@@ -14,7 +14,7 @@ class SellPhoneDetail extends Component
 
     public function mount(SellPhone $sellPhone)
     {
-        if ($sellPhone->user_id !== Auth::id()) {
+        if ($sellPhone->user_id !== Auth::id() && !Auth::user()->hasRole('fl')) {
             abort(403);
         }
         $this->sellPhone = $sellPhone;

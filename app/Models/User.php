@@ -33,6 +33,8 @@ class User extends Authenticatable implements HasMedia
         'accurate_customer_no',
         'accurate_vendor_id',
         'accurate_vendor_no',
+        'warehouse_id',
+        'branch_id'
     ];
 
     /**
@@ -96,5 +98,15 @@ class User extends Authenticatable implements HasMedia
     public function getUserPermissions()
     {
         return $this->getAllPermissions()->mapWithKeys(fn($permission) => [$permission['name'] => true]);
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 }

@@ -1,5 +1,5 @@
-<aside
-    :class="sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'" class="w-[280px] bg-[#f7f7f7] border-r border-gray-200 flex flex-col h-screen shrink-0 fixed lg:sticky top-0 left-0 z-30 transform transition-transform duration-300 ease-in-out lg:translate-x-0 shadow-sm"
+<aside :class="sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'"
+    class="w-[280px] bg-[#f7f7f7] border-r border-gray-200 flex flex-col h-screen shrink-0 fixed lg:sticky top-0 left-0 z-30 transform transition-transform duration-300 ease-in-out lg:translate-x-0 shadow-sm"
     :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
     <div class="p-8 flex flex-col items-center border-b border-gray-200 relative">
         <button @click="sidebarOpen = false"
@@ -10,12 +10,14 @@
             </svg>
         </button>
         {{-- Avatar --}}
-        <div
-            :class="sidebarCollapsed ? 'w-10 h-10 text-sm mb-1' : 'w-16 h-16 text-xl mb-3'" class="rounded-lg bg-[#1c69d4] text-white flex items-center justify-center font-bold shadow-none transition-all duration-300">
+        <div :class="sidebarCollapsed ? 'w-10 h-10 text-sm mb-1' : 'w-16 h-16 text-xl mb-3'"
+            class="rounded-lg bg-[#1c69d4] text-white flex items-center justify-center font-bold shadow-none transition-all duration-300">
             {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 2)) }}
         </div>
-        <h3 x-show="!sidebarCollapsed" class="font-bold text-[#262626] text-sm whitespace-nowrap">{{ auth()->user()->name ?? 'Admin User' }}</h3>
-        <p x-show="!sidebarCollapsed" class="text-[10px] text-[#6b6b6b] mt-0.5 uppercase tracking-wider font-bold whitespace-nowrap">
+        <h3 x-show="!sidebarCollapsed" class="font-bold text-[#262626] text-sm whitespace-nowrap">
+            {{ auth()->user()->name ?? 'Admin User' }}</h3>
+        <p x-show="!sidebarCollapsed"
+            class="text-[10px] text-[#6b6b6b] mt-0.5 uppercase tracking-wider font-bold whitespace-nowrap">
             {{ auth()->user()->roles->pluck('name')->first() ?? 'Member' }}</p>
     </div>
 
@@ -104,8 +106,9 @@
                         </svg>
                         <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Katalog Pusat</span>
                     </div>
-                    <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openProducts }" class="w-4 h-4 transition-transform duration-200"
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openProducts }"
+                        class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                 </button>
@@ -163,10 +166,11 @@
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Master Harga Buyback</span>
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Master Harga</span>
                     </div>
-                    <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openBuyback }" class="w-4 h-4 transition-transform duration-200"
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openBuyback }"
+                        class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                 </button>
@@ -197,6 +201,15 @@
                         d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kelola Pengguna</span>
+            </a>
+            <a href={{ route('admin.user.operational') }} wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.user.operational') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.user.operational') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">User Operational</span>
             </a>
 
             <a href="/admin/roles" wire:navigate

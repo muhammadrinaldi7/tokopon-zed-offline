@@ -44,4 +44,9 @@ class SellPhone extends Model implements HasMedia
     {
         $this->addMediaCollection('photos');
     }
+
+    public function handledBy()
+    {
+        return $this->belongsTo(User::class, 'handled_by');
+    }
 }

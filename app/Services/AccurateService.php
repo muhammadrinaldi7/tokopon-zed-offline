@@ -130,4 +130,39 @@ class AccurateService
             throw new \Exception('API Accurate Error: ' . $response->body());
         }
     }
+    public function getBranchList()
+    {
+        // 1. Siapkan Timestamp (Format ISO 8601 sangat disarankan)
+        $timestamp = now()->toIso8601String();
+
+        // 2. Ambil Secret Key dari .env
+        $secretKey = env('ACCURATE_SECRET_KEY');
+
+        // 3. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        // CONTOH HIT API MENGGUNAKAN LARAVEL HTTP CLIENT:
+        // Pastikan Anda sudah mengatur ACCURATE_HOST dan ACCURATE_TOKEN di .env Anda
+        // dd($vendorData);
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . env('ACCURATE_TOKEN'),
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
+            'Content-Type'  => 'application/json',
+        ])->get(env('ACCURATE_HOST') . '/branch/list.do');
+
+        Log::info('API Accurate Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            // Simpan ID dari Accurate ke Database kita
+            if (isset($data)) {
+                // dd($data[]);
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Error: ' . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
 }

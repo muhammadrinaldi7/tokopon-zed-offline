@@ -145,7 +145,9 @@
             @if (in_array($sellPhone->status, ['WAITING_FOR_DEVICE', 'INSPECTING', 'PAYING', 'COMPLETED']))
                 <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-200">
                     <div class="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
-                        <h3 class="font-bold text-gray-900">Status Pengiriman & Verifikasi</h3>
+                        <h3 class="font-bold text-gray-900">
+                            {{ Auth::user()->hasRole('fl') ? 'Data Pencairan Dana Customer' : 'Status Pengiriman & Verifikasi' }}
+                        </h3>
                         @if ($sellPhone->status === 'INSPECTING')
                             <span
                                 class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-bold">Sedang
@@ -182,11 +184,28 @@
                     @else
                         <div
                             class="bg-gray-50 rounded-2xl p-5 border border-gray-200 flex items-center justify-between mt-2">
-                            <div>
-                                <p class="text-xs text-gray-500 font-bold uppercase mb-1">Resi Pengiriman Anda</p>
-                                <p class="font-mono tracking-widest font-bold text-gray-800 text-lg">
-                                    {{ $sellPhone->customer_shipping_receipt }}</p>
-                            </div>
+                            @if (Auth::user()->hasRole('fl'))
+                                <div>
+                                    <p class="text-xs text-gray-500 font-bold uppercase mb-1">DATA CUSTOMER</p>
+                                    <p class="font-mono tracking-widest font-bold text-gray-800 text-lg">
+                                        {{ $sellPhone->user->name }}</p>
+                                    <p class="font-mono tracking-widest font-bold text-gray-800 text-lg">
+                                        {{ $sellPhone->user->profile->phone_number }}</p>
+                                    <p class="text-xs text-gray-500 font-bold uppercase mb-1">DATA PENCAIRAN DANA</p>
+                                    <p class="font-mono tracking-widest font-bold text-gray-800 text-lg">
+                                        {{ $sellPhone->user->bankAccounts->first()->bank_name }}</p>
+                                    <p class="font-mono tracking-widest font-bold text-gray-800 text-lg">
+                                        {{ $sellPhone->user->bankAccounts->first()->account_number }}</p>
+                                    <p class="font-mono tracking-widest font-bold text-gray-800 text-lg">
+                                        {{ $sellPhone->user->bankAccounts->first()->account_name }}</p>
+                                </div>
+                            @else
+                                <div>
+                                    <p class="text-xs text-gray-500 font-bold uppercase mb-1">Resi Pengiriman Anda</p>
+                                    <p class="font-mono tracking-widest font-bold text-gray-800 text-lg">
+                                        {{ $sellPhone->customer_shipping_receipt }}</p>
+                                </div>
+                            @endif
                             <div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
                                 <svg class="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor" stroke-width="2.5">
@@ -205,6 +224,17 @@
                     <p class="text-teal-700 text-sm mb-0 mx-auto">Admin kami sedang melakukan transfer dana ke rekening
                         Anda. Harap tunggu beberapa saat.</p>
                 </div>
+                @if (Auth::user()->hasRole('fl'))
+                    <div class="flex">
+                        <div>
+                            <p class="text-xs text-gray-500 font-bold uppercase mb-1">Tandai Selesai dan Kirim Produk
+                                Ke Sistem</p>
+                            <button wire:click="submitComplete"
+                                class="bg-[#00b16a] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#009e5f] transition shrink-0"
+                                wire:loading.attr="disabled">Tandai Selesai</button>
+                        </div>
+                    </div>
+                @endif
             @endif
 
             @if ($sellPhone->status === 'COMPLETED')

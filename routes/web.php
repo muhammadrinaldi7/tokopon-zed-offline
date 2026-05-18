@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Admin\Users\UserOperational;
 use App\Livewire\Pages\Buymobile;
 use App\Livewire\Pages\PhoneRepair;
 use App\Livewire\Pages\SellPhone;
@@ -11,13 +12,14 @@ use Illuminate\Support\Facades\Route;
 
 // ─── Public Routes ──────────────────────────────────────────────
 Route::livewire('/', 'pages::home');
-Route::get('/buy-mobile', Buymobile::class)->name('buy-mobile');
-Route::get('/phone-repair', PhoneRepair::class)->name('phone-repair');
-Route::get('/trade-in/{product:slug?}', TradeIn::class)->name('trade-in');
-Route::get('/sell-phone', SellPhone::class)->name('sell-phone');
+
+Route::get('/buy-mobile', Buymobile::class)->middleware('customer')->name('buy-mobile');
+Route::get('/phone-repair', PhoneRepair::class)->middleware('customer')->name('phone-repair');
+Route::get('/trade-in/{product:slug?}', TradeIn::class)->middleware('customer')->name('trade-in');
+Route::get('/sell-phone', SellPhone::class)->middleware('customer')->name('sell-phone');
 Route::get('/products', \App\Livewire\Pages\ProductList::class)->name('products.index');
 Route::get('/products/{product:slug}', \App\Livewire\Pages\ProductDetail::class)->name('products.show');
-Route::get('/cart', \App\Livewire\Pages\CartPage::class)->name('cart');
+Route::get('/cart', \App\Livewire\Pages\CartPage::class)->middleware('customer')->name('cart');
 
 // ─── Google OAuth Routes ────────────────────────────────────────
 Route::get('/auth/google', [\App\Http\Controllers\GoogleCallbackController::class, 'redirectToGoogle'])->name('auth.google');
@@ -44,7 +46,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::livewire('/dashboard', 'pages::admin.dashboard')->name('dashboard');
     Route::livewire('/users', 'pages::admin.user-management')->name('users');
     Route::livewire('/roles', 'pages::admin.role-permission')->name('roles');
-
+    Route::get('/user/operational', UserOperational::class)->name('user.operational');
     Route::get('/products', \App\Livewire\Admin\Products\ProductManagement::class)->name('products');
     Route::get('/orders', \App\Livewire\Admin\Orders\OrderManagement::class)->name('orders.management');
     Route::get('/categories', \App\Livewire\Admin\Products\CategoryManagement::class)->name('categories');
