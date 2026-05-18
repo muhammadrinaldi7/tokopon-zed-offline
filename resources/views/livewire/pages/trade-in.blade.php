@@ -3,7 +3,8 @@
     <div class="flex gap-2">
         <a href="/"
             class="bg-neutral-500 text-white px-3 flex justify-center items-center rounded-md hover:bg-neutral-600 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-8 rotate-180">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+                class="size-6 md:size-8 rotate-180">
                 <path fill-rule="evenodd"
                     d="M4.5 5.653c0-1.427 1.529-2.33 2.779-1.643l11.54 6.347c1.295.712 1.295 2.573 0 3.286L7.28 19.99c-1.25.687-2.779-.217-2.779-1.643V5.653Z"
                     clip-rule="evenodd" />
@@ -123,7 +124,8 @@
                                 class="bg-white h-auto overflow-hidden rounded-2xl text-center transition-all peer-checked:bg-emerald-100 hover:shadow-lg shadow-sm flex items-center justify-center">
 
                                 @php
-                                    $baseName = strtolower($brand->name) === 'apple' ? 'iphone' : strtolower($brand->name);
+                                    $baseName =
+                                        strtolower($brand->name) === 'apple' ? 'iphone' : strtolower($brand->name);
                                     $imageName = $baseName . 'header';
                                 @endphp
 
@@ -151,7 +153,8 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {{-- Model --}}
                     <div class="space-y-2 md:col-span-2">
-                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">2. Model / Seri</label>
+                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">2. Model /
+                            Seri</label>
                         <select wire:model.live="selected_model_name"
                             class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-emerald-500 outline-none transition-all font-bold text-neutral-700 appearance-none cursor-pointer">
                             <option value="">Pilih Model HP</option>
@@ -166,7 +169,8 @@
 
                     {{-- Storage/RAM --}}
                     <div x-show="$wire.selected_model_name" x-cloak class="space-y-2 md:col-span-2">
-                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Kapasitas (RAM / Storage)</label>
+                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Kapasitas (RAM
+                            / Storage)</label>
                         <select wire:model.live="buyback_device_id"
                             class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-emerald-500 outline-none transition-all font-bold text-neutral-700 appearance-none cursor-pointer">
                             <option value="">Pilih Kapasitas</option>
@@ -214,24 +218,29 @@
                     3. Kondisi Fisik
                 </h1>
 
-                @if($buyback_device && count($device_rules) > 0)
+                @if ($buyback_device && count($device_rules) > 0)
                     <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl mb-6">
-                        <p class="text-sm font-bold text-emerald-900 mb-2">Harga Dasar (Mulus 100%): Rp {{ number_format($buyback_device->base_price, 0, ',', '.') }}</p>
-                        <p class="text-xs text-emerald-700">Silakan centang opsi di bawah ini jika terdapat minus pada perangkat Anda. Harga akan dikalkulasi secara otomatis.</p>
+                        <p class="text-sm font-bold text-emerald-900 mb-2">Harga Dasar (Mulus 100%): Rp
+                            {{ number_format($buyback_device->base_price, 0, ',', '.') }}</p>
+                        <p class="text-xs text-emerald-700">Silakan centang opsi di bawah ini jika terdapat minus pada
+                            perangkat Anda. Harga akan dikalkulasi secara otomatis.</p>
                     </div>
 
                     @php
                         $groupedRules = collect($device_rules)->groupBy('category');
                     @endphp
 
-                    @foreach($groupedRules as $category => $rules)
+                    @foreach ($groupedRules as $category => $rules)
                         <div class="space-y-3 mb-4">
-                            <h2 class="text-[10px] font-black text-neutral-400 uppercase tracking-wider block ml-1">{{ $category }}</h2>
+                            <h2 class="text-[10px] font-black text-neutral-400 uppercase tracking-wider block ml-1">
+                                {{ $category }}</h2>
                             <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                @foreach($rules as $rule)
+                                @foreach ($rules as $rule)
                                     <label class="cursor-pointer block">
-                                        <input type="checkbox" wire:model.live="selected_rules.{{ $rule['key'] }}" class="peer hidden">
-                                        <div class="py-4 px-3 bg-white shadow-sm border-2 border-transparent rounded-2xl text-center text-sm font-bold text-neutral-600 transition-all peer-checked:border-emerald-600 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 hover:border-emerald-200 flex items-center justify-center min-h-[4rem]">
+                                        <input type="checkbox" wire:model.live="selected_rules.{{ $rule['key'] }}"
+                                            class="peer hidden">
+                                        <div
+                                            class="py-4 px-3 bg-white shadow-sm border-2 border-transparent rounded-2xl text-center text-sm font-bold text-neutral-600 transition-all peer-checked:border-emerald-600 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 hover:border-emerald-200 flex items-center justify-center min-h-[4rem]">
                                             {{ $rule['name'] }}
                                         </div>
                                     </label>
@@ -241,7 +250,8 @@
                     @endforeach
                 @else
                     <div class="p-6 bg-neutral-50 rounded-2xl text-center border border-neutral-200">
-                        <p class="text-sm font-medium text-neutral-500">Silakan pilih perangkat pada langkah sebelumnya untuk memuat formulir kondisi.</p>
+                        <p class="text-sm font-medium text-neutral-500">Silakan pilih perangkat pada langkah sebelumnya
+                            untuk memuat formulir kondisi.</p>
                     </div>
                 @endif
             </div>
@@ -432,14 +442,16 @@
                                         </p>
                                     </div>
                                 </div>
-                                
-                                <div class="mt-6 bg-emerald-50 rounded-xl p-4 border border-emerald-100 flex items-center justify-between gap-4">
+
+                                <div
+                                    class="mt-6 bg-emerald-50 rounded-xl p-4 border border-emerald-100 flex items-center justify-between gap-4">
                                     <div class="text-xs">
                                         <p class="font-black text-emerald-900">Estimasi Harga Jual Anda</p>
                                         <p class="text-emerald-700 font-medium">Berdasarkan kondisi yang dicentang.</p>
                                     </div>
                                     <div class="text-right">
-                                        <p class="text-xl md:text-2xl font-black text-emerald-600">Rp {{ number_format($final_price, 0, ',', '.') }}</p>
+                                        <p class="text-xl md:text-2xl font-black text-emerald-600">Rp
+                                            {{ number_format($final_price, 0, ',', '.') }}</p>
                                     </div>
                                 </div>
                             </div>
