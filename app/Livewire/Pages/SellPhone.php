@@ -23,6 +23,11 @@ class SellPhone extends Component
     public $npwp;
     public $foto_ktp;
 
+    public $account_number;
+    public $account_name;
+
+    public $bank_name;
+
     // END KEPERLUAN DATA USER DI FL
 
     public $selected_brand_id;
@@ -162,6 +167,9 @@ class SellPhone extends Component
             $rules['nik']         = 'required|numeric|digits:16|unique:users,nik'; // Sesuaikan field NIK di table user Anda
             $rules['npwp']        = 'nullable|string|max:20';
             $rules['foto_ktp']    = 'required|image|max:2048'; // Max 2MB
+            $rules['account_number'] = 'required|string|max:20';
+            $rules['account_name'] = 'required|string|max:20';
+            $rules['bank_name'] = 'required|string|max:20';
         }
         return $rules;
     }
@@ -187,6 +195,9 @@ class SellPhone extends Component
         'nik.digits'          => 'NIK harus tepat 16 digit.',
         'nik.unique'          => 'NIK sudah terdaftar di sistem.',
         'foto_ktp.required'   => 'Foto KTP wajib diunggah oleh FL.',
+        'account_number.required' => 'Nomor Rekening wajib diisi.',
+        'account_name.required' => 'Nama Pemilik Rekening wajib diisi.',
+        'bank_name.required' => 'Nama Bank wajib diisi.',
     ];
 
     public function submit()
@@ -219,6 +230,12 @@ class SellPhone extends Component
                     'user_id'      => $customer->id,
                     'full_name'    => $this->name,
                     'phone_number' => $this->mobilePhone,
+                ]);
+
+                $customer->bankAccounts()->create([
+                    'account_number' => $this->account_number,
+                    'account_name'   => $this->account_name,
+                    'bank_name'      => $this->bank_name,
                 ]);
             }
             event(new Registered($customer));
@@ -305,7 +322,8 @@ class SellPhone extends Component
             'phone_storage'     => $device->storage,
             'minus_desc'        => $minusDesc,
             'appraised_value'   => $this->final_price,
-            'status'            => User::findOrFail(Auth::user()->id)->hasRole('fl') ? 'RECEIVED' : 'WAITING_FOR_DEVICE', // Jika di toko oleh FL, status bisa langsung RECEIVED atau disesuaikan bisnis proses Anda
+            'status'            => User::findOrFail(Auth::user()->id)->hasRole('fl') ? 'PAYING' : 'WAITING_FOR_DEVICE', // Jika di toko oleh FL, status bisa langsung RECEIVED atau disesuaikan bisnis proses Anda
+            'handled_by'        => User::findOrFail(Auth::user()->id)->hasRole('fl') ? Auth::id() : null,
         ]);
 
         // Upload Media Handphone (Spatie Media Library)

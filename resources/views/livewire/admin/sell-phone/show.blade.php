@@ -145,19 +145,13 @@
                                 <button type="button" wire:click="markAsPaid"
                                     wire:confirm="Sesuai! Anda akan mentransfer uang ke pelanggan dan menandai lunas?"
                                     class="w-full bg-emerald-500 text-white py-2.5 rounded-lg font-bold hover:bg-emerald-600 transition flex items-center justify-center gap-2">
-                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+
                                     Fisik Sesuai (Lanjutkan Pembayaran)
                                 </button>
 
                                 <button type="button" wire:click="$set('isRevising', true)"
                                     class="w-full bg-amber-500 text-white py-2.5 rounded-lg font-bold hover:bg-amber-600 transition flex items-center justify-center gap-2">
-                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
+
                                     Fisik Tidak Sesuai (Revisi Harga)
                                 </button>
 
@@ -211,8 +205,7 @@
                                 Tandai Selesai / Lunas
                             </button>
 
-                            <button type="button" wire:click="reject"
-                                wire:confirm="Yakin ingin menolak penawaran ini?"
+                            <button type="button" wire:click="reject" wire:confirm="Yakin ingin menolak penawaran ini?"
                                 class="w-full bg-white border-2 border-rose-100 text-rose-600 py-2.5 rounded-lg font-bold hover:bg-rose-50 transition">
                                 Tolak / Batalkan
                             </button>

@@ -171,7 +171,7 @@
 
                             <form wire:submit="submitReceipt" class="flex flex-col sm:flex-row gap-2 relative">
                                 <input type="text" wire:model="customerShippingReceipt"
-                                    class="w-full text-sm font-mono tracking-widest rounded-xl border-[#00b16a]/30 bg-white py-3 focus:ring-2 focus:ring-[#00b16a] focus:border-[#00b16a] placeholder:tracking-normal placeholder:font-sans"
+                                    class="w-full px-2 text-sm font-mono tracking-widest rounded-xl border-[#00b16a]/30 bg-white py-3 focus:ring-2 focus:ring-[#00b16a] focus:border-[#00b16a] placeholder:tracking-normal placeholder:font-sans"
                                     placeholder="Ketik nomor resi pengiriman">
                                 <button type="submit"
                                     class="bg-[#00b16a] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#009e5f] transition shrink-0"

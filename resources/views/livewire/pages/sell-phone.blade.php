@@ -544,6 +544,52 @@
                             </div>
                         </div>
                     </div>
+                    <div class="mb-8 p-6 bg-neutral-50 rounded-3xl border border-neutral-100 space-y-4">
+                        <p class="text-xs font-black text-neutral-400 uppercase tracking-widest mb-2">
+                            Informasi Account Transfer User (FL)
+                        </p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {{-- Input Nama --}}
+                            <div class="flex flex-col gap-1">
+                                <label for="bank_name"
+                                    class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
+                                    Bank</label>
+                                <input type="text" id="bank_name" wire:model="bank_name" required
+                                    class="w-full px-4 py-3 text-sm bg-white border @error('bank_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                    placeholder="Masukkan Nama Bank">
+                                @error('bank_name')
+                                    <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                @enderror
+                            </div>
+
+                            {{-- Input Mobile Phone --}}
+                            <div class="flex flex-col gap-1">
+                                <label for="account_number"
+                                    class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nomor
+                                    Rekening</label>
+                                <input type="number" id="account_number" wire:model="account_number" required
+                                    class="w-full px-4 py-3 text-sm bg-white border @error('account_number') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                    placeholder="Contoh: 3121321312312">
+                                @error('account_number')
+                                    <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                @enderror
+                            </div>
+
+                            {{-- Input Email --}}
+                            <div class="flex flex-col gap-1">
+                                <label for="account_name"
+                                    class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
+                                    Pemilik Rekening</label>
+                                <input type="text" id="account_name" wire:model="account_name" required
+                                    class="w-full px-4 py-3 text-sm bg-white border @error('account_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                    placeholder="Contoh: user">
+                                @error('account_name')
+                                    <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                @enderror
+                            </div>
+                        </div>
+                    </div>
                 @endif
                 <div class="space-y-6 relative">
                     <div class="bg-neutral-50 rounded-3xl p-6">

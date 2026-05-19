@@ -5,8 +5,12 @@ namespace App\Livewire\Admin\SellPhone;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SellPhone;
+use App\Services\AccurateService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -22,7 +26,7 @@ class Show extends Component
     public $sellPrice = 0;
     public $secondCondition = 'Bekas';
     public $existingProductId = null;
-
+    public $dataParamPurchaseInvoice = [];
     // Revision
     public $isRevising = false;
     public $revisedAppraisedValue = 0;
@@ -33,6 +37,12 @@ class Show extends Component
         $this->appraisedValue = $this->sellPhone->appraised_value ?? 0;
     }
 
+    #[Computed]
+    public function phoneData()
+    {
+        // loadMissing akan me-load relasi hanya saat data ini dipanggil di Blade
+        return $this->sellPhone->loadMissing(['buybackDevice.secondProductVariant', 'user']);
+    }
     public function submitAppraisal()
     {
         $this->validate([
@@ -64,11 +74,83 @@ class Show extends Component
 
     public function markAsPaid()
     {
+        $billNumber = 'TPD-' . date('dmY') . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT);
+
         if ($this->sellPhone->status === 'COMPLETED' || $this->sellPhone->status === 'CANCELLED') return;
+        if ($this->sellPhone->status === 'INSPECTING') {
+            $this->sellPhone->update(['status' => 'PAYING']);
+            $this->dispatch('toast', ['type' => 'success', 'title' => 'Inspected', 'message' => 'Status penjualan HP ditandai sebagai Checked.']);
+        } else if ($this->sellPhone->status === 'PAYING') {
+            $phoneData = $this->phoneData;
+            // 1. Susun Array untuk detailItem terlebih dahulu agar lebih rapi
+            $detailItem = [
+                [
+                    // Pastikan memanggil kolom yang sesuai dari tabel devices/sell_phones Anda
+                    'itemNo' => $phoneData->buybackDevice->secondProductVariant->sku ?? 'TES-001',
+                    'warehouseName' => Auth::user()->hasRole('fl') ? Auth::user()->warehouse->name : 'Banjarbaru', // Sesuaikan jika dinamis
+                    'unitPrice' => (int) $this->sellPhone->appraised_value, // Harga yang disepakati
+                    'quantity' => 1,
 
-        $this->sellPhone->update(['status' => 'COMPLETED']);
+                    // Array di dalam array untuk serial number
+                    'detailSerialNumber' => [
+                        [
+                            'serialNumberNo' => 'SN-' . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT) ?? 'SN-UNKNOWN', // Kolom IMEI/SN HP
+                            'quantity' => 1
+                        ]
+                    ]
+                ]
+            ];
 
-        $this->dispatch('toast', title: 'Lunas', message: 'Status penjualan HP ditandai sebagai Selesai / Lunas.', type: 'success');
+            // 2. Masukkan ke dalam parameter utama Purchase Invoice Accurate
+            $this->dataParamPurchaseInvoice = [
+                'billNumber' => $billNumber,
+                'vendorNo' => str_replace('"', '', $phoneData->user->accurate_vendor_no),
+                'branchName' => Auth::user()->hasRole('fl') ? Auth::user()->warehouse->name : 'Head Office',
+                // Field tambahan yang Anda tulis sebelumnya (opsional/dibutuhkan Accurate)
+                // 'name' => $phoneData->user->profile->full_name ?? '',
+                'transDate' => date('d/m/Y'),
+                'currencyCode' => 'IDR',
+                'description' => 'Pembelian HP - NIK:' . ($phoneData->user->identity ?? '-'),
+                // Sisipkan array detailItem yang sudah dibentuk di atas
+                'detailItem' => $detailItem,
+            ];
+            dd($this->dataParamPurchaseInvoice);
+
+            // Opsional: Cek struktur datanya sebelum di-hit ke API Accurate
+            // dd($this->dataParamPurchaseInvoice);
+            // 4. Eksekusi Service API dengan Try-Catch
+            // DB::beginTransaction();
+            // try {
+            //     // Hit API menggunakan service yang di-inject
+            //     $accurateResponse = app(AccurateService::class)->postPurchaseInvoice($this->dataParamPurchaseInvoice);
+            //     Log::info('data invoice yang masuk ke accurate : ', ['data' => $this->dataParamPurchaseInvoice, 'response' => $accurateResponse]);
+            //     // JIKA BERHASIL: Update status dan redirect
+            //     $this->sellPhone->update([
+            //         'invoice_number' => $billNumber,
+            //         'status' => 'COMPLETED'
+            //     ]);
+
+            //     $this->dispatch('toast', [
+            //         'type' => 'success',
+            //         'title' => 'Success',
+            //         'message' => 'Invoice Accurate Berhasil Dibuat. Pengajuan Jual HP Selesai.'
+            //     ]);
+            //     DB::commit();
+            //     return $this->redirect(route('sell-phone-history'));
+            // } catch (\Exception $e) {
+            //     // JIKA GAGAL: Tangkap error dari service dan tampilkan ke user via Toast
+            //     // Status SellPhone TIDAK diupdate ke COMPLETED, sehingga user bisa mencoba klik submit lagi
+            //     DB::rollBack();
+            //     Log::error('API Accurate Failed: ' . $e->getMessage());
+            //     $this->dispatch('toast', [
+            //         'type' => 'error',
+            //         'title' => 'Error',
+            //         'message' => 'Gagal membuat faktur di Accurate: ' . $e->getMessage()
+            //     ]);
+            // }
+        } else {
+            return;
+        }
     }
 
     public function reject()

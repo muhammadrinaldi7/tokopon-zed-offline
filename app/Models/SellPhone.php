@@ -22,7 +22,9 @@ class SellPhone extends Model implements HasMedia
         'customer_shipping_receipt',
         'bank_name',
         'bank_account_number',
-        'bank_account_name'
+        'bank_account_name',
+        'invoice_number',
+        'handled_by',
     ];
 
     public function buybackDevice()
