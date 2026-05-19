@@ -25,6 +25,9 @@ return new class extends Migration
             // Kombinasi ID Accurate dan Sumber Database harus unik
             $table->unique(['accurate_id', 'database_source']);
         });
+        Schema::table('product_variants', function (Blueprint $table) {
+            $table->foreignId('product_accurate_id')->nullable()->after('product_id')->constrained('product_accurates')->nullOnDelete();
+        });
     }
 
     /**
@@ -33,5 +36,11 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('product_accurates');
+        Schema::table('product_variants', function (Blueprint $table) {
+            if (Schema::hasColumn('product_variants', 'product_accurate_id')) {
+                $table->dropForeign(['product_accurate_id']);
+                $table->dropColumn('product_accurate_id');
+            }
+        });
     }
 };
