@@ -422,7 +422,7 @@
                     <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                 </h4>
                 {{-- Form Input Khusus Role FL --}}
-                @if (Auth::user()->hasRole('fl'))
+                @if (Auth::user() && Auth::user()->hasRole('fl'))
                     <div class="mb-8 p-6 bg-neutral-50 rounded-3xl border border-neutral-100 space-y-4">
                         <p class="text-xs font-black text-neutral-400 uppercase tracking-widest mb-2">
                             Informasi Tambahan (FL)

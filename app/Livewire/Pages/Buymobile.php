@@ -25,23 +25,35 @@ class Buymobile extends Component
         // 1. Ambil data brands dari database (urutkan sesuai kebutuhan, misal by nama atau ID)
         $brands = Brand::orderBy('id', 'asc')->get();
 
-        $query = Product::with(['variants', 'brand'])->availableForCustomer();
+        $query1 = Product::with(['variants', 'brand'])->availableForCustomer();
+        $query2 = \App\Models\SecondProduct::with(['variants', 'brand'])->availableForCustomer();
 
         // 2. Filter berdasarkan brand jika selectedBrand tidak null
         if ($this->selectedBrand) {
-            $query->whereHas('brand', function ($q) {
-                // Menggunakan exact match "=" lebih aman dibanding "like"
+            $query1->whereHas('brand', function ($q) {
+                $q->where('name', $this->selectedBrand);
+            });
+            $query2->whereHas('brand', function ($q) {
                 $q->where('name', $this->selectedBrand);
             });
         }
 
-        $products = $query->get();
+        $products1 = $query1->get()->map(function ($item) {
+            $item->is_second_catalog = false;
+            return $item;
+        });
+
+        $products2 = $query2->get()->map(function ($item) {
+            $item->is_second_catalog = true;
+            return $item;
+        });
+
+        $products = $products1->concat($products2);
 
         // 3. Mengelompokkan produk berdasarkan nama brand
         $groupedProducts = $products->groupBy(function ($item) {
             return $item->brand->name ?? 'Lainnya';
         });
-
         // 4. Kirim $brands ke view
         return view('livewire.pages.buymobile', [
             'brands' => $brands,

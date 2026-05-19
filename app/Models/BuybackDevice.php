@@ -25,6 +25,12 @@ class BuybackDevice extends Model
         return $this->belongsTo(BuybackTier::class, 'buyback_tier_id');
     }
 
+    // Relasi ke Second Product Variant untuk data integrasi Accurate dan Master Bekas
+    public function secondProductVariant()
+    {
+        return $this->belongsTo(SecondProductVariant::class, 'second_product_variant_id');
+    }
+
     /**
      * Auto-assign tier berdasarkan base_price.
      * Dipanggil setelah device dibuat/diupdate.

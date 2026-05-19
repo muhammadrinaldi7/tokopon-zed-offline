@@ -127,7 +127,7 @@
                 </div>
 
                 {{-- Variant Selector --}}
-                @if ($product->variants->count() > 1)
+                @if ($product->variants->count() > 0)
                     <div>
                         <h3 class="text-sm font-bold text-gray-700 mb-3">Pilih Varian</h3>
                         <div class="flex flex-wrap gap-2">

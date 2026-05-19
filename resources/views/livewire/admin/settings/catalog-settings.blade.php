@@ -13,7 +13,7 @@
             <div class="mb-6 space-y-4">
                 <div class="bg-[#eff2ff] p-4 rounded-lg border border-[#1c69d4]/20">
                     <p class="text-sm text-[#1c69d4] font-medium leading-relaxed">
-                        Pengaturan ini memastikan bahwa hanya produk yang sudah tersinkron dengan Erzap (<code>has_active_erzap = true</code>) dan memiliki stok di atas atau sama dengan nilai di bawah ini yang akan ditampilkan ke publik. Hal ini menjaga agar katalog online sesuai dengan ketersediaan barang di toko fisik.
+                        Pengaturan ini memastikan bahwa hanya produk yang sudah tersinkron dengan Accurate (<code>has_active_accurate = true</code>) dan memiliki stok di atas atau sama dengan nilai di bawah ini yang akan ditampilkan ke publik. Hal ini menjaga agar katalog online sesuai dengan ketersediaan barang di toko fisik.
                     </p>
                 </div>
 

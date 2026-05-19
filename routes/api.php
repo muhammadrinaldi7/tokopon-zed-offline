@@ -10,3 +10,7 @@ Route::get('/user', function (Request $request) {
 // Xendit Webhooks
 Route::post('/webhooks/xendit/invoice', [\App\Http\Controllers\Api\XenditWebhookController::class, 'handleInvoiceCallback'])
     ->name('api.webhooks.xendit.invoice');
+
+// Accurate API Sync
+Route::get('/accurate/import-items', [\App\Http\Controllers\Api\AccurateImportController::class, 'importItems'])
+    ->name('api.accurate.import-items');

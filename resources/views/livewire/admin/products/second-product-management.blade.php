@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-gray-800">Manajemen Produk</h1>
+        <h1 class="text-2xl font-bold text-gray-800">Manajemen Produk Second</h1>
         <button wire:click="create"
             class="bg-[#1c69d4] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-opacity-90 transition">
             Tambah Produk
@@ -71,6 +71,8 @@
                                         class="font-bold text-[#1c69d4] hover:text-[#3f36b8] hover:underline text-left transition-colors">
                                         {{ $product->name }}
                                     </button>
+                                    <span
+                                        class="text-[9px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded w-fit mt-0.5 border border-amber-200">SECOND</span>
                                 </div>
                             </div>
                         </td>
@@ -87,7 +89,7 @@
                         <td class="px-6 py-4">{{ $product->total_stock }} Unit</td>
                         <td class="px-6 py-4">Rp. {{ number_format($product->starting_price ?? 0, 0, ',', '.') }}</td>
                         <td class="px-6 py-4 text-right">
-                            <a href="{{ route('admin.products.variants', $product->slug) }}" wire:navigate
+                            <a href="{{ route('admin.second-products.variants', $product->slug) }}" wire:navigate
                                 class="text-[#1c69d4] font-semibold text-xs border border-[#1c69d4] px-3 py-1.5 rounded-lg hover:bg-[#eff2ff] mr-2 transition inline-flex items-center">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none"
                                     viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -136,7 +138,7 @@
                 <div
                     class="px-6 py-5 border-b border-gray-200/50 flex justify-between items-center backdrop-blur-md bg-white/40">
                     <h2 class="text-[17px] font-semibold tracking-tight text-gray-900">
-                        {{ $isEditing ? 'Edit Produk Utama' : 'Tambah Produk Baru' }}</h2>
+                        {{ $isEditing ? 'Edit Produk Second' : 'Tambah Produk Second' }}</h2>
                     <button wire:click="$set('showModal', false)"
                         class="text-gray-400 hover:text-gray-600 bg-gray-100/50 hover:bg-gray-200/50 rounded-full p-1.5 transition-colors focus:outline-none">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

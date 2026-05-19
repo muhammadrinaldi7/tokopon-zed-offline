@@ -3,14 +3,14 @@
 namespace App\Livewire\Admin\Products;
 
 use Livewire\Component;
-use App\Models\Product;
+use App\Models\SecondProduct;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\WithFileUploads;
 
 
-class ProductManagement extends Component
+class SecondProductManagement extends Component
 {
     use WithPagination, WithFileUploads;
 
@@ -30,7 +30,6 @@ class ProductManagement extends Component
     public $search = '';
     public $filterCategory = '';
     public $filterBrand = '';
-
     protected $queryString = [
         'search' => ['except' => ''],
         'filterCategory' => ['except' => ''],
@@ -70,14 +69,14 @@ class ProductManagement extends Component
 
     public function viewDetail($id)
     {
-        $this->detailProduct = Product::with(['category', 'brand'])->find($id);
+        $this->detailProduct = SecondProduct::with(['category', 'brand'])->find($id);
         $this->showDetailModal = true;
     }
 
     public function edit($id)
     {
         $this->resetFields();
-        $product = Product::findOrFail($id);
+        $product = SecondProduct::findOrFail($id);
         $this->productId = $id;
         $this->name = $product->name;
         $this->description = $product->description;
@@ -126,7 +125,7 @@ class ProductManagement extends Component
         }
 
         if ($this->isEditing) {
-            $product = Product::find($this->productId);
+            $product = SecondProduct::find($this->productId);
             $product->update([
                 'name' => $this->name,
                 'slug' => \Illuminate\Support\Str::slug($this->name) . '-' . time(),
@@ -136,7 +135,7 @@ class ProductManagement extends Component
                 'specifications' => empty($specsDict) ? null : $specsDict,
             ]);
         } else {
-            $product = Product::create([
+            $product = SecondProduct::create([
                 'name' => $this->name,
                 'slug' => \Illuminate\Support\Str::slug($this->name) . '-' . time(),
                 'description' => $this->description,
@@ -170,7 +169,7 @@ class ProductManagement extends Component
 
     public function confirmDelete($id)
     {
-        $product = Product::find($id);
+        $product = SecondProduct::find($id);
         $this->dispatch(
             'show-confirm',
             title: 'Hapus Produk',
@@ -185,7 +184,7 @@ class ProductManagement extends Component
     #[On('delete-product')]
     public function delete($id)
     {
-        $product = Product::find($id);
+        $product = SecondProduct::find($id);
         if ($product) {
             // Spatie handles media deletion automatically if configured or manually
             $product->delete();
@@ -195,7 +194,7 @@ class ProductManagement extends Component
 
     public function removeGalleryImage($mediaId)
     {
-        $product = Product::find($this->productId);
+        $product = SecondProduct::find($this->productId);
         $product?->deleteMedia($mediaId);
 
         // Refresh gallery
@@ -223,7 +222,7 @@ class ProductManagement extends Component
     #[Layout('layouts.admin')]
     public function render()
     {
-        $query = Product::with(['category', 'brand']);
+        $query = SecondProduct::with(['category', 'brand']);
 
         if ($this->search) {
             $query->where('name', 'like', '%' . $this->search . '%');
@@ -241,7 +240,7 @@ class ProductManagement extends Component
         $categoriesList = \App\Models\Category::orderBy('name')->get();
         $brandsList = \App\Models\Brand::orderBy('name')->get();
 
-        return view('livewire.admin.products.product-management', [
+        return view('livewire.admin.products.second-product-management', [
             'products' => $products,
             'categoriesList' => $categoriesList,
             'brandsList' => $brandsList,

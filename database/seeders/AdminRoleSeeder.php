@@ -16,6 +16,8 @@ class AdminRoleSeeder extends Seeder
         $adminRole = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'superadmin', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'cs', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'fl', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'user', 'guard_name' => 'web']);
 
         // Create admin user
         $adminUser = User::firstOrCreate(
@@ -31,7 +33,7 @@ class AdminRoleSeeder extends Seeder
         if (!$adminUser->hasRole('admin')) {
             $adminUser->assignRole('admin');
         }
-        
+
         $this->command->info("Role 'admin' ensure created and assigned to admin@zed.com");
     }
 }

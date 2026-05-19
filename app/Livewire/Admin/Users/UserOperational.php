@@ -20,6 +20,14 @@ class UserOperational extends Component
     public $editingUser = null;
     public $selectedRoles = [];
 
+    // Create User
+    public $isCreateModalOpen = false;
+    public $createName = '';
+    public $createEmail = '';
+    public $createPassword = '';
+    public $createPasswordConfirmation = '';
+    public $selectedCreateRoles = [];
+
     public function mount()
     {
         /** @var \App\Models\User $user */
@@ -86,6 +94,60 @@ class UserOperational extends Component
     {
         $this->isEditModalOpen = false;
         $this->editingUser = null;
+    }
+
+    public function openCreateModal()
+    {
+        $this->resetCreateForm();
+        $this->isCreateModalOpen = true;
+    }
+
+    public function closeCreateModal()
+    {
+        $this->isCreateModalOpen = false;
+        $this->resetCreateForm();
+    }
+
+    public function storeUser()
+    {
+        $this->validate([
+            'createName' => 'required|string|max:255',
+            'createEmail' => 'required|email|unique:users,email',
+            'createPassword' => 'required|string|min:8|same:createPasswordConfirmation',
+            'createPasswordConfirmation' => 'required',
+            'selectedCreateRoles' => 'required|array|min:1',
+        ], [
+            'createName.required' => 'Nama wajib diisi.',
+            'createEmail.required' => 'Email wajib diisi.',
+            'createEmail.unique' => 'Email sudah terdaftar.',
+            'createPassword.required' => 'Password wajib diisi.',
+            'createPassword.min' => 'Password minimal 8 karakter.',
+            'createPassword.same' => 'Konfirmasi password tidak sesuai.',
+            'selectedCreateRoles.required' => 'Pilih minimal satu role.',
+            'selectedCreateRoles.min' => 'Pilih minimal satu role.',
+        ]);
+
+        $user = User::create([
+            'name' => $this->createName,
+            'email' => $this->createEmail,
+            'password' => bcrypt($this->createPassword),
+        ]);
+
+        $user->syncRoles($this->selectedCreateRoles);
+
+        $this->isCreateModalOpen = false;
+        $this->resetCreateForm();
+
+        $this->dispatch('admin-alert', type: 'success', message: 'Staff baru "' . $user->name . '" berhasil ditambahkan!');
+    }
+
+    private function resetCreateForm()
+    {
+        $this->createName = '';
+        $this->createEmail = '';
+        $this->createPassword = '';
+        $this->createPasswordConfirmation = '';
+        $this->selectedCreateRoles = [];
     }
     // Di dalam Class Index.php Anda
     #[On('refresh-user-table')]

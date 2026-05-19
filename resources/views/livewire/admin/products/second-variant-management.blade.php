@@ -2,9 +2,9 @@
     {{-- Header --}}
     <div class="flex items-center justify-between">
         <div>
-            <a href="{{ route('admin.products') }}"
-                class="text-sm font-medium text-gray-400 hover:text-[#1c69d4] transition">← Kembali ke Daftar Produk</a>
-            <h1 class="text-2xl font-bold text-gray-800 mt-2">Kelola Varian: {{ $product->name }}</h1>
+            <a href="{{ route('admin.second-products') }}"
+                class="text-sm font-medium text-gray-400 hover:text-[#1c69d4] transition">← Kembali ke Daftar Produk Second</a>
+            <h1 class="text-2xl font-bold text-gray-800 mt-2">Kelola Varian Second: {{ $product->name }}</h1>
         </div>
     </div>
 
@@ -33,7 +33,7 @@
                                     {{ $variant->ram ? $variant->ram . ' - ' : '' }}{{ $variant->storage ? $variant->storage . ' - ' : '' }}{{ $variant->color ?? 'Standar' }}
                                 </h3>
                                 <span
-                                    class="text-[10px] font-bold tracking-widest px-2 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{{ $variant->condition }}</span>
+                                    class="text-[10px] font-bold tracking-widest px-2 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{{ $variant->condition_desc }}</span>
                             </div>
                             <p class="text-sm text-gray-500">SKU: <span
                                     class="font-mono text-gray-700">{{ $variant->sku ?? '-' }}</span></p>

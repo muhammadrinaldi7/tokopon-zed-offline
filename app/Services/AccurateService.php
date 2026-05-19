@@ -165,4 +165,121 @@ class AccurateService
             throw new \Exception('API Accurate Error: ' . $response->body());
         }
     }
+
+    public function postPurchaseInvoice($purchaseInvoiceData)
+    {
+        // 1. Siapkan Timestamp (Format ISO 8601 sangat disarankan)
+        $timestamp = now()->toIso8601String();
+
+        // 2. Ambil Secret Key dari .env
+        $secretKey = env('ACCURATE_SECRET_KEY');
+
+        // 3. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        // CONTOH HIT API MENGGUNAKAN LARAVEL HTTP CLIENT:
+        // Pastikan Anda sudah mengatur ACCURATE_HOST dan ACCURATE_TOKEN di .env Anda
+        // dd($vendorData);
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . env('ACCURATE_TOKEN'),
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
+            'Content-Type'  => 'application/json',
+        ])->post(env('ACCURATE_HOST') . '/purchase-invoice/save.do', $purchaseInvoiceData);
+
+        Log::info('API Accurate Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            // Simpan ID dari Accurate ke Database kita
+            if (isset($data)) {
+                // dd($data[]);
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Error: ' . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+
+    public function getItemList($databaseSource = 'syihab')
+    {
+        // Tentukan kredensial berdasarkan sumber database
+        // Default (syihab) mengambil dari ACCURATE_TOKEN, sedangkan 'second' dari ACCURATE_TOKEN_SECOND
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+        $param = [
+            "fields" => "no,unitPrice,availableToSell,itemBranchName",
+            "filter.keywords.op" => "CONTAIN",
+            "filter.keywords.val" => "hp",
+        ];
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/item/list.do', $param);
+
+        Log::info("API Accurate Get Item List ({$databaseSource}) Success: " . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info("API Accurate Get Item List ({$databaseSource}) Error: " . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+    public function getItemListForBuyback($databaseSource = 'syihab')
+    {
+        // Tentukan kredensial berdasarkan sumber database
+        // Default (syihab) mengambil dari ACCURATE_TOKEN, sedangkan 'second' dari ACCURATE_TOKEN_SECOND
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+        $param = [
+            "fields" => "no,availableToSell,itemBranchName",
+            "filter.keywords.op" => "CONTAIN",
+            "filter.keywords.val" => "hp",
+        ];
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/item/list.do', $param);
+
+        Log::info("API Accurate Get Item List ({$databaseSource}) Success: " . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info("API Accurate Get Item List ({$databaseSource}) Error: " . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
 }

@@ -22,7 +22,7 @@ class ProductDetail extends Component
     public function mount(Product $product): void
     {
         $minStock = \App\Models\Setting::where('key', 'minimum_stock_threshold')->value('value') ?? 5;
-        if (!$product->is_active || !$product->has_active_erzap || $product->total_stock < $minStock) {
+        if (!$product->is_active || !$product->has_active_accurate || $product->total_stock < $minStock) {
             abort(404, 'Produk tidak ditemukan atau tidak tersedia.');
         }
 

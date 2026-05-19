@@ -7,15 +7,20 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class ProductVariant extends Model implements HasMedia
+class SecondProductVariant extends Model implements HasMedia
 {
     use InteractsWithMedia;
 
     protected $guarded = ['id'];
 
-    public function product()
+    public function secondProduct()
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(SecondProduct::class);
+    }
+
+    public function sellPhone()
+    {
+        return $this->belongsTo(SellPhone::class);
     }
 
     public function accurateData()

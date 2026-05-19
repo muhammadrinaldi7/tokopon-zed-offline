@@ -3,19 +3,18 @@
 namespace App\Livewire\Admin\Products;
 
 use Livewire\Component;
-use App\Models\Product;
+use App\Models\SecondProduct;
+use App\Models\SecondProductVariant;
 use App\Models\ProductAccurate;
-use App\Models\ProductVariant;
-use App\Models\ProductErzap;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\WithFileUploads;
 
-class VariantManagement extends Component
+class SecondVariantManagement extends Component
 {
     use WithFileUploads;
 
-    public Product $product;
+    public SecondProduct $product;
     public $variants;
 
     // Form inputs
@@ -41,7 +40,7 @@ class VariantManagement extends Component
     public $isEditing = false;
     public $editingVariantId = null;
 
-    public function mount(Product $product)
+    public function mount(SecondProduct $product)
     {
         $this->product = $product;
         $this->loadVariants();
@@ -55,14 +54,13 @@ class VariantManagement extends Component
     public function updatedSearchAccurate()
     {
         if (strlen($this->searchAccurate) > 2) {
-            $source = 'syihab'; // Produk baru selalu dari database syihab
+            $source = 'second';
             $this->searchResults = ProductAccurate::where('database_source', $source)
                 ->where(function ($query) {
                     $query->where('name', 'like', '%' . $this->searchAccurate . '%')
                         ->orWhere('item_no', 'like', '%' . $this->searchAccurate . '%')
                         ->orWhere('accurate_id', 'like', '%' . $this->searchAccurate . '%');
                 })
-                ->doesntHave('productVariants')
                 ->doesntHave('secondProductVariants')
                 ->take(5)
                 ->get();
@@ -108,15 +106,15 @@ class VariantManagement extends Component
             'color' => 'nullable|string',
             'sku' => 'nullable|string',
             'variantImage' => 'nullable|image|max:2048',
-            'manualPrice' => 'nullable',
+            'manualPrice' => 'required|numeric|min:0',
         ]);
 
         $isNew = false;
         if ($this->isEditing && $this->editingVariantId) {
-            $variant = ProductVariant::find($this->editingVariantId);
+            $variant = SecondProductVariant::find($this->editingVariantId);
             $variant->update([
                 'product_accurate_id' => $this->selectedAccurateId,
-                'condition' => $this->condition,
+                'condition_desc' => $this->condition,
                 'ram' => $this->ram,
                 'storage' => $this->storage,
                 'color' => $this->color,
@@ -127,10 +125,10 @@ class VariantManagement extends Component
             ]);
         } else {
             // Create
-            $variant = ProductVariant::create([
-                'product_id' => $this->product->id,
+            $variant = SecondProductVariant::create([
+                'second_product_id' => $this->product->id,
                 'product_accurate_id' => $this->selectedAccurateId,
-                'condition' => $this->condition,
+                'condition_desc' => $this->condition,
                 'ram' => $this->ram,
                 'storage' => $this->storage,
                 'color' => $this->color,
@@ -178,11 +176,11 @@ class VariantManagement extends Component
 
     public function editVariant($id)
     {
-        $variant = ProductVariant::find($id);
+        $variant = SecondProductVariant::find($id);
         if ($variant) {
             $this->isEditing = true;
             $this->editingVariantId = $id;
-            $this->condition = $variant->condition;
+            $this->condition = $variant->condition_desc;
             $this->ram = $variant->ram;
             $this->storage = $variant->storage;
             $this->color = $variant->color;
@@ -202,11 +200,11 @@ class VariantManagement extends Component
 
     public function confirmDelete($id)
     {
-        $productDelete = ProductVariant::with('product')->find($id);
+        $productDelete = SecondProductVariant::with('secondProduct')->find($id);
         $this->dispatch(
             'show-confirm',
             title: 'Hapus Varian',
-            message: 'Apakah Anda yakin ingin menghapus varian ' . $productDelete->product->description . '?',
+            message: 'Apakah Anda yakin ingin menghapus varian ' . ($productDelete->secondProduct->name ?? '') . '?',
             confirmEvent: 'delete-variant',
             confirmParams: [$id],
             type: 'danger',
@@ -218,7 +216,7 @@ class VariantManagement extends Component
     #[On('delete-variant')]
     public function deleteVariant($id)
     {
-        ProductVariant::find($id)?->delete();
+        SecondProductVariant::find($id)?->delete();
         $this->triggerObserverCalculation();
         $this->loadVariants();
 
@@ -247,6 +245,6 @@ class VariantManagement extends Component
     #[Layout('layouts.admin')]
     public function render()
     {
-        return view('livewire.admin.products.variant-management');
+        return view('livewire.admin.products.second-variant-management');
     }
 }

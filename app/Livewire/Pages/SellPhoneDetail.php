@@ -50,6 +50,10 @@ class SellPhoneDetail extends Component
         return $this->redirect(route('sell-phone-history'));
     }
 
+
+
+    public function submitComplete() {}
+
     #[Layout('layouts.app', ['title' => 'Detail Penjualan HP'])]
     public function render()
     {
