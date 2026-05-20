@@ -304,30 +304,78 @@
                     </div>
 
                     {{-- Upload Foto --}}
+                    {{-- Container Utama Upload Media --}}
                     <div class="space-y-3">
-                        <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">Upload Foto
-                            HP (Maks. 5MB/Foto)</h1>
-                        <div class="relative group">
-                            {{-- Menggunakan wire:model.live agar bisa mendeteksi saat file dipilih --}}
-                            <input type="file" wire:model.live="photos" multiple accept="image/*"
-                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-                            <div
-                                class="w-full p-8 border-2 border-dashed border-violet-200 rounded-3xl bg-white shadow-sm hover:bg-violet-50 transition-colors flex flex-col items-center justify-center text-center">
+                        <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">
+                            Upload Foto HP (Maks. 5MB/Foto)
+                        </h1>
+
+                        {{-- Grid 2 Pilihan: Kamera Langsung & Galeri --}}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                            {{-- OPSI 1: AMBIL FOTO LANGSUNG (KAMERA) --}}
+                            <div class="relative group">
+                                {{-- 
+                Tanpa 'multiple' karena kamera HP hanya bisa menjepret 1 foto per klik.
+                Ditambah 'capture="environment"' agar memaksa HP langsung membuka kamera belakang.
+                Logika array_merge di backend yang akan menyatukannya sampai 5 foto.
+            --}}
+                                <input type="file" wire:model.live="photos" accept="image/*"
+                                    capture="environment"
+                                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+
                                 <div
-                                    class="w-12 h-12 bg-violet-100 text-violet-600 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-                                    </svg>
+                                    class="w-full p-6 border-2 border-dashed border-emerald-200 rounded-3xl bg-white shadow-sm hover:bg-emerald-50 transition-colors flex flex-col items-center justify-center text-center h-full min-h-[150px]">
+                                    <div
+                                        class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                        {{-- Icon Kamera --}}
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z">
+                                            </path>
+                                            <circle cx="12" cy="13" r="3" stroke-linecap="round"
+                                                stroke-linejoin="round" stroke-width="2"></circle>
+                                        </svg>
+                                    </div>
+                                    <p class="font-bold text-emerald-900 text-sm">Ambil Foto Langsung</p>
+                                    <p class="text-xs text-emerald-600/70 mt-1">Buka kamera (bisa jepret bergantian
+                                        sampai 5x)</p>
                                 </div>
-                                <p class="font-bold text-violet-900 text-sm">Klik atau seret foto ke sini</p>
-                                <p class="text-xs text-violet-600/70 mt-1">Minimal 1, Maksimal 5 foto</p>
                             </div>
-                            @error('photos')
-                                <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span>
-                            @enderror
+
+                            {{-- OPSI 2: UPLOAD DARI GALERI --}}
+                            <div class="relative group">
+                                {{-- Menggunakan 'multiple' dan TANPA 'capture' agar bisa pilih banyak langsung dari galeri --}}
+                                <input type="file" wire:model.live="photos" multiple accept="image/*"
+                                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+
+                                <div
+                                    class="w-full p-6 border-2 border-dashed border-violet-200 rounded-3xl bg-white shadow-sm hover:bg-violet-50 transition-colors flex flex-col items-center justify-center text-center h-full min-h-[160px]">
+                                    <div
+                                        class="w-12 h-12 bg-violet-100 text-violet-600 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                        {{-- Icon Upload/Galeri --}}
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12">
+                                            </path>
+                                        </svg>
+                                    </div>
+                                    <p class="font-bold text-violet-900 text-sm">Pilih dari Galeri</p>
+                                    <p class="text-xs text-violet-600/70 mt-1">Pilih sekaligus banyak (Maksimal 5 foto)
+                                    </p>
+                                </div>
+                            </div>
+
                         </div>
 
+                        {{-- Error handling global untuk properti $photos --}}
+                        @error('photos')
+                            <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span>
+                        @enderror
+
+                        {{-- Indikator Loading upload file sementara --}}
                         <div wire:loading wire:target="photos"
                             class="text-xs font-bold text-violet-600 mt-2 flex items-center gap-2">
                             <svg class="animate-spin h-4 w-4 text-violet-600" xmlns="http://www.w3.org/2000/svg"
@@ -341,6 +389,7 @@
                             Sedang mengunggah...
                         </div>
 
+                        {{-- Grid Preview Foto-Foto yang Sudah Masuk --}}
                         @if ($photos)
                             <div class="grid grid-cols-3 md:grid-cols-4 gap-3 mt-4">
                                 @foreach ($photos as $photo)
@@ -351,6 +400,8 @@
                                 @endforeach
                             </div>
                         @endif
+
+                        {{-- Error handling untuk validasi per file di dalam array --}}
                         @error('photos.*')
                             <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span>
                         @enderror

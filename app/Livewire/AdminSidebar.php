@@ -21,11 +21,11 @@ class AdminSidebar extends Component
     #[On('echo-private:user.{userId},MessageSent')]
     public function updateUnreadCount($event = null)
     {
-        if ($this->userId) {
-            $this->unreadCount = Message::where('user_id', $this->userId)
-                ->where('is_read', false)
-                ->count();
-        }
+        // if ($this->userId) {
+        //     $this->unreadCount = Message::where('user_id', $this->userId)
+        //         ->where('is_read', false)
+        //         ->count();
+        // }
     }
 
     public function render()
