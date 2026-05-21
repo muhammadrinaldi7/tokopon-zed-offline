@@ -107,7 +107,7 @@ return [
     /*
      * The class that contains the strategy for determining a media file's path.
      */
-    'path_generator' => App\Paths\TradeInPathGenerator::class,
+    'path_generator' => App\Paths\TokoponPathGenerator::class,
 
     /*
      * The class that contains the strategy for determining how to remove files.

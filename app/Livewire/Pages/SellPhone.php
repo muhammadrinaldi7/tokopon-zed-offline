@@ -42,6 +42,11 @@ class SellPhone extends Component
     // Fallback notes
     public $old_phone_additional_note;
     public $photos = [];
+    public $photo_depan;
+    public $photo_belakang;
+    public $photo_kiri;
+    public $photo_kanan;
+    public $photo_kelengkapan;
 
     // Temporary properties for UI dropdowns
     public $available_models = [];
@@ -152,8 +157,13 @@ class SellPhone extends Component
         $rules = [
             'buyback_device_id'         => 'required|exists:buyback_devices,id',
             'selected_rules'            => 'required|array|min:1',
-            'photos'                    => 'required|array|min:1|max:5',
-            'photos.*'                  => 'image|max:5120',
+            // Aturan Baru: Semua slot wajib berupa gambar dan maksimal 5MB (5120 KB)
+            'photo_depan'               => 'required|image|max:5120',
+            'photo_belakang'            => 'required|image|max:5120',
+            'photo_kiri'                => 'required|image|max:5120',
+            'photo_kanan'               => 'required|image|max:5120',
+            'photo_kelengkapan'         => 'required|image|max:5120',
+
             'old_phone_additional_note' => 'nullable|string|max:1000',
             // 'old_phone_battery_health'  => 'required_if:buyback_device->brand->name,Apple,APPLE|nullable|numeric|min:1|max:100',
             // Jika kamu masih memakai BH atau RAM secara manual, tambahkan di sini. 
@@ -179,11 +189,26 @@ class SellPhone extends Component
         'buyback_device_id.exists'      => 'Perangkat tidak ditemukan.',
         'selected_rules.required'       => 'Silakan pilih kondisi perangkat Anda.',
         'selected_rules.min'            => 'Setidaknya satu kondisi harus dipilih.',
-        'photos.required'               => 'Wajib mengunggah minimal 1 foto HP.',
-        'photos.min'                    => 'Wajib mengunggah minimal 1 foto HP.',
-        'photos.max'                    => 'Maksimal hanya boleh mengunggah 5 foto.',
-        'photos.*.image'                => 'File harus berupa gambar.',
-        'photos.*.max'                  => 'Ukuran foto maksimal 5MB per file.',
+        // Pesan Error Baru Per Slot
+        'photo_depan.required'          => 'Foto tampak depan wajib diunggah.',
+        'photo_depan.image'             => 'File foto depan harus berupa gambar.',
+        'photo_depan.max'               => 'Ukuran foto depan maksimal 5MB.',
+
+        'photo_belakang.required'       => 'Foto tampak belakang wajib diunggah.',
+        'photo_belakang.image'          => 'File foto belakang harus berupa gambar.',
+        'photo_belakang.max'            => 'Ukuran foto belakang maksimal 5MB.',
+
+        'photo_kiri.required'           => 'Foto samping kiri wajib diunggah.',
+        'photo_kiri.image'              => 'File foto samping kiri harus berupa gambar.',
+        'photo_kiri.max'                => 'Ukuran foto samping kiri maksimal 5MB.',
+
+        'photo_kanan.required'          => 'Foto samping kanan wajib diunggah.',
+        'photo_kanan.image'             => 'File foto samping kanan harus berupa gambar.',
+        'photo_kanan.max'               => 'Ukuran foto samping kanan maksimal 5MB.',
+
+        'photo_kelengkapan.required'    => 'Foto kelengkapan wajib diunggah.',
+        'photo_kelengkapan.image'       => 'File foto kelengkapan harus berupa gambar.',
+        'photo_kelengkapan.max'         => 'Ukuran foto kelengkapan maksimal 5MB.',
         'old_phone_additional_note.max' => 'Catatan tambahan maksimal 1000 karakter.',
 
         // Tambahkan baris ini di dalam array $messages Anda yang sudah ada
@@ -282,11 +307,15 @@ class SellPhone extends Component
             return;
         }
 
-        $checkedRulesNames = [];
         $rulesByKey = collect($this->device_rules)->keyBy('key');
+
+        // Array baru untuk menampung data yang sudah dikelompokkan per kategori
+        $groupedSelections = [];
 
         foreach ($this->selected_rules as $key => $value) {
             $ruleId = null;
+
+            // Logika pembacaan nilai dari checkbox (boolean) atau radio (string)
             if (is_bool($value) && $value) {
                 $ruleId = $key;
             } elseif (is_string($value) && !empty($value)) {
@@ -296,14 +325,35 @@ class SellPhone extends Component
             if ($ruleId) {
                 $rule = $rulesByKey->get($ruleId);
                 if ($rule) {
-                    $checkedRulesNames[] = $rule['name'];
+                    $categoryName = $rule['category']; // Ambil nama kategori (misal: "Kondisi Fisik", "Kelengkapan")
+
+                    // Masukkan nama kondisi ke dalam kelompok kategorinya
+                    $groupedSelections[$categoryName][] = $rule['name'];
                 }
             }
         }
 
-        $kondisi = !empty($checkedRulesNames) ? implode(', ', $checkedRulesNames) : 'Mulus / Normal';
-        $catatanText = $this->old_phone_additional_note ? ". Catatan Tambahan: {$this->old_phone_additional_note}" : "";
-        $minusDesc = "Kondisi: {$kondisi}{$catatanText}";
+        // Merakit array kelompok menjadi string kalimat yang rapi
+        $formattedConditions = [];
+        foreach ($groupedSelections as $category => $items) {
+            // Gabungkan item-item dalam satu kategori dengan koma. Contoh: "Lecet Wajar, Layar Retak"
+            $joinedItems = implode(', ', $items);
+
+            // Gabungkan dengan nama kategorinya. Contoh: "Kondisi Fisik: Lecet Wajar, Layar Retak"
+            $formattedConditions[] = "{$category}: {$joinedItems}";
+        }
+
+        // Gabungkan semua kategori yang sudah diformat dengan tanda pemisah " | " atau ", "
+        $kondisi = !empty($formattedConditions)
+            ? implode(' | ', $formattedConditions)
+            : 'Mulus / Normal';
+
+        $catatanText = $this->old_phone_additional_note
+            ? ". Catatan Tambahan: {$this->old_phone_additional_note}"
+            : "";
+
+        // Hasil akhir: "Kondisi Fisik: Lecet Wajar | Kelengkapan: Fullset. Catatan Tambahan: Casing belakang agak kotor"
+        $minusDesc = "{$kondisi}{$catatanText}";
         // Hit API Accurate dengan data user/customer yang sesuai
         try {
             // dd($userForAccurate);
@@ -326,11 +376,27 @@ class SellPhone extends Component
             'handled_by'        => User::findOrFail(Auth::user()->id)->hasRole('fl') ? Auth::id() : null,
         ]);
 
-        // Upload Media Handphone (Spatie Media Library)
-        if (!empty($this->photos)) {
-            foreach ($this->photos as $photo) {
+        // 1. Petakan semua properti slot ke dalam array beserta label custom-nya
+        $slots = [
+            'photo_depan' => 'Tampak Depan',
+            'photo_belakang' => 'Tampak Belakang',
+            'photo_kiri' => 'Samping Kiri',
+            'photo_kanan' => 'Samping Kanan',
+            'photo_kelengkapan' => 'Kelengkapan',
+        ];
+
+        // 2. Loop tiap slot dan upload jika filenya ada
+        foreach ($slots as $propertyName => $label) {
+            if ($this->$propertyName) {
+                $photo = $this->$propertyName;
+
                 $sellPhone->addMedia($photo->getRealPath())
                     ->usingFileName($photo->getClientOriginalName())
+                    // Menyimpan info posisi foto ke dalam custom property Spatie
+                    ->withCustomProperties([
+                        'position' => str_replace('photo_', '', $propertyName), // Hasilnya: 'depan', 'belakang', dll
+                        'label' => $label
+                    ])
                     ->toMediaCollection('photos');
             }
         }
@@ -351,7 +417,12 @@ class SellPhone extends Component
             'selected_rules',
             'final_price',
             'old_phone_additional_note',
-            'photos',
+            // Bersihkan state file upload per slot di memory
+            'photo_depan',
+            'photo_belakang',
+            'photo_kiri',
+            'photo_kanan',
+            'photo_kelengkapan',
             'available_models',
             'available_storages',
             'buyback_device'
@@ -478,3 +549,28 @@ class SellPhone extends Component
     
         //     return $this->redirect(route('sell-phone-history'), navigate: true);
         // }
+
+
+        
+           // $checkedRulesNames = [];
+        // $rulesByKey = collect($this->device_rules)->keyBy('key');
+
+        // foreach ($this->selected_rules as $key => $value) {
+        //     $ruleId = null;
+        //     if (is_bool($value) && $value) {
+        //         $ruleId = $key;
+        //     } elseif (is_string($value) && !empty($value)) {
+        //         $ruleId = $value;
+        //     }
+
+        //     if ($ruleId) {
+        //         $rule = $rulesByKey->get($ruleId);
+        //         if ($rule) {
+        //             $checkedRulesNames[] = $rule['name'];
+        //         }
+        //     }
+        // }
+
+        // $kondisi = !empty($checkedRulesNames) ? implode(', ', $checkedRulesNames) : 'Mulus / Normal';
+        // $catatanText = $this->old_phone_additional_note ? ". Catatan Tambahan: {$this->old_phone_additional_note}" : "";
+        // $minusDesc = "Kondisi: {$kondisi}{$catatanText}";

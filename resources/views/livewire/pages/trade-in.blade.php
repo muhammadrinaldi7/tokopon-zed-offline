@@ -231,16 +231,30 @@
                     @endphp
 
                     @foreach ($groupedRules as $category => $rules)
-                        <div class="space-y-3 mb-4">
-                            <h2 class="text-[10px] font-black text-neutral-400 uppercase tracking-wider block ml-1">
-                                {{ $category }}</h2>
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div class="space-y-3 mb-8">
+                            <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">
+                                {{ $category }}
+                            </h1>
+
+                            <div class="flex flex-wrap gap-3">
                                 @foreach ($rules as $rule)
-                                    <label class="cursor-pointer block">
-                                        <input type="checkbox" wire:model.live="selected_rules.{{ $rule['key'] }}"
-                                            class="peer hidden">
+                                    <label class="cursor-pointer block ">
+                                        {{-- LOGIKA PEMISAHAN: Jika kategori 'kelengkapan' pakai checkbox, jika tidak pakai radio --}}
+                                        @if (str_contains(strtolower($category), 'kelengkapan'))
+                                            <input type="checkbox"
+                                                wire:model.live="selected_rules.{{ $rule['key'] }}"
+                                                class="peer hidden">
+                                        @else
+                                            {{-- Untuk Radio, wire:model harus diarahkan ke property yang sama per kategori --}}
+                                            {{-- Contoh: selected_rules.layar atau selected_rules.fisik --}}
+                                            <input type="radio" name="{{ $category }}"
+                                                value="{{ $rule['key'] }}"
+                                                wire:model.live="selected_rules.{{ $category }}"
+                                                class="peer hidden">
+                                        @endif
+
                                         <div
-                                            class="py-4 px-3 bg-white shadow-sm border-2 border-transparent rounded-2xl text-center text-sm font-bold text-neutral-600 transition-all peer-checked:border-emerald-600 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 hover:border-emerald-200 flex items-center justify-center min-h-[4rem]">
+                                            class="py-2 px-4 bg-white shadow-sm border-2 border-transparent rounded-xl text-center text-sm font-bold text-neutral-600 transition-all peer-checked:border-violet-600 peer-checked:bg-violet-50 peer-checked:text-violet-700 hover:border-violet-200 flex items-center justify-center ">
                                             {{ $rule['name'] }}
                                         </div>
                                     </label>
@@ -267,58 +281,189 @@
             </div>
 
             {{-- Upload Foto --}}
-            <div>
-                <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider mb-4 block">
-                    6. Foto Unit (Maks 5MB)
+            {{-- Upload Foto --}}
+            {{-- Container Utama Upload Media --}}
+            <div class="space-y-4" x-data="{ activeSlot: null }">
+                <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">
+                    Upload Foto HP Sesuai Posisi (Maks. 5MB/Foto)
                 </h1>
-                <div class="relative group">
-                    <input type="file" wire:model.live="photos" multiple accept="image/*"
-                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-                    <div
-                        class="w-full p-8 bg-white shadow-sm border-2 border-dashed border-emerald-200 rounded-3xl hover:bg-emerald-50 transition-colors flex flex-col items-center justify-center text-center">
-                        <div
-                            class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-                            </svg>
+
+                {{-- Array Helper PHP untuk mapping slot --}}
+                @php
+                    $slots = [
+                        'depan' => 'Tampak Depan',
+                        'belakang' => 'Tampak Belakang',
+                        'kiri' => 'Samping Kiri',
+                        'kanan' => 'Samping Kanan',
+                        'kelengkapan' => 'Kelengkapan / Box / Charger',
+                    ];
+                @endphp
+
+                {{-- Grid Layout Utama untuk Slot (Keterangan di Tengah Kotak) --}}
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    @foreach ($slots as $key => $label)
+                        @php
+                            $propertyName = 'photo_' . $key;
+                            $photoFile = $this->{$propertyName};
+                            $hasError = $errors->has($propertyName);
+                        @endphp
+
+                        {{-- Main Interactive Container --}}
+                        <div class="relative aspect-square rounded-3xl overflow-hidden transition-all duration-300 group
+                                 {{ $photoFile ? 'border border-neutral-100 shadow-sm' : 'border-2 border-dashed bg-neutral-50/50 hover:bg-neutral-50/100 cursor-pointer' }}
+                                {{ $hasError ? 'border-rose-300 bg-rose-50/20' : 'border-neutral-200 hover:border-neutral-300' }}"
+                            @if (!$photoFile) @click="activeSlot === '{{ $key }}' ? activeSlot = null : activeSlot = '{{ $key }}'" @endif>
+
+                            @if ($photoFile)
+                                {{-- State 1: Image Preview --}}
+                                <img src="{{ $photoFile->temporaryUrl() }}"
+                                    class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+
+                                {{-- Text Overlay di Bagian Bawah Gambar Terunggah --}}
+                                <div
+                                    class="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-xs py-2 px-3 text-center pointer-events-none z-10">
+                                    <span class="text-[11px] font-bold text-white tracking-wide block truncate">
+                                        {{ $label }}
+                                    </span>
+                                </div>
+
+                                {{-- Floating Delete Button --}}
+                                <button type="button" wire:click="$set('{{ $propertyName }}', null)"
+                                    class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-10 flex items-center justify-center">
+                                    <svg class="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-16v1M4 7h16" />
+                                    </svg>
+                                </button>
+                            @else
+                                {{-- State 2: Placeholder Empty (Teks Center di Tengah) --}}
+                                <div
+                                    class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center select-none">
+                                    <div
+                                        class="w-9 h-9 {{ $hasError ? 'bg-rose-100 text-rose-600' : 'bg-neutral-100 text-neutral-500' }} rounded-xl flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                                d="M12 4v16m8-8H4" />
+                                        </svg>
+                                    </div>
+                                    <h4
+                                        class="font-bold text-xs tracking-tight {{ $hasError ? 'text-rose-700' : 'text-neutral-700' }}">
+                                        {{ $label }}
+                                    </h4>
+                                    <p class="text-[10px] text-neutral-400 mt-0.5">Ketuk untuk upload</p>
+                                </div>
+                            @endif
+
+                            {{-- Indikator Loading Layer --}}
+                            <div wire:loading.flex wire:target="{{ $propertyName }}"
+                                class="absolute inset-0 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center gap-1 z-10">
+                                <span
+                                    class="animate-spin inline-block w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full"></span>
+                                <span
+                                    class="text-[9px] font-black text-violet-600 uppercase tracking-widest">Uploading</span>
+                            </div>
+
+                            @error('photo_' . $key)
+                                <div
+                                    class="absolute inset-x-0 bottom-0 bg-rose-500 text-white p-2 text-center z-10 flex flex-col items-center justify-center h-12 transition-all duration-300">
+                                    <span class="text-[9px] font-bold uppercase tracking-wider leading-none">Gagal
+                                        Upload</span>
+                                    <span
+                                        class="text-[10px] font-medium block truncate w-full px-1 mt-0.5 leading-tight">{{ $message }}</span>
+                                </div>
+                            @enderror
+
+                            {{-- POP-UP PILIHAN (Kamera vs Galeri) yang sudah dilengkapi Auto Compress --}}
+                            <div x-show="activeSlot === '{{ $key }}'"
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="transform opacity-0 scale-95 translate-y-2"
+                                x-transition:enter-end="transform opacity-100 scale-100 translate-y-0"
+                                x-transition:leave="transition ease-in duration-100"
+                                x-transition:leave-start="transform opacity-100 scale-100 translate-y-0"
+                                x-transition:leave-end="transform opacity-0 scale-95 translate-y-2"
+                                @click.away="activeSlot = null"
+                                class="absolute inset-x-2 bottom-2 bg-white border border-neutral-200 rounded-2xl shadow-xl z-20 p-1.5 space-y-1">
+
+                                {{-- Opsi 1: Kamera --}}
+                                <label
+                                    class="flex items-center gap-2.5 p-2 rounded-xl hover:bg-emerald-50 text-emerald-900 cursor-pointer transition-colors">
+                                    {{-- Menggunakan event JavaScript customCompressHandler --}}
+                                    <input type="file" accept="image/*" capture="environment" class="hidden"
+                                        @change="customCompressHandler($event, 'photo_{{ $key }}'); activeSlot = null">
+                                    <div
+                                        class="w-7 h-7 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z">
+                                            </path>
+                                            <circle cx="12" cy="13" r="3" stroke-linecap="round"
+                                                stroke-linejoin="round" stroke-width="2"></circle>
+                                        </svg>
+                                    </div>
+                                    <span class="text-xs font-bold">Kamera</span>
+                                </label>
+
+                                {{-- Opsi 2: Galeri --}}
+                                <label
+                                    class="flex items-center gap-2.5 p-2 rounded-xl hover:bg-violet-50 text-violet-900 cursor-pointer transition-colors">
+                                    {{-- Menggunakan event JavaScript customCompressHandler --}}
+                                    <input type="file" accept="image/*" class="hidden"
+                                        @change="customCompressHandler($event, 'photo_{{ $key }}'); activeSlot = null">
+                                    <div
+                                        class="w-7 h-7 bg-violet-100 text-violet-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12">
+                                            </path>
+                                        </svg>
+                                    </div>
+                                    <span class="text-xs font-bold">Galeri</span>
+                                </label>
+                            </div>
                         </div>
-                        <p class="font-bold text-emerald-900 text-sm">Klik atau seret foto ke sini</p>
-                        <p class="text-xs text-emerald-600/70 mt-1">Sertakan foto depan & belakang HP</p>
-                    </div>
+                    @endforeach
                 </div>
-
-                <div wire:loading wire:target="photos"
-                    class="text-xs font-bold text-emerald-600 mt-3 flex items-center gap-2">
-                    <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                            stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                        </path>
-                    </svg>
-                    Memproses foto...
-                </div>
-
-                @if ($photos)
-                    <div class="flex gap-3 mt-4 overflow-x-auto pb-2">
-                        @foreach ($photos as $photo)
-                            <img src="{{ $photo->temporaryUrl() }}"
-                                class="w-20 h-20 object-cover rounded-xl border border-neutral-200 shadow-sm shrink-0 bg-white p-1">
-                        @endforeach
-                    </div>
-                @endif
-                @error('photos.*')
-                    <span class="text-rose-500 text-xs font-bold block mt-1 ml-1">{{ $message }}</span>
-                @enderror
-                @error('photos')
-                    <span class="text-rose-500 text-xs font-bold block mt-1 ml-1">{{ $message }}</span>
-                @enderror
             </div>
 
             {{-- Evaluasi Step 2 --}}
             @php
-                $isStep2Valid = !empty($photos) && count($photos) >= 1;
+                // 1. Validasi Foto (Semua slot wajib diisi)
+                $photoValid =
+                    !empty($photo_depan) &&
+                    !empty($photo_belakang) &&
+                    !empty($photo_kiri) &&
+                    !empty($photo_kanan) &&
+                    !empty($photo_kelengkapan);
+
+                // 2. Validasi Inputan Radio/Kondisi
+                $rulesValid = false;
+                if ($buyback_device && count($device_rules) > 0) {
+                    // Ambil semua nama kategori unik yang BUKAN kelengkapan (karena non-kelengkapan menggunakan sistem Radio)
+                    $requiredCategories = collect($device_rules)
+                        ->filter(function ($rule) {
+                            return !str_contains(strtolower($rule['category']), 'kelengkapan');
+                        })
+                        ->pluck('category')
+                        ->unique();
+
+                    // Hitung berapa banyak kategori wajib yang sudah dipilih oleh user di komponen Livewire
+                    $filledCategoriesCount = collect($selected_rules)
+                        ->filter(function ($value, $key) use ($requiredCategories) {
+                            // Memastikan key yang diisi ada di daftar kategori wajib dan nilainya tidak kosong
+                            return $requiredCategories->contains($key) && !empty($value);
+                        })
+                        ->count();
+
+                    // Dianggap valid jika jumlah yang diisi sama dengan jumlah kategori yang diwajibkan
+                    $rulesValid = $filledCategoriesCount === $requiredCategories->count();
+                }
+
+                // Gabungkan semua kondisi: Foto harus valid DAN semua radio kondisi harus sudah dipilih
+                $isStep2Valid = $photoValid && $rulesValid;
             @endphp
 
             <div class="flex justify-between items-center pt-6 pb-10">
