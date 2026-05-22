@@ -16,6 +16,7 @@
                     'OFFERED' => 'bg-blue-100 text-blue-800',
                     'WAITING_FOR_DEVICE' => 'bg-purple-100 text-purple-800',
                     'INSPECTING' => 'bg-indigo-100 text-indigo-800',
+                    'WAITING_PAYMENT' => 'bg-orange-100 text-orange-800',
                     'PAYING' => 'bg-teal-100 text-teal-800',
                     'COMPLETED' => 'bg-emerald-100 text-emerald-800',
                     'CANCELLED' => 'bg-rose-100 text-rose-800',
@@ -112,8 +113,17 @@
                             Harga Disepakati
                         </h3>
                         <div class="text-right">
-                            <span class="text-xs font-bold text-emerald-600 uppercase tracking-widest block">Trade In Value</span>
-                            <span class="text-2xl font-black text-emerald-700">Rp {{ number_format($tradeIn->appraised_value, 0, ',', '.') }}</span>
+                            <span class="text-xs font-bold text-emerald-600 uppercase tracking-widest block mb-1">Trade In Value</span>
+                            @if(in_array($tradeIn->status, ['WAITING_FOR_DEVICE', 'INSPECTING']))
+                                <div class="flex items-center justify-end gap-1">
+                                    <span class="text-lg font-bold text-emerald-700">Rp</span>
+                                    <input type="number" wire:model.live="appraisedValue" class="text-2xl font-black text-emerald-700 w-40 border-0 border-b-2 border-emerald-200 focus:ring-0 focus:border-emerald-500 px-1 bg-transparent text-right p-0 m-0 leading-none h-8">
+                                    <button type="button" wire:click="updateAppraisedValue" class="ml-2 bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-emerald-200 transition shadow-sm">Ubah Harga</button>
+                                </div>
+                                @error('appraisedValue') <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
+                            @else
+                                <span class="text-2xl font-black text-emerald-700">Rp {{ number_format($tradeIn->appraised_value, 0, ',', '.') }}</span>
+                            @endif
                         </div>
                     </div>
 
@@ -125,7 +135,11 @@
                         <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                                 <h4 class="font-bold text-gray-900">Pilih Unit Kandidat</h4>
-                                <p class="text-sm text-gray-500">Kandidat unit produk incaran: <span class="font-bold text-[#1c69d4]">{{ $tradeIn->targetProduct->name }}</span></p>
+                                <p class="text-sm text-gray-500">Kandidat unit produk incaran: 
+                                    <span class="font-bold {{ $tradeIn->target_product_type === \App\Models\Product::class ? 'text-emerald-600' : 'text-[#1c69d4]' }}">
+                                        [{{ $tradeIn->target_product_type === \App\Models\Product::class ? 'BARU' : 'SECOND' }}] {{ $tradeIn->targetProduct->name }}
+                                    </span>
+                                </p>
                             </div>
                             <div class="relative max-w-xs">
                                 <input type="text" wire:model.live.debounce.300ms="searchVariant" placeholder="Cari warna/storage..." class="w-full text-sm rounded-lg border-gray-200 py-2 focus:ring-[#1c69d4] focus:border-[#1c69d4]">
@@ -148,14 +162,16 @@
                                         <div class="flex-1">
                                             <div class="flex items-center gap-2">
                                                 <h5 class="font-bold text-gray-900">{{ $variant->color }} - {{ $variant->storage }}</h5>
-                                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">{{ $variant->condition ?? 'Bekas' }}</span>
+                                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">
+                                                    {{ $tradeIn->target_product_type === \App\Models\Product::class ? 'Baru' : ($variant->condition_desc ?? 'Bekas') }}
+                                                </span>
                                             </div>
                                             <p class="text-sm font-black text-[#1c69d4] mt-1">Harga: Rp {{ number_format($variant->price, 0, ',', '.') }}</p>
                                         </div>
                                         <div class="text-right">
                                             <p class="text-[10px] text-gray-400 font-bold uppercase mb-1">Estimasi Tambahan dari Klien</p>
                                             @php
-                                                $topup = max(0, $variant->price - (float) ($tradeIn->appraised_value ?: 0));
+                                                $topup = max(0, $variant->price - (float) ($appraisedValue ?: 0));
                                             @endphp
                                             <span class="font-bold {{ $topup > 0 ? 'text-amber-600' : 'text-emerald-500' }}">Rp {{ number_format($topup, 0, ',', '.') }}</span>
                                         </div>
@@ -170,11 +186,11 @@
                         </div>
 
                         <div class="flex gap-4">
-                            <button type="button" wire:click="reject" wire:confirm="Yakin ingin membatalkan aplikasi trade-in secara sepihak?" class="px-6 py-3.5 rounded-lg font-bold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 transition">
+                            <button type="button" wire:click="cancelTradeIn" wire:confirm="Yakin ingin membatalkan aplikasi trade-in secara sepihak?" class="px-6 py-3.5 rounded-lg font-bold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 transition">
                                 Tolak & Batalkan
                             </button>
-                            <button type="button" wire:click="markAsPhysicallyVerified" wire:confirm="Sistem akan langsung menagih pembayaran sisa kepada Klien (jika ada selisih). Lanjutkan?" class="flex-1 px-6 py-3 rounded-lg font-bold bg-#1c69d4 text-white hover:bg-indigo-700 shadow-sm shadow-#1c69d4/30 transition">
-                                Fisik Lolos Validasi (Setuju & Tagih)
+                            <button type="button" wire:click="markAsPhysicallyVerified" wire:confirm="Penawaran ini akan dikunci dan dikirim ke halaman Pelanggan untuk dikonfirmasi. Lanjutkan?" class="flex-1 px-6 py-3 rounded-lg font-bold bg-[#1c69d4] text-white hover:bg-indigo-700 shadow-sm shadow-[#1c69d4]/30 transition">
+                                Ajukan Penawaran Harga Akhir
                             </button>
                         </div>
                     </form>
@@ -183,7 +199,26 @@
 
 
             
-            @if(in_array($tradeIn->status, ['PAYING', 'COMPLETED', 'CANCELLED']))
+            @if($tradeIn->status === 'OFFERED')
+                <div class="bg-amber-50 rounded-lg shadow-sm border border-amber-200 p-6 mt-6">
+                    <h3 class="font-bold text-amber-800 mb-2 text-xl flex items-center gap-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Menunggu Persetujuan Pelanggan
+                    </h3>
+                    <p class="text-amber-700 mb-4">Anda telah mengajukan penawaran harga akhir. Silakan arahkan FrontLiner atau Pelanggan untuk mengecek halaman "Detail Transaksi" di akun mereka dan menekan tombol persetujuan.</p>
+                    <div class="bg-white p-4 rounded-lg border border-amber-100 flex justify-between items-center">
+                        <div>
+                            <p class="text-sm text-gray-500 font-bold mb-1">Top-Up yang Harus Dibayar:</p>
+                            <p class="text-2xl font-black text-amber-600">Rp {{ number_format($tradeIn->topup_amount, 0, ',', '.') }}</p>
+                        </div>
+                        <button type="button" wire:click="cancelTradeIn" wire:confirm="Batalkan penawaran ini?" class="px-4 py-2 rounded-lg font-bold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 transition">
+                            Batal Sepihak
+                        </button>
+                    </div>
+                </div>
+            @endif
+            
+            @if(in_array($tradeIn->status, ['WAITING_PAYMENT', 'PAYING', 'COMPLETED', 'CANCELLED']))
                 <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 opacity-70">
                     <h3 class="font-bold text-gray-900 mb-2">Penawaran yang Terkunci</h3>
                     <p class="text-sm text-gray-500 mb-4">Konsumen sudah menyetujui unit atau transaksi sudah berjalan melebihi tahap penawaran.</p>
@@ -191,7 +226,7 @@
                         Taksiran Disetujui: Rp {{ number_format($tradeIn->appraised_value, 0, ',', '.') }}
                     </div>
                     @if($tradeIn->product_variant_id)
-                        @php $var = \App\Models\ProductVariant::find($tradeIn->product_variant_id); @endphp
+                        @php $var = \App\Models\SecondProductVariant::find($tradeIn->product_variant_id); @endphp
                         @if($var)
                         <div class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                             <p class="text-xs font-bold text-gray-500 uppercase">Unit Diberikan (Target):</p>
@@ -202,10 +237,60 @@
                 </div>
             @endif
 
+            @if($tradeIn->status === 'WAITING_PAYMENT')
+                <div class="bg-orange-50 border border-orange-200 rounded-lg p-6 relative">
+                    <h3 class="font-bold text-orange-900 text-xl mb-2">Menunggu Pembayaran Manual</h3>
+                    <p class="text-sm text-orange-700 mb-5">Pelanggan perlu mentransfer sisa tagihan sebesar <strong>Rp {{ number_format($tradeIn->topup_amount, 0, ',', '.') }}</strong>. Admin Finance memverifikasi transfer sebelum konfirmasi.</p>
+                    <button wire:click="promptConfirmPayment" class="bg-orange-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-orange-600 transition shadow-sm shadow-orange-500/25">
+                        <svg class="w-5 h-5 inline-block mr-1 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        Konfirmasi Pembayaran Diterima
+                    </button>
+
+                    {{-- Modal Konfirmasi & Input SN --}}
+                    @if($showConfirmModal)
+                        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-gray-100">
+                                <div class="p-6 bg-gray-50 border-b border-gray-100">
+                                    <h3 class="font-black text-xl text-gray-900">Konfirmasi Integrasi Accurate</h3>
+                                    <p class="text-sm text-gray-500 mt-1">Lengkapi data Serial Number (SN) / IMEI untuk Purchase & Sales Invoice.</p>
+                                </div>
+                                <div class="p-6 space-y-5">
+                                    <div>
+                                        <label class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1 block">
+                                            SN HP Lama Pelanggan
+                                            <span class="text-rose-500">*</span>
+                                        </label>
+                                        <div class="text-[10px] text-gray-400 mb-2 leading-tight">Digunakan untuk Purchase Invoice (Toko menerima HP lama). Anda dapat membiarkan nilai auto-generated ini atau mengubahnya.</div>
+                                        <input type="text" wire:model="oldPhoneSN" class="w-full border border-gray-200 rounded-lg p-3 text-sm focus:border-[#1c69d4] focus:ring-0 transition-all font-bold text-gray-700 bg-gray-50" placeholder="Contoh: IMEI123456789">
+                                        @error('oldPhoneSN') <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
+                                    </div>
+                                    <div>
+                                        <label class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1 block">
+                                            SN HP Incaran (Baru/Second)
+                                            <span class="text-rose-500">*</span>
+                                        </label>
+                                        <div class="text-[10px] text-gray-400 mb-2 leading-tight">Digunakan untuk Sales Invoice (Toko menyerahkan HP incaran).</div>
+                                        <input type="text" wire:model="targetSN" class="w-full border border-gray-200 rounded-lg p-3 text-sm focus:border-[#1c69d4] focus:ring-0 transition-all font-bold text-[#1c69d4]" placeholder="Ketik SN / IMEI perangkat di sini">
+                                        @error('targetSN') <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
+                                    </div>
+                                </div>
+                                <div class="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                                    <button wire:click="$set('showConfirmModal', false)" type="button" class="px-5 py-2.5 rounded-lg text-gray-600 font-bold bg-white border border-gray-200 hover:bg-gray-100 transition-all text-sm">Batal</button>
+                                    <button wire:click="confirmPayment" wire:target="confirmPayment" wire:loading.attr="disabled" type="button" class="px-5 py-2.5 rounded-lg text-white font-bold bg-[#1c69d4] hover:bg-blue-700 transition-all text-sm shadow-md shadow-blue-500/20 flex items-center gap-2">
+                                        <span wire:loading.remove wire:target="confirmPayment">Submit & Sinkronisasi Accurate</span>
+                                        <span wire:loading wire:target="confirmPayment">Memproses...</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            @endif
+
             {{-- Tombol Konversi ke Produk Second --}}
             @if($tradeIn->status === 'COMPLETED')
                 @php
-                    $alreadyConverted = \App\Models\ProductVariant::where('trade_in_id', $tradeIn->id)->exists();
+                    $alreadyConverted = \App\Models\SecondProductVariant::where('trade_in_id', $tradeIn->id)->exists();
                 @endphp
 
                 @if($alreadyConverted)

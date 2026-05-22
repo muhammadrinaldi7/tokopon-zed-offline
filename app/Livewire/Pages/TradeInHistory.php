@@ -12,10 +12,19 @@ class TradeInHistory extends Component
     #[Layout('layouts.app', ['title' => 'Riwayat Tukar Tambah'])]
     public function render()
     {
-        $tradeIns = TradeIn::with('targetProduct')
-            ->where('user_id', Auth::id())
-            ->latest()
-            ->get();
+        if (Auth::user()->hasRole('fl')) {
+            // Tampilkan history yang kolom 'handled_by'-nya adalah ID FL yang sedang login
+            $tradeIns = TradeIn::with(['media', 'handledBy'])
+                ->where('handled_by', Auth::id())
+                ->latest()
+                ->get();
+        } else {
+            // Tampilkan history milik customer biasa berdasarkan 'user_id'
+            $tradeIns = TradeIn::with('media')
+                ->where('user_id', Auth::id())
+                ->latest()
+                ->get();
+        }
 
         return view('livewire.pages.trade-in-history', compact('tradeIns'));
     }

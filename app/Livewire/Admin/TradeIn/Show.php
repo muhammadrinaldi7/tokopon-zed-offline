@@ -5,10 +5,11 @@ namespace App\Livewire\Admin\TradeIn;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
-use App\Models\ProductVariant;
+use App\Models\SecondProductVariant;
 use App\Models\TradeIn;
 use App\Models\TradeInUnitOption;
 use App\Services\XenditService;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Illuminate\Support\Facades\DB;
@@ -17,15 +18,20 @@ use Illuminate\Support\Str;
 class Show extends Component
 {
     public TradeIn $tradeIn;
-    
+
     // Appraisal Form
     public $appraisedValue = 0;
     public array $selectedVariants = [];
     public $searchVariant = '';
-    
+
+    // Accurate Confirm Payment SNs
+    public $showConfirmModal = false;
+    public $targetSN = '';
+    public $oldPhoneSN = '';
+
     // Physical Inspection Form
     public $shippingCost = 0;
-    
+
     // Convert to Second Product
     public $convertModal = false;
     public $sellPrice = 0;
@@ -36,90 +42,236 @@ class Show extends Component
     {
         $this->tradeIn = $tradeIn->load(['user', 'targetProduct', 'media', 'unitOptions.variant', 'buybackDevice.tier']);
         $this->appraisedValue = $this->tradeIn->appraised_value ?? 0;
-        
+
         $this->selectedVariants = $this->tradeIn->product_variant_id ? [$this->tradeIn->product_variant_id] : [];
     }
 
     // submitAppraisal dihapus karena harga sudah fix dan admin langsung assign unit saat inspeksi
-    
+
     public function toggleVariant($variantId)
     {
         $this->selectedVariants = [$variantId];
     }
 
-    public function markAsPhysicallyVerified(XenditService $xendit)
+    public function updateAppraisedValue()
     {
         if (!in_array($this->tradeIn->status, ['WAITING_FOR_DEVICE', 'INSPECTING'])) return;
+
+        $this->validate([
+            'appraisedValue' => 'required|numeric|min:0'
+        ]);
+
+        $this->tradeIn->update([
+            'appraised_value' => $this->appraisedValue
+        ]);
+
+        $this->dispatch('toast', title: 'Berhasil', message: 'Harga disepakati berhasil diperbarui.', type: 'success');
+    }
+
+    public function markAsPhysicallyVerified()
+    {
+        if (!in_array($this->tradeIn->status, ['WAITING_FOR_DEVICE', 'INSPECTING'])) return;
+
+        $this->validate([
+            'appraisedValue' => 'required|numeric|min:0'
+        ]);
 
         if (empty($this->selectedVariants)) {
             $this->dispatch('toast', title: 'Gagal', message: 'Silakan pilih 1 unit produk untuk diberikan ke pengguna.', type: 'error');
             return;
         }
 
-        DB::transaction(function () use ($xendit) {
+        // Update nilai beli HP lama jika diubah oleh admin saat inspeksi
+        $this->tradeIn->update([
+            'appraised_value' => $this->appraisedValue
+        ]);
+
+        DB::transaction(function () {
             $variantId = $this->selectedVariants[0];
-            $variant = \App\Models\ProductVariant::find($variantId);
-            $topupAmount = max(0, $variant->price - (float) $this->tradeIn->appraised_value);
-            
-            // Assign unit ke trade in
-            $this->tradeIn->update([
-                'product_variant_id' => $variant->id
-            ]);
+            $isNew = $this->tradeIn->target_product_type === \App\Models\Product::class;
 
-            // Build temporary Order
-            $order = Order::create([
-                'user_id' => $this->tradeIn->user_id,
-                'order_number' => 'ORD-TRD-' . date('YmdHis') . rand(100, 999),
-                'total_amount' => $topupAmount,
-                'shipping_cost' => 0,
-                'discount_amount' => 0,
-                'grand_total' => $topupAmount,
-                'order_status' => 'PENDING',
-                'shipping_address_snapshot' => ['address' => 'Tukar Tambah Unit di Cabang', 'phone_number' => '0000', 'city' => '-', 'postal_code' => '0000'],
-            ]);
-
-            OrderItem::create([
-                'order_id' => $order->id,
-                'product_variant_id' => $variant->id,
-                'qty' => 1,
-                'price_at_checkout' => $variant->price,
-                'subtotal' => $variant->price
-            ]);
-            
-            // Deduct Stock immediately
-            $variant->decrement('stock', 1);
-
-            // Jika ada selisih, buat Invoice Xendit
-            if ($topupAmount > 0) {
-                // Buat invoice di Xendit
-                $invoice = $xendit->createInvoice($order);
-
-                // Buat OrderPayment
-                OrderPayment::create([
-                    'order_id' => $order->id,
-                    'payment_method' => 'xendit',
-                    'xendit_external_id' => $order->order_number,
-                    'amount' => $topupAmount,
-                    'status' => 'PENDING',
-                    'xendit_invoice_url' => $invoice['invoice_url']
-                ]);
-                $this->tradeIn->update(['status' => 'PAYING', 'order_id' => $order->id]);
+            if ($isNew) {
+                $variant = \App\Models\ProductVariant::with('product')->find($variantId);
             } else {
-                // Lunas karena harga sama atau appraise > harga unit incaran
-                OrderPayment::create([
-                    'order_id' => $order->id,
-                    'payment_method' => 'wallet',
-                    'xendit_external_id' => $order->order_number,
-                    'amount' => 0,
-                    'status' => 'PAID',
-                ]);
-                $order->update(['status' => 'COMPLETED']);
-                $this->tradeIn->update(['status' => 'COMPLETED', 'order_id' => $order->id]);
+                $variant = \App\Models\SecondProductVariant::with('secondProduct')->find($variantId);
             }
+
+            $topupAmount = max(0, $variant->price - (float) $this->tradeIn->appraised_value);
+
+            // Assign unit ke trade in & ubah status ke OFFERED
+            $this->tradeIn->update([
+                'product_variant_id' => $variant->id,
+                'topup_amount' => $topupAmount,
+                'status' => 'OFFERED'
+            ]);
         });
 
         $this->tradeIn->refresh();
-        $this->dispatch('toast', title: 'Fisik Diterima', message: 'Tagihan berhasil diterbitkan untuk pengguna.', type: 'success');
+        $this->dispatch('toast', title: 'Berhasil Diajukan', message: 'Silakan konfirmasi nominal Top-Up ke Klien.', type: 'success');
+    }
+
+    public function cancelTradeIn()
+    {
+        if (!in_array($this->tradeIn->status, ['WAITING_FOR_DEVICE', 'INSPECTING', 'WAITING_PAYMENT'])) return;
+
+        DB::transaction(function () {
+            // Restore stock if it was already locked (WAITING_PAYMENT)
+            if ($this->tradeIn->status === 'WAITING_PAYMENT' && $this->tradeIn->productVariant) {
+                $this->tradeIn->productVariant->increment('stock', 1);
+            }
+
+            if ($this->tradeIn->order) {
+                $this->tradeIn->order->update(['order_status' => 'CANCELLED']);
+            }
+
+            $this->tradeIn->update(['status' => 'CANCELLED']);
+        });
+
+        $this->dispatch('toast', title: 'Dibatalkan', message: 'Transaksi Trade-In berhasil dibatalkan secara sepihak.', type: 'info');
+    }
+
+    public function promptConfirmPayment()
+    {
+        if ($this->tradeIn->status !== 'WAITING_PAYMENT') return;
+        $this->oldPhoneSN = 'TRD-SN-' . str_pad($this->tradeIn->id, 4, '0', STR_PAD_LEFT);
+        // dd($this->tradeIn->topup_amount);
+        $accurateService = app(\App\Services\AccurateService::class)->itemDetailDo($this->tradeIn->productVariant->sku);
+        $this->targetSN = '';
+        $this->showConfirmModal = true;
+    }
+
+    public function confirmPayment()
+    {
+        if ($this->tradeIn->status !== 'WAITING_PAYMENT') return;
+
+        $this->validate([
+            'oldPhoneSN' => 'required|string',
+            'targetSN' => 'required|string',
+        ]);
+
+        $handler = $this->tradeIn->handledBy ?? Auth::user();
+        $branchName = $handler && $handler->branch ? $handler->branch->name : 'Banjarbaru';
+        $warehouseName = $handler && $handler->warehouse ? $handler->warehouse->name : 'Head Office';
+
+        try {
+            DB::transaction(function () use ($branchName, $warehouseName) {
+                // Update Order and Payment
+                $order = $this->tradeIn->order;
+                if ($order) {
+                    $order->update(['order_status' => 'COMPLETED']);
+                    $payment = $order->payments()->where('status', 'PENDING')->first();
+                    if ($payment) {
+                        $payment->update(['status' => 'PAID']);
+                    }
+                }
+
+                // Accurate hits (PI, SI, SR)
+                $isNew = $this->tradeIn->target_product_type === \App\Models\Product::class;
+                $dbSource = $isNew ? 'syihab' : 'second';
+                $variant = $this->tradeIn->productVariant;
+                $productName = $isNew ? $variant->product->name : $variant->secondProduct->name;
+
+                // 0. Sync Vendor & Customer ke Accurate (agar vendorNo dan customerNo pasti terisi)
+                $accurateService = app(\App\Services\AccurateService::class);
+                $customerUser = $this->tradeIn->user;
+
+                // Lepas try-catch agar jika gagal, otomatis terlempar ke luar DB::transaction dan menyebabkan rollback
+                $accurateService->syncVendor($customerUser, $dbSource);
+                $accurateService->syncCustomer($customerUser, $dbSource);
+
+                // Refresh user agar mendapat vendor_no & customer_no terbaru dari database
+                $customerUser->refresh();
+                $billNumber = 'TRDN-' . date('dmY') . str_pad($this->tradeIn->id, 4, '0', STR_PAD_LEFT);
+                // 1. Hit Accurate Purchase Invoice (Pembelian HP Lama)
+                $vendorNo = str_replace('"', '', $customerUser->accurate_vendor_no) ?? 'V-CASH';
+                // dd($vendorNo);
+                $purchaseInvoiceData = [
+                    'vendorNo' => $vendorNo,
+                    'billNumber' => $billNumber,
+                    'branchName' => $branchName,
+                    'detailItem' => [
+                        [
+                            'itemNo' => $this->tradeIn->productVariant->sku,
+                            'warehouseName' => $warehouseName,
+                            'unitPrice' => (float) $this->tradeIn->appraised_value,
+                            'quantity' => 1,
+                            'detailName' => $this->tradeIn->old_phone_brand . ' ' . $this->tradeIn->old_phone_model,
+                            'detailSerialNumber' => [
+                                [
+                                    'serialNumberNo' => $this->oldPhoneSN,
+                                    'quantity' => 1
+                                ]
+                            ]
+                        ]
+                    ]
+                ];
+
+                $piResult = $accurateService->postPurchaseInvoice($purchaseInvoiceData, $dbSource);
+                if (isset($piResult['r']['number'])) {
+                    $this->tradeIn->update(['purchase_invoice_number' => $piResult['r']['number']]);
+                }
+
+                // 2. Hit Accurate Sales Invoice (Penjualan Unit Baru)
+                $salesInvoiceData = [
+                    'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
+                    'branchName' => $branchName,
+                    'detailItem' => [
+                        [
+                            'itemNo' => $variant->sku ?? 'HP-BARU-DUMMY',
+                            'warehouseName' => $warehouseName,
+                            'unitPrice' => (float) $this->tradeIn->topup_amount,
+                            'quantity' => 1,
+                            'useTax1' => false,
+                            'detailName' => $productName . ' - ' . $variant->storage,
+                            'detailSerialNumber' => [
+                                [
+                                    'serialNumberNo' => $this->targetSN,
+                                    'quantity' => 1
+                                ]
+                            ]
+                        ]
+                    ]
+                ];
+
+                $siResult = $accurateService->postSalesInvoice($salesInvoiceData, $dbSource);
+                if (isset($siResult['r']['number'])) {
+                    $this->tradeIn->update(['sales_invoice_number' => $siResult['r']['number']]);
+                }
+
+                // 3. Hit Accurate Sales Receipt (Pelunasan Sisa) jika ada topup dan invoice
+                if ($this->tradeIn->topup_amount > 0 && $this->tradeIn->sales_invoice_number) {
+                    $salesReceiptData = [
+                        'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
+                        'branchName' => $branchName,
+                        'chequeAmount' => $this->tradeIn->topup_amount,
+                        'bankNo' => '10.02.102.002', // Sesuaikan dengan akun kas/bank Accurate
+                        // 'receiptAmount' => (float) $this->tradeIn->topup_amount,
+                        'detailInvoice' => [
+                            [
+                                'invoiceNo' => $this->tradeIn->sales_invoice_number,
+                                'paymentAmount' => (float) $this->tradeIn->topup_amount
+                            ]
+                        ]
+                    ];
+
+                    $srResult = $accurateService->postSalesReceipt($salesReceiptData, $dbSource);
+                    if (isset($srResult['r']['number'])) {
+                        $this->tradeIn->update(['sales_receipt_number' => $srResult['r']['number']]);
+                    }
+                }
+
+                // Mark TradeIn as Completed
+                $this->tradeIn->update(['status' => 'COMPLETED']);
+            });
+
+            $this->showConfirmModal = false;
+            $this->dispatch('toast', title: 'Pembayaran Dikonfirmasi', message: 'Pembayaran selesai dan data telah diupdate.', type: 'success');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Accurate Integration Failed during confirmPayment: ' . $e->getMessage());
+
+            // Dispatch a toast error to the UI so the user knows it failed and rolled back
+            $this->dispatch('toast', title: 'Gagal Sinkronisasi Accurate', message: $e->getMessage(), type: 'error');
+        }
     }
 
     public function reject()
@@ -140,13 +292,13 @@ class Show extends Component
         DB::transaction(function () {
             // Cek apakah produk parent sudah pernah dibikin untuk merek/tipe ini (yang second)
             $productName = $this->tradeIn->old_phone_brand . ' ' . $this->tradeIn->old_phone_model;
-            
+
             $product = null;
             if ($this->existingProductId) {
-                $product = \App\Models\Product::find($this->existingProductId);
+                $product = \App\Models\SecondProduct::find($this->existingProductId);
             } else {
-                $product = \App\Models\Product::firstOrCreate(
-                    ['name' => $productName, 'is_second' => true],
+                $product = \App\Models\SecondProduct::firstOrCreate(
+                    ['name' => $productName],
                     [
                         'slug' => Str::slug($productName . ' Second ' . rand(100, 999)),
                         'brand_id' => null, // Opsional jika punya relasi tabel brands
@@ -159,17 +311,17 @@ class Show extends Component
             }
 
             // Buat variant fisiknya
-            ProductVariant::create([
-                'product_id' => $product->id,
+            SecondProductVariant::create([
+                'second_product_id' => $product->id,
                 'trade_in_id' => $this->tradeIn->id,
                 'storage' => $this->tradeIn->old_phone_storage ?? '-',
                 'color' => '-',
-                'condition' => $this->secondCondition,
+                'condition_desc' => $this->secondCondition,
                 'weight' => 500, // asumsikan
                 'price' => $this->sellPrice,
                 'stock' => 1,
             ]);
-            
+
             // Tandai Trade In sudah memiliki produk / ter-convert (opsional, bisa dilacak dari trade_in_id di variants)
         });
 
@@ -180,15 +332,28 @@ class Show extends Component
     #[Layout('layouts.admin')]
     public function render()
     {
-        $availableVariants = ProductVariant::with('product')
-            ->where('product_id', $this->tradeIn->target_product_id)
-            ->where('stock', '>', 0) /* Sesuai instruksi user bahwa 1 unit fisik adalah 1 product/variant */
-            ->when($this->searchVariant, function($q) {
-                $q->where('storage', 'like', "%{$this->searchVariant}%")
-                  ->orWhere('color', 'like', "%{$this->searchVariant}%")
-                  ->orWhere('condition', 'like', "%{$this->searchVariant}%");
-            })
-            ->get();
+        $isNew = $this->tradeIn->target_product_type === \App\Models\Product::class;
+
+        if ($isNew) {
+            $availableVariants = \App\Models\ProductVariant::with('product')
+                ->where('product_id', $this->tradeIn->target_product_id)
+                ->where('stock', '>', 0)
+                ->when($this->searchVariant, function ($q) {
+                    $q->where('storage', 'like', "%{$this->searchVariant}%")
+                        ->orWhere('color', 'like', "%{$this->searchVariant}%");
+                })
+                ->get();
+        } else {
+            $availableVariants = SecondProductVariant::with('secondProduct')
+                ->where('second_product_id', $this->tradeIn->target_product_id)
+                ->where('stock', '>', 0)
+                ->when($this->searchVariant, function ($q) {
+                    $q->where('storage', 'like', "%{$this->searchVariant}%")
+                        ->orWhere('color', 'like', "%{$this->searchVariant}%")
+                        ->orWhere('condition_desc', 'like', "%{$this->searchVariant}%");
+                })
+                ->get();
+        }
 
         return view('livewire.admin.trade-in.show', [
             'availableVariants' => $availableVariants

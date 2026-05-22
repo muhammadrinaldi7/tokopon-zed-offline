@@ -19,7 +19,7 @@ class TradeIn extends Model implements HasMedia
 
     public function targetProduct()
     {
-        return $this->belongsTo(Product::class, 'target_product_id');
+        return $this->morphTo(null, 'target_product_type', 'target_product_id');
     }
 
     public function buybackDevice()
@@ -37,11 +37,19 @@ class TradeIn extends Model implements HasMedia
         return $this->hasMany(TradeInUnitOption::class);
     }
 
+    public function handledBy()
+    {
+        return $this->belongsTo(User::class, 'handled_by');
+    }
+
+    public function productVariant()
+    {
+        return $this->morphTo(null, 'product_variant_type', 'product_variant_id');
+    }
+
     public function registerMediaCollections(): void
     {
-        // Foto fisik dari user
-        $this->addMediaCollection('phone_condition');
-        // Foto fisik dari bukti admin
+        $this->addMediaCollection('photos');
         $this->addMediaCollection('admin_inspection_photos');
     }
 }

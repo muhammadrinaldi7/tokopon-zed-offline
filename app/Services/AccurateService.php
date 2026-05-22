@@ -15,12 +15,57 @@ class AccurateService
      * @return void
      * @throws \Exception
      */
-    public function syncVendor(User $user)
+
+    public function itemDetailDo($itemNo)
+    {
+        // 1. Siapkan Timestamp (Format ISO 8601 sangat disarankan)
+        $timestamp = now()->toIso8601String();
+
+        // 2. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
+        $signature = hash_hmac('sha256', $timestamp, env('ACCURATE_SECRET_KEY'));
+
+        // CONTOH HIT API MENGGUNAKAN LARAVEL HTTP CLIENT:
+        // Pastikan Anda sudah mengatur ACCURATE_HOST dan ACCURATE_TOKEN di .env Anda
+        // dd($vendorData);
+        $param = [
+            "no" => $itemNo
+        ];
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . env('ACCURATE_TOKEN'),
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
+            'Content-Type'  => 'application/json',
+        ])->get(env('ACCURATE_HOST') . '/item/detail.do', $param);
+
+        Log::info('API Accurate Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            // Simpan ID dari Accurate ke Database kita
+            if (isset($data)) {
+                $result = $data['d']['detailOpenBalance'][0]['detailSerialNumber'];
+                return $result;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Error: ' . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+    public function syncVendor(User $user, $databaseSource = 'syihab')
     {
         // Jika sudah punya vendor ID, tidak perlu hit API lagi
         if ($user->accurate_vendor_id) {
             return;
         }
+
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
 
         // Ambil alamat primary
         $address = $user->addresses()->where('is_primary', true)->first();
@@ -46,25 +91,26 @@ class AccurateService
         // 1. Siapkan Timestamp (Format ISO 8601 sangat disarankan)
         $timestamp = now()->toIso8601String();
 
-        // 2. Ambil Secret Key dari .env
-        $secretKey = env('ACCURATE_SECRET_KEY');
-
-        // 3. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
+        // 2. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
         // CONTOH HIT API MENGGUNAKAN LARAVEL HTTP CLIENT:
         // Pastikan Anda sudah mengatur ACCURATE_HOST dan ACCURATE_TOKEN di .env Anda
         // dd($vendorData);
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . env('ACCURATE_TOKEN'),
+            'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
             'Content-Type'  => 'application/json',
-        ])->post(env('ACCURATE_HOST') . '/vendor/save.do', $vendorData);
+        ])->post($host . '/vendor/save.do', $vendorData);
 
         Log::info('API Accurate Success: ' . $response->body());
         if ($response->successful()) {
             $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
             // Simpan ID dari Accurate ke Database kita
             if (isset($data['r'])) {
 
@@ -119,6 +165,10 @@ class AccurateService
         Log::info('API Accurate Success: ' . $response->body());
         if ($response->successful()) {
             $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
             // Simpan ID dari Accurate ke Database kita
             if (isset($data)) {
                 // dd($data[]);
@@ -154,6 +204,10 @@ class AccurateService
         Log::info('API Accurate Success: ' . $response->body());
         if ($response->successful()) {
             $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
             // Simpan ID dari Accurate ke Database kita
             if (isset($data)) {
                 // dd($data[]);
@@ -166,30 +220,38 @@ class AccurateService
         }
     }
 
-    public function postPurchaseInvoice($purchaseInvoiceData)
+    public function postPurchaseInvoice($purchaseInvoiceData, $databaseSource = 'syihab')
     {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
         // 1. Siapkan Timestamp (Format ISO 8601 sangat disarankan)
         $timestamp = now()->toIso8601String();
-
-        // 2. Ambil Secret Key dari .env
-        $secretKey = env('ACCURATE_SECRET_KEY');
 
         // 3. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        // CONTOH HIT API MENGGUNAKAN LARAVEL HTTP CLIENT:
-        // Pastikan Anda sudah mengatur ACCURATE_HOST dan ACCURATE_TOKEN di .env Anda
-        // dd($vendorData);
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . env('ACCURATE_TOKEN'),
+            'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
             'Content-Type'  => 'application/json',
-        ])->post(env('ACCURATE_HOST') . '/purchase-invoice/save.do', $purchaseInvoiceData);
+        ])->post($host . '/purchase-invoice/save.do', $purchaseInvoiceData);
 
         Log::info('API Accurate Success: ' . $response->body());
         if ($response->successful()) {
             $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
             // Simpan ID dari Accurate ke Database kita
             if (isset($data)) {
                 // dd($data[]);
@@ -233,6 +295,10 @@ class AccurateService
         Log::info("API Accurate Get Item List ({$databaseSource}) Success: " . $response->body());
         if ($response->successful()) {
             $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
             if (isset($data)) {
                 return $data;
             }
@@ -273,6 +339,10 @@ class AccurateService
         Log::info("API Accurate Get Item List ({$databaseSource}) Success: " . $response->body());
         if ($response->successful()) {
             $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
             if (isset($data)) {
                 return $data;
             }
@@ -280,6 +350,132 @@ class AccurateService
         } else {
             Log::info("API Accurate Get Item List ({$databaseSource}) Error: " . $response->body());
             throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+
+    public function syncCustomer(User $user, $databaseSource = 'syihab')
+    {
+        if ($user->accurate_customer_id) {
+            return;
+        }
+
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        $address = $user->addresses()->where('is_primary', true)->first();
+
+        $customerData = [
+            'name' => 'GSK_CUSTOMER_' . $user->profile->full_name,
+            'customerNo' => 'GSK_CUSTOMER_' . str_pad($user->id, 5, '0', STR_PAD_LEFT),
+            'currencyCode' => 'IDR',
+            'mobilePhone' => $user->profile->phone_number,
+            'email' => $user->email,
+            'npwpNo' => $user->npwp,
+            'notes' => 'CUSTOMER GSK - NIK:' . $user->identity,
+        ];
+
+        if ($address) {
+            $customerData['billStreet'] = $address->full_address;
+            $customerData['billZipCode'] = $address->postal_code;
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/customer/save.do', $customerData);
+
+        Log::info('API Accurate Customer Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data['r'])) {
+                $result = $data['r'];
+                $user->update([
+                    'accurate_customer_id' => $result['id'],
+                    'accurate_customer_no' => $result['customerNo'],
+                ]);
+            }
+        } else {
+            Log::info('API Accurate Customer Error: ' . $response->body());
+            throw new \Exception('API Accurate Customer Error: ' . $response->body());
+        }
+    }
+
+    public function postSalesInvoice($salesInvoiceData, $databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-invoice/save.do', $salesInvoiceData);
+
+        Log::info('API Accurate Sales Invoice Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Sales Invoice Error: ' . $response->body());
+            throw new \Exception('API Accurate Sales Invoice Error: ' . $response->body());
+        }
+    }
+
+    public function postSalesReceipt($salesReceiptData, $databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-receipt/save.do', $salesReceiptData);
+
+        Log::info('API Accurate Sales Receipt Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Sales Receipt Error: ' . $response->body());
+            throw new \Exception('API Accurate Sales Receipt Error: ' . $response->body());
         }
     }
 }

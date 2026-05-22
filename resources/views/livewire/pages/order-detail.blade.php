@@ -75,7 +75,9 @@
                 @foreach ($order->items as $item)
                     @php
                         $variant = $item->variant;
-                        $product = $variant?->product;
+                        $product = $variant instanceof \App\Models\SecondProductVariant
+                            ? $variant->secondProduct
+                            : $variant?->product;
                         $imgUrl = $product ? ($product->getFirstMediaUrl('cover', 'thumb') ?: $product->getFirstMediaUrl('gallery', 'thumb')) : '';
                     @endphp
                     <div class="flex gap-4 px-6 py-4">

@@ -3,6 +3,9 @@
 namespace App\Livewire\Pages;
 
 use App\Models\Order;
+use App\Models\ProductVariant;
+use App\Models\SecondProductVariant;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -18,11 +21,21 @@ class OrderDetail extends Component
 
     public function mount(Order $order): void
     {
-        if ($order->user_id !== Auth::id()) {
+        if ($order->user_id !== Auth::id() && !Auth::user()->hasRole('fl')) {
             abort(403);
         }
 
-        $this->order = $order->load(['items.variant.product.media', 'items.review', 'payments', 'shipping']);
+        $this->order = $order->load([
+            'items.variant' => function (MorphTo $morphTo) {
+                $morphTo->morphWith([
+                    ProductVariant::class => ['product.media'],
+                    SecondProductVariant::class => ['secondProduct.media'],
+                ]);
+            },
+            'items.review',
+            'payments',
+            'shipping',
+        ]);
     }
 
     public function confirmReceived(): void
@@ -59,9 +72,15 @@ class OrderDetail extends Component
         $item = collect($this->order->items)->firstWhere('id', $this->reviewItemId);
         if (!$item || $item->review) return;
 
+        // Resolve parent product ID regardless of variant type
+        $variant = $item->variant;
+        $productId = $variant instanceof SecondProductVariant
+            ? $variant->second_product_id
+            : $variant->product_id;
+
         \App\Models\ProductReview::create([
             'user_id' => Auth::id(),
-            'product_id' => $item->variant->product_id,
+            'product_id' => $productId,
             'order_item_id' => $item->id,
             'rating' => $this->reviewRating,
             'comment' => $this->reviewComment,

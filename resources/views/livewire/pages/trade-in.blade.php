@@ -463,7 +463,8 @@
                 }
 
                 // Gabungkan semua kondisi: Foto harus valid DAN semua radio kondisi harus sudah dipilih
-                $isStep2Valid = $photoValid && $rulesValid;
+                // $isStep2Valid = $photoValid && $rulesValid;
+                $isStep2Valid = $rulesValid;
             @endphp
 
             <div class="flex justify-between items-center pt-6 pb-10">
@@ -497,8 +498,13 @@
 
             {{-- Pemilihan Target --}}
             <div class="space-y-6">
-                <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">7. Pilih HP
-                    Incaranmu</h1>
+                <div class="flex items-center justify-between">
+                    <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">7. Pilih HP Incaranmu</h1>
+                    <div class="flex bg-neutral-100 p-1 rounded-lg">
+                        <button type="button" wire:click="$set('targetType', 'second')" class="px-4 py-1.5 text-xs font-bold rounded-md transition-all {{ $targetType === 'second' ? 'bg-white text-emerald-600 shadow-sm' : 'text-neutral-500 hover:text-neutral-700' }}">Second</button>
+                        <button type="button" wire:click="$set('targetType', 'new')" class="px-4 py-1.5 text-xs font-bold rounded-md transition-all {{ $targetType === 'new' ? 'bg-white text-emerald-600 shadow-sm' : 'text-neutral-500 hover:text-neutral-700' }}">Baru</button>
+                    </div>
+                </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {{-- Select Brand Incaran --}}
@@ -529,7 +535,148 @@
                 @error('selectedProductId')
                     <span class="text-rose-500 text-xs font-bold block ml-1">{{ $message }}</span>
                 @enderror
+
+                @if(!empty($availableTargetVariants))
+                <div class="space-y-4 mt-6">
+                    <label class="text-xs font-black text-neutral-400 uppercase ml-1 tracking-widest block">Pilih Varian (Warna & Storage)</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        @foreach($availableTargetVariants as $variant)
+                            <label class="cursor-pointer">
+                                <input type="radio" wire:model.live="selectedTargetVariantId" value="{{ $variant['id'] }}" class="hidden peer">
+                                <div class="p-4 rounded-xl border-2 transition-all {{ $selectedTargetVariantId == $variant['id'] ? 'border-emerald-500 bg-emerald-50' : 'border-neutral-100 bg-white hover:border-emerald-200' }}">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <span class="font-bold text-neutral-800">{{ $variant['label'] }}</span>
+                                        <span class="text-[10px] font-black uppercase bg-neutral-100 text-neutral-500 px-2 py-0.5 rounded">Stok: {{ $variant['stock'] }}</span>
+                                    </div>
+                                    <p class="text-emerald-600 font-bold text-sm">Rp {{ number_format($variant['price'], 0, ',', '.') }}</p>
+                                </div>
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('selectedTargetVariantId')
+                        <span class="text-rose-500 text-xs font-bold block ml-1">{{ $message }}</span>
+                    @enderror
+                </div>
+                @endif
             </div>
+
+            @auth
+                @if(auth()->user()->hasRole('fl'))
+                {{-- Data Customer (Khusus FL) --}}
+                <div class="space-y-6 mt-10">
+                    <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">Data Customer</h1>
+                    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6 space-y-6">
+                        
+                        {{-- Tabs --}}
+                        <div class="flex p-1 bg-neutral-100 rounded-xl w-fit">
+                            <button type="button" wire:click="$set('isNewCustomer', true)" 
+                                class="px-6 py-2 rounded-lg text-sm font-bold transition-all {{ $isNewCustomer ? 'bg-white text-emerald-600 shadow-sm' : 'text-neutral-500 hover:text-neutral-700' }}">
+                                Pelanggan Baru
+                            </button>
+                            <button type="button" wire:click="$set('isNewCustomer', false)" 
+                                class="px-6 py-2 rounded-lg text-sm font-bold transition-all {{ !$isNewCustomer ? 'bg-white text-emerald-600 shadow-sm' : 'text-neutral-500 hover:text-neutral-700' }}">
+                                Cari Pelanggan Lama
+                            </button>
+                        </div>
+
+                        @if(!$isNewCustomer)
+                            {{-- Mode: Cari Pelanggan Lama --}}
+                            <div class="space-y-4">
+                                @if($selectedCustomerId)
+                                    @php $selectedUser = \App\Models\User::find($selectedCustomerId); @endphp
+                                    <div class="p-4 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-between">
+                                        <div>
+                                            <p class="text-xs font-black text-emerald-600 uppercase tracking-wider mb-1">Pelanggan Terpilih</p>
+                                            <h3 class="font-bold text-neutral-800">{{ $selectedUser->name }}</h3>
+                                            <p class="text-sm text-neutral-500">{{ $selectedUser->email }} • {{ $selectedUser->profile->phone_number ?? '-' }}</p>
+                                        </div>
+                                        <button type="button" wire:click="clearSelectedCustomer" class="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition-colors font-bold text-sm">
+                                            Batal
+                                        </button>
+                                    </div>
+                                    <input type="hidden" wire:model="selectedCustomerId" value="{{ $selectedCustomerId }}">
+                                @else
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <svg class="h-5 w-5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                        </div>
+                                        <input type="text" wire:model.live.debounce.300ms="searchCustomer" class="w-full pl-10 p-3 bg-neutral-50 border rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition-all" placeholder="Cari nama, email, atau no HP...">
+                                    </div>
+                                    
+                                    @if(strlen($searchCustomer) >= 2)
+                                        <div class="bg-white border rounded-xl shadow-lg max-h-60 overflow-y-auto divide-y mt-2">
+                                            @forelse($this->customerResults as $user)
+                                                <div wire:click="selectCustomer({{ $user->id }})" class="p-3 hover:bg-neutral-50 cursor-pointer transition-colors flex justify-between items-center group">
+                                                    <div>
+                                                        <h4 class="font-bold text-neutral-800">{{ $user->name }}</h4>
+                                                        <p class="text-xs text-neutral-500">{{ $user->email }} • {{ $user->profile->phone_number ?? '-' }}</p>
+                                                    </div>
+                                                    <span class="text-emerald-500 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">Pilih</span>
+                                                </div>
+                                            @empty
+                                                <div class="p-4 text-center text-neutral-500 text-sm">
+                                                    Pelanggan tidak ditemukan.
+                                                </div>
+                                            @endforelse
+                                        </div>
+                                    @endif
+                                @endif
+                                @error('selectedCustomerId') <span class="text-rose-500 text-xs font-bold">{{ $message }}</span> @enderror
+                            </div>
+                        @else
+                            {{-- Mode: Registrasi Pelanggan Baru --}}
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-xs font-bold text-neutral-500 mb-1 block">Nama Lengkap</label>
+                                    <input type="text" wire:model="name" class="w-full p-3 bg-neutral-50 border rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition-all" placeholder="Nama Sesuai KTP">
+                                    @error('name') <span class="text-rose-500 text-xs">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-neutral-500 mb-1 block">Nomor HP</label>
+                                    <input type="text" wire:model="mobilePhone" class="w-full p-3 bg-neutral-50 border rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition-all" placeholder="08xxxxxxxx">
+                                    @error('mobilePhone') <span class="text-rose-500 text-xs">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-neutral-500 mb-1 block">Email</label>
+                                    <input type="email" wire:model="email" class="w-full p-3 bg-neutral-50 border rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition-all" placeholder="email@contoh.com">
+                                    @error('email') <span class="text-rose-500 text-xs">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-neutral-500 mb-1 block">NIK</label>
+                                    <input type="number" wire:model="nik" class="w-full p-3 bg-neutral-50 border rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition-all" placeholder="16 Digit NIK">
+                                    @error('nik') <span class="text-rose-500 text-xs">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-neutral-500 mb-1 block">NPWP (Opsional)</label>
+                                    <input type="text" wire:model="npwp" class="w-full p-3 bg-neutral-50 border rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition-all" placeholder="Nomor NPWP">
+                                    @error('npwp') <span class="text-rose-500 text-xs">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-neutral-500 mb-1 block">Foto KTP</label>
+                                    <input type="file" wire:model="foto_ktp" class="w-full p-3 bg-neutral-50 border rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition-all" accept="image/*">
+                                    @error('foto_ktp') <span class="text-rose-500 text-xs">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-neutral-500 mb-1 block">Nama Bank</label>
+                                    <input type="text" wire:model="bank_name" class="w-full p-3 bg-neutral-50 border rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition-all" placeholder="BCA / Mandiri / BNI">
+                                    @error('bank_name') <span class="text-rose-500 text-xs">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-neutral-500 mb-1 block">Nomor Rekening</label>
+                                    <input type="number" wire:model="account_number" class="w-full p-3 bg-neutral-50 border rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition-all" placeholder="1234567890">
+                                    @error('account_number') <span class="text-rose-500 text-xs">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-neutral-500 mb-1 block">Nama Pemilik Rekening</label>
+                                    <input type="text" wire:model="account_name" class="w-full p-3 bg-neutral-50 border rounded-xl focus:border-emerald-500 focus:ring-0 outline-none transition-all" placeholder="Nama Sesuai Rekening">
+                                    @error('account_name') <span class="text-rose-500 text-xs">{{ $message }}</span> @enderror
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+                @endif
+            @endauth
 
             {{-- Rincian Akhir (Summary) --}}
             <div class="space-y-6 mt-10">
@@ -618,26 +765,31 @@
                             {{-- Sisi Kanan: HP Incaran --}}
                             <div class="lg:col-span-5 p-8 md:p-10">
                                 @php
-                                    $target = $selectedProductId
-                                        ? \App\Models\Product::with('brand')->find($selectedProductId)
-                                        : null;
+                                    if ($targetType === 'new') {
+                                        $target = $selectedProductId ? \App\Models\Product::with('brand')->find($selectedProductId) : null;
+                                        $targetVariant = $selectedTargetVariantId ? \App\Models\ProductVariant::find($selectedTargetVariantId) : null;
+                                    } else {
+                                        $target = $selectedProductId ? \App\Models\SecondProduct::with('brand')->find($selectedProductId) : null;
+                                        $targetVariant = $selectedTargetVariantId ? \App\Models\SecondProductVariant::find($selectedTargetVariantId) : null;
+                                    }
                                 @endphp
 
                                 <div class="flex items-center gap-5">
-                                    @if ($target)
+                                    @if ($target && $targetVariant)
                                         {{-- Thumbnail Produk --}}
                                         <div
                                             class="w-20 h-20 bg-neutral-50 rounded-2xl p-2 border border-neutral-100 shrink-0 flex items-center justify-center">
-                                            <img src="{{ $target->getFirstMediaUrl('cover') }}"
+                                            <img src="{{ $target->getFirstMediaUrl('thumbnail_image') ?: $target->getFirstMediaUrl('cover') }}"
                                                 class="max-w-full max-h-full object-contain">
                                         </div>
                                         <div class="space-y-1">
                                             <span
-                                                class="text-[10px] font-black text-emerald-600 uppercase italic tracking-tighter">{{ $target->brand->name }}</span>
+                                                class="text-[10px] font-black text-emerald-600 uppercase italic tracking-tighter">{{ $target->brand->name ?? '' }}</span>
                                             <h2 class="text-xl md:text-2xl font-bold text-neutral-800 leading-tight">
                                                 {{ $target->name }}</h2>
+                                            <p class="text-xs font-bold text-neutral-500 uppercase">{{ $targetVariant->color }} - {{ $targetVariant->storage }}</p>
                                             <p class="text-emerald-500 font-bold text-sm">Rp
-                                                {{ number_format($target->starting_price, 0, ',', '.') }}*</p>
+                                                {{ number_format($targetVariant->price, 0, ',', '.') }}</p>
                                         </div>
                                     @else
                                         <div

@@ -3,10 +3,12 @@
 namespace App\Livewire\Pages;
 
 use App\Models\Brand;
-use App\Models\Product;
+use App\Models\SecondProduct;
+use App\Models\SecondProductVariant;
 use App\Models\TradeIn as TradeInModel;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -14,8 +16,11 @@ class TradeIn extends Component
 {
     use WithFileUploads;
 
+    public $targetType = 'second'; // 'new' or 'second'
     public $selectedProductId;
     public $selectedTargetBrand = null;
+    public $selectedTargetVariantId = null;
+    public $availableTargetVariants = [];
 
     // Properti HP Lama (Fixed Price)
     public $selected_brand_id;
@@ -40,21 +45,74 @@ class TradeIn extends Component
     public $photo_kiri;
     public $photo_kanan;
     public $photo_kelengkapan;
+    public $name;
+    public $mobilePhone;
+    public $email;
+    public $nik;
+    public $npwp;
+    public $foto_ktp;
+    public $account_number;
+    public $account_name;
+    public $bank_name;
+
+    // FL Customer Search
+    public $isNewCustomer = true;
+    public $searchCustomer = '';
+    public $selectedCustomerId = null;
+
+    #[Computed]
+    public function customerResults()
+    {
+        if (strlen($this->searchCustomer) < 2) return [];
+
+        return User::whereHas('roles', function($q) {
+            $q->where('name', 'user');
+        })->where(function($q) {
+            $q->where('name', 'like', '%' . $this->searchCustomer . '%')
+              ->orWhere('email', 'like', '%' . $this->searchCustomer . '%')
+              ->orWhereHas('profile', function($q2) {
+                  $q2->where('phone_number', 'like', '%' . $this->searchCustomer . '%');
+              });
+        })->take(5)->get();
+    }
+
+    public function selectCustomer($id)
+    {
+        $this->selectedCustomerId = $id;
+        $this->searchCustomer = '';
+    }
+
+    public function clearSelectedCustomer()
+    {
+        $this->selectedCustomerId = null;
+    }
+
     /**
      * Fungsi mount dijalankan sekali saat halaman pertama kali dibuka.
      * Kita masukkan parameter $product (diambil dari URL {product?})
      */
-    public function mount(Product $product = null)
+    public function mount($product = null)
     {
         if ($product && $product->exists) {
             $this->selectedProductId = $product->id;
-
-            // Tambahkan baris ini untuk otomatis mengisi brand incaran
-            // Kita ambil nama brand dari relasi product->brand
+            if (get_class($product) === \App\Models\Product::class) {
+                $this->targetType = 'new';
+            } else {
+                $this->targetType = 'second';
+            }
             if ($product->brand) {
                 $this->selectedTargetBrand = $product->brand->name;
             }
+            $this->updatedSelectedProductId();
         }
+    }
+
+    public function updatedTargetType()
+    {
+        $this->selectedTargetBrand = null;
+        $this->selectedProductId = null;
+        $this->selectedTargetVariantId = null;
+        $this->availableTargetVariants = [];
     }
 
     public function updatedSelectedBrandId()
@@ -73,6 +131,35 @@ class TradeIn extends Component
                 ->toArray();
         } else {
             $this->available_models = [];
+        }
+    }
+
+    public function updatedSelectedProductId()
+    {
+        $this->selectedTargetVariantId = null;
+        $this->availableTargetVariants = [];
+
+        if ($this->selectedProductId) {
+            if ($this->targetType === 'new') {
+                $variants = \App\Models\ProductVariant::where('product_id', $this->selectedProductId)
+                    ->where('stock', '>', 0)
+                    ->get();
+            } else {
+                $variants = SecondProductVariant::where('second_product_id', $this->selectedProductId)
+                    ->where('stock', '>', 0)
+                    ->get();
+            }
+
+            $this->availableTargetVariants = $variants->groupBy(function ($item) {
+                return $item->color . ' - ' . $item->storage;
+            })->map(function ($group) {
+                return [
+                    'id' => $group->first()->id,
+                    'label' => $group->first()->color . ' - ' . $group->first()->storage,
+                    'price' => $group->first()->price,
+                    'stock' => $group->count()
+                ];
+            })->values()->toArray();
         }
     }
 
@@ -97,7 +184,9 @@ class TradeIn extends Component
             $this->buyback_device = \App\Models\BuybackDevice::with('tier')->find($this->buyback_device_id);
             $this->device_rules = $this->buyback_device ? $this->buyback_device->getFlatRules() : [];
             $this->selected_rules = [];
-            $this->calculatePrice();
+            
+            // Invoke Livewire dependency injection for calculatePrice
+            $this->calculatePrice(app(\App\Services\TradeInService::class));
         } else {
             $this->buyback_device = null;
             $this->device_rules = [];
@@ -107,34 +196,14 @@ class TradeIn extends Component
 
     public function updatedSelectedRules()
     {
-        $this->calculatePrice();
+        $this->calculatePrice(app(\App\Services\TradeInService::class));
     }
 
-    public function calculatePrice()
+    public function calculatePrice(\App\Services\TradeInService $tradeInService)
     {
         if (!$this->buyback_device) return;
 
-        $price = $this->buyback_device->base_price;
-
-        $rulesByKey = collect($this->device_rules)->keyBy('key');
-
-        foreach ($this->selected_rules as $ruleKey => $isChecked) {
-            if ($isChecked) {
-                $rule = $rulesByKey->get($ruleKey);
-                if ($rule) {
-                    $type = $rule['type'];
-                    $val = $rule['value'];
-
-                    if ($type === 'fixed') {
-                        $price -= $val;
-                    } elseif ($type === 'percentage') {
-                        $price -= ($this->buyback_device->base_price * ($val / 100));
-                    }
-                }
-            }
-        }
-
-        $this->final_price = max(0, $price); // Ensure price doesn't go below 0
+        $this->final_price = $tradeInService->calculatePrice($this->buyback_device, $this->selected_rules);
     }
 
     protected function rules()
@@ -142,30 +211,29 @@ class TradeIn extends Component
         $rules = [
             'buyback_device_id'         => 'required|exists:buyback_devices,id',
             'selected_rules'            => 'required|array|min:1',
-            // Aturan Baru: Semua slot wajib berupa gambar dan maksimal 5MB (5120 KB)
             'photo_depan'               => 'required|image|max:5120',
             'photo_belakang'            => 'required|image|max:5120',
             'photo_kiri'                => 'required|image|max:5120',
             'photo_kanan'               => 'required|image|max:5120',
             'photo_kelengkapan'         => 'required|image|max:5120',
-
             'old_phone_additional_note' => 'nullable|string|max:1000',
             'selectedProductId' => 'required',
-            // 'old_phone_battery_health'  => 'required_if:buyback_device->brand->name,Apple,APPLE|nullable|numeric|min:1|max:100',
-            // Jika kamu masih memakai BH atau RAM secara manual, tambahkan di sini. 
-            // Tapi jika sudah include di selected_rules, ini sudah cukup.
+            'selectedTargetVariantId' => 'required',
         ];
-        // JIKA USER ADALAH FL, TAMBAHKAN VALIDASI REGISTRASI CUSTOMER OFFLINE
         if (Auth::check() && User::findOrFail(Auth::user()->id)->hasRole('fl')) {
-            $rules['name']        = 'required|string|max:255';
-            $rules['mobilePhone'] = 'required|string|max:15';
-            $rules['email']       = 'required|email|unique:users,email';
-            $rules['nik']         = 'required|numeric|digits:16|unique:users,nik'; // Sesuaikan field NIK di table user Anda
-            $rules['npwp']        = 'nullable|string|max:20';
-            $rules['foto_ktp']    = 'required|image|max:2048'; // Max 2MB
-            $rules['account_number'] = 'required|string|max:20';
-            $rules['account_name'] = 'required|string|max:20';
-            $rules['bank_name'] = 'required|string|max:20';
+            if ($this->isNewCustomer) {
+                $rules['name']        = 'required|string|max:255';
+                $rules['mobilePhone'] = 'required|string|max:15';
+                $rules['email']       = 'required|email|unique:users,email';
+                $rules['nik']         = 'required|numeric|digits:16|unique:users,nik';
+                $rules['npwp']        = 'nullable|string|max:20';
+                $rules['foto_ktp']    = 'required|image|max:2048';
+                $rules['account_number'] = 'required|string|max:20';
+                $rules['account_name'] = 'required|string|max:20';
+                $rules['bank_name'] = 'required|string|max:20';
+            } else {
+                $rules['selectedCustomerId'] = 'required|exists:users,id';
+            }
         }
         return $rules;
     }
@@ -175,30 +243,24 @@ class TradeIn extends Component
         'buyback_device_id.exists'      => 'Perangkat tidak ditemukan.',
         'selected_rules.required'       => 'Silakan pilih kondisi perangkat Anda.',
         'selected_rules.min'            => 'Setidaknya satu kondisi harus dipilih.',
-        // Pesan Error Baru Per Slot
         'photo_depan.required'          => 'Foto tampak depan wajib diunggah.',
         'photo_depan.image'             => 'File foto depan harus berupa gambar.',
         'photo_depan.max'               => 'Ukuran foto depan maksimal 5MB.',
-
         'photo_belakang.required'       => 'Foto tampak belakang wajib diunggah.',
         'photo_belakang.image'          => 'File foto belakang harus berupa gambar.',
         'photo_belakang.max'            => 'Ukuran foto belakang maksimal 5MB.',
-
         'photo_kiri.required'           => 'Foto samping kiri wajib diunggah.',
         'photo_kiri.image'              => 'File foto samping kiri harus berupa gambar.',
         'photo_kiri.max'                => 'Ukuran foto samping kiri maksimal 5MB.',
-
         'photo_kanan.required'          => 'Foto samping kanan wajib diunggah.',
         'photo_kanan.image'             => 'File foto samping kanan harus berupa gambar.',
         'photo_kanan.max'               => 'Ukuran foto samping kanan maksimal 5MB.',
-
         'photo_kelengkapan.required'    => 'Foto kelengkapan wajib diunggah.',
         'photo_kelengkapan.image'       => 'File foto kelengkapan harus berupa gambar.',
         'photo_kelengkapan.max'         => 'Ukuran foto kelengkapan maksimal 5MB.',
         'old_phone_additional_note.max' => 'Catatan tambahan maksimal 1000 karakter.',
         'selectedProductId.required'    => 'Produk wajib dipilih.',
-
-        // Tambahkan baris ini di dalam array $messages Anda yang sudah ada
+        'selectedTargetVariantId.required' => 'Varian wajib dipilih.',
         'name.required'       => 'Nama lengkap wajib diisi.',
         'mobilePhone.required' => 'Nomor HP wajib diisi.',
         'email.required'      => 'Email wajib diisi.',
@@ -210,157 +272,126 @@ class TradeIn extends Component
         'account_number.required' => 'Nomor Rekening wajib diisi.',
         'account_name.required' => 'Nama Pemilik Rekening wajib diisi.',
         'bank_name.required' => 'Nama Bank wajib diisi.',
+        'selectedCustomerId.required' => 'Silakan cari dan pilih pelanggan terlebih dahulu.',
     ];
-    public function submit()
+    public function submit(\App\Services\TradeInService $tradeInService)
     {
-        // Cek Autentikasi
         if (!Auth::check()) {
             return redirect()->to('/login');
         }
 
-        // Cek kelengkapan Profil Penjual
-        $user = Auth::user();
-        $isSellerReady = $user->profile && !empty($user->profile->full_name)
-            && !empty($user->profile->phone_number)
-            && !empty($user->identity)
-            && !empty($user->npwp)
-            && !empty($user->getFirstMediaUrl('ktp_photo'))
-            && $user->bankAccounts()->where('is_primary', true)->exists();
+        $isFL = User::findOrFail(Auth::user()->id)->hasRole('fl');
 
-        if (!$isSellerReady) {
-            session()->flash('error', 'Silakan lengkapi Data Pribadi, KTP, NPWP, dan Rekening Bank di menu Profil.');
-            return $this->redirect(route('profile'), navigate: true);
+        if (!$isFL) {
+            $user = Auth::user();
+            $isSellerReady = $user->profile && !empty($user->profile->full_name)
+                && !empty($user->profile->phone_number)
+                && !empty($user->identity)
+                && !empty($user->npwp)
+                && !empty($user->getFirstMediaUrl('ktp_photo'))
+                && $user->bankAccounts()->where('is_primary', true)->exists();
+
+            if (!$isSellerReady) {
+                session()->flash('error', 'Silakan lengkapi Data Pribadi, KTP, NPWP, dan Rekening Bank di menu Profil.');
+                return $this->redirect(route('profile'), navigate: true);
+            }
         }
 
-        // Validasi
         $this->validate();
 
         try {
-            // --- PROSES DATA ---
             $device = \App\Models\BuybackDevice::with('brand')->find($this->buyback_device_id);
+            
+            $minusDesc = $tradeInService->formatMinusDescription(
+                $this->device_rules,
+                $this->selected_rules,
+                $this->old_phone_additional_note
+            );
 
-            $rulesByKey = collect($this->device_rules)->keyBy('key');
+            $tradeInUserId = Auth::id();
+            $handledBy = null;
+            $status = 'WAITING_FOR_DEVICE';
 
-            // Array baru untuk menampung data yang sudah dikelompokkan per kategori
-            $groupedSelections = [];
+            if ($isFL) {
+                if ($this->isNewCustomer) {
+                    $newUser = $tradeInService->registerOfflineCustomer([
+                        'name' => $this->name,
+                        'email' => $this->email,
+                        'mobilePhone' => $this->mobilePhone,
+                        'nik' => $this->nik,
+                        'npwp' => $this->npwp,
+                        'foto_ktp' => $this->foto_ktp,
+                        'bank_name' => $this->bank_name,
+                        'account_number' => $this->account_number,
+                        'account_name' => $this->account_name,
+                    ]);
 
-            foreach ($this->selected_rules as $key => $value) {
-                $ruleId = null;
-
-                // Logika pembacaan nilai dari checkbox (boolean) atau radio (string)
-                if (is_bool($value) && $value) {
-                    $ruleId = $key;
-                } elseif (is_string($value) && !empty($value)) {
-                    $ruleId = $value;
+                    $tradeInUserId = $newUser->id;
+                } else {
+                    $tradeInUserId = $this->selectedCustomerId;
                 }
-
-                if ($ruleId) {
-                    $rule = $rulesByKey->get($ruleId);
-                    if ($rule) {
-                        $categoryName = $rule['category']; // Ambil nama kategori (misal: "Kondisi Fisik", "Kelengkapan")
-
-                        // Masukkan nama kondisi ke dalam kelompok kategorinya
-                        $groupedSelections[$categoryName][] = $rule['name'];
-                    }
-                }
+                
+                $handledBy = Auth::id();
+                $status = 'INSPECTING';
+            } else {
             }
 
-            // Merakit array kelompok menjadi string kalimat yang rapi
-            $formattedConditions = [];
-            foreach ($groupedSelections as $category => $items) {
-                // Gabungkan item-item dalam satu kategori dengan koma. Contoh: "Lecet Wajar, Layar Retak"
-                $joinedItems = implode(', ', $items);
+            $targetProductType = $this->targetType === 'new' ? \App\Models\Product::class : \App\Models\SecondProduct::class;
+            $productVariantType = $this->targetType === 'new' ? \App\Models\ProductVariant::class : \App\Models\SecondProductVariant::class;
 
-                // Gabungkan dengan nama kategorinya. Contoh: "Kondisi Fisik: Lecet Wajar, Layar Retak"
-                $formattedConditions[] = "{$category}: {$joinedItems}";
-            }
-
-            // Gabungkan semua kategori yang sudah diformat dengan tanda pemisah " | " atau ", "
-            $kondisi = !empty($formattedConditions)
-                ? implode(' | ', $formattedConditions)
-                : 'Mulus / Normal';
-
-            $catatanText = $this->old_phone_additional_note
-                ? ". Catatan Tambahan: {$this->old_phone_additional_note}"
-                : "";
-
-            // Hasil akhir: "Kondisi Fisik: Lecet Wajar | Kelengkapan: Fullset. Catatan Tambahan: Casing belakang agak kotor"
-            $minusDesc = "{$kondisi}{$catatanText}";
-
-            // 0. Hit API Accurate jika user belum punya ID Vendor
-            try {
-                app(\App\Services\AccurateService::class)->syncVendor(Auth::user());
-            } catch (\Exception $e) {
-                // Log error jika gagal hit accurate, tapi biarkan proses berlanjut
-                \Illuminate\Support\Facades\Log::error('Failed to sync vendor to Accurate: ' . $e->getMessage());
-            }
-
-            // 1. Simpan Model
-            $tradeIn = TradeInModel::create([
-                'user_id' => Auth::id(),
+            $tradeInService->createTradeInRequest([
+                'user_id' => $tradeInUserId,
+                'target_product_type' => $targetProductType,
                 'target_product_id' => $this->selectedProductId,
+                'product_variant_type' => $productVariantType,
+                'product_variant_id' => $this->selectedTargetVariantId,
                 'buyback_device_id' => $device->id,
-                // UBAH BAGIAN INI (Sesuaikan dengan nama kolom di tabel database)
                 'old_phone_brand'   => $device->brand->name,
                 'old_phone_model'   => $device->model_name,
                 'old_phone_ram'     => $device->ram,
                 'old_phone_storage' => $device->storage,
                 'old_phone_minus_desc' => $minusDesc,
                 'appraised_value' => $this->final_price,
-                'status' => 'WAITING_FOR_DEVICE',
+                'status' => $status,
+                'handled_by' => $handledBy,
+            ], [
+                'photo_depan' => $this->photo_depan,
+                'photo_belakang' => $this->photo_belakang,
+                'photo_kiri' => $this->photo_kiri,
+                'photo_kanan' => $this->photo_kanan,
+                'photo_kelengkapan' => $this->photo_kelengkapan,
             ]);
 
-            // 1. Petakan semua properti slot ke dalam array beserta label custom-nya
-            $slots = [
-                'photo_depan' => 'Tampak Depan',
-                'photo_belakang' => 'Tampak Belakang',
-                'photo_kiri' => 'Samping Kiri',
-                'photo_kanan' => 'Samping Kanan',
-                'photo_kelengkapan' => 'Kelengkapan',
-            ];
-
-            // 2. Loop tiap slot dan upload jika filenya ada
-            foreach ($slots as $propertyName => $label) {
-                if ($this->$propertyName) {
-                    $photo = $this->$propertyName;
-
-                    $tradeIn->addMedia($photo->getRealPath())
-                        ->usingFileName($photo->getClientOriginalName())
-                        // Menyimpan info posisi foto ke dalam custom property Spatie
-                        ->withCustomProperties([
-                            'position' => str_replace('photo_', '', $propertyName), // Hasilnya: 'depan', 'belakang', dll
-                            'label' => $label
-                        ])
-                        ->toMediaCollection('photos');
-                }
-            }
-
             session()->flash('message', 'Pengajuan berhasil dikirim!');
-
-            // Cek apakah route ini benar ada di web.php kamu?
             return redirect()->to('/trade-in-history');
-        } catch (\Throwable $e) { // Throwable akan menangkap Exception DAN Error fatal
-            session()->flash('error', 'Terjadi kesalahan sistem');
+        } catch (\Throwable $e) {
+            session()->flash('error', 'Terjadi kesalahan sistem: ' . $e->getMessage());
             \Illuminate\Support\Facades\Log::error($e->getMessage());
         }
     }
 
     public function updatedSelectedTargetBrand()
     {
-        // Reset pilihan produk saat user mengganti brand
         $this->selectedProductId = null;
+        $this->selectedTargetVariantId = null;
+        $this->availableTargetVariants = [];
     }
+
     public function render()
     {
-        $targetProducts = Product::query();
+        if ($this->targetType === 'new') {
+            $targetProducts = \App\Models\Product::where('is_active', true);
+            $brandIds = \App\Models\Product::where('is_active', true)->select('brand_id')->distinct();
+        } else {
+            $targetProducts = SecondProduct::where('is_active', true);
+            $brandIds = SecondProduct::where('is_active', true)->select('brand_id')->distinct();
+        }
 
         if ($this->selectedTargetBrand) {
             $targetProducts->whereHas('brand', function ($q) {
                 $q->where('name', $this->selectedTargetBrand);
             });
         } elseif ($this->selectedProductId) {
-            // Fallback: Jika ada product ID tapi brand belum terpilih (misal saat inisiasi)
-            // Tetap tampilkan setidaknya produk yang dipilih tersebut
             $targetProducts->where('id', $this->selectedProductId);
         } else {
             $targetProducts->whereRaw('1 = 0');
@@ -368,7 +399,7 @@ class TradeIn extends Component
 
         return view('livewire.pages.trade-in', [
             'products' => $targetProducts->get(),
-            'brands' => \App\Models\Brand::whereIn('id', \App\Models\BuybackDevice::where('is_active', true)->select('brand_id')->distinct())->orderBy('name')->get(),
+            'brands' => \App\Models\Brand::whereIn('id', $brandIds)->orderBy('name')->get(),
         ]);
     }
 }

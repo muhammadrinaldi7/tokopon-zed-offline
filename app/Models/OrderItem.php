@@ -14,7 +14,7 @@ class OrderItem extends Model
     }
     public function variant()
     {
-        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
+        return $this->morphTo(__FUNCTION__, 'product_variant_type', 'product_variant_id');
     }
 
     public function review()

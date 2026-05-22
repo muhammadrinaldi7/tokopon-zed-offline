@@ -113,7 +113,7 @@
                 </div>
             @elseif($tradeIn->status === 'OFFERED')
                 <div class="mt-8">
-                    <p class="text-gray-900 font-black text-3xl">Pilih Varian Dibawah</p>
+                    {{-- <p class="text-gray-900 font-black text-3xl">Pilih Varian Dibawah</p> --}}
                     <p class="text-sm font-bold text-gray-400 uppercase tracking-widest mt-3 mb-2">Untuk Melihat
                         Kalkulasi Harga</p>
                     <div
@@ -208,12 +208,19 @@
                 </div>
             @endif
 
-            @if (in_array($tradeIn->status, ['WAITING_FOR_DEVICE', 'INSPECTING', 'PAYING', 'COMPLETED']))
+            @if (in_array($tradeIn->status, [
+                    'WAITING_FOR_DEVICE',
+                    'INSPECTING',
+                    'OFFERED',
+                    'PAYING',
+                    'COMPLETED',
+                    'WAITING_PAYMENT',
+                ]))
                 @php
-                    $selectedOption = $tradeIn->unitOptions->where('is_selected', true)->first();
+                    $variant = $tradeIn->productVariant;
                     $topupAmount = 0;
-                    if ($selectedOption) {
-                        $topupAmount = max(0, $selectedOption->variant->price - (float) $tradeIn->appraised_value);
+                    if ($variant) {
+                        $topupAmount = max(0, $variant->price - (float) $tradeIn->appraised_value);
                     }
                 @endphp
 
@@ -224,14 +231,41 @@
                             <span
                                 class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[10px] font-bold">Sedang
                                 Dicek BM Pusat</span>
+                        @elseif ($tradeIn->status === 'OFFERED')
+                            <span
+                                class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[10px] font-bold">Menunggu
+                                Persetujuan Anda</span>
                         @endif
                     </div>
 
-                    <p class="font-bold text-gray-800 mb-1">{{ $selectedOption?->variant->color }} -
-                        {{ $selectedOption?->variant->storage }}</p>
+                    <p class="font-bold text-gray-800 mb-1">{{ $variant?->color }} -
+                        {{ $variant?->storage }}</p>
                     <p class="text-sm text-gray-500 mb-4">Sisa Tagihan (Top-Up Terkunci): <span
                             class="font-bold text-[#4E44DB]">Rp {{ number_format($topupAmount, 0, ',', '.') }}</span>
                     </p>
+
+                    @if ($tradeIn->status === 'OFFERED')
+                        <div class="bg-amber-50 rounded-2xl p-6 border border-amber-200 mt-6">
+                            <h4 class="font-bold text-amber-800 mb-2 text-lg">Konfirmasi Sisa Tagihan</h4>
+                            <p class="text-sm text-amber-700 mb-6">Pihak toko telah selesai memverifikasi HP Lama Anda.
+                                Sisa tagihan (Top-Up) yang harus dibayar adalah sebesar <strong>Rp
+                                    {{ number_format($topupAmount, 0, ',', '.') }}</strong>. Silakan konfirmasi jika
+                                Anda setuju dengan nominal ini.</p>
+
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <button type="button" wire:click="rejectOffer"
+                                    wire:confirm="Anda yakin ingin menolak dan membatalkan transaksi Tukar Tambah ini secara sepihak?"
+                                    class="px-6 py-3 rounded-xl font-bold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 transition text-center">
+                                    Tolak Penawaran
+                                </button>
+                                <button type="button" wire:click="acceptOffer"
+                                    wire:confirm="Dengan menyetujui, Anda siap untuk membayar sisa tagihan tersebut. Lanjutkan?"
+                                    class="flex-1 px-6 py-3 rounded-xl font-bold bg-[#4E44DB] text-white hover:bg-indigo-700 shadow-md shadow-[#4E44DB]/30 transition text-center">
+                                    Ya, Setuju Lanjut Pembayaran
+                                </button>
+                            </div>
+                        </div>
+                    @endif
 
                     @if ($tradeIn->status === 'WAITING_FOR_DEVICE')
                         <div class="bg-[#00b16a]/5 rounded-2xl p-6 border border-[#00b16a]/20 mt-6">
@@ -255,7 +289,7 @@
                                 <span class="text-xs text-rose-500 mt-2 block font-medium">{{ $message }}</span>
                             @enderror
                         </div>
-                    @else
+                    @elseif ($tradeIn->customer_shipping_receipt)
                         <div
                             class="bg-gray-50 rounded-2xl p-5 border border-gray-200 mt-4 flex items-center justify-between">
                             <div>
@@ -275,7 +309,7 @@
                 </div>
             @endif
 
-            @if (in_array($tradeIn->status, ['PAYING', 'COMPLETED']))
+            @if (in_array($tradeIn->status, ['WAITING_PAYMENT', 'PAYING', 'COMPLETED']))
                 <div
                     class="bg-[#4E44DB] text-center rounded-3xl p-8 relative overflow-hidden text-white mt-8 shadow-xl shadow-[#4E44DB]/30">
                     <svg class="absolute -right-10 -bottom-10 w-48 h-48 text-white opacity-5" fill="currentColor"

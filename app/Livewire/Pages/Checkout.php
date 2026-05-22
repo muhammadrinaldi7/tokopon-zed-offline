@@ -244,6 +244,7 @@ class Checkout extends Component
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_variant_id' => $item->productVariant->id,
+                    'product_variant_type' => \App\Models\ProductVariant::class,
                     'qty' => $item->qty,
                     'price_at_checkout' => $item->productVariant->price,
                     'subtotal' => $item->qty * $item->productVariant->price,
