@@ -273,6 +273,22 @@
                                         <input type="text" wire:model="targetSN" class="w-full border border-gray-200 rounded-lg p-3 text-sm focus:border-[#1c69d4] focus:ring-0 transition-all font-bold text-[#1c69d4]" placeholder="Ketik SN / IMEI perangkat di sini">
                                         @error('targetSN') <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
                                     </div>
+                                    @if($tradeIn->topup_amount > 0)
+                                    <div>
+                                        <label class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1 block">
+                                            Rekening Penerima Uang Top-Up
+                                            <span class="text-rose-500">*</span>
+                                        </label>
+                                        <div class="text-[10px] text-gray-400 mb-2 leading-tight">Pilih rekening penerima agar uang masuk ke akun yang tepat di Accurate (Sales Receipt).</div>
+                                        <select wire:model="payment_method_id" class="w-full border border-gray-200 rounded-lg p-3 text-sm focus:border-[#1c69d4] focus:ring-0 transition-all font-bold text-gray-700 bg-white">
+                                            <option value="">-- Pilih Rekening Penerima --</option>
+                                            @foreach($available_payment_methods as $method)
+                                                <option value="{{ $method->id }}">{{ $method->name }} ({{ $method->accurate_bank_no }})</option>
+                                            @endforeach
+                                        </select>
+                                        @error('payment_method_id') <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
+                                    </div>
+                                    @endif
                                 </div>
                                 <div class="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
                                     <button wire:click="$set('showConfirmModal', false)" type="button" class="px-5 py-2.5 rounded-lg text-gray-600 font-bold bg-white border border-gray-200 hover:bg-gray-100 transition-all text-sm">Batal</button>

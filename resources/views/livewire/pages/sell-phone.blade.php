@@ -530,171 +530,256 @@
                 </h4>
                 {{-- Form Input Khusus Role FL --}}
                 @if (Auth::user() && Auth::user()->hasRole('fl'))
-                    <div class="mb-8 p-6 bg-neutral-50 rounded-3xl border border-neutral-100 space-y-4">
-                        <p class="text-xs font-black text-neutral-400 uppercase tracking-widest mb-2">
-                            Informasi Tambahan (FL)
-                        </p>
+                    <div class="mb-8 space-y-6">
+                        {{-- Tabs --}}
+                        <div class="flex p-1 bg-neutral-100 rounded-2xl w-fit">
+                            <button type="button" wire:click="$set('isNewCustomer', true)"
+                                class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all {{ $isNewCustomer ? 'bg-white text-violet-600 shadow-sm' : 'text-neutral-500 hover:text-neutral-700' }}">
+                                Pelanggan Baru
+                            </button>
+                            <button type="button" wire:click="$set('isNewCustomer', false)"
+                                class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all {{ !$isNewCustomer ? 'bg-white text-violet-600 shadow-sm' : 'text-neutral-500 hover:text-neutral-700' }}">
+                                Cari Pelanggan Lama
+                            </button>
+                        </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {{-- Input Nama --}}
-                            <div class="flex flex-col gap-1">
-                                <label for="name"
-                                    class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
-                                    Lengkap</label>
-                                <input type="text" id="name" wire:model="name" required
-                                    class="w-full px-4 py-3 text-sm bg-white border @error('name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
-                                    placeholder="Masukkan nama lengkap">
-                                @error('name')
-                                    <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
-                                @enderror
-                            </div>
+                        @if (!$isNewCustomer)
+                            {{-- Mode: Cari Pelanggan Lama --}}
+                            <div class="p-6 bg-neutral-50 rounded-3xl border border-neutral-100 space-y-4">
+                                <p class="text-xs font-black text-neutral-400 uppercase tracking-widest mb-2">
+                                    Pencarian Pelanggan (FL)
+                                </p>
 
-                            {{-- Input Mobile Phone --}}
-                            <div class="flex flex-col gap-1">
-                                <label for="mobilePhone"
-                                    class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nomor
-                                    HP</label>
-                                <input type="tel" id="mobilePhone" wire:model="mobilePhone" required
-                                    class="w-full px-4 py-3 text-sm bg-white border @error('mobilePhone') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
-                                    placeholder="Contoh: 08123456789">
-                                @error('mobilePhone')
-                                    <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
-                                @enderror
-                            </div>
-
-                            {{-- Input Email --}}
-                            <div class="flex flex-col gap-1">
-                                <label for="email"
-                                    class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Email</label>
-                                <input type="email" id="email" wire:model="email" required
-                                    class="w-full px-4 py-3 text-sm bg-white border @error('email') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
-                                    placeholder="Contoh: user@email.com">
-                                @error('email')
-                                    <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
-                                @enderror
-                            </div>
-
-                            {{-- Input NIK --}}
-                            <div class="flex flex-col gap-1">
-                                <label for="nik"
-                                    class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">NIK
-                                    (KTP)</label>
-                                <input type="text" id="nik" wire:model="nik" required maxlength="16"
-                                    class="w-full px-4 py-3 text-sm bg-white border @error('nik') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
-                                    placeholder="16 digit nomor NIK">
-                                @error('nik')
-                                    <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
-                                @enderror
-                            </div>
-
-                            {{-- Input NPWP --}}
-                            <div class="flex flex-col gap-1 md:col-span-2">
-                                <label for="npwp"
-                                    class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">NPWP
-                                    (Opsional)</label>
-                                <input type="text" id="npwp" wire:model="npwp"
-                                    class="w-full px-4 py-3 text-sm bg-white border @error('npwp') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
-                                    placeholder="Masukkan nomor NPWP">
-                                @error('npwp')
-                                    <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
-                                @enderror
-                            </div>
-
-                            {{-- Upload Foto KTP --}}
-                            <div class="flex flex-col gap-1 md:col-span-2">
-                                <label class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Upload
-                                    Foto KTP</label>
-                                <div class="relative flex items-center justify-center w-full">
-                                    <label for="foto_ktp"
-                                        class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer bg-white hover:bg-neutral-50 transition-colors @error('foto_ktp') border-red-400 @else border-neutral-200 @enderror">
-                                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
-
-                                            {{-- Indikator Loading upload file --}}
-                                            <div wire:loading wire:target="foto_ktp"
-                                                class="text-xs text-violet-600 font-bold mb-2 animate-pulse">
-                                                Memproses foto KTP...
-                                            </div>
-
-                                            <div wire:loading.remove wire:target="foto_ktp"
-                                                class="flex flex-col items-center justify-center">
-                                                @if ($foto_ktp)
-                                                    <p
-                                                        class="mb-1 text-xs text-emerald-600 font-bold flex items-center gap-1">
-                                                        ✓ KTP Berhasil Dimuat
-                                                    </p>
-                                                    <p class="text-[10px] text-neutral-500">
-                                                        {{ $foto_ktp->getClientOriginalName() }}</p>
-                                                @else
-                                                    <svg class="w-8 h-8 mb-2 text-neutral-400" aria-hidden="true"
-                                                        xmlns="http://www.w3.org/2000/svg" fill="none"
-                                                        viewBox="0 0 20 16">
-                                                        <path stroke="currentColor" stroke-linecap="round"
-                                                            stroke-linejoin="round" stroke-width="2"
-                                                            d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
-                                                    </svg>
-                                                    <p class="mb-1 text-xs text-neutral-500 font-medium">Klik untuk
-                                                        upload foto KTP</p>
-                                                    <p class="text-[10px] text-neutral-400 uppercase">PNG, JPG, JPEG
-                                                        (Max. 2MB)</p>
-                                                @endif
-                                            </div>
+                                @if ($selectedCustomerId)
+                                    @php $selectedUser = \App\Models\User::find($selectedCustomerId); @endphp
+                                    <div
+                                        class="p-4 bg-violet-50 border border-violet-100 rounded-2xl flex items-center justify-between">
+                                        <div>
+                                            <p
+                                                class="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-1">
+                                                Pelanggan Terpilih</p>
+                                            <h3 class="font-bold text-neutral-800">{{ $selectedUser->name }}</h3>
+                                            <p class="text-xs text-neutral-500">{{ $selectedUser->email }} •
+                                                {{ $selectedUser->profile->phone_number ?? '-' }}</p>
                                         </div>
-                                        {{-- DISESUAIKAN: wire:model diganti ke foto_ktp agar sinkron dengan Class --}}
-                                        <input id="foto_ktp" wire:model="foto_ktp" type="file" accept="image/*"
-                                            required class="hidden" />
-                                    </label>
+                                        <button type="button" wire:click="clearSelectedCustomer"
+                                            class="text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-colors font-bold text-sm">
+                                            Batal
+                                        </button>
+                                    </div>
+                                    <input type="hidden" wire:model="selectedCustomerId"
+                                        value="{{ $selectedCustomerId }}">
+                                @else
+                                    <div class="relative">
+                                        <div
+                                            class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                            <svg class="h-5 w-5 text-neutral-400" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <input type="text" wire:model.live.debounce.300ms="searchCustomer"
+                                            class="w-full pl-11 pr-4 py-3 text-sm bg-white border @error('selectedCustomerId') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            placeholder="Cari nama, email, atau no HP...">
+                                    </div>
+
+                                    @if (strlen($searchCustomer) >= 2)
+                                        <div
+                                            class="bg-white border border-neutral-100 rounded-2xl shadow-lg max-h-60 overflow-y-auto divide-y mt-2 overflow-hidden">
+                                            @forelse($this->customerResults as $user)
+                                                <div wire:click="selectCustomer({{ $user->id }})"
+                                                    class="p-4 hover:bg-neutral-50 cursor-pointer transition-colors flex justify-between items-center group">
+                                                    <div>
+                                                        <h4 class="font-bold text-neutral-800">{{ $user->name }}
+                                                        </h4>
+                                                        <p class="text-xs text-neutral-500">{{ $user->email }} •
+                                                            {{ $user->profile->phone_number ?? '-' }}</p>
+                                                    </div>
+                                                    <span
+                                                        class="text-violet-500 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">Pilih</span>
+                                                </div>
+                                            @empty
+                                                <div class="p-4 text-center text-neutral-500 text-sm">
+                                                    Pelanggan tidak ditemukan.
+                                                </div>
+                                            @endforelse
+                                        </div>
+                                    @endif
+                                @endif
+                                @error('selectedCustomerId')
+                                    <span class="text-red-500 text-xs font-bold mt-1 block">{{ $message }}</span>
+                                @enderror
+                            </div>
+                        @else
+                            {{-- Mode: Registrasi Pelanggan Baru --}}
+                            <div class="mb-8 p-6 bg-neutral-50 rounded-3xl border border-neutral-100 space-y-4">
+                                <p class="text-xs font-black text-neutral-400 uppercase tracking-widest mb-2">
+                                    Informasi Tambahan (FL)
+                                </p>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {{-- Input Nama --}}
+                                    <div class="flex flex-col gap-1">
+                                        <label for="name"
+                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
+                                            Lengkap</label>
+                                        <input type="text" id="name" wire:model="name" required
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            placeholder="Masukkan nama lengkap">
+                                        @error('name')
+                                            <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Input Mobile Phone --}}
+                                    <div class="flex flex-col gap-1">
+                                        <label for="mobilePhone"
+                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nomor
+                                            HP</label>
+                                        <input type="tel" id="mobilePhone" wire:model="mobilePhone" required
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('mobilePhone') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            placeholder="Contoh: 08123456789">
+                                        @error('mobilePhone')
+                                            <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Input Email --}}
+                                    <div class="flex flex-col gap-1">
+                                        <label for="email"
+                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Email</label>
+                                        <input type="email" id="email" wire:model="email" required
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('email') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            placeholder="Contoh: user@email.com">
+                                        @error('email')
+                                            <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Input NIK --}}
+                                    <div class="flex flex-col gap-1">
+                                        <label for="nik"
+                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">NIK
+                                            (KTP)</label>
+                                        <input type="text" id="nik" wire:model="nik" required maxlength="16"
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('nik') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            placeholder="16 digit nomor NIK">
+                                        @error('nik')
+                                            <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Input NPWP --}}
+                                    <div class="flex flex-col gap-1 md:col-span-2">
+                                        <label for="npwp"
+                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">NPWP
+                                            (Opsional)</label>
+                                        <input type="text" id="npwp" wire:model="npwp"
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('npwp') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            placeholder="Masukkan nomor NPWP">
+                                        @error('npwp')
+                                            <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Upload Foto KTP --}}
+                                    <div class="flex flex-col gap-1 md:col-span-2">
+                                        <label class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Upload
+                                            Foto KTP</label>
+                                        <div class="relative flex items-center justify-center w-full">
+                                            <label for="foto_ktp"
+                                                class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer bg-white hover:bg-neutral-50 transition-colors @error('foto_ktp') border-red-400 @else border-neutral-200 @enderror">
+                                                <div class="flex flex-col items-center justify-center pt-5 pb-6">
+
+                                                    {{-- Indikator Loading upload file --}}
+                                                    <div wire:loading wire:target="foto_ktp"
+                                                        class="text-xs text-violet-600 font-bold mb-2 animate-pulse">
+                                                        Memproses foto KTP...
+                                                    </div>
+
+                                                    <div wire:loading.remove wire:target="foto_ktp"
+                                                        class="flex flex-col items-center justify-center">
+                                                        @if ($foto_ktp)
+                                                            <p
+                                                                class="mb-1 text-xs text-emerald-600 font-bold flex items-center gap-1">
+                                                                ✓ KTP Berhasil Dimuat
+                                                            </p>
+                                                            <p class="text-[10px] text-neutral-500">
+                                                                {{ $foto_ktp->getClientOriginalName() }}</p>
+                                                        @else
+                                                            <svg class="w-8 h-8 mb-2 text-neutral-400" aria-hidden="true"
+                                                                xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                                viewBox="0 0 20 16">
+                                                                <path stroke="currentColor" stroke-linecap="round"
+                                                                    stroke-linejoin="round" stroke-width="2"
+                                                                    d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
+                                                            </svg>
+                                                            <p class="mb-1 text-xs text-neutral-500 font-medium">Klik untuk
+                                                                upload foto KTP</p>
+                                                            <p class="text-[10px] text-neutral-400 uppercase">PNG, JPG, JPEG
+                                                                (Max. 2MB)</p>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <input id="foto_ktp" wire:model="foto_ktp" type="file" accept="image/*"
+                                                    required class="hidden" />
+                                            </label>
+                                        </div>
+                                        @error('foto_ktp')
+                                            <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
+                                        @enderror
+                                    </div>
                                 </div>
-                                @error('foto_ktp')
-                                    <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
-                                @enderror
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mb-8 p-6 bg-neutral-50 rounded-3xl border border-neutral-100 space-y-4">
-                        <p class="text-xs font-black text-neutral-400 uppercase tracking-widest mb-2">
-                            Informasi Account Transfer User (FL)
-                        </p>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {{-- Input Nama --}}
-                            <div class="flex flex-col gap-1">
-                                <label for="bank_name"
-                                    class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
-                                    Bank</label>
-                                <input type="text" id="bank_name" wire:model="bank_name" required
-                                    class="w-full px-4 py-3 text-sm bg-white border @error('bank_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
-                                    placeholder="Masukkan Nama Bank">
-                                @error('bank_name')
-                                    <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
-                                @enderror
                             </div>
 
-                            {{-- Input Mobile Phone --}}
-                            <div class="flex flex-col gap-1">
-                                <label for="account_number"
-                                    class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nomor
-                                    Rekening</label>
-                                <input type="number" id="account_number" wire:model="account_number" required
-                                    class="w-full px-4 py-3 text-sm bg-white border @error('account_number') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
-                                    placeholder="Contoh: 3121321312312">
-                                @error('account_number')
-                                    <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
-                                @enderror
-                            </div>
+                            <div class="mb-8 p-6 bg-neutral-50 rounded-3xl border border-neutral-100 space-y-4">
+                                <p class="text-xs font-black text-neutral-400 uppercase tracking-widest mb-2">
+                                    Informasi Account Transfer User (FL)
+                                </p>
 
-                            {{-- Input Email --}}
-                            <div class="flex flex-col gap-1">
-                                <label for="account_name"
-                                    class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
-                                    Pemilik Rekening</label>
-                                <input type="text" id="account_name" wire:model="account_name" required
-                                    class="w-full px-4 py-3 text-sm bg-white border @error('account_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
-                                    placeholder="Contoh: user">
-                                @error('account_name')
-                                    <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
-                                @enderror
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {{-- Input Nama --}}
+                                    <div class="flex flex-col gap-1">
+                                        <label for="bank_name"
+                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
+                                            Bank</label>
+                                        <input type="text" id="bank_name" wire:model="bank_name" required
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('bank_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            placeholder="Masukkan Nama Bank">
+                                        @error('bank_name')
+                                            <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Input Mobile Phone --}}
+                                    <div class="flex flex-col gap-1">
+                                        <label for="account_number"
+                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nomor
+                                            Rekening</label>
+                                        <input type="number" id="account_number" wire:model="account_number" required
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('account_number') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            placeholder="Contoh: 3121321312312">
+                                        @error('account_number')
+                                            <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Input Email --}}
+                                    <div class="flex flex-col gap-1">
+                                        <label for="account_name"
+                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
+                                            Pemilik Rekening</label>
+                                        <input type="text" id="account_name" wire:model="account_name" required
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('account_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            placeholder="Contoh: user">
+                                        @error('account_name')
+                                            <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                        @enderror
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        @endif
                     </div>
                 @endif
                 <div class="space-y-6 relative">

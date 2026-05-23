@@ -65,14 +65,14 @@ class TradeIn extends Component
     {
         if (strlen($this->searchCustomer) < 2) return [];
 
-        return User::whereHas('roles', function($q) {
+        return User::whereHas('roles', function ($q) {
             $q->where('name', 'user');
-        })->where(function($q) {
+        })->where(function ($q) {
             $q->where('name', 'like', '%' . $this->searchCustomer . '%')
-              ->orWhere('email', 'like', '%' . $this->searchCustomer . '%')
-              ->orWhereHas('profile', function($q2) {
-                  $q2->where('phone_number', 'like', '%' . $this->searchCustomer . '%');
-              });
+                ->orWhere('email', 'like', '%' . $this->searchCustomer . '%')
+                ->orWhereHas('profile', function ($q2) {
+                    $q2->where('phone_number', 'like', '%' . $this->searchCustomer . '%');
+                });
         })->take(5)->get();
     }
 
@@ -184,7 +184,7 @@ class TradeIn extends Component
             $this->buyback_device = \App\Models\BuybackDevice::with('tier')->find($this->buyback_device_id);
             $this->device_rules = $this->buyback_device ? $this->buyback_device->getFlatRules() : [];
             $this->selected_rules = [];
-            
+
             // Invoke Livewire dependency injection for calculatePrice
             $this->calculatePrice(app(\App\Services\TradeInService::class));
         } else {
@@ -301,7 +301,7 @@ class TradeIn extends Component
 
         try {
             $device = \App\Models\BuybackDevice::with('brand')->find($this->buyback_device_id);
-            
+
             $minusDesc = $tradeInService->formatMinusDescription(
                 $this->device_rules,
                 $this->selected_rules,
@@ -330,7 +330,7 @@ class TradeIn extends Component
                 } else {
                     $tradeInUserId = $this->selectedCustomerId;
                 }
-                
+
                 $handledBy = Auth::id();
                 $status = 'INSPECTING';
             } else {

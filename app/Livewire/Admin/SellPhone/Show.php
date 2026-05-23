@@ -118,15 +118,32 @@ class Show extends Component
 
             // Opsional: Cek struktur datanya sebelum di-hit ke API Accurate
             // dd($this->dataParamPurchaseInvoice);
-            // 4. Eksekusi Service API dengan Try-Catch
-            DB::beginTransaction();
             try {
-                // Hit API menggunakan service yang di-inject
-                $accurateResponse = app(AccurateService::class)->postPurchaseInvoice($this->dataParamPurchaseInvoice);
-                Log::info('data invoice yang masuk ke accurate : ', ['data' => $this->dataParamPurchaseInvoice, 'response' => $accurateResponse]);
+                // 3. Sync Vendor ke Accurate agar Vendor No pasti terisi/terupdate
+                $accurateService = app(AccurateService::class);
+                $customerUser = $phoneData->user;
+                $accurateService->syncVendor($customerUser, 'second');
+                $customerUser->refresh();
+                
+                // Update vendor No di param
+                $this->dataParamPurchaseInvoice['vendorNo'] = str_replace('"', '', $customerUser->accurate_vendor_no) ?? 'V-CASH';
+
+                // 4. Hit API menggunakan service yang di-inject JIKA BELUM ADA
+                if (!$this->sellPhone->invoice_number) {
+                    $accurateResponse = $accurateService->postPurchaseInvoice($this->dataParamPurchaseInvoice, 'second');
+                    Log::info('data invoice yang masuk ke accurate : ', ['data' => $this->dataParamPurchaseInvoice, 'response' => $accurateResponse]);
+                    
+                    if (isset($accurateResponse['r']['number'])) {
+                        // Simpan state secara iteratif
+                        $this->sellPhone->update(['invoice_number' => $accurateResponse['r']['number']]);
+                    } else {
+                        // Fallback jika tidak ada number
+                        $this->sellPhone->update(['invoice_number' => $billNumber]);
+                    }
+                }
+
                 // JIKA BERHASIL: Update status dan redirect
                 $this->sellPhone->update([
-                    'invoice_number' => $billNumber,
                     'status' => 'COMPLETED'
                 ]);
 
@@ -135,12 +152,10 @@ class Show extends Component
                     'title' => 'Success',
                     'message' => 'Invoice Accurate Berhasil Dibuat. Pengajuan Jual HP Selesai.'
                 ]);
-                DB::commit();
                 return $this->redirect(route('admin.sell-phone.index'));
             } catch (\Exception $e) {
                 // JIKA GAGAL: Tangkap error dari service dan tampilkan ke user via Toast
                 // Status SellPhone TIDAK diupdate ke COMPLETED, sehingga user bisa mencoba klik submit lagi
-                DB::rollBack();
                 Log::error('API Accurate Failed: ' . $e->getMessage());
                 $this->dispatch('toast', [
                     'type' => 'error',

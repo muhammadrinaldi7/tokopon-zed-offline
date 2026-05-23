@@ -9,6 +9,7 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Computed;
 use Livewire\WithFileUploads;
 
 class SellPhone extends Component
@@ -27,6 +28,11 @@ class SellPhone extends Component
     public $account_name;
 
     public $bank_name;
+
+    // FL Customer Search
+    public $isNewCustomer = true;
+    public $searchCustomer = '';
+    public $selectedCustomerId = null;
 
     // END KEPERLUAN DATA USER DI FL
 
@@ -52,6 +58,33 @@ class SellPhone extends Component
     public $available_models = [];
     public $available_storages = [];
     public $buyback_device = null;
+
+    #[Computed]
+    public function customerResults()
+    {
+        if (strlen($this->searchCustomer) < 2) return [];
+
+        return User::whereHas('roles', function ($q) {
+            $q->where('name', 'user');
+        })->where(function ($q) {
+            $q->where('name', 'like', '%' . $this->searchCustomer . '%')
+                ->orWhere('email', 'like', '%' . $this->searchCustomer . '%')
+                ->orWhereHas('profile', function ($q2) {
+                    $q2->where('phone_number', 'like', '%' . $this->searchCustomer . '%');
+                });
+        })->take(5)->get();
+    }
+
+    public function selectCustomer($id)
+    {
+        $this->selectedCustomerId = $id;
+        $this->searchCustomer = '';
+    }
+
+    public function clearSelectedCustomer()
+    {
+        $this->selectedCustomerId = null;
+    }
 
     public function updatedSelectedBrandId()
     {
@@ -171,15 +204,19 @@ class SellPhone extends Component
         ];
         // JIKA USER ADALAH FL, TAMBAHKAN VALIDASI REGISTRASI CUSTOMER OFFLINE
         if (Auth::check() && User::findOrFail(Auth::user()->id)->hasRole('fl')) {
-            $rules['name']        = 'required|string|max:255';
-            $rules['mobilePhone'] = 'required|string|max:15';
-            $rules['email']       = 'required|email|unique:users,email';
-            $rules['nik']         = 'required|numeric|digits:16|unique:users,nik'; // Sesuaikan field NIK di table user Anda
-            $rules['npwp']        = 'nullable|string|max:20';
-            $rules['foto_ktp']    = 'required|image|max:2048'; // Max 2MB
-            $rules['account_number'] = 'required|string|max:20';
-            $rules['account_name'] = 'required|string|max:20';
-            $rules['bank_name'] = 'required|string|max:20';
+            if ($this->isNewCustomer) {
+                $rules['name']        = 'required|string|max:255';
+                $rules['mobilePhone'] = 'required|string|max:15';
+                $rules['email']       = 'required|email|unique:users,email';
+                $rules['nik']         = 'required|numeric|digits:16|unique:users,nik'; // Sesuaikan field NIK di table user Anda
+                $rules['npwp']        = 'nullable|string|max:20';
+                $rules['foto_ktp']    = 'required|image|max:2048'; // Max 2MB
+                $rules['account_number'] = 'required|string|max:20';
+                $rules['account_name'] = 'required|string|max:20';
+                $rules['bank_name'] = 'required|string|max:20';
+            } else {
+                $rules['selectedCustomerId'] = 'required|exists:users,id';
+            }
         }
         return $rules;
     }
@@ -223,6 +260,7 @@ class SellPhone extends Component
         'account_number.required' => 'Nomor Rekening wajib diisi.',
         'account_name.required' => 'Nama Pemilik Rekening wajib diisi.',
         'bank_name.required' => 'Nama Bank wajib diisi.',
+        'selectedCustomerId.required' => 'Silakan cari dan pilih pelanggan terlebih dahulu.',
     ];
 
     public function submit()
@@ -240,41 +278,47 @@ class SellPhone extends Component
             // 1. Jalankan Validasi (Otomatis memuat rules tambahan milik FL)
             $this->validate();
 
-            // 2. Buat User Baru untuk Customer Offline
-            $customer = User::create([
-                'name'         => $this->name,
-                // 'mobile_phone' => $this->mobilePhone, // Sesuaikan nama kolom table users Anda
-                'email'        => $this->email,
-                'nik'          => $this->nik,
-                'npwp'         => $this->npwp,
-                'password'     => \Illuminate\Support\Facades\Hash::make($this->nik), // Hash otomatis dari NIK
-            ]);
-            if ($customer) {
-                $customer->assignRole('user');
-                $customer->profile()->create([
-                    'user_id'      => $customer->id,
-                    'full_name'    => $this->name,
-                    'phone_number' => $this->mobilePhone,
+            if ($this->isNewCustomer) {
+                // 2. Buat User Baru untuk Customer Offline
+                $customer = User::create([
+                    'name'         => $this->name,
+                    // 'mobile_phone' => $this->mobilePhone, // Sesuaikan nama kolom table users Anda
+                    'email'        => $this->email,
+                    'nik'          => $this->nik,
+                    'npwp'         => $this->npwp,
+                    'password'     => \Illuminate\Support\Facades\Hash::make($this->nik), // Hash otomatis dari NIK
                 ]);
+                if ($customer) {
+                    $customer->assignRole('user');
+                    $customer->profile()->create([
+                        'user_id'      => $customer->id,
+                        'full_name'    => $this->name,
+                        'phone_number' => $this->mobilePhone,
+                    ]);
 
-                $customer->bankAccounts()->create([
-                    'account_number' => $this->account_number,
-                    'account_name'   => $this->account_name,
-                    'bank_name'      => $this->bank_name,
-                ]);
-            }
-            event(new Registered($customer));
-            // 3. Upload Foto KTP Customer Baru menggunakan Spatie Media Library / Storage biasa
-            // Jika User model menggunakan Spatie Media Library:
-            if ($this->foto_ktp) {
-                $customer->addMedia($this->foto_ktp->getRealPath())
-                    ->usingFileName($this->foto_ktp->getClientOriginalName())
-                    ->toMediaCollection('ktp_photo'); // Sesuaikan nama collection Anda
-            }
+                    $customer->bankAccounts()->create([
+                        'account_number' => $this->account_number,
+                        'account_name'   => $this->account_name,
+                        'bank_name'      => $this->bank_name,
+                    ]);
+                }
+                event(new Registered($customer));
+                // 3. Upload Foto KTP Customer Baru menggunakan Spatie Media Library / Storage biasa
+                // Jika User model menggunakan Spatie Media Library:
+                if ($this->foto_ktp) {
+                    $customer->addMedia($this->foto_ktp->getRealPath())
+                        ->usingFileName($this->foto_ktp->getClientOriginalName())
+                        ->toMediaCollection('ktp_photo'); // Sesuaikan nama collection Anda
+                }
 
-            // Alihkan ID user yang akan disimpan di SellPhone ke ID customer baru ini
-            $userIdToSave = $customer->id;
-            $userForAccurate = $customer;
+                // Alihkan ID user yang akan disimpan di SellPhone ke ID customer baru ini
+                $userIdToSave = $customer->id;
+                $userForAccurate = $customer;
+            } else {
+                $customer = User::findOrFail($this->selectedCustomerId);
+                $userIdToSave = $customer->id;
+                $userForAccurate = $customer;
+            }
         } else {
             // LOGIKA LAMA UNTUK USER ONLINE UMUM
             $user = User::findOrFail(Auth::user()->id);
@@ -411,6 +455,12 @@ class SellPhone extends Component
             'nik',
             'npwp',
             'foto_ktp',
+            'account_number',
+            'account_name',
+            'bank_name',
+            'isNewCustomer',
+            'searchCustomer',
+            'selectedCustomerId',
             'selected_brand_id',
             'selected_model_name',
             'buyback_device_id',

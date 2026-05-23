@@ -38,6 +38,9 @@ class Show extends Component
     public $secondCondition = 'Bekas';
     public $existingProductId = null; // Opsional: gabung ke parent "iPhone 13 Pro Max - Second" yang sudah ada
 
+    // Payment Method
+    public $payment_method_id;
+    public $available_payment_methods = [];
     public function mount(TradeIn $tradeIn)
     {
         $this->tradeIn = $tradeIn->load(['user', 'targetProduct', 'media', 'unitOptions.variant', 'buybackDevice.tier']);
@@ -133,10 +136,16 @@ class Show extends Component
     public function promptConfirmPayment()
     {
         if ($this->tradeIn->status !== 'WAITING_PAYMENT') return;
+
         $this->oldPhoneSN = 'TRD-SN-' . str_pad($this->tradeIn->id, 4, '0', STR_PAD_LEFT);
-        // dd($this->tradeIn->topup_amount);
-        $accurateService = app(\App\Services\AccurateService::class)->itemDetailDo($this->tradeIn->productVariant->sku);
         $this->targetSN = '';
+
+        $this->available_payment_methods = \App\Models\PaymentMethod::where('is_active', true)->get();
+        if ($this->available_payment_methods->count() > 0) {
+            $this->payment_method_id = $this->available_payment_methods->first()->id;
+        }
+        // dd($this->available_payment_methods);
+
         $this->showConfirmModal = true;
     }
 
@@ -147,6 +156,7 @@ class Show extends Component
         $this->validate([
             'oldPhoneSN' => 'required|string',
             'targetSN' => 'required|string',
+            'payment_method_id' => 'required|exists:payment_methods,id'
         ]);
 
         $handler = $this->tradeIn->handledBy ?? Auth::user();
@@ -154,37 +164,39 @@ class Show extends Component
         $warehouseName = $handler && $handler->warehouse ? $handler->warehouse->name : 'Head Office';
 
         try {
-            DB::transaction(function () use ($branchName, $warehouseName) {
-                // Update Order and Payment
-                $order = $this->tradeIn->order;
-                if ($order) {
-                    $order->update(['order_status' => 'COMPLETED']);
-                    $payment = $order->payments()->where('status', 'PENDING')->first();
-                    if ($payment) {
-                        $payment->update(['status' => 'PAID']);
-                    }
+            // Update Order and Payment locally (Aman dari rollback)
+            $order = $this->tradeIn->order;
+            if ($order && $order->order_status !== 'COMPLETED') {
+                $order->update(['order_status' => 'COMPLETED']);
+                $payment = $order->payments()->where('status', 'PENDING')->first();
+                if ($payment) {
+                    $payment->update([
+                        'status' => 'PAID',
+                        'payment_method_id' => $this->payment_method_id
+                    ]);
                 }
+            }
 
-                // Accurate hits (PI, SI, SR)
-                $isNew = $this->tradeIn->target_product_type === \App\Models\Product::class;
-                $dbSource = $isNew ? 'syihab' : 'second';
-                $variant = $this->tradeIn->productVariant;
-                $productName = $isNew ? $variant->product->name : $variant->secondProduct->name;
+            // Accurate hits (PI, SI, SR)
+            $isNew = $this->tradeIn->target_product_type === \App\Models\Product::class;
+            $dbSource = $isNew ? 'syihab' : 'second';
+            $variant = $this->tradeIn->productVariant;
+            $productName = $isNew ? $variant->product->name : $variant->secondProduct->name;
 
-                // 0. Sync Vendor & Customer ke Accurate (agar vendorNo dan customerNo pasti terisi)
-                $accurateService = app(\App\Services\AccurateService::class);
-                $customerUser = $this->tradeIn->user;
+            // 0. Sync Vendor & Customer ke Accurate (agar vendorNo dan customerNo pasti terisi)
+            $accurateService = app(\App\Services\AccurateService::class);
+            $customerUser = $this->tradeIn->user;
 
-                // Lepas try-catch agar jika gagal, otomatis terlempar ke luar DB::transaction dan menyebabkan rollback
-                $accurateService->syncVendor($customerUser, $dbSource);
-                $accurateService->syncCustomer($customerUser, $dbSource);
+            $accurateService->syncVendor($customerUser, $dbSource);
+            $accurateService->syncCustomer($customerUser, $dbSource);
 
-                // Refresh user agar mendapat vendor_no & customer_no terbaru dari database
-                $customerUser->refresh();
-                $billNumber = 'TRDN-' . date('dmY') . str_pad($this->tradeIn->id, 4, '0', STR_PAD_LEFT);
-                // 1. Hit Accurate Purchase Invoice (Pembelian HP Lama)
-                $vendorNo = str_replace('"', '', $customerUser->accurate_vendor_no) ?? 'V-CASH';
-                // dd($vendorNo);
+            // Refresh user agar mendapat vendor_no & customer_no terbaru dari database
+            $customerUser->refresh();
+            $billNumber = 'TRD-' . date('dmY') . str_pad($this->tradeIn->id, 4, '0', STR_PAD_LEFT);
+            $vendorNo = str_replace('"', '', $customerUser->accurate_vendor_no) ?? 'V-CASH';
+
+            // 1. Hit Accurate Purchase Invoice (Pembelian HP Lama) JIKA BELUM ADA
+            if (!$this->tradeIn->purchase_invoice_number) {
                 $purchaseInvoiceData = [
                     'vendorNo' => $vendorNo,
                     'billNumber' => $billNumber,
@@ -195,6 +207,7 @@ class Show extends Component
                             'warehouseName' => $warehouseName,
                             'unitPrice' => (float) $this->tradeIn->appraised_value,
                             'quantity' => 1,
+                            'useTax1' => false,
                             'detailName' => $this->tradeIn->old_phone_brand . ' ' . $this->tradeIn->old_phone_model,
                             'detailSerialNumber' => [
                                 [
@@ -208,10 +221,13 @@ class Show extends Component
 
                 $piResult = $accurateService->postPurchaseInvoice($purchaseInvoiceData, $dbSource);
                 if (isset($piResult['r']['number'])) {
+                    // Simpan state secara iteratif
                     $this->tradeIn->update(['purchase_invoice_number' => $piResult['r']['number']]);
                 }
+            }
 
-                // 2. Hit Accurate Sales Invoice (Penjualan Unit Baru)
+            // 2. Hit Accurate Sales Invoice (Penjualan Unit Baru) JIKA BELUM ADA
+            if (!$this->tradeIn->sales_invoice_number) {
                 $salesInvoiceData = [
                     'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
                     'branchName' => $branchName,
@@ -237,15 +253,21 @@ class Show extends Component
                 if (isset($siResult['r']['number'])) {
                     $this->tradeIn->update(['sales_invoice_number' => $siResult['r']['number']]);
                 }
+            }
 
-                // 3. Hit Accurate Sales Receipt (Pelunasan Sisa) jika ada topup dan invoice
-                if ($this->tradeIn->topup_amount > 0 && $this->tradeIn->sales_invoice_number) {
+            // 3. Hit Accurate Sales Receipt (Pelunasan Sisa) JIKA BELUM ADA dan ada tagihan
+            if ($this->tradeIn->topup_amount > 0 && !$this->tradeIn->sales_receipt_number) {
+                // Pastikan Sales Invoice Number sudah terisi dari step sebelumnya
+                if ($this->tradeIn->sales_invoice_number) {
+                    $orderPayment = $this->tradeIn->order ? $this->tradeIn->order->payments()->first() : null;
+                    $accurateBankNo = $orderPayment && $orderPayment->paymentMethod ? $orderPayment->paymentMethod->accurate_bank_no : 'KAS-CASH';
+
                     $salesReceiptData = [
                         'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
                         'branchName' => $branchName,
+                        'bankNo' => $accurateBankNo, // Dinamis dari Database
+                        'receiptAmount' => (float) $this->tradeIn->topup_amount,
                         'chequeAmount' => $this->tradeIn->topup_amount,
-                        'bankNo' => '10.02.102.002', // Sesuaikan dengan akun kas/bank Accurate
-                        // 'receiptAmount' => (float) $this->tradeIn->topup_amount,
                         'detailInvoice' => [
                             [
                                 'invoiceNo' => $this->tradeIn->sales_invoice_number,
@@ -259,10 +281,10 @@ class Show extends Component
                         $this->tradeIn->update(['sales_receipt_number' => $srResult['r']['number']]);
                     }
                 }
+            }
 
-                // Mark TradeIn as Completed
-                $this->tradeIn->update(['status' => 'COMPLETED']);
-            });
+            // Mark TradeIn as Completed jika semua berhasil
+            $this->tradeIn->update(['status' => 'COMPLETED']);
 
             $this->showConfirmModal = false;
             $this->dispatch('toast', title: 'Pembayaran Dikonfirmasi', message: 'Pembayaran selesai dan data telah diupdate.', type: 'success');

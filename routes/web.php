@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 // ─── Public Routes ──────────────────────────────────────────────
-Route::livewire('/', 'pages::home');
+Route::livewire('/', 'pages::home')->name('/');
 
 Route::get('/buy-mobile', Buymobile::class)->name('buy-mobile');
 Route::get('/phone-repair', PhoneRepair::class)->name('phone-repair');
@@ -43,6 +43,7 @@ Route::middleware(['auth', 'customer'])->group(function () {
 
 // ─── Admin Routes (requires auth + admin role) ──────────────────
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/pos', \App\Livewire\Admin\Pos\PointOfSale::class)->name('pos');
     Route::livewire('/dashboard', 'pages::admin.dashboard')->name('dashboard');
     Route::livewire('/users', 'pages::admin.user-management')->name('users');
     Route::livewire('/roles', 'pages::admin.role-permission')->name('roles');
@@ -57,6 +58,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/accurate-products', \App\Livewire\Admin\Accurate\ProductAccurateManagement::class)->name('accurate-products');
 
     Route::get('/settings/payment', \App\Livewire\Admin\Settings\PaymentSettings::class)->name('settings.payment');
+    Route::get('/settings/payment-methods', \App\Livewire\Admin\Settings\PaymentMethodIndex::class)->name('settings.payment-methods');
     Route::get('/settings/shipping', \App\Livewire\Admin\Settings\ShippingSettings::class)->name('settings.shipping');
     Route::get('/settings/catalog', \App\Livewire\Admin\Settings\CatalogSettings::class)->name('settings.catalog');
     Route::get('/settings/warehouse', \App\Livewire\Admin\Settings\Warehouse\Index::class)->name('settings.warehouse');
