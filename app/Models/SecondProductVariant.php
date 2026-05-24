@@ -18,6 +18,11 @@ class SecondProductVariant extends Model implements HasMedia
         return $this->belongsTo(SecondProduct::class);
     }
 
+    public function warehouseStocks()
+    {
+        return $this->morphMany(WarehouseStock::class, 'variant');
+    }
+
     public function sellPhone()
     {
         return $this->belongsTo(SellPhone::class);

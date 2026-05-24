@@ -14,3 +14,6 @@ Route::post('/webhooks/xendit/invoice', [\App\Http\Controllers\Api\XenditWebhook
 // Accurate API Sync
 Route::get('/accurate/import-items', [\App\Http\Controllers\Api\AccurateImportController::class, 'importItems'])
     ->name('api.accurate.import-items');
+
+Route::post('/webhooks/accurate', [\App\Http\Controllers\Api\AccurateWebhookController::class, 'handle'])
+    ->name('api.webhooks.accurate');

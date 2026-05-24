@@ -120,7 +120,21 @@ class Show extends Component
         DB::transaction(function () {
             // Restore stock if it was already locked (WAITING_PAYMENT)
             if ($this->tradeIn->status === 'WAITING_PAYMENT' && $this->tradeIn->productVariant) {
-                $this->tradeIn->productVariant->increment('stock', 1);
+                $handler = $this->tradeIn->handledBy ?? Auth::user();
+                $warehouseId = $handler->warehouse_id ?? \App\Models\Warehouse::first()?->id;
+
+                if ($warehouseId) {
+                    \App\Models\WarehouseStock::updateOrCreate(
+                        [
+                            'warehouse_id' => $warehouseId,
+                            'variant_id' => $this->tradeIn->product_variant_id,
+                            'variant_type' => $this->tradeIn->product_variant_type,
+                        ],
+                        [
+                            'stock' => \Illuminate\Support\Facades\DB::raw("stock + 1")
+                        ]
+                    );
+                }
             }
 
             if ($this->tradeIn->order) {
@@ -333,7 +347,7 @@ class Show extends Component
             }
 
             // Buat variant fisiknya
-            SecondProductVariant::create([
+            $variant = SecondProductVariant::create([
                 'second_product_id' => $product->id,
                 'trade_in_id' => $this->tradeIn->id,
                 'storage' => $this->tradeIn->old_phone_storage ?? '-',
@@ -343,6 +357,16 @@ class Show extends Component
                 'price' => $this->sellPrice,
                 'stock' => 1,
             ]);
+
+            $warehouseId = Auth::user()->warehouse_id ?? \App\Models\Warehouse::first()?->id;
+            if ($warehouseId) {
+                \App\Models\WarehouseStock::create([
+                    'warehouse_id' => $warehouseId,
+                    'variant_id' => $variant->id,
+                    'variant_type' => get_class($variant),
+                    'stock' => 1,
+                ]);
+            }
 
             // Tandai Trade In sudah memiliki produk / ter-convert (opsional, bisa dilacak dari trade_in_id di variants)
         });
@@ -356,19 +380,29 @@ class Show extends Component
     {
         $isNew = $this->tradeIn->target_product_type === \App\Models\Product::class;
 
+        $warehouseId = Auth::user()->warehouse_id;
+
         if ($isNew) {
-            $availableVariants = \App\Models\ProductVariant::with('product')
+            $availableVariants = \App\Models\ProductVariant::with(['product', 'warehouseStocks' => function($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId);
+            }])
                 ->where('product_id', $this->tradeIn->target_product_id)
-                ->where('stock', '>', 0)
+                ->whereHas('warehouseStocks', function($q) use ($warehouseId) {
+                    $q->where('warehouse_id', $warehouseId)->where('stock', '>', 0);
+                })
                 ->when($this->searchVariant, function ($q) {
                     $q->where('storage', 'like', "%{$this->searchVariant}%")
                         ->orWhere('color', 'like', "%{$this->searchVariant}%");
                 })
                 ->get();
         } else {
-            $availableVariants = SecondProductVariant::with('secondProduct')
+            $availableVariants = SecondProductVariant::with(['secondProduct', 'warehouseStocks' => function($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId);
+            }])
                 ->where('second_product_id', $this->tradeIn->target_product_id)
-                ->where('stock', '>', 0)
+                ->whereHas('warehouseStocks', function($q) use ($warehouseId) {
+                    $q->where('warehouse_id', $warehouseId)->where('stock', '>', 0);
+                })
                 ->when($this->searchVariant, function ($q) {
                     $q->where('storage', 'like', "%{$this->searchVariant}%")
                         ->orWhere('color', 'like', "%{$this->searchVariant}%")

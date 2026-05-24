@@ -203,7 +203,7 @@ class Show extends Component
                 );
             }
 
-            ProductVariant::create([
+            $variant = ProductVariant::create([
                 'product_id' => $product->id,
                 'sell_phone_id' => $this->sellPhone->id,
                 'storage' => $this->sellPhone->phone_storage ?? '-',
@@ -212,6 +212,16 @@ class Show extends Component
                 'price' => $this->sellPrice,
                 'stock' => 1,
             ]);
+
+            $warehouseId = Auth::user()->warehouse_id ?? \App\Models\Warehouse::first()?->id;
+            if ($warehouseId) {
+                \App\Models\WarehouseStock::create([
+                    'warehouse_id' => $warehouseId,
+                    'variant_id' => $variant->id,
+                    'variant_type' => get_class($variant),
+                    'stock' => 1,
+                ]);
+            }
         });
 
         $this->convertModal = false;

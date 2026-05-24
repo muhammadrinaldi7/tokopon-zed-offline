@@ -10,24 +10,19 @@ use App\Livewire\Pages\UserProfile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-// ─── Public Routes ──────────────────────────────────────────────
-Route::livewire('/', 'pages::home')->name('/');
+// ─── POS Landing Page (requires auth + admin role) ──────────────
+Route::get('/', \App\Livewire\Admin\Pos\PointOfSale::class)->middleware(['auth', 'admin'])->name('/');
 
-Route::get('/buy-mobile', Buymobile::class)->name('buy-mobile');
-Route::get('/phone-repair', PhoneRepair::class)->name('phone-repair');
-Route::get('/trade-in/{product:slug?}', TradeIn::class)->name('trade-in');
-Route::get('/sell-phone', SellPhone::class)->name('sell-phone');
-Route::get('/products', \App\Livewire\Pages\ProductList::class)->name('products.index');
-Route::get('/products/{product:slug}', \App\Livewire\Pages\ProductDetail::class)->name('products.show');
-Route::get('/cart', \App\Livewire\Pages\CartPage::class)->name('cart');
+// ─── Trade In & Sell Phone Client Pages (accessible by authenticated users, e.g. FL or customer) ───
+Route::middleware(['auth'])->group(function () {
+    Route::get('/sell-phone', SellPhone::class)->name('sell-phone');
+    Route::get('/sell-phone-history', SellPhoneHistory::class)->name('sell-phone-history');
+    Route::get('/sell-phone/{sellPhone}/detail', \App\Livewire\Pages\SellPhoneDetail::class)->name('sell-phone.show');
 
-// ─── Google OAuth Routes ────────────────────────────────────────
-Route::get('/auth/google', [\App\Http\Controllers\GoogleCallbackController::class, 'redirectToGoogle'])->name('auth.google');
-Route::get('/auth/google/callback', [\App\Http\Controllers\GoogleCallbackController::class, 'handleGoogleCallback'])->name('auth.google.callback');
-
-// ─── Customer Routes (requires auth + customer role) ────────────
-Route::middleware(['auth', 'customer'])->group(function () {
-    Route::get('/checkout', \App\Livewire\Pages\Checkout::class)->name('checkout');
+    Route::get('/trade-in/{product:slug?}', TradeIn::class)->name('trade-in');
+    Route::get('/trade-in-history', \App\Livewire\Pages\TradeInHistory::class)->name('trade-in-history');
+    Route::get('/trade-in/{product}/submit', \App\Livewire\Pages\SubmitTradeIn::class)->name('trade-in.submit');
+    Route::get('/trade-in/{tradeIn}/detail', \App\Livewire\Pages\TradeInDetail::class)->name('trade-ins.show');
     Route::get('/orders', \App\Livewire\Pages\OrderHistory::class)->name('orders.index');
     Route::get('/orders/{order}', \App\Livewire\Pages\OrderDetail::class)->name('orders.show');
     Route::get('/orders/{order}/confirmation', \App\Livewire\Pages\OrderConfirmation::class)->name('orders.confirmation');
@@ -56,6 +51,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/products/{product}/variants', \App\Livewire\Admin\Products\VariantManagement::class)->name('products.variants');
     Route::get('/second-products/{product}/variants', \App\Livewire\Admin\Products\SecondVariantManagement::class)->name('second-products.variants');
     Route::get('/accurate-products', \App\Livewire\Admin\Accurate\ProductAccurateManagement::class)->name('accurate-products');
+    Route::get('/warehouse-stocks', \App\Livewire\Admin\Warehouse\StockManagement::class)->name('warehouse-stocks');
 
     Route::get('/settings/payment', \App\Livewire\Admin\Settings\PaymentSettings::class)->name('settings.payment');
     Route::get('/settings/payment-methods', \App\Livewire\Admin\Settings\PaymentMethodIndex::class)->name('settings.payment-methods');
@@ -89,6 +85,11 @@ Route::post('/logout', function () {
 
     return redirect('/');
 })->middleware('auth')->name('logout');
+
+// ─── Google OAuth Routes ────────────────────────────────────────
+Route::get('/auth/google', [\App\Http\Controllers\GoogleCallbackController::class, 'redirectToGoogle'])->name('auth.google');
+Route::get('/auth/google/callback', [\App\Http\Controllers\GoogleCallbackController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+
 
 // ─── Erzap Webhook Routes (Dynamic Source Support) ────────────────
 Route::post('/web_service/import_produk_json/new.json', [\App\Http\Controllers\Api\ErzapProductController::class, 'store']);

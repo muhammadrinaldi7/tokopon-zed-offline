@@ -40,9 +40,11 @@ class Login extends Component
         $user = Auth::user();
         
         if ($user->roles->count() > 0 && !$user->hasRole('user')) {
-            $this->redirect('/admin/dashboard', navigate: true);
-        } else {
             $this->redirect('/', navigate: true);
+        } else {
+            Auth::logout();
+            $this->addError('email', 'Akses ditolak. Aplikasi ini hanya untuk operasional.');
+            return;
         }
     }
 

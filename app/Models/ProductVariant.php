@@ -18,6 +18,11 @@ class ProductVariant extends Model implements HasMedia
         return $this->belongsTo(Product::class);
     }
 
+    public function warehouseStocks()
+    {
+        return $this->morphMany(WarehouseStock::class, 'variant');
+    }
+
     public function accurateData()
     {
         return $this->belongsTo(ProductAccurate::class, 'product_accurate_id');

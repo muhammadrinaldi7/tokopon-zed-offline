@@ -145,6 +145,10 @@
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-products') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                             Produk Accurate
                         </a>
+                        <a href="{{ route('admin.warehouse-stocks') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.warehouse-stocks') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Stok Gudang
+                        </a>
                     </div>
                 </div>
 

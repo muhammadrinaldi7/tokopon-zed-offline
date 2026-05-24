@@ -90,7 +90,21 @@ class TradeInDetail extends Component
             
             // Deduct Stock immediately
             if ($variant) {
-                $variant->decrement('stock', 1);
+                $handler = $this->tradeIn->handledBy ?? Auth::user();
+                $warehouseId = $handler->warehouse_id ?? \App\Models\Warehouse::first()?->id;
+
+                if ($warehouseId) {
+                    \App\Models\WarehouseStock::updateOrCreate(
+                        [
+                            'warehouse_id' => $warehouseId,
+                            'variant_id' => $variant->id,
+                            'variant_type' => get_class($variant),
+                        ],
+                        [
+                            'stock' => \Illuminate\Support\Facades\DB::raw("GREATEST(0, stock - 1)")
+                        ]
+                    );
+                }
             }
 
             if ($topupAmount > 0) {

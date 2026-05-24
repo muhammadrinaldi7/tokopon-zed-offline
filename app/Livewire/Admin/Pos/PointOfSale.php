@@ -186,24 +186,42 @@ class PointOfSale extends Component
 
     public function openVariantPicker($productId, $isSecond = false)
     {
+        $warehouseId = Auth::user()->warehouse_id;
+
         if ($isSecond) {
-            $product = SecondProduct::with(['variants', 'brand'])->find($productId);
+            $product = SecondProduct::with([
+                'variants' => function($q) use ($warehouseId) {
+                    $q->with(['warehouseStocks' => function($q2) use ($warehouseId) {
+                        $q2->where('warehouse_id', $warehouseId);
+                    }]);
+                },
+                'brand'
+            ])->find($productId);
+
             $this->variantModalVariants = $product->variants->map(fn($v) => [
                 'id' => $v->id,
                 'label' => $v->color . ' - ' . $v->storage,
                 'condition' => $v->condition ?? '',
                 'price' => $v->price,
-                'stock' => $v->stock,
+                'stock' => $v->warehouseStocks->first()?->stock ?? 0,
                 'sku' => $v->sku ?? '',
             ])->toArray();
         } else {
-            $product = Product::with(['variants', 'brand'])->find($productId);
+            $product = Product::with([
+                'variants' => function($q) use ($warehouseId) {
+                    $q->with(['warehouseStocks' => function($q2) use ($warehouseId) {
+                        $q2->where('warehouse_id', $warehouseId);
+                    }]);
+                },
+                'brand'
+            ])->find($productId);
+
             $this->variantModalVariants = $product->variants->map(fn($v) => [
                 'id' => $v->id,
                 'label' => $v->color . ' - ' . $v->storage,
                 'condition' => '',
                 'price' => $v->price,
-                'stock' => $v->stock,
+                'stock' => $v->warehouseStocks->first()?->stock ?? 0,
                 'sku' => $v->sku ?? '',
             ])->toArray();
         }
@@ -216,16 +234,23 @@ class PointOfSale extends Component
     {
         $isSecond = $this->variantModalIsSecond;
         $product = $this->variantModalProduct;
+        $warehouseId = Auth::user()->warehouse_id;
 
         if ($isSecond) {
-            $variant = SecondProductVariant::find($variantId);
+            $variant = SecondProductVariant::with(['warehouseStocks' => function($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId);
+            }])->find($variantId);
             $variantType = SecondProductVariant::class;
         } else {
-            $variant = ProductVariant::find($variantId);
+            $variant = ProductVariant::with(['warehouseStocks' => function($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId);
+            }])->find($variantId);
             $variantType = ProductVariant::class;
         }
 
-        if (!$variant || $variant->stock <= 0) {
+        $stock = $variant ? ($variant->warehouseStocks->first()?->stock ?? 0) : 0;
+
+        if (!$variant || $stock <= 0) {
             $this->dispatch('toast', title: 'Stok Habis', message: 'Varian ini tidak tersedia.', type: 'warning');
             return;
         }
@@ -238,7 +263,7 @@ class PointOfSale extends Component
 
         if ($existingIndex !== false) {
             $currentQty = $this->cart[$existingIndex]['qty'];
-            if ($currentQty < $variant->stock) {
+            if ($currentQty < $stock) {
                 $this->cart[$existingIndex]['qty']++;
             } else {
                 $this->dispatch('toast', title: 'Stok Tidak Cukup', message: 'Sudah mencapai batas stok.', type: 'warning');
@@ -426,15 +451,16 @@ class PointOfSale extends Component
                 ]);
 
                 // Reduce stock
-                if ($item['variant_type'] === SecondProductVariant::class) {
-                    $variant = SecondProductVariant::find($item['variant_id']);
-                } else {
-                    $variant = ProductVariant::find($item['variant_id']);
-                }
-
-                if ($variant) {
-                    $variant->decrement('stock', $item['qty']);
-                }
+                \App\Models\WarehouseStock::updateOrCreate(
+                    [
+                        'warehouse_id' => Auth::user()->warehouse_id,
+                        'variant_id' => $item['variant_id'],
+                        'variant_type' => $item['variant_type'],
+                    ],
+                    [
+                        'stock' => \Illuminate\Support\Facades\DB::raw("GREATEST(0, stock - " . (int)$item['qty'] . ")")
+                    ]
+                );
             }
 
             // Create OrderPayment

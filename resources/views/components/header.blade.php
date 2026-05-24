@@ -52,7 +52,7 @@ new class extends Component {
         </a>
 
         {{-- Desktop Navigation --}}
-        <div class="hidden lg:flex items-center gap-1">
+        {{-- <div class="hidden lg:flex items-center gap-1">
             <a href="/" wire:navigate
                 class="px-4 py-2 text-sm font-medium rounded-lg transition {{ request()->is('/') ? 'text-blue-500 bg-blue-50 font-semibold' : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50/50' }}">
                 Home
@@ -73,7 +73,7 @@ new class extends Component {
                 class="px-4 py-2 text-sm font-medium text-gray-500 rounded-lg transition hover:text-blue-500 hover:bg-blue-50/50">
                 Sell Phones
             </a>
-        </div>
+        </div> --}}
 
         {{-- Desktop CTA --}}
         <div class="hidden lg:flex items-center gap-3">

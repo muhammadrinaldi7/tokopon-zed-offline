@@ -478,4 +478,64 @@ class AccurateService
             throw new \Exception('API Accurate Sales Receipt Error: ' . $response->body());
         }
     }
+
+    public function getItemStockPerWarehouse($warehouseName, $databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/item/list-stock.do', [
+            'sp.pageSize' => 1000,
+            'warehouseName' => $warehouseName
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                throw new \Exception('API Accurate Error: ' . json_encode($data['d']));
+            }
+            return $data['d'] ?? [];
+        } else {
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+    public function getItemStockAllPerWarehouse($itemNo, $databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/item/list-stock.do', [
+            'pageSize' => 100,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                throw new \Exception('API Accurate Error: ' . json_encode($data['d']));
+            }
+            return $data['d'] ?? [];
+        } else {
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
 }
