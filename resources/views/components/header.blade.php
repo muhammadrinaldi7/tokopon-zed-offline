@@ -52,28 +52,20 @@ new class extends Component {
         </a>
 
         {{-- Desktop Navigation --}}
-        {{-- <div class="hidden lg:flex items-center gap-1">
+        <div class="hidden lg:flex items-center gap-1">
             <a href="/" wire:navigate
-                class="px-4 py-2 text-sm font-medium rounded-lg transition {{ request()->is('/') ? 'text-blue-500 bg-blue-50 font-semibold' : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50/50' }}">
-                Home
-            </a>
-            <a href="/buy-mobile" wire:navigate
-                class="px-4 py-2 text-sm font-medium rounded-lg transition {{ request()->is('products*') ? 'text-blue-500 bg-blue-50 font-semibold' : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50/50' }}">
-                Buy Phones
-            </a>
-            <a href="{{ route('phone-repair') }}" wire:navigate
-                class="px-4 py-2 text-sm font-medium text-gray-500 rounded-lg transition hover:text-blue-500 hover:bg-blue-50/50">
-                Repair Service
+                class="px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->is('/') ? 'text-[#4E44DB] bg-blue-50' : 'text-gray-500 hover:text-[#4E44DB] hover:bg-blue-50/30' }}">
+                Point of Sale
             </a>
             <a href="{{ route('trade-in') }}" wire:navigate
-                class="px-4 py-2 text-sm font-medium text-gray-500 rounded-lg transition hover:text-blue-500 hover:bg-blue-50/50">
-                Trade In
+                class="px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->is('trade-in*') ? 'text-emerald-600 bg-emerald-50' : 'text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/30' }}">
+                Tukar Tambah
             </a>
             <a href="{{ route('sell-phone') }}" wire:navigate
-                class="px-4 py-2 text-sm font-medium text-gray-500 rounded-lg transition hover:text-blue-500 hover:bg-blue-50/50">
-                Sell Phones
+                class="px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 {{ request()->is('sell-phone*') ? 'text-violet-600 bg-violet-50' : 'text-gray-500 hover:text-violet-600 hover:bg-violet-50/30' }}">
+                Jual HP Bekas
             </a>
-        </div> --}}
+        </div>
 
         {{-- Desktop CTA --}}
         <div class="hidden lg:flex items-center gap-3">
@@ -239,26 +231,18 @@ new class extends Component {
 
     {{-- Mobile Menu --}}
     @if ($mobileMenuOpen)
-        <div class="lg:hidden flex flex-col px-6 pb-6 border-t border-gray-100 bg-white">
+        <div class="lg:hidden flex flex-col px-6 pb-6 border-t border-gray-100 bg-white space-y-1 pt-2">
             <a href="/" wire:navigate
-                class="block px-4 py-3 text-sm font-medium rounded-lg transition {{ request()->is('/') ? 'text-blue-500 bg-blue-50' : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50/50' }}">
-                Home
+                class="block px-4 py-3 text-sm font-semibold rounded-xl transition-all {{ request()->is('/') ? 'text-[#4E44DB] bg-blue-50' : 'text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50/30' }}">
+                Point of Sale
             </a>
-            <a href="/products" wire:navigate
-                class="block px-4 py-3 text-sm font-medium rounded-lg transition {{ request()->is('products*') ? 'text-blue-500 bg-blue-50 font-semibold' : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50/50' }}">
-                Buy Phones
+            <a href="{{ route('trade-in') }}" wire:navigate
+                class="block px-4 py-3 text-sm font-semibold rounded-xl transition-all {{ request()->is('trade-in*') ? 'text-emerald-600 bg-emerald-50' : 'text-gray-600 hover:text-emerald-600 hover:bg-emerald-50/30' }}">
+                Tukar Tambah
             </a>
-            <a href="#"
-                class="block px-4 py-3 text-sm font-medium text-gray-500 rounded-lg transition hover:text-blue-500 hover:bg-blue-50/50">
-                Repair Service
-            </a>
-            <a href="#"
-                class="block px-4 py-3 text-sm font-medium text-gray-500 rounded-lg transition hover:text-blue-500 hover:bg-blue-50/50">
-                Trade In
-            </a>
-            <a href="#"
-                class="block px-4 py-3 text-sm font-medium text-gray-500 rounded-lg transition hover:text-blue-500 hover:bg-blue-50/50">
-                Sell Phones
+            <a href="{{ route('sell-phone') }}" wire:navigate
+                class="block px-4 py-3 text-sm font-semibold rounded-xl transition-all {{ request()->is('sell-phone*') ? 'text-violet-600 bg-violet-50' : 'text-gray-600 hover:text-violet-600 hover:bg-violet-50/30' }}">
+                Jual HP Bekas
             </a>
 
             {{-- Mobile Cart Link --}}

@@ -28,7 +28,9 @@
         {{ $slot }}
     </main>
 
-    <livewire:footer />
+    @unless (request()->is('/'))
+        <livewire:footer />
+    @endunless
 
     <livewire:confirm-modal />
     <livewire:toast-notification />

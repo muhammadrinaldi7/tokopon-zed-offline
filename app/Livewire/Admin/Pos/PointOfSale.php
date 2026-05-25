@@ -593,7 +593,7 @@ class PointOfSale extends Component
         $this->completedOrder = null;
     }
 
-    #[Layout('layouts.admin', ['title' => 'Point of Sale'])]
+    #[Layout('layouts.app', ['title' => 'Point of Sale'])]
     public function render()
     {
         return view('livewire.admin.pos.point-of-sale');

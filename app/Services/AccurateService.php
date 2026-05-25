@@ -281,9 +281,8 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
         $param = [
+            "sp.pageSize" => 3000,
             "fields" => "no,unitPrice,availableToSell,itemBranchName",
-            "filter.keywords.op" => "CONTAIN",
-            "filter.keywords.val" => "hp",
         ];
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $token,

@@ -1,5 +1,5 @@
-<div class="min-h-screen bg-gray-100" x-data="{ showSidebar: false }">
-    <div class="flex h-screen overflow-hidden">
+<div class="bg-gray-100" x-data="{ showSidebar: false }">
+    <div class="flex h-[calc(100vh-72px)] overflow-hidden">
 
         {{-- ═══════════════════════════════════════════════════════════
              LEFT PANEL: Product Search & Grid
