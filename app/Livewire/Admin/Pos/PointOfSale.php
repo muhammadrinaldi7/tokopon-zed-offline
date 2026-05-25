@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Pos;
 
+use App\Mail\SalesReceiptMail;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
@@ -15,7 +16,10 @@ use App\Models\User;
 use App\Services\AccurateService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -52,6 +56,33 @@ class PointOfSale extends Component
     public $variantModalProduct = null;
     public $variantModalVariants = [];
     public $variantModalIsSecond = false;
+
+    // ─── History Sales Properties ──────────────────────────────
+    public $showHistoryModal = false;
+    public $historyOrders = [];
+
+    // Method untuk membuka modal dan memuat data transaksi POS terbaru
+    public function openHistory()
+    {
+        // Mengambil transaksi khusus channel POS handled oleh user aktif / bebas tergantung kebutuhan bisnis
+        $this->historyOrders = Order::with(['items', 'user', 'paymentMethod'])
+            ->where('order_channel', 'POS')
+            ->latest()
+            ->take(20) // Ambil 20 transaksi terakhir
+            ->get();
+
+        $this->showHistoryModal = true;
+    }
+
+    // Method untuk cetak ulang (reprint) dari riwayat
+    public function reprintOrder($orderId)
+    {
+        $this->completedOrder = Order::with(['items', 'user', 'paymentMethod', 'handledBy'])->find($orderId);
+        if ($this->completedOrder) {
+            $this->showHistoryModal = false; // tutup modal history
+            $this->showReceiptModal = true;  // buka modal struk bawaan kamu
+        }
+    }
 
     public function mount()
     {
@@ -701,6 +732,167 @@ class PointOfSale extends Component
         $this->search = '';
         $this->showReceiptModal = false;
         $this->completedOrder = null;
+    }
+
+    // ─── Kirim Struk via Email (SMTP) ─────────────────────────
+    public function sendReceiptToEmail()
+    {
+        if (!$this->completedOrder) return;
+
+        // Ambil ID dari state, lalu tarik data paling FRESH langsung dari database
+        $orderId = $this->completedOrder->id;
+        $order = Order::with('user')->find($orderId);
+        $email = $order->user->email ?? null;
+
+        // ─── VALIDASI PEMBATASAN AKSES UTK FRONT-LINER (FL) ───
+        $userAktif = Auth::user();
+        if (!$userAktif->hasRole('admin') && $order->is_email_sent) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Struk email hanya dapat dikirim sekali oleh Kasir/FL.', type: 'warning');
+            return;
+        }
+
+        // Validasi jika email kosong atau merupakan email dummy sistem POS
+        if (!$email || str_contains($email, '@pos.tokopun.com')) {
+            $this->dispatch('toast', title: 'Gagal Kirim', message: 'Email customer tidak valid atau kosong.', type: 'warning');
+            return;
+        }
+
+        try {
+            // Mengirim email menggunakan Mailable yang sudah dibuat
+            Mail::mailer('pos_sales')
+                ->to($email)
+                ->send(new SalesReceiptMail($order));
+
+            // 1. Update ke database menggunakan instance fresh
+            $order->update(['is_email_sent' => true]);
+
+            // 2. PAKSA REFRESH STATE LIVEWIRE UTAMA
+            $this->completedOrder->refresh();
+
+            $this->dispatch('toast', title: 'Berhasil', message: 'Struk digital telah dikirim ke ' . $email, type: 'success');
+        } catch (\Exception $e) {
+            Log::error('POS Email Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Koneksi SMTP bermasalah: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    // ─── Kirim Struk via WA (Qontak) ─────────────────────────
+    public function sendReceiptToQontak()
+    {
+        // 1. Validasi Awal data order
+        if (!$this->completedOrder) return;
+
+        // Ambil ID dari state, lalu tarik data paling FRESH langsung dari database
+        $orderId = $this->completedOrder->id;
+        $order = Order::with('user.profile')->find($orderId);
+        $phone = $order->user->profile->phone_number ?? null;
+
+        // ─── VALIDASI PEMBATASAN AKSES UTK FRONT-LINER (FL) ───
+        $userAktif = Auth::user();
+        if (!$userAktif->hasRole('admin') && $order->is_wa_sent) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Struk WhatsApp hanya dapat dikirim sekali oleh Kasir/FL.', type: 'warning');
+            return;
+        }
+
+        if (!$phone) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Nomor HP customer tidak ditemukan.', type: 'warning');
+            return;
+        }
+
+        // Standardisasi nomor HP (08xx -> 628xx)
+        if (str_starts_with($phone, '0')) {
+            $phone = '62' . substr($phone, 1);
+        }
+
+        // 2. Tarik variabel dari env
+        $fullUrl = env('QONTAK_API_URL');
+        $method = 'POST';
+
+        // Ganti skema parse_url ala JavaScript Postman
+        $parsedUrl = parse_url($fullUrl);
+
+        // $baseUrl akan berisi "https://api.mekari.com"
+        $baseUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
+
+        // $endpoint otomatis akan mengambil path murni "/qontak/chat/v1/broadcasts/whatsapp/direct"
+        $endpoint = $parsedUrl['path'];
+
+        $clientId = env('QONTAK_CLIENT_ID');
+        $clientSecret = env('QONTAK_CLIENT_SECRET');
+
+        // ─── 2. PROSES GENERATE HMAC SIGNATURE (TETAP AMAN & PRESISI) ────
+        $dateString = gmdate('D, d M Y H:i:s') . ' GMT';
+        $requestLine = "{$method} {$endpoint} HTTP/1.1";
+
+        $stringToSign = "date: {$dateString}\n{$requestLine}";
+
+        $digest = hash_hmac('sha256', $stringToSign, $clientSecret, true);
+        $signature = base64_encode($digest);
+
+        $hmacHeader = "hmac username=\"{$clientId}\", algorithm=\"hmac-sha256\", headers=\"date request-line\", signature=\"{$signature}\"";
+        $idempotencyKey = (string) \Illuminate\Support\Str::uuid();
+
+        // ─── 3. STRUKTUR PAYLOAD BODY JSON (100% SAMA DENGAN POSTMAN) ────
+        $payload = [
+            'to_name' => $order->user->name ?? 'Customer',
+            'to_number' => $phone,
+            'channel_integration_id' => env('QONTAK_CHANNEL_INTEGRATION_ID'),
+            'message_template_id' => env('QONTAK_TEMPLATE_ID'),
+            'language' => [
+                'code' => 'id'
+            ],
+            'parameters' => [
+                'body' => [
+                    [
+                        'key' => '1',
+                        'value' => 'nama',
+                        'value_text' => $order->user->name ?? 'Customer'
+                    ],
+                    [
+                        'key' => '2',
+                        'value' => 'no_invoice',
+                        'value_text' => $order->order_number
+                    ],
+                    [
+                        'key' => '3',
+                        'value' => 'total_tagihan',
+                        'value_text' => 'Rp ' . number_format($order->grand_total, 0, ',', '.')
+                    ]
+                ]
+            ]
+        ];
+
+        // ─── 4. EXECUTE API CALL KE FULL URL ─────────────────────────────
+        try {
+            $response = Http::withHeaders([
+                'Authorization'     => $hmacHeader,
+                'Date'              => $dateString,
+                'X-Idempotency-Key' => $idempotencyKey,
+                'Content-Type'      => 'application/json',
+                'Accept'            => 'application/json',
+            ])->post($fullUrl, $payload);
+
+            if ($response->successful()) {
+                // Update ke database menggunakan instance fresh
+                $order->update(['is_wa_sent' => true]);
+
+                // REFRESH STATE LIVEWIRE UTAMA
+                $this->completedOrder->refresh();
+
+                $this->dispatch('toast', title: 'Berhasil', message: 'Struk WA berhasil dikirim via Mekari Qontak!', type: 'success');
+            } else {
+                Log::error('=== DEBUG MEKARI QONTAK ===');
+                Log::error('Status Code: ' . $response->status());
+                Log::error('Response Body: ' . $response->body());
+                Log::error('Parsed Endpoint for HMAC: ' . $endpoint);
+                Log::error('===========================');
+
+                $this->dispatch('toast', title: 'Gagal API', message: 'Mekari: Code ' . $response->status(), type: 'error');
+            }
+        } catch (\Exception $e) {
+            Log::error('Qontak HMAC Integration Crash: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
+        }
     }
 
     #[Layout('layouts.app', ['title' => 'Point of Sale'])]

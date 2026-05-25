@@ -21,6 +21,15 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
+                    <button type="button" wire:click="openHistory"
+                        class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg hover:bg-gray-700 transition shadow-sm">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Riwayat Transaksi
+                    </button>
+
                     <div class="flex bg-gray-100 p-1 rounded-lg">
                         <button type="button" wire:click="$set('productType', 'all')"
                             class="px-3 py-1.5 text-xs font-bold rounded-md transition-all {{ $productType === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">Semua</button>
@@ -505,6 +514,100 @@
     @endif
 
     {{-- ═══════════════════════════════════════════════════════════
+         MODAL: History Sales (Riwayat Penjualan)
+    ═══════════════════════════════════════════════════════════ --}}
+    @if ($showHistoryModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
+                {{-- Header --}}
+                <div class="p-5 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                    <div>
+                        <h3 class="font-black text-gray-900 text-lg">20 Transaksi POS Terakhir</h3>
+                        <p class="text-xs text-gray-400">Daftar penjualan yang berhasil diproses lewat kasir</p>
+                    </div>
+                    <button wire:click="$set('showHistoryModal', false)" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Table/Content --}}
+                <div class="p-5 max-h-[450px] overflow-y-auto">
+                    @if (count($historyOrders) > 0)
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr
+                                        class="border-b border-gray-200 text-gray-400 uppercase font-black tracking-wider bg-gray-50/50">
+                                        <th class="p-3">Waktu / No. Order</th>
+                                        <th class="p-3">Customer</th>
+                                        <th class="p-3">Metode</th>
+                                        <th class="p-3 text-right">Total Akhir</th>
+                                        <th class="p-3 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 font-medium text-gray-700">
+                                    @foreach ($historyOrders as $order)
+                                        <tr class="hover:bg-gray-50/80 transition-colors">
+                                            <td class="p-3">
+                                                <p class="font-bold text-gray-900">{{ $order->order_number }}</p>
+                                                <p class="text-[10px] text-gray-400 font-mono">
+                                                    {{ $order->created_at->format('d M Y H:i') }}</p>
+                                            </td>
+                                            <td class="p-3 text-gray-600">
+                                                {{ $order->user->name ?? 'Umum/Cash' }}
+                                            </td>
+                                            <td class="p-3">
+                                                <span
+                                                    class="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md uppercase">
+                                                    {{ $order->paymentMethod->name ?? 'Cash' }}
+                                                </span>
+                                            </td>
+                                            <td class="p-3 text-right font-bold text-gray-900">
+                                                Rp {{ number_format($order->grand_total, 0, ',', '.') }}
+                                            </td>
+                                            <td class="p-3 text-center">
+                                                <button wire:click="reprintOrder({{ $order->id }})"
+                                                    class="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-md text-[11px] font-bold transition-all">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
+                                                        stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                    </svg>
+                                                    Struk
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="flex flex-col items-center justify-center py-12 text-gray-300">
+                            <svg class="w-12 h-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="1">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            <p class="text-sm font-bold text-gray-400">Belum ada riwayat transaksi hari ini</p>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Footer --}}
+                <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+                    <button wire:click="$set('showHistoryModal', false)"
+                        class="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-xl text-xs font-bold transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- ═══════════════════════════════════════════════════════════
          MODAL: Receipt (Struk)
     ═══════════════════════════════════════════════════════════ --}}
     @if ($showReceiptModal && $completedOrder)
@@ -523,6 +626,59 @@
                             </svg>
                             Cetak
                         </button>
+                        {{-- ─── TOMBOL WHATSAPP MEKARI QONTAK ─── --}}
+                        @if (Auth::user()->hasRole('admin') || !$completedOrder->is_wa_sent)
+                            {{-- Aktif jika Admin ATAU jika WA belum pernah dikirim --}}
+                            <button wire:click="sendReceiptToQontak" wire:loading.attr="disabled"
+                                class="text-emerald-600 hover:text-emerald-700 font-bold text-xs flex items-center gap-1 transition">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397 0 11.983 0c3.192.001 6.192 1.242 8.447 3.498c2.256 2.255 3.497 5.255 3.497 8.447c-.004 6.585-5.342 11.93-11.93 11.93c-2.002-.001-3.973-.503-5.729-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451c5.436 0 9.86-4.42 9.864-9.858c.002-2.634-1.023-5.11-2.887-6.974c-1.864-1.864-4.341-2.887-6.973-2.889c-5.44 0-9.865 4.42-9.869 9.859c-.001 1.706.469 3.372 1.36 4.866l-.993 3.626l3.71-.973zm11.233-6.17c-.3-.149-1.774-.875-2.046-.974c-.272-.1-.471-.149-.669.149c-.198.299-.768.974-.941 1.173c-.173.199-.347.224-.647.075c-.3-.15-1.266-.466-2.41-1.487c-.89-.794-1.49-1.774-1.664-2.073c-.173-.3-.018-.462.13-.61c.134-.133.298-.348.446-.521c.15-.173.199-.298.298-.497c.099-.198.05-.372-.025-.521c-.075-.149-.669-1.612-.916-2.207c-.242-.579-.487-.501-.669-.51l-.57-.01c-.199 0-.52.074-.792.372c-.272.297-1.04 1.016-1.04 2.479c0 1.462 1.065 2.875 1.213 3.074c.149.198 2.095 3.2 5.076 4.487c.709.306 1.263.489 1.694.626c.712.226 1.36.194 1.872.118c.571-.085 1.774-.726 2.022-1.392c.247-.667.247-1.241.173-1.392c-.074-.15-.272-.249-.571-.398z" />
+                                </svg>
+                                <span wire:loading.remove wire:target="sendReceiptToQontak">WhatsApp</span>
+                                <span wire:loading wire:target="sendReceiptToQontak">Sending...</span>
+                            </button>
+                        @else
+                            {{-- Terkunci untuk Kasir/FL jika is_wa_sent bernilai true --}}
+                            <button disabled
+                                class="text-gray-300 cursor-not-allowed font-bold text-xs flex items-center gap-1"
+                                title="Sudah dikirim oleh kasir">
+                                <svg class="w-4 h-4 opacity-40" fill="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                        d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397 0 11.983 0c3.192.001 6.192 1.242 8.447 3.498c2.256 2.255 3.497 5.255 3.497 8.447c-.004 6.585-5.342 11.93-11.93 11.93c-2.002-.001-3.973-.503-5.729-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451c5.436 0 9.86-4.42 9.864-9.858c.002-2.634-1.023-5.11-2.887-6.974c-1.864-1.864-4.341-2.887-6.973-2.889c-5.44 0-9.865 4.42-9.869 9.859c-.001 1.706.469 3.372 1.36 4.866l-.993 3.626l3.71-.973zm11.233-6.17c-.3-.149-1.774-.875-2.046-.974c-.272-.1-.471-.149-.669.149c-.198.299-.768.974-.941 1.173c-.173.199-.347.224-.647.075c-.3-.15-1.266-.466-2.41-1.487c-.89-.794-1.49-1.774-1.664-2.073c-.173-.3-.018-.462.13-.61c.134-.133.298-.348.446-.521c.15-.173.199-.298.298-.497c.099-.198.05-.372-.025-.521c-.075-.149-.669-1.612-.916-2.207c-.242-.579-.487-.501-.669-.51l-.57-.01c-.199 0-.52.074-.792.372c-.272.297-1.04 1.016-1.04 2.479c0 1.462 1.065 2.875 1.213 3.074c.149.198 2.095 3.2 5.076 4.487c.709.306 1.263.489 1.694.626c.712.226 1.36.194 1.872.118c.571-.085 1.774-.726 2.022-1.392c.247-.667.247-1.241.173-1.392c-.074-.15-.272-.249-.571-.398z" />
+                                </svg>
+                                WA (Sent)
+                            </button>
+                        @endif
+
+                        {{-- ─── TOMBOL EMAIL POS_SALES ─── --}}
+                        @if (Auth::user()->hasRole('admin') || !$completedOrder->is_email_sent)
+                            {{-- Aktif jika Admin ATAU jika Email belum pernah dikirim --}}
+                            <button wire:click="sendReceiptToEmail" wire:loading.attr="disabled"
+                                class="text-blue-600 hover:text-blue-700 font-bold text-xs flex items-center gap-1 transition">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                <span wire:loading.remove wire:target="sendReceiptToEmail">Email</span>
+                                <span wire:loading wire:target="sendReceiptToEmail">Sending...</span>
+                            </button>
+                        @else
+                            {{-- Terkunci untuk Kasir/FL jika is_email_sent bernilai true --}}
+                            <button disabled
+                                class="text-gray-300 cursor-not-allowed font-bold text-xs flex items-center gap-1"
+                                title="Sudah dikirim oleh kasir">
+                                <svg class="w-4 h-4 opacity-40" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                Email (Sent)
+                            </button>
+                        @endif
+
+                        {{-- Tombol Tutup --}}
                         <button wire:click="closeReceipt" class="text-gray-400 hover:text-gray-600">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 stroke-width="2">
