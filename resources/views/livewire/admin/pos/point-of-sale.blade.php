@@ -114,10 +114,10 @@
         {{-- ═══════════════════════════════════════════════════════════
              RIGHT PANEL: Cart, Customer & Payment
         ═══════════════════════════════════════════════════════════ --}}
-        <div class="w-[420px] bg-white border-l border-gray-200 flex flex-col shrink-0 overflow-hidden">
-            {{-- Cart Header --}}
-            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-                <h2 class="font-black text-gray-900 text-lg flex items-center gap-2">
+                        <div class="w-[420px] bg-white border-l border-gray-200 flex flex-col shrink-0 overflow-hidden h-full">
+            {{-- Cart Header (Compact) --}}
+            <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
+                <h2 class="font-black text-gray-900 text-base flex items-center gap-2">
                     <svg class="w-5 h-5 text-[#1c69d4]" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                         stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -127,24 +127,24 @@
                 </h2>
                 @if (!empty($cart))
                     <span
-                        class="bg-[#1c69d4] text-white text-xs font-black px-2.5 py-1 rounded-full">{{ count($cart) }}</span>
+                        class="bg-[#1c69d4] text-white text-xs font-black px-2.5 py-0.5 rounded-full">{{ count($cart) }}</span>
                 @endif
             </div>
 
-            {{-- Cart Items --}}
-            <div class="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+            {{-- Cart Items (Compact & Scrollable, max-h-[170px]) --}}
+            <div class="max-h-[170px] overflow-y-auto px-4 py-2.5 space-y-2.5 border-b border-gray-100 shrink-0 bg-white">
                 @forelse($cart as $index => $item)
-                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 relative group">
+                    <div class="bg-gray-50 rounded-lg p-2.5 border border-gray-100 relative group">
                         <button wire:click="removeFromCart({{ $index }})"
-                            class="absolute top-2 right-2 text-gray-300 hover:text-rose-500 transition opacity-0 group-hover:opacity-100">
+                            class="absolute top-2.5 right-2.5 text-gray-300 hover:text-rose-500 transition opacity-0 group-hover:opacity-100">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
-                        <div class="flex justify-between items-start mb-2">
+                        <div class="flex justify-between items-start mb-1.5">
                             <div class="pr-6">
-                                <h4 class="font-bold text-gray-800 text-sm">{{ $item['name'] }}</h4>
+                                <h4 class="font-bold text-gray-800 text-xs">{{ $item['name'] }}</h4>
                                 <p class="text-[10px] text-gray-400 uppercase font-bold">{{ $item['color'] }} -
                                     {{ $item['storage'] }}
                                     @if ($item['is_second'] ?? false)
@@ -152,79 +152,78 @@
                                     @endif
                                 </p>
                             </div>
-                            <p class="font-bold text-gray-800 text-sm whitespace-nowrap">Rp
+                            <p class="font-bold text-gray-800 text-xs whitespace-nowrap">Rp
                                 {{ number_format($item['price'] * $item['qty'], 0, ',', '.') }}</p>
                         </div>
-                        <div class="flex items-center justify-between gap-2 mt-2">
+                        <div class="flex items-center justify-between gap-2">
                             <div class="flex items-center gap-1">
                                 <button wire:click="decrementCartItem({{ $index }})"
-                                    class="w-7 h-7 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition text-sm font-bold">−</button>
-                                <span class="w-8 text-center font-bold text-sm">{{ $item['qty'] }}</span>
+                                    class="w-6 h-6 rounded bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition text-xs font-bold">−</button>
+                                <span class="w-6 text-center font-bold text-xs">{{ $item['qty'] }}</span>
                                 <button wire:click="incrementCartItem({{ $index }})"
-                                    class="w-7 h-7 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition text-sm font-bold">+</button>
+                                    class="w-6 h-6 rounded bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition text-xs font-bold">+</button>
                             </div>
-                            <p class="text-xs text-gray-400">@ Rp {{ number_format($item['price'], 0, ',', '.') }}</p>
+                            <p class="text-[10px] text-gray-400">@ Rp {{ number_format($item['price'], 0, ',', '.') }}</p>
                         </div>
                         {{-- SN Input --}}
-                        <div class="mt-3">
+                        <div class="mt-2">
                             <input type="text"
                                 wire:change="updateSerialNumber({{ $index }}, $event.target.value)"
                                 value="{{ $item['serial_number'] }}"
-                                class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono focus:border-[#1c69d4] focus:ring-0 transition-all placeholder-gray-300"
+                                class="w-full bg-white border border-gray-200 rounded px-2.5 py-1 text-[11px] font-mono focus:border-[#1c69d4] focus:ring-0 transition-all placeholder-gray-300"
                                 placeholder="SN / IMEI...">
                         </div>
                     </div>
                 @empty
-                    <div class="flex flex-col items-center justify-center py-12 text-gray-300">
-                        <svg class="w-12 h-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            stroke-width="1">
+                    <div class="flex flex-col items-center justify-center py-6 text-gray-300">
+                        <svg class="w-8 h-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
                         </svg>
-                        <p class="text-sm font-bold text-gray-400">Keranjang kosong</p>
+                        <p class="text-xs font-bold text-gray-400">Keranjang kosong</p>
                     </div>
                 @endforelse
             </div>
 
-            {{-- Bottom Section: Customer, Payment, Totals --}}
-            <div class="border-t border-gray-200 bg-gray-50 shrink-0">
-
+            {{-- Form Section: Customer, Payments, Discount (Scrollable & Responsive) --}}
+            <div class="flex-1 overflow-y-auto bg-gray-50 divide-y divide-gray-100 min-h-0">
                 {{-- Customer Section --}}
-                <div class="px-5 py-3 border-b border-gray-100">
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Customer</p>
+                <div class="px-4 py-3">
+                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Customer</p>
                     @if ($selectedCustomerId)
                         @php $customer = \App\Models\User::with('profile')->find($selectedCustomerId); @endphp
                         <div
-                            class="flex items-center justify-between bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+                            class="flex items-center justify-between bg-emerald-50 rounded-lg p-2.5 border border-emerald-100">
                             <div>
-                                <p class="font-bold text-gray-800 text-sm">{{ $customer->name }}</p>
+                                <p class="font-bold text-gray-800 text-xs">{{ $customer->name }}</p>
                                 <p class="text-[10px] text-gray-500">
                                     {{ $customer->profile->phone_number ?? $customer->email }}</p>
                             </div>
                             <button wire:click="clearSelectedCustomer"
-                                class="text-rose-400 hover:text-rose-600 text-xs font-bold">Ganti</button>
+                                class="text-rose-400 hover:text-rose-600 text-[11px] font-bold">Ganti</button>
                         </div>
                     @elseif($isNewCustomer)
-                        <div class="space-y-2">
+                        <div class="space-y-1.5">
                             <input type="text" wire:model="customerName"
-                                class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-[#1c69d4] focus:ring-0"
+                                class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0"
                                 placeholder="Nama Customer *">
                             <input type="text" wire:model="customerPhone"
-                                class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-[#1c69d4] focus:ring-0"
+                                class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0"
                                 placeholder="No HP *">
                             <input type="email" wire:model="customerEmail"
-                                class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-[#1c69d4] focus:ring-0"
+                                class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0"
                                 placeholder="Email (opsional)">
                             <button wire:click="$set('isNewCustomer', false)"
-                                class="text-xs text-gray-400 hover:text-gray-600 font-bold">← Cari customer
+                                class="text-[10px] text-gray-400 hover:text-gray-600 font-bold">← Cari customer
                                 lama</button>
                         </div>
                     @else
                         <div class="relative">
                             <input type="text" wire:model.live.debounce.300ms="searchCustomer"
-                                class="w-full bg-white border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:border-[#1c69d4] focus:ring-0"
+                                class="w-full bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0"
                                 placeholder="Cari nama / no HP...">
-                            <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none"
+                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none"
                                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -248,82 +247,155 @@
                             </div>
                         @endif
                         <button wire:click="$set('isNewCustomer', true)"
-                            class="text-xs text-[#1c69d4] hover:underline font-bold mt-2 block">+ Customer
-                            Baru</button>
+                            class="text-[10px] text-[#1c69d4] hover:underline font-bold mt-1.5 block">+ Customer Baru</button>
                     @endif
                 </div>
 
-                {{-- Payment Method --}}
-                <div class="px-5 py-3 border-b border-gray-100">
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Pembayaran</p>
-                    <select wire:model.live="payment_method_id"
-                        class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:border-[#1c69d4] focus:ring-0">
-                        <option value="">-- Pilih Metode --</option>
-                        @foreach ($this->paymentMethods as $pm)
-                            <option value="{{ $pm->id }}">{{ $pm->name }}
-                                {{ $pm->rates->count() > 0 ? '(' . $pm->rates->count() . ' tarif)' : ($pm->mdr_percentage > 0 ? '(MDR ' . $pm->mdr_percentage . '%)' : '') }}
-                            </option>
-                        @endforeach
-                    </select>
+                {{-- Payment Methods (Split Payment Support) --}}
+                <div class="px-4 py-3 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Metode Pembayaran</p>
+                        <button type="button" wire:click="addPaymentRow" 
+                            class="text-[11px] font-bold text-[#1c69d4] hover:text-blue-800 flex items-center gap-1 transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Split Pembayaran
+                        </button>
+                    </div>
 
-                    @if ($this->paymentMethodRates->count() > 0)
-                        <div class="mt-2.5">
-                            <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tipe Kartu
-                                / Tenor Cicilan</p>
-                            <select wire:model.live="payment_method_rate_id"
-                                class="w-full bg-[#f4f7fc] border border-blue-100 text-blue-900 rounded-lg px-3 py-2 text-xs font-bold focus:border-[#1c69d4] focus:ring-0">
-                                <option value="">-- Pilih Opsi / Tenor --</option>
-                                @foreach ($this->paymentMethodRates as $rate)
-                                    <option value="{{ $rate->id }}">{{ $rate->name }} (MDR
-                                        {{ $rate->mdr_percentage }}%)</option>
-                                @endforeach
-                            </select>
+                    <div class="space-y-2.5">
+                        @foreach ($payments as $index => $payment)
+                            <div class="p-2.5 bg-white border border-gray-200 rounded-xl space-y-2 relative" wire:key="payment-row-{{ $index }}">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[10px] font-extrabold text-gray-500">Alokasi #{{ $index + 1 }}</span>
+                                    @if (count($payments) > 1)
+                                        <button type="button" wire:click="removePaymentRow({{ $index }})" 
+                                            class="text-rose-500 hover:text-rose-700 text-[10px] font-bold flex items-center gap-0.5 transition-colors">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            Hapus
+                                        </button>
+                                    @endif
+                                </div>
+
+                                {{-- Payment Method Dropdown --}}
+                                <select wire:model.live="payments.{{ $index }}.payment_method_id"
+                                    class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold focus:border-[#1c69d4] focus:ring-0">
+                                    <option value="">-- Pilih Metode --</option>
+                                    @foreach ($this->paymentMethods as $pm)
+                                        <option value="{{ $pm->id }}">{{ $pm->name }}
+                                            {{ $pm->rates->count() > 0 ? '(' . $pm->rates->count() . ' tarif)' : ($pm->mdr_percentage > 0 ? '(MDR ' . $pm->mdr_percentage . '%)' : '') }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                {{-- Payment Method Rates Dropdown (if exists and active) --}}
+                                @php
+                                    $pmId = $payment['payment_method_id'];
+                                    $pmObj = $pmId ? \App\Models\PaymentMethod::find($pmId) : null;
+                                    $rowRates = $pmObj ? $pmObj->rates()->where('is_active', true)->get() : collect();
+                                @endphp
+
+                                @if ($rowRates->count() > 0)
+                                    <select wire:model.live="payments.{{ $index }}.payment_method_rate_id"
+                                        class="w-full bg-blue-50/50 border border-blue-100 text-blue-900 rounded-lg px-2 py-1.5 text-xs font-bold focus:border-[#1c69d4] focus:ring-0">
+                                        <option value="">-- Pilih Opsi / Tenor --</option>
+                                        @foreach ($rowRates as $rate)
+                                            <option value="{{ $rate->id }}">{{ $rate->name }} (MDR {{ $rate->mdr_percentage }}%)</option>
+                                        @endforeach
+                                    </select>
+                                @endif
+
+                                {{-- Amount Input --}}
+                                <div class="flex gap-2">
+                                    <div class="relative flex-1">
+                                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                                        <input type="number" wire:model.live="payments.{{ $index }}.amount"
+                                            class="w-full pl-7 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold focus:border-[#1c69d4] focus:ring-0"
+                                            placeholder="Jumlah Bayar" min="0">
+                                    </div>
+                                    @if (count($payments) > 1)
+                                        <button type="button" wire:click="autofillRemaining({{ $index }})"
+                                            class="px-2 py-1.5 text-xs font-bold bg-[#1c69d4] text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-all whitespace-nowrap">
+                                            Gunakan Sisa
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    {{-- Validation Status Banner --}}
+                    @php
+                        $targetTotal = max(0, $this->subtotal - $this->discount_amount);
+                        $allocatedTotal = (int) $this->paymentsTotalBase;
+                        $diff = $targetTotal - $allocatedTotal;
+                    @endphp
+
+                    @if ($diff === 0)
+                        <div class="flex items-center gap-2 p-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-bold justify-center">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Jumlah Pembayaran Sesuai
+                        </div>
+                    @elseif ($diff > 0)
+                        <div class="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-bold justify-center">
+                            <svg class="w-4 h-4 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            Kurang Bayar: Rp {{ number_format($diff, 0, ',', '.') }}
+                        </div>
+                    @else
+                        <div class="flex items-center gap-2 p-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-bold justify-center">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Kelebihan Bayar: Rp {{ number_format(abs($diff), 0, ',', '.') }}
                         </div>
                     @endif
                 </div>
 
                 {{-- Discount --}}
-                <div class="px-5 py-3 border-b border-gray-100">
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Diskon (Rp)</p>
+                <div class="px-4 py-3">
+                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Diskon (Rp)</p>
                     <input type="number" wire:model.live="discount_amount"
-                        class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold focus:border-[#1c69d4] focus:ring-0"
+                        class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:border-[#1c69d4] focus:ring-0"
                         placeholder="0" min="0">
                 </div>
+            </div>
 
+            {{-- Pinned Footer: Totals & Pay Button --}}
+            <div class="border-t border-gray-200 bg-white shrink-0 p-4 space-y-3.5">
                 {{-- Totals --}}
-                <div class="px-5 py-4 space-y-2">
-                    <div class="flex justify-between text-sm">
-                        <span class="text-gray-500">Subtotal</span>
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs font-medium text-gray-500">
+                        <span>Subtotal</span>
                         <span class="font-bold text-gray-800">Rp
                             {{ number_format($this->subtotal, 0, ',', '.') }}</span>
                     </div>
                     @if ($this->discount_amount > 0)
-                        <div class="flex justify-between text-sm">
-                            <span class="text-rose-500">Diskon</span>
-                            <span class="font-bold text-rose-500">- Rp
+                        <div class="flex justify-between text-xs font-medium text-rose-500">
+                            <span>Diskon</span>
+                            <span class="font-bold">- Rp
                                 {{ number_format($this->discount_amount, 0, ',', '.') }}</span>
                         </div>
                     @endif
-                    @if ($this->mdrAmount > 0)
-                        <div class="flex justify-between text-sm">
-                            <span class="text-amber-600">Beban MDR ({{ $this->mdrPercentage }}%)</span>
-                            <span class="font-bold text-amber-600">+ Rp
-                                {{ number_format($this->mdrAmount, 0, ',', '.') }}</span>
-                        </div>
-                    @endif
-                    <div class="border-t border-gray-200 pt-2 flex justify-between">
-                        <span class="font-black text-gray-900 text-lg">Total</span>
+                    <div class="border-t border-gray-150 pt-1.5 flex justify-between items-center">
+                        <span class="font-black text-gray-900 text-base">Total Tagihan</span>
                         <span class="font-black text-[#1c69d4] text-lg">Rp
                             {{ number_format($this->grandTotal, 0, ',', '.') }}</span>
                     </div>
                 </div>
 
                 {{-- Pay Button --}}
-                <div class="px-5 pb-5">
+                <div>
                     <button wire:click="openCheckout" {{ empty($cart) ? 'disabled' : '' }}
-                        class="w-full py-4 rounded-xl font-black text-white text-lg transition-all shadow-lg active:scale-[0.98]
-                        {{ empty($cart) ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#1c69d4] hover:bg-blue-700 shadow-blue-500/30' }}">
-                        <svg class="w-5 h-5 inline-block mr-2 -mt-0.5" fill="none" viewBox="0 0 24 24"
+                        class="w-full py-3.5 rounded-xl font-black text-white text-base transition-all shadow-md active:scale-[0.98]
+                        {{ empty($cart) ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#1c69d4] hover:bg-blue-700 shadow-blue-500/20' }}">
+                        <svg class="w-4 h-4 inline-block mr-1.5 -mt-0.5" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -333,6 +405,8 @@
                 </div>
             </div>
         </div>
+
+
     </div>
 
     {{-- ═══════════════════════════════════════════════════════════
@@ -412,12 +486,6 @@
                         <div class="flex justify-between text-sm"><span class="text-rose-500">Diskon</span><span
                                 class="font-bold text-rose-500">- Rp
                                 {{ number_format($this->discount_amount, 0, ',', '.') }}</span></div>
-                    @endif
-                    @if ($this->mdrAmount > 0)
-                        <div class="flex justify-between text-sm"><span class="text-amber-600">MDR
-                                ({{ $this->selectedPaymentMethodRate ? $this->selectedPaymentMethodRate->name : $this->selectedPaymentMethod->name ?? '' }}
-                                - {{ $this->mdrPercentage }}%)</span><span class="font-bold text-amber-600">+ Rp
-                                {{ number_format($this->mdrAmount, 0, ',', '.') }}</span></div>
                     @endif
                     <div class="flex justify-between pt-2 border-t border-gray-200"><span
                             class="font-black text-lg">TOTAL</span><span class="font-black text-[#1c69d4] text-lg">Rp
@@ -504,21 +572,18 @@
                             <span>Diskon</span><span>-{{ number_format($completedOrder->discount_amount, 0, ',', '.') }}</span>
                         </div>
                     @endif
-                    @if ($completedOrder->mdr_amount > 0)
-                        <div class="flex justify-between text-amber-600">
-                            <span>MDR
-                                ({{ $completedOrder->paymentMethodRate ? $completedOrder->paymentMethodRate->name : $completedOrder->paymentMethod->name ?? '' }}
-                                - {{ $completedOrder->mdr_percentage }}%)</span>
-                            <span>+{{ number_format($completedOrder->mdr_amount, 0, ',', '.') }}</span>
-                        </div>
-                    @endif
                     <div class="border-t border-dashed border-gray-300 my-1"></div>
                     <div class="flex justify-between font-bold text-sm"><span>TOTAL</span><span>Rp
                             {{ number_format($completedOrder->grand_total, 0, ',', '.') }}</span></div>
                     <div class="border-t border-dashed border-gray-300 my-2"></div>
-                    <p class="text-[10px] text-gray-500">Bayar:
-                        {{ $completedOrder->paymentMethod->name ?? 'Cash' }}{{ $completedOrder->paymentMethodRate ? ' - ' . $completedOrder->paymentMethodRate->name : '' }}
-                    </p>
+                    <div class="space-y-0.5 mb-2">
+                        @foreach ($completedOrder->payments as $payment)
+                            <div class="flex justify-between text-[10px] text-gray-500">
+                                <span>Bayar ({{ $payment->paymentMethod->name ?? 'Cash' }}{{ $payment->paymentMethodRate ? ' - ' . $payment->paymentMethodRate->name : '' }}):</span>
+                                <span>Rp {{ number_format($payment->amount, 0, ',', '.') }}</span>
+                            </div>
+                        @endforeach
+                    </div>
                     @if ($completedOrder->accurate_invoice_no)
                         <p class="text-[10px] text-gray-400">Inv: {{ $completedOrder->accurate_invoice_no }}</p>
                     @endif

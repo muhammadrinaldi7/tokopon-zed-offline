@@ -38,15 +38,9 @@ class PointOfSale extends Component
     public $customerEmail = '';
 
     // ─── Payment ───────────────────────────────────────────────
-    public $payment_method_id = null;
-    public $payment_method_rate_id = null;
+    public $payments = [];
     public $discount_amount = 0;
     public $notes = '';
-
-    public function updatedPaymentMethodId($value)
-    {
-        $this->payment_method_rate_id = null;
-    }
 
     // ─── Modals ────────────────────────────────────────────────
     public $showCheckoutModal = false;
@@ -59,35 +53,113 @@ class PointOfSale extends Component
     public $variantModalVariants = [];
     public $variantModalIsSecond = false;
 
-    // ─── Computed Properties ───────────────────────────────────
+    public function mount()
+    {
+        $this->payments = [
+            [
+                'payment_method_id' => '',
+                'payment_method_rate_id' => '',
+                'amount' => 0,
+            ]
+        ];
+    }
+
+    public function updatedPayments($value, $key)
+    {
+        // Reset rate when method changes
+        if (str_contains($key, '.payment_method_id')) {
+            $parts = explode('.', $key);
+            $index = $parts[0];
+            $this->payments[$index]['payment_method_rate_id'] = '';
+        }
+        $this->syncSinglePaymentAmount();
+    }
+
+    public function updatedDiscountAmount()
+    {
+        $this->syncSinglePaymentAmount();
+    }
+
+    public function addPaymentRow()
+    {
+        $remaining = max(0, ($this->subtotal - $this->discount_amount) - $this->paymentsTotalBase);
+        $this->payments[] = [
+            'payment_method_id' => '',
+            'payment_method_rate_id' => '',
+            'amount' => $remaining,
+        ];
+    }
+
+    public function removePaymentRow($index)
+    {
+        if (count($this->payments) > 1) {
+            unset($this->payments[$index]);
+            $this->payments = array_values($this->payments);
+            $this->syncSinglePaymentAmount();
+        }
+    }
+
+    public function autofillRemaining($index)
+    {
+        $totalOther = 0;
+        foreach ($this->payments as $i => $p) {
+            if ($i !== $index) {
+                $totalOther += (int)$p['amount'];
+            }
+        }
+        $target = max(0, $this->subtotal - $this->discount_amount);
+        $this->payments[$index]['amount'] = max(0, $target - $totalOther);
+    }
+
+    public function syncSinglePaymentAmount()
+    {
+        if (count($this->payments) === 1) {
+            $this->payments[0]['amount'] = max(0, $this->subtotal - $this->discount_amount);
+        }
+    }
+
+    public function getMdrPercentage($payment)
+    {
+        $pmId = $payment['payment_method_id'] ?? null;
+        $rateId = $payment['payment_method_rate_id'] ?? null;
+
+        if (!$pmId) return 0;
+
+        if ($rateId) {
+            $rate = \App\Models\PaymentMethodRate::find($rateId);
+            return $rate ? (float) $rate->mdr_percentage : 0;
+        }
+
+        $pm = \App\Models\PaymentMethod::find($pmId);
+        return $pm ? (float) $pm->mdr_percentage : 0;
+    }
+
+    #[Computed]
+    public function paymentsTotalBase()
+    {
+        return collect($this->payments)->sum(fn($p) => (float)($p['amount'] ?? 0));
+    }
+
+    #[Computed]
+    public function isPaymentsValid()
+    {
+        foreach ($this->payments as $p) {
+            if (empty($p['payment_method_id'])) return false;
+
+            $pm = \App\Models\PaymentMethod::find($p['payment_method_id']);
+            if ($pm && $pm->rates()->where('is_active', true)->count() > 0 && empty($p['payment_method_rate_id'])) {
+                return false;
+            }
+        }
+
+        $target = max(0, $this->subtotal - $this->discount_amount);
+        return (int) $this->paymentsTotalBase === (int) $target;
+    }
 
     #[Computed]
     public function paymentMethods()
     {
         return PaymentMethod::where('is_active', true)->get();
-    }
-
-    #[Computed]
-    public function selectedPaymentMethod()
-    {
-        if (!$this->payment_method_id) return null;
-        return PaymentMethod::find($this->payment_method_id);
-    }
-
-    #[Computed]
-    public function paymentMethodRates()
-    {
-        if (!$this->payment_method_id) return collect();
-        return PaymentMethodRate::where('payment_method_id', $this->payment_method_id)
-            ->where('is_active', true)
-            ->get();
-    }
-
-    #[Computed]
-    public function selectedPaymentMethodRate()
-    {
-        if (!$this->payment_method_rate_id) return null;
-        return PaymentMethodRate::find($this->payment_method_rate_id);
     }
 
     #[Computed]
@@ -158,28 +230,22 @@ class PointOfSale extends Component
     }
 
     #[Computed]
-    public function mdrPercentage()
-    {
-        if ($this->payment_method_rate_id) {
-            $rate = $this->selectedPaymentMethodRate;
-            return $rate ? (float) $rate->mdr_percentage : 0;
-        }
-
-        $pm = $this->selectedPaymentMethod;
-        return $pm ? (float) $pm->mdr_percentage : 0;
-    }
-
-    #[Computed]
     public function mdrAmount()
     {
-        if ($this->mdrPercentage <= 0) return 0;
-        return round(($this->subtotal - $this->discount_amount) * $this->mdrPercentage / 100, 0);
+        $totalMdr = 0;
+        foreach ($this->payments as $payment) {
+            $pct = $this->getMdrPercentage($payment);
+            if ($pct > 0) {
+                $totalMdr += round((float)$payment['amount'] * $pct / 100, 0);
+            }
+        }
+        return $totalMdr;
     }
 
     #[Computed]
     public function grandTotal()
     {
-        return max(0, $this->subtotal - $this->discount_amount + $this->mdrAmount);
+        return max(0, $this->subtotal() - $this->discount_amount);
     }
 
     // ─── Cart Actions ──────────────────────────────────────────
@@ -190,8 +256,8 @@ class PointOfSale extends Component
 
         if ($isSecond) {
             $product = SecondProduct::with([
-                'variants' => function($q) use ($warehouseId) {
-                    $q->with(['warehouseStocks' => function($q2) use ($warehouseId) {
+                'variants' => function ($q) use ($warehouseId) {
+                    $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
                         $q2->where('warehouse_id', $warehouseId);
                     }]);
                 },
@@ -208,8 +274,8 @@ class PointOfSale extends Component
             ])->toArray();
         } else {
             $product = Product::with([
-                'variants' => function($q) use ($warehouseId) {
-                    $q->with(['warehouseStocks' => function($q2) use ($warehouseId) {
+                'variants' => function ($q) use ($warehouseId) {
+                    $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
                         $q2->where('warehouse_id', $warehouseId);
                     }]);
                 },
@@ -237,12 +303,12 @@ class PointOfSale extends Component
         $warehouseId = Auth::user()->warehouse_id;
 
         if ($isSecond) {
-            $variant = SecondProductVariant::with(['warehouseStocks' => function($q) use ($warehouseId) {
+            $variant = SecondProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
                 $q->where('warehouse_id', $warehouseId);
             }])->find($variantId);
             $variantType = SecondProductVariant::class;
         } else {
-            $variant = ProductVariant::with(['warehouseStocks' => function($q) use ($warehouseId) {
+            $variant = ProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
                 $q->where('warehouse_id', $warehouseId);
             }])->find($variantId);
             $variantType = ProductVariant::class;
@@ -286,18 +352,21 @@ class PointOfSale extends Component
         $this->showVariantModal = false;
         $this->variantModalProduct = null;
         $this->variantModalVariants = [];
+        $this->syncSinglePaymentAmount();
     }
 
     public function removeFromCart($index)
     {
         unset($this->cart[$index]);
         $this->cart = array_values($this->cart); // re-index
+        $this->syncSinglePaymentAmount();
     }
 
     public function incrementCartItem($index)
     {
         if (isset($this->cart[$index])) {
             $this->cart[$index]['qty']++;
+            $this->syncSinglePaymentAmount();
         }
     }
 
@@ -305,6 +374,7 @@ class PointOfSale extends Component
     {
         if (isset($this->cart[$index]) && $this->cart[$index]['qty'] > 1) {
             $this->cart[$index]['qty']--;
+            $this->syncSinglePaymentAmount();
         }
     }
 
@@ -351,13 +421,8 @@ class PointOfSale extends Component
             return;
         }
 
-        if (!$this->payment_method_id) {
-            $this->dispatch('toast', title: 'Metode Bayar', message: 'Pilih metode pembayaran.', type: 'warning');
-            return;
-        }
-
-        if ($this->paymentMethodRates->count() > 0 && !$this->payment_method_rate_id) {
-            $this->dispatch('toast', title: 'Tarif MDR Belum Dipilih', message: 'Silakan pilih tipe kartu / tenor cicilan terlebih dahulu.', type: 'warning');
+        if (!$this->isPaymentsValid) {
+            $this->dispatch('toast', title: 'Pembayaran Belum Sesuai', message: 'Pastikan total pembayaran cocok dengan tagihan dan semua metode pembayaran sudah dipilih.', type: 'warning');
             return;
         }
 
@@ -398,10 +463,8 @@ class PointOfSale extends Component
                 return;
             }
 
-            $paymentMethod = PaymentMethod::findOrFail($this->payment_method_id);
-
-            if ($this->paymentMethodRates->count() > 0 && !$this->payment_method_rate_id) {
-                $this->dispatch('toast', title: 'Tarif MDR Belum Dipilih', message: 'Silakan pilih tipe kartu / tenor cicilan terlebih dahulu.', type: 'warning');
+            if (!$this->isPaymentsValid) {
+                $this->dispatch('toast', title: 'Error', message: 'Pembayaran belum valid.', type: 'error');
                 return;
             }
 
@@ -413,11 +476,10 @@ class PointOfSale extends Component
                 STR_PAD_LEFT
             );
 
-            $subtotal = $this->subtotal;
+            $subtotal = $this->subtotal();
             $discountAmount = (int) $this->discount_amount;
-            $mdrPct = $this->mdrPercentage;
-            $mdrAmt = round(($subtotal - $discountAmount) * $mdrPct / 100, 0);
-            $grandTotal = max(0, $subtotal - $discountAmount + $mdrAmt);
+            $mdrAmt = $this->mdrAmount;
+            $grandTotal = max(0, $subtotal - $discountAmount);
 
             // Create Order
             $order = Order::create([
@@ -426,14 +488,14 @@ class PointOfSale extends Component
                 'total_amount' => $subtotal,
                 'shipping_cost' => 0,
                 'discount_amount' => $discountAmount,
-                'mdr_percentage' => $mdrPct,
+                'mdr_percentage' => ($subtotal - $discountAmount) > 0 ? round(($mdrAmt / ($subtotal - $discountAmount)) * 100, 2) : 0,
                 'mdr_amount' => $mdrAmt,
                 'grand_total' => $grandTotal,
                 'order_status' => 'COMPLETED',
                 'order_channel' => 'POS',
                 'handled_by' => Auth::id(),
-                'payment_method_id' => $this->payment_method_id,
-                'payment_method_rate_id' => $this->payment_method_rate_id,
+                'payment_method_id' => $this->payments[0]['payment_method_id'] ?: null,
+                'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
                 'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
                 'notes' => $this->notes,
             ]);
@@ -451,27 +513,33 @@ class PointOfSale extends Component
                 ]);
 
                 // Reduce stock
-                \App\Models\WarehouseStock::updateOrCreate(
+                $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
                     [
                         'warehouse_id' => Auth::user()->warehouse_id,
                         'variant_id' => $item['variant_id'],
                         'variant_type' => $item['variant_type'],
                     ],
                     [
-                        'stock' => \Illuminate\Support\Facades\DB::raw("GREATEST(0, stock - " . (int)$item['qty'] . ")")
+                        'stock' => 0
                     ]
                 );
+                $warehouseStock->update([
+                    'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
+                ]);
             }
+            // Create OrderPayments (for each split payment row)
+            foreach ($this->payments as $payment) {
+                $rowTotal = (float)$payment['amount'];
 
-            // Create OrderPayment
-            OrderPayment::create([
-                'order_id' => $order->id,
-                'xendit_external_id' => 'ORD-BUY-' . date('YmdHis') . rand(100, 999),
-                'amount' => $grandTotal,
-                'status' => 'PAID',
-                'payment_method_id' => $this->payment_method_id,
-                'payment_method_rate_id' => $this->payment_method_rate_id,
-            ]);
+                OrderPayment::create([
+                    'order_id' => $order->id,
+                    'xendit_external_id' => 'ORD-BUY-' . date('YmdHis') . rand(1000, 9999),
+                    'amount' => $rowTotal,
+                    'status' => 'PAID',
+                    'payment_method_id' => $payment['payment_method_id'],
+                    'payment_method_rate_id' => $payment['payment_method_rate_id'] ?: null,
+                ]);
+            }
 
             // ─── Accurate Integration (Iterative State Saving) ─────
 
@@ -520,25 +588,57 @@ class PointOfSale extends Component
                     }
                 }
 
-                // Sales Receipt (jika belum ada dan ada invoice)
+                // Sales Receipts (jika belum ada dan ada invoice)
                 if (!$order->accurate_receipt_no && $order->accurate_invoice_no) {
-                    $srData = [
-                        'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
-                        'branchName' => $branchName,
-                        'bankNo' => $paymentMethod->accurate_bank_no ?? 'KAS-CASH',
-                        'receiptAmount' => (float) $grandTotal,
-                        'chequeAmount' => (float) $grandTotal,
-                        'detailInvoice' => [
-                            [
-                                'invoiceNo' => $order->accurate_invoice_no,
-                                'paymentAmount' => (float) $grandTotal,
-                            ]
-                        ]
-                    ];
+                    $srNumbers = [];
+                    foreach ($this->payments as $payment) {
+                        $pm = \App\Models\PaymentMethod::findOrFail($payment['payment_method_id']);
+                        $rate = $payment['payment_method_rate_id'] ? \App\Models\PaymentMethodRate::find($payment['payment_method_rate_id']) : null;
 
-                    $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
-                    if (isset($srResult['r']['number'])) {
-                        $order->update(['accurate_receipt_no' => $srResult['r']['number']]);
+                        $pct = $this->getMdrPercentage($payment);
+                        $rowMdr = $pct > 0 ? round((float)$payment['amount'] * $pct / 100, 0) : 0;
+                        $rowBaseAmount = (float)$payment['amount'];
+
+                        $netReceiptAmount = $rowBaseAmount - $rowMdr;
+                        $mdrAccountNo = $rate ? $rate->accurate_account_no : null;
+
+                        $detailInvoiceItem = [
+                            'invoiceNo' => $order->accurate_invoice_no,
+                            'paymentAmount' => $rowBaseAmount,
+                        ];
+
+                        if ($rowMdr > 0 && $mdrAccountNo) {
+                            $detailInvoiceItem['detailDiscount'] = [
+                                [
+                                    'accountNo' => $mdrAccountNo,
+                                    'amount' => (float) $rowMdr,
+                                    'departmentName' => $branchName,
+                                    'discountNotes' => 'MDR'
+                                ]
+                            ];
+                        } else {
+                            $netReceiptAmount = $rowBaseAmount;
+                        }
+
+                        $srData = [
+                            'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
+                            'branchName' => $branchName,
+                            'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
+                            'receiptAmount' => (float) $netReceiptAmount,
+                            'chequeAmount' => (float) $netReceiptAmount,
+                            'detailInvoice' => [
+                                $detailInvoiceItem
+                            ]
+                        ];
+                        Log::info('POS Accurate Integration SR Data: ' . json_encode($srData));
+                        $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+                        if (isset($srResult['r']['number'])) {
+                            $srNumbers[] = $srResult['r']['number'];
+                        }
+                    }
+
+                    if (!empty($srNumbers)) {
+                        $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
                     }
                 }
             } catch (\Exception $e) {
@@ -547,7 +647,7 @@ class PointOfSale extends Component
             }
 
             // Success! Show receipt
-            $this->completedOrder = $order->load(['items', 'user', 'paymentMethod', 'handledBy']);
+            $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
             $this->showCheckoutModal = false;
             $this->showReceiptModal = true;
 
@@ -562,8 +662,13 @@ class PointOfSale extends Component
             $this->customerPhone = '';
             $this->customerEmail = '';
             $this->search = '';
-            $this->payment_method_id = null;
-            $this->payment_method_rate_id = null;
+            $this->payments = [
+                [
+                    'payment_method_id' => '',
+                    'payment_method_rate_id' => '',
+                    'amount' => 0,
+                ]
+            ];
 
             $this->dispatch('toast', title: 'Transaksi Berhasil', message: 'Order ' . $orderNumber . ' berhasil diproses.', type: 'success');
         } catch (\Exception $e) {
@@ -583,8 +688,13 @@ class PointOfSale extends Component
         $this->cart = [];
         $this->discount_amount = 0;
         $this->notes = '';
-        $this->payment_method_id = null;
-        $this->payment_method_rate_id = null;
+        $this->payments = [
+            [
+                'payment_method_id' => '',
+                'payment_method_rate_id' => '',
+                'amount' => 0,
+            ]
+        ];
         $this->selectedCustomerId = null;
         $this->isNewCustomer = false;
         $this->searchCustomer = '';

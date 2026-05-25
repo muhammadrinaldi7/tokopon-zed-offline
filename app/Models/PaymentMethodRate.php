@@ -13,6 +13,7 @@ class PaymentMethodRate extends Model
         'payment_method_id',
         'name',
         'mdr_percentage',
+        'accurate_account_no',
         'is_active',
     ];
 
