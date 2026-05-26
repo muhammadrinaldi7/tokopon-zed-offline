@@ -8,11 +8,11 @@
             {{-- Top Bar --}}
             <div class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
                 <div class="flex items-center gap-3">
-                    <a href="{{ route('/') }}" wire:navigate class="text-gray-400 hover:text-gray-600 transition">
+                    {{-- <a href="{{ route('/') }}" wire:navigate class="text-gray-400 hover:text-gray-600 transition">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                         </svg>
-                    </a>
+                    </a> --}}
                     <div>
                         <h1 class="text-xl font-black text-gray-900 tracking-tight">Point of Sale</h1>
                         <p class="text-xs text-gray-400">Kasir: <span
@@ -30,14 +30,14 @@
                         Riwayat Transaksi
                     </button>
 
-                    <div class="flex bg-gray-100 p-1 rounded-lg">
+                    {{-- <div class="flex bg-gray-100 p-1 rounded-lg">
                         <button type="button" wire:click="$set('productType', 'all')"
                             class="px-3 py-1.5 text-xs font-bold rounded-md transition-all {{ $productType === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">Semua</button>
                         <button type="button" wire:click="$set('productType', 'new')"
                             class="px-3 py-1.5 text-xs font-bold rounded-md transition-all {{ $productType === 'new' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">Baru</button>
                         <button type="button" wire:click="$set('productType', 'second')"
                             class="px-3 py-1.5 text-xs font-bold rounded-md transition-all {{ $productType === 'second' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">Second</button>
-                    </div>
+                    </div> --}}
                 </div>
             </div>
 
@@ -123,7 +123,7 @@
         {{-- ═══════════════════════════════════════════════════════════
              RIGHT PANEL: Cart, Customer & Payment
         ═══════════════════════════════════════════════════════════ --}}
-                        <div class="w-[420px] bg-white border-l border-gray-200 flex flex-col shrink-0 overflow-hidden h-full">
+        <div class="w-[420px] bg-white border-l border-gray-200 flex flex-col shrink-0 overflow-hidden h-full">
             {{-- Cart Header (Compact) --}}
             <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
                 <h2 class="font-black text-gray-900 text-base flex items-center gap-2">
@@ -141,7 +141,8 @@
             </div>
 
             {{-- Cart Items (Compact & Scrollable, max-h-[170px]) --}}
-            <div class="max-h-[170px] overflow-y-auto px-4 py-2.5 space-y-2.5 border-b border-gray-100 shrink-0 bg-white">
+            <div
+                class="max-h-[170px] overflow-y-auto px-4 py-2.5 space-y-2.5 border-b border-gray-100 shrink-0 bg-white">
                 @forelse($cart as $index => $item)
                     <div class="bg-gray-50 rounded-lg p-2.5 border border-gray-100 relative group">
                         <button wire:click="removeFromCart({{ $index }})"
@@ -172,7 +173,8 @@
                                 <button wire:click="incrementCartItem({{ $index }})"
                                     class="w-6 h-6 rounded bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition text-xs font-bold">+</button>
                             </div>
-                            <p class="text-[10px] text-gray-400">@ Rp {{ number_format($item['price'], 0, ',', '.') }}</p>
+                            <p class="text-[10px] text-gray-400">@ Rp {{ number_format($item['price'], 0, ',', '.') }}
+                            </p>
                         </div>
                         {{-- SN Input --}}
                         <div class="mt-2">
@@ -232,8 +234,8 @@
                             <input type="text" wire:model.live.debounce.300ms="searchCustomer"
                                 class="w-full bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0"
                                 placeholder="Cari nama / no HP...">
-                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
@@ -256,7 +258,8 @@
                             </div>
                         @endif
                         <button wire:click="$set('isNewCustomer', true)"
-                            class="text-[10px] text-[#1c69d4] hover:underline font-bold mt-1.5 block">+ Customer Baru</button>
+                            class="text-[10px] text-[#1c69d4] hover:underline font-bold mt-1.5 block">+ Customer
+                            Baru</button>
                     @endif
                 </div>
 
@@ -264,9 +267,10 @@
                 <div class="px-4 py-3 space-y-3">
                     <div class="flex justify-between items-center">
                         <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Metode Pembayaran</p>
-                        <button type="button" wire:click="addPaymentRow" 
+                        <button type="button" wire:click="addPaymentRow"
                             class="text-[11px] font-bold text-[#1c69d4] hover:text-blue-800 flex items-center gap-1 transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                             </svg>
                             Split Pembayaran
@@ -275,14 +279,18 @@
 
                     <div class="space-y-2.5">
                         @foreach ($payments as $index => $payment)
-                            <div class="p-2.5 bg-white border border-gray-200 rounded-xl space-y-2 relative" wire:key="payment-row-{{ $index }}">
+                            <div class="p-2.5 bg-white border border-gray-200 rounded-xl space-y-2 relative"
+                                wire:key="payment-row-{{ $index }}">
                                 <div class="flex justify-between items-center">
-                                    <span class="text-[10px] font-extrabold text-gray-500">Alokasi #{{ $index + 1 }}</span>
+                                    <span class="text-[10px] font-extrabold text-gray-500">Alokasi
+                                        #{{ $index + 1 }}</span>
                                     @if (count($payments) > 1)
-                                        <button type="button" wire:click="removePaymentRow({{ $index }})" 
+                                        <button type="button" wire:click="removePaymentRow({{ $index }})"
                                             class="text-rose-500 hover:text-rose-700 text-[10px] font-bold flex items-center gap-0.5 transition-colors">
-                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                             Hapus
                                         </button>
@@ -312,7 +320,8 @@
                                         class="w-full bg-blue-50/50 border border-blue-100 text-blue-900 rounded-lg px-2 py-1.5 text-xs font-bold focus:border-[#1c69d4] focus:ring-0">
                                         <option value="">-- Pilih Opsi / Tenor --</option>
                                         @foreach ($rowRates as $rate)
-                                            <option value="{{ $rate->id }}">{{ $rate->name }} (MDR {{ $rate->mdr_percentage }}%)</option>
+                                            <option value="{{ $rate->id }}">{{ $rate->name }} (MDR
+                                                {{ $rate->mdr_percentage }}%)</option>
                                         @endforeach
                                     </select>
                                 @endif
@@ -320,7 +329,8 @@
                                 {{-- Amount Input --}}
                                 <div class="flex gap-2">
                                     <div class="relative flex-1">
-                                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                                        <span
+                                            class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
                                         <input type="number" wire:model.live="payments.{{ $index }}.amount"
                                             class="w-full pl-7 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold focus:border-[#1c69d4] focus:ring-0"
                                             placeholder="Jumlah Bayar" min="0">
@@ -344,23 +354,32 @@
                     @endphp
 
                     @if ($diff === 0)
-                        <div class="flex items-center gap-2 p-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-bold justify-center">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <div
+                            class="flex items-center gap-2 p-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-bold justify-center">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             Jumlah Pembayaran Sesuai
                         </div>
                     @elseif ($diff > 0)
-                        <div class="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-bold justify-center">
-                            <svg class="w-4 h-4 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        <div
+                            class="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-bold justify-center">
+                            <svg class="w-4 h-4 animate-pulse" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
                             Kurang Bayar: Rp {{ number_format($diff, 0, ',', '.') }}
                         </div>
                     @else
-                        <div class="flex items-center gap-2 p-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-bold justify-center">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <div
+                            class="flex items-center gap-2 p-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-bold justify-center">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             Kelebihan Bayar: Rp {{ number_format(abs($diff), 0, ',', '.') }}
                         </div>
@@ -624,7 +643,31 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                             </svg>
-                            Cetak
+                            Cetak (Browser)
+                        </button>
+                        <button
+                            wire:click="printEscpos"
+                            wire:loading.attr="disabled"
+                            class="text-orange-600 hover:text-orange-700 font-bold text-sm flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                            <span wire:loading.remove wire:target="printEscpos">Cetak (ESC/POS)</span>
+                            <span wire:loading wire:target="printEscpos">Printing...</span>
+                        </button>
+                        <button
+                            wire:click="getEscposBase64"
+                            wire:loading.attr="disabled"
+                            class="text-teal-600 hover:text-teal-700 font-bold text-sm flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                            <span wire:loading.remove wire:target="getEscposBase64">Cetak (RawBT)</span>
+                            <span wire:loading wire:target="getEscposBase64">Memproses...</span>
                         </button>
                         {{-- ─── TOMBOL WHATSAPP MEKARI QONTAK ─── --}}
                         @if (Auth::user()->hasRole('admin') || !$completedOrder->is_wa_sent)
@@ -735,7 +778,9 @@
                     <div class="space-y-0.5 mb-2">
                         @foreach ($completedOrder->payments as $payment)
                             <div class="flex justify-between text-[10px] text-gray-500">
-                                <span>Bayar ({{ $payment->paymentMethod->name ?? 'Cash' }}{{ $payment->paymentMethodRate ? ' - ' . $payment->paymentMethodRate->name : '' }}):</span>
+                                <span>Bayar
+                                    ({{ $payment->paymentMethod->name ?? 'Cash' }}{{ $payment->paymentMethodRate ? ' - ' . $payment->paymentMethodRate->name : '' }})
+                                    :</span>
                                 <span>Rp {{ number_format($payment->amount, 0, ',', '.') }}</span>
                             </div>
                         @endforeach
@@ -762,6 +807,10 @@
     {{-- Print Styles --}}
     <style>
         @media print {
+            @page {
+                margin: 0;
+            }
+
             body * {
                 visibility: hidden;
             }
@@ -776,9 +825,39 @@
                 left: 0;
                 top: 0;
                 width: 80mm;
-                padding: 5mm;
-                font-size: 10px;
+                padding: 4mm;
+                font-size: 12px;
             }
         }
     </style>
+    @script
+    <script>
+        $wire.on('print-rawbt', (event) => {
+            const base64 = event.base64;
+            const orderNumber = event.orderNumber;
+            const isAndroid = /Android/i.test(navigator.userAgent);
+
+            if (isAndroid) {
+                const rawbtUri = `rawbt:base64,${base64}`;
+                window.location.href = rawbtUri;
+            } else {
+                const rawBytes = atob(base64);
+                const bytes = new Uint8Array(rawBytes.length);
+                for (let i = 0; i < rawBytes.length; i++) {
+                    bytes[i] = rawBytes.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `nota-${orderNumber}.prn`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        });
+    </script>
+    @endscript
 </div>

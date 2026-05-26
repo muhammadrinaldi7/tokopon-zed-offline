@@ -51,4 +51,14 @@ class SellPhone extends Model implements HasMedia
     {
         return $this->belongsTo(User::class, 'handled_by');
     }
+
+    public function inspections()
+    {
+        return $this->morphMany(DeviceInspection::class, 'inspectable');
+    }
+
+    public function hasPassedQc(): bool
+    {
+        return $this->inspections()->where('verdict', 'pass')->exists();
+    }
 }

@@ -28,7 +28,7 @@ class PointOfSale extends Component
 {
     // ─── Search & Filter ───────────────────────────────────────
     public $search = '';
-    public $productType = 'all'; // all, new, second
+    public $productType = 'new'; // all, new, second
 
     // ─── Cart (in-memory) ──────────────────────────────────────
     public $cart = []; // [{variant_id, variant_type, name, storage, color, price, qty, serial_number, sku}]
@@ -893,6 +893,146 @@ class PointOfSale extends Component
             Log::error('Qontak HMAC Integration Crash: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
         }
+    }
+
+    public function printEscpos()
+    {
+        if (!$this->completedOrder) {
+            $this->dispatch('toast', title: 'Error', message: 'Tidak ada transaksi aktif untuk dicetak.', type: 'error');
+            return;
+        }
+
+        $printerName = env('ESCPOS_PRINTER_NAME', 'POS-80');
+
+        try {
+            if (filter_var($printerName, FILTER_VALIDATE_IP)) {
+                $connector = new \Mike42\Escpos\PrintConnectors\NetworkPrintConnector($printerName, 9100);
+            } else {
+                $connector = new \Mike42\Escpos\PrintConnectors\WindowsPrintConnector($printerName);
+            }
+
+            $printer = new \Mike42\Escpos\Printer($connector);
+            $printer->initialize();
+
+            $this->generateEscposContent($printer);
+
+            $printer->close();
+
+            $this->dispatch('toast', title: 'Sukses', message: 'Perintah cetak thermal terkirim ke ' . $printerName, type: 'success');
+        } catch (\Exception $e) {
+            Log::error('ESCPOS Print Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Cetak Gagal', message: 'Tidak dapat mencetak ke ' . $printerName . ': ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    public function getEscposBase64()
+    {
+        if (!$this->completedOrder) {
+            $this->dispatch('toast', title: 'Error', message: 'Tidak ada transaksi aktif untuk dicetak.', type: 'error');
+            return;
+        }
+
+        try {
+            $connector = new \Mike42\Escpos\PrintConnectors\DummyPrintConnector();
+            $printer = new \Mike42\Escpos\Printer($connector);
+            $printer->initialize();
+
+            $this->generateEscposContent($printer);
+
+            $data = $connector->getData();
+            $base64 = base64_encode($data);
+
+            $printer->close();
+
+            $this->dispatch('print-rawbt', base64: $base64, orderNumber: $this->completedOrder->order_number);
+        } catch (\Exception $e) {
+            Log::error('ESCPOS Base64 Generation Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan RawBT: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    private function generateEscposContent($printer)
+    {
+        // Store Title (Center, Large)
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
+        $printer->selectPrintMode(\Mike42\Escpos\Printer::MODE_DOUBLE_WIDTH | \Mike42\Escpos\Printer::MODE_DOUBLE_HEIGHT);
+        $printer->text("TOKOPON\n");
+
+        $printer->selectPrintMode();
+        $storeName = $this->completedOrder->shipping_address_snapshot['store'] ?? 'Toko';
+        $printer->text($storeName . "\n");
+        $printer->text($this->completedOrder->created_at->format('d/m/Y H:i') . "\n");
+        $printer->text("--------------------------------\n");
+
+        // Info (Left)
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_LEFT);
+        $printer->text($this->formatLine("No. Transaksi", $this->completedOrder->order_number, 58) . "\n");
+        $printer->text($this->formatLine("Kasir", $this->completedOrder->handledBy->name ?? '-', 58) . "\n");
+        $printer->text($this->formatLine("Customer", $this->completedOrder->user->name ?? '-', 58) . "\n");
+        $printer->text("--------------------------------\n");
+
+        // Items List
+        foreach ($this->completedOrder->items as $item) {
+            $v = $item->variant;
+            $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
+            if ($v) {
+                $itemName .= " (" . $v->color . "/" . $v->storage . ")";
+            }
+
+            $printer->text($itemName . "\n");
+
+            $qtyAndPrice = $item->qty . "x Rp " . number_format($item->price_at_checkout, 0, ',', '.');
+            $subtotal = "Rp " . number_format($item->subtotal, 0, ',', '.');
+            $printer->text($this->formatLine("  " . $qtyAndPrice, $subtotal, 58) . "\n");
+
+            if ($item->serial_number) {
+                $printer->text("  SN: " . $item->serial_number . "\n");
+            }
+        }
+        $printer->text("--------------------------------\n");
+
+        // Subtotal & Discount
+        $printer->text($this->formatLine("Subtotal", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), 58) . "\n");
+        // if ($this->completedOrder->discount_amount > 0) {
+        //     $printer->text($this->formatLine("Diskon", "-Rp " . number_format($this->completedOrder->discount_amount, 0, ',', '.'), 58) . "\n");
+        // }
+        $printer->text("--------------------------------\n");
+
+        // Grand Total (Bold)
+        $printer->setEmphasis(true);
+        $printer->text($this->formatLine("TOTAL", "Rp " . number_format($this->completedOrder->grand_total, 0, ',', '.'), 58) . "\n");
+        $printer->setEmphasis(false);
+        $printer->text("--------------------------------\n");
+
+        // Payments (Split Payments Support)
+        foreach ($this->completedOrder->payments as $payment) {
+            $label = "Bayar (" . ($payment->paymentMethod->name ?? 'Cash') . ($payment->paymentMethodRate ? ' - ' . $payment->paymentMethodRate->name : '') . ")";
+            $amount = "Rp " . number_format($payment->amount, 0, ',', '.');
+            $printer->text($this->formatLine($label, $amount, 58) . "\n");
+        }
+
+        if ($this->completedOrder->accurate_invoice_no) {
+            $printer->text($this->formatLine("Accurate Invoice", $this->completedOrder->accurate_invoice_no, 58) . "\n");
+        }
+        $printer->text("--------------------------------\n");
+
+        // Footer (Center)
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
+        $printer->text("\nTerima kasih telah berbelanja!\n");
+        $printer->text("www.tokopon.id\n\n\n\n");
+
+        $printer->cut();
+    }
+
+    private function formatLine($left, $right, $width = 58)
+    {
+        $leftWidth = strlen($left);
+        $rightWidth = strlen($right);
+        $spaces = $width - $leftWidth - $rightWidth;
+        if ($spaces < 1) {
+            $spaces = 1;
+        }
+        return $left . str_repeat(' ', $spaces) . $right;
     }
 
     #[Layout('layouts.app', ['title' => 'Point of Sale'])]
