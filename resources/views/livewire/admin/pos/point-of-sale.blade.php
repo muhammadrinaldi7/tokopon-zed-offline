@@ -1,18 +1,13 @@
 <div class="bg-gray-100" x-data="{ showSidebar: false }">
-    <div class="flex h-[calc(100vh-72px)] overflow-hidden">
 
-        {{-- ═══════════════════════════════════════════════════════════
-             LEFT PANEL: Product Search & Grid
-        ═══════════════════════════════════════════════════════════ --}}
-        <div class="flex-1 flex flex-col overflow-hidden">
+    {{-- Bungkus layout utama dengan x-data dari Alpine.js --}}
+    <div x-data="{ openCart: false }" class="relative flex h-[calc(100vh-72px)] overflow-hidden">
+
+        {{-- LEFT PANEL: Product Search & Grid --}}
+        <div class="flex-1 flex flex-col overflow-hidden w-full">
             {{-- Top Bar --}}
             <div class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
                 <div class="flex items-center gap-3">
-                    {{-- <a href="{{ route('/') }}" wire:navigate class="text-gray-400 hover:text-gray-600 transition">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                    </a> --}}
                     <div>
                         <h1 class="text-xl font-black text-gray-900 tracking-tight">Point of Sale</h1>
                         <p class="text-xs text-gray-400">Kasir: <span
@@ -29,15 +24,6 @@
                         </svg>
                         Riwayat Transaksi
                     </button>
-
-                    {{-- <div class="flex bg-gray-100 p-1 rounded-lg">
-                        <button type="button" wire:click="$set('productType', 'all')"
-                            class="px-3 py-1.5 text-xs font-bold rounded-md transition-all {{ $productType === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">Semua</button>
-                        <button type="button" wire:click="$set('productType', 'new')"
-                            class="px-3 py-1.5 text-xs font-bold rounded-md transition-all {{ $productType === 'new' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">Baru</button>
-                        <button type="button" wire:click="$set('productType', 'second')"
-                            class="px-3 py-1.5 text-xs font-bold rounded-md transition-all {{ $productType === 'second' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">Second</button>
-                    </div> --}}
                 </div>
             </div>
 
@@ -67,7 +53,7 @@
                                     class="bg-white rounded-xl border border-gray-100 hover:border-[#1c69d4]/50 hover:shadow-md transition-all p-4 text-left group relative">
                                     @if ($product->is_second_catalog)
                                         <span
-                                            class="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Second</span>
+                                            class="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase z-10">Second</span>
                                     @endif
                                     <div
                                         class="aspect-square rounded-lg bg-gray-50 mb-3 overflow-hidden flex items-center justify-center">
@@ -120,11 +106,18 @@
             </div>
         </div>
 
+        {{-- Overlay Background (Muncul saat cart dibuka di mobile) --}}
+        <div x-show="openCart" x-transition.opacity x-cloak @click="openCart = false"
+            class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 lg:hidden">
+        </div>
+
         {{-- ═══════════════════════════════════════════════════════════
-             RIGHT PANEL: Cart, Customer & Payment
-        ═══════════════════════════════════════════════════════════ --}}
-        <div class="w-[420px] bg-white border-l border-gray-200 flex flex-col shrink-0 overflow-hidden h-full">
-            {{-- Cart Header (Compact) --}}
+         RIGHT PANEL: Cart, Customer & Payment (Drawer on Mobile)
+    ═══════════════════════════════════════════════════════════ --}}
+        <div :class="openCart ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'"
+            class="fixed lg:static inset-y-0 right-0 z-50 w-[85%] sm:w-[420px] transform transition-transform duration-300 ease-in-out bg-white border-l border-gray-200 flex flex-col shrink-0 h-full shadow-2xl lg:shadow-none">
+
+            {{-- Cart Header --}}
             <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
                 <h2 class="font-black text-gray-900 text-base flex items-center gap-2">
                     <svg class="w-5 h-5 text-[#1c69d4]" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -133,20 +126,28 @@
                             d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
                     </svg>
                     Keranjang
+                    @if (!empty($cart))
+                        <span
+                            class="bg-[#1c69d4] text-white text-xs font-black px-2.5 py-0.5 rounded-full ml-1">{{ count($cart) }}</span>
+                    @endif
                 </h2>
-                @if (!empty($cart))
-                    <span
-                        class="bg-[#1c69d4] text-white text-xs font-black px-2.5 py-0.5 rounded-full">{{ count($cart) }}</span>
-                @endif
+
+                {{-- Tombol Close (Hanya tampil di mobile) --}}
+                <button @click="openCart = false"
+                    class="lg:hidden p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
 
-            {{-- Cart Items (Compact & Scrollable, max-h-[170px]) --}}
+            {{-- Cart Items --}}
             <div
                 class="max-h-[170px] overflow-y-auto px-4 py-2.5 space-y-2.5 border-b border-gray-100 shrink-0 bg-white">
                 @forelse($cart as $index => $item)
                     <div class="bg-gray-50 rounded-lg p-2.5 border border-gray-100 relative group">
                         <button wire:click="removeFromCart({{ $index }})"
-                            class="absolute top-2.5 right-2.5 text-gray-300 hover:text-rose-500 transition opacity-0 group-hover:opacity-100">
+                            class="absolute top-2.5 right-2.5 text-gray-300 hover:text-rose-500 transition lg:opacity-0 group-hover:opacity-100">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -176,13 +177,25 @@
                             <p class="text-[10px] text-gray-400">@ Rp {{ number_format($item['price'], 0, ',', '.') }}
                             </p>
                         </div>
+
                         {{-- SN Input --}}
-                        <div class="mt-2">
-                            <input type="text"
+                        <div class="mt-2 flex items-center gap-2">
+                            <input type="text" id="sn_input_{{ $index }}"
                                 wire:change="updateSerialNumber({{ $index }}, $event.target.value)"
                                 value="{{ $item['serial_number'] }}"
                                 class="w-full bg-white border border-gray-200 rounded px-2.5 py-1 text-[11px] font-mono focus:border-[#1c69d4] focus:ring-0 transition-all placeholder-gray-300"
                                 placeholder="SN / IMEI...">
+
+                            <button type="button" onclick="startScanner({{ $index }})"
+                                class="shrink-0 bg-[#1c69d4] hover:bg-blue-700 text-white border border-[#1c69d4] rounded px-2 py-1 transition-all focus:outline-none focus:ring-2 focus:ring-[#1c69d4] focus:ring-offset-1"
+                                title="Scan Barcode Kamera">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
+                                    </path>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 @empty
@@ -197,7 +210,7 @@
                 @endforelse
             </div>
 
-            {{-- Form Section: Customer, Payments, Discount (Scrollable & Responsive) --}}
+            {{-- Form Section: Customer, Payments, Discount --}}
             <div class="flex-1 overflow-y-auto bg-gray-50 divide-y divide-gray-100 min-h-0">
                 {{-- Customer Section --}}
                 <div class="px-4 py-3">
@@ -263,7 +276,7 @@
                     @endif
                 </div>
 
-                {{-- Payment Methods (Split Payment Support) --}}
+                {{-- Payment Methods --}}
                 <div class="px-4 py-3 space-y-3">
                     <div class="flex justify-between items-center">
                         <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Metode Pembayaran</p>
@@ -297,7 +310,6 @@
                                     @endif
                                 </div>
 
-                                {{-- Payment Method Dropdown --}}
                                 <select wire:model.live="payments.{{ $index }}.payment_method_id"
                                     class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold focus:border-[#1c69d4] focus:ring-0">
                                     <option value="">-- Pilih Metode --</option>
@@ -308,7 +320,6 @@
                                     @endforeach
                                 </select>
 
-                                {{-- Payment Method Rates Dropdown (if exists and active) --}}
                                 @php
                                     $pmId = $payment['payment_method_id'];
                                     $pmObj = $pmId ? \App\Models\PaymentMethod::find($pmId) : null;
@@ -326,7 +337,6 @@
                                     </select>
                                 @endif
 
-                                {{-- Amount Input --}}
                                 <div class="flex gap-2">
                                     <div class="relative flex-1">
                                         <span
@@ -397,7 +407,6 @@
 
             {{-- Pinned Footer: Totals & Pay Button --}}
             <div class="border-t border-gray-200 bg-white shrink-0 p-4 space-y-3.5">
-                {{-- Totals --}}
                 <div class="space-y-1.5">
                     <div class="flex justify-between text-xs font-medium text-gray-500">
                         <span>Subtotal</span>
@@ -418,11 +427,10 @@
                     </div>
                 </div>
 
-                {{-- Pay Button --}}
                 <div>
                     <button wire:click="openCheckout" {{ empty($cart) ? 'disabled' : '' }}
                         class="w-full py-3.5 rounded-xl font-black text-white text-base transition-all shadow-md active:scale-[0.98]
-                        {{ empty($cart) ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#1c69d4] hover:bg-blue-700 shadow-blue-500/20' }}">
+                    {{ empty($cart) ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#1c69d4] hover:bg-blue-700 shadow-blue-500/20' }}">
                         <svg class="w-4 h-4 inline-block mr-1.5 -mt-0.5" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -434,7 +442,18 @@
             </div>
         </div>
 
-
+        {{-- Floating Action Button (FAB) khusus Mobile untuk membuka Cart --}}
+        <button @click="openCart = true"
+            class="lg:hidden fixed bottom-25 right-6 bg-[#1c69d4] text-white p-4 rounded-full shadow-xl hover:bg-blue-700 active:scale-95 transition-all z-30 flex items-center justify-center">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+            </svg>
+            @if (!empty($cart))
+                <span
+                    class="absolute -top-2 -right-2 bg-rose-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-white">{{ count($cart) }}</span>
+            @endif
+        </button>
     </div>
 
     {{-- ═══════════════════════════════════════════════════════════
@@ -645,9 +664,7 @@
                             </svg>
                             Cetak (Browser)
                         </button>
-                        <button
-                            wire:click="printEscpos"
-                            wire:loading.attr="disabled"
+                        <button wire:click="printEscpos" wire:loading.attr="disabled"
                             class="text-orange-600 hover:text-orange-700 font-bold text-sm flex items-center gap-1">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 stroke-width="2">
@@ -657,9 +674,7 @@
                             <span wire:loading.remove wire:target="printEscpos">Cetak (ESC/POS)</span>
                             <span wire:loading wire:target="printEscpos">Printing...</span>
                         </button>
-                        <button
-                            wire:click="getEscposBase64"
-                            wire:loading.attr="disabled"
+                        <button wire:click="getEscposBase64" wire:loading.attr="disabled"
                             class="text-teal-600 hover:text-teal-700 font-bold text-sm flex items-center gap-1">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 stroke-width="2">
@@ -803,7 +818,16 @@
             </div>
         </div>
     @endif
-
+    <div id="scanner-modal"
+        class="hidden fixed inset-0 z-50 bg-black/60  items-center justify-center backdrop-blur-sm">
+        <div class="bg-white p-4 rounded-lg w-11/12 max-w-md shadow-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-gray-700">Arahkan Kamera ke Barcode</h3>
+                <button onclick="closeScanner()" class="text-red-500 hover:text-red-700 font-bold p-1">Tutup</button>
+            </div>
+            <div id="reader" class="w-full bg-black rounded overflow-hidden"></div>
+        </div>
+    </div>
     {{-- Print Styles --}}
     <style>
         @media print {
@@ -831,33 +855,35 @@
         }
     </style>
     @script
-    <script>
-        $wire.on('print-rawbt', (event) => {
-            const base64 = event.base64;
-            const orderNumber = event.orderNumber;
-            const isAndroid = /Android/i.test(navigator.userAgent);
+        <script>
+            $wire.on('print-rawbt', (event) => {
+                const base64 = event.base64;
+                const orderNumber = event.orderNumber;
+                const isAndroid = /Android/i.test(navigator.userAgent);
 
-            if (isAndroid) {
-                const rawbtUri = `rawbt:base64,${base64}`;
-                window.location.href = rawbtUri;
-            } else {
-                const rawBytes = atob(base64);
-                const bytes = new Uint8Array(rawBytes.length);
-                for (let i = 0; i < rawBytes.length; i++) {
-                    bytes[i] = rawBytes.charCodeAt(i);
+                if (isAndroid) {
+                    const rawbtUri = `rawbt:base64,${base64}`;
+                    window.location.href = rawbtUri;
+                } else {
+                    const rawBytes = atob(base64);
+                    const bytes = new Uint8Array(rawBytes.length);
+                    for (let i = 0; i < rawBytes.length; i++) {
+                        bytes[i] = rawBytes.charCodeAt(i);
+                    }
+                    const blob = new Blob([bytes], {
+                        type: 'application/octet-stream'
+                    });
+                    const url = URL.createObjectURL(blob);
+
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `nota-${orderNumber}.prn`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
                 }
-                const blob = new Blob([bytes], { type: 'application/octet-stream' });
-                const url = URL.createObjectURL(blob);
-
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `nota-${orderNumber}.prn`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }
-        });
-    </script>
+            });
+        </script>
     @endscript
 </div>

@@ -135,6 +135,71 @@
             };
         }
     </script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script>
+        let html5QrcodeScanner;
+        let currentInputIndex = null;
+
+        // Fungsi untuk membuka kamera
+        function startScanner(index) {
+            currentInputIndex = index;
+
+            // Tampilkan Modal
+            document.getElementById('scanner-modal').classList.remove('hidden');
+
+            // Inisialisasi Scanner
+            html5QrcodeScanner = new Html5Qrcode("reader");
+
+            // Mulai kamera belakang (environment)
+            html5QrcodeScanner.start({
+                    facingMode: "environment"
+                }, {
+                    fps: 10, // Frame per second
+                    qrbox: {
+                        width: 250,
+                        height: 150
+                    } // Area scan bentuk persegi panjang (cocok untuk barcode SN)
+                },
+                (decodedText, decodedResult) => {
+                    // JIKA BERHASIL SCAN:
+
+                    // 1. Matikan kamera dan tutup modal
+                    closeScanner();
+
+                    // 2. Cari elemen input berdasarkan index
+                    let inputElement = document.getElementById('sn_input_' + currentInputIndex);
+
+                    if (inputElement) {
+                        // 3. Masukkan teks hasil scan ke inputan
+                        inputElement.value = decodedText;
+
+                        // 4. Trigger event 'change' agar Livewire (wire:change) langsung bereaksi
+                        inputElement.dispatchEvent(new Event('change'));
+                    }
+                },
+                (errorMessage) => {
+                    // Proses scan berjalan... (diabaikan saja, tidak perlu di-log agar console tidak penuh)
+                }
+            ).catch((err) => {
+                alert("Gagal mengakses kamera. Pastikan browser memiliki izin untuk menggunakan kamera.");
+                console.error(err);
+                closeScanner();
+            });
+        }
+
+        // Fungsi untuk menutup kamera
+        function closeScanner() {
+            document.getElementById('scanner-modal').classList.add('hidden');
+
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then((ignore) => {
+                    html5QrcodeScanner.clear(); // Bersihkan DOM
+                }).catch((err) => {
+                    console.error("Gagal mematikan scanner", err);
+                });
+            }
+        }
+    </script>
 </body>
 
 </html>
