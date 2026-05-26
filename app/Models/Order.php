@@ -43,6 +43,10 @@ class Order extends Model
     {
         return $this->belongsTo(User::class, 'handled_by');
     }
+    public function salesBy()
+    {
+        return $this->hasMany(Employe::class, 'sales_id');
+    }
 
     public function paymentMethod()
     {

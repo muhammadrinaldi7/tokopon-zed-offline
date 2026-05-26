@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Pos;
 
 use App\Mail\SalesReceiptMail;
+use App\Models\Employe;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
@@ -40,6 +41,10 @@ class PointOfSale extends Component
     public $customerName = '';
     public $customerPhone = '';
     public $customerEmail = '';
+
+    // SALES
+    public $selectedSales = []; // Array untuk menampung lebih dari 1 sales
+    public $searchSales = '';
 
     // ─── Payment ───────────────────────────────────────────────
     public $payments = [];
@@ -208,6 +213,15 @@ class PointOfSale extends Component
                 });
         })->with('profile')->take(5)->get();
     }
+    #[Computed]
+    public function salesResults()
+    {
+        if (strlen($this->searchSales) < 2) return [];
+
+        return Employe::where(function ($q) {
+            $q->where('name', 'like', '%' . $this->searchSales . '%');
+        })->take(5)->get();
+    }
 
     #[Computed]
     public function searchResults()
@@ -362,6 +376,10 @@ class PointOfSale extends Component
             $currentQty = $this->cart[$existingIndex]['qty'];
             if ($currentQty < $stock) {
                 $this->cart[$existingIndex]['qty']++;
+                if (!isset($this->cart[$existingIndex]['serial_numbers'])) {
+                    $this->cart[$existingIndex]['serial_numbers'] = [$this->cart[$existingIndex]['serial_number'] ?? ''];
+                }
+                $this->cart[$existingIndex]['serial_numbers'][] = '';
             } else {
                 $this->dispatch('toast', title: 'Stok Tidak Cukup', message: 'Sudah mencapai batas stok.', type: 'warning');
             }
@@ -374,7 +392,8 @@ class PointOfSale extends Component
                 'color' => $variant->color ?? '-',
                 'price' => (int) $variant->price,
                 'qty' => 1,
-                'serial_number' => '',
+                'serial_number' => '', // legacy
+                'serial_numbers' => [''], // array of SNs based on qty
                 'sku' => $variant->sku ?? '',
                 'is_second' => $isSecond,
             ];
@@ -397,6 +416,10 @@ class PointOfSale extends Component
     {
         if (isset($this->cart[$index])) {
             $this->cart[$index]['qty']++;
+            if (!isset($this->cart[$index]['serial_numbers'])) {
+                $this->cart[$index]['serial_numbers'] = [$this->cart[$index]['serial_number'] ?? ''];
+            }
+            $this->cart[$index]['serial_numbers'][] = '';
             $this->syncSinglePaymentAmount();
         }
     }
@@ -405,14 +428,24 @@ class PointOfSale extends Component
     {
         if (isset($this->cart[$index]) && $this->cart[$index]['qty'] > 1) {
             $this->cart[$index]['qty']--;
+            if (isset($this->cart[$index]['serial_numbers'])) {
+                array_pop($this->cart[$index]['serial_numbers']);
+            }
             $this->syncSinglePaymentAmount();
         }
     }
 
-    public function updateSerialNumber($index, $value)
+    public function updateSerialNumber($index, $snIndex, $value)
     {
         if (isset($this->cart[$index])) {
-            $this->cart[$index]['serial_number'] = $value;
+            if (!isset($this->cart[$index]['serial_numbers'])) {
+                $this->cart[$index]['serial_numbers'] = [$this->cart[$index]['serial_number'] ?? ''];
+            }
+            $this->cart[$index]['serial_numbers'][$snIndex] = $value;
+            // Also update legacy for backward compatibility
+            if ($snIndex === 0) {
+                $this->cart[$index]['serial_number'] = $value;
+            }
         }
     }
 
@@ -428,6 +461,28 @@ class PointOfSale extends Component
     {
         $this->selectedCustomerId = null;
         $this->isNewCustomer = false;
+    }
+
+    // ─── Sales Actions ──────────────────────────────────────
+
+    public function selectSales($id)
+    {
+        $sales = \App\Models\Employe::find($id);
+        if ($sales && !collect($this->selectedSales)->contains('id', $id)) {
+            $this->selectedSales[] = [
+                'id' => $sales->id,
+                'name' => $sales->name,
+                'employee_no' => $sales->employee_no
+            ];
+        }
+        $this->searchSales = '';
+    }
+
+    public function removeSales($id)
+    {
+        $this->selectedSales = array_values(array_filter($this->selectedSales, function ($s) use ($id) {
+            return $s['id'] != $id;
+        }));
     }
 
     // ─── Checkout ──────────────────────────────────────────────
@@ -449,6 +504,11 @@ class PointOfSale extends Component
 
         if (!$this->selectedCustomerId && !$this->isNewCustomer) {
             $this->dispatch('toast', title: 'Customer Belum Dipilih', message: 'Pilih atau buat data customer terlebih dahulu.', type: 'warning');
+            return;
+        }
+
+        if (empty($this->selectedSales)) {
+            $this->dispatch('toast', title: 'Sales Belum Dipilih', message: 'Pilih minimal 1 tenaga penjual.', type: 'warning');
             return;
         }
 
@@ -525,6 +585,7 @@ class PointOfSale extends Component
                 'order_status' => 'COMPLETED',
                 'order_channel' => 'POS',
                 'handled_by' => Auth::id(),
+                'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
                 'payment_method_id' => $this->payments[0]['payment_method_id'] ?: null,
                 'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
                 'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
@@ -533,6 +594,8 @@ class PointOfSale extends Component
 
             // Create Order Items + reduce stock
             foreach ($this->cart as $item) {
+                $sns = $item['serial_numbers'] ?? [$item['serial_number'] ?? ''];
+
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
@@ -540,7 +603,7 @@ class PointOfSale extends Component
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'serial_number' => $item['serial_number'],
+                    'serial_number' => implode(', ', $sns),
                 ]);
 
                 // Reduce stock
@@ -593,24 +656,36 @@ class PointOfSale extends Component
                 if (!$order->accurate_invoice_no) {
                     $detailItems = [];
                     foreach ($this->cart as $item) {
+                        $detailSN = array_map(function ($sn) {
+                            return ['serialNumberNo' => $sn ?: '-', 'quantity' => 1];
+                        }, $item['serial_numbers'] ?? [$item['serial_number'] ?? '-']);
+                        $detailSalesman = [];
+                        foreach ($this->selectedSales as $sales) {
+                            if (!empty($sales['employee_no'])) {
+                                // Langsung push nilai string-nya ke dalam array
+                                $detailSalesman[] = (string) $sales['employee_no'];
+                            }
+                        }
+
                         $detailItems[] = [
                             'itemNo' => $item['sku'] ?: 'ITEM-UNKNOWN',
                             'warehouseName' => $warehouseName,
                             'unitPrice' => $item['price'],
                             'itemCashDiscount' => $discountAmount,
                             'quantity' => $item['qty'],
-                            'useTax1' => false,
                             'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
-                            'detailSerialNumber' => [
-                                ['serialNumberNo' => $item['serial_number'], 'quantity' => $item['qty']]
-                            ]
+                            'detailSerialNumber' => $detailSN,
+                            'salesmanListNumber' => $detailSalesman,
                         ];
                     }
+
 
                     $siData = [
                         'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
                         'branchName' => $branchName,
                         'detailItem' => $detailItems,
+                        'inclusiveTax' => true,
+                        'taxable' => true
                     ];
 
                     $siResult = $accurateService->postSalesInvoice($siData, $dbSource);

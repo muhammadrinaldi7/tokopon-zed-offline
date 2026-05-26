@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Employe;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -442,6 +443,41 @@ class AccurateService
             Log::info('API Accurate Sales Invoice Error: ' . $response->body());
             throw new \Exception('API Accurate Sales Invoice Error: ' . $response->body());
         }
+    }
+
+    public function getEmployees($databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+
+        // Mengambil konfigurasi environment berdasarkan database source
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        // Pembuatan Signature Oauth / API Timestamp jika menggunakan metode signature custom
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+        $paramBody = [
+            "sp.pageSize" => 10000
+        ];
+        // Hit ke endpoint karyawan milik Accurate Online
+        $response = Http::withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+            // 'X-Session-ID'   => $this->sessionId, // Hidupkan kolom ini jika otentikasi Anda via Session ID open-db
+        ])->get($host . '/employee/list.do', $paramBody);
+
+        // Jika request sukses, kembalikan data array murninya ke pemanggil (Livewire)
+        if ($response->successful()) {
+            return $response->json('d') ?? [];
+        }
+
+        // Catat log jika terjadi kendala pada server Accurate
+        \Illuminate\Support\Facades\Log::error("Accurate API Get Employees Failed ({$databaseSource}): " . $response->body());
+
+        return [];
     }
 
     public function postSalesReceipt($salesReceiptData, $databaseSource = 'syihab')

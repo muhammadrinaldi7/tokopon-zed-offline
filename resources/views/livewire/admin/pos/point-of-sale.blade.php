@@ -115,7 +115,7 @@
          RIGHT PANEL: Cart, Customer & Payment (Drawer on Mobile)
     ═══════════════════════════════════════════════════════════ --}}
         <div :class="openCart ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'"
-            class="fixed lg:static inset-y-0 right-0 z-50 w-[85%] sm:w-[420px] transform transition-transform duration-300 ease-in-out bg-white border-l border-gray-200 flex flex-col shrink-0 h-full shadow-2xl lg:shadow-none">
+            class="fixed lg:static inset-y-0 right-0 z-50 md:z-10 w-[85%] sm:w-[420px] transform transition-transform duration-300 ease-in-out bg-white border-l border-gray-200 flex flex-col shrink-0 h-full shadow-2xl lg:shadow-none">
 
             {{-- Cart Header --}}
             <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
@@ -179,23 +179,31 @@
                         </div>
 
                         {{-- SN Input --}}
-                        <div class="mt-2 flex items-center gap-2">
-                            <input type="text" id="sn_input_{{ $index }}"
-                                wire:change="updateSerialNumber({{ $index }}, $event.target.value)"
-                                value="{{ $item['serial_number'] }}"
-                                class="w-full bg-white border border-gray-200 rounded px-2.5 py-1 text-[11px] font-mono focus:border-[#1c69d4] focus:ring-0 transition-all placeholder-gray-300"
-                                placeholder="SN / IMEI...">
+                        @php
+                            $snArray = $item['serial_numbers'] ?? [$item['serial_number'] ?? ''];
+                        @endphp
+                        <div class="mt-2 space-y-2">
+                            @foreach ($snArray as $snIndex => $snValue)
+                                <div class="flex items-center gap-2">
+                                    <input type="text" id="sn_input_{{ $index }}_{{ $snIndex }}"
+                                        wire:change="updateSerialNumber({{ $index }}, {{ $snIndex }}, $event.target.value)"
+                                        value="{{ $snValue }}"
+                                        class="w-full bg-white border border-gray-200 rounded px-2.5 py-1 text-[11px] font-mono focus:border-[#1c69d4] focus:ring-0 transition-all placeholder-gray-300"
+                                        placeholder="SN / IMEI {{ count($snArray) > 1 ? 'ke-' . ($snIndex + 1) : '' }}...">
 
-                            <button type="button" onclick="startScanner({{ $index }})"
-                                class="shrink-0 bg-[#1c69d4] hover:bg-blue-700 text-white border border-[#1c69d4] rounded px-2 py-1 transition-all focus:outline-none focus:ring-2 focus:ring-[#1c69d4] focus:ring-offset-1"
-                                title="Scan Barcode Kamera">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
-                                    </path>
-                                </svg>
-                            </button>
+                                    <button type="button"
+                                        onclick="startScanner({{ $index }}, {{ $snIndex }})"
+                                        class="shrink-0 bg-[#1c69d4] hover:bg-blue-700 text-white border border-[#1c69d4] rounded px-2 py-1 transition-all focus:outline-none focus:ring-2 focus:ring-[#1c69d4] focus:ring-offset-1"
+                                        title="Scan Barcode Kamera">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
+                                            </path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            @endforeach
                         </div>
                     </div>
                 @empty
@@ -274,6 +282,62 @@
                             class="text-[10px] text-[#1c69d4] hover:underline font-bold mt-1.5 block">+ Customer
                             Baru</button>
                     @endif
+                </div>
+                {{-- Sales Section --}}
+                <div class="px-4 py-3">
+                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tenaga Penjual
+                        (Sales)</p>
+
+                    {{-- Selected Sales Tags --}}
+                    @if (count($selectedSales) > 0)
+                        <div class="flex flex-wrap gap-2 mb-2">
+                            @foreach ($selectedSales as $sales)
+                                <div
+                                    class="flex items-center gap-1.5 bg-[#1c69d4]/10 text-[#1c69d4] border border-[#1c69d4]/20 rounded-md px-2 py-1">
+                                    <span class="text-[11px] font-bold">{{ $sales['name'] }}</span>
+                                    <button wire:click="removeSales({{ $sales['id'] }})"
+                                        class="text-[#1c69d4]/70 hover:text-rose-500 transition-colors">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <div class="relative">
+                        <div class="relative">
+                            <input type="text" wire:model.live.debounce.300ms="searchSales"
+                                class="w-full bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0"
+                                placeholder="Cari nama / NIK (tambah sales)...">
+                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        @if (strlen($searchSales) >= 2)
+                            <div
+                                class="absolute z-10 w-full bg-white border rounded-lg shadow-lg max-h-40 overflow-y-auto divide-y mt-1">
+                                @forelse($this->salesResults as $sales)
+                                    <button wire:click="selectSales({{ $sales->id }})"
+                                        class="w-full p-2 hover:bg-gray-50 text-left flex justify-between items-center group transition">
+                                        <div>
+                                            <p class="font-bold text-gray-800 text-xs">{{ $sales->name }}</p>
+                                            <p class="text-[9px] text-gray-400">{{ $sales->employee_no ?? 'N/A' }}</p>
+                                        </div>
+                                        <span
+                                            class="text-[#1c69d4] text-[10px] font-bold opacity-0 group-hover:opacity-100 transition">Pilih</span>
+                                    </button>
+                                @empty
+                                    <p class="p-2 text-xs text-gray-400 text-center">Tidak ditemukan</p>
+                                @endforelse
+                            </div>
+                        @endif
+                    </div>
                 </div>
 
                 {{-- Payment Methods --}}
@@ -662,9 +726,9 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                             </svg>
-                            Cetak (Browser)
+
                         </button>
-                        <button wire:click="printEscpos" wire:loading.attr="disabled"
+                        {{-- <button wire:click="printEscpos" wire:loading.attr="disabled"
                             class="text-orange-600 hover:text-orange-700 font-bold text-sm flex items-center gap-1">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 stroke-width="2">
@@ -673,7 +737,7 @@
                             </svg>
                             <span wire:loading.remove wire:target="printEscpos">Cetak (ESC/POS)</span>
                             <span wire:loading wire:target="printEscpos">Printing...</span>
-                        </button>
+                        </button> --}}
                         <button wire:click="getEscposBase64" wire:loading.attr="disabled"
                             class="text-teal-600 hover:text-teal-700 font-bold text-sm flex items-center gap-1">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -681,7 +745,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                             </svg>
-                            <span wire:loading.remove wire:target="getEscposBase64">Cetak (RawBT)</span>
+                            <span wire:loading.remove wire:target="getEscposBase64"></span>
                             <span wire:loading wire:target="getEscposBase64">Memproses...</span>
                         </button>
                         {{-- ─── TOMBOL WHATSAPP MEKARI QONTAK ─── --}}

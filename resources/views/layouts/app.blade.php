@@ -139,10 +139,12 @@
     <script>
         let html5QrcodeScanner;
         let currentInputIndex = null;
+        let currentSnIndex = null;
 
         // Fungsi untuk membuka kamera
-        function startScanner(index) {
+        function startScanner(index, snIndex = null) {
             currentInputIndex = index;
+            currentSnIndex = snIndex;
 
             // Tampilkan Modal
             document.getElementById('scanner-modal').classList.remove('hidden');
@@ -167,13 +169,14 @@
                     closeScanner();
 
                     // 2. Cari elemen input berdasarkan index
-                    let inputElement = document.getElementById('sn_input_' + currentInputIndex);
+                    let inputId = currentSnIndex !== null ? 'sn_input_' + currentInputIndex + '_' + currentSnIndex : 'sn_input_' + currentInputIndex;
+                    let inputElement = document.getElementById(inputId);
 
                     if (inputElement) {
-                        // 3. Masukkan teks hasil scan ke inputan
+                        // 3. Update value di input
                         inputElement.value = decodedText;
 
-                        // 4. Trigger event 'change' agar Livewire (wire:change) langsung bereaksi
+                        // 4. Trigger event 'change' agar Livewire menangkap perubahan ini (karena ada wire:change)
                         inputElement.dispatchEvent(new Event('change'));
                     }
                 },

@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Admin\Employe\EmployeManage;
 use App\Livewire\Admin\Users\UserOperational;
 use App\Livewire\Pages\Buymobile;
 use App\Livewire\Pages\PhoneRepair;
@@ -43,6 +44,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::livewire('/users', 'pages::admin.user-management')->name('users');
     Route::livewire('/roles', 'pages::admin.role-permission')->name('roles');
     Route::get('/user/operational', UserOperational::class)->name('user.operational');
+    Route::get('/user/employes', EmployeManage::class)->name('user.employes');
     Route::get('/products', \App\Livewire\Admin\Products\ProductManagement::class)->name('products');
     Route::get('/second-products', \App\Livewire\Admin\Products\SecondProductManagement::class)->name('second-products');
     Route::get('/orders', \App\Livewire\Admin\Orders\OrderManagement::class)->name('orders.management');
