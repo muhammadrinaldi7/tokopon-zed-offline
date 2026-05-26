@@ -820,8 +820,11 @@
                         </p>
                     </div>
                     <div class="border-t border-dashed border-gray-300 my-2"></div>
+                    <p class="text-[10px] text-gray-500">Tanggal:
+                        {{ $completedOrder->created_at->format('d/m/Y H:i') }}</p>
                     <p class="text-[10px] text-gray-500">No: {{ $completedOrder->order_number }}</p>
-                    <p class="text-[10px] text-gray-500">Kasir: {{ $completedOrder->handledBy->name ?? '-' }}</p>
+                    <p class="text-[10px] text-gray-500">Sales: {{ $completedOrder->salesBy->first()->name ?? '-' }}
+                    </p>
                     <p class="text-[10px] text-gray-500">Customer: {{ $completedOrder->user->name ?? '-' }}</p>
                     <div class="border-t border-dashed border-gray-300 my-2"></div>
                     @foreach ($completedOrder->items as $item)

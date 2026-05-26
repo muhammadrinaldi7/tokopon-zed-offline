@@ -45,7 +45,7 @@ class Order extends Model
     }
     public function salesBy()
     {
-        return $this->hasMany(Employe::class, 'sales_id');
+        return $this->hasMany(Employe::class, 'id');
     }
 
     public function paymentMethod()

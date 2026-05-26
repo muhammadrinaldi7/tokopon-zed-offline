@@ -31,6 +31,6 @@ class Employe extends Model
     // Relasi one-to-many ke Order (karyawan yang menangani order)
     public function orders()
     {
-        return $this->hasMany(Order::class, 'sales_id');
+        return $this->hasMany(Order::class, 'id');
     }
 }
