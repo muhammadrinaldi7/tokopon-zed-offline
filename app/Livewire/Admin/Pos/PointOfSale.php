@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Pos;
 
+use App\Mail\SalesReceiptMail;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
@@ -15,7 +16,10 @@ use App\Models\User;
 use App\Services\AccurateService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -24,7 +28,7 @@ class PointOfSale extends Component
 {
     // ─── Search & Filter ───────────────────────────────────────
     public $search = '';
-    public $productType = 'all'; // all, new, second
+    public $productType = 'new'; // all, new, second
 
     // ─── Cart (in-memory) ──────────────────────────────────────
     public $cart = []; // [{variant_id, variant_type, name, storage, color, price, qty, serial_number, sku}]
@@ -38,15 +42,9 @@ class PointOfSale extends Component
     public $customerEmail = '';
 
     // ─── Payment ───────────────────────────────────────────────
-    public $payment_method_id = null;
-    public $payment_method_rate_id = null;
+    public $payments = [];
     public $discount_amount = 0;
     public $notes = '';
-
-    public function updatedPaymentMethodId($value)
-    {
-        $this->payment_method_rate_id = null;
-    }
 
     // ─── Modals ────────────────────────────────────────────────
     public $showCheckoutModal = false;
@@ -59,35 +57,140 @@ class PointOfSale extends Component
     public $variantModalVariants = [];
     public $variantModalIsSecond = false;
 
-    // ─── Computed Properties ───────────────────────────────────
+    // ─── History Sales Properties ──────────────────────────────
+    public $showHistoryModal = false;
+    public $historyOrders = [];
+
+    // Method untuk membuka modal dan memuat data transaksi POS terbaru
+    public function openHistory()
+    {
+        // Mengambil transaksi khusus channel POS handled oleh user aktif / bebas tergantung kebutuhan bisnis
+        $this->historyOrders = Order::with(['items', 'user', 'paymentMethod'])
+            ->where('order_channel', 'POS')
+            ->latest()
+            ->take(20) // Ambil 20 transaksi terakhir
+            ->get();
+
+        $this->showHistoryModal = true;
+    }
+
+    // Method untuk cetak ulang (reprint) dari riwayat
+    public function reprintOrder($orderId)
+    {
+        $this->completedOrder = Order::with(['items', 'user', 'paymentMethod', 'handledBy'])->find($orderId);
+        if ($this->completedOrder) {
+            $this->showHistoryModal = false; // tutup modal history
+            $this->showReceiptModal = true;  // buka modal struk bawaan kamu
+        }
+    }
+
+    public function mount()
+    {
+        $this->payments = [
+            [
+                'payment_method_id' => '',
+                'payment_method_rate_id' => '',
+                'amount' => 0,
+            ]
+        ];
+    }
+
+    public function updatedPayments($value, $key)
+    {
+        // Reset rate when method changes
+        if (str_contains($key, '.payment_method_id')) {
+            $parts = explode('.', $key);
+            $index = $parts[0];
+            $this->payments[$index]['payment_method_rate_id'] = '';
+        }
+        $this->syncSinglePaymentAmount();
+    }
+
+    public function updatedDiscountAmount()
+    {
+        $this->syncSinglePaymentAmount();
+    }
+
+    public function addPaymentRow()
+    {
+        $remaining = max(0, ($this->subtotal - $this->discount_amount) - $this->paymentsTotalBase);
+        $this->payments[] = [
+            'payment_method_id' => '',
+            'payment_method_rate_id' => '',
+            'amount' => $remaining,
+        ];
+    }
+
+    public function removePaymentRow($index)
+    {
+        if (count($this->payments) > 1) {
+            unset($this->payments[$index]);
+            $this->payments = array_values($this->payments);
+            $this->syncSinglePaymentAmount();
+        }
+    }
+
+    public function autofillRemaining($index)
+    {
+        $totalOther = 0;
+        foreach ($this->payments as $i => $p) {
+            if ($i !== $index) {
+                $totalOther += (int)$p['amount'];
+            }
+        }
+        $target = max(0, $this->subtotal - $this->discount_amount);
+        $this->payments[$index]['amount'] = max(0, $target - $totalOther);
+    }
+
+    public function syncSinglePaymentAmount()
+    {
+        if (count($this->payments) === 1) {
+            $this->payments[0]['amount'] = max(0, $this->subtotal - $this->discount_amount);
+        }
+    }
+
+    public function getMdrPercentage($payment)
+    {
+        $pmId = $payment['payment_method_id'] ?? null;
+        $rateId = $payment['payment_method_rate_id'] ?? null;
+
+        if (!$pmId) return 0;
+
+        if ($rateId) {
+            $rate = \App\Models\PaymentMethodRate::find($rateId);
+            return $rate ? (float) $rate->mdr_percentage : 0;
+        }
+
+        $pm = \App\Models\PaymentMethod::find($pmId);
+        return $pm ? (float) $pm->mdr_percentage : 0;
+    }
+
+    #[Computed]
+    public function paymentsTotalBase()
+    {
+        return collect($this->payments)->sum(fn($p) => (float)($p['amount'] ?? 0));
+    }
+
+    #[Computed]
+    public function isPaymentsValid()
+    {
+        foreach ($this->payments as $p) {
+            if (empty($p['payment_method_id'])) return false;
+
+            $pm = \App\Models\PaymentMethod::find($p['payment_method_id']);
+            if ($pm && $pm->rates()->where('is_active', true)->count() > 0 && empty($p['payment_method_rate_id'])) {
+                return false;
+            }
+        }
+
+        $target = max(0, $this->subtotal - $this->discount_amount);
+        return (int) $this->paymentsTotalBase === (int) $target;
+    }
 
     #[Computed]
     public function paymentMethods()
     {
         return PaymentMethod::where('is_active', true)->get();
-    }
-
-    #[Computed]
-    public function selectedPaymentMethod()
-    {
-        if (!$this->payment_method_id) return null;
-        return PaymentMethod::find($this->payment_method_id);
-    }
-
-    #[Computed]
-    public function paymentMethodRates()
-    {
-        if (!$this->payment_method_id) return collect();
-        return PaymentMethodRate::where('payment_method_id', $this->payment_method_id)
-            ->where('is_active', true)
-            ->get();
-    }
-
-    #[Computed]
-    public function selectedPaymentMethodRate()
-    {
-        if (!$this->payment_method_rate_id) return null;
-        return PaymentMethodRate::find($this->payment_method_rate_id);
     }
 
     #[Computed]
@@ -158,28 +261,22 @@ class PointOfSale extends Component
     }
 
     #[Computed]
-    public function mdrPercentage()
-    {
-        if ($this->payment_method_rate_id) {
-            $rate = $this->selectedPaymentMethodRate;
-            return $rate ? (float) $rate->mdr_percentage : 0;
-        }
-
-        $pm = $this->selectedPaymentMethod;
-        return $pm ? (float) $pm->mdr_percentage : 0;
-    }
-
-    #[Computed]
     public function mdrAmount()
     {
-        if ($this->mdrPercentage <= 0) return 0;
-        return round(($this->subtotal - $this->discount_amount) * $this->mdrPercentage / 100, 0);
+        $totalMdr = 0;
+        foreach ($this->payments as $payment) {
+            $pct = $this->getMdrPercentage($payment);
+            if ($pct > 0) {
+                $totalMdr += round((float)$payment['amount'] * $pct / 100, 0);
+            }
+        }
+        return $totalMdr;
     }
 
     #[Computed]
     public function grandTotal()
     {
-        return max(0, $this->subtotal - $this->discount_amount + $this->mdrAmount);
+        return max(0, $this->subtotal() - $this->discount_amount);
     }
 
     // ─── Cart Actions ──────────────────────────────────────────
@@ -190,8 +287,8 @@ class PointOfSale extends Component
 
         if ($isSecond) {
             $product = SecondProduct::with([
-                'variants' => function($q) use ($warehouseId) {
-                    $q->with(['warehouseStocks' => function($q2) use ($warehouseId) {
+                'variants' => function ($q) use ($warehouseId) {
+                    $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
                         $q2->where('warehouse_id', $warehouseId);
                     }]);
                 },
@@ -208,8 +305,8 @@ class PointOfSale extends Component
             ])->toArray();
         } else {
             $product = Product::with([
-                'variants' => function($q) use ($warehouseId) {
-                    $q->with(['warehouseStocks' => function($q2) use ($warehouseId) {
+                'variants' => function ($q) use ($warehouseId) {
+                    $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
                         $q2->where('warehouse_id', $warehouseId);
                     }]);
                 },
@@ -237,12 +334,12 @@ class PointOfSale extends Component
         $warehouseId = Auth::user()->warehouse_id;
 
         if ($isSecond) {
-            $variant = SecondProductVariant::with(['warehouseStocks' => function($q) use ($warehouseId) {
+            $variant = SecondProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
                 $q->where('warehouse_id', $warehouseId);
             }])->find($variantId);
             $variantType = SecondProductVariant::class;
         } else {
-            $variant = ProductVariant::with(['warehouseStocks' => function($q) use ($warehouseId) {
+            $variant = ProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
                 $q->where('warehouse_id', $warehouseId);
             }])->find($variantId);
             $variantType = ProductVariant::class;
@@ -286,18 +383,21 @@ class PointOfSale extends Component
         $this->showVariantModal = false;
         $this->variantModalProduct = null;
         $this->variantModalVariants = [];
+        $this->syncSinglePaymentAmount();
     }
 
     public function removeFromCart($index)
     {
         unset($this->cart[$index]);
         $this->cart = array_values($this->cart); // re-index
+        $this->syncSinglePaymentAmount();
     }
 
     public function incrementCartItem($index)
     {
         if (isset($this->cart[$index])) {
             $this->cart[$index]['qty']++;
+            $this->syncSinglePaymentAmount();
         }
     }
 
@@ -305,6 +405,7 @@ class PointOfSale extends Component
     {
         if (isset($this->cart[$index]) && $this->cart[$index]['qty'] > 1) {
             $this->cart[$index]['qty']--;
+            $this->syncSinglePaymentAmount();
         }
     }
 
@@ -351,13 +452,8 @@ class PointOfSale extends Component
             return;
         }
 
-        if (!$this->payment_method_id) {
-            $this->dispatch('toast', title: 'Metode Bayar', message: 'Pilih metode pembayaran.', type: 'warning');
-            return;
-        }
-
-        if ($this->paymentMethodRates->count() > 0 && !$this->payment_method_rate_id) {
-            $this->dispatch('toast', title: 'Tarif MDR Belum Dipilih', message: 'Silakan pilih tipe kartu / tenor cicilan terlebih dahulu.', type: 'warning');
+        if (!$this->isPaymentsValid) {
+            $this->dispatch('toast', title: 'Pembayaran Belum Sesuai', message: 'Pastikan total pembayaran cocok dengan tagihan dan semua metode pembayaran sudah dipilih.', type: 'warning');
             return;
         }
 
@@ -398,10 +494,8 @@ class PointOfSale extends Component
                 return;
             }
 
-            $paymentMethod = PaymentMethod::findOrFail($this->payment_method_id);
-
-            if ($this->paymentMethodRates->count() > 0 && !$this->payment_method_rate_id) {
-                $this->dispatch('toast', title: 'Tarif MDR Belum Dipilih', message: 'Silakan pilih tipe kartu / tenor cicilan terlebih dahulu.', type: 'warning');
+            if (!$this->isPaymentsValid) {
+                $this->dispatch('toast', title: 'Error', message: 'Pembayaran belum valid.', type: 'error');
                 return;
             }
 
@@ -413,11 +507,10 @@ class PointOfSale extends Component
                 STR_PAD_LEFT
             );
 
-            $subtotal = $this->subtotal;
+            $subtotal = $this->subtotal();
             $discountAmount = (int) $this->discount_amount;
-            $mdrPct = $this->mdrPercentage;
-            $mdrAmt = round(($subtotal - $discountAmount) * $mdrPct / 100, 0);
-            $grandTotal = max(0, $subtotal - $discountAmount + $mdrAmt);
+            $mdrAmt = $this->mdrAmount;
+            $grandTotal = max(0, $subtotal - $discountAmount);
 
             // Create Order
             $order = Order::create([
@@ -426,14 +519,14 @@ class PointOfSale extends Component
                 'total_amount' => $subtotal,
                 'shipping_cost' => 0,
                 'discount_amount' => $discountAmount,
-                'mdr_percentage' => $mdrPct,
+                'mdr_percentage' => ($subtotal - $discountAmount) > 0 ? round(($mdrAmt / ($subtotal - $discountAmount)) * 100, 2) : 0,
                 'mdr_amount' => $mdrAmt,
                 'grand_total' => $grandTotal,
                 'order_status' => 'COMPLETED',
                 'order_channel' => 'POS',
                 'handled_by' => Auth::id(),
-                'payment_method_id' => $this->payment_method_id,
-                'payment_method_rate_id' => $this->payment_method_rate_id,
+                'payment_method_id' => $this->payments[0]['payment_method_id'] ?: null,
+                'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
                 'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
                 'notes' => $this->notes,
             ]);
@@ -451,27 +544,33 @@ class PointOfSale extends Component
                 ]);
 
                 // Reduce stock
-                \App\Models\WarehouseStock::updateOrCreate(
+                $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
                     [
                         'warehouse_id' => Auth::user()->warehouse_id,
                         'variant_id' => $item['variant_id'],
                         'variant_type' => $item['variant_type'],
                     ],
                     [
-                        'stock' => \Illuminate\Support\Facades\DB::raw("GREATEST(0, stock - " . (int)$item['qty'] . ")")
+                        'stock' => 0
                     ]
                 );
+                $warehouseStock->update([
+                    'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
+                ]);
             }
+            // Create OrderPayments (for each split payment row)
+            foreach ($this->payments as $payment) {
+                $rowTotal = (float)$payment['amount'];
 
-            // Create OrderPayment
-            OrderPayment::create([
-                'order_id' => $order->id,
-                'xendit_external_id' => 'ORD-BUY-' . date('YmdHis') . rand(100, 999),
-                'amount' => $grandTotal,
-                'status' => 'PAID',
-                'payment_method_id' => $this->payment_method_id,
-                'payment_method_rate_id' => $this->payment_method_rate_id,
-            ]);
+                OrderPayment::create([
+                    'order_id' => $order->id,
+                    'xendit_external_id' => 'ORD-BUY-' . date('YmdHis') . rand(1000, 9999),
+                    'amount' => $rowTotal,
+                    'status' => 'PAID',
+                    'payment_method_id' => $payment['payment_method_id'],
+                    'payment_method_rate_id' => $payment['payment_method_rate_id'] ?: null,
+                ]);
+            }
 
             // ─── Accurate Integration (Iterative State Saving) ─────
 
@@ -520,25 +619,57 @@ class PointOfSale extends Component
                     }
                 }
 
-                // Sales Receipt (jika belum ada dan ada invoice)
+                // Sales Receipts (jika belum ada dan ada invoice)
                 if (!$order->accurate_receipt_no && $order->accurate_invoice_no) {
-                    $srData = [
-                        'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
-                        'branchName' => $branchName,
-                        'bankNo' => $paymentMethod->accurate_bank_no ?? 'KAS-CASH',
-                        'receiptAmount' => (float) $grandTotal,
-                        'chequeAmount' => (float) $grandTotal,
-                        'detailInvoice' => [
-                            [
-                                'invoiceNo' => $order->accurate_invoice_no,
-                                'paymentAmount' => (float) $grandTotal,
-                            ]
-                        ]
-                    ];
+                    $srNumbers = [];
+                    foreach ($this->payments as $payment) {
+                        $pm = \App\Models\PaymentMethod::findOrFail($payment['payment_method_id']);
+                        $rate = $payment['payment_method_rate_id'] ? \App\Models\PaymentMethodRate::find($payment['payment_method_rate_id']) : null;
 
-                    $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
-                    if (isset($srResult['r']['number'])) {
-                        $order->update(['accurate_receipt_no' => $srResult['r']['number']]);
+                        $pct = $this->getMdrPercentage($payment);
+                        $rowMdr = $pct > 0 ? round((float)$payment['amount'] * $pct / 100, 0) : 0;
+                        $rowBaseAmount = (float)$payment['amount'];
+
+                        $netReceiptAmount = $rowBaseAmount - $rowMdr;
+                        $mdrAccountNo = $rate ? $rate->accurate_account_no : null;
+
+                        $detailInvoiceItem = [
+                            'invoiceNo' => $order->accurate_invoice_no,
+                            'paymentAmount' => $rowBaseAmount,
+                        ];
+
+                        if ($rowMdr > 0 && $mdrAccountNo) {
+                            $detailInvoiceItem['detailDiscount'] = [
+                                [
+                                    'accountNo' => $mdrAccountNo,
+                                    'amount' => (float) $rowMdr,
+                                    'departmentName' => $branchName,
+                                    'discountNotes' => 'MDR'
+                                ]
+                            ];
+                        } else {
+                            $netReceiptAmount = $rowBaseAmount;
+                        }
+
+                        $srData = [
+                            'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
+                            'branchName' => $branchName,
+                            'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
+                            'receiptAmount' => (float) $netReceiptAmount,
+                            'chequeAmount' => (float) $netReceiptAmount,
+                            'detailInvoice' => [
+                                $detailInvoiceItem
+                            ]
+                        ];
+                        Log::info('POS Accurate Integration SR Data: ' . json_encode($srData));
+                        $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+                        if (isset($srResult['r']['number'])) {
+                            $srNumbers[] = $srResult['r']['number'];
+                        }
+                    }
+
+                    if (!empty($srNumbers)) {
+                        $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
                     }
                 }
             } catch (\Exception $e) {
@@ -547,7 +678,7 @@ class PointOfSale extends Component
             }
 
             // Success! Show receipt
-            $this->completedOrder = $order->load(['items', 'user', 'paymentMethod', 'handledBy']);
+            $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
             $this->showCheckoutModal = false;
             $this->showReceiptModal = true;
 
@@ -562,8 +693,13 @@ class PointOfSale extends Component
             $this->customerPhone = '';
             $this->customerEmail = '';
             $this->search = '';
-            $this->payment_method_id = null;
-            $this->payment_method_rate_id = null;
+            $this->payments = [
+                [
+                    'payment_method_id' => '',
+                    'payment_method_rate_id' => '',
+                    'amount' => 0,
+                ]
+            ];
 
             $this->dispatch('toast', title: 'Transaksi Berhasil', message: 'Order ' . $orderNumber . ' berhasil diproses.', type: 'success');
         } catch (\Exception $e) {
@@ -583,14 +719,320 @@ class PointOfSale extends Component
         $this->cart = [];
         $this->discount_amount = 0;
         $this->notes = '';
-        $this->payment_method_id = null;
-        $this->payment_method_rate_id = null;
+        $this->payments = [
+            [
+                'payment_method_id' => '',
+                'payment_method_rate_id' => '',
+                'amount' => 0,
+            ]
+        ];
         $this->selectedCustomerId = null;
         $this->isNewCustomer = false;
         $this->searchCustomer = '';
         $this->search = '';
         $this->showReceiptModal = false;
         $this->completedOrder = null;
+    }
+
+    // ─── Kirim Struk via Email (SMTP) ─────────────────────────
+    public function sendReceiptToEmail()
+    {
+        if (!$this->completedOrder) return;
+
+        // Ambil ID dari state, lalu tarik data paling FRESH langsung dari database
+        $orderId = $this->completedOrder->id;
+        $order = Order::with('user')->find($orderId);
+        $email = $order->user->email ?? null;
+
+        // ─── VALIDASI PEMBATASAN AKSES UTK FRONT-LINER (FL) ───
+        $userAktif = Auth::user();
+        if (!$userAktif->hasRole('admin') && $order->is_email_sent) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Struk email hanya dapat dikirim sekali oleh Kasir/FL.', type: 'warning');
+            return;
+        }
+
+        // Validasi jika email kosong atau merupakan email dummy sistem POS
+        if (!$email || str_contains($email, '@pos.tokopun.com')) {
+            $this->dispatch('toast', title: 'Gagal Kirim', message: 'Email customer tidak valid atau kosong.', type: 'warning');
+            return;
+        }
+
+        try {
+            // Mengirim email menggunakan Mailable yang sudah dibuat
+            Mail::mailer('pos_sales')
+                ->to($email)
+                ->send(new SalesReceiptMail($order));
+
+            // 1. Update ke database menggunakan instance fresh
+            $order->update(['is_email_sent' => true]);
+
+            // 2. PAKSA REFRESH STATE LIVEWIRE UTAMA
+            $this->completedOrder->refresh();
+
+            $this->dispatch('toast', title: 'Berhasil', message: 'Struk digital telah dikirim ke ' . $email, type: 'success');
+        } catch (\Exception $e) {
+            Log::error('POS Email Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Koneksi SMTP bermasalah: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    // ─── Kirim Struk via WA (Qontak) ─────────────────────────
+    public function sendReceiptToQontak()
+    {
+        // 1. Validasi Awal data order
+        if (!$this->completedOrder) return;
+
+        // Ambil ID dari state, lalu tarik data paling FRESH langsung dari database
+        $orderId = $this->completedOrder->id;
+        $order = Order::with('user.profile')->find($orderId);
+        $phone = $order->user->profile->phone_number ?? null;
+
+        // ─── VALIDASI PEMBATASAN AKSES UTK FRONT-LINER (FL) ───
+        $userAktif = Auth::user();
+        if (!$userAktif->hasRole('admin') && $order->is_wa_sent) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Struk WhatsApp hanya dapat dikirim sekali oleh Kasir/FL.', type: 'warning');
+            return;
+        }
+
+        if (!$phone) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Nomor HP customer tidak ditemukan.', type: 'warning');
+            return;
+        }
+
+        // Standardisasi nomor HP (08xx -> 628xx)
+        if (str_starts_with($phone, '0')) {
+            $phone = '62' . substr($phone, 1);
+        }
+
+        // 2. Tarik variabel dari env
+        $fullUrl = env('QONTAK_API_URL');
+        $method = 'POST';
+
+        // Ganti skema parse_url ala JavaScript Postman
+        $parsedUrl = parse_url($fullUrl);
+
+        // $baseUrl akan berisi "https://api.mekari.com"
+        $baseUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
+
+        // $endpoint otomatis akan mengambil path murni "/qontak/chat/v1/broadcasts/whatsapp/direct"
+        $endpoint = $parsedUrl['path'];
+
+        $clientId = env('QONTAK_CLIENT_ID');
+        $clientSecret = env('QONTAK_CLIENT_SECRET');
+
+        // ─── 2. PROSES GENERATE HMAC SIGNATURE (TETAP AMAN & PRESISI) ────
+        $dateString = gmdate('D, d M Y H:i:s') . ' GMT';
+        $requestLine = "{$method} {$endpoint} HTTP/1.1";
+
+        $stringToSign = "date: {$dateString}\n{$requestLine}";
+
+        $digest = hash_hmac('sha256', $stringToSign, $clientSecret, true);
+        $signature = base64_encode($digest);
+
+        $hmacHeader = "hmac username=\"{$clientId}\", algorithm=\"hmac-sha256\", headers=\"date request-line\", signature=\"{$signature}\"";
+        $idempotencyKey = (string) \Illuminate\Support\Str::uuid();
+
+        // ─── 3. STRUKTUR PAYLOAD BODY JSON (100% SAMA DENGAN POSTMAN) ────
+        $payload = [
+            'to_name' => $order->user->name ?? 'Customer',
+            'to_number' => $phone,
+            'channel_integration_id' => env('QONTAK_CHANNEL_INTEGRATION_ID'),
+            'message_template_id' => env('QONTAK_TEMPLATE_ID'),
+            'language' => [
+                'code' => 'id'
+            ],
+            'parameters' => [
+                'body' => [
+                    [
+                        'key' => '1',
+                        'value' => 'nama',
+                        'value_text' => $order->user->name ?? 'Customer'
+                    ],
+                    [
+                        'key' => '2',
+                        'value' => 'no_invoice',
+                        'value_text' => $order->order_number
+                    ],
+                    [
+                        'key' => '3',
+                        'value' => 'total_tagihan',
+                        'value_text' => 'Rp ' . number_format($order->grand_total, 0, ',', '.')
+                    ]
+                ]
+            ]
+        ];
+
+        // ─── 4. EXECUTE API CALL KE FULL URL ─────────────────────────────
+        try {
+            $response = Http::withHeaders([
+                'Authorization'     => $hmacHeader,
+                'Date'              => $dateString,
+                'X-Idempotency-Key' => $idempotencyKey,
+                'Content-Type'      => 'application/json',
+                'Accept'            => 'application/json',
+            ])->post($fullUrl, $payload);
+
+            if ($response->successful()) {
+                // Update ke database menggunakan instance fresh
+                $order->update(['is_wa_sent' => true]);
+
+                // REFRESH STATE LIVEWIRE UTAMA
+                $this->completedOrder->refresh();
+
+                $this->dispatch('toast', title: 'Berhasil', message: 'Struk WA berhasil dikirim via Mekari Qontak!', type: 'success');
+            } else {
+                Log::error('=== DEBUG MEKARI QONTAK ===');
+                Log::error('Status Code: ' . $response->status());
+                Log::error('Response Body: ' . $response->body());
+                Log::error('Parsed Endpoint for HMAC: ' . $endpoint);
+                Log::error('===========================');
+
+                $this->dispatch('toast', title: 'Gagal API', message: 'Mekari: Code ' . $response->status(), type: 'error');
+            }
+        } catch (\Exception $e) {
+            Log::error('Qontak HMAC Integration Crash: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    public function printEscpos()
+    {
+        if (!$this->completedOrder) {
+            $this->dispatch('toast', title: 'Error', message: 'Tidak ada transaksi aktif untuk dicetak.', type: 'error');
+            return;
+        }
+
+        $printerName = env('ESCPOS_PRINTER_NAME', 'POS-80');
+
+        try {
+            if (filter_var($printerName, FILTER_VALIDATE_IP)) {
+                $connector = new \Mike42\Escpos\PrintConnectors\NetworkPrintConnector($printerName, 9100);
+            } else {
+                $connector = new \Mike42\Escpos\PrintConnectors\WindowsPrintConnector($printerName);
+            }
+
+            $printer = new \Mike42\Escpos\Printer($connector);
+            $printer->initialize();
+
+            $this->generateEscposContent($printer);
+
+            $printer->close();
+
+            $this->dispatch('toast', title: 'Sukses', message: 'Perintah cetak thermal terkirim ke ' . $printerName, type: 'success');
+        } catch (\Exception $e) {
+            Log::error('ESCPOS Print Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Cetak Gagal', message: 'Tidak dapat mencetak ke ' . $printerName . ': ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    public function getEscposBase64()
+    {
+        if (!$this->completedOrder) {
+            $this->dispatch('toast', title: 'Error', message: 'Tidak ada transaksi aktif untuk dicetak.', type: 'error');
+            return;
+        }
+
+        try {
+            $connector = new \Mike42\Escpos\PrintConnectors\DummyPrintConnector();
+            $printer = new \Mike42\Escpos\Printer($connector);
+            $printer->initialize();
+
+            $this->generateEscposContent($printer);
+
+            $data = $connector->getData();
+            $base64 = base64_encode($data);
+
+            $printer->close();
+
+            $this->dispatch('print-rawbt', base64: $base64, orderNumber: $this->completedOrder->order_number);
+        } catch (\Exception $e) {
+            Log::error('ESCPOS Base64 Generation Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan RawBT: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    private function generateEscposContent($printer)
+    {
+        // Store Title (Center, Large)
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
+        $printer->selectPrintMode(\Mike42\Escpos\Printer::MODE_DOUBLE_WIDTH | \Mike42\Escpos\Printer::MODE_DOUBLE_HEIGHT);
+        $printer->text("TOKOPON\n");
+
+        $printer->selectPrintMode();
+        $storeName = $this->completedOrder->shipping_address_snapshot['store'] ?? 'Toko';
+        $printer->text($storeName . "\n");
+        $printer->text($this->completedOrder->created_at->format('d/m/Y H:i') . "\n");
+        $printer->text("--------------------------------\n");
+
+        // Info (Left)
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_LEFT);
+        $printer->text($this->formatLine("No. Transaksi", $this->completedOrder->order_number, 58) . "\n");
+        $printer->text($this->formatLine("Kasir", $this->completedOrder->handledBy->name ?? '-', 58) . "\n");
+        $printer->text($this->formatLine("Customer", $this->completedOrder->user->name ?? '-', 58) . "\n");
+        $printer->text("--------------------------------\n");
+
+        // Items List
+        foreach ($this->completedOrder->items as $item) {
+            $v = $item->variant;
+            $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
+            if ($v) {
+                $itemName .= " (" . $v->color . "/" . $v->storage . ")";
+            }
+
+            $printer->text($itemName . "\n");
+
+            $qtyAndPrice = $item->qty . "x Rp " . number_format($item->price_at_checkout, 0, ',', '.');
+            $subtotal = "Rp " . number_format($item->subtotal, 0, ',', '.');
+            $printer->text($this->formatLine("  " . $qtyAndPrice, $subtotal, 58) . "\n");
+
+            if ($item->serial_number) {
+                $printer->text("  SN: " . $item->serial_number . "\n");
+            }
+        }
+        $printer->text("--------------------------------\n");
+
+        // Subtotal & Discount
+        $printer->text($this->formatLine("Subtotal", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), 58) . "\n");
+        // if ($this->completedOrder->discount_amount > 0) {
+        //     $printer->text($this->formatLine("Diskon", "-Rp " . number_format($this->completedOrder->discount_amount, 0, ',', '.'), 58) . "\n");
+        // }
+        $printer->text("--------------------------------\n");
+
+        // Grand Total (Bold)
+        $printer->setEmphasis(true);
+        $printer->text($this->formatLine("TOTAL", "Rp " . number_format($this->completedOrder->grand_total, 0, ',', '.'), 58) . "\n");
+        $printer->setEmphasis(false);
+        $printer->text("--------------------------------\n");
+
+        // Payments (Split Payments Support)
+        foreach ($this->completedOrder->payments as $payment) {
+            $label = "Bayar (" . ($payment->paymentMethod->name ?? 'Cash') . ($payment->paymentMethodRate ? ' - ' . $payment->paymentMethodRate->name : '') . ")";
+            $amount = "Rp " . number_format($payment->amount, 0, ',', '.');
+            $printer->text($this->formatLine($label, $amount, 58) . "\n");
+        }
+
+        if ($this->completedOrder->accurate_invoice_no) {
+            $printer->text($this->formatLine("Accurate Invoice", $this->completedOrder->accurate_invoice_no, 58) . "\n");
+        }
+        $printer->text("--------------------------------\n");
+
+        // Footer (Center)
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
+        $printer->text("\nTerima kasih telah berbelanja!\n");
+        $printer->text("www.tokopon.id\n\n\n\n");
+
+        $printer->cut();
+    }
+
+    private function formatLine($left, $right, $width = 58)
+    {
+        $leftWidth = strlen($left);
+        $rightWidth = strlen($right);
+        $spaces = $width - $leftWidth - $rightWidth;
+        if ($spaces < 1) {
+            $spaces = 1;
+        }
+        return $left . str_repeat(' ', $spaces) . $right;
     }
 
     #[Layout('layouts.app', ['title' => 'Point of Sale'])]

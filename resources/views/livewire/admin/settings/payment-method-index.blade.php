@@ -227,6 +227,7 @@
                                 <tr class="bg-gray-50 border-b text-xs uppercase tracking-wider text-gray-500 font-bold">
                                     <th class="p-3">Nama Opsi / Tenor</th>
                                     <th class="p-3 text-center">Beban MDR</th>
+                                    <th class="p-3 text-center">Accurate Account No</th>
                                     <th class="p-3 text-center">Status</th>
                                     <th class="p-3 text-right">Aksi</th>
                                 </tr>
@@ -236,6 +237,7 @@
                                     <tr class="hover:bg-gray-50/50">
                                         <td class="p-3 font-bold text-gray-800">{{ $rate->name }}</td>
                                         <td class="p-3 text-center font-mono font-bold text-blue-600">{{ $rate->mdr_percentage }}%</td>
+                                        <td class="p-3 text-center font-mono text-xs text-gray-500">{{ $rate->accurate_account_no ?? '-' }}</td>
                                         <td class="p-3 text-center">
                                             <button wire:click="toggleRateActive({{ $rate->id }})"
                                                 class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors {{ $rate->is_active ? 'bg-emerald-500' : 'bg-gray-200' }}">
@@ -302,6 +304,15 @@
                         <label class="block text-sm font-bold text-gray-700 mb-1">Beban MDR (%) <span class="text-rose-500">*</span></label>
                         <input type="number" step="0.01" min="0" max="100" wire:model="rateMdrPercentage" class="w-full p-2 border border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm font-mono" placeholder="0.00">
                         @error('rateMdrPercentage')
+                            <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span>
+                        @enderror
+                    </div>
+
+                    <div class="p-4 bg-amber-50 rounded-lg border border-amber-100">
+                        <label class="block text-sm font-bold text-amber-900 mb-1">Accurate Account No (Opsional)</label>
+                        <p class="text-xs text-amber-700 mb-2">Kode akun perkiraan Buku Besar untuk pencatatan detail potongan/beban MDR bank.</p>
+                        <input type="text" wire:model="rateAccurateAccountNo" class="w-full p-2 border border-amber-200 rounded-lg focus:ring-amber-500 focus:border-amber-500 text-sm font-mono" placeholder="Contoh: 6101.01">
+                        @error('rateAccurateAccountNo')
                             <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span>
                         @enderror
                     </div>

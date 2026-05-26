@@ -33,6 +33,11 @@ class SecondProductVariant extends Model implements HasMedia
         return $this->belongsTo(ProductAccurate::class, 'product_accurate_id');
     }
 
+    public function inspections()
+    {
+        return $this->hasMany(DeviceInspection::class, 'second_product_variant_id');
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('variant_image')

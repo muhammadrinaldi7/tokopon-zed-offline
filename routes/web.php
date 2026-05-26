@@ -70,7 +70,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/devices/create', App\Livewire\Admin\Buyback\DeviceForm::class)->name('create');
         Route::get('/tiers', App\Livewire\Admin\Buyback\TierIndex::class)->name('tiers');
     });
+
+    Route::prefix('qc')->name('qc.')->group(function () {
+        Route::get('/templates', App\Livewire\Admin\Qc\TemplateIndex::class)->name('templates');
+        Route::get('/device/{imei}', App\Livewire\Admin\Qc\DevicePassport::class)->name('device-passport');
+        Route::get('/inspect/{secondProductVariant}', App\Livewire\Admin\Qc\InspectionForm::class)->name('inspect');
+    });
 });
+
+Route::get('/qc/device/{imei}', App\Livewire\Pages\PublicDeviceQc::class)->name('public.device-qc');
 
 // ─── CS Chat Route (requires auth + admin middleware + cs role) ──
 Route::livewire('/admin/cs-chat', 'pages::cs-dashboard')

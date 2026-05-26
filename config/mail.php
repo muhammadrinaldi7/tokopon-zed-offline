@@ -49,6 +49,18 @@ return [
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
+        // ─── TAMBAHKAN MAILER POS DISINI CUY ───────────────────
+        'pos_sales' => [
+            'transport' => 'smtp',
+            'host' => env('MAIL_POS_HOST'),
+            'port' => env('MAIL_POS_PORT', 587), // Default ke 587 jika di .env lupa diisi
+            'encryption' => env('MAIL_POS_ENCRYPTION', 'tls'),
+            'username' => env('MAIL_POS_USERNAME'),
+            'password' => env('MAIL_POS_PASSWORD'),
+            'timeout' => 30, // Ditambahkan timeout 30 detik agar kasir tidak lag terlalu lama jika SMTP down
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
         'ses' => [
             'transport' => 'ses',
         ],

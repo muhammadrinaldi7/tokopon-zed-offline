@@ -12,11 +12,15 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Show extends Component
 {
     public SellPhone $sellPhone;
+
+    // QC Status
+    public $qcPassed = false;
 
     // Appraisal Form
     public $appraisedValue = 0;
@@ -35,6 +39,13 @@ class Show extends Component
     {
         $this->sellPhone = $sellPhone->load(['user.bankAccounts', 'buybackDevice.tier']);
         $this->appraisedValue = $this->sellPhone->appraised_value ?? 0;
+        $this->qcPassed = $this->sellPhone->hasPassedQc();
+    }
+
+    #[On('qc-inspection-saved')]
+    public function handleQcSaved($verdict)
+    {
+        $this->qcPassed = ($verdict === 'pass');
     }
 
     #[Computed]
@@ -74,6 +85,11 @@ class Show extends Component
 
     public function markAsPaid()
     {
+        if (!$this->qcPassed) {
+            $this->dispatch('toast', ['type' => 'error', 'title' => 'Gagal', 'message' => 'Lakukan Inspeksi QC terlebih dahulu dan pastikan statusnya LAYAK BELI (PASS).']);
+            return;
+        }
+
         $billNumber = 'TPD-' . date('dmY') . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT);
 
         if ($this->sellPhone->status === 'COMPLETED' || $this->sellPhone->status === 'CANCELLED') return;

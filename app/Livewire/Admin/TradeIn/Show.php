@@ -11,6 +11,7 @@ use App\Models\TradeInUnitOption;
 use App\Services\XenditService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -18,6 +19,9 @@ use Illuminate\Support\Str;
 class Show extends Component
 {
     public TradeIn $tradeIn;
+
+    // QC Status
+    public $qcPassed = false;
 
     // Appraisal Form
     public $appraisedValue = 0;
@@ -47,6 +51,13 @@ class Show extends Component
         $this->appraisedValue = $this->tradeIn->appraised_value ?? 0;
 
         $this->selectedVariants = $this->tradeIn->product_variant_id ? [$this->tradeIn->product_variant_id] : [];
+        $this->qcPassed = $this->tradeIn->hasPassedQc();
+    }
+
+    #[On('qc-inspection-saved')]
+    public function handleQcSaved($verdict)
+    {
+        $this->qcPassed = ($verdict === 'pass');
     }
 
     // submitAppraisal dihapus karena harga sudah fix dan admin langsung assign unit saat inspeksi
@@ -74,6 +85,11 @@ class Show extends Component
     public function markAsPhysicallyVerified()
     {
         if (!in_array($this->tradeIn->status, ['WAITING_FOR_DEVICE', 'INSPECTING'])) return;
+
+        if (!$this->qcPassed) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Lakukan Inspeksi QC terlebih dahulu dan pastikan statusnya LAYAK BELI (PASS).', type: 'error');
+            return;
+        }
 
         $this->validate([
             'appraisedValue' => 'required|numeric|min:0'

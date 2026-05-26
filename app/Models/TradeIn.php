@@ -47,6 +47,16 @@ class TradeIn extends Model implements HasMedia
         return $this->morphTo(null, 'product_variant_type', 'product_variant_id');
     }
 
+    public function inspections()
+    {
+        return $this->morphMany(DeviceInspection::class, 'inspectable');
+    }
+
+    public function hasPassedQc(): bool
+    {
+        return $this->inspections()->where('verdict', 'pass')->exists();
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('photos');

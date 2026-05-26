@@ -137,10 +137,19 @@
                     <h3 class="font-bold text-lg text-gray-900 border-b border-gray-100 pb-3 mb-4">Aksi Transaksi</h3>
 
                     @if ($sellPhone->status === 'INSPECTING')
-                        @if (!$isRevising)
+                        @if (!$qcPassed)
+                            <div class="p-4 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-100 mb-4 animate-in fade-in duration-300">
+                                <p class="text-sm font-bold flex items-center gap-2">
+                                    <svg class="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Menunggu Inspeksi QC
+                                </p>
+                                <p class="text-xs mt-1.5 opacity-90">Silakan selesaikan form inspeksi fisik perangkat di bagian bawah halaman ini terlebih dahulu.</p>
+                            </div>
+                        @elseif (!$isRevising)
                             <div class="space-y-3">
-                                <p class="text-sm text-gray-600 mb-4">Fisik HP telah tiba. Silakan cocokan kondisi fisik
-                                    asli dengan deskripsi awal. Apakah kondisinya sesuai?</p>
+                                <p class="text-sm text-gray-600 mb-4">Inspeksi QC telah selesai. Jika kondisi unit sesuai dan nilai penawaran tidak berubah, lanjutkan ke pembayaran.</p>
 
                                 <button type="button" wire:click="markAsPaid"
                                     wire:confirm="Sesuai! Anda akan mentransfer uang ke pelanggan dan menandai lunas?"
@@ -293,4 +302,14 @@
             @endif
         </div>
     </div>
+
+    {{-- QC Inspection Form (Full Width at Bottom) --}}
+    @if ($sellPhone->status === 'INSPECTING' && !$qcPassed)
+        <div class="mt-8">
+            <livewire:admin.qc.inspection-form 
+                :inspectable-type="get_class($sellPhone)" 
+                :inspectable-id="$sellPhone->id" 
+                label="QC Inbound - Beli HP Bekas" />
+        </div>
+    @endif
 </div>

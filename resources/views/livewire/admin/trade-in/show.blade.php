@@ -127,9 +127,21 @@
                         </div>
                     </div>
 
-                    <p class="text-sm text-gray-500 mb-6">
+                    <p class="text-sm text-gray-500 mb-4">
                         Silakan pilih 1 (satu) unit spesifik dari gudang yang akan ditukarkan untuk konsumen berdasarkan target produk mereka.
                     </p>
+
+                    @if ($tradeIn->status === 'INSPECTING' && !$qcPassed)
+                        <div class="p-4 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-100 mb-6 animate-in fade-in duration-300">
+                            <p class="text-sm font-bold flex items-center gap-2">
+                                <svg class="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Menunggu Inspeksi QC Fisik
+                            </p>
+                            <p class="text-xs mt-1.5 opacity-90">Silakan selesaikan form inspeksi fisik perangkat di bagian bawah halaman ini terlebih dahulu sebelum mengajukan penawaran harga akhir.</p>
+                        </div>
+                    @endif
 
                     <form>
                         <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -146,6 +158,7 @@
                             </div>
                         </div>
                         @error('selectedVariants') <span class="text-sm text-rose-500 font-bold block mb-3 bg-rose-50 p-2 rounded-lg">{{ $message }}</span> @enderror
+
 
                         <div class="space-y-3 mb-8 max-h-80 overflow-y-auto pr-2">
                             @forelse($availableVariants as $variant)
@@ -332,6 +345,16 @@
         </div>
     </div>
 
+    {{-- QC Inspection Form (Full Width at Bottom) --}}
+    @if ($tradeIn->status === 'INSPECTING' && !$qcPassed)
+        <div class="mt-8">
+            <livewire:admin.qc.inspection-form 
+                :inspectable-type="get_class($tradeIn)" 
+                :inspectable-id="$tradeIn->id" 
+                label="QC Inbound - Trade In" />
+        </div>
+    @endif
+
     {{-- Modal Konversi --}}
     @if($convertModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" wire:click.self="$set('convertModal', false)">
@@ -375,6 +398,5 @@
                     </div>
                 </form>
             </div>
-        </div>
     @endif
 </div>

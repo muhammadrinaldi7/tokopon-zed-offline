@@ -33,6 +33,7 @@ class PaymentMethodIndex extends Component
     public $rateId;
     public $rateName;
     public $rateMdrPercentage = 0;
+    public $rateAccurateAccountNo;
     public $rateIsActive = true;
 
     protected $rules = [
@@ -161,6 +162,7 @@ class PaymentMethodIndex extends Component
         $this->rateId = $rate->id;
         $this->rateName = $rate->name;
         $this->rateMdrPercentage = $rate->mdr_percentage;
+        $this->rateAccurateAccountNo = $rate->accurate_account_no;
         $this->rateIsActive = $rate->is_active;
 
         $this->isEditRate = true;
@@ -172,6 +174,7 @@ class PaymentMethodIndex extends Component
         $this->validate([
             'rateName' => 'required|string|max:255',
             'rateMdrPercentage' => 'required|numeric|min:0|max:100',
+            'rateAccurateAccountNo' => 'nullable|string|max:255',
             'rateIsActive' => 'boolean',
         ]);
 
@@ -179,6 +182,7 @@ class PaymentMethodIndex extends Component
             'payment_method_id' => $this->selectedPaymentMethodForRates->id,
             'name' => $this->rateName,
             'mdr_percentage' => $this->rateMdrPercentage,
+            'accurate_account_no' => $this->rateAccurateAccountNo ?: null,
             'is_active' => $this->rateIsActive,
         ];
 
@@ -215,6 +219,7 @@ class PaymentMethodIndex extends Component
         $this->rateId = null;
         $this->rateName = '';
         $this->rateMdrPercentage = 0;
+        $this->rateAccurateAccountNo = '';
         $this->rateIsActive = true;
     }
 

@@ -1,0 +1,1 @@
+{"customerNo":"GSK_CUSTOMER_00012","branchName":"Banjarbaru","bankNo":" 10.02.102.002","receiptAmount":7500000,"chequeAmount":7500000,"detailInvoice":[{"invoiceNo":"SI.2026.05.00049","paymentAmount":7500000}]}

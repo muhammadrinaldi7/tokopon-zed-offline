@@ -9,12 +9,13 @@
     {{-- Filters --}}
     <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 mb-6">
         <div class="flex-1 relative">
-            <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none"
-                viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari No. Pesanan atau Nama Pembeli..."
+            <input type="text" wire:model.live.debounce.300ms="search"
+                placeholder="Cari No. Pesanan atau Nama Pembeli..."
                 class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-[#1c69d4]/20 focus:border-[#1c69d4]">
         </div>
         <div class="w-full md:w-64 shrink-0">
@@ -48,17 +49,20 @@
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="px-6 py-4">
                                 <span class="font-bold text-gray-900text-sm">{{ $order->order_number }}</span>
-                                <div class="text-[10px] text-gray-400 font-mono mt-1 select-all" title="Klik untuk menyalin (segera hadir)">
+                                <div class="text-[10px] text-gray-400 font-mono mt-1 select-all"
+                                    title="Klik untuk menyalin (segera hadir)">
                                     ID: {{ $order->id }}
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                <p class="font-bold text-gray-800 text-sm">{{ $order->user->name ?? 'User Terhapus' }}</p>
+                                <p class="font-bold text-gray-800 text-sm">{{ $order->user->name ?? 'User Terhapus' }}
+                                </p>
                                 <p class="text-xs text-gray-500 mt-1">{{ $order->created_at->format('d M Y, H:i') }}</p>
                             </td>
                             <td class="px-6 py-4">
                                 <p class="text-sm font-semibold text-gray-800">{{ $order->items->count() }} Item</p>
-                                <p class="text-sm font-black text-[#1c69d4] mt-1">Rp {{ number_format($order->grand_total, 0, ',', '.') }}</p>
+                                <p class="text-sm font-black text-[#1c69d4] mt-1">Rp
+                                    {{ number_format($order->grand_total, 0, ',', '.') }}</p>
                             </td>
                             <td class="px-6 py-4">
                                 @php
@@ -70,7 +74,8 @@
                                         'CANCELLED' => 'bg-rose-50 text-rose-600 border-rose-100',
                                     ];
                                 @endphp
-                                <span class="text-xs font-bold px-3 py-1 rounded-lg border {{ $statusColors[$order->order_status] ?? 'bg-gray-100 text-gray-600' }}">
+                                <span
+                                    class="text-xs font-bold px-3 py-1 rounded-lg border {{ $statusColors[$order->order_status] ?? 'bg-gray-100 text-gray-600' }}">
                                     {{ $order->order_status }}
                                 </span>
                             </td>
@@ -78,26 +83,57 @@
                                 <div class="flex items-center justify-center gap-2">
                                     {{-- Quick Actions for Order Progress --}}
                                     @if ($order->order_status === 'PENDING')
-                                        <button wire:click="updateOrderStatus({{ $order->id }}, 'PROCESSING')" wire:confirm="Proses pesanan ini?"
+                                        <button wire:click="updateOrderStatus({{ $order->id }}, 'PROCESSING')"
+                                            wire:confirm="Proses pesanan ini?"
                                             class="text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">
                                             Proses
                                         </button>
-                                        <button wire:click="updateOrderStatus({{ $order->id }}, 'CANCELLED')" wire:confirm="Batalkan pesanan ini?"
+                                        <button wire:click="updateOrderStatus({{ $order->id }}, 'CANCELLED')"
+                                            wire:confirm="Batalkan pesanan ini?"
                                             class="text-xs font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition">
                                             Batal
                                         </button>
                                     @elseif ($order->order_status === 'PROCESSING')
-                                        <button wire:click="updateOrderStatus({{ $order->id }}, 'SHIPPED')" wire:confirm="Tandai pesanan telah dikirim?"
+                                        <button wire:click="updateOrderStatus({{ $order->id }}, 'SHIPPED')"
+                                            wire:confirm="Tandai pesanan telah dikirim?"
                                             class="text-xs font-bold bg-purple-50 text-purple-600 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition">
                                             Kirim
                                         </button>
                                     @endif
 
+                                    {{-- ─── TOMBOL RE-SEND KHUSUS ADMIN ─── --}}
+                                    @if (Auth::user()->hasRole('admin'))
+                                        <button wire:click="resendEmail({{ $order->id }})"
+                                            class="p-1 text-blue-500 hover:bg-blue-50 rounded-lg transition"
+                                            title="Kirim Ulang Email (Admin)">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                        </button>
+
+                                        <button wire:click="resendWhatsApp({{ $order->id }})"
+                                            class="p-1 text-emerald-500 hover:bg-emerald-50 rounded-lg transition"
+                                            title="Kirim Ulang WA Qontak (Admin)">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                            </svg>
+                                        </button>
+                                    @endif
+
                                     {{-- Order Detail Button (Placeholder for Admin Order Detail mapping) --}}
-                                    <button class="p-1.5 text-gray-400 hover:text-[#1c69d4] hover:bg-blue-50 rounded-lg transition" title="Lihat Detail (Segera Hadir)">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    <button
+                                        class="p-1.5 text-gray-400 hover:text-[#1c69d4] hover:bg-blue-50 rounded-lg transition"
+                                        title="Lihat Detail (Segera Hadir)">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                            stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
                                     </button>
                                 </div>
@@ -118,7 +154,7 @@
                 </tbody>
             </table>
         </div>
-        
+
         @if ($orders->hasPages())
             <div class="px-6 py-4 border-t border-gray-100 bg-gray-50/50">
                 {{ $orders->links() }}
