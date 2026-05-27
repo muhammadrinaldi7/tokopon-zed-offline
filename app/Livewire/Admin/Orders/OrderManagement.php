@@ -26,6 +26,16 @@ class OrderManagement extends Component
         $this->resetPage();
     }
 
+    /**
+     * Helper terpusat untuk bikin PDF
+     */
+    private function generateReceiptPdf($order)
+    {
+        // Menggunakan kertas thermal POS 80mm
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.receipt', compact('order'))
+            ->setPaper([0, 0, 226, 600], 'portrait');
+    }
+
     // Ubah status pesanan
     public function updateOrderStatus(int $orderId, string $status): void
     {
@@ -45,10 +55,16 @@ class OrderManagement extends Component
             return;
         }
         // dd($order);
+
+        // Generate file PDF
+        $pdf = $this->generateReceiptPdf($order);
+        $pdfContent = $pdf->output();
+        $filename = 'Struk_' . $order->order_number . '.pdf';
+
         try {
             Mail::mailer('pos_sales')
                 ->to($order->user->email)
-                ->send(new SalesReceiptMail($order));
+                ->send(new SalesReceiptMail($order, $pdfContent, $filename));
 
 
             $this->dispatch('toast', title: 'Berhasil', message: "Re-send Email berhasil untuk #{$order->order_number}", type: 'success');
@@ -57,10 +73,17 @@ class OrderManagement extends Component
         }
     }
 
-    // Method Admin untuk kirim ulang WhatsApp Mekari Qontak
+    // Method Admin untuk kirim ulang WhatsApp Mekari Qontak + PDF Attachment
     public function resendWhatsApp(int $orderId): void
     {
+        // Ambil data order paling fresh beserta profile user-nya
         $order = Order::with(['user.profile'])->find($orderId);
+
+        if (!$order) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Data order tidak ditemukan.', type: 'error');
+            return;
+        }
+
         $phone = $order->user->profile->phone_number ?? null;
 
         if (!$phone) {
@@ -68,27 +91,43 @@ class OrderManagement extends Component
             return;
         }
 
+        // Standardisasi nomor HP (08xx -> 628xx)
         if (str_starts_with($phone, '0')) {
             $phone = '62' . substr($phone, 1);
+        }
+
+        // ─── 1. PROSES GENERATE PDF & SIMPAN KE STORAGE PUBLIK ────
+        try {
+            // Memanggil helper terpusat yang sudah kamu miliki
+            $pdf = $this->generateReceiptPdf($order);
+
+            $filename = 'Struk_' . $order->order_number . '.pdf';
+            $folderPath = 'receipts';
+            $path = $folderPath . '/' . $filename;
+
+            // Simpan ke disk public dengan visibilitas public
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf->output(), 'public');
+
+            // Generate URL Publik (Gunakan Ngrok/Expose saat testing lokal!)
+            $pdfPublicUrl = asset('storage/' . $path);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Qontak Resend PDF Storage Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses file PDF struk.', type: 'error');
+            return;
         }
 
         // 2. Tarik variabel dari env
         $fullUrl = env('QONTAK_API_URL');
         $method = 'POST';
 
-        // Ganti skema parse_url ala JavaScript Postman
         $parsedUrl = parse_url($fullUrl);
-
-        // $baseUrl akan berisi "https://api.mekari.com"
         $baseUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
-
-        // $endpoint otomatis akan mengambil path murni "/qontak/chat/v1/broadcasts/whatsapp/direct"
         $endpoint = $parsedUrl['path'];
 
         $clientId = env('QONTAK_CLIENT_ID');
         $clientSecret = env('QONTAK_CLIENT_SECRET');
 
-        // ─── 2. PROSES GENERATE HMAC SIGNATURE (TETAP AMAN & PRESISI) ────
+        // ─── 2. PROSES GENERATE HMAC SIGNATURE ────
         $dateString = gmdate('D, d M Y H:i:s') . ' GMT';
         $requestLine = "{$method} {$endpoint} HTTP/1.1";
 
@@ -100,7 +139,7 @@ class OrderManagement extends Component
         $hmacHeader = "hmac username=\"{$clientId}\", algorithm=\"hmac-sha256\", headers=\"date request-line\", signature=\"{$signature}\"";
         $idempotencyKey = (string) \Illuminate\Support\Str::uuid();
 
-        // ─── 3. STRUKTUR PAYLOAD BODY JSON (100% SAMA DENGAN POSTMAN) ────
+        // ─── 3. STRUKTUR PAYLOAD BODY JSON (DENGAN HEADER ATTACHMENT) ────
         $payload = [
             'to_name' => $order->user->name ?? 'Customer',
             'to_number' => $phone,
@@ -110,6 +149,20 @@ class OrderManagement extends Component
                 'code' => 'id'
             ],
             'parameters' => [
+                // Disuntikkan object header berkas PDF sesuai dokumentasi Postman
+                'header' => [
+                    'format' => 'DOCUMENT',
+                    'params' => [
+                        [
+                            'key' => 'url',
+                            'value' => $pdfPublicUrl
+                        ],
+                        [
+                            'key' => 'filename',
+                            'value' => $filename
+                        ]
+                    ]
+                ],
                 'body' => [
                     [
                         'key' => '1',
@@ -130,20 +183,28 @@ class OrderManagement extends Component
             ]
         ];
 
+        // ─── 4. EXECUTE API CALL ─────────────────────────────────────────
         try {
             $response = \Illuminate\Support\Facades\Http::withHeaders([
                 'Authorization'     => $hmacHeader,
                 'Date'              => $dateString,
                 'X-Idempotency-Key' => $idempotencyKey,
                 'Content-Type'      => 'application/json',
-            ])->post(env('QONTAK_API_URL'), $payload);
+                'Accept'            => 'application/json',
+            ])->post($fullUrl, $payload);
 
             if ($response->successful()) {
-                $this->dispatch('toast', title: 'Berhasil', message: "Re-send WA Sukses untuk #{$order->order_number}", type: 'success');
+                $this->dispatch('toast', title: 'Berhasil', message: "Re-send WA + PDF Sukses untuk #{$order->order_number}", type: 'success');
             } else {
+                \Illuminate\Support\Facades\Log::error('=== DEBUG MEKARI QONTAK RESEND ERROR ===');
+                \Illuminate\Support\Facades\Log::error('Status Code: ' . $response->status());
+                \Illuminate\Support\Facades\Log::error('Response Body: ' . $response->body());
+                \Illuminate\Support\Facades\Log::error('========================================');
+
                 $this->dispatch('toast', title: 'Gagal API', message: 'Mekari error code: ' . $response->status(), type: 'error');
             }
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Qontak Resend Crash: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
         }
     }
