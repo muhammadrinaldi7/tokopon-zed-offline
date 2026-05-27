@@ -90,6 +90,16 @@ class PointOfSale extends Component
         }
     }
 
+    /**
+     * Helper terpusat untuk bikin PDF
+     */
+    private function generateReceiptPdf($order)
+    {
+        // Menggunakan kertas thermal POS 80mm
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.receipt', compact('order'))
+            ->setPaper([0, 0, 226, 600], 'portrait');
+    }
+
     public function mount()
     {
         $this->payments = [
@@ -834,10 +844,15 @@ class PointOfSale extends Component
         }
 
         try {
+            // Generate file PDF
+            $pdf = $this->generateReceiptPdf($order);
+            $pdfContent = $pdf->output();
+            $filename = 'Struk_' . $order->order_number . '.pdf';
+
             // Mengirim email menggunakan Mailable yang sudah dibuat
             Mail::mailer('pos_sales')
                 ->to($email)
-                ->send(new SalesReceiptMail($order));
+                ->send(new SalesReceiptMail($order, $pdfContent, $filename));
 
             // 1. Update ke database menggunakan instance fresh
             $order->update(['is_email_sent' => true]);
@@ -852,7 +867,7 @@ class PointOfSale extends Component
         }
     }
 
-    // ─── Kirim Struk via WA (Qontak) ─────────────────────────
+    // ─── Kirim Struk via WA + Simpan di Storage (Qontak) ─────────────────────────
     public function sendReceiptToQontak()
     {
         // 1. Validasi Awal data order
@@ -880,23 +895,41 @@ class PointOfSale extends Component
             $phone = '62' . substr($phone, 1);
         }
 
-        // 2. Tarik variabel dari env
+        // 2. Tarik variabel dari env untuk Qontak
         $fullUrl = env('QONTAK_API_URL');
         $method = 'POST';
 
-        // Ganti skema parse_url ala JavaScript Postman
         $parsedUrl = parse_url($fullUrl);
-
-        // $baseUrl akan berisi "https://api.mekari.com"
         $baseUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
-
-        // $endpoint otomatis akan mengambil path murni "/qontak/chat/v1/broadcasts/whatsapp/direct"
         $endpoint = $parsedUrl['path'];
 
         $clientId = env('QONTAK_CLIENT_ID');
         $clientSecret = env('QONTAK_CLIENT_SECRET');
 
-        // ─── 2. PROSES GENERATE HMAC SIGNATURE (TETAP AMAN & PRESISI) ────
+        // ─── 3. PROSES GENERATE PDF & SIMPAN KE STORAGE PUBLIK ────
+        try {
+            // Panggil helper terpusat untuk generate instance PDF
+            $pdf = $this->generateReceiptPdf($order);
+
+            // Buat nama file unik berdasarkan nomor invoice
+            $filename = 'Struk_' . $order->order_number . '.pdf';
+
+            // Tentukan path folder di dalam storage/app/public/
+            $folderPath = 'receipts';
+            $path = $folderPath . '/' . $filename;
+
+            // Simpan output binary PDF ke disk 'public'
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf->output());
+
+            // Ambil URL Publik asset (Menggunakan konfigurasi APP_URL di .env)
+            $pdfPublicUrl = asset('storage/' . $path);
+        } catch (\Exception $e) {
+            Log::error('Qontak PDF Storage Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal menyimpan file PDF struk ke server.', type: 'error');
+            return;
+        }
+
+        // ─── 4. PROSES GENERATE HMAC SIGNATURE ────
         $dateString = gmdate('D, d M Y H:i:s') . ' GMT';
         $requestLine = "{$method} {$endpoint} HTTP/1.1";
 
@@ -908,7 +941,7 @@ class PointOfSale extends Component
         $hmacHeader = "hmac username=\"{$clientId}\", algorithm=\"hmac-sha256\", headers=\"date request-line\", signature=\"{$signature}\"";
         $idempotencyKey = (string) \Illuminate\Support\Str::uuid();
 
-        // ─── 3. STRUKTUR PAYLOAD BODY JSON (100% SAMA DENGAN POSTMAN) ────
+        // ─── 5. STRUKTUR PAYLOAD BODY JSON (DENGAN HEADER ATTACHMENT) ────
         $payload = [
             'to_name' => $order->user->name ?? 'Customer',
             'to_number' => $phone,
@@ -918,6 +951,20 @@ class PointOfSale extends Component
                 'code' => 'id'
             ],
             'parameters' => [
+                // Disuntikkan object header khusus DOCUMENT/PDF sesuai Postman kamu
+                'header' => [
+                    'format' => 'DOCUMENT',
+                    'params' => [
+                        [
+                            'key' => 'url',
+                            'value' => $pdfPublicUrl
+                        ],
+                        [
+                            'key' => 'filename',
+                            'value' => $filename
+                        ]
+                    ]
+                ],
                 'body' => [
                     [
                         'key' => '1',
@@ -938,7 +985,7 @@ class PointOfSale extends Component
             ]
         ];
 
-        // ─── 4. EXECUTE API CALL KE FULL URL ─────────────────────────────
+        // ─── 6. EXECUTE API CALL KE QONTAK VIA HTTP CLIENT ────────────────
         try {
             $response = Http::withHeaders([
                 'Authorization'     => $hmacHeader,
@@ -949,19 +996,19 @@ class PointOfSale extends Component
             ])->post($fullUrl, $payload);
 
             if ($response->successful()) {
-                // Update ke database menggunakan instance fresh
+                // Update status di database menggunakan instance fresh
                 $order->update(['is_wa_sent' => true]);
 
                 // REFRESH STATE LIVEWIRE UTAMA
                 $this->completedOrder->refresh();
 
-                $this->dispatch('toast', title: 'Berhasil', message: 'Struk WA berhasil dikirim via Mekari Qontak!', type: 'success');
+                $this->dispatch('toast', title: 'Berhasil', message: 'Struk WA dengan PDF berhasil dikirim!', type: 'success');
             } else {
-                Log::error('=== DEBUG MEKARI QONTAK ===');
+                Log::error('=== DEBUG MEKARI QONTAK ERROR ===');
                 Log::error('Status Code: ' . $response->status());
                 Log::error('Response Body: ' . $response->body());
-                Log::error('Parsed Endpoint for HMAC: ' . $endpoint);
-                Log::error('===========================');
+                Log::error('Generated URL PDF: ' . $pdfPublicUrl);
+                Log::error('=================================');
 
                 $this->dispatch('toast', title: 'Gagal API', message: 'Mekari: Code ' . $response->status(), type: 'error');
             }
