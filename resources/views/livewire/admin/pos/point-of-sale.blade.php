@@ -848,11 +848,11 @@
                     <div class="flex justify-between">
                         <span>Subtotal</span><span>{{ number_format($completedOrder->total_amount, 0, ',', '.') }}</span>
                     </div>
-                    @if ($completedOrder->discount_amount > 0)
+                    {{-- @if ($completedOrder->discount_amount > 0)
                         <div class="flex justify-between text-rose-600">
                             <span>Diskon</span><span>-{{ number_format($completedOrder->discount_amount, 0, ',', '.') }}</span>
                         </div>
-                    @endif
+                    @endif --}}
                     <div class="border-t border-dashed border-gray-300 my-1"></div>
                     <div class="flex justify-between font-bold text-sm"><span>TOTAL</span><span>Rp
                             {{ number_format($completedOrder->grand_total, 0, ',', '.') }}</span></div>

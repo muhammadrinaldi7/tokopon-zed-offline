@@ -676,7 +676,7 @@ class PointOfSale extends Component
                             'quantity' => $item['qty'],
                             'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
                             'detailSerialNumber' => $detailSN,
-                            'salesmanListNumber' => $detailSalesman,
+                            'salesmanListNumber' => $detailSalesman
                         ];
                     }
 
