@@ -49,6 +49,7 @@ class PointOfSale extends Component
     // ─── Payment ───────────────────────────────────────────────
     public $payments = [];
     public $discount_amount = 0;
+    public $selectedPromos = []; // Menyimpan ID promo yang dipilih
     public $notes = '';
 
     // ─── Modals ────────────────────────────────────────────────
@@ -132,9 +133,14 @@ class PointOfSale extends Component
         $this->syncSinglePaymentAmount();
     }
 
+    public function updatedSelectedPromos()
+    {
+        $this->syncSinglePaymentAmount();
+    }
+
     public function addPaymentRow()
     {
-        $remaining = max(0, ($this->subtotal - $this->discount_amount) - $this->paymentsTotalBase);
+        $remaining = max(0, ($this->subtotal - $this->totalDiscount) - $this->paymentsTotalBase);
         $this->payments[] = [
             'payment_method_id' => '',
             'payment_method_rate_id' => '',
@@ -159,14 +165,14 @@ class PointOfSale extends Component
                 $totalOther += (int)$p['amount'];
             }
         }
-        $target = max(0, $this->subtotal - $this->discount_amount);
+        $target = max(0, $this->subtotal - $this->totalDiscount);
         $this->payments[$index]['amount'] = max(0, $target - $totalOther);
     }
 
     public function syncSinglePaymentAmount()
     {
         if (count($this->payments) === 1) {
-            $this->payments[0]['amount'] = max(0, $this->subtotal - $this->discount_amount);
+            $this->payments[0]['amount'] = max(0, $this->subtotal - $this->totalDiscount);
         }
     }
 
@@ -190,6 +196,49 @@ class PointOfSale extends Component
     public function paymentsTotalBase()
     {
         return collect($this->payments)->sum(fn($p) => (float)($p['amount'] ?? 0));
+    }
+
+    #[Computed]
+    public function totalPromoDiscount()
+    {
+        if (empty($this->selectedPromos)) return 0;
+        
+        $promos = \App\Models\Promo::whereIn('id', $this->selectedPromos)->get();
+        $total = 0;
+        $subtotal = $this->subtotal; // Subtotal belanja sebelum diskon
+
+        foreach ($promos as $promo) {
+            if ($promo->discount_type === 'fixed') {
+                $total += $promo->discount_value;
+            } else {
+                // Percentage
+                $calc = $subtotal * ($promo->discount_value / 100);
+                if ($promo->max_discount) {
+                    $calc = min($calc, $promo->max_discount);
+                }
+                $total += $calc;
+            }
+        }
+        return $total;
+    }
+
+    #[Computed]
+    public function totalDiscount()
+    {
+        return (int)$this->discount_amount + $this->totalPromoDiscount;
+    }
+
+    #[Computed]
+    public function activePromos()
+    {
+        return \App\Models\Promo::where('is_active', true)
+            ->where(function($q) {
+                $q->whereNull('start_date')->orWhere('start_date', '<=', now());
+            })
+            ->where(function($q) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+            })
+            ->get();
     }
 
     #[Computed]
@@ -584,9 +633,12 @@ class PointOfSale extends Component
             );
 
             $subtotal = $this->subtotal();
-            $discountAmount = (int) $this->discount_amount;
+            $manualDiscountAmount = (int) $this->discount_amount;
+            $promoDiscountAmount = $this->totalPromoDiscount;
+            $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
+            
             $mdrAmt = $this->mdrAmount;
-            $grandTotal = max(0, $subtotal - $discountAmount);
+            $grandTotal = max(0, $subtotal - $totalDiscountAmount);
 
             // Create Order
             $order = Order::create([
@@ -594,8 +646,8 @@ class PointOfSale extends Component
                 'order_number' => $orderNumber,
                 'total_amount' => $subtotal,
                 'shipping_cost' => 0,
-                'discount_amount' => $discountAmount,
-                'mdr_percentage' => ($subtotal - $discountAmount) > 0 ? round(($mdrAmt / ($subtotal - $discountAmount)) * 100, 2) : 0,
+                'discount_amount' => $totalDiscountAmount, // Total semua diskon
+                'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
                 'mdr_amount' => $mdrAmt,
                 'grand_total' => $grandTotal,
                 'order_status' => 'COMPLETED',
@@ -607,6 +659,22 @@ class PointOfSale extends Component
                 'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
                 'notes' => $this->notes,
             ]);
+
+            // Save promos to pivot table
+            if (!empty($this->selectedPromos)) {
+                $promos = \App\Models\Promo::whereIn('id', $this->selectedPromos)->get();
+                foreach ($promos as $promo) {
+                    $applied = 0;
+                    if ($promo->discount_type === 'fixed') {
+                        $applied = $promo->discount_value;
+                    } else {
+                        $calc = $subtotal * ($promo->discount_value / 100);
+                        if ($promo->max_discount) $calc = min($calc, $promo->max_discount);
+                        $applied = $calc;
+                    }
+                    $order->promos()->attach($promo->id, ['discount_applied' => $applied]);
+                }
+            }
 
             // Create Order Items + reduce stock
             foreach ($this->cart as $item) {
@@ -678,7 +746,6 @@ class PointOfSale extends Component
                         $detailSalesman = [];
                         foreach ($this->selectedSales as $sales) {
                             if (!empty($sales['employee_no'])) {
-                                // Langsung push nilai string-nya ke dalam array
                                 $detailSalesman[] = (string) $sales['employee_no'];
                             }
                         }
@@ -687,14 +754,13 @@ class PointOfSale extends Component
                             'itemNo' => $item['sku'] ?: 'ITEM-UNKNOWN',
                             'warehouseName' => $warehouseName,
                             'unitPrice' => $item['price'],
-                            'itemCashDiscount' => $discountAmount,
+                            'itemCashDiscount' => $manualDiscountAmount, // Hanya diskon manual yang memotong invoice
                             'quantity' => $item['qty'],
                             'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
                             'detailSerialNumber' => $detailSN,
                             'salesmanListNumber' => $detailSalesman
                         ];
                     }
-
 
                     $siData = [
                         'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
@@ -714,40 +780,60 @@ class PointOfSale extends Component
                 // Sales Receipts (jika belum ada dan ada invoice)
                 if (!$order->accurate_receipt_no && $order->accurate_invoice_no) {
                     $srNumbers = [];
-                    foreach ($this->payments as $payment) {
+                    $promosAppliedToSR = false; // Flag agar promo hanya diaplikasikan 1x di SR pertama
+
+                    foreach ($this->payments as $index => $payment) {
                         $pm = \App\Models\PaymentMethod::findOrFail($payment['payment_method_id']);
                         $rate = $payment['payment_method_rate_id'] ? \App\Models\PaymentMethodRate::find($payment['payment_method_rate_id']) : null;
 
                         $pct = $this->getMdrPercentage($payment);
                         $rowMdr = $pct > 0 ? round((float)$payment['amount'] * $pct / 100, 0) : 0;
                         $rowBaseAmount = (float)$payment['amount'];
-
                         $netReceiptAmount = $rowBaseAmount - $rowMdr;
-                        $mdrAccountNo = $rate ? $rate->accurate_account_no : null;
+
+                        $detailDiscounts = [];
+
+                        // 1. Masukkan MDR sebagai potongan SR
+                        if ($rowMdr > 0 && $rate && $rate->accurate_account_no) {
+                            $detailDiscounts[] = [
+                                'accountNo' => $rate->accurate_account_no,
+                                'amount' => (float) $rowMdr,
+                                'departmentName' => $branchName,
+                                'discountNotes' => 'MDR'
+                            ];
+                        }
+
+                        // 2. Masukkan Semua Promo sebagai potongan SR (hanya di pembayaran pertama)
+                        $promoDiscountsTotal = 0;
+                        if (!$promosAppliedToSR) {
+                            foreach ($order->promos as $promo) {
+                                if ($promo->accurate_account_no && $promo->pivot->discount_applied > 0) {
+                                    $detailDiscounts[] = [
+                                        'accountNo' => $promo->accurate_account_no,
+                                        'amount' => (float) $promo->pivot->discount_applied,
+                                        'departmentName' => $branchName,
+                                        'discountNotes' => 'Promo: ' . $promo->name
+                                    ];
+                                    $promoDiscountsTotal += (float) $promo->pivot->discount_applied;
+                                }
+                            }
+                            $promosAppliedToSR = true;
+                        }
 
                         $detailInvoiceItem = [
                             'invoiceNo' => $order->accurate_invoice_no,
-                            'paymentAmount' => $rowBaseAmount,
+                            'paymentAmount' => $rowBaseAmount + $promoDiscountsTotal, // Bayar sisa tagihan invoice = Cash + Promo
                         ];
 
-                        if ($rowMdr > 0 && $mdrAccountNo) {
-                            $detailInvoiceItem['detailDiscount'] = [
-                                [
-                                    'accountNo' => $mdrAccountNo,
-                                    'amount' => (float) $rowMdr,
-                                    'departmentName' => $branchName,
-                                    'discountNotes' => 'MDR'
-                                ]
-                            ];
-                        } else {
-                            $netReceiptAmount = $rowBaseAmount;
+                        if (!empty($detailDiscounts)) {
+                            $detailInvoiceItem['detailDiscount'] = $detailDiscounts;
                         }
 
                         $srData = [
                             'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
                             'branchName' => $branchName,
                             'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
-                            'receiptAmount' => (float) $netReceiptAmount,
+                            'receiptAmount' => (float) $netReceiptAmount, // Net cash ke bank
                             'chequeAmount' => (float) $netReceiptAmount,
                             'detailInvoice' => [
                                 $detailInvoiceItem

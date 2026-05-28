@@ -70,14 +70,14 @@
             <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Status Servis</span>
         </a>
 
-        <a href="#"
-            class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->is('admin/promos') ? $activeClass : $inactiveClass }}">
-            <svg class="w-5 h-5 {{ request()->is('admin/promos') ? $activeIconClass : $inactiveIconClass }}"
+        <a href="{{ route('admin.promos.index') }}" wire:navigate
+            class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.promos.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 {{ request()->routeIs('admin.promos.*') ? $activeIconClass : $inactiveIconClass }}"
                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round"
                     d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
             </svg>
-            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Promo & Voucher</span>
+            Promo & Voucher
         </a>
 
         {{-- <a href="#"
@@ -237,13 +237,9 @@
                             Template QC
                         </a>
                         <a href="{{ route('admin.qc.device-search') }}" wire:navigate
-                            class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device*') ? $activeClass : $inactiveClass }}">
-                            <svg class="w-5 h-5 {{ request()->routeIs('admin.qc.device*') ? $activeIconClass : $inactiveIconClass }}"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                            Cari Device (IMEI)
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device-search') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+
+                            Cek Devices
                         </a>
                     </div>
                 </div>

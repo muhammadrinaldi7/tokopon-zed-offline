@@ -475,11 +475,37 @@
 
                 {{-- Discount --}}
                 <div class="px-4 py-3">
-                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Diskon (Rp)</p>
+                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Diskon Manual (Rp)</p>
                     <input type="number" wire:model.live.debounce.300ms="discount_amount"
                         class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:border-[#1c69d4] focus:ring-0"
                         placeholder="0" min="0">
                 </div>
+
+                {{-- Promos --}}
+                @if(count($this->activePromos) > 0)
+                <div class="px-4 pb-3">
+                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Gunakan Promo/Voucher</p>
+                    <div class="space-y-2 bg-gray-50 border border-gray-100 p-2.5 rounded-lg max-h-32 overflow-y-auto">
+                        @foreach($this->activePromos as $promo)
+                            <label class="flex items-start gap-2 cursor-pointer group">
+                                <input type="checkbox" wire:model.live="selectedPromos" value="{{ $promo->id }}" 
+                                    class="mt-0.5 rounded text-[#1c69d4] focus:ring-[#1c69d4] border-gray-300">
+                                <div class="text-xs">
+                                    <div class="font-bold text-gray-700 group-hover:text-[#1c69d4] transition-colors">{{ $promo->name }}</div>
+                                    <div class="text-[10px] text-gray-500 font-mono">
+                                        @if($promo->code) {{ $promo->code }} &bull; @endif
+                                        @if($promo->discount_type === 'fixed')
+                                            Potongan Rp {{ number_format($promo->discount_value, 0, ',', '.') }}
+                                        @else
+                                            Potongan {{ number_format($promo->discount_value, 0) }}%
+                                        @endif
+                                    </div>
+                                </div>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
 
                 {{-- Catatan --}}
                 <div class="px-4 pb-4">
@@ -498,9 +524,17 @@
                         <span class="font-bold text-gray-800">Rp
                             {{ number_format($this->subtotal, 0, ',', '.') }}</span>
                     </div>
+                    
+                    @if ($this->totalPromoDiscount > 0)
+                        <div class="flex justify-between text-xs font-medium text-emerald-600">
+                            <span>Diskon Promo</span>
+                            <span class="font-bold">-Rp {{ number_format($this->totalPromoDiscount, 0, ',', '.') }}</span>
+                        </div>
+                    @endif
+
                     @if ($this->discount_amount > 0)
                         <div class="flex justify-between text-xs font-medium text-rose-500">
-                            <span>Diskon</span>
+                            <span>Diskon Manual</span>
                             <span class="font-bold">- Rp
                                 {{ number_format($this->discount_amount, 0, ',', '.') }}</span>
                         </div>
