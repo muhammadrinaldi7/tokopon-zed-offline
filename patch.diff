@@ -1,0 +1,545 @@
+diff --git a/app/Livewire/Admin/Pos/PointOfSale.php b/app/Livewire/Admin/Pos/PointOfSale.php
+index 8833268..8e91523 100644
+--- a/app/Livewire/Admin/Pos/PointOfSale.php
++++ b/app/Livewire/Admin/Pos/PointOfSale.php
+@@ -25,43 +25,13 @@
+ use Livewire\Attributes\Layout;
+ use Livewire\Component;
+ 
++use App\Livewire\Admin\Pos\Traits\WithCart;
++use App\Livewire\Admin\Pos\Traits\WithCustomer;
++use App\Livewire\Admin\Pos\Traits\WithPayment;
++
+ class PointOfSale extends Component
+ {
+-    // ─── Search & Filter ───────────────────────────────────────
+-    public $search = '';
+-    public $productType = 'new'; // all, new, second
+-
+-    // ─── Cart (in-memory) ──────────────────────────────────────
+-    public $cart = []; // [{variant_id, variant_type, name, storage, color, price, qty, serial_number, sku}]
+-
+-    // ─── Customer ──────────────────────────────────────────────
+-    public $isNewCustomer = false;
+-    public $searchCustomer = '';
+-    public $selectedCustomerId = null;
+-    public $customerName = '';
+-    public $customerPhone = '';
+-    public $customerEmail = '';
+-
+-    // SALES
+-    public $selectedSales = []; // Array untuk menampung lebih dari 1 sales
+-    public $searchSales = '';
+-
+-    // ─── Payment ───────────────────────────────────────────────
+-    public $payments = [];
+-    public $discount_amount = 0;
+-    public $selectedPromos = []; // Menyimpan ID promo yang dipilih
+-    public $notes = '';
+-
+-    // ─── Modals ────────────────────────────────────────────────
+-    public $showCheckoutModal = false;
+-    public $showReceiptModal = false;
+-    public $completedOrder = null;
+-
+-    // ─── Variant Selection ─────────────────────────────────────
+-    public $showVariantModal = false;
+-    public $variantModalProduct = null;
+-    public $variantModalVariants = [];
+-    public $variantModalIsSecond = false;
++    use WithCart, WithCustomer, WithPayment;
+ 
+     // ─── History Sales Properties ──────────────────────────────
+     public $showHistoryModal = false;
+@@ -112,292 +82,6 @@ public function mount()
+         ];
+     }
+ 
+-    public function updatedPayments($value, $key)
+-    {
+-        // Reset rate when method changes
+-        if (str_contains($key, '.payment_method_id')) {
+-            $parts = explode('.', $key);
+-            $index = $parts[0];
+-            $this->payments[$index]['payment_method_rate_id'] = '';
+-        }
+-        $this->syncSinglePaymentAmount();
+-    }
+-
+-    public function updatedDiscountAmount($value)
+-    {
+-        if ($value === '' || $value === null) {
+-            $this->discount_amount = 0;
+-        } else {
+-            $this->discount_amount = (int) $value;
+-        }
+-        $this->syncSinglePaymentAmount();
+-    }
+-
+-    public function updatedSelectedPromos()
+-    {
+-        $this->syncSinglePaymentAmount();
+-    }
+-
+-    public function addPaymentRow()
+-    {
+-        $remaining = max(0, ($this->subtotal - $this->totalDiscount) - $this->paymentsTotalBase);
+-        $this->payments[] = [
+-            'payment_method_id' => '',
+-            'payment_method_rate_id' => '',
+-            'amount' => $remaining,
+-        ];
+-    }
+-
+-    public function removePaymentRow($index)
+-    {
+-        if (count($this->payments) > 1) {
+-            unset($this->payments[$index]);
+-            $this->payments = array_values($this->payments);
+-            $this->syncSinglePaymentAmount();
+-        }
+-    }
+-
+-    public function autofillRemaining($index)
+-    {
+-        $totalOther = 0;
+-        foreach ($this->payments as $i => $p) {
+-            if ($i !== $index) {
+-                $totalOther += (int)$p['amount'];
+-            }
+-        }
+-        $target = max(0, $this->subtotal - $this->totalDiscount);
+-        $this->payments[$index]['amount'] = max(0, $target - $totalOther);
+-    }
+-
+-    public function syncSinglePaymentAmount()
+-    {
+-        if (count($this->payments) === 1) {
+-            $this->payments[0]['amount'] = max(0, $this->subtotal - $this->totalDiscount);
+-        }
+-    }
+-
+-    public function getMdrPercentage($payment)
+-    {
+-        $pmId = $payment['payment_method_id'] ?? null;
+-        $rateId = $payment['payment_method_rate_id'] ?? null;
+-
+-        if (!$pmId) return 0;
+-
+-        if ($rateId) {
+-            $rate = \App\Models\PaymentMethodRate::find($rateId);
+-            return $rate ? (float) $rate->mdr_percentage : 0;
+-        }
+-
+-        $pm = \App\Models\PaymentMethod::find($pmId);
+-        return $pm ? (float) $pm->mdr_percentage : 0;
+-    }
+-
+-    #[Computed]
+-    public function paymentsTotalBase()
+-    {
+-        return collect($this->payments)->sum(fn($p) => (float)($p['amount'] ?? 0));
+-    }
+-
+-    public function calculateEligibleCart($promo)
+-    {
+-        $eligibleQty = 0;
+-        $eligibleAmount = 0;
+-
+-        if ($promo->apply_to_all_items) {
+-            $eligibleAmount = $this->subtotal;
+-            $eligibleQty = array_sum(array_column($this->cart, 'qty'));
+-        } else {
+-            $promoSkus = $promo->skus->pluck('sku')->toArray();
+-            foreach ($this->cart as $item) {
+-                if (in_array($item['sku'], $promoSkus)) {
+-                    $eligibleQty += (int)$item['qty'];
+-                    $eligibleAmount += ((int)$item['qty'] * (float)$item['price']);
+-                }
+-            }
+-        }
+-        return ['qty' => $eligibleQty, 'amount' => $eligibleAmount];
+-    }
+-
+-    public function isPromoEligible($promo)
+-    {
+-        $eligible = $this->calculateEligibleCart($promo);
+-        if ($promo->min_qty && $eligible['qty'] < $promo->min_qty) return false;
+-        if ($promo->min_transaction_amount && $eligible['amount'] < $promo->min_transaction_amount) return false;
+-        
+-        // If not apply to all items and eligible qty is 0, it's not eligible
+-        if (!$promo->apply_to_all_items && $eligible['qty'] == 0) return false;
+-
+-        return true;
+-    }
+-
+-    #[Computed]
+-    public function totalPromoDiscount()
+-    {
+-        if (empty($this->selectedPromos)) return 0;
+-        
+-        $promos = \App\Models\Promo::with('skus')->whereIn('id', $this->selectedPromos)->get();
+-        $total = 0;
+-
+-        foreach ($promos as $promo) {
+-            $eligible = $this->calculateEligibleCart($promo);
+-            
+-            if ($promo->discount_type === 'fixed') {
+-                $total += $promo->discount_value;
+-            } else {
+-                // Percentage only from eligible amount!
+-                $calc = $eligible['amount'] * ($promo->discount_value / 100);
+-                if ($promo->max_discount) {
+-                    $calc = min($calc, $promo->max_discount);
+-                }
+-                $total += $calc;
+-            }
+-        }
+-        return $total;
+-    }
+-
+-    #[Computed]
+-    public function totalDiscount()
+-    {
+-        return (int)$this->discount_amount + $this->totalPromoDiscount;
+-    }
+-
+-    #[Computed]
+-    public function activePromos()
+-    {
+-        $promos = \App\Models\Promo::with('skus')
+-            ->where('is_active', true)
+-            ->where(function($q) {
+-                $q->whereNull('start_date')->orWhere('start_date', '<=', now());
+-            })
+-            ->where(function($q) {
+-                $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+-            })
+-            ->get();
+-            
+-        $eligiblePromos = [];
+-        foreach($promos as $promo) {
+-            if ($this->isPromoEligible($promo)) {
+-                $eligiblePromos[] = $promo;
+-            } else {
+-                if (in_array($promo->id, $this->selectedPromos)) {
+-                    $this->selectedPromos = array_diff($this->selectedPromos, [$promo->id]);
+-                }
+-            }
+-        }
+-        return collect($eligiblePromos);
+-    }
+-
+-    #[Computed]
+-    public function isPaymentsValid()
+-    {
+-        foreach ($this->payments as $p) {
+-            if (empty($p['payment_method_id'])) return false;
+-
+-            $pm = \App\Models\PaymentMethod::find($p['payment_method_id']);
+-            if ($pm && $pm->rates()->where('is_active', true)->count() > 0 && empty($p['payment_method_rate_id'])) {
+-                return false;
+-            }
+-        }
+-
+-        $target = max(0, $this->subtotal - $this->discount_amount);
+-        return (int) $this->paymentsTotalBase === (int) $target;
+-    }
+-
+-    #[Computed]
+-    public function paymentMethods()
+-    {
+-        return PaymentMethod::where('is_active', true)->get();
+-    }
+-
+-    #[Computed]
+-    public function customerResults()
+-    {
+-        if (strlen($this->searchCustomer) < 2) return [];
+-
+-        return User::whereHas('roles', function ($q) {
+-            $q->where('name', 'user');
+-        })->where(function ($q) {
+-            $q->where('name', 'like', '%' . $this->searchCustomer . '%')
+-                ->orWhere('email', 'like', '%' . $this->searchCustomer . '%')
+-                ->orWhereHas('profile', function ($q2) {
+-                    $q2->where('phone_number', 'like', '%' . $this->searchCustomer . '%');
+-                });
+-        })->with('profile')->take(5)->get();
+-    }
+-    #[Computed]
+-    public function salesResults()
+-    {
+-        if (strlen($this->searchSales) < 2) return [];
+-
+-        return Employe::where(function ($q) {
+-            $q->where('name', 'like', '%' . $this->searchSales . '%');
+-        })->take(5)->get();
+-    }
+-
+-    #[Computed]
+-    public function searchResults()
+-    {
+-        if (strlen($this->search) < 2) return collect();
+-
+-        $newProducts = collect();
+-        $secondProducts = collect();
+-
+-        if ($this->productType !== 'second') {
+-            $newProducts = Product::with(['variants', 'brand', 'media'])
+-                ->where('is_active', true)
+-                ->where(function ($q) {
+-                    $q->where('name', 'like', '%' . $this->search . '%')
+-                        ->orWhereHas('variants', function ($q2) {
+-                            $q2->where('sku', 'like', '%' . $this->search . '%');
+-                        });
+-                })
+-                ->take(10)->get()
+-                ->map(function ($p) {
+-                    $p->is_second_catalog = false;
+-                    return $p;
+-                });
+-        }
+-
+-        if ($this->productType !== 'new') {
+-            $secondProducts = SecondProduct::with(['variants', 'brand', 'media'])
+-                ->where('is_active', true)
+-                ->where(function ($q) {
+-                    $q->where('name', 'like', '%' . $this->search . '%')
+-                        ->orWhereHas('variants', function ($q2) {
+-                            $q2->where('sku', 'like', '%' . $this->search . '%');
+-                        });
+-                })
+-                ->take(10)->get()
+-                ->map(function ($p) {
+-                    $p->is_second_catalog = true;
+-                    return $p;
+-                });
+-        }
+-
+-        return $newProducts->concat($secondProducts);
+-    }
+-
+-    // ─── Cart Subtotals ────────────────────────────────────────
+-
+-    #[Computed]
+-    public function subtotal()
+-    {
+-        return collect($this->cart)->sum(fn($item) => $item['price'] * $item['qty']);
+-    }
+-
+-    #[Computed]
+-    public function mdrAmount()
+-    {
+-        $totalMdr = 0;
+-        foreach ($this->payments as $payment) {
+-            $pct = $this->getMdrPercentage($payment);
+-            if ($pct > 0) {
+-                $totalMdr += round((float)$payment['amount'] * $pct / 100, 0);
+-            }
+-        }
+-        return $totalMdr;
+-    }
+-
+     #[Computed]
+     public function grandTotal()
+     {
+@@ -406,198 +90,6 @@ public function grandTotal()
+ 
+     // ─── Cart Actions ──────────────────────────────────────────
+ 
+-    public function openVariantPicker($productId, $isSecond = false)
+-    {
+-        $warehouseId = Auth::user()->warehouse_id;
+-
+-        if ($isSecond) {
+-            $product = SecondProduct::with([
+-                'variants' => function ($q) use ($warehouseId) {
+-                    $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
+-                        $q2->where('warehouse_id', $warehouseId);
+-                    }]);
+-                },
+-                'brand'
+-            ])->find($productId);
+-
+-            $this->variantModalVariants = $product->variants->map(fn($v) => [
+-                'id' => $v->id,
+-                'label' => $v->color . ' - ' . $v->storage,
+-                'condition' => $v->condition ?? '',
+-                'price' => $v->price,
+-                'stock' => $v->warehouseStocks->first()?->stock ?? 0,
+-                'sku' => $v->sku ?? '',
+-            ])->toArray();
+-        } else {
+-            $product = Product::with([
+-                'variants' => function ($q) use ($warehouseId) {
+-                    $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
+-                        $q2->where('warehouse_id', $warehouseId);
+-                    }]);
+-                },
+-                'brand'
+-            ])->find($productId);
+-
+-            $this->variantModalVariants = $product->variants->map(fn($v) => [
+-                'id' => $v->id,
+-                'label' => $v->color . ' - ' . $v->storage,
+-                'condition' => '',
+-                'price' => $v->price,
+-                'stock' => $v->warehouseStocks->first()?->stock ?? 0,
+-                'sku' => $v->sku ?? '',
+-            ])->toArray();
+-        }
+-        $this->variantModalProduct = $product;
+-        $this->variantModalIsSecond = $isSecond;
+-        $this->showVariantModal = true;
+-    }
+-
+-    public function addVariantToCart($variantId)
+-    {
+-        $isSecond = $this->variantModalIsSecond;
+-        $product = $this->variantModalProduct;
+-        $warehouseId = Auth::user()->warehouse_id;
+-
+-        if ($isSecond) {
+-            $variant = SecondProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
+-                $q->where('warehouse_id', $warehouseId);
+-            }])->find($variantId);
+-            $variantType = SecondProductVariant::class;
+-        } else {
+-            $variant = ProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
+-                $q->where('warehouse_id', $warehouseId);
+-            }])->find($variantId);
+-            $variantType = ProductVariant::class;
+-        }
+-
+-        $stock = $variant ? ($variant->warehouseStocks->first()?->stock ?? 0) : 0;
+-
+-        if (!$variant || $stock <= 0) {
+-            $this->dispatch('toast', title: 'Stok Habis', message: 'Varian ini tidak tersedia.', type: 'warning');
+-            return;
+-        }
+-
+-        // Check if already in cart
+-        $existingIndex = collect($this->cart)->search(
+-            fn($item) =>
+-            $item['variant_id'] == $variantId && $item['variant_type'] == $variantType
+-        );
+-
+-        if ($existingIndex !== false) {
+-            $currentQty = $this->cart[$existingIndex]['qty'];
+-            if ($currentQty < $stock) {
+-                $this->cart[$existingIndex]['qty']++;
+-                if (!isset($this->cart[$existingIndex]['serial_numbers'])) {
+-                    $this->cart[$existingIndex]['serial_numbers'] = [$this->cart[$existingIndex]['serial_number'] ?? ''];
+-                }
+-                $this->cart[$existingIndex]['serial_numbers'][] = '';
+-            } else {
+-                $this->dispatch('toast', title: 'Stok Tidak Cukup', message: 'Sudah mencapai batas stok.', type: 'warning');
+-            }
+-        } else {
+-            $this->cart[] = [
+-                'variant_id' => $variant->id,
+-                'variant_type' => $variantType,
+-                'name' => $product->name,
+-                'storage' => $variant->storage ?? '-',
+-                'color' => $variant->color ?? '-',
+-                'price' => (int) $variant->price,
+-                'qty' => 1,
+-                'serial_number' => '', // legacy
+-                'serial_numbers' => [''], // array of SNs based on qty
+-                'sku' => $variant->sku ?? '',
+-                'is_second' => $isSecond,
+-            ];
+-        }
+-
+-        $this->showVariantModal = false;
+-        $this->variantModalProduct = null;
+-        $this->variantModalVariants = [];
+-        $this->syncSinglePaymentAmount();
+-    }
+-
+-    public function removeFromCart($index)
+-    {
+-        unset($this->cart[$index]);
+-        $this->cart = array_values($this->cart); // re-index
+-        $this->syncSinglePaymentAmount();
+-    }
+-
+-    public function incrementCartItem($index)
+-    {
+-        if (isset($this->cart[$index])) {
+-            $this->cart[$index]['qty']++;
+-            if (!isset($this->cart[$index]['serial_numbers'])) {
+-                $this->cart[$index]['serial_numbers'] = [$this->cart[$index]['serial_number'] ?? ''];
+-            }
+-            $this->cart[$index]['serial_numbers'][] = '';
+-            $this->syncSinglePaymentAmount();
+-        }
+-    }
+-
+-    public function decrementCartItem($index)
+-    {
+-        if (isset($this->cart[$index]) && $this->cart[$index]['qty'] > 1) {
+-            $this->cart[$index]['qty']--;
+-            if (isset($this->cart[$index]['serial_numbers'])) {
+-                array_pop($this->cart[$index]['serial_numbers']);
+-            }
+-            $this->syncSinglePaymentAmount();
+-        }
+-    }
+-
+-    public function updateSerialNumber($index, $snIndex, $value)
+-    {
+-        if (isset($this->cart[$index])) {
+-            if (!isset($this->cart[$index]['serial_numbers'])) {
+-                $this->cart[$index]['serial_numbers'] = [$this->cart[$index]['serial_number'] ?? ''];
+-            }
+-            $this->cart[$index]['serial_numbers'][$snIndex] = $value;
+-            // Also update legacy for backward compatibility
+-            if ($snIndex === 0) {
+-                $this->cart[$index]['serial_number'] = $value;
+-            }
+-        }
+-    }
+-
+-    // ─── Customer Actions ──────────────────────────────────────
+-
+-    public function selectCustomer($id)
+-    {
+-        $this->selectedCustomerId = $id;
+-        $this->searchCustomer = '';
+-    }
+-
+-    public function clearSelectedCustomer()
+-    {
+-        $this->selectedCustomerId = null;
+-        $this->isNewCustomer = false;
+-    }
+-
+-    // ─── Sales Actions ──────────────────────────────────────
+-
+-    public function selectSales($id)
+-    {
+-        $sales = \App\Models\Employe::find($id);
+-        if ($sales && !collect($this->selectedSales)->contains('id', $id)) {
+-            $this->selectedSales[] = [
+-                'id' => $sales->id,
+-                'name' => $sales->name,
+-                'employee_no' => $sales->employee_no
+-            ];
+-        }
+-        $this->searchSales = '';
+-    }
+-
+-    public function removeSales($id)
+-    {
+-        $this->selectedSales = array_values(array_filter($this->selectedSales, function ($s) use ($id) {
+-            return $s['id'] != $id;
+-        }));
+-    }
+-
+-    // ─── Checkout ──────────────────────────────────────────────
+-
+     public function openCheckout()
+     {
+         if (empty($this->cart)) {
