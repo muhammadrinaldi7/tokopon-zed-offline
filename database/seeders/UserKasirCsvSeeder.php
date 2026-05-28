@@ -92,14 +92,19 @@ class UserKasirCsvSeeder extends Seeder
             $branch = DB::table('branches')->where('name', $cabangName)->first();
             $branchId = $branch ? $branch->id : null;
 
-            // 🔥 PERBAIKAN UTAMA: Gunakan Eloquent User::create agar mengembalikan Object Model asli, bukan stdClass
+            // 🔥 TAMBAHAN: Ambil warehouse_id secara otomatis dari tabel 'warehouses'
+            $warehouse = DB::table('warehouses')->where('name', $cabangName)->first();
+            $warehouseId = $warehouse ? $warehouse->id : null;
+
+            // Masukkan data menggunakan Eloquent Model User
             $adminUser = User::create([
-                'name'       => $nama,
-                'email'      => $email,
-                'password'   => Hash::make('password123'),
-                'branch_id'  => $branchId,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'name'         => $nama,
+                'email'        => $email,
+                'password'     => Hash::make('password123'),
+                'branch_id'    => $branchId,
+                'warehouse_id' => $warehouseId,
+                'created_at'   => now(),
+                'updated_at'   => now(),
             ]);
 
             if ($adminUser) {
