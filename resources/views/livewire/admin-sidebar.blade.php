@@ -70,14 +70,14 @@
             <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Status Servis</span>
         </a>
 
-        <a href="#"
-            class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->is('admin/promos') ? $activeClass : $inactiveClass }}">
-            <svg class="w-5 h-5 {{ request()->is('admin/promos') ? $activeIconClass : $inactiveIconClass }}"
+        <a href="{{ route('admin.promos.index') }}" wire:navigate
+            class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.promos.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 {{ request()->routeIs('admin.promos.*') ? $activeIconClass : $inactiveIconClass }}"
                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round"
                     d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
             </svg>
-            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Promo & Voucher</span>
+            Promo & Voucher
         </a>
 
         {{-- <a href="#"
@@ -237,13 +237,9 @@
                             Template QC
                         </a>
                         <a href="{{ route('admin.qc.device-search') }}" wire:navigate
-                            class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device*') ? $activeClass : $inactiveClass }}">
-                            <svg class="w-5 h-5 {{ request()->routeIs('admin.qc.device*') ? $activeIconClass : $inactiveIconClass }}"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                            Cari Device (IMEI)
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device-search') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+
+                            Cek Devices
                         </a>
                     </div>
                 </div>
@@ -297,7 +293,7 @@
                 <p class="text-[13px] font-bold tracking-[1.5px] text-gray-400 uppercase">Sistem</p>
             </div>
 
-            <a href="{{ route('admin.settings.payment') }}" wire:navigate
+            {{-- <a href="{{ route('admin.settings.payment') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.payment') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.payment') ? $activeIconClass : $inactiveIconClass }}"
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -305,7 +301,7 @@
                         d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan Pembayaran</span>
-            </a>
+            </a> --}}
             <a href="{{ route('admin.settings.payment-methods') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.payment-methods') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.payment-methods') ? $activeIconClass : $inactiveIconClass }}"

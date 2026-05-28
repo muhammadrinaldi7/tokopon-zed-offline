@@ -65,6 +65,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/settings/catalog', \App\Livewire\Admin\Settings\CatalogSettings::class)->name('settings.catalog');
     Route::get('/settings/warehouse', \App\Livewire\Admin\Settings\Warehouse\Index::class)->name('settings.warehouse');
 
+    Route::prefix('promos')->name('promos.')->group(function () {
+        Route::get('/', App\Livewire\Admin\Promo\Index::class)->name('index');
+        Route::get('/create', App\Livewire\Admin\Promo\Form::class)->name('create');
+        Route::get('/{promo}/edit', App\Livewire\Admin\Promo\Form::class)->name('edit');
+    });
+
     Route::get('/trade-ins', App\Livewire\Admin\TradeIn\Index::class)->name('trade-ins.index');
     Route::get('/trade-ins/{tradeIn}', App\Livewire\Admin\TradeIn\Show::class)->name('trade-ins.show');
 

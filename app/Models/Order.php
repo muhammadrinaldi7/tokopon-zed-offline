@@ -17,6 +17,11 @@ class Order extends Model
 
     // ─── Relationships ─────────────────────────────────────────
 
+    public function promos()
+    {
+        return $this->belongsToMany(Promo::class, 'order_promos')->withPivot('discount_applied')->withTimestamps();
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
