@@ -132,21 +132,21 @@ new class extends Component {
         class="lg:hidden fixed bottom-0 left-0 w-full z-50 bg-white/90 backdrop-blur-lg border-t border-gray-100 flex items-center justify-around h-18 p-2 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
 
         {{-- POS --}}
-        <a href="/" wire:navigate
+        <a href="{{ route('zoffline.pos') }}" wire:navigate
             class="flex flex-col items-center justify-center w-16 h-full gap-1 text-[#4E44DB]">
             <img src="{{ asset('assets/png/pos2.png') }}" class="w-8 h-auto" alt="">
             <span class="text-[10px] font-semibold">POS</span>
         </a>
 
         {{-- Tukar Tambah --}}
-        <a href="/trade-in" wire:navigate
+        <a href="{{ route('zoffline.trade-in') }}" wire:navigate
             class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-emerald-600 transition-colors">
             <img src="{{ asset('assets/png/trd.png') }}" class="w-8 h-auto" alt="">
             <span class="text-[10px] font-medium">Trade-In</span>
         </a>
 
         {{-- Jual HP --}}
-        <a href="/sell-phone" wire:navigate
+        <a href="{{ route('zoffline.sell-phone') }}" wire:navigate
             class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-violet-600 transition-colors">
             <img src="{{ asset('assets/png/sellphone.png') }}" class="w-8 h-auto" alt="">
             <span class="text-[10px] font-medium">Jual HP</span>

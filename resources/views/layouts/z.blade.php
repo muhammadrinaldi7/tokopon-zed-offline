@@ -126,11 +126,14 @@
             };
         }
     </script>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    {{-- Tambahkan atribut data-navigate-once di sini --}}
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript" data-navigate-once></script>
+
     <script>
-        let html5QrcodeScanner;
-        let currentInputIndex = null;
-        let currentSnIndex = null;
+        // Ubah 'let' menjadi 'var' agar aman dari error redeklarasi wire:navigate
+        var html5QrcodeScanner;
+        var currentInputIndex = null;
+        var currentSnIndex = null;
 
         // Fungsi untuk membuka kamera
         function startScanner(index, snIndex = null) {
@@ -159,10 +162,10 @@
                     // 1. Matikan kamera dan tutup modal
                     closeScanner();
 
-                    // 2. Cari elemen input berdasarkan index
-                    let inputId = currentSnIndex !== null ? 'sn_input_' + currentInputIndex + '_' + currentSnIndex :
+                    // 2. Cari elemen input berdasarkan index (Ubah let jadi var di sini juga untuk konsistensi)
+                    var inputId = currentSnIndex !== null ? 'sn_input_' + currentInputIndex + '_' + currentSnIndex :
                         'sn_input_' + currentInputIndex;
-                    let inputElement = document.getElementById(inputId);
+                    var inputElement = document.getElementById(inputId);
 
                     if (inputElement) {
                         // 3. Update value di input
@@ -187,11 +190,16 @@
             document.getElementById('scanner-modal').classList.add('hidden');
 
             if (html5QrcodeScanner) {
-                html5QrcodeScanner.stop().then((ignore) => {
-                    html5QrcodeScanner.clear(); // Bersihkan DOM
-                }).catch((err) => {
-                    console.error("Gagal mematikan scanner", err);
-                });
+                // Tambahkan try-catch untuk mencegah error jika user menutup modal sebelum kamera benar-benar menyala
+                try {
+                    html5QrcodeScanner.stop().then((ignore) => {
+                        html5QrcodeScanner.clear(); // Bersihkan DOM
+                    }).catch((err) => {
+                        console.error("Gagal mematikan scanner", err);
+                    });
+                } catch (err) {
+                    console.log("Scanner dihentikan sebelum siap.");
+                }
             }
         }
     </script>

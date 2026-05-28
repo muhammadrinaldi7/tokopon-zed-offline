@@ -174,32 +174,80 @@
                             </p>
                         </div>
 
-                        {{-- SN Input --}}
                         @php
-                            $snArray = $item['serial_numbers'] ?? [$item['serial_number'] ?? ''];
+                            // Ambil array SN dan bersihkan dari string kosong akibat sisa data lama
+                            $snArray = array_filter($item['serial_numbers'] ?? [], function ($val) {
+                                return !empty(trim($val));
+                            });
+
+                            // PENTING: Gunakan ['qty'] sesuai dengan data di backend keranjangmu
+                            $quantity = $item['qty'] ?? 1;
+
+                            $isFull = count($snArray) >= $quantity;
+                            $nextIndex = count($snArray);
                         @endphp
+
                         <div class="mt-2 space-y-2">
-                            @foreach ($snArray as $snIndex => $snValue)
-                                <div class="flex items-center gap-2">
-                                    <input type="text" id="sn_input_{{ $index }}_{{ $snIndex }}"
-                                        wire:change="updateSerialNumber({{ $index }}, {{ $snIndex }}, $event.target.value)"
-                                        value="{{ $snValue }}"
+                            {{-- BARIS 1: Tampilan SN yang sudah berhasil di-scan (Bentuk Badge dengan tombol X) --}}
+                            @if (count($snArray) > 0)
+                                <div class="flex flex-wrap gap-1.5 mb-2">
+                                    @foreach ($snArray as $snIndex => $snValue)
+                                        <span
+                                            class="inline-flex items-center gap-1 bg-neutral-100 border border-neutral-200 text-neutral-800 text-[11px] font-mono pl-2 pr-1 py-0.5 rounded-md shadow-xs select-none">
+                                            {{ $snValue }}
+                                            <button type="button"
+                                                wire:click="removeSerialNumber({{ $index }}, {{ $snIndex }})"
+                                                class="text-neutral-400 hover:text-rose-500 font-sans font-bold text-xs w-4 h-4 flex items-center justify-center rounded-sm hover:bg-neutral-200 transition-colors focus:outline-none"
+                                                title="Hapus SN">
+                                                &times;
+                                            </button>
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            {{-- BARIS 2: Area Input Tunggal & Tombol Scan --}}
+                            <div class="flex items-center gap-2">
+                                @if (!$isFull)
+                                    <input type="text" id="sn_input_{{ $index }}_{{ $nextIndex }}"
+                                        wire:change="updateSerialNumber({{ $index }}, {{ $nextIndex }}, $event.target.value)"
+                                        value=""
                                         class="w-full bg-white border border-gray-200 rounded px-2.5 py-1 text-[11px] font-mono focus:border-[#1c69d4] focus:ring-0 transition-all placeholder-gray-300"
-                                        placeholder="SN / IMEI {{ count($snArray) > 1 ? 'ke-' . ($snIndex + 1) : '' }}...">
+                                        placeholder="Scan / Ketik SN ke-{{ $nextIndex + 1 }}...">
 
                                     <button type="button"
-                                        onclick="startScanner({{ $index }}, {{ $snIndex }})"
+                                        onclick="startScanner({{ $index }}, {{ $nextIndex }})"
                                         class="shrink-0 bg-[#1c69d4] hover:bg-blue-700 text-white border border-[#1c69d4] rounded px-2 py-1 transition-all focus:outline-none focus:ring-2 focus:ring-[#1c69d4] focus:ring-offset-1"
                                         title="Scan Barcode Kamera">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
                                             </path>
                                         </svg>
                                     </button>
-                                </div>
-                            @endforeach
+                                @else
+                                    <div
+                                        class="w-full bg-emerald-50 border border-emerald-200 rounded px-2.5 py-1 text-[11px] text-emerald-700 font-medium flex items-center gap-1.5 select-none">
+                                        <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none"
+                                            stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                                d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        Semua SN sudah terpenuhi ({{ $quantity }} / {{ $quantity }})
+                                    </div>
+
+                                    <button type="button" disabled
+                                        class="shrink-0 bg-gray-100 text-gray-400 border border-gray-200 rounded px-2 py-1 cursor-not-allowed">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
+                                            </path>
+                                        </svg>
+                                    </button>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 @empty
@@ -430,7 +478,7 @@
 
                     {{-- Validation Status Banner --}}
                     @php
-                        $targetTotal = max(0, $this->subtotal - (int) $this->discount_amount);
+                        $targetTotal = max(0, $this->subtotal - (int) $this->totalDiscount);
                         $allocatedTotal = (int) $this->paymentsTotalBase;
                         $diff = $targetTotal - $allocatedTotal;
                     @endphp
@@ -487,6 +535,48 @@
                             placeholder="0">
                     </div>
                 </div>
+
+
+                {{-- Promos --}}
+                @if (count($this->activePromos) > 0)
+                    <div class="px-4 pb-3">
+                        <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Gunakan
+                            Promo/Voucher</p>
+                        <div
+                            class="space-y-2 bg-gray-50 border border-gray-100 p-2.5 rounded-lg max-h-32 overflow-y-auto">
+                            @foreach ($this->activePromos as $promo)
+                                <label class="flex items-start gap-2 cursor-pointer group">
+                                    <input type="checkbox" wire:model.live="selectedPromos"
+                                        value="{{ $promo->id }}"
+                                        class="mt-0.5 rounded text-[#1c69d4] focus:ring-[#1c69d4] border-gray-300">
+                                    <div class="text-xs">
+                                        <div
+                                            class="font-bold text-gray-700 group-hover:text-[#1c69d4] transition-colors">
+                                            {{ $promo->name }}</div>
+                                        <div class="text-[10px] text-gray-500 font-mono">
+                                            @if ($promo->code)
+                                                {{ $promo->code }} &bull;
+                                            @endif
+                                            @if ($promo->discount_type === 'fixed')
+                                                Potongan Rp {{ number_format($promo->discount_value, 0, ',', '.') }}
+                                            @else
+                                                Potongan {{ number_format($promo->discount_value, 0) }}%
+                                            @endif
+                                        </div>
+                                    </div>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Catatan --}}
+                <div class="px-4 pb-4">
+                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Catatan Pesanan</p>
+                    <textarea wire:model.defer="notes" rows="2"
+                        class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0 placeholder-gray-300 resize-none"
+                        placeholder="Opsional..."></textarea>
+                </div>
             </div>
 
             {{-- Pinned Footer: Totals & Pay Button --}}
@@ -497,6 +587,13 @@
                         <span class="font-bold text-gray-800">Rp
                             {{ number_format($this->subtotal, 0, ',', '.') }}</span>
                     </div>
+                    @if ($this->totalPromoDiscount > 0)
+                        <div class="flex justify-between text-xs font-medium text-emerald-600">
+                            <span>Diskon Promo</span>
+                            <span class="font-bold">-Rp
+                                {{ number_format($this->totalPromoDiscount, 0, ',', '.') }}</span>
+                        </div>
+                    @endif
                     @if ($this->discount_amount > 0)
                         <div class="flex justify-between text-xs font-medium text-rose-500">
                             <span>Diskon</span>
@@ -504,6 +601,7 @@
                                 {{ number_format($this->discount_amount, 0, ',', '.') }}</span>
                         </div>
                     @endif
+
                     <div class="border-t border-gray-150 pt-1.5 flex justify-between items-center">
                         <span class="font-black text-gray-900 text-base">Total Tagihan</span>
                         <span class="font-black text-[#1c69d4] text-lg">Rp

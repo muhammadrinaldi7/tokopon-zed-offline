@@ -11,6 +11,7 @@ use App\Models\PaymentMethod;
 use App\Models\PaymentMethodRate;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Promo;
 use App\Models\SecondProduct;
 use App\Models\SecondProductVariant;
 use App\Models\User;
@@ -51,6 +52,8 @@ class Pos extends Component
     public $payments = [];
     public $discount_amount = 0;
     public $notes = '';
+    public $selectedPromos = []; // Menyimpan ID promo yang dipilih
+
 
     // ─── Modals ────────────────────────────────────────────────
     public $showCheckoutModal = false;
@@ -130,7 +133,7 @@ class Pos extends Component
 
     public function addPaymentRow()
     {
-        $remaining = max(0, ($this->subtotal - (int)$this->discount_amount) - $this->paymentsTotalBase);
+        $remaining = max(0, ($this->subtotal - (int)$this->totalDiscount) - $this->paymentsTotalBase);
         $this->payments[] = [
             'payment_method_id' => '',
             'payment_method_rate_id' => '',
@@ -155,14 +158,14 @@ class Pos extends Component
                 $totalOther += (int)$p['amount'];
             }
         }
-        $target = max(0, $this->subtotal - $this->discount_amount);
+        $target = max(0, $this->subtotal - (int)$this->totalDiscount);
         $this->payments[$index]['amount'] = max(0, $target - $totalOther);
     }
 
     public function syncSinglePaymentAmount()
     {
         if (count($this->payments) === 1) {
-            $this->payments[0]['amount'] = max(0, $this->subtotal - (int)$this->discount_amount);
+            $this->payments[0]['amount'] = max(0, $this->subtotal - (int)$this->totalDiscount);
         }
     }
 
@@ -200,7 +203,8 @@ class Pos extends Component
             }
         }
 
-        $target = max(0, $this->subtotal - $this->discount_amount);
+        $target = max(0, $this->subtotal - $this->totalDiscount);
+
         return (int) $this->paymentsTotalBase === (int) $target;
     }
 
@@ -302,8 +306,102 @@ class Pos extends Component
     #[Computed]
     public function grandTotal()
     {
-        return max(0, $this->subtotal() - (int)$this->discount_amount);
+        return max(0, $this->subtotal() - (int)$this->totalDiscount);
     }
+
+
+    // baru
+    #[Computed]
+    public function activePromos()
+    {
+        $promos = Promo::with('skus')
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNull('start_date')->orWhere('start_date', '<=', now());
+            })
+            ->where(function ($q) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+            })
+            ->get();
+
+        $eligiblePromos = [];
+        foreach ($promos as $promo) {
+            if ($this->isPromoEligible($promo)) {
+                $eligiblePromos[] = $promo;
+            } else {
+                if (in_array($promo->id, $this->selectedPromos)) {
+                    $this->selectedPromos = array_diff($this->selectedPromos, [$promo->id]);
+                }
+            }
+        }
+        return collect($eligiblePromos);
+    }
+    #[Computed]
+    public function totalDiscount()
+    {
+        return (int)$this->discount_amount + $this->totalPromoDiscount;
+    }
+    public function isPromoEligible($promo)
+    {
+        $eligible = $this->calculateEligibleCart($promo);
+        if ($promo->min_qty && $eligible['qty'] < $promo->min_qty) return false;
+        if ($promo->min_transaction_amount && $eligible['amount'] < $promo->min_transaction_amount) return false;
+
+        // If not apply to all items and eligible qty is 0, it's not eligible
+        if (!$promo->apply_to_all_items && $eligible['qty'] == 0) return false;
+
+        return true;
+    }
+    public function calculateEligibleCart($promo)
+    {
+        $eligibleQty = 0;
+        $eligibleAmount = 0;
+
+        if ($promo->apply_to_all_items) {
+            $eligibleAmount = $this->subtotal;
+            $eligibleQty = array_sum(array_column($this->cart, 'qty'));
+        } else {
+            $promoSkus = $promo->skus->pluck('sku')->toArray();
+            foreach ($this->cart as $item) {
+                if (in_array($item['sku'], $promoSkus)) {
+                    $eligibleQty += (int)$item['qty'];
+                    $eligibleAmount += ((int)$item['qty'] * (float)$item['price']);
+                }
+            }
+        }
+        return ['qty' => $eligibleQty, 'amount' => $eligibleAmount];
+    }
+    #[Computed]
+    public function totalPromoDiscount()
+    {
+        if (empty($this->selectedPromos)) return 0;
+
+        $promos = Promo::with('skus')->whereIn('id', $this->selectedPromos)->get();
+        $total = 0;
+
+        foreach ($promos as $promo) {
+            $eligible = $this->calculateEligibleCart($promo);
+
+            if ($promo->discount_type === 'fixed') {
+                $total += $promo->discount_value;
+            } else {
+                // Percentage only from eligible amount!
+                $calc = $eligible['amount'] * ($promo->discount_value / 100);
+                if ($promo->max_discount) {
+                    $calc = min($calc, $promo->max_discount);
+                }
+                $total += $calc;
+            }
+        }
+        return $total;
+    }
+    public function updatedSelectedPromos()
+    {
+        $this->syncSinglePaymentAmount();
+    }
+
+
+    // baru
 
     // ─── Cart Actions ──────────────────────────────────────────
 
@@ -427,11 +525,12 @@ class Pos extends Component
     public function incrementCartItem($index)
     {
         if (isset($this->cart[$index])) {
+            // 1. Naikkan jumlah kuantitas barang
             $this->cart[$index]['qty']++;
-            if (!isset($this->cart[$index]['serial_numbers'])) {
-                $this->cart[$index]['serial_numbers'] = [$this->cart[$index]['serial_number'] ?? ''];
-            }
-            $this->cart[$index]['serial_numbers'][] = '';
+
+            // JANGAN lakukan push string kosong ('') lagi di sini.
+            // Biarkan array serial_numbers tetap apa adanya sampai user melakukan scan.
+
             $this->syncSinglePaymentAmount();
         }
     }
@@ -439,25 +538,64 @@ class Pos extends Component
     public function decrementCartItem($index)
     {
         if (isset($this->cart[$index]) && $this->cart[$index]['qty'] > 1) {
+            // 1. Turunkan jumlah kuantitas barang
             $this->cart[$index]['qty']--;
+
+            // 2. Jika jumlah SN yang sudah di-scan melebihi qty yang baru,
+            // kita hapus SN paling terakhir agar jumlahnya sinkron dengan qty baru.
             if (isset($this->cart[$index]['serial_numbers'])) {
-                array_pop($this->cart[$index]['serial_numbers']);
+                while (count($this->cart[$index]['serial_numbers']) > $this->cart[$index]['qty']) {
+                    array_pop($this->cart[$index]['serial_numbers']);
+                }
+
+                // Sinkronisasi ulang data legacy backward compatibility
+                $this->cart[$index]['serial_number'] = !empty($this->cart[$index]['serial_numbers'])
+                    ? $this->cart[$index]['serial_numbers'][0]
+                    : '';
             }
+
             $this->syncSinglePaymentAmount();
         }
     }
 
     public function updateSerialNumber($index, $snIndex, $value)
     {
-        if (isset($this->cart[$index])) {
+        // 1. Pastikan item di cart ada dan input tidak kosong/spasi saja
+        if (isset($this->cart[$index]) && !empty(trim($value))) {
+
+            // 2. Inisialisasi array jika belum ada
             if (!isset($this->cart[$index]['serial_numbers'])) {
-                $this->cart[$index]['serial_numbers'] = [$this->cart[$index]['serial_number'] ?? ''];
+                // Jika ada SN legacy lama yang tidak kosong, gunakan itu. Jika kosong, mulai dengan array kosong []
+                $legacySn = $this->cart[$index]['serial_number'] ?? '';
+                $this->cart[$index]['serial_numbers'] = !empty($legacySn) ? [$legacySn] : [];
             }
-            $this->cart[$index]['serial_numbers'][$snIndex] = $value;
-            // Also update legacy for backward compatibility
+
+            // 3. Masukkan nilai barcode baru ke index yang dituju
+            $this->cart[$index]['serial_numbers'][$snIndex] = trim($value);
+
+            // 4. Update legacy untuk backward compatibility (jika ini SN pertama)
             if ($snIndex === 0) {
-                $this->cart[$index]['serial_number'] = $value;
+                $this->cart[$index]['serial_number'] = trim($value);
             }
+        }
+    }
+
+    public function removeSerialNumber($index, $snIndex)
+    {
+        // Fungsi untuk menghapus badge SN saat tombol X diklik
+        if (isset($this->cart[$index]['serial_numbers'][$snIndex])) {
+
+            // Hapus SN berdasarkan index-nya
+            unset($this->cart[$index]['serial_numbers'][$snIndex]);
+
+            // WAJIB: Reset urutan key array agar kembali menjadi 0, 1, 2...
+            $this->cart[$index]['serial_numbers'] = array_values($this->cart[$index]['serial_numbers']);
+
+            // Sinkronisasi ulang data legacy backward compatibility
+            // Jika array sekarang kosong, kosongkan legacy. Jika masih ada, ambil index ke-0 yang baru
+            $this->cart[$index]['serial_number'] = !empty($this->cart[$index]['serial_numbers'])
+                ? $this->cart[$index]['serial_numbers'][0]
+                : '';
         }
     }
 
@@ -537,7 +675,7 @@ class Pos extends Component
         try {
             $customerId = $this->selectedCustomerId;
 
-            // If new customer, create user first
+            // Jika customer baru, buat user terlebih dahulu
             if ($this->isNewCustomer && !$customerId) {
                 $this->validate([
                     'customerName' => 'required|string|max:255',
@@ -580,9 +718,15 @@ class Pos extends Component
             );
 
             $subtotal = $this->subtotal();
-            $discountAmount = (int) $this->discount_amount;
+            $manualDiscountAmount = (int)$this->discount_amount;
+            $promoDiscountAmount = $this->totalPromoDiscount;
+            $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
+
             $mdrAmt = $this->mdrAmount;
-            $grandTotal = max(0, $subtotal - $discountAmount);
+            $grandTotal = max(0, $subtotal - $totalDiscountAmount);
+
+            // ─── WAJIB: MULAI TRANSAKSI DATABASE LOKAL ───
+            \Illuminate\Support\Facades\DB::beginTransaction();
 
             // Create Order
             $order = Order::create([
@@ -590,8 +734,8 @@ class Pos extends Component
                 'order_number' => $orderNumber,
                 'total_amount' => $subtotal,
                 'shipping_cost' => 0,
-                'discount_amount' => $discountAmount,
-                'mdr_percentage' => ($subtotal - $discountAmount) > 0 ? round(($mdrAmt / ($subtotal - $discountAmount)) * 100, 2) : 0,
+                'discount_amount' => $totalDiscountAmount,
+                'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
                 'mdr_amount' => $mdrAmt,
                 'grand_total' => $grandTotal,
                 'order_status' => 'COMPLETED',
@@ -604,9 +748,29 @@ class Pos extends Component
                 'notes' => $this->notes,
             ]);
 
+            // Save promos to pivot table
+            if (!empty($this->selectedPromos)) {
+                $promos = \App\Models\Promo::with('skus')->whereIn('id', $this->selectedPromos)->get();
+                foreach ($promos as $promo) {
+                    $eligible = $this->calculateEligibleCart($promo);
+                    $applied = 0;
+                    if ($promo->discount_type === 'fixed') {
+                        $applied = $promo->discount_value;
+                    } else {
+                        $calc = $eligible['amount'] * ($promo->discount_value / 100);
+                        if ($promo->max_discount) $calc = min($calc, $promo->max_discount);
+                        $applied = $calc;
+                    }
+                    $order->promos()->attach($promo->id, ['discount_applied' => $applied]);
+                }
+            }
+
+
             // Create Order Items + reduce stock
             foreach ($this->cart as $item) {
-                $sns = $item['serial_numbers'] ?? [$item['serial_number'] ?? ''];
+                // PERBAIKAN SN LOKAL: Ambil dan filter hanya SN yang ada isinya (hilangkan string kosong/spasi)
+                $rawSns = $item['serial_numbers'] ?? (!empty(trim($item['serial_number'] ?? '')) ? [$item['serial_number']] : []);
+                $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
 
                 OrderItem::create([
                     'order_id' => $order->id,
@@ -615,7 +779,7 @@ class Pos extends Component
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'serial_number' => implode(', ', $sns),
+                    'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '', // Disimpan bersih tanpa koma gantung
                 ]);
 
                 // Reduce stock
@@ -633,6 +797,7 @@ class Pos extends Component
                     'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
                 ]);
             }
+
             // Create OrderPayments (for each split payment row)
             foreach ($this->payments as $payment) {
                 $rowTotal = (float)$payment['amount'];
@@ -647,8 +812,11 @@ class Pos extends Component
                 ]);
             }
 
-            // ─── Accurate Integration (Iterative State Saving) ─────
+            // KUNCI TRANSAKSI: Jika sampai sini aman, simpan permanen ke DB Lokal
+            \Illuminate\Support\Facades\DB::commit();
 
+
+            // ─── INTEGRASI ACCURATE (Di luar DB Transaction agar POS tidak macet jika API lambat) ───
             try {
                 $accurateService = app(AccurateService::class);
                 $customerUser = User::find($customerId);
@@ -656,7 +824,6 @@ class Pos extends Component
                 $branchName = $handler->branch->name ?? 'Banjarbaru';
                 $warehouseName = $handler->warehouse->name ?? 'Head Office';
 
-                // Determine dbSource from items (if any is second → 'second', otherwise 'syihab')
                 $hasSecond = collect($this->cart)->contains('is_second', true);
                 $dbSource = $hasSecond ? 'second' : 'syihab';
 
@@ -664,17 +831,28 @@ class Pos extends Component
                 $accurateService->syncCustomer($customerUser, $dbSource);
                 $customerUser->refresh();
 
-                // Sales Invoice (jika belum ada)
+                // Sales Invoice
                 if (!$order->accurate_invoice_no) {
                     $detailItems = [];
                     foreach ($this->cart as $item) {
-                        $detailSN = array_map(function ($sn) {
-                            return ['serialNumberNo' => $sn ?: '-', 'quantity' => 1];
-                        }, $item['serial_numbers'] ?? [$item['serial_number'] ?? '-']);
+
+                        // PERBAIKAN SN ACCURATE: Filter bersih data SN terlebih dahulu
+                        $rawSns = $item['serial_numbers'] ?? (!empty(trim($item['serial_number'] ?? '')) ? [$item['serial_number']] : []);
+                        $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
+
+                        $detailSN = [];
+                        if (!empty($cleanSns)) {
+                            foreach ($cleanSns as $sn) {
+                                $detailSN[] = ['serialNumberNo' => $sn, 'quantity' => 1];
+                            }
+                        } else {
+                            // Jika produk non-SN / kosong, fallback ke tanda '-' bawaan sistemmu
+                            $detailSN[] = ['serialNumberNo' => '-', 'quantity' => 1];
+                        }
+
                         $detailSalesman = [];
                         foreach ($this->selectedSales as $sales) {
                             if (!empty($sales['employee_no'])) {
-                                // Langsung push nilai string-nya ke dalam array
                                 $detailSalesman[] = (string) $sales['employee_no'];
                             }
                         }
@@ -683,14 +861,13 @@ class Pos extends Component
                             'itemNo' => $item['sku'] ?: 'ITEM-UNKNOWN',
                             'warehouseName' => $warehouseName,
                             'unitPrice' => $item['price'],
-                            'itemCashDiscount' => $discountAmount,
+                            'itemCashDiscount' => $manualDiscountAmount,
                             'quantity' => $item['qty'],
                             'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
                             'detailSerialNumber' => $detailSN,
                             'salesmanListNumber' => $detailSalesman
                         ];
                     }
-
 
                     $siData = [
                         'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
@@ -709,40 +886,60 @@ class Pos extends Component
                 // Sales Receipts (jika belum ada dan ada invoice)
                 if (!$order->accurate_receipt_no && $order->accurate_invoice_no) {
                     $srNumbers = [];
-                    foreach ($this->payments as $payment) {
+                    $promosAppliedToSR = false; // Flag agar promo hanya diaplikasikan 1x di SR pertama
+
+                    foreach ($this->payments as $index => $payment) {
                         $pm = \App\Models\PaymentMethod::findOrFail($payment['payment_method_id']);
                         $rate = $payment['payment_method_rate_id'] ? \App\Models\PaymentMethodRate::find($payment['payment_method_rate_id']) : null;
 
                         $pct = $this->getMdrPercentage($payment);
                         $rowMdr = $pct > 0 ? round((float)$payment['amount'] * $pct / 100, 0) : 0;
                         $rowBaseAmount = (float)$payment['amount'];
-
                         $netReceiptAmount = $rowBaseAmount - $rowMdr;
-                        $mdrAccountNo = $rate ? $rate->accurate_account_no : null;
+
+                        $detailDiscounts = [];
+
+                        // 1. Masukkan MDR sebagai potongan SR
+                        if ($rowMdr > 0 && $rate && $rate->accurate_account_no) {
+                            $detailDiscounts[] = [
+                                'accountNo' => $rate->accurate_account_no,
+                                'amount' => (float) $rowMdr,
+                                'departmentName' => $branchName,
+                                'discountNotes' => 'MDR'
+                            ];
+                        }
+
+                        // 2. Masukkan Semua Promo sebagai potongan SR (hanya di pembayaran pertama)
+                        $promoDiscountsTotal = 0;
+                        if (!$promosAppliedToSR) {
+                            foreach ($order->promos as $promo) {
+                                if ($promo->accurate_account_no && $promo->pivot->discount_applied > 0) {
+                                    $detailDiscounts[] = [
+                                        'accountNo' => $promo->accurate_account_no,
+                                        'amount' => (float) $promo->pivot->discount_applied,
+                                        'departmentName' => $branchName,
+                                        'discountNotes' => 'Promo: ' . $promo->name
+                                    ];
+                                    $promoDiscountsTotal += (float) $promo->pivot->discount_applied;
+                                }
+                            }
+                            $promosAppliedToSR = true;
+                        }
 
                         $detailInvoiceItem = [
                             'invoiceNo' => $order->accurate_invoice_no,
-                            'paymentAmount' => $rowBaseAmount,
+                            'paymentAmount' => $rowBaseAmount + $promoDiscountsTotal, // Bayar sisa tagihan invoice = Cash + Promo
                         ];
 
-                        if ($rowMdr > 0 && $mdrAccountNo) {
-                            $detailInvoiceItem['detailDiscount'] = [
-                                [
-                                    'accountNo' => $mdrAccountNo,
-                                    'amount' => (float) $rowMdr,
-                                    'departmentName' => $branchName,
-                                    'discountNotes' => 'MDR'
-                                ]
-                            ];
-                        } else {
-                            $netReceiptAmount = $rowBaseAmount;
+                        if (!empty($detailDiscounts)) {
+                            $detailInvoiceItem['detailDiscount'] = $detailDiscounts;
                         }
 
                         $srData = [
                             'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
                             'branchName' => $branchName,
                             'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
-                            'receiptAmount' => (float) $netReceiptAmount,
+                            'receiptAmount' => (float) $netReceiptAmount, // Net cash ke bank
                             'chequeAmount' => (float) $netReceiptAmount,
                             'detailInvoice' => [
                                 $detailInvoiceItem
@@ -761,7 +958,7 @@ class Pos extends Component
                 }
             } catch (\Exception $e) {
                 Log::error('POS Accurate Integration Error: ' . $e->getMessage());
-                // Don't block the POS sale; Accurate can be retried
+                // Sengaja tidak me-rethrow exception agar transaksi POS lokal tetap dianggap berhasil
             }
 
             // Success! Show receipt
@@ -769,7 +966,7 @@ class Pos extends Component
             $this->showCheckoutModal = false;
             $this->showReceiptModal = true;
 
-            // Reset cart
+            // Reset state keranjang
             $this->cart = [];
             $this->discount_amount = 0;
             $this->notes = '';
@@ -790,6 +987,8 @@ class Pos extends Component
 
             $this->dispatch('toast', title: 'Transaksi Berhasil', message: 'Order ' . $orderNumber . ' berhasil diproses.', type: 'success');
         } catch (\Exception $e) {
+            // BATALKAN semua penulisan DB lokal jika terjadi kegagalan sebelum commit
+            \Illuminate\Support\Facades\DB::rollBack();
             Log::error('POS Payment Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
         }
