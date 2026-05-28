@@ -76,6 +76,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::prefix('qc')->name('qc.')->group(function () {
         Route::get('/templates', App\Livewire\Admin\Qc\TemplateIndex::class)->name('templates');
+        Route::get('/device', App\Livewire\Admin\Qc\DeviceSearch::class)->name('device-search');
         Route::get('/device/{imei}', App\Livewire\Admin\Qc\DevicePassport::class)->name('device-passport');
         Route::get('/inspect/{secondProductVariant}', App\Livewire\Admin\Qc\InspectionForm::class)->name('inspect');
     });

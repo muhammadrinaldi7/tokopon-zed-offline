@@ -236,8 +236,13 @@
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.templates') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                             Template QC
                         </a>
-                        <a href="#" {{-- Placeholder for Device Passport --}}
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium">
+                        <a href="{{ route('admin.qc.device-search') }}" wire:navigate
+                            class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device*') ? $activeClass : $inactiveClass }}">
+                            <svg class="w-5 h-5 {{ request()->routeIs('admin.qc.device*') ? $activeIconClass : $inactiveIconClass }}"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
                             Cari Device (IMEI)
                         </a>
                     </div>

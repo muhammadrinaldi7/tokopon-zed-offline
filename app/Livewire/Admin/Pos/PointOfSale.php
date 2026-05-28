@@ -122,8 +122,13 @@ class PointOfSale extends Component
         $this->syncSinglePaymentAmount();
     }
 
-    public function updatedDiscountAmount()
+    public function updatedDiscountAmount($value)
     {
+        if ($value === '' || $value === null) {
+            $this->discount_amount = 0;
+        } else {
+            $this->discount_amount = (int) $value;
+        }
         $this->syncSinglePaymentAmount();
     }
 
@@ -696,7 +701,8 @@ class PointOfSale extends Component
                         'branchName' => $branchName,
                         'detailItem' => $detailItems,
                         'inclusiveTax' => true,
-                        'taxable' => true
+                        'taxable' => true,
+                        'description' => $this->notes
                     ];
 
                     $siResult = $accurateService->postSalesInvoice($siData, $dbSource);

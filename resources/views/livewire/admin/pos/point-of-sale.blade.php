@@ -184,24 +184,37 @@
                         @endphp
                         <div class="mt-2 space-y-2">
                             @foreach ($snArray as $snIndex => $snValue)
-                                <div class="flex items-center gap-2">
-                                    <input type="text" id="sn_input_{{ $index }}_{{ $snIndex }}"
-                                        wire:change="updateSerialNumber({{ $index }}, {{ $snIndex }}, $event.target.value)"
-                                        value="{{ $snValue }}"
-                                        class="w-full bg-white border border-gray-200 rounded px-2.5 py-1 text-[11px] font-mono focus:border-[#1c69d4] focus:ring-0 transition-all placeholder-gray-300"
-                                        placeholder="SN / IMEI {{ count($snArray) > 1 ? 'ke-' . ($snIndex + 1) : '' }}...">
+                                <div class="space-y-1.5">
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" id="sn_input_{{ $index }}_{{ $snIndex }}"
+                                            wire:change="updateSerialNumber({{ $index }}, {{ $snIndex }}, $event.target.value)"
+                                            value="{{ $snValue }}"
+                                            class="w-full bg-white border border-gray-200 rounded px-2.5 py-1 text-[11px] font-mono focus:border-[#1c69d4] focus:ring-0 transition-all placeholder-gray-300"
+                                            placeholder="SN / IMEI {{ count($snArray) > 1 ? 'ke-' . ($snIndex + 1) : '' }}...">
 
-                                    <button type="button"
-                                        onclick="startScanner({{ $index }}, {{ $snIndex }})"
-                                        class="shrink-0 bg-[#1c69d4] hover:bg-blue-700 text-white border border-[#1c69d4] rounded px-2 py-1 transition-all focus:outline-none focus:ring-2 focus:ring-[#1c69d4] focus:ring-offset-1"
-                                        title="Scan Barcode Kamera">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
-                                            </path>
-                                        </svg>
-                                    </button>
+                                        <button type="button"
+                                            onclick="startScanner({{ $index }}, {{ $snIndex }})"
+                                            class="shrink-0 bg-[#1c69d4] hover:bg-blue-700 text-white border border-[#1c69d4] rounded px-2 py-1 transition-all focus:outline-none focus:ring-2 focus:ring-[#1c69d4] focus:ring-offset-1"
+                                            title="Scan Barcode Kamera">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
+                                                </path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    
+                                    @if(($item['is_second'] ?? false) && $snValue)
+                                        <div class="flex justify-end">
+                                            <a href="{{ route('qc.inspect', ['secondProductVariant' => $item['variant_id'], 'imei' => $snValue]) }}" target="_blank" class="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-100 flex items-center gap-1 transition shadow-sm">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                Lakukan QC Serah Terima
+                                            </a>
+                                        </div>
+                                    @endif
                                 </div>
                             @endforeach
                         </div>
@@ -463,9 +476,17 @@
                 {{-- Discount --}}
                 <div class="px-4 py-3">
                     <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Diskon (Rp)</p>
-                    <input type="number" wire:model.live="discount_amount"
+                    <input type="number" wire:model.live.debounce.300ms="discount_amount"
                         class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:border-[#1c69d4] focus:ring-0"
                         placeholder="0" min="0">
+                </div>
+
+                {{-- Catatan --}}
+                <div class="px-4 pb-4">
+                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Catatan Pesanan</p>
+                    <textarea wire:model.defer="notes" rows="2"
+                        class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0 placeholder-gray-300 resize-none"
+                        placeholder="Opsional..."></textarea>
                 </div>
             </div>
 
@@ -841,6 +862,19 @@
                             </div>
                             @if ($item->serial_number)
                                 <p class="text-[9px] text-gray-400">SN: {{ $item->serial_number }}</p>
+                                @if($item->product_variant_type === 'App\Models\SecondProductVariant')
+                                    @php
+                                        $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                                    @endphp
+                                    @foreach($sns as $sn)
+                                        @if($sn)
+                                        <div class="mt-2 mb-1 flex flex-col items-center justify-center p-2 border border-dashed border-gray-300 rounded bg-gray-50">
+                                            <p class="text-[8px] text-gray-500 font-bold mb-1 text-center">Sertifikat QC Perangkat<br>(SN: {{ $sn }})</p>
+                                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data={{ urlencode(route('public.device-qc', ['imei' => $sn])) }}" class="w-16 h-16 grayscale mix-blend-multiply">
+                                        </div>
+                                        @endif
+                                    @endforeach
+                                @endif
                             @endif
                         </div>
                     @endforeach

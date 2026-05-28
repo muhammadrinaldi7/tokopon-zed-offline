@@ -29,19 +29,28 @@ class InspectionForm extends Component
     public $checklistResults = [];
     public $isSaved = false;
 
-    public function mount($inspectableType, $inspectableId, $secondProductVariantId = null, $label = 'QC Inbound')
+    public function mount($inspectableType = null, $inspectableId = null, $secondProductVariantId = null, $label = 'QC Inbound')
     {
-        $this->inspectableType = $inspectableType;
-        $this->inspectableId = $inspectableId;
-        $this->secondProductVariantId = $secondProductVariantId;
-        $this->label = $label;
+        // Handle route model binding for standalone page
+        if ($inspectableType instanceof \App\Models\SecondProductVariant) {
+            $this->secondProductVariantId = $inspectableType->id;
+            $this->inspectableType = request()->query('type', 'App\Models\Order');
+            $this->inspectableId = request()->query('id', null);
+            $this->label = request()->query('label', 'QC Serah Terima');
+            $this->imei = request()->query('imei', '');
+        } else {
+            $this->inspectableType = $inspectableType;
+            $this->inspectableId = $inspectableId;
+            $this->secondProductVariantId = $secondProductVariantId;
+            $this->label = $label;
+        }
 
         $this->loadTemplate();
     }
 
     private function getInspectableModel(): ?Model
     {
-        if (class_exists($this->inspectableType)) {
+        if ($this->inspectableType && $this->inspectableId && class_exists($this->inspectableType)) {
             return $this->inspectableType::find($this->inspectableId);
         }
         return null;
@@ -127,6 +136,6 @@ class InspectionForm extends Component
 
     public function render()
     {
-        return view('livewire.admin.qc.inspection-form');
+        return view('livewire.admin.qc.inspection-form')->layout('layouts.app');
     }
 }

@@ -136,11 +136,12 @@ class Show extends Component
             // dd($this->dataParamPurchaseInvoice);
             try {
                 // 3. Sync Vendor ke Accurate agar Vendor No pasti terisi/terupdate
-                $accurateService = app(AccurateService::class);
                 $customerUser = $phoneData->user;
+                // dd($customerUser);
+                $accurateService = app(AccurateService::class);
                 $accurateService->syncVendor($customerUser, 'second');
                 $customerUser->refresh();
-                
+
                 // Update vendor No di param
                 $this->dataParamPurchaseInvoice['vendorNo'] = str_replace('"', '', $customerUser->accurate_vendor_no) ?? 'V-CASH';
 
@@ -148,7 +149,7 @@ class Show extends Component
                 if (!$this->sellPhone->invoice_number) {
                     $accurateResponse = $accurateService->postPurchaseInvoice($this->dataParamPurchaseInvoice, 'second');
                     Log::info('data invoice yang masuk ke accurate : ', ['data' => $this->dataParamPurchaseInvoice, 'response' => $accurateResponse]);
-                    
+
                     if (isset($accurateResponse['r']['number'])) {
                         // Simpan state secara iteratif
                         $this->sellPhone->update(['invoice_number' => $accurateResponse['r']['number']]);

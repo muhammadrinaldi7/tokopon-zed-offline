@@ -116,6 +116,32 @@ new class extends Component {
 
         @hasanyrole('admin|super admin')
             <div class="px-4 mt-8 mb-2">
+                <p class="text-[10px] font-bold tracking-wider text-gray-400 uppercase">Quality Control</p>
+            </div>
+
+            <a href="{{ route('admin.qc.device-search') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device*') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.qc.device*') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                Cari Device (IMEI)
+            </a>
+
+            <a href="{{ route('admin.qc.templates') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.qc.templates') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.qc.templates') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                QC Templates
+            </a>
+        @endhasanyrole
+
+        @hasanyrole('admin|super admin')
+            <div class="px-4 mt-8 mb-2">
                 <p class="text-[10px] font-bold tracking-wider text-gray-400 uppercase">Administrator</p>
             </div>
 

@@ -59,7 +59,7 @@ class AccurateService
     public function syncVendor(User $user, $databaseSource = 'syihab')
     {
         // Jika sudah punya vendor ID, tidak perlu hit API lagi
-        if ($user->accurate_vendor_id) {
+        if ($user->accurate_vendor_id || $user->accurate_vendor_no) {
             return;
         }
 
