@@ -138,36 +138,41 @@
 
                     @if ($sellPhone->status === 'INSPECTING')
                         @if (!$qcPassed)
-                            <div class="p-4 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-100 mb-4 animate-in fade-in duration-300">
+                            <div
+                                class="p-4 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-100 mb-4 animate-in fade-in duration-300">
                                 <p class="text-sm font-bold flex items-center gap-2">
-                                    <svg class="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <svg class="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                     Menunggu Inspeksi QC
                                 </p>
-                                <p class="text-xs mt-1.5 opacity-90">Silakan selesaikan form inspeksi fisik perangkat di bagian bawah halaman ini terlebih dahulu.</p>
+                                <p class="text-xs mt-1.5 opacity-90">Silakan selesaikan form inspeksi fisik perangkat di
+                                    bagian bawah halaman ini terlebih dahulu.</p>
                             </div>
                         @elseif (!$isRevising)
                             <div class="space-y-3">
-                                <p class="text-sm text-gray-600 mb-4">Inspeksi QC telah selesai. Jika kondisi unit sesuai dan nilai penawaran tidak berubah, lanjutkan ke pembayaran.</p>
+                                <p class="text-sm text-gray-600 mb-4">Inspeksi QC telah selesai. Jika kondisi unit
+                                    sesuai dan nilai penawaran tidak berubah, lanjutkan ke pembayaran.</p>
 
                                 <button type="button" wire:click="markAsPaid"
                                     wire:confirm="Sesuai! Anda akan mentransfer uang ke pelanggan dan menandai lunas?"
                                     class="w-full bg-emerald-500 text-white py-2.5 rounded-lg font-bold hover:bg-emerald-600 transition flex items-center justify-center gap-2">
 
-                                    Fisik Sesuai (Lanjutkan Pembayaran)
+                                    Fisik Sesuai
                                 </button>
 
                                 <button type="button" wire:click="$set('isRevising', true)"
                                     class="w-full bg-amber-500 text-white py-2.5 rounded-lg font-bold hover:bg-amber-600 transition flex items-center justify-center gap-2">
 
-                                    Fisik Tidak Sesuai (Revisi Harga)
+                                    Fisik Tidak Sesuai
                                 </button>
 
                                 <button type="button" wire:click="reject"
                                     wire:confirm="Yakin menolak transaksi ini mentah-mentah dan mengembalikan unit ke pelanggan?"
                                     class="w-full bg-white border-2 border-rose-100 text-rose-600 py-2.5 rounded-lg font-bold hover:bg-rose-50 transition mt-2">
-                                    Tolak Mentah-mentah
+                                    Tolak
                                 </button>
                             </div>
                         @else
@@ -214,7 +219,8 @@
                                 Tandai Selesai / Lunas
                             </button>
 
-                            <button type="button" wire:click="reject" wire:confirm="Yakin ingin menolak penawaran ini?"
+                            <button type="button" wire:click="reject"
+                                wire:confirm="Yakin ingin menolak penawaran ini?"
                                 class="w-full bg-white border-2 border-rose-100 text-rose-600 py-2.5 rounded-lg font-bold hover:bg-rose-50 transition">
                                 Tolak / Batalkan
                             </button>
@@ -306,9 +312,7 @@
     {{-- QC Inspection Form (Full Width at Bottom) --}}
     @if ($sellPhone->status === 'INSPECTING' && !$qcPassed)
         <div class="mt-8">
-            <livewire:admin.qc.inspection-form 
-                :inspectable-type="get_class($sellPhone)" 
-                :inspectable-id="$sellPhone->id" 
+            <livewire:admin.qc.inspection-form :inspectable-type="get_class($sellPhone)" :inspectable-id="$sellPhone->id"
                 label="QC Inbound - Beli HP Bekas" />
         </div>
     @endif
