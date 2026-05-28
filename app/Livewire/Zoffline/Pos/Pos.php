@@ -560,22 +560,47 @@ class Pos extends Component
 
     public function updateSerialNumber($index, $snIndex, $value)
     {
+        $value = trim($value);
+
         // 1. Pastikan item di cart ada dan input tidak kosong/spasi saja
-        if (isset($this->cart[$index]) && !empty(trim($value))) {
+        if (isset($this->cart[$index]) && !empty($value)) {
+
+            // =================================================================
+            // PROSES VALIDASI SN KE ACCURATE ONLINE
+            // =================================================================
+            $accurateService = app(\App\Services\AccurateService::class);
+            $dbSource = $this->databaseSource ?? 'syihab';
+
+            $isSnExists = $accurateService->checkSerialNumberExistance($value, $dbSource);
+
+            if (!$isSnExists) {
+                $this->dispatch(
+                    'toast',
+                    title: 'Serial Number Salah',
+                    message: "SN '{$value}' tidak ditemukan di Accurate ({$dbSource}).",
+                    type: 'error',
+                    duration: 4000 // Opsional: bisa diatur durasinya dalam milidetik
+                );
+
+                // 2. Kosongkan kembali input di browser berdasarkan id uniknya
+                $this->js("document.getElementById('sn_input_{$index}_{$snIndex}').value = '';");
+
+                return; // Hentikan proses, jangan masukkan ke cart
+            }
+            // =================================================================
 
             // 2. Inisialisasi array jika belum ada
             if (!isset($this->cart[$index]['serial_numbers'])) {
-                // Jika ada SN legacy lama yang tidak kosong, gunakan itu. Jika kosong, mulai dengan array kosong []
                 $legacySn = $this->cart[$index]['serial_number'] ?? '';
                 $this->cart[$index]['serial_numbers'] = !empty($legacySn) ? [$legacySn] : [];
             }
 
             // 3. Masukkan nilai barcode baru ke index yang dituju
-            $this->cart[$index]['serial_numbers'][$snIndex] = trim($value);
+            $this->cart[$index]['serial_numbers'][$snIndex] = $value;
 
             // 4. Update legacy untuk backward compatibility (jika ini SN pertama)
             if ($snIndex === 0) {
-                $this->cart[$index]['serial_number'] = trim($value);
+                $this->cart[$index]['serial_number'] = $value;
             }
         }
     }

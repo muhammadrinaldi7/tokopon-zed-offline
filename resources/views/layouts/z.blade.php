@@ -24,6 +24,7 @@
     </main>
 
     <livewire:confirm-modal />
+    <x-toast />
     <livewire:toast-notification />
     <script>
         /**
