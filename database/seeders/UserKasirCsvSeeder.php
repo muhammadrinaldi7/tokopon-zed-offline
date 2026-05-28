@@ -6,6 +6,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use App\Models\User; // <-- PENTING: Pastikan Model User di-import ke sini
 
 class UserKasirCsvSeeder extends Seeder
 {
@@ -22,12 +23,49 @@ class UserKasirCsvSeeder extends Seeder
             return;
         }
 
-        // Membuka file CSV
+        // ================= TAHAP 1: COLLECT EMAIL DARI CSV =================
+        $fileHandle = fopen($csvFile, 'r');
+        $isHeader = true;
+        $emails = [];
+
+        while (($row = fgetcsv($fileHandle, 1000, ',')) !== FALSE) {
+            if ($isHeader) {
+                $isHeader = false;
+                continue;
+            }
+            if (!empty($row[3])) {
+                $emails[] = trim($row[3]);
+            }
+        }
+        fclose($fileHandle);
+
+
+        // ================= TAHAP 2: ROLLBACK / BERSIHKAN DATA LAMA =================
+        if (!empty($emails)) {
+            // Ambil semua ID user lama berdasarkan email di CSV
+            $userIds = DB::table('users')->whereIn('email', $emails)->pluck('id');
+
+            if ($userIds->isNotEmpty()) {
+                // 1. Hapus relasi role Spatie di tabel model_has_roles agar tidak nyampah
+                DB::table('model_has_roles')
+                    ->whereIn('model_id', $userIds)
+                    ->where('model_type', User::class)
+                    ->delete();
+
+                // 2. Hapus profile di tabel user_profiles
+                DB::table('user_profiles')->whereIn('user_id', $userIds)->delete();
+
+                // 3. Hapus user utama di tabel users
+                DB::table('users')->whereIn('id', $userIds)->delete();
+            }
+        }
+
+
+        // ================= TAHAP 3: PROSES SEEDING DATA BARU =================
         $fileHandle = fopen($csvFile, 'r');
         $isHeader = true;
 
         while (($row = fgetcsv($fileHandle, 1000, ',')) !== FALSE) {
-            // Lewati baris pertama jika merupakan Header
             if ($isHeader) {
                 $isHeader = false;
                 continue;
@@ -38,55 +76,43 @@ class UserKasirCsvSeeder extends Seeder
             $email          = trim($row[3] ?? '');
             $noHpRaw        = trim($row[4] ?? '');
 
-            // Validasi: Jika nama atau email kosong, lewati baris ini
             if (empty($nama) || empty($email)) {
                 continue;
             }
 
-            // ================= LOGIKA MERAPIKAN NOMOR HP =================
-            // 1. Hilangkan spasi, tanda strip (-), atau titik (.) jika ada
+            // Logika merapikan nomor HP
             $noHpClean = preg_replace('/[^0-9]/', '', $noHpRaw);
-
-            // 2. Jika nomor diawali dengan '628', ubah menjadi '08'
             if (Str::startsWith($noHpClean, '628')) {
                 $noHpClean = '0' . substr($noHpClean, 2);
-            }
-            // 3. Jika nomor langsung diawali dengan '8' (contoh: 82157940375), tambahkan '0' di depannya
-            elseif (Str::startsWith($noHpClean, '8')) {
+            } elseif (Str::startsWith($noHpClean, '8')) {
                 $noHpClean = '0' . $noHpClean;
             }
-            // =============================================================
 
             // Ambil branch_id secara otomatis dari tabel 'branches'
             $branch = DB::table('branches')->where('name', $cabangName)->first();
             $branchId = $branch ? $branch->id : null;
 
-            // Insert atau Update data ke tabel 'users'
-            DB::table('users')->updateOrInsert(
-                ['email' => $email],
-                [
-                    'name'       => $nama,
-                    'password'   => Hash::make('password123'),
-                    'branch_id'  => $branchId,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]
-            );
+            // 🔥 PERBAIKAN UTAMA: Gunakan Eloquent User::create agar mengembalikan Object Model asli, bukan stdClass
+            $adminUser = User::create([
+                'name'       => $nama,
+                'email'      => $email,
+                'password'   => Hash::make('password123'),
+                'branch_id'  => $branchId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-            // Ambil ID dari user yang baru saja diproses
-            $user = DB::table('users')->where('email', $email)->first();
+            if ($adminUser) {
+                $adminUser->assignRole('fl');
 
-            if ($user) {
-                // Insert atau Update nomor HP yang SUDAH RAPI ke tabel 'user_profiles'
-                DB::table('user_profiles')->updateOrInsert(
-                    ['user_id' => $user->id],
-                    [
-                        'full_name'    => $nama,
-                        'phone_number' => $noHpClean, // <--- Hasil format rapi '08xxxxxxxxx'
-                        'created_at'   => now(),
-                        'updated_at'   => now(),
-                    ]
-                );
+                // Insert data nomor HP ke tabel 'user_profiles'
+                DB::table('user_profiles')->insert([
+                    'user_id'      => $adminUser->id,
+                    'full_name'    => $nama,
+                    'phone_number' => $noHpClean,
+                    'created_at'   => now(),
+                    'updated_at'   => now(),
+                ]);
             }
         }
 
