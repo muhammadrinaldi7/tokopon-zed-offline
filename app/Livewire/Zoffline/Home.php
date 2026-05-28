@@ -10,15 +10,17 @@ class Home extends Component
 {
     public function navigateToTradeIn()
     {
-        return redirect()->route('zoffline.trade-in');
+        return $this->redirectRoute('zoffline.trade-in', navigate: true);
     }
+
     public function navigateToSellPhone()
     {
-        return redirect()->route('zoffline.sell-phone');
+        return $this->redirectRoute('zoffline.sell-phone', navigate: true);
     }
+
     public function navigateToZPos()
     {
-        return redirect()->route('zoffline.pos');
+        return $this->redirectRoute('zoffline.pos', navigate: true);
     }
     public function render()
     {
