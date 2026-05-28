@@ -10,11 +10,11 @@ class Home extends Component
 {
     public function navigateToTradeIn()
     {
-        return redirect()->route('trade-in');
+        return redirect()->route('zoffline.trade-in');
     }
     public function navigateToSellPhone()
     {
-        return redirect()->route('sell-phone');
+        return redirect()->route('zoffline.sell-phone');
     }
     public function navigateToZPos()
     {

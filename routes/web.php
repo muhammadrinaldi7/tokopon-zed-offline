@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', \App\Livewire\Admin\Pos\PointOfSale::class)->middleware(['auth', 'admin'])->name('/');
 Route::get('/zoffline', \App\Livewire\Zoffline\Home::class)->name('zoffline');
 Route::get('/zoffline/pos', \App\Livewire\Zoffline\Pos\Pos::class)->name('zoffline.pos');
+Route::get('/zoffline/trade-in', \App\Livewire\Zoffline\TradeIn\TradeIn::class)->name('zoffline.trade-in');
+Route::get('/zoffline/sell-phone', \App\Livewire\Zoffline\SellPhone\SellPhone::class)->name('zoffline.sell-phone');
+
 // ─── Trade In & Sell Phone Client Pages (accessible by authenticated users, e.g. FL or customer) ───
 Route::middleware(['auth'])->group(function () {
     Route::get('/sell-phone', SellPhone::class)->name('sell-phone');

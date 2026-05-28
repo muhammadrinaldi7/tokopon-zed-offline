@@ -38,12 +38,9 @@ new class extends Component {
         <nav class="flex-1 flex flex-col gap-4 w-full items-center">
 
             {{-- Item: POS --}}
-            <a href="/" wire:navigate
+            <a href="{{ route('zoffline.pos') }}" wire:navigate
                 class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-[#4E44DB] hover:bg-blue-50 transition-all duration-200">
-                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
+                <img src="{{ asset('assets/png/pos2.png') }}" class="w-8 h-auto" alt="">
                 <span
                     class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
                     Point of Sale
@@ -52,12 +49,10 @@ new class extends Component {
             </a>
 
             {{-- Item: Tukar Tambah --}}
-            <a href="/trade-in" wire:navigate
+            <a href="{{ route('zoffline.trade-in') }}" wire:navigate
                 class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-all duration-200">
-                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                </svg>
+                <img src="{{ asset('assets/png/trd.png') }}" class="w-8 h-auto" alt="">
+
                 <span
                     class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
                     Tukar Tambah
@@ -66,12 +61,9 @@ new class extends Component {
             </a>
 
             {{-- Item: Jual HP --}}
-            <a href="/sell-phone" wire:navigate
+            <a href="{{ route('zoffline.sell-phone') }}" wire:navigate
                 class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-violet-600 hover:bg-violet-50 transition-all duration-200">
-                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <img src="{{ asset('assets/png/sellphone.png') }}" class="w-8 h-auto" alt="">
                 <span
                     class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
                     Jual HP Bekas
