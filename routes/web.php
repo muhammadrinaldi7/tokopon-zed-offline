@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Route;
 
 // ─── POS Landing Page (requires auth + admin role) ──────────────
 Route::get('/', \App\Livewire\Admin\Pos\PointOfSale::class)->middleware(['auth', 'admin'])->name('/');
-
+Route::get('/zoffline', \App\Livewire\Zoffline\Home::class)->name('zoffline');
+Route::get('/zoffline/pos', \App\Livewire\Zoffline\Pos\Pos::class)->name('zoffline.pos');
 // ─── Trade In & Sell Phone Client Pages (accessible by authenticated users, e.g. FL or customer) ───
 Route::middleware(['auth'])->group(function () {
     Route::get('/sell-phone', SellPhone::class)->name('sell-phone');

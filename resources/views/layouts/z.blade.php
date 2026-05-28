@@ -18,19 +18,10 @@
 
 <body class="min-h-screen bg-gray-50 antialiased flex flex-col">
 
-    <livewire:header />
-    @auth
-        @unless (auth()->user()->hasRole('cs'))
-            <livewire:chatroom />
-        @endunless
-    @endauth
-    <main class="flex-1">
+    <livewire:sidebar />
+    <main class="flex-1 pb-24 lg:pb-0 lg:ml-20">
         {{ $slot }}
     </main>
-
-    @unless (request()->is('/'))
-        <livewire:footer />
-    @endunless
 
     <livewire:confirm-modal />
     <livewire:toast-notification />
