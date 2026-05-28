@@ -14,6 +14,9 @@ class Promo extends Model
         'is_active' => 'boolean',
         'discount_value' => 'decimal:2',
         'max_discount' => 'decimal:2',
+        'min_transaction_amount' => 'decimal:2',
+        'min_qty' => 'integer',
+        'apply_to_all_items' => 'boolean',
     ];
 
     public function brand()
@@ -24,5 +27,10 @@ class Promo extends Model
     public function orders()
     {
         return $this->belongsToMany(Order::class, 'order_promos')->withPivot('discount_applied')->withTimestamps();
+    }
+
+    public function skus()
+    {
+        return $this->hasMany(PromoSku::class);
     }
 }

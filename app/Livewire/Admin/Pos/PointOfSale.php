@@ -198,21 +198,54 @@ class PointOfSale extends Component
         return collect($this->payments)->sum(fn($p) => (float)($p['amount'] ?? 0));
     }
 
+    public function calculateEligibleCart($promo)
+    {
+        $eligibleQty = 0;
+        $eligibleAmount = 0;
+
+        if ($promo->apply_to_all_items) {
+            $eligibleAmount = $this->subtotal;
+            $eligibleQty = array_sum(array_column($this->cart, 'qty'));
+        } else {
+            $promoSkus = $promo->skus->pluck('sku')->toArray();
+            foreach ($this->cart as $item) {
+                if (in_array($item['sku'], $promoSkus)) {
+                    $eligibleQty += (int)$item['qty'];
+                    $eligibleAmount += ((int)$item['qty'] * (float)$item['price']);
+                }
+            }
+        }
+        return ['qty' => $eligibleQty, 'amount' => $eligibleAmount];
+    }
+
+    public function isPromoEligible($promo)
+    {
+        $eligible = $this->calculateEligibleCart($promo);
+        if ($promo->min_qty && $eligible['qty'] < $promo->min_qty) return false;
+        if ($promo->min_transaction_amount && $eligible['amount'] < $promo->min_transaction_amount) return false;
+        
+        // If not apply to all items and eligible qty is 0, it's not eligible
+        if (!$promo->apply_to_all_items && $eligible['qty'] == 0) return false;
+
+        return true;
+    }
+
     #[Computed]
     public function totalPromoDiscount()
     {
         if (empty($this->selectedPromos)) return 0;
         
-        $promos = \App\Models\Promo::whereIn('id', $this->selectedPromos)->get();
+        $promos = \App\Models\Promo::with('skus')->whereIn('id', $this->selectedPromos)->get();
         $total = 0;
-        $subtotal = $this->subtotal; // Subtotal belanja sebelum diskon
 
         foreach ($promos as $promo) {
+            $eligible = $this->calculateEligibleCart($promo);
+            
             if ($promo->discount_type === 'fixed') {
                 $total += $promo->discount_value;
             } else {
-                // Percentage
-                $calc = $subtotal * ($promo->discount_value / 100);
+                // Percentage only from eligible amount!
+                $calc = $eligible['amount'] * ($promo->discount_value / 100);
                 if ($promo->max_discount) {
                     $calc = min($calc, $promo->max_discount);
                 }
@@ -231,7 +264,8 @@ class PointOfSale extends Component
     #[Computed]
     public function activePromos()
     {
-        return \App\Models\Promo::where('is_active', true)
+        $promos = \App\Models\Promo::with('skus')
+            ->where('is_active', true)
             ->where(function($q) {
                 $q->whereNull('start_date')->orWhere('start_date', '<=', now());
             })
@@ -239,6 +273,18 @@ class PointOfSale extends Component
                 $q->whereNull('end_date')->orWhere('end_date', '>=', now());
             })
             ->get();
+            
+        $eligiblePromos = [];
+        foreach($promos as $promo) {
+            if ($this->isPromoEligible($promo)) {
+                $eligiblePromos[] = $promo;
+            } else {
+                if (in_array($promo->id, $this->selectedPromos)) {
+                    $this->selectedPromos = array_diff($this->selectedPromos, [$promo->id]);
+                }
+            }
+        }
+        return collect($eligiblePromos);
     }
 
     #[Computed]
@@ -662,13 +708,14 @@ class PointOfSale extends Component
 
             // Save promos to pivot table
             if (!empty($this->selectedPromos)) {
-                $promos = \App\Models\Promo::whereIn('id', $this->selectedPromos)->get();
+                $promos = \App\Models\Promo::with('skus')->whereIn('id', $this->selectedPromos)->get();
                 foreach ($promos as $promo) {
+                    $eligible = $this->calculateEligibleCart($promo);
                     $applied = 0;
                     if ($promo->discount_type === 'fixed') {
                         $applied = $promo->discount_value;
                     } else {
-                        $calc = $subtotal * ($promo->discount_value / 100);
+                        $calc = $eligible['amount'] * ($promo->discount_value / 100);
                         if ($promo->max_discount) $calc = min($calc, $promo->max_discount);
                         $applied = $calc;
                     }
