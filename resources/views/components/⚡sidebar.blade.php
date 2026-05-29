@@ -113,6 +113,10 @@ new class extends Component {
                     class="block px-4 py-2 text-sm text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors">
                     Profil & Pengaturan
                 </a>
+                <a href="{{ route('zoffline.sell-phone-history') }}" wire:navigate
+                    class="block px-4 py-2 text-sm text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors">
+                    History Sell Phone
+                </a>
 
                 <div class="h-px bg-gray-100 my-1"></div>
 
