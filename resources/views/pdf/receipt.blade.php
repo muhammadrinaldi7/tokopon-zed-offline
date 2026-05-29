@@ -78,7 +78,7 @@
         </tr>
         <tr>
             <td>Sales:</td>
-            <td class="text-right">{{ $order->salesBy->first()->name ?? '-' }}</td>
+            <td class="text-right">{{ $order->salesBy->name ?? '-' }}</td>
         </tr>
         <tr>
             <td>Customer:</td>

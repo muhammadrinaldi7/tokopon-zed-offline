@@ -1379,7 +1379,7 @@ class Pos extends Component
         $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_LEFT);
         $printer->text($this->formatLine("No. Transaksi", $this->completedOrder->order_number, $maxColumns) . "\n");
         $printer->text($this->formatLine("Kasir", $this->completedOrder->handledBy->name ?? '-', $maxColumns) . "\n");
-        $printer->text($this->formatLine("Sales", $this->completedOrder->salesBy->first()->name ?? '-', $maxColumns) . "\n");
+        $printer->text($this->formatLine("Sales", $this->completedOrder->salesBy->name ?? '-', $maxColumns) . "\n");
         $printer->text($this->formatLine("Customer", $this->completedOrder->user->name ?? '-', $maxColumns) . "\n");
         $printer->text($separator);
 
