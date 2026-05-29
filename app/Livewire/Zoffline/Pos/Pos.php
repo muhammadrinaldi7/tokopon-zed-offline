@@ -585,8 +585,15 @@ class Pos extends Component
     {
         $value = trim($value);
 
-        // 1. Pastikan item di cart ada dan input tidak kosong/spasi saja
         if (isset($this->cart[$index]) && !empty($value)) {
+
+            $expectedSku = $this->cart[$index]['sku'] ?? null;
+
+            if (empty($expectedSku)) {
+                $this->dispatch('toast', title: 'Error Data', message: 'SKU untuk produk ini tidak ditemukan di keranjang.', type: 'error');
+                $this->js("document.getElementById('sn_input_{$index}_{$snIndex}').value = '';");
+                return;
+            }
 
             // =================================================================
             // PROSES VALIDASI SN KE ACCURATE ONLINE
@@ -594,21 +601,38 @@ class Pos extends Component
             $accurateService = app(\App\Services\AccurateService::class);
             $dbSource = $this->databaseSource ?? 'syihab';
 
-            $isSnExists = $accurateService->checkSerialNumberExistance($value, $dbSource);
+            // Menampung string status ('valid', 'not_found', 'mismatch', 'error')
+            $status = $accurateService->checkSerialNumberExistance($value, $expectedSku, $dbSource);
 
-            if (!$isSnExists) {
+            if ($status !== 'valid') {
+                $title = 'Gagal Validasi';
+                $message = 'Terjadi kesalahan saat memvalidasi SN.';
+
+                // Pilah pesan error sesuai kondisi riil dari Accurate
+                if ($status === 'not_found') {
+                    $title = 'SN Tidak Ditemukan';
+                    $message = "Serial Number '{$value}' tidak terdaftar di Accurate ({$dbSource}).";
+                } elseif ($status === 'mismatch') {
+                    $title = 'SN Tidak Sesuai';
+                    $message = "SN '{$value}' ada di Accurate, TAPI milik produk/barang lain.";
+                } elseif ($status === 'error') {
+                    $title = 'Gangguan Sistem';
+                    $message = "Gagal menghubungi Accurate. Silakan coba beberapa saat lagi.";
+                }
+
+                // Kirim toast spesifik sesuai error-nya
                 $this->dispatch(
                     'toast',
-                    title: 'Serial Number Salah',
-                    message: "SN '{$value}' tidak ditemukan di Accurate ({$dbSource}).",
+                    title: $title,
+                    message: $message,
                     type: 'error',
-                    duration: 4000 // Opsional: bisa diatur durasinya dalam milidetik
+                    duration: 4000
                 );
 
-                // 2. Kosongkan kembali input di browser berdasarkan id uniknya
+                // Kosongkan input text pencarian di browser
                 $this->js("document.getElementById('sn_input_{$index}_{$snIndex}').value = '';");
 
-                return; // Hentikan proses, jangan masukkan ke cart
+                return; // Gagalkan pengisian SN ke cart
             }
             // =================================================================
 
@@ -618,7 +642,7 @@ class Pos extends Component
                 $this->cart[$index]['serial_numbers'] = !empty($legacySn) ? [$legacySn] : [];
             }
 
-            // 3. Masukkan nilai barcode baru ke index yang dituju
+            // 3. Masukkan nilai SN baru ke index yang dituju
             $this->cart[$index]['serial_numbers'][$snIndex] = $value;
 
             // 4. Update legacy untuk backward compatibility (jika ini SN pertama)

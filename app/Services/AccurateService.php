@@ -576,7 +576,42 @@ class AccurateService
     /**
      * FUNGSI BARU: Memeriksa keberadaan Serial Number (SN) di database Accurate Online
      */
-    public function checkSerialNumberExistance($sn, $databaseSource = 'syihab')
+    // public function checkSerialNumberExistance($sn, $databaseSource = 'syihab')
+    // {
+    //     $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+    //     $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+    //     $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+    //     $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+    //     $timestamp = now()->toIso8601String();
+    //     $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+    //     try {
+    //         $response = Http::withHeaders([
+    //             'Authorization'   => 'Bearer ' . $token,
+    //             'X-Api-Timestamp' => $timestamp,
+    //             'X-Api-Signature' => $signature,
+    //             'Content-Type'    => 'application/json',
+    //         ])->get($host . '/item/search-by-item-or-sn.do', [
+    //             'keywords' => $sn
+    //         ]);
+
+    //         Log::info("API Accurate Check SN ({$databaseSource}) Success: " . $response->body());
+
+    //         if ($response->successful()) {
+    //             $data = $response->json();
+    //             // Jika Accurate mengembalikan status sukses (s = true) dan isi datanya (d) tidak kosong, berati SN ada
+    //             if (isset($data['s']) && $data['s'] === true && !empty($data['d'])) {
+    //                 return true;
+    //             }
+    //         }
+    //         return false;
+    //     } catch (\Exception $e) {
+    //         Log::error("API Accurate Check SN ({$databaseSource}) Error: " . $e->getMessage());
+    //         return false;
+    //     }
+    // }
+    public function checkSerialNumberExistance($sn, $expectedSku, $databaseSource = 'syihab')
     {
         $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
         $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
@@ -596,19 +631,31 @@ class AccurateService
                 'keywords' => $sn
             ]);
 
-            Log::info("API Accurate Check SN ({$databaseSource}) Success: " . $response->body());
-
             if ($response->successful()) {
                 $data = $response->json();
-                // Jika Accurate mengembalikan status sukses (s = true) dan isi datanya (d) tidak kosong, berati SN ada
-                if (isset($data['s']) && $data['s'] === true && !empty($data['d'])) {
-                    return true;
+
+                if (isset($data['s']) && $data['s'] === true) {
+                    // KONDISI 1: Jika Accurate sukses merespons tapi array 'd' kosong (SN memang tidak ada)
+                    if (empty($data['d'])) {
+                        return 'not_found';
+                    }
+
+                    // Jika array 'd' ada isinya, kita cek kecocokan SKU
+                    foreach ($data['d'] as $accurateItem) {
+                        if (isset($accurateItem['no']) && $accurateItem['no'] === $expectedSku) {
+                            return 'valid'; // SN ada DAN cocok dengan SKU
+                        }
+                    }
+
+                    // KONDISI 2: Loop selesai tapi tidak ada SKU yang cocok (SN ada, tapi beda barang)
+                    return 'mismatch';
                 }
             }
-            return false;
+
+            return 'not_found';
         } catch (\Exception $e) {
             Log::error("API Accurate Check SN ({$databaseSource}) Error: " . $e->getMessage());
-            return false;
+            return 'error'; // Jika terjadi gangguan server / API timeout
         }
     }
 }
