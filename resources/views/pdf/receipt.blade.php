@@ -114,12 +114,12 @@
             <td>Subtotal</td>
             <td class="text-right">{{ number_format($order->total_amount, 0, ',', '.') }}</td>
         </tr>
-        @if ($order->discount_amount > 0)
+        {{-- @if ($order->discount_amount > 0)
             <tr>
                 <td>Diskon</td>
                 <td class="text-right">-{{ number_format($order->discount_amount, 0, ',', '.') }}</td>
             </tr>
-        @endif
+        @endif --}}
     </table>
 
     <div class="divider"></div>
@@ -137,7 +137,8 @@
         @foreach ($order->payments as $payment)
             <tr>
                 <td>Bayar
-                    ({{ $payment->paymentMethod->name ?? 'Cash' }}{{ $payment->paymentMethodRate ? ' - ' . $payment->paymentMethodRate->name : '' }}):
+                    ({{ $payment->paymentMethod->name ?? 'Cash' }}{{ $payment->paymentMethodRate ? ' - ' . $payment->paymentMethodRate->name : '' }})
+                    :
                 </td>
                 <td class="text-right">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
             </tr>
