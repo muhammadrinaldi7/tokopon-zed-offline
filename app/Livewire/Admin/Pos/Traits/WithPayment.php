@@ -108,16 +108,18 @@ trait WithPayment
         return collect($this->payments)->sum(fn($p) => (float)($p['amount'] ?? 0));
     }
 
-    public function calculateEligibleCart($promo)
+    public function calculateEligibleCart($promo, $forBundle = false)
     {
         $eligibleQty = 0;
         $eligibleAmount = 0;
 
-        if ($promo->apply_to_all_items) {
+        if ($promo->apply_to_all_items && !$forBundle) {
             $eligibleAmount = $this->subtotal;
             $eligibleQty = array_sum(array_column($this->cart, 'qty'));
         } else {
-            $promoSkus = $promo->skus->pluck('sku')->toArray();
+            // Jika untuk bundle, cari dari bundleSkus. Jika utama, dari skus.
+            $promoSkus = $forBundle ? $promo->bundleSkus->pluck('sku')->toArray() : $promo->skus->pluck('sku')->toArray();
+            
             foreach ($this->cart as $item) {
                 if (in_array($item['sku'], $promoSkus)) {
                     $eligibleQty += (int)$item['qty'];
@@ -125,12 +127,22 @@ trait WithPayment
                 }
             }
         }
+
+        // Cap reward qty untuk produk bundle
+        if ($forBundle && $promo->bundle_max_qty && $eligibleQty > $promo->bundle_max_qty) {
+            $avgPrice = $eligibleQty > 0 ? ($eligibleAmount / $eligibleQty) : 0;
+            $eligibleQty = $promo->bundle_max_qty;
+            $eligibleAmount = $eligibleQty * $avgPrice;
+        }
+
         return ['qty' => $eligibleQty, 'amount' => $eligibleAmount];
     }
 
     public function isPromoEligible($promo)
     {
-        $eligible = $this->calculateEligibleCart($promo);
+        // Mengecek kelayakan hanya berdasarkan Produk Utama (Main Product)
+        $eligible = $this->calculateEligibleCart($promo, false);
+        
         if ($promo->min_qty && $eligible['qty'] < $promo->min_qty) return false;
         if ($promo->min_transaction_amount && $eligible['amount'] < $promo->min_transaction_amount) return false;
         
@@ -145,21 +157,33 @@ trait WithPayment
     {
         if (empty($this->selectedPromos)) return 0;
         
-        $promos = Promo::with('skus')->whereIn('id', $this->selectedPromos)->get();
+        $promos = Promo::with(['skus', 'bundleSkus'])->whereIn('id', $this->selectedPromos)->get();
         $total = 0;
 
         foreach ($promos as $promo) {
-            $eligible = $this->calculateEligibleCart($promo);
-            
+            // 1. Kalkulasi Diskon Utama
+            $eligibleMain = $this->calculateEligibleCart($promo, false);
             if ($promo->discount_type === 'fixed') {
-                $total += $promo->discount_value;
+                $total += $promo->discount_value; // Fixed amount per transaction for main discount
             } else {
-                // Percentage only from eligible amount!
-                $calc = $eligible['amount'] * ($promo->discount_value / 100);
-                if ($promo->max_discount) {
-                    $calc = min($calc, $promo->max_discount);
-                }
+                $calc = $eligibleMain['amount'] * ($promo->discount_value / 100);
+                if ($promo->max_discount) $calc = min($calc, $promo->max_discount);
                 $total += $calc;
+            }
+
+            // 2. Kalkulasi Diskon Tambahan (Bundle)
+            if ($promo->is_bundle) {
+                $eligibleBundle = $this->calculateEligibleCart($promo, true);
+                if ($eligibleBundle['qty'] > 0) {
+                    if ($promo->bundle_discount_type === 'fixed') {
+                        // Fixed bundle discount multiplied by eligible bundle qty
+                        $total += $promo->bundle_discount_value * $eligibleBundle['qty'];
+                    } else {
+                        $calc = $eligibleBundle['amount'] * ($promo->bundle_discount_value / 100);
+                        if ($promo->bundle_max_discount) $calc = min($calc, $promo->bundle_max_discount);
+                        $total += $calc;
+                    }
+                }
             }
         }
         return $total;
@@ -174,7 +198,7 @@ trait WithPayment
     #[Computed]
     public function activePromos()
     {
-        $promos = Promo::with('skus')
+        $promos = Promo::with(['skus', 'bundleSkus'])
             ->where('is_active', true)
             ->where(function($q) {
                 $q->whereNull('start_date')->orWhere('start_date', '<=', now());
@@ -190,7 +214,7 @@ trait WithPayment
                 $eligiblePromos[] = $promo;
             } else {
                 if (in_array($promo->id, $this->selectedPromos)) {
-                    $this->selectedPromos = array_diff($this->selectedPromos, [$promo->id]);
+                    $this->selectedPromos = array_values(array_diff($this->selectedPromos, [$promo->id]));
                 }
             }
         }

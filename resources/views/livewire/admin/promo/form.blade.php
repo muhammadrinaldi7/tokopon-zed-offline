@@ -243,6 +243,144 @@
                     @enderror
                 </div>
 
+                {{-- Toggle Bundling --}}
+                <div class="md:col-span-2 mt-2">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" wire:model.live="is_bundle" class="sr-only peer">
+                        <div
+                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500">
+                        </div>
+                        <span class="ml-3 text-sm font-bold text-gray-700">Promo Bundling</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1">Aktifkan jika promo ini juga memberikan diskon tambahan untuk
+                        produk pendamping (Bundle) jika dibeli bersamaan dengan produk utama di atas.</p>
+                </div>
+
+                @if ($is_bundle)
+                    <div class="md:col-span-2 mt-2 bg-amber-50 rounded-xl p-4 border border-amber-200">
+                        <h4 class="font-bold text-amber-800 mb-4 border-b border-amber-200 pb-2">Aturan Diskon Produk
+                            Pendamping (Bundle)</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label class="block text-sm font-bold text-amber-900 mb-2">Tipe Diskon Bundle</label>
+                                <select wire:model.live="bundle_discount_type"
+                                    class="w-full border border-amber-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white">
+                                    <option value="fixed">Nominal Tetap (Rp)</option>
+                                    <option value="percentage">Persentase (%)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-amber-900 mb-2">Nilai Diskon Bundle</label>
+                                <div class="relative">
+                                    @if ($bundle_discount_type === 'fixed')
+                                        <span
+                                            class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
+                                        <input type="number" wire:model="bundle_discount_value"
+                                            class="w-full pl-10 pr-4 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                            min="0" placeholder="0">
+                                    @else
+                                        <input type="number" wire:model="bundle_discount_value"
+                                            class="w-full pl-4 pr-10 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                            min="0" max="100" placeholder="0">
+                                        <span
+                                            class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">%</span>
+                                    @endif
+                                </div>
+                                @error('bundle_discount_value')
+                                    <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            @if ($bundle_discount_type === 'percentage')
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-bold text-amber-900 mb-2">Maksimal Potongan Bundle
+                                        (Opsional)</label>
+                                    <div class="relative max-w-md">
+                                        <span
+                                            class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
+                                        <input type="number" wire:model="bundle_max_discount"
+                                            class="w-full pl-10 pr-4 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                            min="0" placeholder="Biarkan kosong jika tanpa batas">
+                                    </div>
+                                    @error('bundle_max_discount')
+                                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold text-amber-900 mb-2">Maks. Qty Produk Pendamping yang
+                                Dapat Diskon (Opsional)</label>
+                            <input type="number" wire:model="bundle_max_qty"
+                                class="max-w-xs border border-amber-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                min="1" placeholder="Kosongkan = tanpa batas">
+                            <p class="text-xs text-amber-700 mt-1">Misal: jika diisi 1, maka hanya 1 unit smartwatch
+                                yang dapat diskon meskipun pelanggan beli 2.</p>
+                            @error('bundle_max_qty')
+                                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        {{-- Bundle Reward Products --}}
+                        <div>
+                            <label class="block text-sm font-bold text-amber-900 mb-2">
+                                Produk Pendamping (Bundle)
+                            </label>
+                            <p class="text-xs text-amber-700 mb-3">Pilih produk yang akan mendapat potongan diskon
+                                tambahan di atas JIKA produk utama dibeli.</p>
+
+                            <div class="relative max-w-md">
+                                <input type="text" wire:model.live.debounce.300ms="search_bundle_sku"
+                                    class="w-full border border-amber-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                    placeholder="Ketik nama produk pendamping atau SKU...">
+
+                                @if (count($bundle_sku_search_results) > 0)
+                                    <div
+                                        class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                        @foreach ($bundle_sku_search_results as $item)
+                                            <div wire:click="addBundleSku('{{ $item['sku'] }}', '{{ $item['name'] }}')"
+                                                class="px-4 py-2 hover:bg-amber-50 cursor-pointer border-b border-gray-100 last:border-0">
+                                                <div class="font-bold text-sm text-gray-800">{{ $item['name'] }}</div>
+                                                <div class="text-xs text-amber-600 font-mono">{{ $item['sku'] }}
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                @foreach ($selected_bundle_skus as $index => $item)
+                                    <div
+                                        class="inline-flex items-center gap-2 bg-white border border-amber-200 px-3 py-1.5 rounded-lg text-sm shadow-sm">
+                                        <div>
+                                            <span class="font-bold text-gray-700">{{ $item['name'] }}</span>
+                                            <span
+                                                class="text-xs text-gray-400 font-mono ml-1">({{ $item['sku'] }})</span>
+                                        </div>
+                                        <button type="button" wire:click="removeBundleSku('{{ $item['sku'] }}')"
+                                            class="text-red-500 hover:bg-red-50 p-1 rounded-md transition-colors">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                @endforeach
+
+                                @if (count($selected_bundle_skus) === 0)
+                                    <div class="text-sm text-amber-500 italic">Belum ada produk pendamping yang
+                                        dipilih.</div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 <div class="md:col-span-2 mt-4">
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" wire:model.live="apply_to_all_items" class="sr-only peer">
@@ -255,8 +393,11 @@
 
                 @if (!$apply_to_all_items)
                     <div class="md:col-span-2 mt-2 bg-gray-50 rounded-xl p-4 border border-gray-200">
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Pilih Barang yang Berlaku (Pilih
-                            produk/SKU)</label>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">
+                            Pilih Barang yang Berlaku (Pilih produk/SKU Utama)
+                        </label>
+                        <p class="text-xs text-gray-500 mb-3">Produk-produk ini yang akan menjadi trigger validasi
+                            promo dan mendapatkan diskon utama.</p>
 
                         <div class="relative max-w-md">
                             <input type="text" wire:model.live.debounce.300ms="search_sku"
@@ -298,7 +439,7 @@
                             @endforeach
 
                             @if (count($selected_skus) === 0)
-                                <div class="text-sm text-gray-400 italic">Belum ada barang yang dipilih.</div>
+                                <div class="text-sm text-gray-400 italic">Belum ada barang utama yang dipilih.</div>
                             @endif
                         </div>
                     </div>

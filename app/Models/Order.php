@@ -50,7 +50,7 @@ class Order extends Model
     }
     public function salesBy()
     {
-        return $this->hasMany(Employe::class, 'id');
+        return $this->belongsTo(Employe::class, 'sales_id', 'id');
     }
 
     public function paymentMethod()

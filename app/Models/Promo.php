@@ -12,10 +12,14 @@ class Promo extends Model
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'is_active' => 'boolean',
+        'is_bundle' => 'boolean',
         'discount_value' => 'decimal:2',
         'max_discount' => 'decimal:2',
         'min_transaction_amount' => 'decimal:2',
         'min_qty' => 'integer',
+        'bundle_discount_value' => 'decimal:2',
+        'bundle_max_discount' => 'decimal:2',
+        'bundle_max_qty' => 'integer',
         'apply_to_all_items' => 'boolean',
     ];
 
@@ -33,4 +37,10 @@ class Promo extends Model
     {
         return $this->hasMany(PromoSku::class);
     }
+
+    public function bundleSkus()
+    {
+        return $this->hasMany(PromoBundleSku::class);
+    }
 }
+
