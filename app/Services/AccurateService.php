@@ -725,4 +725,47 @@ class AccurateService
             return 'error'; // Jika terjadi gangguan server / API timeout
         }
     }
+
+    /**
+     * Hit API Bulk Save Penyesuaian Persediaan (Max 100 data)
+     * * @param array $chunkData
+     * @return array
+     * @throws \Exception
+     */
+    public function bulkSaveItemAdjustment(array $chunkData)
+    {
+        // 1. Siapkan Timestamp & Signature khas Accurate
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, env('ACCURATE_SECRET_KEY'));
+
+        // 2. Susun parameter bungkus "data"
+        $payload = [
+            "data" => $chunkData
+        ];
+
+        // 3. Eksekusi POST ke endpoint bulk-save
+        $response = Http::withHeaders([
+            'Authorization'   => 'Bearer ' . env('ACCURATE_TOKEN'),
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->post(env('ACCURATE_HOST') . '/item-adjustment/bulk-save.do', $payload);
+
+        // 4. Catat Log & Validasi Response internal Accurate
+        Log::info('API Accurate Bulk Adjustment Response: ' . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+
+            // Cek jika status 's' bernilai false (error bawaan Accurate)
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+
+            return $data;
+        } else {
+            throw new \Exception('API Accurate Connection Error: ' . $response->body());
+        }
+    }
 }
