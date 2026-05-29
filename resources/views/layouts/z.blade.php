@@ -14,6 +14,25 @@
 
     <!-- Vite Assets -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        @keyframes laser-scan {
+            0% {
+                top: 0%;
+            }
+
+            50% {
+                top: 100%;
+            }
+
+            100% {
+                top: 0%;
+            }
+        }
+
+        .animate-laser {
+            animation: laser-scan 2s linear infinite;
+        }
+    </style>
 </head>
 
 <body class="min-h-screen bg-gray-50 antialiased flex flex-col">

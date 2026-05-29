@@ -139,14 +139,14 @@ new class extends Component {
                         @endif
 
 
-                        <a href="{{ route('orders.index') }}" wire:navigate
+                        {{-- <a href="{{ route('orders.index') }}" wire:navigate
                             class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                             </svg>
                             Pesanan Saya
-                        </a>
+                        </a> --}}
 
                         <a href="{{ route('trade-in-history') }}" wire:navigate
                             class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition">
@@ -185,9 +185,8 @@ new class extends Component {
                 </a>
                 <a href="#"
                     class="flex items-center gap-1.5 px-5 py-2 text-sm font-semibold text-gray-500 bg-gray-100 border border-gray-200 rounded-lg transition hover:bg-gray-200 hover:-translate-y-0.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                        stroke-linejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                     </svg>
                     Chat

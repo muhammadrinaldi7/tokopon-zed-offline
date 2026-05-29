@@ -25,6 +25,8 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Mike42\Escpos\PrintConnectors\WindowsPrintConnector;
+use Mike42\Escpos\Printer;
 
 #[Layout('layouts.z', ['title' => 'Point of Sale'])]
 class Pos extends Component
@@ -1339,27 +1341,100 @@ class Pos extends Component
             return;
         }
 
-        $printerName = env('ESCPOS_PRINTER_NAME', 'POS-80');
-
         try {
-            if (filter_var($printerName, FILTER_VALIDATE_IP)) {
-                $connector = new \Mike42\Escpos\PrintConnectors\NetworkPrintConnector($printerName, 9100);
-            } else {
-                $connector = new \Mike42\Escpos\PrintConnectors\WindowsPrintConnector($printerName);
-            }
-
-            $printer = new \Mike42\Escpos\Printer($connector);
+            $connector = new WindowsPrintConnector("PrinterKasir");
+            $printer = new Printer($connector);
             $printer->initialize();
 
             $this->generateEscposContent($printer);
 
             $printer->close();
 
-            $this->dispatch('toast', title: 'Sukses', message: 'Perintah cetak thermal terkirim ke ' . $printerName, type: 'success');
+            // Mengubah kata 'thermal' menjadi 'dot matrix' atau 'kasir'
+            $this->dispatch('toast', title: 'Sukses', message: 'Perintah cetak kasir terkirim ke ' . "PrinterKasir", type: 'success');
         } catch (\Exception $e) {
             Log::error('ESCPOS Print Error: ' . $e->getMessage());
-            $this->dispatch('toast', title: 'Cetak Gagal', message: 'Tidak dapat mencetak ke ' . $printerName . ': ' . $e->getMessage(), type: 'error');
+            $this->dispatch('toast', title: 'Cetak Gagal', message: 'Tidak dapat mencetak ke "PrinterKasir" : ' . $e->getMessage(), type: 'error');
         }
+    }
+
+    private function generateEscposContent($printer)
+    {
+        // Ubah ke 33 karena printer menggunakan Font besar/Font B agar tidak meluber
+        $maxColumns = 33;
+        $separator = str_repeat("-", $maxColumns) . "\n"; // Otomatis membuat 33 karakter '-'
+
+        // Store Title (Center, Large)
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
+        $printer->selectPrintMode(\Mike42\Escpos\Printer::MODE_DOUBLE_WIDTH | \Mike42\Escpos\Printer::MODE_DOUBLE_HEIGHT);
+        $printer->text("TOKOPON\n");
+
+        $printer->selectPrintMode();
+        $storeName = $this->completedOrder->shipping_address_snapshot['store'] ?? 'Toko';
+        $printer->text($storeName . "\n");
+        $printer->text($this->completedOrder->created_at->format('d/m/Y H:i') . "\n");
+        $printer->text($separator);
+
+        // Info (Left)
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_LEFT);
+        $printer->text($this->formatLine("No. Transaksi", $this->completedOrder->order_number, $maxColumns) . "\n");
+        $printer->text($this->formatLine("Kasir", $this->completedOrder->handledBy->name ?? '-', $maxColumns) . "\n");
+        $printer->text($this->formatLine("Customer", $this->completedOrder->user->name ?? '-', $maxColumns) . "\n");
+        $printer->text($separator);
+
+        // Items List
+        foreach ($this->completedOrder->items as $item) {
+            $v = $item->variant;
+            $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
+            if ($v) {
+                $itemName .= " (" . $v->color . "/" . $v->storage . ")";
+            }
+
+            $printer->text($itemName . "\n");
+
+            $qtyAndPrice = $item->qty . "x Rp " . number_format($item->price_at_checkout, 0, ',', '.');
+            $subtotal = "Rp " . number_format($item->subtotal, 0, ',', '.');
+
+            // Mengurangi space di depan menjadi 1 spasi saja agar menghemat karakter yang makin sempit
+            $printer->text($this->formatLine(" " . $qtyAndPrice, $subtotal, $maxColumns) . "\n");
+
+            if ($item->serial_number) {
+                $printer->text(" SN: " . $item->serial_number . "\n");
+            }
+        }
+        $printer->text($separator);
+
+        // Subtotal
+        $printer->text($this->formatLine("Subtotal", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), $maxColumns) . "\n");
+        $printer->text($separator);
+
+        // Grand Total (Bold)
+        $printer->setEmphasis(true);
+        $printer->text($this->formatLine("TOTAL", "Rp " . number_format($this->completedOrder->grand_total, 0, ',', '.'), $maxColumns) . "\n");
+        $printer->setEmphasis(false);
+        $printer->text($separator);
+
+        // Payments (Split Payments Support)
+        foreach ($this->completedOrder->payments as $payment) {
+            $label = "Bayar (" . ($payment->paymentMethod->name ?? 'Cash') . ")";
+            $amount = "Rp " . number_format($payment->amount, 0, ',', '.');
+
+            // Jika label terlalu panjang untuk 33 kolom, otomatis akan terformat rapi oleh formatLine
+            $printer->text($this->formatLine($label, $amount, $maxColumns) . "\n");
+        }
+
+        if ($this->completedOrder->accurate_invoice_no) {
+            $printer->text($this->formatLine("Accurate No", $this->completedOrder->accurate_invoice_no, $maxColumns) . "\n");
+        }
+        $printer->text($separator);
+
+        // Footer (Center)
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
+        $printer->text("\nTerima kasih telah berbelanja!\n");
+        $printer->text("www.tokopon.id\n");
+
+        // Spasi kosong untuk dorong kertas keluar (karena TM-U220D sobek manual)
+        $printer->text("\n\n\n\n\n");
     }
 
     public function getEscposBase64()
@@ -1388,78 +1463,7 @@ class Pos extends Component
         }
     }
 
-    private function generateEscposContent($printer)
-    {
-        // Store Title (Center, Large)
-        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
-        $printer->selectPrintMode(\Mike42\Escpos\Printer::MODE_DOUBLE_WIDTH | \Mike42\Escpos\Printer::MODE_DOUBLE_HEIGHT);
-        $printer->text("TOKOPON\n");
 
-        $printer->selectPrintMode();
-        $storeName = $this->completedOrder->shipping_address_snapshot['store'] ?? 'Toko';
-        $printer->text($storeName . "\n");
-        $printer->text($this->completedOrder->created_at->format('d/m/Y H:i') . "\n");
-        $printer->text("--------------------------------\n");
-
-        // Info (Left)
-        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_LEFT);
-        $printer->text($this->formatLine("No. Transaksi", $this->completedOrder->order_number, 58) . "\n");
-        $printer->text($this->formatLine("Kasir", $this->completedOrder->handledBy->name ?? '-', 58) . "\n");
-        $printer->text($this->formatLine("Customer", $this->completedOrder->user->name ?? '-', 58) . "\n");
-        $printer->text("--------------------------------\n");
-
-        // Items List
-        foreach ($this->completedOrder->items as $item) {
-            $v = $item->variant;
-            $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
-            if ($v) {
-                $itemName .= " (" . $v->color . "/" . $v->storage . ")";
-            }
-
-            $printer->text($itemName . "\n");
-
-            $qtyAndPrice = $item->qty . "x Rp " . number_format($item->price_at_checkout, 0, ',', '.');
-            $subtotal = "Rp " . number_format($item->subtotal, 0, ',', '.');
-            $printer->text($this->formatLine("  " . $qtyAndPrice, $subtotal, 58) . "\n");
-
-            if ($item->serial_number) {
-                $printer->text("  SN: " . $item->serial_number . "\n");
-            }
-        }
-        $printer->text("--------------------------------\n");
-
-        // Subtotal & Discount
-        $printer->text($this->formatLine("Subtotal", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), 58) . "\n");
-        // if ($this->completedOrder->discount_amount > 0) {
-        //     $printer->text($this->formatLine("Diskon", "-Rp " . number_format($this->completedOrder->discount_amount, 0, ',', '.'), 58) . "\n");
-        // }
-        $printer->text("--------------------------------\n");
-
-        // Grand Total (Bold)
-        $printer->setEmphasis(true);
-        $printer->text($this->formatLine("TOTAL", "Rp " . number_format($this->completedOrder->grand_total, 0, ',', '.'), 58) . "\n");
-        $printer->setEmphasis(false);
-        $printer->text("--------------------------------\n");
-
-        // Payments (Split Payments Support)
-        foreach ($this->completedOrder->payments as $payment) {
-            $label = "Bayar (" . ($payment->paymentMethod->name ?? 'Cash') . ($payment->paymentMethodRate ? ' - ' . $payment->paymentMethodRate->name : '') . ")";
-            $amount = "Rp " . number_format($payment->amount, 0, ',', '.');
-            $printer->text($this->formatLine($label, $amount, 58) . "\n");
-        }
-
-        if ($this->completedOrder->accurate_invoice_no) {
-            $printer->text($this->formatLine("Accurate Invoice", $this->completedOrder->accurate_invoice_no, 58) . "\n");
-        }
-        $printer->text("--------------------------------\n");
-
-        // Footer (Center)
-        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
-        $printer->text("\nTerima kasih telah berbelanja!\n");
-        $printer->text("www.tokopon.id\n\n\n\n");
-
-        $printer->cut();
-    }
 
     private function formatLine($left, $right, $width = 58)
     {

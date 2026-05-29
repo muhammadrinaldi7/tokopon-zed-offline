@@ -859,7 +859,7 @@
     @include('livewire.zoffline.pos.modal.receipt-struk')
     @include('livewire.zoffline.pos.modal.stok-gudang')
 
-    <div id="scanner-modal"
+    {{-- <div id="scanner-modal"
         class="hidden fixed inset-0 z-50 bg-black/60  items-center justify-center backdrop-blur-sm">
         <div class="bg-white p-4 rounded-lg w-11/12 max-w-md shadow-xl">
             <div class="flex justify-between items-center mb-4">
@@ -867,6 +867,47 @@
                 <button onclick="closeScanner()" class="text-red-500 hover:text-red-700 font-bold p-1">Tutup</button>
             </div>
             <div id="reader" class="w-full bg-black rounded overflow-hidden"></div>
+        </div>
+    </div> --}}
+    <div id="scanner-modal"
+        class="hidden fixed inset-0 z-50 bg-black/60 items-center justify-center backdrop-blur-sm">
+        <div class="bg-white p-4 rounded-lg w-11/12 max-w-md shadow-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-gray-700">Arahkan Kamera ke Barcode</h3>
+                <button onclick="closeScanner()" class="text-red-500 hover:text-red-700 font-bold p-1">Tutup</button>
+            </div>
+
+            {{-- Wrapper Scanner dengan Overlay --}}
+            <div class="relative w-full bg-black rounded-lg overflow-hidden aspect-[4/3]">
+                {{-- Kamera Element --}}
+                <div id="reader" class="w-full h-full"></div>
+
+                {{-- Efek Animasi & Bingkai Target di Tengah --}}
+                <div class="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+                    {{-- Kotak Target (Ukurannya pas dengan qrbox: 250x150) --}}
+                    <div
+                        class="w-[250px] h-[150px] relative border border-emerald-500/20 rounded shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+
+                        {{-- Garis Laser Bergerak --}}
+                        <div class="absolute inset-x-0 h-[2px] bg-emerald-500 shadow-[0_0_10px_#10b981] animate-laser">
+                        </div>
+
+                        {{-- Siku-Siku Pojok Bingkai --}}
+                        <div
+                            class="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-emerald-500 rounded-tl-sm">
+                        </div>
+                        <div
+                            class="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-emerald-500 rounded-tr-sm">
+                        </div>
+                        <div
+                            class="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-emerald-500 rounded-bl-sm">
+                        </div>
+                        <div
+                            class="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-emerald-500 rounded-br-sm">
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     {{-- Print Styles --}}
