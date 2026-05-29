@@ -2,8 +2,6 @@
 
 use App\Livewire\Admin\Employe\EmployeManage;
 use App\Livewire\Admin\Users\UserOperational;
-use App\Livewire\Pages\Buymobile;
-use App\Livewire\Pages\PhoneRepair;
 use App\Livewire\Pages\SellPhone;
 use App\Livewire\Pages\SellPhoneHistory;
 use App\Livewire\Pages\TradeIn;
@@ -28,9 +26,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/trade-in-history', \App\Livewire\Pages\TradeInHistory::class)->name('trade-in-history');
     Route::get('/trade-in/{product}/submit', \App\Livewire\Pages\SubmitTradeIn::class)->name('trade-in.submit');
     Route::get('/trade-in/{tradeIn}/detail', \App\Livewire\Pages\TradeInDetail::class)->name('trade-ins.show');
-    Route::get('/orders', \App\Livewire\Pages\OrderHistory::class)->name('orders.index');
-    Route::get('/orders/{order}', \App\Livewire\Pages\OrderDetail::class)->name('orders.show');
-    Route::get('/orders/{order}/confirmation', \App\Livewire\Pages\OrderConfirmation::class)->name('orders.confirmation');
+    // Route::get('/orders', \App\Livewire\Pages\OrderHistory::class)->name('orders.index');
+    // Route::get('/orders/{order}', \App\Livewire\Pages\OrderDetail::class)->name('orders.show');
+    // Route::get('/orders/{order}/confirmation', \App\Livewire\Pages\OrderConfirmation::class)->name('orders.confirmation');
 
     // Trade In Client
     Route::get('/trade-in-history', \App\Livewire\Pages\TradeInHistory::class)->name('trade-in-history');
@@ -91,7 +89,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     });
 });
 
-Route::get('/qc/device/{imei}', App\Livewire\Pages\PublicDeviceQc::class)->name('public.device-qc');
+// Route::get('/qc/device/{imei}', App\Livewire\Pages\PublicDeviceQc::class)->name('public.device-qc');
 
 // ─── CS Chat Route (requires auth + admin middleware + cs role) ──
 Route::livewire('/admin/cs-chat', 'pages::cs-dashboard')
