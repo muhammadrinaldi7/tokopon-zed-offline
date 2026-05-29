@@ -20,7 +20,7 @@
                     class="bg-gray-50 border-b border-gray-100 text-xs uppercase tracking-wider text-gray-500 font-bold">
                     <th class="p-4">Nama Metode</th>
                     <th class="p-4">Detail Rekening</th>
-                    <th class="p-4">MDR (%)</th>
+                    {{-- <th class="p-4">MDR (%)</th> --}}
                     <th class="p-4">Accurate Bank No</th>
                     <th class="p-4 text-center">Status</th>
                     <th class="p-4 text-right">Aksi</th>
@@ -42,9 +42,9 @@
                                 <span class="text-sm text-gray-400 italic">Kas Tunai / Bebas</span>
                             @endif
                         </td>
-                        <td class="p-4">
+                        {{-- <td class="p-4">
                             <span class="font-bold text-gray-900">{{ $method->mdr_percentage }}%</span>
-                        </td>
+                        </td> --}}
                         <td class="p-4">
                             <span
                                 class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
@@ -153,7 +153,7 @@
                             placeholder="1234567890">
                     </div>
 
-                    <div>
+                    {{-- <div>
                         <label class="block text-sm font-bold text-gray-700 mb-1">Beban MDR (%) <span
                                 class="text-rose-500">*</span></label>
                         <input type="number" step="0.01" wire:model="mdr_percentage"
@@ -162,7 +162,7 @@
                         @error('mdr_percentage')
                             <span class="text-xs text-rose-500 mt-1">{{ $message }}</span>
                         @enderror
-                    </div>
+                    </div> --}}
 
                     <div class="p-4 bg-amber-50 rounded-lg border border-amber-100">
                         <label class="block text-sm font-bold text-amber-900 mb-1">Accurate Bank No <span

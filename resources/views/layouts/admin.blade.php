@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'Admin Dashboard - TokoPun' }}</title>
-    <link rel="icon" type="image/png" href="{{ asset('zlogoblack.png') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('zlogoblack.svg') }}" sizes="any">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 

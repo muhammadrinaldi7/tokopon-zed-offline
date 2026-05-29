@@ -6,7 +6,9 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 use App\Jobs\ProcessStockAdjustment;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Layout;
 
+#[Layout('layouts.admin', ['title' => 'Penyesuaian Stock'])]
 class Index extends Component
 {
     use WithFileUploads;
