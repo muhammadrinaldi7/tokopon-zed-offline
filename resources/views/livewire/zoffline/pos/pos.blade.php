@@ -111,7 +111,7 @@
          RIGHT PANEL: Cart, Customer & Payment (Drawer on Mobile)
     ═══════════════════════════════════════════════════════════ --}}
         <div :class="openCart ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'"
-            class="fixed lg:static inset-y-0 right-0 z-50  w-[85%] sm:w-[420px] transform transition-transform duration-300 ease-in-out bg-white border-l border-gray-200 flex flex-col shrink-0 h-full shadow-2xl lg:shadow-none">
+            class="fixed lg:static inset-y-0 right-0 z-50  w-[85%] md:w-[50%] lg:w-[35%] transform transition-transform duration-300 ease-in-out bg-white border-l border-gray-200 flex flex-col shrink-0 h-full shadow-2xl lg:shadow-none">
 
             {{-- Cart Header --}}
             <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
@@ -137,445 +137,521 @@
                 </button>
             </div>
 
-            {{-- Cart Items --}}
-            <div
-                class="max-h-[170px] overflow-y-auto px-4 py-2.5 space-y-2.5 border-b border-gray-100 shrink-0 bg-white">
-                @forelse($cart as $index => $item)
-                    <div class="bg-gray-50 rounded-lg p-2.5 border border-gray-100 relative group">
-                        <button wire:click="removeFromCart({{ $index }})"
-                            class="absolute top-2.5 right-2.5 text-gray-300 hover:text-rose-500 transition lg:opacity-0 group-hover:opacity-100">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                        <div class="flex justify-between items-start mb-1.5">
-                            <div class="pr-6">
-                                <h4 class="font-bold text-gray-800 text-xs">{{ $item['name'] }}</h4>
-                                <p class="text-[10px] text-gray-400 uppercase font-bold">{{ $item['color'] }} -
-                                    {{ $item['storage'] }}
-                                    @if ($item['is_second'] ?? false)
-                                        <span class="text-emerald-500">• Second</span>
-                                    @endif
-                                </p>
-                            </div>
-                            <p class="font-bold text-gray-800 text-xs whitespace-nowrap">Rp
-                                {{ number_format($item['price'] * $item['qty'], 0, ',', '.') }}</p>
-                        </div>
-                        <div class="flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-1">
-                                <button wire:click="decrementCartItem({{ $index }})"
-                                    class="w-6 h-6 rounded bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition text-xs font-bold">−</button>
-                                <span class="w-6 text-center font-bold text-xs">{{ $item['qty'] }}</span>
-                                <button wire:click="incrementCartItem({{ $index }})"
-                                    class="w-6 h-6 rounded bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition text-xs font-bold">+</button>
-                            </div>
-                            <p class="text-[10px] text-gray-400">@ Rp {{ number_format($item['price'], 0, ',', '.') }}
-                            </p>
-                        </div>
+            <div class="flex-1 overflow-y-auto min-h-0 bg-gray-50">
+                {{-- Cart Items --}}
+                <div class="px-4 py-3 space-y-3 border-b border-gray-100  bg-gray-50/30">
+                    @forelse($cart as $index => $item)
+                        <div
+                            class="bg-white rounded-xl p-3 border border-gray-200 shadow-sm relative group transition-all duration-200 hover:shadow-md hover:border-blue-200">
 
-                        @php
-                            // Ambil array SN dan bersihkan dari string kosong akibat sisa data lama
-                            $snArray = array_filter($item['serial_numbers'] ?? [], function ($val) {
-                                return !empty(trim($val));
-                            });
+                            {{-- Tombol Hapus (Muncul saat hover di Desktop) --}}
+                            <button wire:click="removeFromCart({{ $index }})"
+                                class="absolute top-2.5 right-2.5 text-gray-300 hover:text-rose-500 transition-all bg-white rounded-full p-1 hover:bg-rose-50 lg:opacity-0 group-hover:opacity-100 z-10">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
 
-                            // PENTING: Gunakan ['qty'] sesuai dengan data di backend keranjangmu
-                            $quantity = $item['qty'] ?? 1;
-
-                            $isFull = count($snArray) >= $quantity;
-                            $nextIndex = count($snArray);
-                        @endphp
-
-                        <div class="mt-2 space-y-2">
-                            {{-- BARIS 1: Tampilan SN yang sudah berhasil di-scan (Bentuk Badge dengan tombol X) --}}
-                            @if (count($snArray) > 0)
-                                <div class="flex flex-wrap gap-1.5 mb-2">
-                                    @foreach ($snArray as $snIndex => $snValue)
-                                        <span
-                                            class="inline-flex items-center gap-1 bg-neutral-100 border border-neutral-200 text-neutral-800 text-[11px] font-mono pl-2 pr-1 py-0.5 rounded-md shadow-xs select-none">
-                                            {{ $snValue }}
-                                            <button type="button"
-                                                wire:click="removeSerialNumber({{ $index }}, {{ $snIndex }})"
-                                                class="text-neutral-400 hover:text-rose-500 font-sans font-bold text-xs w-4 h-4 flex items-center justify-center rounded-sm hover:bg-neutral-200 transition-colors focus:outline-none"
-                                                title="Hapus SN">
-                                                &times;
-                                            </button>
-                                        </span>
-                                    @endforeach
+                            <div class="flex flex-col gap-3">
+                                {{-- Bagian Header: Nama, Spesifikasi, & Harga Total --}}
+                                <div class="flex justify-between items-start pr-8">
+                                    <div class="space-y-1.5">
+                                        <h4 class="font-bold text-gray-800 text-sm leading-tight">{{ $item['name'] }}
+                                        </h4>
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span
+                                                class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-bold uppercase tracking-wide">{{ $item['color'] }}</span>
+                                            <span
+                                                class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-bold uppercase tracking-wide">{{ $item['storage'] }}</span>
+                                            @if ($item['is_second'] ?? false)
+                                                <span
+                                                    class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100 font-bold uppercase tracking-wide">Second</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="font-bold text-blue-600 text-sm whitespace-nowrap">Rp
+                                            {{ number_format($item['price'] * $item['qty'], 0, ',', '.') }}</p>
+                                        <p class="text-[10px] text-gray-400 font-medium mt-0.5">@ Rp
+                                            {{ number_format($item['price'], 0, ',', '.') }}</p>
+                                    </div>
                                 </div>
-                            @endif
 
-                            {{-- BARIS 2: Area Input Tunggal & Tombol Scan --}}
-                            <div class="flex items-center gap-2">
-                                @if (!$isFull)
-                                    <input type="text" id="sn_input_{{ $index }}_{{ $nextIndex }}"
-                                        wire:change="updateSerialNumber({{ $index }}, {{ $nextIndex }}, $event.target.value)"
-                                        value=""
-                                        class="w-full bg-white border border-gray-200 rounded px-2.5 py-1 text-[11px] font-mono focus:border-[#1c69d4] focus:ring-0 transition-all placeholder-gray-300"
-                                        placeholder="Scan / Ketik SN ke-{{ $nextIndex + 1 }}...">
-
-                                    <button type="button"
-                                        onclick="startScanner({{ $index }}, {{ $nextIndex }})"
-                                        class="shrink-0 bg-[#1c69d4] hover:bg-blue-700 text-white border border-[#1c69d4] rounded px-2 py-1 transition-all focus:outline-none focus:ring-2 focus:ring-[#1c69d4] focus:ring-offset-1"
-                                        title="Scan Barcode Kamera">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
-                                            </path>
-                                        </svg>
-                                    </button>
-                                @else
-                                    <div
-                                        class="w-full bg-emerald-50 border border-emerald-200 rounded px-2.5 py-1 text-[11px] text-emerald-700 font-medium flex items-center gap-1.5 select-none">
-                                        <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none"
-                                            stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                                                d="M5 13l4 4L19 7"></path>
-                                        </svg>
-                                        Semua SN sudah terpenuhi ({{ $quantity }} / {{ $quantity }})
+                                {{-- Bagian Action: Quantity & Tombol Cek Stok --}}
+                                <div class="flex items-center justify-between gap-3 pt-2 border-t border-gray-100">
+                                    <div class="flex items-center gap-1">
+                                        <button wire:click="decrementCartItem({{ $index }})"
+                                            class="w-7 h-7 rounded-md bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-100 transition shadow-sm text-sm font-bold">−</button>
+                                        <span
+                                            class="w-7 text-center font-bold text-gray-800 text-xs">{{ $item['qty'] }}</span>
+                                        <button wire:click="incrementCartItem({{ $index }})"
+                                            class="w-7 h-7 rounded-md bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-100 transition shadow-sm text-sm font-bold">+</button>
                                     </div>
 
-                                    <button type="button" disabled
-                                        class="shrink-0 bg-gray-100 text-gray-400 border border-gray-200 rounded px-2 py-1 cursor-not-allowed">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
-                                            </path>
-                                        </svg>
-                                    </button>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                @empty
-                    <div class="flex flex-col items-center justify-center py-6 text-gray-300">
-                        <svg class="w-8 h-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-                        </svg>
-                        <p class="text-xs font-bold text-gray-400">Keranjang kosong</p>
-                    </div>
-                @endforelse
-            </div>
-
-            {{-- Form Section: Customer, Payments, Discount --}}
-            <div class="flex-1 overflow-y-auto bg-gray-50 divide-y divide-gray-100 min-h-0">
-                {{-- Customer Section --}}
-                <div class="px-4 py-3">
-                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Customer</p>
-                    @if ($selectedCustomerId)
-                        @php $customer = \App\Models\User::with('profile')->find($selectedCustomerId); @endphp
-                        <div
-                            class="flex items-center justify-between bg-emerald-50 rounded-lg p-2.5 border border-emerald-100">
-                            <div>
-                                <p class="font-bold text-gray-800 text-xs">{{ $customer->name }}</p>
-                                <p class="text-[10px] text-gray-500">
-                                    {{ $customer->profile->phone_number ?? $customer->email }}</p>
-                            </div>
-                            <button wire:click="clearSelectedCustomer"
-                                class="text-rose-400 hover:text-rose-600 text-[11px] font-bold">Ganti</button>
-                        </div>
-                    @elseif($isNewCustomer)
-                        <div class="space-y-1.5">
-                            <input type="text" wire:model="customerName"
-                                class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0"
-                                placeholder="Nama Customer *">
-                            <input type="text" wire:model="customerPhone"
-                                class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0"
-                                placeholder="No HP *">
-                            <input type="email" wire:model="customerEmail"
-                                class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0"
-                                placeholder="Email (opsional)">
-                            <button wire:click="$set('isNewCustomer', false)"
-                                class="text-[10px] text-gray-400 hover:text-gray-600 font-bold">← Cari customer
-                                lama</button>
-                        </div>
-                    @else
-                        <div class="relative">
-                            <input type="text" wire:model.live.debounce.300ms="searchCustomer"
-                                class="w-full bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0"
-                                placeholder="Cari nama / no HP...">
-                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </div>
-                        @if (strlen($searchCustomer) >= 2)
-                            <div class="bg-white border rounded-lg shadow-lg max-h-32 overflow-y-auto divide-y mt-1">
-                                @forelse($this->customerResults as $user)
-                                    <button wire:click="selectCustomer({{ $user->id }})"
-                                        class="w-full p-2 hover:bg-gray-50 text-left flex justify-between items-center">
-                                        <div>
-                                            <p class="font-bold text-gray-800 text-xs">{{ $user->name }}</p>
-                                            <p class="text-[10px] text-gray-400">
-                                                {{ $user->profile->phone_number ?? $user->email }}</p>
-                                        </div>
-                                        <span class="text-emerald-500 text-[10px] font-bold">Pilih</span>
-                                    </button>
-                                @empty
-                                    <p class="p-2 text-xs text-gray-400 text-center">Tidak ditemukan</p>
-                                @endforelse
-                            </div>
-                        @endif
-                        <button wire:click="$set('isNewCustomer', true)"
-                            class="text-[10px] text-[#1c69d4] hover:underline font-bold mt-1.5 block">+ Customer
-                            Baru</button>
-                    @endif
-                </div>
-                {{-- Sales Section --}}
-                <div class="px-4 py-3">
-                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tenaga Penjual
-                        (Sales)</p>
-
-                    {{-- Selected Sales Tags --}}
-                    @if (count($selectedSales) > 0)
-                        <div class="flex flex-wrap gap-2 mb-2">
-                            @foreach ($selectedSales as $sales)
-                                <div
-                                    class="flex items-center gap-1.5 bg-[#1c69d4]/10 text-[#1c69d4] border border-[#1c69d4]/20 rounded-md px-2 py-1">
-                                    <span class="text-[11px] font-bold">{{ $sales['name'] }}</span>
-                                    <button wire:click="removeSales({{ $sales['id'] }})"
-                                        class="text-[#1c69d4]/70 hover:text-rose-500 transition-colors">
+                                    {{-- TOMBOL CEK STOK (Baru ditambahkan) --}}
+                                    <button wire:click="checkStock({{ $index }})"
+                                        class="flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-100 transition-colors px-2.5 py-1.5 rounded-md text-[11px] font-bold shadow-sm">
                                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
                                             stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="M6 18L18 6M6 6l12 12" />
+                                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                         </svg>
+                                        Cek Stok
                                     </button>
                                 </div>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    <div class="relative">
-                        <div class="relative">
-                            <input type="text" wire:model.live.debounce.300ms="searchSales"
-                                class="w-full bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0"
-                                placeholder="Cari nama / NIK (tambah sales)...">
-                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </div>
-                        @if (strlen($searchSales) >= 2)
-                            <div
-                                class="absolute z-10 w-full bg-white border rounded-lg shadow-lg max-h-40 overflow-y-auto divide-y mt-1">
-                                @forelse($this->salesResults as $sales)
-                                    <button wire:click="selectSales({{ $sales->id }})"
-                                        class="w-full p-2 hover:bg-gray-50 text-left flex justify-between items-center group transition">
-                                        <div>
-                                            <p class="font-bold text-gray-800 text-xs">{{ $sales->name }}</p>
-                                            <p class="text-[9px] text-gray-400">{{ $sales->employee_no ?? 'N/A' }}</p>
-                                        </div>
-                                        <span
-                                            class="text-[#1c69d4] text-[10px] font-bold opacity-0 group-hover:opacity-100 transition">Pilih</span>
-                                    </button>
-                                @empty
-                                    <p class="p-2 text-xs text-gray-400 text-center">Tidak ditemukan</p>
-                                @endforelse
-                            </div>
-                        @endif
-                    </div>
-                </div>
-
-                {{-- Payment Methods --}}
-                <div class="px-4 py-3 space-y-3">
-                    <div class="flex justify-between items-center">
-                        <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Metode Pembayaran</p>
-                        <button type="button" wire:click="addPaymentRow"
-                            class="text-[11px] font-bold text-[#1c69d4] hover:text-blue-800 flex items-center gap-1 transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                            </svg>
-                            Split Pembayaran
-                        </button>
-                    </div>
-
-                    <div class="space-y-2.5">
-                        @foreach ($payments as $index => $payment)
-                            <div class="p-2.5 bg-white border border-gray-200 rounded-xl space-y-2 relative"
-                                wire:key="payment-row-{{ $index }}">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-[10px] font-extrabold text-gray-500">Alokasi
-                                        #{{ $index + 1 }}</span>
-                                    @if (count($payments) > 1)
-                                        <button type="button" wire:click="removePaymentRow({{ $index }})"
-                                            class="text-rose-500 hover:text-rose-700 text-[10px] font-bold flex items-center gap-0.5 transition-colors">
-                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                            Hapus
-                                        </button>
-                                    @endif
-                                </div>
-
-                                <select wire:model.live="payments.{{ $index }}.payment_method_id"
-                                    class="w-full bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold focus:border-[#1c69d4] focus:ring-0">
-                                    <option value="">-- Pilih Metode --</option>
-                                    @foreach ($this->paymentMethods as $pm)
-                                        <option value="{{ $pm->id }}">{{ $pm->name }}
-                                            {{ $pm->rates->count() > 0 ? '(' . $pm->rates->count() . ' tarif)' : ($pm->mdr_percentage > 0 ? '(MDR ' . $pm->mdr_percentage . '%)' : '') }}
-                                        </option>
-                                    @endforeach
-                                </select>
 
                                 @php
-                                    $pmId = $payment['payment_method_id'];
-                                    $pmObj = $pmId ? \App\Models\PaymentMethod::find($pmId) : null;
-                                    $rowRates = $pmObj ? $pmObj->rates()->where('is_active', true)->get() : collect();
+                                    $snArray = array_filter($item['serial_numbers'] ?? [], function ($val) {
+                                        return !empty(trim($val));
+                                    });
+                                    $quantity = $item['qty'] ?? 1;
+                                    $isFull = count($snArray) >= $quantity;
+                                    $nextIndex = count($snArray);
                                 @endphp
 
-                                @if ($rowRates->count() > 0)
-                                    <select wire:model.live="payments.{{ $index }}.payment_method_rate_id"
-                                        class="w-full bg-blue-50/50 border border-blue-100 text-blue-900 rounded-lg px-2 py-1.5 text-xs font-bold focus:border-[#1c69d4] focus:ring-0">
-                                        <option value="">-- Pilih Opsi / Tenor --</option>
-                                        @foreach ($rowRates as $rate)
-                                            <option value="{{ $rate->id }}">{{ $rate->name }} (MDR
-                                                {{ $rate->mdr_percentage }}%)</option>
-                                        @endforeach
-                                    </select>
-                                @endif
+                                {{-- Bagian Serial Number (SN) --}}
+                                <div class="mt-1 space-y-2.5 bg-gray-50/50 p-2.5 rounded-lg border border-gray-100">
 
-                                <div class="flex gap-2">
-                                    <div class="relative flex-1" x-data="{
-                                        rawAmount: @entangle('payments.' . $index . '.amount').live,
-                                        get maskedAmount() {
-                                            if (!this.rawAmount) return '';
-                                            // Mengubah angka murni dari backend menjadi format titik (cth: 15000000 -> 15.000.000)
-                                            return this.rawAmount.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                                        },
-                                        set maskedAmount(val) {
-                                            // Membersihkan titik saat kasir mengetik, lalu mengirim angka murninya ke Livewire
-                                            this.rawAmount = val.replace(/\D/g, '');
-                                        }
-                                    }">
-                                        <span
-                                            class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
-
-                                        <input type="text" x-model="maskedAmount"
-                                            class="w-full pl-7 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold focus:border-[#1c69d4] focus:ring-0"
-                                            placeholder="Jumlah Bayar">
-                                    </div>
-                                    @if (count($payments) > 1)
-                                        <button type="button" wire:click="autofillRemaining({{ $index }})"
-                                            class="px-2 py-1.5 text-xs font-bold bg-[#1c69d4] text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-all whitespace-nowrap">
-                                            Gunakan Sisa
-                                        </button>
+                                    {{-- BARIS 1: Badge SN yang sudah di-scan --}}
+                                    @if (count($snArray) > 0)
+                                        <div class="flex flex-wrap gap-1.5">
+                                            @foreach ($snArray as $snIndex => $snValue)
+                                                <span
+                                                    class="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 text-[11px] font-mono pl-2 pr-1 py-1 rounded-md shadow-sm select-none">
+                                                    {{ $snValue }}
+                                                    <button type="button"
+                                                        wire:click="removeSerialNumber({{ $index }}, {{ $snIndex }})"
+                                                        class="text-gray-400 hover:text-rose-500 font-bold w-4 h-4 flex items-center justify-center rounded hover:bg-rose-50 transition-colors focus:outline-none"
+                                                        title="Hapus SN">
+                                                        &times;
+                                                    </button>
+                                                </span>
+                                            @endforeach
+                                        </div>
                                     @endif
+
+                                    {{-- BARIS 2: Input & Tombol Scan --}}
+                                    <div class="flex items-center gap-2">
+                                        @if (!$isFull)
+                                            <div class="relative flex-1">
+                                                <div
+                                                    class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                                                    <svg class="w-3.5 h-3.5 text-gray-400" fill="none"
+                                                        stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
+                                                        </path>
+                                                    </svg>
+                                                </div>
+                                                <input type="text"
+                                                    id="sn_input_{{ $index }}_{{ $nextIndex }}"
+                                                    wire:change="updateSerialNumber({{ $index }}, {{ $nextIndex }}, $event.target.value)"
+                                                    class="w-full bg-white border border-gray-300 rounded-md pl-7 pr-2.5 py-1.5 text-[11px] font-mono focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-400 shadow-sm"
+                                                    placeholder="Scan / Ketik SN ke-{{ $nextIndex + 1 }}...">
+                                            </div>
+
+                                            <button type="button"
+                                                onclick="startScanner({{ $index }}, {{ $nextIndex }})"
+                                                class="shrink-0 bg-neutral-600 hover:bg-neutral-700 text-white rounded-md py-1.5 px-2 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-1"
+                                                title="Scan Barcode Kamera">
+                                                <svg fill="#ffffff" width="800px" height="800px" class="size-5"
+                                                    viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+                                                    <path
+                                                        d="M48.5,32A1.61,1.61,0,0,1,50,33.5v8.85Q50,47,45.5,47h-9a1.55,1.55,0,0,1,0-3.1h8.25c1.66,0,2.25-.61,2.25-2.32V33.5A1.61,1.61,0,0,1,48.5,32Zm-45,0A1.61,1.61,0,0,1,5,33.5H5v8.08c0,1.71.59,2.32,2.25,2.32H15.5a1.55,1.55,0,0,1,0,3.1h-9Q2,47,2,42.35H2V33.5A1.61,1.61,0,0,1,3.5,32ZM20.17,14c.73,0,1.33.45,1.33,1h0V37c0,.55-.6,1-1.33,1H16.83c-.73,0-1.33-.45-1.33-1h0V15c0-.55.6-1,1.33-1h3.34ZM11.5,14a1,1,0,0,1,1,1h0V37a1,1,0,0,1-1,1h-1a1,1,0,0,1-1-1h0V15a1,1,0,0,1,1-1h1Zm15,0a1,1,0,0,1,1,1h0V37a1,1,0,0,1-1,1h-1a1,1,0,0,1-1-1h0V15a1,1,0,0,1,1-1h1Zm15,0a1,1,0,0,1,1,1h0V37a1,1,0,0,1-1,1h-1a1,1,0,0,1-1-1h0V15a1,1,0,0,1,1-1h1Zm-6.33,0c.73,0,1.33.45,1.33,1h0V37c0,.55-.6,1-1.33,1H31.83c-.73,0-1.33-.45-1.33-1h0V15c0-.55.6-1,1.33-1h3.34ZM45.5,5Q50,5,50,9.65h0V18.5a1.5,1.5,0,0,1-3,0h0V10.42c0-1.71-.59-2.32-2.25-2.32H36.5a1.55,1.55,0,0,1,0-3.1h9Zm-30,0a1.55,1.55,0,0,1,0,3.1H7.25C5.59,8.1,5,8.71,5,10.42V18.5A1.61,1.61,0,0,1,3.5,20,1.61,1.61,0,0,1,2,18.5V9.65Q2,5,6.5,5Z" />
+                                                </svg>
+                                            </button>
+                                        @else
+                                            <div
+                                                class="w-full bg-emerald-50 border border-emerald-200 rounded-md px-3 py-1.5 text-[11px] text-emerald-700 font-bold flex items-center justify-center gap-1.5 select-none shadow-sm">
+                                                <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none"
+                                                    stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2.5"
+                                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                                Semua SN sudah terpenuhi ({{ $quantity }}/{{ $quantity }})
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
                             </div>
-                        @endforeach
-                    </div>
-
-                    {{-- Validation Status Banner --}}
-                    @php
-                        $targetTotal = max(0, $this->subtotal - (int) $this->totalDiscount);
-                        $allocatedTotal = (int) $this->paymentsTotalBase;
-                        $diff = $targetTotal - $allocatedTotal;
-                    @endphp
-
-                    @if ($diff === 0)
-                        <div
-                            class="flex items-center gap-2 p-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-xs font-bold justify-center">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Jumlah Pembayaran Sesuai
                         </div>
-                    @elseif ($diff > 0)
+                    @empty
+                        {{-- Tampilan Kosong (Empty State) yang diperbarui --}}
                         <div
-                            class="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-bold justify-center">
-                            <svg class="w-4 h-4 animate-pulse" fill="none" viewBox="0 0 24 24"
-                                stroke="currentColor" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                            Kurang Bayar: Rp {{ number_format($diff, 0, ',', '.') }}
+                            class="flex flex-col items-center justify-center py-10 bg-white border border-dashed border-gray-300 rounded-xl">
+                            <div class="bg-gray-50 p-3 rounded-full mb-3">
+                                <svg class="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+                                </svg>
+                            </div>
+                            <p class="text-sm font-bold text-gray-500">Keranjang masih kosong</p>
+                            <p class="text-xs text-gray-400 mt-1">Pilih produk dan tambahkan ke keranjang</p>
                         </div>
-                    @else
-                        <div
-                            class="flex items-center gap-2 p-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-bold justify-center">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Kelebihan Bayar: Rp {{ number_format(abs($diff), 0, ',', '.') }}
-                        </div>
-                    @endif
+                    @endforelse
                 </div>
 
-                {{-- Discount --}}
-                <div class="px-4 py-3">
-                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Diskon (Rp)</p>
+                {{-- Form Section: Customer, Payments, Discount --}}
+                <div class=" divide-y divide-gray-200/60 antialiased selection:bg-blue-500 selection:text-white">
+                    {{-- Customer Section --}}
+                    <div class="p-4 transition-all">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Customer</p>
+                            @if (!$selectedCustomerId && !$isNewCustomer)
+                                <button wire:click="$set('isNewCustomer', true)"
+                                    class="text-[11px] text-[#1c69d4] hover:text-blue-700 font-semibold transition flex items-center gap-0.5">
+                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Customer Baru
+                                </button>
+                            @endif
+                        </div>
 
-                    <div x-data="{
-                        rawDiscount: @entangle('discount_amount').live,
-                        get maskedDiscount() {
-                            if (!this.rawDiscount) return '';
-                            return this.rawDiscount.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                        },
-                        set maskedDiscount(val) {
-                            this.rawDiscount = val.replace(/\D/g, '');
-                        }
-                    }">
-                        <input type="text" x-model="maskedDiscount"
-                            class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:border-[#1c69d4] focus:ring-0"
-                            placeholder="0">
-                    </div>
-                </div>
-
-
-                {{-- Promos --}}
-                @if (count($this->activePromos) > 0)
-                    <div class="px-4 pb-3">
-                        <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Gunakan
-                            Promo/Voucher</p>
-                        <div
-                            class="space-y-2 bg-gray-50 border border-gray-100 p-2.5 rounded-lg max-h-32 overflow-y-auto">
-                            @foreach ($this->activePromos as $promo)
-                                <label class="flex items-start gap-2 cursor-pointer group">
-                                    <input type="checkbox" wire:model.live="selectedPromos"
-                                        value="{{ $promo->id }}"
-                                        class="mt-0.5 rounded text-[#1c69d4] focus:ring-[#1c69d4] border-gray-300">
-                                    <div class="text-xs">
-                                        <div
-                                            class="font-bold text-gray-700 group-hover:text-[#1c69d4] transition-colors">
-                                            {{ $promo->name }}</div>
-                                        <div class="text-[10px] text-gray-500 font-mono">
-                                            @if ($promo->code)
-                                                {{ $promo->code }} &bull;
-                                            @endif
-                                            @if ($promo->discount_type === 'fixed')
-                                                Potongan Rp {{ number_format($promo->discount_value, 0, ',', '.') }}
-                                            @else
-                                                Potongan {{ number_format($promo->discount_value, 0) }}%
-                                            @endif
-                                        </div>
+                        @if ($selectedCustomerId)
+                            {{-- Direkomendasikan mengganti query ini dengan $selectedCustomerData dari Component Livewire --}}
+                            @php $customer = \App\Models\User::with('profile')->find($selectedCustomerId); @endphp
+                            <div
+                                class="flex items-center justify-between bg-white border border-emerald-100 shadow-sm rounded-xl p-3 transition-all hover:border-emerald-200">
+                                <div class="flex items-center gap-2.5">
+                                    <div
+                                        class="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs uppercase shadow-inner">
+                                        {{ substr($customer->name, 0, 2) }}
                                     </div>
-                                </label>
+                                    <div>
+                                        <p class="font-semibold text-gray-800 text-xs tracking-tight">
+                                            {{ $customer->name }}</p>
+                                        <p class="text-[11px] text-gray-500 font-medium">
+                                            {{ $customer->profile->phone_number ?? $customer->email }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button wire:click="clearSelectedCustomer"
+                                    class="text-gray-400 hover:text-rose-500 text-[11px] font-semibold px-2 py-1 hover:bg-rose-50 rounded-lg transition-all duration-200">Ganti</button>
+                            </div>
+                        @elseif($isNewCustomer)
+                            <div class="bg-white border border-gray-200/80 shadow-sm rounded-xl p-3 space-y-2.5">
+                                <div class="space-y-2">
+                                    <input type="text" wire:model="customerName"
+                                        class="w-full bg-gray-50/50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-medium focus:bg-white focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20 transition-all placeholder:text-gray-400"
+                                        placeholder="Nama Customer *">
+                                    <input type="text" wire:model="customerPhone"
+                                        class="w-full bg-gray-50/50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-medium focus:bg-white focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20 transition-all placeholder:text-gray-400"
+                                        placeholder="No HP *">
+                                    <input type="email" wire:model="customerEmail"
+                                        class="w-full bg-gray-50/50 border border-gray-200 rounded-lg px-3 py-2 text-xs font-medium focus:bg-white focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20 transition-all placeholder:text-gray-400"
+                                        placeholder="Email (opsional)">
+                                </div>
+                                <button wire:click="$set('isNewCustomer', false)"
+                                    class="text-[11px] text-gray-400 hover:text-gray-600 font-medium flex items-center gap-1 transition">
+                                    ← Cari customer lama
+                                </button>
+                            </div>
+                        @else
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </span>
+                                <input type="text" wire:model.live.debounce.300ms="searchCustomer"
+                                    class="w-full bg-white border border-gray-200 shadow-sm rounded-lg pl-9 pr-3 py-2 text-xs focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20 transition placeholder:text-gray-400"
+                                    placeholder="Cari nama / no HP...">
+                            </div>
+
+                            @if (strlen($searchCustomer) >= 2)
+                                <div
+                                    class="bg-white border border-gray-200 rounded-xl shadow-xl max-h-40 overflow-y-auto divide-y divide-gray-50 mt-1.5 z-20 relative">
+                                    @forelse($this->customerResults as $user)
+                                        <button wire:click="selectCustomer({{ $user->id }})"
+                                            class="w-full p-2.5 hover:bg-gray-50/80 text-left flex justify-between items-center transition group">
+                                            <div>
+                                                <p
+                                                    class="font-semibold text-gray-800 text-xs group-hover:text-[#1c69d4] transition-colors">
+                                                    {{ $user->name }}</p>
+                                                <p class="text-[10px] text-gray-400 font-medium">
+                                                    {{ $user->profile->phone_number ?? $user->email }}</p>
+                                            </div>
+                                            <span
+                                                class="text-xs text-gray-400 group-hover:text-emerald-500 font-bold transition-all transform group-hover:translate-x-[-2px]">Pilih
+                                                →</span>
+                                        </button>
+                                    @empty
+                                        <p class="p-3 text-xs text-gray-400 text-center font-medium">Customer tidak
+                                            ditemukan</p>
+                                    @endforelse
+                                </div>
+                            @endif
+                        @endif
+                    </div>
+
+                    {{-- Sales Section --}}
+                    <div class="p-4">
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Tenaga Penjual
+                            (Sales)</p>
+
+                        {{-- Selected Sales Tags --}}
+                        @if (count($selectedSales) > 0)
+                            <div class="flex flex-wrap gap-1.5 mb-2.5">
+                                @foreach ($selectedSales as $sales)
+                                    <div
+                                        class="flex items-center gap-1 bg-[#1c69d4]/5 text-[#1c69d4] border border-[#1c69d4]/10 rounded-lg pl-2.5 pr-1.5 py-1 shadow-sm transition hover:bg-[#1c69d4]/10">
+                                        <span class="text-[11px] font-bold tracking-tight">{{ $sales['name'] }}</span>
+                                        <button wire:click="removeSales({{ $sales['id'] }})"
+                                            class="w-5 h-5 rounded-md flex items-center justify-center text-[#1c69d4]/60 hover:text-rose-600 hover:bg-rose-50 transition-colors">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </span>
+                            <input type="text" wire:model.live.debounce.300ms="searchSales"
+                                class="w-full bg-white border border-gray-200 shadow-sm rounded-lg pl-9 pr-3 py-2 text-xs focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20 transition placeholder:text-gray-400"
+                                placeholder="Cari nama / NIK (tambah sales)...">
+
+                            @if (strlen($searchSales) >= 2)
+                                <div
+                                    class="absolute z-30 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-40 overflow-y-auto divide-y divide-gray-50 mt-1.5">
+                                    @forelse($this->salesResults as $sales)
+                                        <button wire:click="selectSales({{ $sales->id }})"
+                                            class="w-full p-2.5 hover:bg-gray-50 text-left flex justify-between items-center group transition">
+                                            <div>
+                                                <p
+                                                    class="font-semibold text-gray-800 text-xs group-hover:text-[#1c69d4] transition-colors">
+                                                    {{ $sales->name }}</p>
+                                                <p class="text-[10px] text-gray-400 font-medium">NIK:
+                                                    {{ $sales->employee_no ?? 'N/A' }}</p>
+                                            </div>
+                                            <span
+                                                class="text-xs font-bold text-[#1c69d4] opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all">+
+                                                Tambah</span>
+                                        </button>
+                                    @empty
+                                        <p class="p-3 text-xs text-gray-400 text-center font-medium">Sales tidak
+                                            ditemukan</p>
+                                    @endforelse
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Payment Methods --}}
+                    <div class="p-4 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Metode Pembayaran
+                            </p>
+                            <button type="button" wire:click="addPaymentRow"
+                                class="text-[11px] font-bold text-[#1c69d4] hover:text-blue-800 flex items-center gap-0.5 transition-colors px-2 py-1 hover:bg-blue-50 rounded-lg">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Split Bayar
+                            </button>
+                        </div>
+
+                        <div class="space-y-3">
+                            @foreach ($payments as $index => $payment)
+                                <div class="p-3 bg-white border border-gray-200/80 shadow-sm rounded-xl space-y-2.5 transition hover:shadow-md relative"
+                                    wire:key="payment-row-{{ $index }}">
+                                    <div class="flex justify-between items-center border-b border-gray-50 pb-1.5">
+                                        <span
+                                            class="text-[10px] font-extrabold text-gray-400 tracking-wider uppercase">Alokasi
+                                            #{{ $index + 1 }}</span>
+                                        @if (count($payments) > 1)
+                                            <button type="button" wire:click="removePaymentRow({{ $index }})"
+                                                class="text-rose-500 hover:text-rose-700 text-[11px] font-semibold flex items-center gap-0.5 transition-colors px-1.5 py-0.5 hover:bg-rose-50 rounded-md">
+                                                Hapus
+                                            </button>
+                                        @endif
+                                    </div>
+
+                                    <select wire:model.live="payments.{{ $index }}.payment_method_id"
+                                        class="w-full bg-gray-50/50 border border-gray-200 rounded-lg px-2.5 py-2 text-xs font-semibold focus:bg-white focus:border-[#1c69d4] focus:ring-0 transition">
+                                        <option value="">-- Pilih Metode --</option>
+                                        @foreach ($this->paymentMethods as $pm)
+                                            <option value="{{ $pm->id }}">{{ $pm->name }}
+                                                {{ $pm->rates->count() > 0 ? '(' . $pm->rates->count() . ' tarif)' : ($pm->mdr_percentage > 0 ? '(MDR ' . $pm->mdr_percentage . '%)' : '') }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+
+                                    @php
+                                        $pmId = $payment['payment_method_id'];
+                                        $pmObj = $pmId ? \App\Models\PaymentMethod::find($pmId) : null;
+                                        $rowRates = $pmObj
+                                            ? $pmObj->rates()->where('is_active', true)->get()
+                                            : collect();
+                                    @endphp
+
+                                    @if ($rowRates->count() > 0)
+                                        <select wire:model.live="payments.{{ $index }}.payment_method_rate_id"
+                                            class="w-full bg-blue-50/30 border border-blue-100 text-blue-900 rounded-lg px-2.5 py-2 text-xs font-bold focus:border-[#1c69d4] focus:ring-0 transition">
+                                            <option value="">-- Pilih Opsi / Tenor --</option>
+                                            @foreach ($rowRates as $rate)
+                                                <option value="{{ $rate->id }}">{{ $rate->name }} (MDR
+                                                    {{ $rate->mdr_percentage }}%)</option>
+                                            @endforeach
+                                        </select>
+                                    @endif
+
+                                    <div class="flex gap-2">
+                                        <div class="relative flex-1" x-data="{
+                                            rawAmount: @entangle('payments.' . $index . '.amount').live,
+                                            get maskedAmount() {
+                                                if (!this.rawAmount) return '';
+                                                return this.rawAmount.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                            },
+                                            set maskedAmount(val) {
+                                                this.rawAmount = val.replace(/\D/g, '');
+                                            }
+                                        }">
+                                            <span
+                                                class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                                            <input type="text" x-model="maskedAmount"
+                                                class="w-full pl-8 pr-3 py-2 bg-gray-50/50 border border-gray-200 rounded-lg text-xs font-bold focus:bg-white focus:border-[#1c69d4] focus:ring-0 transition"
+                                                placeholder="Jumlah Bayar">
+                                        </div>
+                                        @if (count($payments) > 1)
+                                            <button type="button"
+                                                wire:click="autofillRemaining({{ $index }})"
+                                                class="px-3 py-2 text-xs font-bold bg-[#1c69d4] text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-sm shadow-blue-500/20 whitespace-nowrap">
+                                                Sisa Tab
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
                             @endforeach
                         </div>
-                    </div>
-                @endif
 
-                {{-- Catatan --}}
-                <div class="px-4 pb-4">
-                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Catatan Pesanan</p>
-                    <textarea wire:model.defer="notes" rows="2"
-                        class="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:border-[#1c69d4] focus:ring-0 placeholder-gray-300 resize-none"
-                        placeholder="Opsional..."></textarea>
+                        {{-- Validation Status Banner --}}
+                        @php
+                            $targetTotal = max(0, $this->subtotal - (int) $this->totalDiscount);
+                            $allocatedTotal = (int) $this->paymentsTotalBase;
+                            $diff = $targetTotal - $allocatedTotal;
+                        @endphp
+
+                        <div class="transition-all duration-300">
+                            @if ($diff === 0)
+                                <div
+                                    class="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold justify-center shadow-sm">
+                                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Pembayaran Lunas & Sesuai
+                                </div>
+                            @elseif ($diff > 0)
+                                <div
+                                    class="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-bold justify-center shadow-sm">
+                                    <svg class="w-4 h-4 text-amber-600 animate-pulse" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    Kurang Bayar: Rp {{ number_format($diff, 0, ',', '.') }}
+                                </div>
+                            @else
+                                <div
+                                    class="flex items-center gap-2 p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold justify-center shadow-sm">
+                                    <svg class="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Kembalian / Lebih: Rp {{ number_format(abs($diff), 0, ',', '.') }}
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Discount Section --}}
+                    <div class="p-4">
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Diskon Manual (Rp)
+                        </p>
+                        <div class="relative" x-data="{
+                            rawDiscount: @entangle('discount_amount').live,
+                            get maskedDiscount() {
+                                if (!this.rawDiscount) return '';
+                                return this.rawDiscount.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                            },
+                            set maskedDiscount(val) {
+                                this.rawDiscount = val.replace(/\D/g, '');
+                            }
+                        }">
+                            <span
+                                class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                            <input type="text" x-model="maskedDiscount"
+                                class="w-full bg-white border border-gray-200 shadow-sm rounded-lg pl-8 pr-3 py-2 text-xs font-bold focus:border-[#1c69d4] focus:ring-0 transition placeholder:text-gray-300"
+                                placeholder="0">
+                        </div>
+                    </div>
+
+                    {{-- Promos Section --}}
+                    @if (count($this->activePromos) > 0)
+                        <div class="p-4">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Promo /
+                                Voucher Terpakai</p>
+                            <div class="space-y-2 max-h-36 overflow-y-auto pr-1">
+                                @foreach ($this->activePromos as $promo)
+                                    <label
+                                        class="flex items-start gap-2.5 bg-white border border-gray-200/60 p-2.5 rounded-xl cursor-pointer shadow-sm hover:border-[#1c69d4]/40 transition group">
+                                        <input type="checkbox" wire:model.live="selectedPromos"
+                                            value="{{ $promo->id }}"
+                                            class="mt-0.5 rounded text-[#1c69d4] focus:ring-[#1c69d4]/20 border-gray-300 w-3.5 h-3.5 transition">
+                                        <div class="text-xs leading-tight">
+                                            <div
+                                                class="font-bold text-gray-700 group-hover:text-[#1c69d4] transition-colors">
+                                                {{ $promo->name }}
+                                            </div>
+                                            <div class="text-[10px] text-gray-400 font-semibold mt-0.5 tracking-wide">
+                                                @if ($promo->code)
+                                                    <span
+                                                        class="bg-gray-100 text-gray-600 px-1 py-0.5 rounded mr-1 font-mono font-normal">{{ $promo->code }}</span>
+                                                    &bull;
+                                                @endif
+                                                @if ($promo->discount_type === 'fixed')
+                                                    Potongan Rp{{ number_format($promo->discount_value, 0, ',', '.') }}
+                                                @else
+                                                    Potongan {{ number_format($promo->discount_value, 0) }}%
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Notes Section --}}
+                    <div class="p-4">
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Catatan Pesanan
+                        </p>
+                        <textarea wire:model.defer="notes" rows="2"
+                            class="w-full bg-white border border-gray-200 shadow-sm rounded-lg px-3 py-2 text-xs focus:border-[#1c69d4] focus:ring-0 placeholder-gray-300 resize-none transition"
+                            placeholder="Tambahkan catatan internal atau request cetakan jika ada..."></textarea>
+                    </div>
                 </div>
             </div>
 
@@ -1000,6 +1076,82 @@
                         Transaksi Baru
                     </button>
                 </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- MODAL CEK STOK GUDANG --}}
+    @if ($showStockModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-opacity"
+            wire:transition.fade>
+
+            <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden transform transition-all"
+                wire:click.away="closeStockModal">
+
+                {{-- Header Modal --}}
+                <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-800">Ketersediaan Stok</h3>
+                        <p class="text-[11px] text-gray-500 mt-0.5">{{ $stockModalItemTitle }}</p>
+                    </div>
+                    <button wire:click="closeStockModal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Body Modal --}}
+                <div class="p-5 max-h-[60vh] overflow-y-auto">
+                    @if (count($stockModalData) > 0)
+                        <ul class="space-y-2.5">
+                            @foreach ($stockModalData as $data)
+                                <li
+                                    class="flex justify-between items-center p-3 rounded-lg border 
+                            {{ $data['is_current_user_warehouse'] ? 'bg-indigo-50/50 border-indigo-200' : 'bg-white border-gray-100' }}">
+
+                                    <div class="flex items-center gap-2">
+                                        <svg class="w-4 h-4 {{ $data['is_current_user_warehouse'] ? 'text-indigo-600' : 'text-gray-400' }}"
+                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                        {{-- Warna teks beda untuk gudang user saat ini --}}
+                                        <span
+                                            class="text-sm font-semibold {{ $data['is_current_user_warehouse'] ? 'text-indigo-700' : 'text-gray-700' }}">
+                                            {{ $data['warehouse_name'] }}
+                                            @if ($data['is_current_user_warehouse'])
+                                                <span
+                                                    class="ml-1 text-[10px] font-normal bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded">Gudang
+                                                    Anda</span>
+                                            @endif
+                                        </span>
+                                    </div>
+
+                                    <div class="text-right">
+                                        <span
+                                            class="text-sm font-bold {{ $data['is_current_user_warehouse'] ? 'text-indigo-700' : 'text-gray-900' }}">
+                                            {{ $data['stock'] }}
+                                        </span>
+                                        <span
+                                            class="text-[11px] {{ $data['is_current_user_warehouse'] ? 'text-indigo-500' : 'text-gray-500' }}">Unit</span>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <div class="text-center py-6">
+                            <svg class="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                            <p class="text-sm text-gray-500">Stok tidak tersedia di semua gudang.</p>
+                        </div>
+                    @endif
+                </div>
+
             </div>
         </div>
     @endif

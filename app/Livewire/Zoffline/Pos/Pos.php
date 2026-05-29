@@ -604,7 +604,56 @@ class Pos extends Component
             }
         }
     }
+    // ─── Stock Modal Properties ────────────────────────────────
+    public $showStockModal = false;
+    public $stockModalData = [];
+    public $stockModalItemTitle = '';
 
+    public function checkStock($index)
+    {
+        // 1. Pastikan item ada di keranjang
+        if (!isset($this->cart[$index])) {
+            $this->dispatch('toast', title: 'Error', message: 'Item tidak ditemukan di keranjang.', type: 'error');
+            return;
+        }
+
+        $item = $this->cart[$index];
+        $userWarehouseId = Auth::user()->warehouse_id;
+
+        // 2. Ambil data varian beserta SEMUA stok gudang. 
+        // Pastikan relasi 'warehouse' ada di model WarehouseStock kamu.
+        if (isset($item['is_second']) && $item['is_second']) {
+            $variant = SecondProductVariant::with(['warehouseStocks.warehouse'])->find($item['variant_id']);
+        } else {
+            $variant = ProductVariant::with(['warehouseStocks.warehouse'])->find($item['variant_id']);
+        }
+
+        // 3. Mapping data untuk ditampilkan di modal
+        if ($variant) {
+            $this->stockModalItemTitle = "{$item['name']} ({$item['color']} - {$item['storage']})";
+
+            $this->stockModalData = $variant->warehouseStocks->map(function ($ws) use ($userWarehouseId) {
+                return [
+                    // Sesuaikan 'name' jika field nama gudang di tabelmu beda (misal: nama_gudang)
+                    'warehouse_name' => $ws->warehouse->name ?? 'Gudang Tidak Diketahui',
+                    'stock' => $ws->stock,
+                    'is_current_user_warehouse' => $ws->warehouse_id === $userWarehouseId,
+                ];
+            })->toArray();
+
+            // Tampilkan Modal
+            $this->showStockModal = true;
+        } else {
+            $this->dispatch('toast', title: 'Gagal', message: 'Data varian tidak ditemukan di database.', type: 'error');
+        }
+    }
+
+    public function closeStockModal()
+    {
+        $this->showStockModal = false;
+        $this->stockModalData = [];
+        $this->stockModalItemTitle = '';
+    }
     public function removeSerialNumber($index, $snIndex)
     {
         // Fungsi untuk menghapus badge SN saat tombol X diklik
