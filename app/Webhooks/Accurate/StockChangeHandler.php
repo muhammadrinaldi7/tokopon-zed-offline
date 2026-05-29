@@ -15,15 +15,24 @@ class StockChangeHandler implements WebhookHandlerInterface
     public function handle(AccurateWebhookLog $log): void
     {
         $payload = $log->payload;
-        $itemNo = $payload['item_no'] ?? ($payload['itemNo'] ?? ($payload['no'] ?? null));
         $dbSource = $log->database_source;
 
-        if (!$itemNo) {
-            throw new \Exception("item_no is missing from payload");
+        // Accurate mengirimkan detail event di dalam array 'data'
+        if (isset($payload['data']) && is_array($payload['data'])) {
+            foreach ($payload['data'] as $itemData) {
+                // Biasanya ada key 'itemNo', jika tidak ada cari alternatif lain 
+                $itemNo = $itemData['itemNo'] ?? ($itemData['no'] ?? null);
+                
+                if ($itemNo) {
+                    // Eksekusi logic sinkronisasi stock per item yang ditemukan
+                    $this->syncItemStockFromAccurate($itemNo, $dbSource);
+                } else {
+                    Log::warning("Accurate Webhook Payload Data tidak memiliki itemNo: " . json_encode($itemData));
+                }
+            }
+        } else {
+            throw new \Exception("Format payload tidak dikenali, array 'data' tidak ditemukan.");
         }
-
-        // Logic sync yang dulunya ada di Controller dipindah ke sini
-        $this->syncItemStockFromAccurate($itemNo, $dbSource);
     }
 
     private function syncItemStockFromAccurate($itemNo, $dbSource)

@@ -3,11 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Warehouse;
-use App\Models\ProductVariant;
-use App\Models\SecondProductVariant;
-use App\Models\WarehouseStock;
-use App\Services\AccurateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -15,36 +10,46 @@ class AccurateWebhookController extends Controller
 {
     public function handle(Request $request)
     {
-        // 1. Validasi Token Verifikasi
-        $token = $request->header('X-Accurate-Notification-Token');
-        if ($token && $token !== env('ACCURATE_WEBHOOK_TOKEN')) {
+        // 1. Keamanan: Cek Token dari Parameter URL
+        $urlToken = $request->query('token');
+        $expectedToken = env('ACCURATE_WEBHOOK_TOKEN');
+
+        // Tolak jika URL tidak ada ?token= yang sesuai dengan .env
+        if ($urlToken !== $expectedToken) {
+            Log::warning('Accurate Webhook Ditolak: Token tidak cocok.');
             return response()->json(['message' => 'Unauthorized'], 401);
         }
+        Log::info('webhook masuk:', $request->all());
 
-        $payload = $request->all();
-        $eventType = $payload['event'] ?? 'UNKNOWN';
-        
-        // Accurate terkadang mengirimkan multi-DB source jika diatur
-        $dbSource = $payload['database_source'] ?? 'syihab'; 
+        // 2. Tangkap data bungkusan Array dari Accurate
+        $payloads = $request->json()->all();
 
-        // Generate a pseudo-event ID for idempotency (if needed later)
-        $eventId = md5(json_encode($payload) . time());
+        // Jaga-jaga kalau testing dari postman bukan array
+        if (!is_array($payloads) || !isset($payloads[0])) {
+            $payloads = [$request->all()];
+        }
 
-        // 2. Simpan ke Database
-        $log = \App\Models\AccurateWebhookLog::create([
-            'event_type' => $eventType,
-            'database_source' => $dbSource,
-            'event_id' => $eventId,
-            'payload' => $payload,
-            'status' => 'pending'
-        ]);
+        // 3. Pecah bungkusannya (karena bisa jadi Accurate kirim banyak item sekaligus)
+        foreach ($payloads as $payload) {
+            $eventType = $payload['type'] ?? 'UNKNOWN';
+            $dbSource = $payload['databaseId'] ?? 'unknown_db';
+            $uuid = $payload['uuid'] ?? md5(json_encode($payload) . time());
 
-        // 3. Dispatch Background Job
-        \App\Jobs\ProcessAccurateWebhookJob::dispatch($log->id);
+            // 4. Simpan ke Database persis seperti sebelumnya
+            $log = \App\Models\AccurateWebhookLog::create([
+                'event_type' => $eventType,       // Bakal berisi "ITEM"
+                'database_source' => (string)$dbSource,   // Bakal berisi "2601686"
+                'event_id' => $uuid,
+                'payload' => $payload,
+                'status' => 'pending'
+            ]);
 
-        Log::info("Accurate Webhook queued: [Event: {$eventType}] [Log ID: {$log->id}]");
+            // 5. Lempar ke Antrian
+            \App\Jobs\ProcessAccurateWebhookJob::dispatch($log->id);
+            Log::info("Accurate Webhook queued: [Event: {$eventType}] [Log ID: {$log->id}]");
+        }
 
-        // 4. Respond 200 OK secara instan ke Accurate
-        return response()->json(['status' => 'queued', 'log_id' => $log->id]);
+        // 6. Jawab 200 OK ke Accurate
+        return response()->json(['status' => 'success', 'message' => 'Terekam di log']);
     }
 }
