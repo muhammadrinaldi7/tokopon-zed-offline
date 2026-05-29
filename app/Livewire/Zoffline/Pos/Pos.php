@@ -1367,7 +1367,7 @@ class Pos extends Component
         // Store Title (Center, Large)
         $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
         $printer->selectPrintMode(\Mike42\Escpos\Printer::MODE_DOUBLE_WIDTH | \Mike42\Escpos\Printer::MODE_DOUBLE_HEIGHT);
-        $printer->text("TOKOPON\n");
+        $printer->text("SYIHAB STORE\n");
 
         $printer->selectPrintMode();
         $storeName = $this->completedOrder->shipping_address_snapshot['store'] ?? 'Toko';
@@ -1379,6 +1379,7 @@ class Pos extends Component
         $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_LEFT);
         $printer->text($this->formatLine("No. Transaksi", $this->completedOrder->order_number, $maxColumns) . "\n");
         $printer->text($this->formatLine("Kasir", $this->completedOrder->handledBy->name ?? '-', $maxColumns) . "\n");
+        $printer->text($this->formatLine("Sales", $this->completedOrder->salesBy->first()->name ?? '-', $maxColumns) . "\n");
         $printer->text($this->formatLine("Customer", $this->completedOrder->user->name ?? '-', $maxColumns) . "\n");
         $printer->text($separator);
 
@@ -1405,33 +1406,33 @@ class Pos extends Component
         $printer->text($separator);
 
         // Subtotal
-        $printer->text($this->formatLine("Subtotal", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), $maxColumns) . "\n");
+        $printer->text($this->formatLine("Total", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), $maxColumns) . "\n");
         $printer->text($separator);
 
-        // Grand Total (Bold)
-        $printer->setEmphasis(true);
-        $printer->text($this->formatLine("TOTAL", "Rp " . number_format($this->completedOrder->grand_total, 0, ',', '.'), $maxColumns) . "\n");
-        $printer->setEmphasis(false);
-        $printer->text($separator);
+        // // Grand Total (Bold)
+        // $printer->setEmphasis(true);
+        // $printer->text($this->formatLine("TOTAL", "Rp " . number_format($this->completedOrder->grand_total, 0, ',', '.'), $maxColumns) . "\n");
+        // $printer->setEmphasis(false);
+        // $printer->text($separator);
 
-        // Payments (Split Payments Support)
-        foreach ($this->completedOrder->payments as $payment) {
-            $label = "Bayar (" . ($payment->paymentMethod->name ?? 'Cash') . ")";
-            $amount = "Rp " . number_format($payment->amount, 0, ',', '.');
+        // // Payments (Split Payments Support)
+        // foreach ($this->completedOrder->payments as $payment) {
+        //     $label = "Bayar (" . ($payment->paymentMethod->name ?? 'Cash') . ")";
+        //     $amount = "Rp " . number_format($payment->amount, 0, ',', '.');
 
-            // Jika label terlalu panjang untuk 33 kolom, otomatis akan terformat rapi oleh formatLine
-            $printer->text($this->formatLine($label, $amount, $maxColumns) . "\n");
-        }
+        //     // Jika label terlalu panjang untuk 33 kolom, otomatis akan terformat rapi oleh formatLine
+        //     $printer->text($this->formatLine($label, $amount, $maxColumns) . "\n");
+        // }
 
         if ($this->completedOrder->accurate_invoice_no) {
-            $printer->text($this->formatLine("Accurate No", $this->completedOrder->accurate_invoice_no, $maxColumns) . "\n");
+            $printer->text($this->formatLine("No. SI", $this->completedOrder->accurate_invoice_no, $maxColumns) . "\n");
         }
         $printer->text($separator);
 
         // Footer (Center)
         $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
         $printer->text("\nTerima kasih telah berbelanja!\n");
-        $printer->text("www.tokopon.id\n");
+        $printer->text("Call Center : 0811-5600-6464\n");
 
         // Spasi kosong untuk dorong kertas keluar (karena TM-U220D sobek manual)
         $printer->text("\n\n\n\n\n");
