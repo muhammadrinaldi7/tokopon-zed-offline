@@ -82,7 +82,7 @@
                                 </button>
                             </th>
                         @endforeach
-                        <th class="px-6 py-4 text-right">Aksi</th>
+                        {{-- <th class="px-6 py-4 text-right">Aksi</th> --}}
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 text-sm text-gray-700">
@@ -116,7 +116,7 @@
                                     </span>
                                 </td>
                             @endforeach
-                            <td class="px-6 py-4 text-right">
+                            {{-- <td class="px-6 py-4 text-right">
                                 <button
                                     wire:click="syncVariantStock({{ $variant->id }}, {{ $activeTab === 'second' ? 'true' : 'false' }})"
                                     wire:loading.attr="disabled"
@@ -139,7 +139,7 @@
                                     </svg>
                                     <span>Sync</span>
                                 </button>
-                            </td>
+                            </td> --}}
                         </tr>
                     @empty
                         <tr>

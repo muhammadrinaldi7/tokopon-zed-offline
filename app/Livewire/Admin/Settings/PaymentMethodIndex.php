@@ -33,7 +33,7 @@ class PaymentMethodIndex extends Component
     public $rateId;
     public $rateName;
     public $rateMdrPercentage = 0;
-    public $rateAccurateAccountNo;
+    public $rateAccurateAccountNo = '51.50.005';
     public $rateIsActive = true;
 
     protected $rules = [
@@ -54,6 +54,7 @@ class PaymentMethodIndex extends Component
     public function loadData()
     {
         $this->paymentMethods = PaymentMethod::with('rates')->get();
+        $this->loadGlAccounts();
     }
 
     public function create()
@@ -219,13 +220,60 @@ class PaymentMethodIndex extends Component
         $this->rateId = null;
         $this->rateName = '';
         $this->rateMdrPercentage = 0;
-        $this->rateAccurateAccountNo = '';
+        $this->rateAccurateAccountNo = '51.50.005';
         $this->rateIsActive = true;
     }
+
+    // State untuk GL Accounts
+    public $accurateGlAccounts = [];
+    public $isLoadingGl = false;
 
     #[Layout('layouts.admin', ['title' => 'Master Metode Pembayaran (POS)'])]
     public function render()
     {
         return view('livewire.admin.settings.payment-method-index');
+    }
+
+    public function loadGlAccounts()
+    {
+        $this->accurateGlAccounts = \App\Models\AccurateGlAccount::all();
+    }
+
+    public function syncGlAccounts()
+    {
+        $this->isLoadingGl = true;
+
+        try {
+            $service = app(\App\Services\AccurateService::class);
+            // Anda bisa menambah pengaturan jika butuh database_source 'second'
+            $dbSource = 'syihab';
+
+            $glData = $service->getGlAccounts($dbSource);
+
+            if (!empty($glData)) {
+                // Hapus data lama agar terganti dengan yang baru
+                \App\Models\AccurateGlAccount::where('database_source', $dbSource)->delete();
+
+                foreach ($glData as $gl) {
+                    \App\Models\AccurateGlAccount::create([
+                        'account_no' => $gl['no'],
+                        'name' => $gl['name'],
+                        'account_type' => $gl['accountType'],
+                        'database_source' => $dbSource
+                    ]);
+                }
+
+                $count = count($glData);
+                $this->dispatch('toast', title: 'Berhasil', message: "$count GL Account tersinkronisasi.", type: 'success');
+            } else {
+                $this->dispatch('toast', title: 'Info', message: "Tidak ada GL Account CASH_BANK ditemukan.", type: 'info');
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Gagal sync GL Account: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal sync GL Account: ' . $e->getMessage(), type: 'error');
+        }
+
+        $this->loadGlAccounts();
+        $this->isLoadingGl = false;
     }
 }

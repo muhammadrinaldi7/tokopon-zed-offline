@@ -38,7 +38,8 @@ class StockChangeHandler implements WebhookHandlerInterface
     private function syncItemStockFromAccurate($itemNo, $dbSource)
     {
         $service = app(AccurateService::class);
-        $stockData = $service->getItemStockPerWarehouse($itemNo, $dbSource);
+        // Karena ini trigger dari 1 item, kita ambil stok khusus item tersebut saja dari Accurate
+        $stockData = $service->getStockPerItem($itemNo, $dbSource);
 
         foreach ($stockData as $stockItem) {
             $warehouseName = $stockItem['warehouseName'] ?? ($stockItem['warehouse']['name'] ?? null);

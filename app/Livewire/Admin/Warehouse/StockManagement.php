@@ -96,50 +96,61 @@ class StockManagement extends Component
         $this->isLoading = true;
 
         try {
-            $variants = $this->activeTab === 'second'
-                ? SecondProductVariant::whereNotNull('sku')->get()
-                : ProductVariant::whereNotNull('sku')->get();
-
             $dbSource = $this->activeTab === 'second' ? 'second' : 'syihab';
             $service = app(AccurateService::class);
             $syncedCount = 0;
 
-            foreach ($variants as $variant) {
+            // 1. Ambil daftar Gudang lokal & Varian lokal HANYA 1 KALI
+            $warehouses = Warehouse::all();
+            $variants = $this->activeTab === 'second'
+                ? SecondProductVariant::whereNotNull('sku')->get()
+                : ProductVariant::whereNotNull('sku')->get();
+            $variantClass = $this->activeTab === 'second' ? SecondProductVariant::class : ProductVariant::class;
+
+            foreach ($warehouses as $warehouse) {
                 try {
-                    $stockData = $service->getItemStockPerWarehouse($variant->sku, $dbSource);
+                    // 2. Ambil stok Accurate per gudang
+                    // Pastikan Anda memanggil nama fungsi yang tepat (karena Anda membuat fungsi getItemStockPerWarehouse)
+                    $stockData = $service->getItemStockPerWarehouse($warehouse->name, $dbSource);
+                    
                     if (empty($stockData)) continue;
-                    // Reset
-                    WarehouseStock::where('variant_id', $variant->id)
-                        ->where('variant_type', get_class($variant))
+
+                    // 3. Mapping data array ke Collection berbasis SKU (O(1) lookup di memori)
+                    // Cek struktur array Accurate apakah key-nya 'no' atau 'itemNo'
+                    $accurateStockCollection = collect($stockData)->keyBy(function ($item) {
+                        return $item['itemNo'] ?? ($item['item']['no'] ?? ($item['no'] ?? null));
+                    });
+
+                    // 4. Reset stok khusus gudang INI menjadi 0 dulu (Menghindari barang sisa/ghost stock)
+                    WarehouseStock::where('warehouse_id', $warehouse->id)
+                        ->where('variant_type', $variantClass)
                         ->update(['stock' => 0]);
 
-                    foreach ($stockData as $stockItem) {
-                        $warehouseName = $stockItem['warehouseName'] ?? ($stockItem['warehouse']['name'] ?? null);
-                        $qty = $stockItem['quantity'] ?? ($stockItem['qty'] ?? 0);
+                    // 5. Looping varian dan simpan data stok
+                    foreach ($variants as $variant) {
+                        if ($accurateStockCollection->has($variant->sku)) {
+                            $accurateItem = $accurateStockCollection->get($variant->sku);
+                            $qty = $accurateItem['quantity'] ?? ($accurateItem['qty'] ?? 0);
 
-                        if (!$warehouseName) continue;
-
-                        $warehouse = Warehouse::where('name', $warehouseName)->first();
-                        if (!$warehouse) continue;
-
-                        WarehouseStock::updateOrCreate(
-                            [
-                                'warehouse_id' => $warehouse->id,
-                                'variant_id' => $variant->id,
-                                'variant_type' => get_class($variant),
-                            ],
-                            [
-                                'stock' => $qty
-                            ]
-                        );
+                            WarehouseStock::updateOrCreate(
+                                [
+                                    'warehouse_id' => $warehouse->id,
+                                    'variant_id'   => $variant->id,
+                                    'variant_type' => $variantClass,
+                                ],
+                                [
+                                    'stock'        => $qty
+                                ]
+                            );
+                            $syncedCount++;
+                        }
                     }
-                    $syncedCount++;
                 } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed to sync SKU {$variant->sku} during bulk sync: " . $e->getMessage());
+                    \Illuminate\Support\Facades\Log::error("Failed to sync Warehouse {$warehouse->name} during bulk sync: " . $e->getMessage());
                 }
             }
 
-            $this->dispatch('toast', title: 'Selesai', message: "Berhasil menyelaraskan $syncedCount varian dengan Accurate.", type: 'success');
+            $this->dispatch('toast', title: 'Selesai', message: "Berhasil menyelaraskan total $syncedCount item dari seluruh gudang dengan Accurate.", type: 'success');
         } catch (\Exception $e) {
             $this->dispatch('toast', title: 'Gagal', message: 'Gagal sinkronisasi massal: ' . $e->getMessage(), type: 'error');
         }

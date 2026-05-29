@@ -19,7 +19,7 @@
                 <thead class="text-xs text-gray-500 bg-gray-50 uppercase font-semibold">
                     <tr>
                         <th class="px-6 py-4">Nama</th>
-                        <th class="px-6 py-4 text-right">Aksi</th>
+                        {{-- <th class="px-6 py-4 text-right">Aksi</th> --}}
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -28,11 +28,11 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="font-bold text-gray-900">{{ $item['name'] }}</span>
                             </td>
-                            <td class="px-6 py-4 text-right">
+                            {{-- <td class="px-6 py-4 text-right">
                                 <a wire:navigate class="text-[#1c69d4] hover:text-[#3f36b8] font-semibold text-sm">
                                     Detail →
                                 </a>
-                            </td>
+                            </td> --}}
                         </tr>
                     @empty
                         <tr>
@@ -66,7 +66,7 @@
                 <thead class="text-xs text-gray-500 bg-gray-50 uppercase font-semibold">
                     <tr>
                         <th class="px-6 py-4">Nama</th>
-                        <th class="px-6 py-4 text-right">Aksi</th>
+                        {{-- <th class="px-6 py-4 text-right">Aksi</th> --}}
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -75,11 +75,11 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="font-bold text-gray-900">{{ $item['name'] }}</span>
                             </td>
-                            <td class="px-6 py-4 text-right">
+                            {{-- <td class="px-6 py-4 text-right">
                                 <a wire:navigate class="text-[#1c69d4] hover:text-[#3f36b8] font-semibold text-sm">
                                     Detail →
                                 </a>
-                            </td>
+                            </td> --}}
                         </tr>
                     @empty
                         <tr>
