@@ -5,6 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'Admin Dashboard - TokoPun' }}</title>
+    <link rel="icon" type="image/png" href="{{ asset('zlogoblack.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
@@ -13,12 +14,16 @@
     .no-scrollbar::-webkit-scrollbar {
         display: none;
     }
+
     /* Hide scrollbar for IE, Edge and Firefox */
     .no-scrollbar {
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
+        -ms-overflow-style: none;
+        /* IE and Edge */
+        scrollbar-width: none;
+        /* Firefox */
     }
 </style>
+
 <body class="bg-[#ffffff] text-[#262626] font-sans antialiased overflow-hidden" x-data="{ sidebarOpen: false, sidebarCollapsed: false }">
     <div class="flex h-screen w-full relative">
         {{-- Overlay for mobile --}}
