@@ -59,7 +59,7 @@ class PointOfSale extends Component
     public function reprintOrder($orderId)
     {
         $this->completedOrder = Order::with(['items', 'user', 'paymentMethod', 'handledBy', 'salesBy'])->find($orderId);
-        // dd($this->completedOrder);
+        dd($this->completedOrder);
         if ($this->completedOrder) {
             $this->showHistoryModal = false; // tutup modal history
             $this->showReceiptModal = true;  // buka modal struk bawaan kamu

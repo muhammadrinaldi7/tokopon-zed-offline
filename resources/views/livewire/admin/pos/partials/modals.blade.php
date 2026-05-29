@@ -10,8 +10,7 @@
                         <p class="text-xs text-gray-400">Pilih varian yang akan dijual</p>
                     </div>
                     <button wire:click="$set('showVariantModal', false)" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            stroke-width="2">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -106,8 +105,7 @@
                         <p class="text-xs text-gray-400">Daftar penjualan yang berhasil diproses lewat kasir</p>
                     </div>
                     <button wire:click="$set('showHistoryModal', false)" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            stroke-width="2">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -194,7 +192,7 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
                 <div class="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-                    <h3 class="font-black text-gray-900">Struk Transaksi</h3>
+                    <h3 class="font-black text-gray-900">Struk Transaksis</h3>
                     <div class="flex items-center gap-2">
                         <button
                             onclick="document.getElementById('receipt-content').classList.remove('hidden'); window.print();"
@@ -286,7 +284,7 @@
                     @foreach ($completedOrder->items as $item)
                         @php
                             $v = $item->variant;
-                            $itemName = $v ? ($v->product->name ?? ($v->secondProduct->name ?? '-')) : '-';
+                            $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
                         @endphp
                         <div class="mb-1">
                             <p class="font-bold">{{ $itemName }}</p>
@@ -297,16 +295,19 @@
                             </div>
                             @if ($item->serial_number)
                                 <p class="text-[9px] text-gray-400">SN: {{ $item->serial_number }}</p>
-                                @if($item->product_variant_type === 'App\Models\SecondProductVariant')
+                                @if ($item->product_variant_type === 'App\Models\SecondProductVariant')
                                     @php
                                         $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
                                     @endphp
-                                    @foreach($sns as $sn)
-                                        @if($sn)
-                                        <div class="mt-2 mb-1 flex flex-col items-center justify-center p-2 border border-dashed border-gray-300 rounded bg-gray-50">
-                                            <p class="text-[8px] text-gray-500 font-bold mb-1 text-center">Sertifikat QC Perangkat<br>(SN: {{ $sn }})</p>
-                                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data={{ urlencode(route('public.device-qc', ['imei' => $sn])) }}" class="w-16 h-16 grayscale mix-blend-multiply">
-                                        </div>
+                                    @foreach ($sns as $sn)
+                                        @if ($sn)
+                                            <div
+                                                class="mt-2 mb-1 flex flex-col items-center justify-center p-2 border border-dashed border-gray-300 rounded bg-gray-50">
+                                                <p class="text-[8px] text-gray-500 font-bold mb-1 text-center">
+                                                    Sertifikat QC Perangkat<br>(SN: {{ $sn }})</p>
+                                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data={{ urlencode(route('public.device-qc', ['imei' => $sn])) }}"
+                                                    class="w-16 h-16 grayscale mix-blend-multiply">
+                                            </div>
                                         @endif
                                     @endforeach
                                 @endif
