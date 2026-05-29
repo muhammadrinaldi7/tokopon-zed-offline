@@ -12,4 +12,8 @@ class PromoBundleSku extends Model
     {
         return $this->belongsTo(Promo::class);
     }
+    public function variant()
+    {
+        return $this->belongsTo(ProductVariant::class, 'sku', 'sku');
+    }
 }

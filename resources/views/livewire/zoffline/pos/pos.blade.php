@@ -639,32 +639,127 @@
                     {{-- Promos Section --}}
                     @if (count($this->activePromos) > 0)
                         <div class="p-4">
-                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Promo /
-                                Voucher Terpakai</p>
-                            <div class="space-y-2 max-h-36 overflow-y-auto pr-1">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                                Promo / Voucher Terpakai
+                            </p>
+                            <div class="space-y-2 max-h-36  pr-1">
                                 @foreach ($this->activePromos as $promo)
                                     <label
                                         class="flex items-start gap-2.5 bg-white border border-gray-200/60 p-2.5 rounded-xl cursor-pointer shadow-sm hover:border-[#1c69d4]/40 transition group">
+
                                         <input type="checkbox" wire:model.live="selectedPromos"
                                             value="{{ $promo->id }}"
                                             class="mt-0.5 rounded text-[#1c69d4] focus:ring-[#1c69d4]/20 border-gray-300 w-3.5 h-3.5 transition">
-                                        <div class="text-xs leading-tight">
+
+                                        <div class="text-xs leading-tight w-full">
+                                            {{-- Nama Promo --}}
                                             <div
-                                                class="font-bold text-gray-700 group-hover:text-[#1c69d4] transition-colors">
+                                                class="font-bold text-gray-700 group-hover:text-[#1c69d4] transition-colors line-clamp-1">
                                                 {{ $promo->name }}
                                             </div>
-                                            <div class="text-[10px] text-gray-400 font-semibold mt-0.5 tracking-wide">
+
+                                            {{-- Info Diskon Utama --}}
+                                            <div class="text-[10px] text-gray-400 font-semibold mt-1 tracking-wide">
                                                 @if ($promo->code)
                                                     <span
-                                                        class="bg-gray-100 text-gray-600 px-1 py-0.5 rounded mr-1 font-mono font-normal">{{ $promo->code }}</span>
+                                                        class="bg-gray-100 text-gray-600 px-1 py-0.5 rounded mr-1 font-mono font-normal">
+                                                        {{ $promo->code }}
+                                                    </span>
                                                     &bull;
                                                 @endif
+
                                                 @if ($promo->discount_type === 'fixed')
                                                     Potongan Rp{{ number_format($promo->discount_value, 0, ',', '.') }}
                                                 @else
                                                     Potongan {{ number_format($promo->discount_value, 0) }}%
                                                 @endif
                                             </div>
+
+                                            @if ($promo->is_bundle)
+                                                <div
+                                                    class="mt-3 bg-gradient-to-br from-emerald-50/80 to-white border border-dashed border-emerald-200 rounded-lg p-2.5 relative overflow-hidden">
+
+                                                    {{-- Aksen Dekoratif --}}
+                                                    <div
+                                                        class="absolute -right-2 -top-2 w-8 h-8 bg-emerald-100 rounded-full opacity-50">
+                                                    </div>
+
+                                                    {{-- Header Info Bundle & Nominal (Sejajar Kiri-Kanan) --}}
+                                                    <div
+                                                        class="flex items-start justify-between gap-2 border-emerald-100 pb-2 relative z-10">
+                                                        <div class="flex items-center gap-1.5">
+                                                            <div
+                                                                class="bg-emerald-100 text-emerald-600 p-1 rounded-md shrink-0">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                                    viewBox="0 0 24 24" stroke-width="2"
+                                                                    stroke="currentColor" class="w-3.5 h-3.5">
+                                                                    <path stroke-linecap="round"
+                                                                        stroke-linejoin="round"
+                                                                        d="m8.99 14.993 6-6m6 3.001c0 1.268-.63 2.39-1.593 3.069a3.746 3.746 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043 3.745 3.745 0 0 1-3.068 1.593c-1.268 0-2.39-.63-3.068-1.593a3.745 3.745 0 0 1-3.296-1.043 3.746 3.746 0 0 1-1.043-3.297 3.746 3.746 0 0 1-1.593-3.068c0-1.268.63-2.39 1.593-3.068a3.746 3.746 0 0 1 1.043-3.297 3.745 3.745 0 0 1 3.296-1.042 3.745 3.745 0 0 1 3.068-1.594c1.268 0 2.39.63 3.068 1.593a3.745 3.745 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.297 3.746 3.746 0 0 1 1.593 3.068ZM9.74 9.743h.008v.007H9.74v-.007Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm4.125 4.5h.008v.008h-.008v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                                                                </svg>
+                                                            </div>
+                                                            <span
+                                                                class="text-[10px] font-black text-emerald-700 uppercase tracking-wider">
+                                                                Diskon Bundle
+                                                            </span>
+                                                        </div>
+
+                                                        {{-- Badge Nominal Diskon --}}
+                                                        <div
+                                                            class="bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
+                                                            @if ($promo->bundle_discount_type === 'fixed')
+                                                                +
+                                                                Rp{{ number_format($promo->bundle_discount_value, 0, ',', '.') }}
+                                                            @else
+                                                                +
+                                                                {{ number_format($promo->bundle_discount_value, 0) }}%
+                                                            @endif
+                                                        </div>
+                                                    </div>
+
+                                                    {{-- Daftar Item Bundle --}}
+                                                    <div class="relative z-10">
+                                                        <p
+                                                            class="text-[9px] text-emerald-500 font-bold mb-1.5 uppercase tracking-wide">
+                                                            Berlaku untuk produk:</p>
+
+                                                        @if ($promo->bundleSkus && count($promo->bundleSkus) > 0)
+                                                            <ul class="space-y-1.5">
+                                                                @foreach ($promo->bundleSkus as $bundleItem)
+                                                                    <li
+                                                                        class="flex items-start gap-1.5 text-[10px] text-gray-700 font-medium">
+                                                                        {{-- Icon Check Kecil --}}
+                                                                        <svg class="w-3 h-3 text-emerald-400 shrink-0 mt-0.5"
+                                                                            fill="none" viewBox="0 0 24 24"
+                                                                            stroke="currentColor" stroke-width="3">
+                                                                            <path stroke-linecap="round"
+                                                                                stroke-linejoin="round"
+                                                                                d="M5 13l4 4L19 7" />
+                                                                        </svg>
+                                                                        <span class="line-clamp-1 leading-snug">
+                                                                            {{ $bundleItem->variant->product->name ?? $bundleItem->sku }}
+                                                                        </span>
+                                                                    </li>
+                                                                @endforeach
+                                                            </ul>
+                                                        @else
+                                                            <div
+                                                                class="flex items-center gap-1 text-[9px] text-emerald-400 italic">
+                                                                <svg class="w-3 h-3" fill="none"
+                                                                    viewBox="0 0 24 24" stroke="currentColor"
+                                                                    stroke-width="2">
+                                                                    <path stroke-linecap="round"
+                                                                        stroke-linejoin="round"
+                                                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                Belum ada item di-set
+                                                            </div>
+                                                        @endif
+                                                    </div>
+
+                                                </div>
+                                            @endif
+
                                         </div>
                                     </label>
                                 @endforeach

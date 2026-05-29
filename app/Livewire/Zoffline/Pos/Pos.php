@@ -314,7 +314,7 @@ class Pos extends Component
     #[Computed]
     public function activePromos()
     {
-        $promos = Promo::with(['skus', 'bundleSkus'])
+        $promos = Promo::with(['skus', 'bundleSkus.variant.product'])
             ->where('is_active', true)
             ->where(function ($q) {
                 $q->whereNull('start_date')->orWhere('start_date', '<=', now());
@@ -845,17 +845,34 @@ class Pos extends Component
 
             // Save promos to pivot table
             if (!empty($this->selectedPromos)) {
-                $promos = \App\Models\Promo::with('skus')->whereIn('id', $this->selectedPromos)->get();
+                $promos = \App\Models\Promo::with(['skus', 'bundleSkus'])->whereIn('id', $this->selectedPromos)->get();
                 foreach ($promos as $promo) {
-                    $eligible = $this->calculateEligibleCart($promo);
                     $applied = 0;
+
+                    // 1. Kalkulasi Diskon Utama
+                    $eligibleMain = $this->calculateEligibleCart($promo, false);
                     if ($promo->discount_type === 'fixed') {
-                        $applied = $promo->discount_value;
+                        $applied += $promo->discount_value;
                     } else {
-                        $calc = $eligible['amount'] * ($promo->discount_value / 100);
+                        $calc = $eligibleMain['amount'] * ($promo->discount_value / 100);
                         if ($promo->max_discount) $calc = min($calc, $promo->max_discount);
-                        $applied = $calc;
+                        $applied += $calc;
                     }
+
+                    // 2. Kalkulasi Diskon Tambahan (Bundle)
+                    if ($promo->is_bundle) {
+                        $eligibleBundle = $this->calculateEligibleCart($promo, true);
+                        if ($eligibleBundle['qty'] > 0) {
+                            if ($promo->bundle_discount_type === 'fixed') {
+                                $applied += $promo->bundle_discount_value * $eligibleBundle['qty'];
+                            } else {
+                                $calc = $eligibleBundle['amount'] * ($promo->bundle_discount_value / 100);
+                                if ($promo->bundle_max_discount) $calc = min($calc, $promo->bundle_max_discount);
+                                $applied += $calc;
+                            }
+                        }
+                    }
+
                     $order->promos()->attach($promo->id, ['discount_applied' => $applied]);
                 }
             }
@@ -956,7 +973,6 @@ class Pos extends Component
                             'itemNo' => $item['sku'] ?: 'ITEM-UNKNOWN',
                             'warehouseName' => $warehouseName,
                             'unitPrice' => $item['price'],
-                            'itemCashDiscount' => $manualDiscountAmount,
                             'quantity' => $item['qty'],
                             'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
                             'detailSerialNumber' => $detailSN,
@@ -968,8 +984,10 @@ class Pos extends Component
                         'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
                         'branchName' => $branchName,
                         'detailItem' => $detailItems,
+                        'cashDiscount' => $manualDiscountAmount,
                         'inclusiveTax' => true,
-                        'taxable' => true
+                        'taxable' => true,
+                        'description' => $this->notes
                     ];
 
                     $siResult = $accurateService->postSalesInvoice($siData, $dbSource);
@@ -1038,7 +1056,8 @@ class Pos extends Component
                             'chequeAmount' => (float) $netReceiptAmount,
                             'detailInvoice' => [
                                 $detailInvoiceItem
-                            ]
+                            ],
+                            'description' => $this->notes
                         ];
                         Log::info('POS Accurate Integration SR Data: ' . json_encode($srData));
                         $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
