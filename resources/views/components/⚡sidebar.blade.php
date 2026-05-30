@@ -49,27 +49,31 @@ new class extends Component {
             </a>
 
             {{-- Item: Tukar Tambah --}}
-            <a href="{{ route('zoffline.trade-in') }}" wire:navigate
-                class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-all duration-200">
-                <img src="{{ asset('assets/png/trd.png') }}" class="w-8 h-auto" alt="">
+            @can('trade-in')
+                <a href="{{ route('zoffline.trade-in') }}" wire:navigate
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 transition-all duration-200">
+                    <img src="{{ asset('assets/png/trd.png') }}" class="w-8 h-auto" alt="">
 
-                <span
-                    class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
-                    Tukar Tambah
-                    <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
-                </span>
-            </a>
+                    <span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
+                        Tukar Tambah
+                        <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
+                    </span>
+                </a>
+            @endcan
 
-            {{-- Item: Jual HP --}}
-            <a href="{{ route('zoffline.sell-phone') }}" wire:navigate
-                class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-violet-600 hover:bg-violet-50 transition-all duration-200">
-                <img src="{{ asset('assets/png/sellphone.png') }}" class="w-8 h-auto" alt="">
-                <span
-                    class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
-                    Jual HP Bekas
-                    <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
-                </span>
-            </a>
+            @can('sell-phone')
+                {{-- Item: Jual HP --}}
+                <a href="{{ route('zoffline.sell-phone') }}" wire:navigate
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-violet-600 hover:bg-violet-50 transition-all duration-200">
+                    <img src="{{ asset('assets/png/sellphone.png') }}" class="w-8 h-auto" alt="">
+                    <span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
+                        Jual HP Bekas
+                        <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
+                    </span>
+                </a>
+            @endcan
 
             {{-- Item: Cek Stock --}}
             <a href="{{ route('zoffline.cekstock') }}" wire:navigate
@@ -85,10 +89,10 @@ new class extends Component {
             {{-- Item: Riwayat Kasir --}}
             <a href="{{ route('zoffline.riwayat-kasir') }}" wire:navigate
                 class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200">
-                <img src="{{ asset('assets/png/riwayat.png') }}" class="w-8 h-auto" alt="">
+                <img src="{{ asset('assets/png/rk.png') }}" class="w-8 h-auto" alt="">
                 <span
                     class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
-                    Riwayat Kasir
+                    Shift
                     <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
                 </span>
             </a>
@@ -163,19 +167,23 @@ new class extends Component {
             <span class="text-[10px] font-semibold">POS</span>
         </a>
 
-        {{-- Tukar Tambah --}}
-        <a href="{{ route('zoffline.trade-in') }}" wire:navigate
-            class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-emerald-600 transition-colors">
-            <img src="{{ asset('assets/png/trd.png') }}" class="w-8 h-auto" alt="">
-            <span class="text-[10px] font-medium">Trade-In</span>
-        </a>
+        @can('trade-in')
+            {{-- Tukar Tambah --}}
+            <a href="{{ route('zoffline.trade-in') }}" wire:navigate
+                class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-emerald-600 transition-colors">
+                <img src="{{ asset('assets/png/trd.png') }}" class="w-8 h-auto" alt="">
+                <span class="text-[10px] font-medium">Trade-In</span>
+            </a>
+        @endcan
 
-        {{-- Jual HP --}}
-        <a href="{{ route('zoffline.sell-phone') }}" wire:navigate
-            class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-violet-600 transition-colors">
-            <img src="{{ asset('assets/png/sellphone.png') }}" class="w-8 h-auto" alt="">
-            <span class="text-[10px] font-medium">Jual HP</span>
-        </a>
+        @can('sell-phone')
+            {{-- Jual HP --}}
+            <a href="{{ route('zoffline.sell-phone') }}" wire:navigate
+                class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-violet-600 transition-colors">
+                <img src="{{ asset('assets/png/sellphone.png') }}" class="w-8 h-auto" alt="">
+                <span class="text-[10px] font-medium">Jual HP</span>
+            </a>
+        @endcan
 
         <a href="{{ route('zoffline.cekstock') }}" wire:navigate
             class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-violet-600 transition-colors">
@@ -185,8 +193,8 @@ new class extends Component {
 
         <a href="{{ route('zoffline.riwayat-kasir') }}" wire:navigate
             class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-blue-600 transition-colors">
-            <img src="{{ asset('assets/png/riwayat.png') }}" class="w-8 h-auto" alt="">
-            <span class="text-[10px] font-medium">Kasir</span>
+            <img src="{{ asset('assets/png/rk.png') }}" class="w-8 h-auto" alt="">
+            <span class="text-[10px] font-medium">Shift</span>
         </a>
 
         {{-- Profil dengan Dropdown (Alpine.js) --}}

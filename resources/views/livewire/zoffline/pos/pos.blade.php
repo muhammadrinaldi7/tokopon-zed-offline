@@ -469,151 +469,6 @@
                         </div>
                     </div>
 
-                    {{-- Payment Methods --}}
-                    <div class="p-4 space-y-3">
-                        <div class="flex justify-between items-center">
-                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Metode Pembayaran
-                            </p>
-                            <button type="button" wire:click="addPaymentRow" wire:loading.attr="disabled"
-                                class="text-[11px] font-bold text-[#1c69d4] hover:text-blue-800 flex items-center gap-0.5 transition-colors px-2 py-1 hover:bg-blue-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
-
-                                {{-- Icon Plus (Akan hilang saat loading) --}}
-                                <svg wire:loading.remove wire:target="addPaymentRow" class="w-3.5 h-3.5"
-                                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                                </svg>
-
-                                {{-- Icon Spinner (Akan muncul dan berputar saat loading) --}}
-                                <svg wire:loading wire:target="addPaymentRow"
-                                    class="animate-spin w-3.5 h-3.5 text-[#1c69d4]" xmlns="http://www.w3.org/2000/svg"
-                                    fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10"
-                                        stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor"
-                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                    </path>
-                                </svg>
-
-                                Split Bayar
-                            </button>
-                        </div>
-
-                        <div class="space-y-3">
-                            @foreach ($payments as $index => $payment)
-                                <div class="p-3 bg-white border border-gray-200/80 shadow-sm rounded-xl space-y-2.5 transition hover:shadow-md relative"
-                                    wire:key="payment-row-{{ $index }}">
-                                    <div class="flex justify-between items-center border-b border-gray-50 pb-1.5">
-                                        <span
-                                            class="text-[10px] font-extrabold text-gray-400 tracking-wider uppercase">Alokasi
-                                            #{{ $index + 1 }}</span>
-                                        @if (count($payments) > 1)
-                                            <button type="button" wire:click="removePaymentRow({{ $index }})"
-                                                class="text-rose-500 hover:text-rose-700 text-[11px] font-semibold flex items-center gap-0.5 transition-colors px-1.5 py-0.5 hover:bg-rose-50 rounded-md">
-                                                Hapus
-                                            </button>
-                                        @endif
-                                    </div>
-
-                                    <select wire:model.live="payments.{{ $index }}.payment_method_id"
-                                        class="w-full bg-gray-50/50 border border-gray-200 rounded-lg px-2.5 py-2 text-xs font-semibold focus:bg-white focus:border-[#1c69d4] focus:ring-0 transition">
-                                        <option value="">-- Pilih Metode --</option>
-                                        @foreach ($this->paymentMethods as $pm)
-                                            <option value="{{ $pm->id }}">{{ $pm->name }}
-                                                {{ $pm->rates->count() > 0 ? '(' . $pm->rates->count() . ' tarif)' : ($pm->mdr_percentage > 0 ? '(MDR ' . $pm->mdr_percentage . '%)' : '') }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-
-                                    @php
-                                        $pmId = $payment['payment_method_id'];
-                                        $pmObj = $pmId ? \App\Models\PaymentMethod::find($pmId) : null;
-                                        $rowRates = $pmObj
-                                            ? $pmObj->rates()->where('is_active', true)->get()
-                                            : collect();
-                                    @endphp
-
-                                    @if ($rowRates->count() > 0)
-                                        <select wire:model.live="payments.{{ $index }}.payment_method_rate_id"
-                                            class="w-full bg-blue-50/30 border border-blue-100 text-blue-900 rounded-lg px-2.5 py-2 text-xs font-bold focus:border-[#1c69d4] focus:ring-0 transition">
-                                            <option value="">-- Pilih Opsi / Tenor --</option>
-                                            @foreach ($rowRates as $rate)
-                                                <option value="{{ $rate->id }}">{{ $rate->name }} (MDR
-                                                    {{ $rate->mdr_percentage }}%)</option>
-                                            @endforeach
-                                        </select>
-                                    @endif
-
-                                    <div class="flex gap-2">
-                                        <div class="relative flex-1" x-data="{
-                                            rawAmount: @entangle('payments.' . $index . '.amount').live,
-                                            get maskedAmount() {
-                                                if (!this.rawAmount) return '';
-                                                return this.rawAmount.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                                            },
-                                            set maskedAmount(val) {
-                                                this.rawAmount = val.replace(/\D/g, '');
-                                            }
-                                        }">
-                                            <span
-                                                class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
-                                            <input type="text" x-model="maskedAmount"
-                                                class="w-full pl-8 pr-3 py-2 bg-gray-50/50 border border-gray-200 rounded-lg text-xs font-bold focus:bg-white focus:border-[#1c69d4] focus:ring-0 transition"
-                                                placeholder="Jumlah Bayar">
-                                        </div>
-                                        @if (count($payments) > 1)
-                                            <button type="button"
-                                                wire:click="autofillRemaining({{ $index }})"
-                                                class="px-3 py-2 text-xs font-bold bg-[#1c69d4] text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-sm shadow-blue-500/20 whitespace-nowrap">
-                                                Sisa Tab
-                                            </button>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-
-                        {{-- Validation Status Banner --}}
-                        @php
-                            $targetTotal = max(0, $this->subtotal - (int) $this->totalDiscount);
-                            $allocatedTotal = (int) $this->paymentsTotalBase;
-                            $diff = $targetTotal - $allocatedTotal;
-                        @endphp
-
-                        <div class="transition-all duration-300">
-                            @if ($diff === 0)
-                                <div
-                                    class="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold justify-center shadow-sm">
-                                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Pembayaran Lunas & Sesuai
-                                </div>
-                            @elseif ($diff > 0)
-                                <div
-                                    class="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-bold justify-center shadow-sm">
-                                    <svg class="w-4 h-4 text-amber-600 animate-pulse" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    Kurang Bayar: Rp {{ number_format($diff, 0, ',', '.') }}
-                                </div>
-                            @else
-                                <div
-                                    class="flex items-center gap-2 p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold justify-center shadow-sm">
-                                    <svg class="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Kembalian / Lebih: Rp {{ number_format(abs($diff), 0, ',', '.') }}
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-
                     {{-- Discount Section --}}
                     <div class="p-4">
                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Diskon Manual (Rp)
@@ -766,6 +621,155 @@
                             </div>
                         </div>
                     @endif
+
+                    {{-- Payment Methods --}}
+                    <div class="p-4 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Metode Pembayaran
+                            </p>
+                            <button type="button" wire:click="addPaymentRow" wire:loading.attr="disabled"
+                                class="text-[11px] font-bold text-[#1c69d4] hover:text-blue-800 flex items-center gap-0.5 transition-colors px-2 py-1 hover:bg-blue-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+
+                                {{-- Icon Plus (Akan hilang saat loading) --}}
+                                <svg wire:loading.remove wire:target="addPaymentRow" class="w-3.5 h-3.5"
+                                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+
+                                {{-- Icon Spinner (Akan muncul dan berputar saat loading) --}}
+                                <svg wire:loading wire:target="addPaymentRow"
+                                    class="animate-spin w-3.5 h-3.5 text-[#1c69d4]" xmlns="http://www.w3.org/2000/svg"
+                                    fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                        stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                    </path>
+                                </svg>
+
+                                Split Bayar
+                            </button>
+                        </div>
+
+                        <div class="space-y-3">
+                            @foreach ($payments as $index => $payment)
+                                <div class="p-3 bg-white border border-gray-200/80 shadow-sm rounded-xl space-y-2.5 transition hover:shadow-md relative"
+                                    wire:key="payment-row-{{ $index }}">
+                                    <div class="flex justify-between items-center border-b border-gray-50 pb-1.5">
+                                        <span
+                                            class="text-[10px] font-extrabold text-gray-400 tracking-wider uppercase">Alokasi
+                                            #{{ $index + 1 }}</span>
+                                        @if (count($payments) > 1)
+                                            <button type="button" wire:click="removePaymentRow({{ $index }})"
+                                                class="text-rose-500 hover:text-rose-700 text-[11px] font-semibold flex items-center gap-0.5 transition-colors px-1.5 py-0.5 hover:bg-rose-50 rounded-md">
+                                                Hapus
+                                            </button>
+                                        @endif
+                                    </div>
+
+                                    <select wire:model.live="payments.{{ $index }}.payment_method_id"
+                                        class="w-full bg-gray-50/50 border border-gray-200 rounded-lg px-2.5 py-2 text-xs font-semibold focus:bg-white focus:border-[#1c69d4] focus:ring-0 transition">
+                                        <option value="">-- Pilih Metode --</option>
+                                        @foreach ($this->paymentMethods as $pm)
+                                            <option value="{{ $pm->id }}">{{ $pm->name }}
+                                                {{ $pm->rates->count() > 0 ? '(' . $pm->rates->count() . ' tarif)' : ($pm->mdr_percentage > 0 ? '(MDR ' . $pm->mdr_percentage . '%)' : '') }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+
+                                    @php
+                                        $pmId = $payment['payment_method_id'];
+                                        $pmObj = $pmId ? \App\Models\PaymentMethod::find($pmId) : null;
+                                        $rowRates = $pmObj
+                                            ? $pmObj->rates()->where('is_active', true)->get()
+                                            : collect();
+                                    @endphp
+
+                                    @if ($rowRates->count() > 0)
+                                        <select wire:model.live="payments.{{ $index }}.payment_method_rate_id"
+                                            class="w-full bg-blue-50/30 border border-blue-100 text-blue-900 rounded-lg px-2.5 py-2 text-xs font-bold focus:border-[#1c69d4] focus:ring-0 transition">
+                                            <option value="">-- Pilih Opsi / Tenor --</option>
+                                            @foreach ($rowRates as $rate)
+                                                <option value="{{ $rate->id }}">{{ $rate->name }} (MDR
+                                                    {{ $rate->mdr_percentage }}%)</option>
+                                            @endforeach
+                                        </select>
+                                    @endif
+
+                                    <div class="flex gap-2">
+                                        <div class="relative flex-1" x-data="{
+                                            rawAmount: @entangle('payments.' . $index . '.amount').live,
+                                            get maskedAmount() {
+                                                if (!this.rawAmount) return '';
+                                                return this.rawAmount.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                            },
+                                            set maskedAmount(val) {
+                                                this.rawAmount = val.replace(/\D/g, '');
+                                            }
+                                        }">
+                                            <span
+                                                class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                                            <input type="text" x-model="maskedAmount"
+                                                class="w-full pl-8 pr-3 py-2 bg-gray-50/50 border border-gray-200 rounded-lg text-xs font-bold focus:bg-white focus:border-[#1c69d4] focus:ring-0 transition"
+                                                placeholder="Jumlah Bayar">
+                                        </div>
+                                        @if (count($payments) > 1)
+                                            <button type="button"
+                                                wire:click="autofillRemaining({{ $index }})"
+                                                class="px-3 py-2 text-xs font-bold bg-[#1c69d4] text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-all shadow-sm shadow-blue-500/20 whitespace-nowrap">
+                                                Sisa Tab
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        {{-- Validation Status Banner --}}
+                        @php
+                            $targetTotal = max(0, $this->subtotal - (int) $this->totalDiscount);
+                            $allocatedTotal = (int) $this->paymentsTotalBase;
+                            $diff = $targetTotal - $allocatedTotal;
+                        @endphp
+
+                        <div class="transition-all duration-300">
+                            @if ($diff === 0)
+                                <div
+                                    class="flex items-center gap-2 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold justify-center shadow-sm">
+                                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Pembayaran Lunas & Sesuai
+                                </div>
+                            @elseif ($diff > 0)
+                                <div
+                                    class="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-bold justify-center shadow-sm">
+                                    <svg class="w-4 h-4 text-amber-600 animate-pulse" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    Kurang Bayar: Rp {{ number_format($diff, 0, ',', '.') }}
+                                </div>
+                            @else
+                                <div
+                                    class="flex items-center gap-2 p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold justify-center shadow-sm">
+                                    <svg class="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Kembalian / Lebih: Rp {{ number_format(abs($diff), 0, ',', '.') }}
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+
+
+
 
                     {{-- Notes Section --}}
                     <div class="p-4">
