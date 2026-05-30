@@ -19,7 +19,7 @@ class Home extends Component
 
     public function navigateToShift()
     {
-        return $this->redirectRoute('zoffline.cekstock', navigate: true);
+        return $this->redirectRoute('zoffline.riwayat-kasir', navigate: true);
     }
     public function navigateToSellPhone()
     {
