@@ -8,6 +8,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use App\Models\AccurateWebhookLog;
+use App\Webhooks\Accurate\ItemQuantityHandler;
 
 class ProcessAccurateWebhookJob implements ShouldQueue
 {
@@ -64,14 +65,22 @@ class ProcessAccurateWebhookJob implements ShouldQueue
             'ITEM',
             'ITEM_SAVE' => \App\Webhooks\Accurate\ItemSaveHandler::class,
 
+            // KUMPULAN EVENT DOKUMEN HEADER:
+            // Karena tidak membawa sisa stok, kita abaikan saja (di-set ke null)
             'INVENTORY_ADJUSTMENT',
             'INVENTORY_TRANSFER',
             'PURCHASE_INVOICE',
             'RECEIVE_ITEM',
-            'ITEM_QUANTITY',
-            'STOCK_MUTATION' => \App\Webhooks\Accurate\StockChangeHandler::class,
-            // 'ITEM_ADJUSTMENT',
+            'ITEM_ADJUSTMENT' => null,
 
+            // EVENT DETAIL STOK: 
+            // Ini satu-satunya yang membawa key "quantity" untuk di-update
+            'ITEM_QUANTITY' => ItemQuantityHandler::class,
+
+            // Dimatikan sementara karena belum mengelola SN / IMEI
+            // 'STOCK_MUTATION' => \App\Webhooks\Accurate\StockChangeHandler::class,
+
+            // KUMPULAN EVENT PENJUALAN:
             'SALES_INVOICE',
             'SALES_RECEIPT' => \App\Webhooks\Accurate\SalesInvoiceHandler::class,
 
