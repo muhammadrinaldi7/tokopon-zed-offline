@@ -148,7 +148,7 @@
     </script>
     {{-- Tambahkan atribut data-navigate-once di sini --}}
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript" data-navigate-once></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.min.js"></script>
     <script>
         // Ubah 'let' menjadi 'var' agar aman dari error redeklarasi wire:navigate
         var html5QrcodeScanner;
@@ -221,6 +221,59 @@
                     console.log("Scanner dihentikan sebelum siap.");
                 }
             }
+        }
+    </script>
+    <script>
+        function cetakStruk() {
+            // 1. Cek apakah sudah terhubung dengan QZ Tray
+            if (!qz.websocket.isActive()) {
+                qz.websocket.connect().then(function() {
+                    console.log("Berhasil terhubung ke QZ Tray!");
+                    prosesPrint();
+                }).catch(function(err) {
+                    console.error("Gagal terhubung ke QZ. Pastikan aplikasi QZ Tray berjalan di komputer ini.",
+                        err);
+                    alert("Nyalakan QZ Tray terlebih dahulu!");
+                });
+            } else {
+                prosesPrint();
+            }
+        }
+
+        function prosesPrint() {
+            // 2. Sesuaikan nama printer dengan yang ada di Control Panel / Devices and Printers
+            var namaPrinter = "EPSON TM-U220 Receipt";
+
+            qz.printers.find(namaPrinter).then(function(printer) {
+                console.log("Printer ditemukan: " + printer);
+
+                // 3. Buat konfigurasi printer
+                var config = qz.configs.create(printer);
+
+                // 4. Siapkan data struk (Contoh Raw Text / ESC/POS)
+                var dataStruk = [
+                    '\x1B' + '\x40', // ESC/POS: Inisialisasi printer
+                    'Toko Kopi Maju Jaya\n',
+                    'Jl. Mawar No. 123\n',
+                    '========================\n',
+                    'Kopi Susu       Rp 15000\n',
+                    'Roti Bakar      Rp 12000\n',
+                    '------------------------\n',
+                    'Total           Rp 27000\n',
+                    '========================\n',
+                    'Terima Kasih!\n',
+                    '\n\n\n\n', // Spasi ekstra agar kertas naik sebelum dipotong
+                    '\x1D' + '\x56' + '\x01' // ESC/POS: Perintah potong kertas otomatis (opsional)
+                ];
+
+                // 5. Kirim perintah cetak ke QZ Tray
+                return qz.print(config, dataStruk);
+            }).then(function() {
+                console.log("Berhasil dikirim ke printer!");
+            }).catch(function(err) {
+                console.error("Gagal mencetak: ", err);
+                alert("Gagal mencetak. Cek konsol browser untuk detail error.");
+            });
         }
     </script>
 </body>
