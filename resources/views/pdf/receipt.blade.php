@@ -77,12 +77,20 @@
             <td class="text-right">{{ $order->order_number }}</td>
         </tr>
         <tr>
+            <td>Kasir:</td>
+            <td class="text-right">{{ $order->handledBy->name ?? '-' }}</td>
+        </tr>
+        <tr>
             <td>Sales:</td>
             <td class="text-right">{{ $order->salesBy->name ?? '-' }}</td>
         </tr>
         <tr>
             <td>Customer:</td>
             <td class="text-right">{{ $order->user->name ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td>Customer No:</td>
+            <td class="text-right">{{ $order->user->profile->phone_number ?? '-' }}</td>
         </tr>
     </table>
 
@@ -92,9 +100,17 @@
         @php
             $v = $item->variant;
             $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
+            $ram = $v ? $v->ram ?? '' : '';
+            $storage = $v ? $v->storage ?? '' : '';
+            $color = $v ? $v->color ?? '' : '';
         @endphp
         <div style="margin-bottom: 6px;">
-            <p class="font-bold" style="margin: 0;">{{ $itemName }}</p>
+            <p class="font-bold" style="margin: 0;">{{ $itemName }}
+                @if ($ram != null)
+                    {{ $ram }}/
+                @endif{{ $storage }}
+                {{ $color }}
+            </p>
             <table class="item-table">
                 <tr>
                     <td>{{ $item->qty }}x {{ number_format($item->price_at_checkout, 0, ',', '.') }}</td>
@@ -114,36 +130,11 @@
             <td>TOTAL</td>
             <td class="text-right">{{ number_format($order->total_amount, 0, ',', '.') }}</td>
         </tr>
-        {{-- @if ($order->discount_amount > 0)
-            <tr>
-                <td>Diskon</td>
-                <td class="text-right">-{{ number_format($order->discount_amount, 0, ',', '.') }}</td>
-            </tr>
-        @endif --}}
     </table>
 
     <div class="divider"></div>
 
-    {{-- <table class="item-table" style="font-size: 13px;">
-        <tr class="font-bold">
-            <td>TOTAL</td>
-            <td class="text-right">Rp {{ number_format($order->grand_total, 0, ',', '.') }}</td>
-        </tr>
-    </table> --}}
-
     <div class="divider"></div>
-
-    {{-- <table class="payment-table">
-        @foreach ($order->payments as $payment)
-            <tr>
-                <td>Bayar
-                    ({{ $payment->paymentMethod->name ?? 'Cash' }}{{ $payment->paymentMethodRate ? ' - ' . $payment->paymentMethodRate->name : '' }})
-                    :
-                </td>
-                <td class="text-right">Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
-            </tr>
-        @endforeach
-    </table> --}}
 
     @if ($order->accurate_invoice_no)
         <p style="margin: 5px 0 0 0; font-size: 10px; color: #555;">No. SI: {{ $order->accurate_invoice_no }}</p>

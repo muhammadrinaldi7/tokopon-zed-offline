@@ -181,7 +181,7 @@
                {{-- Receipt Preview --}}
                <div id="receipt-content" class="p-5 font-mono text-xs leading-relaxed">
                    <div class="text-center mb-3">
-                       <p class="font-bold text-sm">TOKOPUN</p>
+                       <p class="font-bold text-sm">SYIHAB STORE</p>
                        <p class="text-[10px] text-gray-500">
                            {{ $completedOrder->shipping_address_snapshot['store'] ?? 'Toko' }}</p>
                        <p class="text-[10px] text-gray-400">{{ $completedOrder->created_at->format('d/m/Y H:i') }}
@@ -191,17 +191,29 @@
                    <p class="text-[10px] text-gray-500">Tanggal:
                        {{ $completedOrder->created_at->format('d/m/Y H:i') }}</p>
                    <p class="text-[10px] text-gray-500">No: {{ $completedOrder->order_number }}</p>
+                   <p class="text-[10px] text-gray-500">Kasir: {{ $completedOrder->handledBy->name ?? '-' }}</p>
                    <p class="text-[10px] text-gray-500">Sales: {{ $completedOrder->salesBy->name ?? '-' }}
                    </p>
                    <p class="text-[10px] text-gray-500">Customer: {{ $completedOrder->user->name ?? '-' }}</p>
+                   <p class="text-[10px] text-gray-500">Customer No:
+                       {{ $completedOrder->user->profile->phone_number ?? '-' }}
+                   </p>
                    <div class="border-t border-dashed border-gray-300 my-2"></div>
                    @foreach ($completedOrder->items as $item)
                        @php
                            $v = $item->variant;
                            $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
+                           $ram = $v ? $v->ram ?? '' : '';
+                           $storage = $v ? $v->storage ?? '' : '';
+                           $color = $v ? $v->color ?? '' : '';
                        @endphp
                        <div class="mb-1">
-                           <p class="font-bold">{{ $itemName }}</p>
+                           <p class="font-bold">{{ $itemName }}
+                               @if ($ram != null)
+                                   {{ $ram }}/
+                               @endif{{ $storage }}
+                               {{ $color }}
+                           </p>
                            <div class="flex justify-between">
                                <span>{{ $item->qty }}x
                                    {{ number_format($item->price_at_checkout, 0, ',', '.') }}</span>
@@ -240,7 +252,7 @@
                    @endif
                    <div class="text-center mt-4">
                        <p class="text-[10px] text-gray-400">Terima kasih telah berbelanja!</p>
-                       <p class="text-[10px] text-gray-300">www.tokopun.com</p>
+                       <p class="text-[10px] text-gray-300">Call Center : 0811-5600-6464</p>
                    </div>
                </div>
 

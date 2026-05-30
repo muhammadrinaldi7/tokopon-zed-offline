@@ -123,7 +123,7 @@ new class extends Component {
                 @auth
                     <div class="px-4 py-2 border-b border-gray-100 mb-1">
                         <span class="block text-sm font-bold text-gray-800 truncate">{{ auth()->user()->name }}</span>
-                        <span class="block text-[11px] text-gray-500">Administrator</span>
+                        <span class="block text-[11px] text-gray-500">{{ auth()->user()->roles->first()->name }}</span>
                     </div>
                 @endauth
 
@@ -223,7 +223,7 @@ new class extends Component {
                 @auth
                     <div class="px-4 py-2 border-b border-gray-100 mb-1 text-left">
                         <span class="block text-sm font-bold text-gray-800 truncate">{{ auth()->user()->name }}</span>
-                        <span class="block text-[11px] text-gray-500">Administrator</span>
+                        <span class="block text-[11px] text-gray-500">{{ auth()->user()->roles->first()->name }}</span>
                     </div>
                 @endauth
 
@@ -241,10 +241,10 @@ new class extends Component {
 
                 <div class="h-px bg-gray-100 my-1"></div>
 
-                <a href="/logout"
+                <button wire:click="confirmLogout"
                     class="block px-4 py-2 text-sm text-left text-red-500 hover:bg-red-50 font-medium transition-colors">
                     Keluar Akun
-                </a>
+                </button>
             </div>
         </div>
 

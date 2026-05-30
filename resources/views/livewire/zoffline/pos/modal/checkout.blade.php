@@ -30,6 +30,11 @@
                              class="font-bold text-rose-500">- Rp
                              {{ number_format($this->discount_amount, 0, ',', '.') }}</span></div>
                  @endif
+                 @if ($this->totalPromoDiscount > 0)
+                     <div class="flex justify-between text-sm"><span class="text-rose-500">Promo</span><span
+                             class="font-bold text-rose-500">- Rp
+                             {{ number_format($this->totalPromoDiscount, 0, ',', '.') }}</span></div>
+                 @endif
                  <div class="flex justify-between pt-2 border-t border-gray-200"><span
                          class="font-black text-lg">TOTAL</span><span class="font-black text-[#1c69d4] text-lg">Rp
                          {{ number_format($this->grandTotal, 0, ',', '.') }}</span></div>
