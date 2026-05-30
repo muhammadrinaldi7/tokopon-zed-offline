@@ -22,10 +22,10 @@ class StockChangeHandler implements WebhookHandlerInterface
             foreach ($payload['data'] as $itemData) {
                 // Biasanya ada key 'itemNo', jika tidak ada cari alternatif lain 
                 $itemNo = $itemData['itemNo'] ?? ($itemData['no'] ?? null);
-                
+                $warehouseName = $itemData['warehouseName'] ?? null;
                 if ($itemNo) {
                     // Eksekusi logic sinkronisasi stock per item yang ditemukan
-                    $this->syncItemStockFromAccurate($itemNo, $dbSource);
+                    $this->syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource);
                 } else {
                     Log::warning("Accurate Webhook Payload Data tidak memiliki itemNo: " . json_encode($itemData));
                 }
@@ -35,36 +35,36 @@ class StockChangeHandler implements WebhookHandlerInterface
         }
     }
 
-    private function syncItemStockFromAccurate($itemNo, $dbSource)
+    private function syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource)
     {
+        // 1. Validasi DB Lokal: Pastikan Gudang ada di Laravel Anda
+        $warehouse = Warehouse::where('name', $warehouseName)->first();
+        if (!$warehouse) return;
+
+        // 2. Validasi DB Lokal: Pastikan Varian (SKU) ada di Laravel Anda
+        $variant = ProductVariant::where('sku', $itemNo)->first()
+            ?? SecondProductVariant::where('sku', $itemNo)->first();
+        if (!$variant) return;
+
+        // 3. Tembak API Accurate (Hanya dieksekusi jika gudang & produk valid)
         $service = app(AccurateService::class);
-        // Karena ini trigger dari 1 item, kita ambil stok khusus item tersebut saja dari Accurate
-        $stockData = $service->getStockPerItem($itemNo, $dbSource);
+        $stockData = $service->getStockPerItemWarehouse($itemNo, $warehouseName, $dbSource);
 
-        foreach ($stockData as $stockItem) {
-            $warehouseName = $stockItem['warehouseName'] ?? ($stockItem['warehouse']['name'] ?? null);
-            $qty = $stockItem['quantity'] ?? ($stockItem['qty'] ?? 0);
+        // --- PERBAIKAN DI SINI ---
+        // Langsung ambil nilai availableStock. Jika tidak ada/null, jadikan 0.
+        $qty = $stockData['availableStock'] ?? 0;
 
-            if (!$warehouseName) continue;
-
-            $warehouse = Warehouse::where('name', $warehouseName)->first();
-            if (!$warehouse) continue;
-
-            $variant = ProductVariant::where('sku', $itemNo)->first() 
-                ?? SecondProductVariant::where('sku', $itemNo)->first();
-
-            if ($variant) {
-                WarehouseStock::updateOrCreate(
-                    [
-                        'warehouse_id' => $warehouse->id,
-                        'variant_id' => $variant->id,
-                        'variant_type' => get_class($variant),
-                    ],
-                    [
-                        'stock' => $qty
-                    ]
-                );
-            }
-        }
+        // 4. Update Stok di Database Laravel
+        WarehouseStock::updateOrCreate(
+            [
+                'warehouse_id' => $warehouse->id,
+                'variant_id'   => $variant->id,
+                'variant_type' => get_class($variant),
+            ],
+            [
+                // Lakukan casting ke (int) agar 5.000000 menjadi 5 di database Laravel Anda
+                'stock'        => (int) $qty
+            ]
+        );
     }
 }

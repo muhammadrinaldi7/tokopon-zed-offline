@@ -37,7 +37,7 @@ class ProcessAccurateWebhookJob implements ShouldQueue
 
         try {
             $handlerClass = $this->resolveHandler($log->event_type);
-            
+
             if ($handlerClass) {
                 $handler = new $handlerClass();
                 $handler->handle($log);
@@ -46,14 +46,13 @@ class ProcessAccurateWebhookJob implements ShouldQueue
             }
 
             $log->update(['status' => 'success']);
-
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Accurate Webhook Job Failed: " . $e->getMessage());
             $log->update([
                 'status' => 'failed',
                 'error_message' => $e->getMessage() . "\n" . $e->getTraceAsString(),
             ]);
-            
+
             // Re-throw so Laravel's queue manager knows it failed
             throw $e;
         }
@@ -64,15 +63,15 @@ class ProcessAccurateWebhookJob implements ShouldQueue
         return match ($eventType) {
             'ITEM',
             'ITEM_SAVE' => \App\Webhooks\Accurate\ItemSaveHandler::class,
-            
+
             'INVENTORY_ADJUSTMENT',
             'INVENTORY_TRANSFER',
             'PURCHASE_INVOICE',
             'RECEIVE_ITEM',
             'ITEM_QUANTITY',
-            'STOCK_MUTATION',
-            'ITEM_ADJUSTMENT' => \App\Webhooks\Accurate\StockChangeHandler::class,
-            
+            'STOCK_MUTATION' => \App\Webhooks\Accurate\StockChangeHandler::class,
+            // 'ITEM_ADJUSTMENT',
+
             'SALES_INVOICE',
             'SALES_RECEIPT' => \App\Webhooks\Accurate\SalesInvoiceHandler::class,
 
