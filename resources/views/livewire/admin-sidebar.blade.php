@@ -95,14 +95,25 @@
                 <p class="text-[13px] font-bold tracking-[1.5px] text-gray-400 uppercase">Toko & Katalog</p>
             </div>
 
-            <a href="{{ route('admin.pos') }}" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.pos') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('admin.pos') ? $activeIconClass : $inactiveIconClass }}"
+            <a href="{{ route('zoffline.pos') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.pos') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('zoffline.pos') ? $activeIconClass : $inactiveIconClass }}"
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kasir (POS)</span>
+            </a>
+            <a href="{{ route('zoffline.cekstock') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.cekstock') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('zoffline.cekstock') ? $activeIconClass : $inactiveIconClass }}"
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor" class="size-6">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+                </svg>
+
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Cek Stock</span>
             </a>
 
             @hasanyrole('admin|superadmin')

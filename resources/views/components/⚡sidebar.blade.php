@@ -71,6 +71,21 @@ new class extends Component {
                 </span>
             </a>
 
+            {{-- Item: Cek Stock --}}
+            <a href="{{ route('zoffline.cekstock') }}" wire:navigate
+                class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-violet-600 hover:bg-violet-50 transition-all duration-200">
+                <svg class="w-8 h-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                    stroke-width="1.5" stroke="currentColor" class="size-6">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+                </svg>
+                <span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
+                    Cek Stock
+                    <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
+                </span>
+            </a>
+
         </nav>
 
         {{-- Profil dengan Dropdown (Alpine.js) --}}
@@ -156,11 +171,22 @@ new class extends Component {
             <span class="text-[10px] font-medium">Jual HP</span>
         </a>
 
+        <a href="{{ route('zoffline.cekstock') }}" wire:navigate
+            class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-violet-600 transition-colors">
+            <svg class="w-8 h-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                stroke-width="1.5" stroke="currentColor" class="size-6">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+            </svg>
+            <span class="text-[10px] font-medium">Jual HP</span>
+        </a>
+
         {{-- Profil dengan Dropdown (Alpine.js) --}}
         <div x-data="{ open: false }" class="relative flex flex-col items-center justify-center w-16 h-full"
             @click.outside="open = false">
 
-            <button @click="open = !open" class="flex flex-col items-center gap-1 focus:outline-none transition-colors"
+            <button @click="open = !open"
+                class="flex flex-col items-center gap-1 focus:outline-none transition-colors"
                 :class="open ? 'text-gray-800' : 'text-gray-400 hover:text-gray-800'">
                 <div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center font-bold text-xs transition-colors"
                     :class="open ? 'bg-gray-300 text-gray-800' : 'text-gray-500'">

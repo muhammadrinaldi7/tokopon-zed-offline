@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Admin\Employe\EmployeManage;
+use App\Livewire\Admin\Pos\CekStock;
 use App\Livewire\Admin\Users\UserOperational;
 use App\Livewire\Pages\SellPhone;
 use App\Livewire\Pages\SellPhoneHistory;
@@ -17,6 +18,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/trade-in', \App\Livewire\Zoffline\TradeIn\TradeIn::class)->name('zoffline.trade-in');
     Route::get('/zoffline/sell-phone', \App\Livewire\Zoffline\SellPhone\SellPhone::class)->name('zoffline.sell-phone');
     Route::get('/zoffline/sell-phone-history', \App\Livewire\Zoffline\SellPhone\History::class)->name('zoffline.sell-phone-history');
+    Route::get('/zoffline/cekstock', CekStock::class)->name('zoffline.cekstock');
 });
 
 // ─── Trade In & Sell Phone Client Pages (accessible by authenticated users, e.g. FL or customer) ───
