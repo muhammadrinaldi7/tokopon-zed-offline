@@ -1434,14 +1434,37 @@ class Pos extends Component
         $printer->text($this->formatLine("Kasir", $this->completedOrder->handledBy->name ?? '-', $maxColumns) . "\n");
         $printer->text($this->formatLine("Sales", $this->completedOrder->salesBy->name ?? '-', $maxColumns) . "\n");
         $printer->text($this->formatLine("Customer", $this->completedOrder->user->name ?? '-', $maxColumns) . "\n");
+        $printer->text($this->formatLine("Customer No", $this->completedOrder->user->profile->phone_number ?? '-', $maxColumns) . "\n");
         $printer->text($separator);
 
         // Items List
         foreach ($this->completedOrder->items as $item) {
             $v = $item->variant;
             $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
+            // SINKRONISASI LOGIKA DARI BLADE
             if ($v) {
-                $itemName .= " (" . $v->color . "/" . $v->storage . ")";
+                $ram = $v->ram ?? '';
+                $storage = $v->storage ?? '';
+                $color = $v->color ?? '';
+
+                // Buat penampung string varian
+                $variantDetails = "";
+
+                if ($ram != null && $ram !== '') {
+                    $variantDetails .= $ram . "/";
+                }
+
+                $variantDetails .= $storage;
+
+                if ($color != null && $color !== '') {
+                    $variantDetails .= " " . $color;
+                }
+
+                // Gabungkan ke nama item (Mengikuti gaya Blade tanpa tanda kurung)
+                // Contoh hasil: "iPhone 13 8GB/256GB Black"
+                if (trim($variantDetails) !== '') {
+                    $itemName .= " " . trim($variantDetails);
+                }
             }
 
             $printer->text($itemName . "\n");
