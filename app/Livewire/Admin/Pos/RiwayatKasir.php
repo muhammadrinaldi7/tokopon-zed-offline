@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Pos;
 
 use Livewire\Component;
 use App\Models\Order;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\WithPagination;
@@ -26,10 +27,17 @@ class RiwayatKasir extends Component
 
     public function showDetail($date, $handledById)
     {
-        $orders = Order::pos()
+        $userWarehouseName = Auth::user()->warehouse->name ?? null;
+
+        $query = Order::pos()
             ->whereDate('created_at', $date)
-            ->where('handled_by', $handledById)
-            ->with(['handledBy', 'payments.paymentMethod'])
+            ->where('handled_by', $handledById);
+
+        if ($userWarehouseName) {
+            $query->where('shipping_address_snapshot->store', $userWarehouseName);
+        }
+
+        $orders = $query->with(['handledBy', 'payments.paymentMethod'])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -49,6 +57,8 @@ class RiwayatKasir extends Component
 
     public function render()
     {
+        $userWarehouseName = Auth::user()->warehouse->name ?? null;
+
         $query = Order::pos()
             ->select(
                 DB::raw('DATE(created_at) as date'),
@@ -56,6 +66,10 @@ class RiwayatKasir extends Component
                 DB::raw('COUNT(id) as total_invoice'),
                 DB::raw('SUM(grand_total) as grand_total')
             );
+
+        if ($userWarehouseName) {
+            $query->where('shipping_address_snapshot->store', $userWarehouseName);
+        }
 
         if ($this->dateFilter) {
             $query->whereDate('created_at', $this->dateFilter);
@@ -68,11 +82,16 @@ class RiwayatKasir extends Component
             ->paginate(15);
 
         // Menghitung rincian pembayaran (Tunai vs Non-Tunai)
-        $reports->getCollection()->transform(function ($report) {
-            $orderIds = Order::pos()
+        $reports->getCollection()->transform(function ($report) use ($userWarehouseName) {
+            $orderQuery = Order::pos()
                 ->whereDate('created_at', $report->date)
-                ->where('handled_by', $report->handled_by)
-                ->pluck('id');
+                ->where('handled_by', $report->handled_by);
+
+            if ($userWarehouseName) {
+                $orderQuery->where('shipping_address_snapshot->store', $userWarehouseName);
+            }
+
+            $orderIds = $orderQuery->pluck('id');
 
             $payments = \App\Models\OrderPayment::whereIn('order_id', $orderIds)
                 ->with('paymentMethod')

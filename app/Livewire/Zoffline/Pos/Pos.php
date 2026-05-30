@@ -798,11 +798,40 @@ class Pos extends Component
 
             // Jika customer baru, buat user terlebih dahulu
             if ($this->isNewCustomer && !$customerId) {
-                $this->validate([
-                    'customerName' => 'required|string|max:255',
-                    'customerPhone' => 'required|string|max:20',
-                ]);
+                // 1. Tentukan email yang akan divalidasi
+                $emailToValidate = $this->customerEmail ?: ($this->customerPhone . '@pos.tokopun.com');
 
+                // 2. Terapkan Validasi Ketat di Livewire (termasuk cek unik ke database)
+                try {
+                    $this->validate(
+                        [
+                            'customerName'  => 'required|string|max:255',
+                            'customerPhone' => 'required|string|max:20',
+                            // Cek agar email belum pernah dipakai di tabel users
+                            'customerEmail' => [
+                                'nullable',
+                                'email',
+                                \Illuminate\Validation\Rule::unique('users', 'email')->where(function ($query) use ($emailToValidate) {
+                                    return $query->where('email', $emailToValidate);
+                                })
+                            ],
+                        ],
+                        [
+                            // Custom pesan error agar ramah dibaca kasir
+                            'customerName.required'  => 'Nama customer wajib diisi.',
+                            'customerPhone.required' => 'Nomor HP customer wajib diisi.',
+                            'customerEmail.unique'   => 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                        ]
+                    );
+                } catch (\Illuminate\Validation\ValidationException $e) {
+                    // JIKA VALIDASI GAGAL: 
+                    // Tangkap pesan pertama dari bag error dan lempar sebagai toast, lalu hentikan eksekusi
+                    $firstErrorMessage = collect($e->errors())->flatten()->first();
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
+                    return; // Hentikan proses pembayaran di sini
+                }
+
+                // 3. Jika validasi aman, barulah proses ke database
                 $newUser = User::create([
                     'name' => $this->customerName,
                     'email' => $this->customerEmail ?: ($this->customerPhone . '@pos.tokopun.com'),
