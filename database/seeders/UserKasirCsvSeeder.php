@@ -108,7 +108,7 @@ class UserKasirCsvSeeder extends Seeder
             ]);
 
             if ($adminUser) {
-                $adminUser->assignRole('fl');
+                $adminUser->assignRole('kasir_sju');
 
                 // Insert data nomor HP ke tabel 'user_profiles'
                 DB::table('user_profiles')->insert([

@@ -18,6 +18,7 @@ class AdminRoleSeeder extends Seeder
         Role::firstOrCreate(['name' => 'cs', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'fl', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'user', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'kasir_sju', 'guard_name' => 'web']);
 
         // Create admin user
         $adminUser = User::firstOrCreate(

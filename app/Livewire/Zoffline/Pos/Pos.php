@@ -218,6 +218,13 @@ class Pos extends Component
         $this->syncSinglePaymentAmount();
     }
 
+    public function updated($property)
+    {
+        if (str_starts_with($property, 'cart.')) {
+            $this->syncSinglePaymentAmount();
+        }
+    }
+
     public function addPaymentRow()
     {
         $remaining = max(0, ($this->subtotal - (int)$this->totalDiscount) - $this->paymentsTotalBase);
@@ -903,7 +910,6 @@ class Pos extends Component
             $this->dispatch('toast', title: 'Pembayaran Belum Sesuai', message: 'Pastikan total pembayaran cocok dengan tagihan dan semua metode pembayaran sudah dipilih.', type: 'warning');
             return;
         }
-
         $this->showCheckoutModal = true;
     }
 

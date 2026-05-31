@@ -179,10 +179,19 @@
                                         </div>
                                     </div>
                                     <div class="text-right">
-                                        <p class="font-bold text-blue-600 text-sm whitespace-nowrap">Rp
+                                        <p class="text-xs font-black text-[#1c69d4]">Rp
                                             {{ number_format($item['price'] * $item['qty'], 0, ',', '.') }}</p>
-                                        <p class="text-[10px] text-gray-400 font-medium mt-0.5">@ Rp
-                                            {{ number_format($item['price'], 0, ',', '.') }}</p>
+                                        @if (auth()->user()->hasRole(['admin', 'bm']))
+                                            <div class="mt-0.5 flex items-center justify-end gap-1">
+                                                <span class="text-[10px] text-gray-400 font-medium">@ Rp</span>
+                                                <input type="number" wire:model.live.debounce.500ms="cart.{{ $index }}.price" 
+                                                    class="w-24 text-right bg-white border border-gray-200 shadow-sm rounded px-1.5 py-0.5 text-[10px] font-bold focus:border-[#1c69d4] focus:ring-0"
+                                                    min="0" step="1">
+                                            </div>
+                                        @else
+                                            <p class="text-[10px] text-gray-400 font-medium mt-0.5">@ Rp
+                                                {{ number_format($item['price'], 0, ',', '.') }}</p>
+                                        @endif
                                     </div>
                                 </div>
                                 {{-- Discount Section --}}
