@@ -526,7 +526,8 @@ class Pos extends Component
 
             $this->variantModalVariants = $product->variants->map(fn($v) => [
                 'id' => $v->id,
-                'label' => $v->color . ' - ' . $v->storage,
+                // PERBAIKAN DI SINI
+                'label' => trim(($v->ram ? $v->ram . ' / ' : '') . $v->storage . ' ' . $v->color),
                 'condition' => $v->condition ?? '',
                 'price' => $v->price,
                 'stock' => $v->warehouseStocks->first()?->stock ?? 0,
@@ -544,7 +545,8 @@ class Pos extends Component
 
             $this->variantModalVariants = $product->variants->map(fn($v) => [
                 'id' => $v->id,
-                'label' => $v->color . ' - ' . $v->storage,
+                // PERBAIKAN DI SINI
+                'label' => trim(($v->ram ? $v->ram . ' / ' : '') . $v->storage . ' ' . $v->color),
                 'condition' => '',
                 'price' => $v->price,
                 'stock' => $v->warehouseStocks->first()?->stock ?? 0,
@@ -603,6 +605,7 @@ class Pos extends Component
                 'variant_id' => $variant->id,
                 'variant_type' => $variantType,
                 'name' => $product->name,
+                'ram' => $variant->ram ?? '-',
                 'storage' => $variant->storage ?? '-',
                 'color' => $variant->color ?? '-',
                 'price' => (int) $variant->price,
