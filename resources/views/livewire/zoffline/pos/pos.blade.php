@@ -16,6 +16,14 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
+                    <button type="button" wire:click="openDraft"
+                        class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-[#1c69d4] text-xs font-bold rounded-lg hover:bg-blue-200 transition shadow-sm border border-blue-200">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                        </svg>
+                        Daftar Draft
+                    </button>
                     <button type="button" wire:click="openHistory"
                         class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg hover:bg-gray-700 transition shadow-sm">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -812,10 +820,33 @@
                     </div>
                 </div>
 
-                <div>
+                <div class="flex gap-3">
+                    <button wire:click="saveAsDraft" wire:loading.attr="disabled"
+                        {{ empty($cart) ? 'disabled' : '' }}
+                        class="w-1/3 py-3.5 rounded-xl font-black text-[#1c69d4] bg-blue-50 hover:bg-blue-100 border border-blue-100 text-base transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
+                        
+                        <svg wire:loading.remove wire:target="saveAsDraft"
+                            class="w-4 h-4 inline-block mr-1 -mt-0.5" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                        </svg>
+
+                        <svg wire:loading wire:target="saveAsDraft"
+                            class="animate-spin w-4 h-4 inline-block mr-1 -mt-0.5 text-[#1c69d4]"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        Draft
+                    </button>
+
                     <button wire:click="openCheckout" wire:loading.attr="disabled"
                         {{ empty($cart) ? 'disabled' : '' }}
-                        class="w-full py-3.5 rounded-xl font-black text-white text-base transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
+                        class="w-2/3 py-3.5 rounded-xl font-black text-white text-base transition-all shadow-md active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
     {{ empty($cart) ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#1c69d4] hover:bg-blue-700 shadow-blue-500/20' }}">
 
                         {{-- Icon Dompet/Bayar (Akan hilang saat loading) --}}
@@ -860,6 +891,7 @@
     @include('livewire.zoffline.pos.modal.variant')
     @include('livewire.zoffline.pos.modal.checkout')
     @include('livewire.zoffline.pos.modal.riwayat-penjualan')
+    @include('livewire.zoffline.pos.modal.draft-penjualan')
     @include('livewire.zoffline.pos.modal.receipt-struk')
     @include('livewire.zoffline.pos.modal.stok-gudang')
 

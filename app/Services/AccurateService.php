@@ -411,6 +411,40 @@ class AccurateService
         }
     }
 
+    public function postSalesOrder($salesOrderData, $databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-order/save.do', $salesOrderData);
+
+        Log::info('API Accurate Sales Order Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Sales Order Error: ' . $response->body());
+            throw new \Exception('API Accurate Sales Order Error: ' . $response->body());
+        }
+    }
+
     public function postSalesInvoice($salesInvoiceData, $databaseSource = 'syihab')
     {
         $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
