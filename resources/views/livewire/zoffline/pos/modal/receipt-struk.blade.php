@@ -30,17 +30,15 @@
                                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                            </svg>
                        </button> --}}
-                       <button wire:click="printEscpos" wire:loading.attr="disabled"
+                       {{-- <button wire:click="printEscpos" wire:loading.attr="disabled"
                            class="group relative text-teal-600 hover:text-teal-700 font-bold text-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
 
-                           {{-- Icon Printer (Akan hilang saat loading) --}}
                            <svg wire:loading.remove wire:target="printEscpos" class="w-5 h-auto" fill="none"
                                viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                <path stroke-linecap="round" stroke-linejoin="round"
                                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                            </svg>
 
-                           {{-- Icon Spinner (Akan muncul dan berputar saat loading) --}}
                            <svg wire:loading wire:target="printEscpos" class="animate-spin w-5 h-auto text-teal-600"
                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
@@ -50,15 +48,13 @@
                                </path>
                            </svg>
 
-                           {{-- Tooltip Text (Muncul di sebelah kiri) --}}
                            <span
                                class="absolute right-full top-1/2 -translate-y-1/2 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gray-800 text-white text-[10px] font-normal py-1 px-2 rounded whitespace-nowrap pointer-events-none">
                                Print
                            </span>
-                       </button>
+                       </button> --}}
                        <button wire:click="getEscposBase64" wire:loading.attr="disabled"
                            class="group relative text-blue-500 hover:text-blue-700 font-bold text-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
-
 
                            <svg wire:loading.remove wire:target="getEscposBase64" class="w-5 h-auto" fill="none"
                                viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -159,8 +155,8 @@
                            <button disabled
                                class="text-gray-300 cursor-not-allowed font-bold text-xs flex items-center gap-1"
                                title="Sudah dikirim oleh kasir">
-                               <svg class="w-4 h-4 opacity-40" fill="none" viewBox="0 0 24 24"
-                                   stroke="currentColor" stroke-width="2">
+                               <svg class="w-4 h-4 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                   stroke-width="2">
                                    <path stroke-linecap="round" stroke-linejoin="round"
                                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                </svg>

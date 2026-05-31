@@ -75,9 +75,12 @@ class Pos extends Component
     // Method untuk membuka modal dan memuat data transaksi POS terbaru
     public function openHistory()
     {
+        $userWarehouseName = Auth::user()->warehouse->name ?? null;
         // Mengambil transaksi khusus channel POS handled oleh user aktif / bebas tergantung kebutuhan bisnis
-        $this->historyOrders = Order::with(['items', 'user', 'paymentMethod'])
+        $this->historyOrders = Order::with(['items', 'user', 'paymentMethod', 'handledBy'])
             ->where('order_channel', 'POS')
+            ->where('shipping_address_snapshot->store', $userWarehouseName)
+            ->whereNotIn('order_status', ['DRAFT', 'DRAFT_LOADED', 'CANCELLED', 'RETURNED'])
             ->latest()
             ->take(20) // Ambil 20 transaksi terakhir
             ->get();

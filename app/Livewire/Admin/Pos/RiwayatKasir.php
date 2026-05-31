@@ -51,7 +51,7 @@ class RiwayatKasir extends Component
                 'Kasir', 
                 'Sales', 
                 'No Invoice Lokal', 
-                'No SO Accurate', 
+                'No Invoice Accurate', 
                 'Pelanggan', 
                 'Subtotal', 
                 'Diskon Manual', 
@@ -65,7 +65,7 @@ class RiwayatKasir extends Component
             foreach ($orders as $order) {
                 $payments = $order->payments->map(function($p) {
                     return $p->paymentMethod->name ?? 'Tunai';
-                })->implode(', ');
+                })->implode(' + ');
                 
                 $promo_discount = max(0, $order->total_amount - $order->discount_amount + $order->mdr_amount - $order->grand_total);
 
@@ -75,7 +75,7 @@ class RiwayatKasir extends Component
                     $order->handledBy->name ?? '-',
                     $order->salesBy->name ?? '-',
                     $order->order_number,
-                    $order->accurate_so_number ?? '-',
+                    $order->accurate_invoice_no ?? '-',
                     $order->user->name ?? 'Walk-in Customer',
                     $order->total_amount,
                     $order->discount_amount,

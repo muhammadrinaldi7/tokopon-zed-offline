@@ -1,10 +1,19 @@
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-gray-800">Manajemen Produk</h1>
-        <button wire:click="create"
-            class="bg-[#1c69d4] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-opacity-90 transition">
-            Tambah Produk
-        </button>
+        <div class="flex gap-2">
+            <button wire:click="$set('showImportModal', true)"
+                class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Import CSV
+            </button>
+            <button wire:click="create"
+                class="bg-[#1c69d4] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-opacity-90 transition">
+                Tambah Produk
+            </button>
+        </div>
     </div>
 
     {{-- Filter Bar --}}
@@ -454,6 +463,82 @@
                         </div>
                     @endif
                 </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal Import CSV --}}
+    @if ($showImportModal)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-0 transition-opacity"
+            aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div wire:click="$set('showImportModal', false)"
+                class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity"></div>
+
+            <div
+                class="relative transform overflow-hidden rounded-4xl bg-white/80 backdrop-blur-2xl border border-white shadow-sm shadow-[#1c69d4]/15 text-left transition-all sm:my-8 w-full max-w-lg">
+                <div
+                    class="px-6 py-5 border-b border-gray-200/50 flex justify-between items-center backdrop-blur-md bg-white/40">
+                    <h2 class="text-[17px] font-semibold tracking-tight text-gray-900">Import Produk & Varian (CSV)</h2>
+                    <button wire:click="$set('showImportModal', false)"
+                        class="text-gray-400 hover:text-gray-600 bg-gray-100/50 hover:bg-gray-200/50 rounded-full p-1.5 transition-colors focus:outline-none">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <form wire:submit.prevent="importCsv" class="p-6 space-y-5">
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                        <h3 class="text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Panduan Import
+                        </h3>
+                        <p class="text-xs text-blue-700 leading-relaxed mb-3">
+                            Pastikan format kolom sesuai dengan kerangka standar (template). Baris dengan nama produk yang sama otomatis dikelompokkan ke satu induk. Kode Accurate yang tidak ditemukan akan diabaikan (dibiarkan kosong).
+                        </p>
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <button type="button" wire:click="downloadTemplateCsv" wire:loading.attr="disabled"
+                                class="bg-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-blue-100 transition inline-flex items-center justify-center gap-1.5 w-full sm:w-auto">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                Download Template CSV
+                            </button>
+                            <button type="button" wire:click="exportAccurateDataCsv" wire:loading.attr="disabled"
+                                class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-emerald-100 transition inline-flex items-center justify-center gap-1.5 w-full sm:w-auto">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                Ekspor Master Accurate
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Upload File CSV</label>
+                        <input type="file" wire:model="importFile" accept=".csv"
+                            class="w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer bg-gray-50 border border-gray-200 rounded-xl p-1"
+                            required>
+                        @error('importFile')
+                            <span class="text-xs text-rose-500 font-medium ml-1 mt-1 block">{{ $message }}</span>
+                        @enderror
+                    </div>
+
+                    <div class="pt-4 flex gap-3">
+                        <button type="button" wire:click="$set('showImportModal', false)"
+                            class="flex-1 bg-gray-100/50 hover:bg-gray-200/70 text-gray-700 py-3 rounded-lg text-[15px] font-semibold transition-all">
+                            Batal
+                        </button>
+                        <button type="submit" wire:loading.attr="disabled"
+                            class="flex-1 bg-[#1c69d4] text-white py-3 rounded-lg text-[15px] font-semibold hover:bg-[#3f36b8] hover:shadow-sm hover:shadow-[#1c69d4]/30 active:scale-[0.98] transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                            <span wire:loading.remove wire:target="importCsv">Mulai Import</span>
+                            <span wire:loading wire:target="importCsv">Memproses...</span>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     @endif

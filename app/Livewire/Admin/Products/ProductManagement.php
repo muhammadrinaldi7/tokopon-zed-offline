@@ -8,6 +8,14 @@ use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\WithFileUploads;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use App\Models\Category;
+use App\Models\Brand;
+use App\Models\ProductVariant;
+use App\Models\ProductAccurate;
+use App\Models\Warehouse;
+use App\Models\WarehouseStock;
 
 
 class ProductManagement extends Component
@@ -16,9 +24,11 @@ class ProductManagement extends Component
 
     public $showModal = false;
     public $showDetailModal = false;
+    public $showImportModal = false;
     public $isEditing = false;
     public $productId;
     public $detailProduct = null;
+    public $importFile;
 
     public $name;
     public $description;
@@ -37,9 +47,18 @@ class ProductManagement extends Component
         'filterBrand' => ['except' => ''],
     ];
 
-    public function updatingSearch() { $this->resetPage(); }
-    public function updatingFilterCategory() { $this->resetPage(); }
-    public function updatingFilterBrand() { $this->resetPage(); }
+    public function updatingSearch()
+    {
+        $this->resetPage();
+    }
+    public function updatingFilterCategory()
+    {
+        $this->resetPage();
+    }
+    public function updatingFilterBrand()
+    {
+        $this->resetPage();
+    }
 
     // Media properties
     public $coverImage;
@@ -65,6 +84,195 @@ class ProductManagement extends Component
         $this->currentCoverUrl = null;
         $this->currentGallery = [];
         $this->showModal = true;
+    }
+
+    public function downloadTemplateCsv()
+    {
+        $filename = 'template_import_produk.csv';
+        $headers = [
+            'Product Name',
+            'Category',
+            'Brand',
+            'Description',
+            'SKU',
+            'Condition',
+            'RAM',
+            'Storage',
+            'Color',
+            'Price',
+            'Stock',
+            'Kode Accurate'
+        ];
+
+        return response()->streamDownload(function () use ($headers) {
+            $file = fopen('php://output', 'w');
+            fputs($file, "\xEF\xBB\xBF");
+            fputcsv($file, $headers, ',');
+            fputcsv($file, ['iPhone 15 Pro Max', 'Smartphone', 'Apple', 'HP Baru', 'IPH-15-PM-256-BLK', 'Baru', '8GB', '256GB', 'Black Titanium', '', '', 'ITM-IPH15-256B'], ',');
+            fclose($file);
+        }, $filename);
+    }
+
+    public function exportAccurateDataCsv()
+    {
+        $filename = 'data_master_accurate_lokal.csv';
+        $headers = [
+            'ID Database Lokal',
+            'Kode Accurate (Item No)',
+            'Nama Produk Accurate',
+            'Harga Dasar',
+            'Stok Accurate'
+        ];
+
+        return response()->streamDownload(function () use ($headers) {
+            $file = fopen('php://output', 'w');
+            fputs($file, "\xEF\xBB\xBF");
+            fputcsv($file, $headers, ',');
+
+            $accurateItems = ProductAccurate::where('database_source', 'syihab')->orderBy('name')->get();
+            foreach ($accurateItems as $item) {
+                fputcsv($file, [
+                    $item->id,
+                    $item->item_no,
+                    $item->name,
+                    (int) $item->base_price,
+                    $item->stock
+                ], ',');
+            }
+            fclose($file);
+        }, $filename);
+    }
+
+    public function importCsv()
+    {
+        $this->validate([
+            'importFile' => 'required|mimes:csv,txt|max:10240', // Max 10MB
+        ]);
+
+        $rowNum = 1;
+
+        try {
+            DB::beginTransaction();
+
+            $file = fopen($this->importFile->getRealPath(), 'r');
+
+            // Baca header
+            $header = fgetcsv($file, 1000, ',');
+            // Deteksi separator (koma atau titik koma)
+            if (count($header) < 5) {
+                fclose($file);
+                $file = fopen($this->importFile->getRealPath(), 'r');
+                $header = fgetcsv($file, 1000, ';');
+                $delimiter = ';';
+            } else {
+                $delimiter = ',';
+            }
+
+            // Clean BOM
+            $header[0] = preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $header[0]);
+
+            while (($row = fgetcsv($file, 1000, $delimiter)) !== false) {
+                $rowNum++;
+                if (count($row) < 11) continue; // Skip baris tidak valid
+
+                $productName = trim($row[0]);
+                $categoryName = trim($row[1]);
+                $brandName = trim($row[2]);
+                $description = trim($row[3]);
+                $sku = trim($row[4]);
+                $condition = trim($row[5]);
+                $ram = trim($row[6]);
+                $storage = trim($row[7]);
+                $color = trim($row[8]);
+                $price = (float) str_replace(['Rp', '.', ','], '', trim($row[9])); // Clean format Rp / titik / koma
+                $stock = (int) trim($row[10]);
+                $kodeAccurate = isset($row[11]) ? trim($row[11]) : null;
+
+                if (empty($productName) || empty($categoryName)) continue;
+
+                // 1. Cari atau buat Category
+                $category = Category::firstOrCreate(
+                    ['name' => $categoryName],
+                    ['slug' => \Illuminate\Support\Str::slug($categoryName)]
+                );
+
+                // 2. Cari atau buat Brand (jika diisi)
+                $brandId = null;
+                if (!empty($brandName)) {
+                    $brand = Brand::firstOrCreate(
+                        ['name' => $brandName],
+                        ['slug' => \Illuminate\Support\Str::slug($brandName)]
+                    );
+                    $brandId = $brand->id;
+                }
+
+                // 3. Cari atau buat Product Induk
+                $product = Product::firstOrCreate(
+                    ['name' => $productName],
+                    [
+                        'slug' => \Illuminate\Support\Str::slug($productName) . '-' . time(),
+                        'category_id' => $category->id,
+                        'brand_id' => $brandId,
+                        'description' => $description,
+                        'is_active' => true,
+                        'has_active_accurate' => false
+                    ]
+                );
+
+                // 4. Integrasi Accurate
+                $accurateId = null;
+                $finalPrice = $price;
+                $finalStock = $stock;
+
+                if (!empty($kodeAccurate)) {
+                    $accurateData = ProductAccurate::where('item_no', $kodeAccurate)->first();
+                    if ($accurateData) {
+                        $accurateId = $accurateData->id;
+                        $finalPrice = (float) $accurateData->base_price;
+                        $finalStock = (int) $accurateData->stock;
+
+                        $product->has_active_accurate = true;
+                        $product->save();
+                    }
+                }
+
+                // 5. Buat Variant
+                $variant = ProductVariant::create([
+                    'product_id' => $product->id,
+                    'sku' => empty($sku) ? null : $sku,
+                    'condition' => empty($condition) ? 'Baru' : $condition,
+                    'ram' => empty($ram) ? null : $ram,
+                    'storage' => empty($storage) ? null : $storage,
+                    'color' => empty($color) ? null : $color,
+                    'price' => $finalPrice,
+                    'stock' => 0, // Akan di-handle oleh WarehouseStock
+                    'product_accurate_id' => $accurateId
+                ]);
+
+                // 6. Buat initial stock di Warehouse Stock
+                $warehouseId = Auth::user()->warehouse_id ?? Warehouse::first()->id ?? null;
+                if ($warehouseId) {
+                    WarehouseStock::create([
+                        'warehouse_id' => $warehouseId,
+                        'variant_id' => $variant->id,
+                        'variant_type' => get_class($variant),
+                        'stock' => $finalStock
+                    ]);
+                    // Update total_stock di product (bisa ditrigger observer, tapi amannya kita panggil method)
+                    $product->increment('total_stock', $finalStock);
+                }
+            }
+
+            fclose($file);
+            DB::commit();
+
+            $this->showImportModal = false;
+            $this->importFile = null;
+            $this->dispatch('toast', title: 'Berhasil', message: 'Data Produk berhasil diimport massal.', type: 'success');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            $this->dispatch('toast', title: 'Gagal Import', message: 'Error pada baris ke-' . $rowNum . ': ' . $e->getMessage(), type: 'error');
+        }
     }
 
 
