@@ -266,7 +266,7 @@
 
         function prosesPrintBase64(base64Data) {
             // 2. Sesuaikan nama printer
-            var namaPrinter = "Printer Kasir"; // Ganti dengan nama printer di Control Panel
+            var namaPrinter = "PrinterKasir"; // Ganti dengan nama printer di Control Panel
 
             qz.printers.find(namaPrinter).then(function(printer) {
                 console.log("Printer ditemukan: " + printer);
