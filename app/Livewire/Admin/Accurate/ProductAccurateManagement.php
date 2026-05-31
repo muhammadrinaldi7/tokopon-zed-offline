@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Accurate;
 
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\ProductAccurate;
@@ -17,6 +18,9 @@ class ProductAccurateManagement extends Component
     public $activeTab = 'syihab'; // 'syihab' or 'second'
     public $isLoading = false;
 
+    public $isSyncing = false;
+    public $syncCurrentPage = 1;
+    public $syncImportedCount = 0;
     // Menangani perubahan search agar reset pagination
     public function updatedSearch()
     {
@@ -28,7 +32,93 @@ class ProductAccurateManagement extends Component
         $this->resetPage();
         $this->search = '';
     }
+    /**
+     * Langkah 1: Tombol UI memicu ini untuk mereset state dan memulai estafet
+     */
 
+    #[On('trigger-next-page')]
+    public function processNextPage()
+    {
+        // Pencegah bypass jika tidak sedang sync
+        if (!$this->isSyncing) return;
+
+        try {
+            $service = app(AccurateService::class);
+            $pageSize = 100;
+
+            // Tarik HANYA 1 halaman saja (Super cepat, < 1 detik)
+            $items = $service->getItemList($this->syncCurrentPage, $pageSize, $this->activeTab);
+
+            if (empty($items) && $this->syncCurrentPage === 1) {
+                $this->isSyncing = false;
+                $this->dispatch('notify', [
+                    'type' => 'warning',
+                    'message' => 'Data tidak ditemukan dari server Accurate.'
+                ]);
+                return;
+            }
+
+            // --- PROSES BULK UPSERT ---
+            $importData = [];
+            foreach ($items as $item) {
+                if (!isset($item['no'])) continue;
+                $importData[] = [
+                    'accurate_id'     => $item['no'],
+                    'database_source' => $this->activeTab,
+                    'item_no'         => $item['no'],
+                    'name'            => $item['name'] ?? 'Unknown Item',
+                    'base_price'      => (int) round($item['unitPrice'] ?? 0),
+                    'stock'           => (int) round($item['availableToSell'] ?? 0),
+                    'raw_data'        => json_encode($item),
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ];
+            }
+
+            if (!empty($importData)) {
+                ProductAccurate::upsert(
+                    $importData,
+                    ['accurate_id', 'database_source'],
+                    ['item_no', 'name', 'base_price', 'stock', 'raw_data', 'updated_at']
+                );
+
+                $this->syncImportedCount += count($importData);
+            }
+
+            // --- CEK KONDISI SELANJUTNYA ---
+            if (count($items) < $pageSize) {
+                // KONDISI A: Data habis. SELESAI!
+                $this->isSyncing = false;
+                $this->dispatch('notify', [
+                    'type' => 'success',
+                    'message' => "Selesai! {$this->syncImportedCount} data produk berhasil disinkronisasi."
+                ]);
+            } else {
+                // KONDISI B: Masih ada data. Lanjut ke halaman berikutnya.
+                $this->syncCurrentPage++;
+
+                // UX MAGIC: Suruh browser mengirim request lagi secara otomatis
+                // Ini membuat UI sempat me-render angka progress sebelum request berikutnya jalan.
+                $this->dispatch('trigger-next-page');
+            }
+        } catch (\Exception $e) {
+            $this->isSyncing = false;
+            Log::error("Error Sync Accurate ({$this->activeTab}): " . $e->getMessage());
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Gagal sinkronisasi pada halaman ' . $this->syncCurrentPage . ': ' . $e->getMessage()
+            ]);
+        }
+    }
+    public function startSync()
+    {
+        $this->isSyncing = true;
+        $this->syncCurrentPage = 1;
+        $this->syncImportedCount = 0;
+
+        // Perintahkan browser untuk langsung memanggil proses halaman pertama
+        $this->dispatch('trigger-next-page');
+    }
     public function syncItems()
     {
         $this->isLoading = true;

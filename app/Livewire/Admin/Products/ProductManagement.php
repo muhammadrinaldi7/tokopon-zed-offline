@@ -210,7 +210,7 @@ class ProductManagement extends Component
                 $product = Product::firstOrCreate(
                     ['name' => $productName],
                     [
-                        'slug' => \Illuminate\Support\Str::slug($productName) . '-' . time(),
+                        'slug' => \Illuminate\Support\Str::slug($productName) . '-' . uniqid(),
                         'category_id' => $category->id,
                         'brand_id' => $brandId,
                         'description' => $description,
@@ -337,7 +337,7 @@ class ProductManagement extends Component
             $product = Product::find($this->productId);
             $product->update([
                 'name' => $this->name,
-                'slug' => \Illuminate\Support\Str::slug($this->name) . '-' . time(),
+                'slug' => \Illuminate\Support\Str::slug($this->name) . '-' . uniqid(),
                 'description' => $this->description,
                 'category_id' => $this->categoryId,
                 'brand_id' => empty($this->brandId) ? null : $this->brandId,
@@ -346,7 +346,7 @@ class ProductManagement extends Component
         } else {
             $product = Product::create([
                 'name' => $this->name,
-                'slug' => \Illuminate\Support\Str::slug($this->name) . '-' . time(),
+                'slug' => \Illuminate\Support\Str::slug($this->name) . '-' . uniqid(),
                 'description' => $this->description,
                 'category_id' => $this->categoryId,
                 'brand_id' => empty($this->brandId) ? null : $this->brandId,

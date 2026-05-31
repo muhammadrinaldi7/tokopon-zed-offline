@@ -5,7 +5,8 @@
             <button wire:click="$set('showImportModal', true)"
                 class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-100 transition flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
                 Import CSV
             </button>
@@ -45,83 +46,88 @@
     </div>
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-        <table class="w-full text-left text-sm whitespace-nowrap">
-            <thead class="bg-gray-50 text-gray-600 font-semibold border-b border-gray-100">
-                <tr>
-                    <th class="px-6 py-4">Produk</th>
-                    <th class="px-6 py-4">Status Accurate</th>
-                    <th class="px-6 py-4">Total Stok</th>
-                    <th class="px-6 py-4">Harga Termurah</th>
-                    <th class="px-6 py-4 text-right">Aksi</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                @forelse($products as $product)
-                    <tr class="hover:bg-gray-50 transition">
-                        <td class="px-6 py-4">
-                            <div class="flex items-center gap-3">
-                                <div
-                                    class="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden shrink-0 border border-gray-100">
-                                    @if ($product->hasMedia('cover'))
-                                        <img src="{{ $product->getFirstMediaUrl('cover', 'thumb') }}"
-                                            class="w-full h-full object-cover">
-                                    @else
-                                        <div class="w-full h-full flex items-center justify-center text-gray-400">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
-                                                viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                        </div>
-                                    @endif
-                                </div>
-                                <div class="flex flex-col">
-                                    <button wire:click="viewDetail({{ $product->id }})"
-                                        class="font-bold text-[#1c69d4] hover:text-[#3f36b8] hover:underline text-left transition-colors">
-                                        {{ $product->name }}
-                                    </button>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4">
-                            @if ($product->has_active_accurate)
-                                <span
-                                    class="bg-emerald-100 text-emerald-700 font-bold px-2.5 py-1 rounded-full text-xs">Aktif
-                                    ✓</span>
-                            @else
-                                <span class="bg-gray-100 text-gray-600 font-bold px-2.5 py-1 rounded-full text-xs">Belum
-                                    Link</span>
-                            @endif
-                        </td>
-                        <td class="px-6 py-4">{{ $product->total_stock }} Unit</td>
-                        <td class="px-6 py-4">Rp. {{ number_format($product->starting_price ?? 0, 0, ',', '.') }}</td>
-                        <td class="px-6 py-4 text-right">
-                            <a href="{{ route('admin.products.variants', $product->slug) }}" wire:navigate
-                                class="text-[#1c69d4] font-semibold text-xs border border-[#1c69d4] px-3 py-1.5 rounded-lg hover:bg-[#eff2ff] mr-2 transition inline-flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none"
-                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                                </svg>
-                                Varian
-                            </a>
-                            <button wire:click="edit({{ $product->id }})"
-                                class="text-gray-500 hover:text-gray-800 transition mr-2">
-                                Edit
-                            </button>
-                            <button wire:click="confirmDelete({{ $product->id }})"
-                                class="text-rose-500 hover:text-rose-700 transition">
-                                Hapus
-                            </button>
-                        </td>
-                    </tr>
-                @empty
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm whitespace-nowrap">
+                <thead class="bg-gray-50 text-gray-600 font-semibold border-b border-gray-100">
                     <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">Belum ada produk.</td>
+                        <th class="px-6 py-4">Produk</th>
+                        <th class="px-6 py-4">Status Accurate</th>
+                        {{-- <th class="px-6 py-4">Total Stok</th>
+                    <th class="px-6 py-4">Harga Termurah</th> --}}
+                        <th class="px-6 py-4 text-right">Aksi</th>
                     </tr>
-                @endforelse
-            </tbody>
-        </table>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @forelse($products as $product)
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden shrink-0 border border-gray-100">
+                                        @if ($product->hasMedia('cover'))
+                                            <img src="{{ $product->getFirstMediaUrl('cover', 'thumb') }}"
+                                                class="w-full h-full object-cover">
+                                        @else
+                                            <div class="w-full h-full flex items-center justify-center text-gray-400">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
+                                                    viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                            </div>
+                                        @endif
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <button wire:click="viewDetail({{ $product->id }})"
+                                            class="font-bold text-[#1c69d4] hover:text-[#3f36b8] hover:underline text-left transition-colors truncate max-w-[200px] md:max-w-[300px]"
+                                            title="{{ $product->name }}">
+                                            {{ $product->name }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                @if ($product->has_active_accurate)
+                                    <span
+                                        class="bg-emerald-100 text-emerald-700 font-bold px-2.5 py-1 rounded-full text-xs">Aktif
+                                        ✓</span>
+                                @else
+                                    <span
+                                        class="bg-gray-100 text-gray-600 font-bold px-2.5 py-1 rounded-full text-xs">Belum
+                                        Link</span>
+                                @endif
+                            </td>
+                            {{-- <td class="px-6 py-4">{{ $product->total_stock }} Unit</td>
+                        <td class="px-6 py-4">Rp. {{ number_format($product->starting_price ?? 0, 0, ',', '.') }}</td> --}}
+                            <td class="px-6 py-4 text-right">
+                                <a href="{{ route('admin.products.variants', $product->slug) }}" wire:navigate
+                                    class="text-[#1c69d4] font-semibold text-xs border border-[#1c69d4] px-3 py-1.5 rounded-lg hover:bg-[#eff2ff] mr-2 transition inline-flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                                    </svg>
+                                    Varian
+                                </a>
+                                <button wire:click="edit({{ $product->id }})"
+                                    class="text-gray-500 hover:text-gray-800 transition mr-2">
+                                    Edit
+                                </button>
+                                <button wire:click="confirmDelete({{ $product->id }})"
+                                    class="text-rose-500 hover:text-rose-700 transition">
+                                    Hapus
+                                </button>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="px-6 py-12 text-center text-gray-500">Belum ada produk.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
         @if ($products->hasPages())
             <div class="p-4 border-t border-gray-100">
                 {{ $products->links() }}
@@ -478,7 +484,8 @@
                 class="relative transform overflow-hidden rounded-4xl bg-white/80 backdrop-blur-2xl border border-white shadow-sm shadow-[#1c69d4]/15 text-left transition-all sm:my-8 w-full max-w-lg">
                 <div
                     class="px-6 py-5 border-b border-gray-200/50 flex justify-between items-center backdrop-blur-md bg-white/40">
-                    <h2 class="text-[17px] font-semibold tracking-tight text-gray-900">Import Produk & Varian (CSV)</h2>
+                    <h2 class="text-[17px] font-semibold tracking-tight text-gray-900">Import Produk & Varian (CSV)
+                    </h2>
                     <button wire:click="$set('showImportModal', false)"
                         class="text-gray-400 hover:text-gray-600 bg-gray-100/50 hover:bg-gray-200/50 rounded-full p-1.5 transition-colors focus:outline-none">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -491,26 +498,34 @@
                 <form wire:submit.prevent="importCsv" class="p-6 space-y-5">
                     <div class="bg-blue-50 border border-blue-100 rounded-xl p-4">
                         <h3 class="text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             Panduan Import
                         </h3>
                         <p class="text-xs text-blue-700 leading-relaxed mb-3">
-                            Pastikan format kolom sesuai dengan kerangka standar (template). Baris dengan nama produk yang sama otomatis dikelompokkan ke satu induk. Kode Accurate yang tidak ditemukan akan diabaikan (dibiarkan kosong).
+                            Pastikan format kolom sesuai dengan kerangka standar (template). Baris dengan nama produk
+                            yang sama otomatis dikelompokkan ke satu induk. Kode Accurate yang tidak ditemukan akan
+                            diabaikan (dibiarkan kosong).
                         </p>
                         <div class="flex flex-col sm:flex-row gap-2">
                             <button type="button" wire:click="downloadTemplateCsv" wire:loading.attr="disabled"
                                 class="bg-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-blue-100 transition inline-flex items-center justify-center gap-1.5 w-full sm:w-auto">
-                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>
                                 Download Template CSV
                             </button>
                             <button type="button" wire:click="exportAccurateDataCsv" wire:loading.attr="disabled"
                                 class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-emerald-100 transition inline-flex items-center justify-center gap-1.5 w-full sm:w-auto">
-                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>
                                 Ekspor Master Accurate
                             </button>

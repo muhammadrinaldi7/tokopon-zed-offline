@@ -362,6 +362,41 @@ class AccurateService
         }
     }
 
+    public function fetchCustomers($page = 1, $databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $param = [
+            'fields' => 'id,name,customerNo,email,mobilePhone',
+            'sp.sort' => 'id|asc',
+            'sp.page' => $page,
+            'sp.pageSize' => 100
+        ];
+
+        $response = \Illuminate\Support\Facades\Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature
+        ])->get($host . '/customer/list.do', $param);
+
+        if ($response->successful()) {
+            return $response->json();
+        }
+
+        \Illuminate\Support\Facades\Log::error('API Accurate Fetch Customers Error: ' . $response->body());
+        throw new \Exception('API Accurate Fetch Customers Error: ' . $response->body());
+    }
+
     public function syncCustomer(User $user, $databaseSource = 'syihab')
     {
         if ($user->accurate_customer_id) {
