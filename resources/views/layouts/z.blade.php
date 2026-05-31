@@ -225,39 +225,55 @@
     </script>
     <script>
         document.addEventListener('livewire:initialized', () => {
-            // Ganti nama 'print-qz-tray' jika di PHP kamu menggunakan nama event yang berbeda
-            // (misal: 'print-rawbt')
-            Livewire.on('print-qz-tray', (event) => {
-                // 1. Log event untuk memudahkan kita mengintip bentuk datanya di Console Browser
-                console.log('Isi event dari Livewire:', event);
 
-                // 2. Ambil payload datanya dengan aman (antisipasi berbagai bentuk format Livewire v3)
+            Livewire.on('print-receipt', (event) => {
+                console.log('Event cetak diterima:', event);
+
+                // Parsing payload Livewire v3
                 let payload = event[0] || event.detail || event;
-
-                // 3. Ambil string base64-nya (mencari key base64Data atau base64)
                 let base64Data = payload?.base64Data || payload?.base64;
+                let orderNumber = payload?.orderNumber || 'terbaru';
 
-                // 4. Hentikan proses jika base64 benar-benar kosong agar tidak error
                 if (!base64Data) {
-                    console.error("Gagal! Data base64 tidak ditemukan dalam event.", payload);
+                    console.error("Gagal! Data base64 tidak ditemukan.", payload);
                     alert("Data struk gagal dibuat.");
                     return;
                 }
 
-                // 5. Lanjut cetak
-                cetakDenganQZ(base64Data);
+                const isAndroid = /Android/i.test(navigator.userAgent);
+
+                if (isAndroid) {
+                    // ==========================================
+                    // JALUR ANDROID: Gunakan RawBT
+                    // ==========================================
+                    console.log("Perangkat Android terdeteksi, membuka RawBT...");
+                    const rawbtUri = `rawbt:base64,${base64Data}`;
+                    window.location.href = rawbtUri;
+
+                } else {
+                    // ==========================================
+                    // JALUR PC/DESKTOP: Gunakan QZ Tray
+                    // ==========================================
+                    console.log("Perangkat Desktop terdeteksi, menggunakan QZ Tray...");
+                    cetakDenganQZ(base64Data);
+                }
             });
         });
 
         function cetakDenganQZ(base64Data) {
-            // 1. Cek koneksi QZ Tray
+            // Pastikan library QZ sudah dimuat sebelumnya
+            if (typeof qz === 'undefined') {
+                console.error("Library QZ Tray belum dimuat!");
+                return;
+            }
+
             if (!qz.websocket.isActive()) {
                 qz.websocket.connect().then(function() {
                     console.log("Berhasil terhubung ke QZ Tray!");
                     prosesPrintBase64(base64Data);
                 }).catch(function(err) {
                     console.error("Gagal terhubung ke QZ.", err);
-                    alert("Nyalakan QZ Tray terlebih dahulu di komputer ini!");
+                    alert("Pastikan aplikasi QZ Tray sudah berjalan di komputer ini!");
                 });
             } else {
                 prosesPrintBase64(base64Data);
@@ -265,27 +281,25 @@
         }
 
         function prosesPrintBase64(base64Data) {
-            // 2. Sesuaikan nama printer
-            var namaPrinter = "PrinterKasir"; // Ganti dengan nama printer di Control Panel
+            // Pastikan nama printer sesuai dengan yang ada di sistem OS (Windows/Mac)
+            var namaPrinter = "PrinterKasir";
 
             qz.printers.find(namaPrinter).then(function(printer) {
                 console.log("Printer ditemukan: " + printer);
                 var config = qz.configs.create(printer);
 
-                // 3. Setup data format Base64 untuk QZ Tray
                 var dataStruk = [{
                     type: 'raw',
                     format: 'base64',
                     data: base64Data
                 }];
 
-                // 4. Kirim print
                 return qz.print(config, dataStruk);
             }).then(function() {
                 console.log("Struk berhasil dicetak!");
             }).catch(function(err) {
                 console.error("Gagal mencetak: ", err);
-                alert("Gagal mencetak. Cek konsol browser.");
+                alert("Gagal mencetak struk. Cek koneksi printer atau konsol browser.");
             });
         }
     </script>
