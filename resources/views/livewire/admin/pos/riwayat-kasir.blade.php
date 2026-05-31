@@ -34,8 +34,8 @@
                         <th class="p-4">Tanggal</th>
                         <th class="p-4">Kasir (Handled By)</th>
                         <th class="p-4 text-center">Total Transaksi</th>
-                        <th class="p-4 text-right">Total Tunai</th>
-                        <th class="p-4 text-right">Total Non-Tunai</th>
+                        {{-- <th class="p-4 text-right">Total Tunai</th>
+                        <th class="p-4 text-right">Total Non-Tunai</th> --}}
                         <th class="p-4 text-right bg-emerald-50/50 text-emerald-700">TOTAL INVOICE</th>
                     </tr>
                 </thead>
@@ -60,12 +60,12 @@
                                     {{ $report->total_invoice }} TRX
                                 </span>
                             </td>
-                            <td class="p-4 text-right font-mono text-gray-600">
+                            {{-- <td class="p-4 text-right font-mono text-gray-600">
                                 Rp {{ number_format($report->total_tunai, 0, ',', '.') }}
                             </td>
                             <td class="p-4 text-right font-mono text-gray-600">
                                 Rp {{ number_format($report->total_non_tunai, 0, ',', '.') }}
-                            </td>
+                            </td> --}}
                             <td class="p-4 text-right font-mono font-bold text-emerald-600 bg-emerald-50/30">
                                 Rp {{ number_format($report->grand_total, 0, ',', '.') }}
                             </td>

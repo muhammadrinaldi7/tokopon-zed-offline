@@ -526,7 +526,7 @@ class Pos extends Component
 
             $this->variantModalVariants = $product->variants->map(fn($v) => [
                 'id' => $v->id,
-                'label' => trim(($v->ram ? $v->ram . ' / ' : '') . $v->storage . ' ' . $v->color),
+                'label' => $v->color . ' - ' . $v->storage,
                 'condition' => $v->condition ?? '',
                 'price' => $v->price,
                 'stock' => $v->warehouseStocks->first()?->stock ?? 0,
@@ -544,7 +544,7 @@ class Pos extends Component
 
             $this->variantModalVariants = $product->variants->map(fn($v) => [
                 'id' => $v->id,
-                'label' => trim(($v->ram ? $v->ram . ' / ' : '') . $v->storage . ' ' . $v->color),
+                'label' => $v->color . ' - ' . $v->storage,
                 'condition' => '',
                 'price' => $v->price,
                 'stock' => $v->warehouseStocks->first()?->stock ?? 0,
@@ -603,12 +603,11 @@ class Pos extends Component
                 'variant_id' => $variant->id,
                 'variant_type' => $variantType,
                 'name' => $product->name,
-                'ram' => $variant->ram ?? '-',
                 'storage' => $variant->storage ?? '-',
                 'color' => $variant->color ?? '-',
                 'price' => (int) $variant->price,
                 'qty' => 1,
-                // 'serial_number' => '', // legacy
+                'serial_number' => '', // legacy
                 'serial_numbers' => [''], // array of SNs based on qty
                 'sku' => $variant->sku ?? '',
                 'is_second' => $isSecond,
@@ -847,7 +846,6 @@ class Pos extends Component
             $this->dispatch('toast', title: 'Keranjang Kosong', message: 'Tambahkan produk ke keranjang terlebih dahulu.', type: 'warning');
             return;
         }
-        // dd($this->cart);
 
         // Validate all items have SN
         foreach ($this->cart as $item) {
@@ -1965,31 +1963,6 @@ class Pos extends Component
         $printer->text("\n\n\n\n\n");
     }
 
-    // public function getEscposBase64()
-    // {
-    //     if (!$this->completedOrder) {
-    //         $this->dispatch('toast', title: 'Error', message: 'Tidak ada transaksi aktif untuk dicetak.', type: 'error');
-    //         return;
-    //     }
-
-    //     try {
-    //         $connector = new \Mike42\Escpos\PrintConnectors\DummyPrintConnector();
-    //         $printer = new \Mike42\Escpos\Printer($connector);
-    //         $printer->initialize();
-
-    //         $this->generateEscposContent($printer);
-
-    //         $data = $connector->getData();
-    //         $base64 = base64_encode($data);
-
-    //         $printer->close();
-
-    //         $this->dispatch('print-rawbt', base64: $base64, orderNumber: $this->completedOrder->order_number);
-    //     } catch (\Exception $e) {
-    //         Log::error('ESCPOS Base64 Generation Error: ' . $e->getMessage());
-    //         $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan RawBT: ' . $e->getMessage(), type: 'error');
-    //     }
-    // }
     public function getEscposBase64()
     {
         if (!$this->completedOrder) {
@@ -2002,21 +1975,17 @@ class Pos extends Component
             $printer = new \Mike42\Escpos\Printer($connector);
             $printer->initialize();
 
-            // Memanggil fungsi pembuatan struk
             $this->generateEscposContent($printer);
 
-            // Ambil raw data dan convert ke Base64
             $data = $connector->getData();
             $base64 = base64_encode($data);
 
             $printer->close();
 
-            // Kirim event ke frontend (JavaScript) dengan membawa data Base64
-            // Kita beri nama event 'print-qz-tray'
-            $this->dispatch('print-qz-tray', base64Data: $base64);
+            $this->dispatch('print-rawbt', base64: $base64, orderNumber: $this->completedOrder->order_number);
         } catch (\Exception $e) {
             Log::error('ESCPOS Base64 Generation Error: ' . $e->getMessage());
-            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan: ' . $e->getMessage(), type: 'error');
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan RawBT: ' . $e->getMessage(), type: 'error');
         }
     }
 
