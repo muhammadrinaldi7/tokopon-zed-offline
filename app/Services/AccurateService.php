@@ -10,13 +10,12 @@ use Illuminate\Support\Facades\Log;
 class AccurateService
 {
     /**
-     * Hit Accurate Online API to save User as Vendor
+     * Fetch Item Detail from Accurate
      * 
-     * @param User $user
-     * @return void
+     * @param string $itemNo
+     * @return array
      * @throws \Exception
      */
-
     public function itemDetailDo($itemNo)
     {
         // 1. Siapkan Timestamp (Format ISO 8601 sangat disarankan)
@@ -47,7 +46,7 @@ class AccurateService
             }
             // Simpan ID dari Accurate ke Database kita
             if (isset($data)) {
-                $result = $data['d']['detailOpenBalance'][0]['detailSerialNumber'];
+                $result = $data['d'];
                 return $result;
             }
             return [];
@@ -56,6 +55,14 @@ class AccurateService
             throw new \Exception('API Accurate Error: ' . $response->body());
         }
     }
+    /**
+     * Hit Accurate Online API to save User as Vendor
+     * 
+     * @param User $user
+     * @param string $databaseSource
+     * @return void
+     * @throws \Exception
+     */
     public function syncVendor(User $user, $databaseSource = 'syihab')
     {
         // Jika sudah punya vendor ID, tidak perlu hit API lagi
@@ -367,13 +374,13 @@ class AccurateService
         $address = $user->addresses()->where('is_primary', true)->first();
 
         $customerData = [
-            'name' => 'GSK_CUSTOMER_' . $user->profile->full_name,
-            'customerNo' => 'GSK_CUSTOMER_' . str_pad($user->id, 5, '0', STR_PAD_LEFT),
+            'name' => 'SYB_CUSTOMER_' . $user ? $user->profile->full_name : $user->name,
+            'customerNo' => 'SYB_CUSTOMER_' . str_pad($user->id, 5, '0', STR_PAD_LEFT),
             'currencyCode' => 'IDR',
             'mobilePhone' => $user->profile->phone_number,
             'email' => $user->email,
             'npwpNo' => $user->npwp,
-            'notes' => 'CUSTOMER GSK - NIK:' . $user->identity,
+            'notes' => 'CUSTOMER SYB - NIK:' . $user->identity,
         ];
 
         if ($address) {

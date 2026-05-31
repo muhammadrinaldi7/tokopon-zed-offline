@@ -185,7 +185,28 @@
                                             {{ number_format($item['price'], 0, ',', '.') }}</p>
                                     </div>
                                 </div>
-
+                                {{-- Discount Section --}}
+                                <div class="p-4">
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Diskon
+                                        Manual (Rp)
+                                    </p>
+                                    <div class="relative" x-data="{
+                                        rawDiscount: @entangle('cart.' . $index . '.discount_amount').live,
+                                        get maskedDiscount() {
+                                            if (!this.rawDiscount) return '';
+                                            return this.rawDiscount.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                        },
+                                        set maskedDiscount(val) {
+                                            this.rawDiscount = val.replace(/\D/g, '');
+                                        }
+                                    }">
+                                        <span
+                                            class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                                        <input type="text" x-model="maskedDiscount"
+                                            class="w-full bg-white border border-gray-200 shadow-sm rounded-lg pl-8 pr-3 py-2 text-xs font-bold focus:border-[#1c69d4] focus:ring-0 transition placeholder:text-gray-300"
+                                            placeholder="0">
+                                    </div>
+                                </div>
                                 {{-- Bagian Action: Quantity & Tombol Cek Stok --}}
                                 <div class="flex items-center justify-between gap-3 pt-2 border-t border-gray-100">
                                     <div class="flex items-center gap-1">
@@ -474,28 +495,6 @@
                                     @endforelse
                                 </div>
                             @endif
-                        </div>
-                    </div>
-
-                    {{-- Discount Section --}}
-                    <div class="p-4">
-                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Diskon Manual (Rp)
-                        </p>
-                        <div class="relative" x-data="{
-                            rawDiscount: @entangle('discount_amount').live,
-                            get maskedDiscount() {
-                                if (!this.rawDiscount) return '';
-                                return this.rawDiscount.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                            },
-                            set maskedDiscount(val) {
-                                this.rawDiscount = val.replace(/\D/g, '');
-                            }
-                        }">
-                            <span
-                                class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
-                            <input type="text" x-model="maskedDiscount"
-                                class="w-full bg-white border border-gray-200 shadow-sm rounded-lg pl-8 pr-3 py-2 text-xs font-bold focus:border-[#1c69d4] focus:ring-0 transition placeholder:text-gray-300"
-                                placeholder="0">
                         </div>
                     </div>
 

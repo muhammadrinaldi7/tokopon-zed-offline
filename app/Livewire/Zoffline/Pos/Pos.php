@@ -455,7 +455,8 @@ class Pos extends Component
     #[Computed]
     public function totalDiscount()
     {
-        return (int)$this->discount_amount + $this->totalPromoDiscount;
+        $itemDiscounts = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
+        return $itemDiscounts + $this->totalPromoDiscount;
     }
     public function isPromoEligible($promo)
     {
@@ -643,6 +644,7 @@ class Pos extends Component
                 'storage' => $variant->storage ?? '-',
                 'color' => $variant->color ?? '-',
                 'price' => (int) $variant->price,
+                'discount_amount' => 0,
                 'qty' => 1,
                 'serial_numbers' => [''], // array of SNs based on qty
                 'sku' => $variant->sku ?? '',
@@ -872,7 +874,6 @@ class Pos extends Component
             $this->dispatch('toast', title: 'Keranjang Kosong', message: 'Tambahkan produk ke keranjang terlebih dahulu.', type: 'warning');
             return;
         }
-
         // Validate all items have SN
         foreach ($this->cart as $item) {
             // Ambil array serial_numbers, default ke array kosong jika tidak ada
@@ -975,7 +976,7 @@ class Pos extends Component
             }
 
             $subtotal = $this->subtotal();
-            $manualDiscountAmount = (int)$this->discount_amount;
+            $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
             $promoDiscountAmount = $this->totalPromoDiscount;
             $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
 
@@ -1108,6 +1109,7 @@ class Pos extends Component
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
+                    'discount_amount' => $item['discount_amount'] ?? 0,
                     // 3. Simpan ke database. Jika ada 2 SN, jadinya: "SN001, SN002"
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
@@ -1192,9 +1194,11 @@ class Pos extends Component
                             'warehouseName' => $warehouseName,
                             'unitPrice' => $item['price'],
                             'quantity' => $item['qty'],
-                            'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
+                            'itemCashDiscount' => $item['discount_amount'] ?? 0,
+                            // 'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
                             'detailSerialNumber' => $detailSN,
-                            'salesmanListNumber' => $detailSalesman
+                            'salesmanListNumber' => $detailSalesman,
+
                         ];
 
                         if ($this->loadedAccurateSoId) {
@@ -1208,7 +1212,7 @@ class Pos extends Component
                         'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
                         'branchName' => $branchName,
                         'detailItem' => $detailItems,
-                        'cashDiscount' => $manualDiscountAmount,
+                        // 'cashDiscount' => $manualDiscountAmount,
                         'inclusiveTax' => true,
                         'taxable' => true,
                         'description' => $this->notes
@@ -1427,7 +1431,7 @@ class Pos extends Component
             }
 
             $subtotal = $this->subtotal();
-            $manualDiscountAmount = (int)$this->discount_amount;
+            $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
             $promoDiscountAmount = $this->totalPromoDiscount;
             $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
 
@@ -1547,6 +1551,7 @@ class Pos extends Component
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
+                    'discount_amount' => $item['discount_amount'] ?? 0,
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
 
@@ -1601,7 +1606,8 @@ class Pos extends Component
                         'warehouseName' => $warehouseName,
                         'unitPrice' => $item['price'],
                         'quantity' => $item['qty'],
-                        'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
+                        'itemCashDiscount' => $item['discount_amount'] ?? 0,
+                        // 'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
                         // 'detailSerialNumber' => $detailSN, // Di Sales Order belum motong stok fisik beneran, tapi jika butuh serial number bisa ditambahkan
                         'salesmanListNumber' => $detailSalesman
                     ];
@@ -1611,7 +1617,7 @@ class Pos extends Component
                     'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
                     'branchName' => $branchName,
                     'detailItem' => $detailItems,
-                    'cashDiscount' => $manualDiscountAmount,
+                    // 'cashDiscount' => $manualDiscountAmount,
                     'inclusiveTax' => true,
                     'taxable' => true,
                     'description' => 'DRAFT ' . $this->notes
