@@ -85,6 +85,88 @@ class Pos extends Component
         $this->showHistoryModal = true;
     }
 
+    // ─── Draft Sales Properties ──────────────────────────────
+    public $showDraftModal = false;
+    public $draftOrders = [];
+    public $loadedAccurateSoId = null;
+    public $loadedAccurateSoNumber = null;
+    public $loadedDraftId = null;
+
+    public function openDraft()
+    {
+        $this->draftOrders = Order::with(['user'])
+            ->where('order_channel', 'POS')
+            ->where('order_status', 'DRAFT')
+            ->latest()
+            ->take(20)
+            ->get();
+
+        $this->showDraftModal = true;
+    }
+
+    public function loadDraft($orderId)
+    {
+        $order = Order::with(['items.variant.product', 'user', 'promos'])->find($orderId);
+        if (!$order) {
+            $this->dispatch('toast', title: 'Error', message: 'Draft tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        // Restore customer
+        $this->selectedCustomerId = $order->user_id;
+        $this->isNewCustomer = false;
+
+        // Restore sales (jika ada)
+        if ($order->sales_id) {
+            $sales = \App\Models\Employe::find($order->sales_id);
+            if ($sales) {
+                $this->selectedSales = [[
+                    'id' => $sales->id,
+                    'name' => $sales->name,
+                    'employee_no' => $sales->employee_no
+                ]];
+            }
+        }
+
+        // Restore manual discount
+        $this->discount_amount = $order->discount_amount;
+        $this->notes = $order->notes;
+
+        // Restore promos
+        $this->selectedPromos = $order->promos->pluck('id')->toArray();
+
+        // Restore SO Accurate info
+        $this->loadedAccurateSoId = $order->accurate_so_id;
+        $this->loadedAccurateSoNumber = $order->accurate_so_number;
+
+        // Restore cart
+        $this->cart = [];
+        foreach ($order->items as $item) {
+            // Karena orderItem punya serial_number (string dipisah koma), kita split lagi
+            $snArray = array_values(array_filter(array_map('trim', explode(',', $item->serial_number))));
+
+            $product = $item->variant->product ?? $item->variant->secondProduct;
+            $this->cart[] = [
+                'variant_id' => $item->product_variant_id,
+                'variant_type' => $item->product_variant_type,
+                'is_second' => $item->product_variant_type === \App\Models\SecondProductVariant::class,
+                'name' => $product->name ?? 'Unknown',
+                'sku' => $item->variant->sku ?? '',
+                'storage' => $item->variant->storage ?? '',
+                'color' => $item->variant->color ?? '',
+                'price' => $item->price_at_checkout,
+                'qty' => $item->qty,
+                'serial_numbers' => $snArray,
+            ];
+        }
+
+        // Set the loaded draft ID so we can update it later
+        $this->loadedDraftId = $order->id;
+
+        $this->showDraftModal = false;
+        $this->dispatch('toast', title: 'Berhasil', message: 'Draft berhasil dimuat.', type: 'success');
+    }
+
     // Method untuk cetak ulang (reprint) dari riwayat
     public function reprintOrder($orderId)
     {
@@ -764,10 +846,13 @@ class Pos extends Component
             $this->dispatch('toast', title: 'Keranjang Kosong', message: 'Tambahkan produk ke keranjang terlebih dahulu.', type: 'warning');
             return;
         }
+        // dd($this->cart);
 
         // Validate all items have SN
         foreach ($this->cart as $item) {
-            if (empty($item['serial_number'])) {
+            $sn = $item['serial_number'] ?? [];
+            $sns = $item['serial_numbers'] ?? [];
+            if (empty($sn) && empty($sns)) {
                 $this->dispatch('toast', title: 'SN Belum Lengkap', message: 'Pastikan semua item sudah diisi Serial Number / IMEI.', type: 'warning');
                 return;
             }
@@ -859,14 +944,6 @@ class Pos extends Component
                 return;
             }
 
-            // Generate order number
-            $orderNumber = 'POS-' . now()->format('Ymd') . '-' . str_pad(
-                Order::whereDate('created_at', today())->where('order_channel', 'POS')->count() + 1,
-                3,
-                '0',
-                STR_PAD_LEFT
-            );
-
             $subtotal = $this->subtotal();
             $manualDiscountAmount = (int)$this->discount_amount;
             $promoDiscountAmount = $this->totalPromoDiscount;
@@ -875,28 +952,82 @@ class Pos extends Component
             $mdrAmt = $this->mdrAmount;
             $grandTotal = max(0, $subtotal - $totalDiscountAmount);
 
-            // ─── WAJIB: MULAI TRANSAKSI DATABASE LOKAL ───
             \Illuminate\Support\Facades\DB::beginTransaction();
 
-            // Create Order
-            $order = Order::create([
-                'user_id' => $customerId,
-                'order_number' => $orderNumber,
-                'total_amount' => $subtotal,
-                'shipping_cost' => 0,
-                'discount_amount' => $totalDiscountAmount,
-                'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
-                'mdr_amount' => $mdrAmt,
-                'grand_total' => $grandTotal,
-                'order_status' => 'COMPLETED',
-                'order_channel' => 'POS',
-                'handled_by' => Auth::id(),
-                'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
-                'payment_method_id' => $this->payments[0]['payment_method_id'] ?: null,
-                'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
-                'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
-                'notes' => $this->notes,
-            ]);
+            $order = null;
+            if ($this->loadedDraftId) {
+                $order = Order::find($this->loadedDraftId);
+                if ($order) {
+                    // Kembalikan stock dari item draft yang lama
+                    foreach ($order->items as $oldItem) {
+                        $warehouseStock = \App\Models\WarehouseStock::where([
+                            'warehouse_id' => Auth::user()->warehouse_id,
+                            'variant_id' => $oldItem->product_variant_id,
+                            'variant_type' => $oldItem->product_variant_type,
+                        ])->first();
+                        if ($warehouseStock) {
+                            $warehouseStock->update([
+                                'stock' => $warehouseStock->stock + (int)$oldItem->qty
+                            ]);
+                        }
+                    }
+                    $order->items()->delete();
+                    $order->promos()->detach();
+
+                    $order->update([
+                        'user_id' => $customerId,
+                        'total_amount' => $subtotal,
+                        'shipping_cost' => 0,
+                        'discount_amount' => $totalDiscountAmount,
+                        'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
+                        'mdr_amount' => $mdrAmt,
+                        'grand_total' => $grandTotal,
+                        'order_status' => 'COMPLETED',
+                        'order_channel' => 'POS',
+                        'handled_by' => Auth::id(),
+                        'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
+                        'payment_method_id' => $this->payments[0]['payment_method_id'] ?: null,
+                        'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
+                        'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
+                        'notes' => $this->notes,
+                        'accurate_so_id' => $this->loadedAccurateSoId,
+                        'accurate_so_number' => $this->loadedAccurateSoNumber,
+                    ]);
+                    $orderNumber = $order->order_number;
+                }
+            }
+
+            if (!$order) {
+                // Generate order number
+                $orderNumber = 'POS-' . now()->format('Ymd') . '-' . str_pad(
+                    Order::whereDate('created_at', today())->where('order_channel', 'POS')->count() + 1,
+                    3,
+                    '0',
+                    STR_PAD_LEFT
+                );
+
+                // Create Order
+                $order = Order::create([
+                    'user_id' => $customerId,
+                    'order_number' => $orderNumber,
+                    'total_amount' => $subtotal,
+                    'shipping_cost' => 0,
+                    'discount_amount' => $totalDiscountAmount,
+                    'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
+                    'mdr_amount' => $mdrAmt,
+                    'grand_total' => $grandTotal,
+                    'order_status' => 'COMPLETED',
+                    'order_channel' => 'POS',
+                    'handled_by' => Auth::id(),
+                    'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
+                    'payment_method_id' => $this->payments[0]['payment_method_id'] ?: null,
+                    'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
+                    'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
+                    'notes' => $this->notes,
+                    'accurate_so_id' => $this->loadedAccurateSoId,
+                    'accurate_so_number' => $this->loadedAccurateSoNumber,
+                ]);
+            }
 
             // Save promos to pivot table
             if (!empty($this->selectedPromos)) {
@@ -1024,7 +1155,7 @@ class Pos extends Component
                             }
                         }
 
-                        $detailItems[] = [
+                        $itemData = [
                             'itemNo' => $item['sku'] ?: 'ITEM-UNKNOWN',
                             'warehouseName' => $warehouseName,
                             'unitPrice' => $item['price'],
@@ -1033,6 +1164,12 @@ class Pos extends Component
                             'detailSerialNumber' => $detailSN,
                             'salesmanListNumber' => $detailSalesman
                         ];
+
+                        if ($this->loadedAccurateSoId) {
+                            $itemData['salesOrderId'] = $this->loadedAccurateSoId;
+                        }
+
+                        $detailItems[] = $itemData;
                     }
 
                     $siData = [
@@ -1135,7 +1272,9 @@ class Pos extends Component
             $this->showCheckoutModal = false;
             $this->showReceiptModal = true;
 
-            // Reset state keranjang
+            $this->loadedAccurateSoId = null;
+            $this->loadedAccurateSoNumber = null;
+            $this->loadedDraftId = null;
             $this->cart = [];
             $this->discount_amount = 0;
             $this->notes = '';
@@ -1159,6 +1298,317 @@ class Pos extends Component
             // BATALKAN semua penulisan DB lokal jika terjadi kegagalan sebelum commit
             \Illuminate\Support\Facades\DB::rollBack();
             Log::error('POS Payment Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
+        }
+    }
+
+    public function saveAsDraft()
+    {
+        if (empty($this->cart)) {
+            $this->dispatch('toast', title: 'Keranjang Kosong', message: 'Tambahkan produk ke keranjang terlebih dahulu.', type: 'warning');
+            return;
+        }
+
+        // Validate all items have SN
+        foreach ($this->cart as $item) {
+            $sn = $item['serial_number'] ?? null;
+            $sns = $item['serial_numbers'] ?? [];
+            if (empty($sn) && empty($sns)) {
+                $this->dispatch('toast', title: 'SN Belum Lengkap', message: 'Pastikan semua item sudah diisi Serial Number / IMEI.', type: 'warning');
+                return;
+            }
+        }
+
+        if (!$this->selectedCustomerId && !$this->isNewCustomer) {
+            $this->dispatch('toast', title: 'Customer Belum Dipilih', message: 'Pilih atau buat data customer terlebih dahulu.', type: 'warning');
+            return;
+        }
+
+        if (empty($this->selectedSales)) {
+            $this->dispatch('toast', title: 'Sales Belum Dipilih', message: 'Pilih minimal 1 tenaga penjual.', type: 'warning');
+            return;
+        }
+
+        try {
+            $customerId = $this->selectedCustomerId;
+            $hasSecond = collect($this->cart)->contains('is_second', true);
+            $dbSource = $hasSecond ? 'second' : 'syihab';
+            $accurateService = app(\App\Services\AccurateService::class);
+
+            // Jika customer baru, buat user terlebih dahulu
+            if ($this->isNewCustomer && !$customerId) {
+                // 1. Tentukan email yang akan divalidasi
+                $emailToValidate = $this->customerEmail ?: ($this->customerPhone . '@pos.tokopun.com');
+
+                // 2. Terapkan Validasi Ketat di Livewire
+                try {
+                    $this->validate(
+                        [
+                            'customerName'  => 'required|string|max:255',
+                            'customerPhone' => 'required|string|max:20',
+                            'customerEmail' => [
+                                'nullable',
+                                'email',
+                                \Illuminate\Validation\Rule::unique('users', 'email')->where(function ($query) use ($emailToValidate) {
+                                    return $query->where('email', $emailToValidate);
+                                })
+                            ],
+                        ],
+                        [
+                            'customerName.required'  => 'Nama customer wajib diisi.',
+                            'customerPhone.required' => 'Nomor HP customer wajib diisi.',
+                            'customerEmail.unique'   => 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                        ]
+                    );
+                } catch (\Illuminate\Validation\ValidationException $e) {
+                    $firstErrorMessage = collect($e->errors())->flatten()->first();
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
+                    return;
+                }
+
+                // 3. Jika validasi aman, barulah proses ke database
+                $newUser = User::create([
+                    'name' => $this->customerName,
+                    'email' => $this->customerEmail ?: ($this->customerPhone . '@pos.tokopun.com'),
+                    'password' => bcrypt('tokopun' . rand(1000, 9999)),
+                ]);
+                $newUser->assignRole('user');
+
+                if ($this->customerPhone) {
+                    $newUser->profile()->create([
+                        'full_name' => $this->customerName,
+                        'phone_number' => $this->customerPhone,
+                    ]);
+                }
+
+                $customerId = $newUser->id;
+            }
+
+            if (!$customerId) {
+                $this->dispatch('toast', title: 'Error', message: 'Customer belum dipilih.', type: 'error');
+                return;
+            }
+
+            $subtotal = $this->subtotal();
+            $manualDiscountAmount = (int)$this->discount_amount;
+            $promoDiscountAmount = $this->totalPromoDiscount;
+            $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
+
+            $mdrAmt = $this->mdrAmount;
+            $grandTotal = max(0, $subtotal - $totalDiscountAmount);
+            $branchName = Auth::user()->branch->name ?? 'Toko';
+
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
+            $order = null;
+            if ($this->loadedDraftId) {
+                $order = Order::find($this->loadedDraftId);
+                if ($order) {
+                    // Kembalikan stock dari item draft yang lama
+                    foreach ($order->items as $oldItem) {
+                        $warehouseStock = \App\Models\WarehouseStock::where([
+                            'warehouse_id' => Auth::user()->warehouse_id,
+                            'variant_id' => $oldItem->product_variant_id,
+                            'variant_type' => $oldItem->product_variant_type,
+                        ])->first();
+                        if ($warehouseStock) {
+                            $warehouseStock->update([
+                                'stock' => $warehouseStock->stock + (int)$oldItem->qty
+                            ]);
+                        }
+                    }
+                    $order->items()->delete();
+                    $order->promos()->detach();
+
+                    $order->update([
+                        'user_id' => $customerId,
+                        'total_amount' => $subtotal,
+                        'shipping_cost' => 0,
+                        'discount_amount' => $totalDiscountAmount,
+                        'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
+                        'mdr_amount' => $mdrAmt,
+                        'grand_total' => $grandTotal,
+                        'order_status' => 'DRAFT',
+                        'order_channel' => 'POS',
+                        'handled_by' => Auth::id(),
+                        'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
+                        'shipping_address_snapshot' => ['type' => 'POS', 'store' => $branchName],
+                        'notes' => $this->notes,
+                    ]);
+                    $orderNumber = $order->order_number;
+                }
+            }
+
+            if (!$order) {
+                // Generate order number
+                $orderNumber = 'POS-' . now()->format('Ymd') . '-' . str_pad(
+                    Order::whereDate('created_at', today())->where('order_channel', 'POS')->count() + 1,
+                    3,
+                    '0',
+                    STR_PAD_LEFT
+                );
+
+                // Create Order
+                $order = Order::create([
+                    'user_id' => $customerId,
+                    'order_number' => $orderNumber,
+                    'total_amount' => $subtotal,
+                    'shipping_cost' => 0,
+                    'discount_amount' => $totalDiscountAmount,
+                    'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
+                    'mdr_amount' => $mdrAmt,
+                    'grand_total' => $grandTotal,
+                    'order_status' => 'DRAFT',
+                    'order_channel' => 'POS',
+                    'handled_by' => Auth::id(),
+                    'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
+                    'shipping_address_snapshot' => ['type' => 'POS', 'store' => $branchName],
+                    'notes' => $this->notes,
+                ]);
+            }
+
+            // Save promos to pivot table
+            if (!empty($this->selectedPromos)) {
+                $promos = \App\Models\Promo::with(['skus', 'bundleSkus'])->whereIn('id', $this->selectedPromos)->get();
+                foreach ($promos as $promo) {
+                    $applied = 0;
+                    $eligibleMain = $this->calculateEligibleCart($promo, false);
+                    if ($promo->discount_type === 'fixed') {
+                        $applied += $promo->discount_value;
+                    } else {
+                        $calc = $eligibleMain['amount'] * ($promo->discount_value / 100);
+                        if ($promo->max_discount) $calc = min($calc, $promo->max_discount);
+                        $applied += $calc;
+                    }
+
+                    if ($promo->is_bundle) {
+                        $eligibleBundle = $this->calculateEligibleCart($promo, true);
+                        if ($eligibleBundle['qty'] > 0) {
+                            if ($promo->bundle_discount_type === 'fixed') {
+                                $applied += $promo->bundle_discount_value * $eligibleBundle['qty'];
+                            } else {
+                                $calc = $eligibleBundle['amount'] * ($promo->bundle_discount_value / 100);
+                                if ($promo->bundle_max_discount) $calc = min($calc, $promo->bundle_max_discount);
+                                $applied += $calc;
+                            }
+                        }
+                    }
+
+                    $order->promos()->attach($promo->id, ['discount_applied' => $applied]);
+                }
+            }
+
+            // Create Order Items + reduce stock
+            foreach ($this->cart as $item) {
+                $rawSns = $item['serial_numbers'] ?? (!empty(trim($item['serial_number'] ?? '')) ? [$item['serial_number']] : []);
+                $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
+
+                \App\Models\OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_variant_id' => $item['variant_id'],
+                    'product_variant_type' => $item['variant_type'],
+                    'qty' => $item['qty'],
+                    'price_at_checkout' => $item['price'],
+                    'subtotal' => $item['price'] * $item['qty'],
+                    'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
+                ]);
+
+                // Reduce stock
+                $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
+                    [
+                        'warehouse_id' => Auth::user()->warehouse_id,
+                        'variant_id' => $item['variant_id'],
+                        'variant_type' => $item['variant_type'],
+                    ],
+                    [
+                        'stock' => 0
+                    ]
+                );
+                $warehouseStock->update([
+                    'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
+                ]);
+            }
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            // Hit Accurate Sales Order
+            try {
+                $customerUser = User::find($customerId);
+                $accurateService->syncCustomer($customerUser, $dbSource);
+
+                $detailItems = [];
+                $warehouseName = Auth::user()->warehouse->name ?? 'Head Office';
+
+                foreach ($this->cart as $item) {
+                    $rawSns = $item['serial_numbers'] ?? (!empty(trim($item['serial_number'] ?? '')) ? [$item['serial_number']] : []);
+                    $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
+
+                    $detailSN = [];
+                    if (!empty($cleanSns)) {
+                        foreach ($cleanSns as $sn) {
+                            $detailSN[] = ['serialNumberNo' => $sn, 'quantity' => 1];
+                        }
+                    } else {
+                        $detailSN[] = ['serialNumberNo' => '-', 'quantity' => 1];
+                    }
+
+                    $detailSalesman = [];
+                    foreach ($this->selectedSales as $sales) {
+                        if (!empty($sales['employee_no'])) {
+                            $detailSalesman[] = (string) $sales['employee_no'];
+                        }
+                    }
+
+                    $detailItems[] = [
+                        'itemNo' => $item['sku'] ?: 'ITEM-UNKNOWN',
+                        'warehouseName' => $warehouseName,
+                        'unitPrice' => $item['price'],
+                        'quantity' => $item['qty'],
+                        'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
+                        // 'detailSerialNumber' => $detailSN, // Di Sales Order belum motong stok fisik beneran, tapi jika butuh serial number bisa ditambahkan
+                        'salesmanListNumber' => $detailSalesman
+                    ];
+                }
+
+                $soData = [
+                    'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
+                    'branchName' => $branchName,
+                    'detailItem' => $detailItems,
+                    'cashDiscount' => $manualDiscountAmount,
+                    'inclusiveTax' => true,
+                    'taxable' => true,
+                    'description' => 'DRAFT ' . $this->notes
+                ];
+
+                $soResult = $accurateService->postSalesOrder($soData, $dbSource);
+                if (isset($soResult['r']['id']) && isset($soResult['r']['number'])) {
+                    $order->update([
+                        'accurate_so_id' => $soResult['r']['id'],
+                        'accurate_so_number' => $soResult['r']['number'],
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('POS Accurate SO Draft Error: ' . $e->getMessage());
+                // Tetap berhasil nyimpan draft lokal
+            }
+
+            // Reset state keranjang
+            $this->cart = [];
+            $this->loadedDraftId = null;
+            $this->discount_amount = 0;
+            $this->notes = '';
+            $this->selectedCustomerId = null;
+            $this->isNewCustomer = false;
+            $this->searchCustomer = '';
+            $this->customerName = '';
+            $this->customerPhone = '';
+            $this->customerEmail = '';
+            $this->search = '';
+
+            $this->dispatch('toast', title: 'Draft Berhasil', message: 'Order ' . $orderNumber . ' berhasil disimpan sebagai Draft.', type: 'success');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            Log::error('POS Save Draft Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
         }
     }

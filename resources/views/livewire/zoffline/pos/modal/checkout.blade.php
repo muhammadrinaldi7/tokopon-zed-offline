@@ -15,7 +15,7 @@
                              <p class="font-bold text-gray-800">{{ $item['name'] }} <span
                                      class="text-gray-400">({{ $item['color'] }}/{{ $item['storage'] }})</span>
                              </p>
-                             <p class="text-[10px] text-gray-400 font-mono">SN: {{ $item['serial_number'] }}</p>
+                             <p class="text-[10px] text-gray-400 font-mono">SN: {{ $item['serial_number'] ?? implode(', ', $item['serial_numbers'] ?? []) }}</p>
                          </div>
                          <p class="font-bold text-gray-700 whitespace-nowrap">{{ $item['qty'] }}x Rp
                              {{ number_format($item['price'], 0, ',', '.') }}</p>
