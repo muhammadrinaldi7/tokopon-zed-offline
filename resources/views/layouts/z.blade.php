@@ -266,7 +266,7 @@
 
         function prosesPrintBase64(base64Data) {
             // 2. Sesuaikan nama printer
-            var namaPrinter = "EPSON TM-U220 Receipt"; // Ganti dengan nama printer di Control Panel
+            var namaPrinter = "Printer Kasir"; // Ganti dengan nama printer di Control Panel
 
             qz.printers.find(namaPrinter).then(function(printer) {
                 console.log("Printer ditemukan: " + printer);

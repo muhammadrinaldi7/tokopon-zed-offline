@@ -824,10 +824,9 @@
                     <button wire:click="saveAsDraft" wire:loading.attr="disabled"
                         {{ empty($cart) ? 'disabled' : '' }}
                         class="w-1/3 py-3.5 rounded-xl font-black text-[#1c69d4] bg-blue-50 hover:bg-blue-100 border border-blue-100 text-base transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
-                        
-                        <svg wire:loading.remove wire:target="saveAsDraft"
-                            class="w-4 h-4 inline-block mr-1 -mt-0.5" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor" stroke-width="2">
+
+                        <svg wire:loading.remove wire:target="saveAsDraft" class="w-4 h-4 inline-block mr-1 -mt-0.5"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                         </svg>
