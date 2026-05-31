@@ -593,8 +593,10 @@ class Pos extends Component
             $currentQty = $this->cart[$existingIndex]['qty'];
             if ($currentQty < $stock) {
                 $this->cart[$existingIndex]['qty']++;
+
+                // PERBAIKAN: Langsung push slot kosong ke array serial_numbers tanpa mengecek legacy
                 if (!isset($this->cart[$existingIndex]['serial_numbers'])) {
-                    $this->cart[$existingIndex]['serial_numbers'] = [$this->cart[$existingIndex]['serial_number'] ?? ''];
+                    $this->cart[$existingIndex]['serial_numbers'] = [];
                 }
                 $this->cart[$existingIndex]['serial_numbers'][] = '';
             } else {
@@ -610,13 +612,11 @@ class Pos extends Component
                 'color' => $variant->color ?? '-',
                 'price' => (int) $variant->price,
                 'qty' => 1,
-                'serial_number' => '', // legacy
                 'serial_numbers' => [''], // array of SNs based on qty
                 'sku' => $variant->sku ?? '',
                 'is_second' => $isSecond,
             ];
         }
-
         $this->showVariantModal = false;
         $this->variantModalProduct = null;
         $this->variantModalVariants = [];
@@ -649,22 +649,20 @@ class Pos extends Component
             // 1. Turunkan jumlah kuantitas barang
             $this->cart[$index]['qty']--;
 
-            // 2. Jika jumlah SN yang sudah di-scan melebihi qty yang baru,
-            // kita hapus SN paling terakhir agar jumlahnya sinkron dengan qty baru.
+            // 2. Jika jumlah array SN melebihi qty yang baru,
+            // kita hapus elemen/slot paling terakhir agar sinkron.
             if (isset($this->cart[$index]['serial_numbers'])) {
                 while (count($this->cart[$index]['serial_numbers']) > $this->cart[$index]['qty']) {
                     array_pop($this->cart[$index]['serial_numbers']);
                 }
 
-                // Sinkronisasi ulang data legacy backward compatibility
-                $this->cart[$index]['serial_number'] = !empty($this->cart[$index]['serial_numbers'])
-                    ? $this->cart[$index]['serial_numbers'][0]
-                    : '';
+                // Catatan: Sinkronisasi legacy di sini sudah dihapus!
             }
 
             $this->syncSinglePaymentAmount();
         }
     }
+
 
     public function updateSerialNumber($index, $snIndex, $value)
     {
@@ -721,19 +719,15 @@ class Pos extends Component
             }
             // =================================================================
 
-            // 2. Inisialisasi array jika belum ada
+            // 2. Pastikan array serial_numbers sudah ada (buat jaga-jaga saja)
             if (!isset($this->cart[$index]['serial_numbers'])) {
-                $legacySn = $this->cart[$index]['serial_number'] ?? '';
-                $this->cart[$index]['serial_numbers'] = !empty($legacySn) ? [$legacySn] : [];
+                $this->cart[$index]['serial_numbers'] = [];
             }
 
-            // 3. Masukkan nilai SN baru ke index yang dituju
+            // 3. Langsung masukkan nilai SN baru ke index yang dituju
             $this->cart[$index]['serial_numbers'][$snIndex] = $value;
 
-            // 4. Update legacy untuk backward compatibility (jika ini SN pertama)
-            if ($snIndex === 0) {
-                $this->cart[$index]['serial_number'] = $value;
-            }
+            // Catatan: Baris kode step ke-4 (Legacy) sudah dihapus total!
         }
     }
     // ─── Stock Modal Properties ────────────────────────────────
@@ -786,22 +780,19 @@ class Pos extends Component
         $this->stockModalData = [];
         $this->stockModalItemTitle = '';
     }
+
     public function removeSerialNumber($index, $snIndex)
     {
         // Fungsi untuk menghapus badge SN saat tombol X diklik
         if (isset($this->cart[$index]['serial_numbers'][$snIndex])) {
 
-            // Hapus SN berdasarkan index-nya
+            // 1. Hapus SN berdasarkan index-nya
             unset($this->cart[$index]['serial_numbers'][$snIndex]);
 
-            // WAJIB: Reset urutan key array agar kembali menjadi 0, 1, 2...
+            // 2. WAJIB: Reset urutan key array agar kembali berurutan (0, 1, 2...)
             $this->cart[$index]['serial_numbers'] = array_values($this->cart[$index]['serial_numbers']);
 
-            // Sinkronisasi ulang data legacy backward compatibility
-            // Jika array sekarang kosong, kosongkan legacy. Jika masih ada, ambil index ke-0 yang baru
-            $this->cart[$index]['serial_number'] = !empty($this->cart[$index]['serial_numbers'])
-                ? $this->cart[$index]['serial_numbers'][0]
-                : '';
+            // Catatan: Bagian "Sinkronisasi ulang data legacy backward compatibility" sudah dihapus total!
         }
     }
 
@@ -852,10 +843,15 @@ class Pos extends Component
 
         // Validate all items have SN
         foreach ($this->cart as $item) {
-            $sn = $item['serial_number'] ?? [];
+            // Ambil array serial_numbers, default ke array kosong jika tidak ada
             $sns = $item['serial_numbers'] ?? [];
-            if (empty($sn) && empty($sns)) {
-                $this->dispatch('toast', title: 'SN Belum Lengkap', message: 'Pastikan semua item sudah diisi Serial Number / IMEI.', type: 'warning');
+
+            // array_filter akan membuang elemen yang isinya string kosong '' atau null
+            $validSns = array_filter($sns, fn($value) => trim($value) !== '');
+
+            // Jika setelah difilter ternyata kosong, atau jumlah SN yang diisi kurang dari QTY
+            if (empty($validSns) || count($validSns) < $item['qty']) {
+                $this->dispatch('toast', title: 'SN Belum Lengkap', message: 'Pastikan semua item sudah diisi Serial Number / IMEI sesuai jumlah barang.', type: 'warning');
                 return;
             }
         }
@@ -1068,10 +1064,11 @@ class Pos extends Component
 
             // Create Order Items + reduce stock
             foreach ($this->cart as $item) {
-                // PERBAIKAN SN LOKAL: Ambil dan filter hanya SN yang ada isinya (hilangkan string kosong/spasi)
-                $rawSns = $item['serial_numbers'] ?? (!empty(trim($item['serial_number'] ?? '')) ? [$item['serial_number']] : []);
-                $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
+                // 1. Murni hanya mengambil dari array 'serial_numbers'
+                $rawSns = $item['serial_numbers'] ?? [];
 
+                // 2. Bersihkan spasi berlebih dan buang array yang kosong
+                $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
@@ -1079,7 +1076,8 @@ class Pos extends Component
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '', // Disimpan bersih tanpa koma gantung
+                    // 3. Simpan ke database. Jika ada 2 SN, jadinya: "SN001, SN002"
+                    'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
 
                 // Reduce stock
@@ -1137,7 +1135,7 @@ class Pos extends Component
                     foreach ($this->cart as $item) {
 
                         // PERBAIKAN SN ACCURATE: Filter bersih data SN terlebih dahulu
-                        $rawSns = $item['serial_numbers'] ?? (!empty(trim($item['serial_number'] ?? '')) ? [$item['serial_number']] : []);
+                        $rawSns = $item['serial_numbers'] ?? [];
                         $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
 
                         $detailSN = [];
