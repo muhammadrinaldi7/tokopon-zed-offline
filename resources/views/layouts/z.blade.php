@@ -224,56 +224,55 @@
         }
     </script>
     <script>
-        document.addEventListener('livewire:initialized', () => {
+        // Gunakan window listener untuk menangkap dispatch dari Livewire v3
+        window.addEventListener('print-receipt', event => {
+            console.log('🔥 Event cetak berhasil ditangkap di Frontend!');
 
-            Livewire.on('print-receipt', (event) => {
-                console.log('Event cetak diterima:', event);
+            // Di Livewire v3, data dari PHP otomatis masuk ke properti event.detail
+            let payload = event.detail;
+            console.log('Isi Data dari PHP:', payload);
 
-                // Parsing payload Livewire v3
-                let payload = event[0] || event.detail || event;
-                let base64Data = payload?.base64Data || payload?.base64;
-                let orderNumber = payload?.orderNumber || 'terbaru';
+            let base64Data = payload?.base64Data;
+            let orderNumber = payload?.orderNumber || 'terbaru';
 
-                if (!base64Data) {
-                    console.error("Gagal! Data base64 tidak ditemukan.", payload);
-                    alert("Data struk gagal dibuat.");
-                    return;
-                }
+            if (!base64Data) {
+                console.error("Gagal! Data base64 tidak ditemukan.");
+                alert("Data struk kosong.");
+                return;
+            }
 
-                const isAndroid = /Android/i.test(navigator.userAgent);
+            const isAndroid = /Android/i.test(navigator.userAgent);
 
-                if (isAndroid) {
-                    // ==========================================
-                    // JALUR ANDROID: Gunakan RawBT
-                    // ==========================================
-                    console.log("Perangkat Android terdeteksi, membuka RawBT...");
-                    const rawbtUri = `rawbt:base64,${base64Data}`;
-                    window.location.href = rawbtUri;
-
-                } else {
-                    // ==========================================
-                    // JALUR PC/DESKTOP: Gunakan QZ Tray
-                    // ==========================================
-                    console.log("Perangkat Desktop terdeteksi, menggunakan QZ Tray...");
-                    cetakDenganQZ(base64Data);
-                }
-            });
+            if (isAndroid) {
+                // ==========================================
+                // JALUR ANDROID: Membuka RawBT
+                // ==========================================
+                console.log("Membuka aplikasi RawBT...");
+                window.location.href = `rawbt:base64,${base64Data}`;
+            } else {
+                // ==========================================
+                // JALUR PC / DESKTOP: Menjalankan QZ Tray
+                // ==========================================
+                console.log("Mencoba mencetak lewat QZ Tray...");
+                cetakDenganQZ(base64Data);
+            }
         });
 
         function cetakDenganQZ(base64Data) {
-            // Pastikan library QZ sudah dimuat sebelumnya
+            // Antisipasi jika library qz-tray.js belum di-include di aplikasi
             if (typeof qz === 'undefined') {
-                console.error("Library QZ Tray belum dimuat!");
+                console.warn("Library QZ Tray tidak ditemukan di halaman ini.");
+                alert("Sistem mendeteksi Anda di PC, tetapi library QZ belum dipasang.");
                 return;
             }
 
             if (!qz.websocket.isActive()) {
                 qz.websocket.connect().then(function() {
-                    console.log("Berhasil terhubung ke QZ Tray!");
+                    console.log("Berhasil terhubung ke WebSocket QZ Tray!");
                     prosesPrintBase64(base64Data);
                 }).catch(function(err) {
-                    console.error("Gagal terhubung ke QZ.", err);
-                    alert("Pastikan aplikasi QZ Tray sudah berjalan di komputer ini!");
+                    console.error("Gagal terhubung ke QZ Tray.", err);
+                    alert("Nyalakan aplikasi QZ Tray terlebih dahulu di komputer ini!");
                 });
             } else {
                 prosesPrintBase64(base64Data);
@@ -281,7 +280,7 @@
         }
 
         function prosesPrintBase64(base64Data) {
-            // Pastikan nama printer sesuai dengan yang ada di sistem OS (Windows/Mac)
+            // Sesuaikan nama ini dengan nama printer kasir yang terdeteksi di Windows/Mac kamu
             var namaPrinter = "PrinterKasir";
 
             qz.printers.find(namaPrinter).then(function(printer) {
@@ -296,10 +295,10 @@
 
                 return qz.print(config, dataStruk);
             }).then(function() {
-                console.log("Struk berhasil dicetak!");
+                console.log("Sukses! Perintah cetak telah dikirim ke printer.");
             }).catch(function(err) {
-                console.error("Gagal mencetak: ", err);
-                alert("Gagal mencetak struk. Cek koneksi printer atau konsol browser.");
+                console.error("Gagal mengeksekusi cetak QZ: ", err);
+                alert("Gagal mencetak. Pastikan nama printer '" + namaPrinter + "' sudah benar.");
             });
         }
     </script>

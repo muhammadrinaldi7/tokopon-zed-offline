@@ -2000,15 +2000,18 @@ class Pos extends Component
             $printer = new \Mike42\Escpos\Printer($connector);
             $printer->initialize();
 
+            // Memanggil fungsi pembuatan struk
             $this->generateEscposContent($printer);
 
+            // Ambil raw data dan convert ke Base64
             $data = $connector->getData();
             $base64 = base64_encode($data);
 
             $printer->close();
 
-            // Cukup dispatch SATU event saja, kirim juga orderNumber jika ada
             $orderNumber = $this->completedOrder->order_number ?? 'terbaru';
+
+            // Di Livewire v3, parameter otomatis dibungkus ke dalam event.detail di frontend
             $this->dispatch('print-receipt', base64Data: $base64, orderNumber: $orderNumber);
         } catch (\Exception $e) {
             Log::error('ESCPOS Base64 Generation Error: ' . $e->getMessage());
