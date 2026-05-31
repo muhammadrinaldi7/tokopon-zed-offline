@@ -292,10 +292,39 @@ class Pos extends Component
         return (int) $this->paymentsTotalBase === (int) $target;
     }
 
+    // #[Computed]
+    // public function paymentMethods()
+    // {
+    //     return PaymentMethod::where('is_active', true)->get();
+
+    // }
     #[Computed]
     public function paymentMethods()
     {
-        return PaymentMethod::where('is_active', true)->get();
+        // 1. Ambil nama warehouse atau branch dari user yang sedang login
+        // Sesuaikan bagian ini dengan relasi database kamu (misal $user->branch->name)
+        $user = Auth::user();
+        $locationName = $user->warehouse->name ?? '';
+
+        // 2. Ambil semua metode pembayaran yang aktif
+        $methods = PaymentMethod::where('is_active', true)->get();
+
+        // 3. Filter datanya
+        return $methods->filter(function ($method) use ($locationName) {
+            // Ubah ke huruf kecil semua agar pencarian tidak sensitif huruf besar/kecil
+            $methodName = strtolower($method->name);
+            $location = strtolower($locationName);
+
+            // Jika nama metode pembayarannya mengandung kata 'tunai'
+            if (str_contains($methodName, 'tunai')) {
+                // Hanya tampilkan jika nama metode juga mengandung nama lokasi user (misal: 'banjarbaru')
+                // Jika $location kosong, kita asumsikan tidak lolos filter untuk keamanan
+                return $location !== '' && str_contains($methodName, $location);
+            }
+
+            // Jika BUKAN tunai (misal: EDC BCA, Transfer Mandiri), biarkan tetap muncul
+            return true;
+        })->values(); // values() berguna untuk me-reset nomor urut/index array
     }
 
     #[Computed]
