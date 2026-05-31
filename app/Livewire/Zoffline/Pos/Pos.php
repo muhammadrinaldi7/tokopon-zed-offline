@@ -129,7 +129,7 @@ class Pos extends Component
         }
 
         // Restore manual discount
-        $this->discount_amount = $order->discount_amount;
+        $this->discount_amount = (int) $order->discount_amount;
         $this->notes = $order->notes;
 
         // Restore promos
@@ -138,7 +138,7 @@ class Pos extends Component
         // Restore SO Accurate info
         $this->loadedAccurateSoId = $order->accurate_so_id;
         $this->loadedAccurateSoNumber = $order->accurate_so_number;
-
+        // dd($order);
         // Restore cart
         $this->cart = [];
         foreach ($order->items as $item) {
@@ -154,7 +154,7 @@ class Pos extends Component
                 'sku' => $item->variant->sku ?? '',
                 'storage' => $item->variant->storage ?? '',
                 'color' => $item->variant->color ?? '',
-                'price' => $item->price_at_checkout,
+                'price' => (int) $item->variant->price,
                 'qty' => $item->qty,
                 'serial_numbers' => $snArray,
             ];
@@ -162,7 +162,7 @@ class Pos extends Component
 
         // Set the loaded draft ID so we can update it later
         $this->loadedDraftId = $order->id;
-
+        $this->syncSinglePaymentAmount();
         $this->showDraftModal = false;
         $this->dispatch('toast', title: 'Berhasil', message: 'Draft berhasil dimuat.', type: 'success');
     }
@@ -1274,27 +1274,7 @@ class Pos extends Component
             $this->showCheckoutModal = false;
             $this->showReceiptModal = true;
 
-            $this->loadedAccurateSoId = null;
-            $this->loadedAccurateSoNumber = null;
-            $this->loadedDraftId = null;
-            $this->cart = [];
-            $this->discount_amount = 0;
-            $this->notes = '';
-            $this->selectedCustomerId = null;
-            $this->isNewCustomer = false;
-            $this->searchCustomer = '';
-            $this->customerName = '';
-            $this->customerPhone = '';
-            $this->customerEmail = '';
-            $this->search = '';
-            $this->payments = [
-                [
-                    'payment_method_id' => '',
-                    'payment_method_rate_id' => '',
-                    'amount' => 0,
-                ]
-            ];
-
+            $this->resetCheckout();
             $this->dispatch('toast', title: 'Transaksi Berhasil', message: 'Order ' . $orderNumber . ' berhasil diproses.', type: 'success');
         } catch (\Exception $e) {
             // BATALKAN semua penulisan DB lokal jika terjadi kegagalan sebelum commit
@@ -1302,6 +1282,31 @@ class Pos extends Component
             Log::error('POS Payment Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
         }
+    }
+
+    public function resetCheckout()
+    {
+        $this->loadedAccurateSoId = null;
+        $this->loadedAccurateSoNumber = null;
+        $this->loadedDraftId = null;
+        $this->cart = [];
+        $this->selectedSales = [];
+        $this->discount_amount = 0;
+        $this->notes = '';
+        $this->selectedCustomerId = null;
+        $this->isNewCustomer = false;
+        $this->searchCustomer = '';
+        $this->customerName = '';
+        $this->customerPhone = '';
+        $this->customerEmail = '';
+        $this->search = '';
+        $this->payments = [
+            [
+                'payment_method_id' => '',
+                'payment_method_rate_id' => '',
+                'amount' => 0,
+            ]
+        ];
     }
 
     public function saveAsDraft()
@@ -1595,17 +1600,7 @@ class Pos extends Component
             }
 
             // Reset state keranjang
-            $this->cart = [];
-            $this->loadedDraftId = null;
-            $this->discount_amount = 0;
-            $this->notes = '';
-            $this->selectedCustomerId = null;
-            $this->isNewCustomer = false;
-            $this->searchCustomer = '';
-            $this->customerName = '';
-            $this->customerPhone = '';
-            $this->customerEmail = '';
-            $this->search = '';
+            $this->resetCheckout();
 
             $this->dispatch('toast', title: 'Draft Berhasil', message: 'Order ' . $orderNumber . ' berhasil disimpan sebagai Draft.', type: 'success');
         } catch (\Exception $e) {
@@ -1978,17 +1973,21 @@ class Pos extends Component
             $printer = new \Mike42\Escpos\Printer($connector);
             $printer->initialize();
 
+            // Memanggil fungsi pembuatan struk
             $this->generateEscposContent($printer);
 
+            // Ambil raw data dan convert ke Base64
             $data = $connector->getData();
             $base64 = base64_encode($data);
 
             $printer->close();
 
-            $this->dispatch('print-rawbt', base64: $base64, orderNumber: $this->completedOrder->order_number);
+            // Kirim event ke frontend (JavaScript) dengan membawa data Base64
+            // Kita beri nama event 'print-qz-tray'
+            $this->dispatch('print-qz-tray', base64Data: $base64);
         } catch (\Exception $e) {
             Log::error('ESCPOS Base64 Generation Error: ' . $e->getMessage());
-            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan RawBT: ' . $e->getMessage(), type: 'error');
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan: ' . $e->getMessage(), type: 'error');
         }
     }
 
