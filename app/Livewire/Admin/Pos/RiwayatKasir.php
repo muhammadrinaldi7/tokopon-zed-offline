@@ -19,6 +19,77 @@ class RiwayatKasir extends Component
     public $selectedOrders = [];
     public $detailModalTitle = '';
 
+    public function exportCsv()
+    {
+        $userWarehouseName = Auth::user()->warehouse->name ?? null;
+
+        $query = Order::pos()
+            ->with(['handledBy', 'salesBy', 'payments.paymentMethod', 'user'])
+            ->orderBy('handled_by')
+            ->orderBy('created_at', 'desc');
+
+        if ($userWarehouseName) {
+            $query->where('shipping_address_snapshot->store', $userWarehouseName);
+        }
+
+        if ($this->dateFilter) {
+            $query->whereDate('created_at', $this->dateFilter);
+        }
+
+        $orders = $query->get();
+
+        $filename = 'Export_Penjualan_POS_' . ($this->dateFilter ?: 'Semua') . '.csv';
+
+        return response()->streamDownload(function () use ($orders) {
+            $file = fopen('php://output', 'w');
+            // Add UTF-8 BOM for Excel compatibility
+            fputs($file, "\xEF\xBB\xBF");
+            
+            fputcsv($file, [
+                'Tanggal', 
+                'Waktu', 
+                'Kasir', 
+                'Sales', 
+                'No Invoice Lokal', 
+                'No SO Accurate', 
+                'Pelanggan', 
+                'Subtotal', 
+                'Diskon Manual', 
+                'Diskon Promo', 
+                'Biaya MDR', 
+                'Grand Total', 
+                'Metode Pembayaran',
+                'Status'
+            ], ';'); // Menggunakan titik koma agar otomatis kolom di Excel Indonesia
+
+            foreach ($orders as $order) {
+                $payments = $order->payments->map(function($p) {
+                    return $p->paymentMethod->name ?? 'Tunai';
+                })->implode(', ');
+                
+                $promo_discount = max(0, $order->total_amount - $order->discount_amount + $order->mdr_amount - $order->grand_total);
+
+                fputcsv($file, [
+                    $order->created_at->format('Y-m-d'),
+                    $order->created_at->format('H:i:s'),
+                    $order->handledBy->name ?? '-',
+                    $order->salesBy->name ?? '-',
+                    $order->order_number,
+                    $order->accurate_so_number ?? '-',
+                    $order->user->name ?? 'Walk-in Customer',
+                    $order->total_amount,
+                    $order->discount_amount,
+                    $promo_discount,
+                    $order->mdr_amount,
+                    $order->grand_total,
+                    $payments,
+                    $order->order_status
+                ], ';');
+            }
+            fclose($file);
+        }, $filename);
+    }
+
     public function mount()
     {
         // Default filter ke hari ini
