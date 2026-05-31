@@ -1514,6 +1514,31 @@ class Pos extends Component
         $printer->text("\n\n\n\n\n");
     }
 
+    // public function getEscposBase64()
+    // {
+    //     if (!$this->completedOrder) {
+    //         $this->dispatch('toast', title: 'Error', message: 'Tidak ada transaksi aktif untuk dicetak.', type: 'error');
+    //         return;
+    //     }
+
+    //     try {
+    //         $connector = new \Mike42\Escpos\PrintConnectors\DummyPrintConnector();
+    //         $printer = new \Mike42\Escpos\Printer($connector);
+    //         $printer->initialize();
+
+    //         $this->generateEscposContent($printer);
+
+    //         $data = $connector->getData();
+    //         $base64 = base64_encode($data);
+
+    //         $printer->close();
+
+    //         $this->dispatch('print-rawbt', base64: $base64, orderNumber: $this->completedOrder->order_number);
+    //     } catch (\Exception $e) {
+    //         Log::error('ESCPOS Base64 Generation Error: ' . $e->getMessage());
+    //         $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan RawBT: ' . $e->getMessage(), type: 'error');
+    //     }
+    // }
     public function getEscposBase64()
     {
         if (!$this->completedOrder) {
@@ -1526,17 +1551,21 @@ class Pos extends Component
             $printer = new \Mike42\Escpos\Printer($connector);
             $printer->initialize();
 
+            // Memanggil fungsi pembuatan struk
             $this->generateEscposContent($printer);
 
+            // Ambil raw data dan convert ke Base64
             $data = $connector->getData();
             $base64 = base64_encode($data);
 
             $printer->close();
 
-            $this->dispatch('print-rawbt', base64: $base64, orderNumber: $this->completedOrder->order_number);
+            // Kirim event ke frontend (JavaScript) dengan membawa data Base64
+            // Kita beri nama event 'print-qz-tray'
+            $this->dispatch('print-qz-tray', base64Data: $base64);
         } catch (\Exception $e) {
             Log::error('ESCPOS Base64 Generation Error: ' . $e->getMessage());
-            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan RawBT: ' . $e->getMessage(), type: 'error');
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan: ' . $e->getMessage(), type: 'error');
         }
     }
 

@@ -224,55 +224,68 @@
         }
     </script>
     <script>
-        function cetakStruk() {
-            // 1. Cek apakah sudah terhubung dengan QZ Tray
+        document.addEventListener('livewire:initialized', () => {
+            // Ganti nama 'print-qz-tray' jika di PHP kamu menggunakan nama event yang berbeda
+            // (misal: 'print-rawbt')
+            Livewire.on('print-qz-tray', (event) => {
+                // 1. Log event untuk memudahkan kita mengintip bentuk datanya di Console Browser
+                console.log('Isi event dari Livewire:', event);
+
+                // 2. Ambil payload datanya dengan aman (antisipasi berbagai bentuk format Livewire v3)
+                let payload = event[0] || event.detail || event;
+
+                // 3. Ambil string base64-nya (mencari key base64Data atau base64)
+                let base64Data = payload?.base64Data || payload?.base64;
+
+                // 4. Hentikan proses jika base64 benar-benar kosong agar tidak error
+                if (!base64Data) {
+                    console.error("Gagal! Data base64 tidak ditemukan dalam event.", payload);
+                    alert("Data struk gagal dibuat.");
+                    return;
+                }
+
+                // 5. Lanjut cetak
+                cetakDenganQZ(base64Data);
+            });
+        });
+
+        function cetakDenganQZ(base64Data) {
+            // 1. Cek koneksi QZ Tray
             if (!qz.websocket.isActive()) {
                 qz.websocket.connect().then(function() {
                     console.log("Berhasil terhubung ke QZ Tray!");
-                    prosesPrint();
+                    prosesPrintBase64(base64Data);
                 }).catch(function(err) {
-                    console.error("Gagal terhubung ke QZ. Pastikan aplikasi QZ Tray berjalan di komputer ini.",
-                        err);
-                    alert("Nyalakan QZ Tray terlebih dahulu!");
+                    console.error("Gagal terhubung ke QZ.", err);
+                    alert("Nyalakan QZ Tray terlebih dahulu di komputer ini!");
                 });
             } else {
-                prosesPrint();
+                prosesPrintBase64(base64Data);
             }
         }
 
-        function prosesPrint() {
-            // 2. Sesuaikan nama printer dengan yang ada di Control Panel / Devices and Printers
-            var namaPrinter = "EPSON TM-U220 Receipt";
+        function prosesPrintBase64(base64Data) {
+            // 2. Sesuaikan nama printer
+            var namaPrinter = "EPSON TM-U220 Receipt"; // Ganti dengan nama printer di Control Panel
 
             qz.printers.find(namaPrinter).then(function(printer) {
                 console.log("Printer ditemukan: " + printer);
-
-                // 3. Buat konfigurasi printer
                 var config = qz.configs.create(printer);
 
-                // 4. Siapkan data struk (Contoh Raw Text / ESC/POS)
-                var dataStruk = [
-                    '\x1B' + '\x40', // ESC/POS: Inisialisasi printer
-                    'Toko Kopi Maju Jaya\n',
-                    'Jl. Mawar No. 123\n',
-                    '========================\n',
-                    'Kopi Susu       Rp 15000\n',
-                    'Roti Bakar      Rp 12000\n',
-                    '------------------------\n',
-                    'Total           Rp 27000\n',
-                    '========================\n',
-                    'Terima Kasih!\n',
-                    '\n\n\n\n', // Spasi ekstra agar kertas naik sebelum dipotong
-                    '\x1D' + '\x56' + '\x01' // ESC/POS: Perintah potong kertas otomatis (opsional)
-                ];
+                // 3. Setup data format Base64 untuk QZ Tray
+                var dataStruk = [{
+                    type: 'raw',
+                    format: 'base64',
+                    data: base64Data
+                }];
 
-                // 5. Kirim perintah cetak ke QZ Tray
+                // 4. Kirim print
                 return qz.print(config, dataStruk);
             }).then(function() {
-                console.log("Berhasil dikirim ke printer!");
+                console.log("Struk berhasil dicetak!");
             }).catch(function(err) {
                 console.error("Gagal mencetak: ", err);
-                alert("Gagal mencetak. Cek konsol browser untuk detail error.");
+                alert("Gagal mencetak. Cek konsol browser.");
             });
         }
     </script>
