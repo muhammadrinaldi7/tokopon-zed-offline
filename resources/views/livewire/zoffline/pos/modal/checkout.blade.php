@@ -19,7 +19,20 @@
                                      {{ $item['color'] }})
                                  </span>
                              </p>
-                             <p class="text-[10px] text-gray-400 font-mono">SN: {{ $item['serial_number'] }}</p>
+                             {{-- PERBAIKAN: Menampilkan Array SN --}}
+                             <p class="text-[10px] text-gray-400 font-mono">
+                                 SN:
+                                 @php
+                                     // Bersihkan array dari input kosong (opsional tapi disarankan)
+                                     $cleanSNs = array_filter($item['serial_numbers'] ?? []);
+                                 @endphp
+
+                                 @if (!empty($cleanSNs))
+                                     {{ implode(', ', $cleanSNs) }}
+                                 @else
+                                     -
+                                 @endif
+                             </p>
                          </div>
                          <p class="font-bold text-gray-700 whitespace-nowrap">{{ $item['qty'] }}x Rp
                              {{ number_format($item['price'], 0, ',', '.') }}</p>
