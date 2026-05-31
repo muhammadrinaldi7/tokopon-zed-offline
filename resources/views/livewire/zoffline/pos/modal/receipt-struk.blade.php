@@ -199,6 +199,7 @@
                        {{ $completedOrder->user->profile->phone_number ?? '-' }}
                    </p>
                    <div class="border-t border-dashed border-gray-300 my-2"></div>
+
                    @foreach ($completedOrder->items as $item)
                        @php
                            $v = $item->variant;
@@ -250,7 +251,12 @@
                    @if ($completedOrder->accurate_invoice_no)
                        <p class="text-[10px] text-gray-400">Inv: {{ $completedOrder->accurate_invoice_no }}</p>
                    @endif
+                   <div class="text-start mt-2">
+                       <p class="text-[10px] text-gray-400">Catatan : {{ $completedOrder->notes ?? '' }}</p>
+                   </div>
                    <div class="text-center mt-4">
+
+
                        <p class="text-[10px] text-gray-400">Terima kasih telah berbelanja!</p>
                        <p class="text-[10px] text-gray-300">Call Center : 0811-5600-6464</p>
                    </div>
