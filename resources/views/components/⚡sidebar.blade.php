@@ -128,12 +128,13 @@ new class extends Component {
                 @endauth
 
                 {{-- Menu Item --}}
-                @if (auth()->check() && !auth()->user()->hasRole('user'))
+                @can('view_dashboard')
                     <a href="{{ route('admin.dashboard') }}" wire:navigate
                         class="block px-4 py-2 text-sm text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors">
                         Dashboard Admin
                     </a>
-                @endif
+                @endcan
+
                 <a href="/profile" wire:navigate
                     class="block px-4 py-2 text-sm text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors">
                     Profil & Pengaturan
