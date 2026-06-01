@@ -184,7 +184,8 @@
                                         @if (auth()->user()->hasRole(['admin', 'bm']))
                                             <div class="mt-0.5 flex items-center justify-end gap-1">
                                                 <span class="text-[10px] text-gray-400 font-medium">@ Rp</span>
-                                                <input type="number" wire:model.live.debounce.500ms="cart.{{ $index }}.price" 
+                                                <input type="number"
+                                                    wire:model.live.debounce.500ms="cart.{{ $index }}.price"
                                                     class="w-24 text-right bg-white border border-gray-200 shadow-sm rounded px-1.5 py-0.5 text-[10px] font-bold focus:border-[#1c69d4] focus:ring-0"
                                                     min="0" step="1">
                                             </div>
@@ -194,28 +195,7 @@
                                         @endif
                                     </div>
                                 </div>
-                                {{-- Discount Section --}}
-                                <div class="p-4">
-                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Diskon
-                                        Manual (Rp)
-                                    </p>
-                                    <div class="relative" x-data="{
-                                        rawDiscount: @entangle('cart.' . $index . '.discount_amount').live,
-                                        get maskedDiscount() {
-                                            if (!this.rawDiscount) return '';
-                                            return this.rawDiscount.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                                        },
-                                        set maskedDiscount(val) {
-                                            this.rawDiscount = val.replace(/\D/g, '');
-                                        }
-                                    }">
-                                        <span
-                                            class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
-                                        <input type="text" x-model="maskedDiscount"
-                                            class="w-full bg-white border border-gray-200 shadow-sm rounded-lg pl-8 pr-3 py-2 text-xs font-bold focus:border-[#1c69d4] focus:ring-0 transition placeholder:text-gray-300"
-                                            placeholder="0">
-                                    </div>
-                                </div>
+
                                 {{-- Bagian Action: Quantity & Tombol Cek Stok --}}
                                 <div class="flex items-center justify-between gap-3 pt-2 border-t border-gray-100">
                                     <div class="flex items-center gap-1">
@@ -312,6 +292,28 @@
                                                 Semua SN sudah terpenuhi ({{ $quantity }}/{{ $quantity }})
                                             </div>
                                         @endif
+                                    </div>
+                                </div>
+                                {{-- Discount Section --}}
+                                <div class="mt-1 space-y-2.5 bg-gray-50/50 p-2.5 rounded-lg border border-gray-100">
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Diskon
+                                        Manual (Rp)
+                                    </p>
+                                    <div class="relative" x-data="{
+                                        rawDiscount: @entangle('cart.' . $index . '.discount_amount').live,
+                                        get maskedDiscount() {
+                                            if (!this.rawDiscount) return '';
+                                            return this.rawDiscount.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                        },
+                                        set maskedDiscount(val) {
+                                            this.rawDiscount = val.replace(/\D/g, '');
+                                        }
+                                    }">
+                                        <span
+                                            class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                                        <input type="text" x-model="maskedDiscount"
+                                            class="w-full bg-white border border-gray-200 shadow-sm rounded-lg pl-8 pr-3 py-2 text-xs font-bold focus:border-[#1c69d4] focus:ring-0 transition placeholder:text-gray-300"
+                                            placeholder="0">
                                     </div>
                                 </div>
                             </div>
@@ -813,11 +815,12 @@
                                 {{ number_format($this->totalPromoDiscount, 0, ',', '.') }}</span>
                         </div>
                     @endif
-                    @if ($this->discount_amount > 0)
+                    {{-- Ubah bagian ini agar membaca itemDiscountTotal --}}
+                    @if ($this->itemDiscountTotal > 0)
                         <div class="flex justify-between text-xs font-medium text-rose-500">
-                            <span>Diskon</span>
+                            <span>Diskon Manual</span>
                             <span class="font-bold">- Rp
-                                {{ number_format($this->discount_amount, 0, ',', '.') }}</span>
+                                {{ number_format($this->itemDiscountTotal, 0, ',', '.') }}</span>
                         </div>
                     @endif
 

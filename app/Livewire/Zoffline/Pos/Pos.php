@@ -432,8 +432,6 @@ class Pos extends Component
         return max(0, $this->subtotal() - (int)$this->totalDiscount);
     }
 
-
-    // baru
     #[Computed]
     public function activePromos()
     {
@@ -459,12 +457,23 @@ class Pos extends Component
         }
         return collect($eligiblePromos);
     }
+
+    #[Computed]
+    public function itemDiscountTotal()
+    {
+        // Menghitung total diskon manual dari semua item di keranjang
+        return collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
+    }
+
     #[Computed]
     public function totalDiscount()
     {
-        $itemDiscounts = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
-        return $itemDiscounts + $this->totalPromoDiscount;
+        // $itemDiscounts = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
+        return $this->itemDiscountTotal + $this->totalPromoDiscount;
     }
+
+    // discount
+
     public function isPromoEligible($promo)
     {
         // Mengecek kelayakan HANYA berdasarkan Produk Utama (Main Product)
@@ -910,11 +919,13 @@ class Pos extends Component
             $this->dispatch('toast', title: 'Pembayaran Belum Sesuai', message: 'Pastikan total pembayaran cocok dengan tagihan dan semua metode pembayaran sudah dipilih.', type: 'warning');
             return;
         }
+
         $this->showCheckoutModal = true;
     }
 
     public function processPayment()
     {
+
         try {
             $customerId = $this->selectedCustomerId;
 
@@ -1033,7 +1044,6 @@ class Pos extends Component
                     $orderNumber = $order->order_number;
                 }
             }
-
             if (!$order) {
                 // Generate order number
                 $orderNumber = 'POS-' . now()->format('Ymd') . '-' . str_pad(

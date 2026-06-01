@@ -42,10 +42,10 @@
              <div class="p-5 bg-gray-50 border-t border-gray-100 space-y-1">
                  <div class="flex justify-between text-sm"><span class="text-gray-500">Subtotal</span><span
                          class="font-bold">Rp {{ number_format($this->subtotal, 0, ',', '.') }}</span></div>
-                 @if ($this->discount_amount > 0)
+                 @if ($this->itemDiscountTotal > 0)
                      <div class="flex justify-between text-sm"><span class="text-rose-500">Diskon</span><span
                              class="font-bold text-rose-500">- Rp
-                             {{ number_format($this->discount_amount, 0, ',', '.') }}</span></div>
+                             {{ number_format($this->itemDiscountTotal, 0, ',', '.') }}</span></div>
                  @endif
                  @if ($this->totalPromoDiscount > 0)
                      <div class="flex justify-between text-sm"><span class="text-rose-500">Promo</span><span
