@@ -1046,9 +1046,9 @@ class Pos extends Component
             }
             if (!$order) {
                 // Generate order number
-                $orderNumber = 'POS-' . now()->format('Ymd') . '-' . str_pad(
+                $orderNumber = 'POS-SYB-' . now()->format('Ymd') . '-' . str_pad(
                     Order::whereDate('created_at', today())->where('order_channel', 'POS')->count() + 1,
-                    3,
+                    4,
                     '0',
                     STR_PAD_LEFT
                 );

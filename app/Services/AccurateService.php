@@ -532,30 +532,53 @@ class AccurateService
         $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
         $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
 
-        // Pembuatan Signature Oauth / API Timestamp jika menggunakan metode signature custom
-        $timestamp = now()->toIso8601String();
-        $signature = hash_hmac('sha256', $timestamp, $secretKey);
-        $paramBody = [
-            "sp.pageSize" => 10000
-        ];
-        // Hit ke endpoint karyawan milik Accurate Online
-        $response = Http::withHeaders([
-            'Authorization'   => 'Bearer ' . $token,
-            'X-Api-Timestamp' => $timestamp,
-            'X-Api-Signature' => $signature,
-            'Content-Type'    => 'application/json',
-            // 'X-Session-ID'   => $this->sessionId, // Hidupkan kolom ini jika otentikasi Anda via Session ID open-db
-        ])->get($host . '/employee/list.do', $paramBody);
+        $allEmployees = [];
+        $page = 1;
+        $hasMore = true;
 
-        // Jika request sukses, kembalikan data array murninya ke pemanggil (Livewire)
-        if ($response->successful()) {
-            return $response->json('d') ?? [];
+        while ($hasMore) {
+            // Pembuatan Signature Oauth / API Timestamp jika menggunakan metode signature custom
+            $timestamp = now()->toIso8601String();
+            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+            $paramBody = [
+                "sp.pageSize" => 100,
+                "sp.page" => $page
+            ];
+
+            // Hit ke endpoint karyawan milik Accurate Online
+            $response = Http::withHeaders([
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ])->get($host . '/employee/list.do', $paramBody);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if (isset($data['s']) && $data['s'] === false) {
+                    \Illuminate\Support\Facades\Log::error("Accurate API Get Employees Error ({$databaseSource}): " . json_encode($data));
+                    break;
+                }
+
+                $chunk = $data['d'] ?? [];
+                $allEmployees = array_merge($allEmployees, $chunk);
+                
+                $pageCount = $data['sp']['pageCount'] ?? 1;
+                
+                if ($page >= $pageCount || count($chunk) < 100) {
+                    $hasMore = false;
+                } else {
+                    $page++;
+                }
+            } else {
+                // Catat log jika terjadi kendala pada server Accurate
+                \Illuminate\Support\Facades\Log::error("Accurate API Get Employees Failed ({$databaseSource}): " . $response->body());
+                $hasMore = false;
+            }
         }
 
-        // Catat log jika terjadi kendala pada server Accurate
-        \Illuminate\Support\Facades\Log::error("Accurate API Get Employees Failed ({$databaseSource}): " . $response->body());
-
-        return [];
+        return $allEmployees;
     }
 
     public function postSalesReceipt($salesReceiptData, $databaseSource = 'syihab')
