@@ -159,6 +159,7 @@ class Pos extends Component
                 'color' => $item->variant->color ?? '',
                 'price' => (int) $item->variant->price,
                 'qty' => $item->qty,
+                'discount_amount' => (int) $item->discount_amount,
                 'serial_numbers' => $snArray,
             ];
         }

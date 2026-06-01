@@ -63,6 +63,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Pesanan
     Route::get('/orders', \App\Livewire\Admin\Orders\OrderManagement::class)->name('orders.management')->middleware('can:manage-orders');
+    Route::get('/orders/import-draft', \App\Livewire\Admin\Orders\ImportDraft::class)->name('orders.import-draft')->middleware('can:manage-orders');
 
     // Settings
     Route::get('/settings/payment', \App\Livewire\Admin\Settings\PaymentSettings::class)->name('settings.payment')->middleware('can:manage-settings');
