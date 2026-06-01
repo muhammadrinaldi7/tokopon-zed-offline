@@ -38,9 +38,18 @@ class ProcessStockAdjustment implements ShouldQueue
         // 1. Baca CSV baris demi baris
         $rows = LazyCollection::make(function () use ($fullPath) {
             $handle = fopen($fullPath, 'r');
-            $headers = fgetcsv($handle, 1000, ",");
-            while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                yield array_combine($headers, $data);
+
+            // Deteksi pemisah (comma atau semicolon) dari baris pertama
+            $firstLine = fgets($handle);
+            $delimiter = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
+            rewind($handle);
+
+            $headers = fgetcsv($handle, 1000, $delimiter);
+            while (($data = fgetcsv($handle, 1000, $delimiter)) !== FALSE) {
+                // Pastikan jumlah kolom data sama dengan header untuk menghindari error array_combine
+                if (is_array($headers) && is_array($data) && count($headers) === count($data)) {
+                    yield array_combine($headers, $data);
+                }
             }
             fclose($handle);
         });

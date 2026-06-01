@@ -10,6 +10,8 @@ use App\Models\UserProfile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 
+use Livewire\Attributes\On;
+
 class CustomerAccurateManagement extends Component
 {
     public $syncStatus = 'idle'; // idle, running, completed, error
@@ -17,25 +19,32 @@ class CustomerAccurateManagement extends Component
     public $syncImportedCount = 0;
     public $syncSkippedCount = 0;
     public $databaseSource = 'syihab';
+    public $syncCurrentPage = 1;
 
-    public function startSync(AccurateService $accurateService)
+    public function startSync()
     {
         $this->syncStatus = 'running';
         $this->syncMessage = 'Memulai proses sinkronisasi pelanggan dari Accurate...';
         $this->syncImportedCount = 0;
         $this->syncSkippedCount = 0;
+        // Kita tidak mereset syncCurrentPage di sini agar user bisa melanjutkannya
+        
+        $this->dispatch('trigger-next-page');
+    }
 
-        $page = 1;
-        $hasNextPage = true;
+    #[On('trigger-next-page')]
+    public function processNextPage(AccurateService $accurateService)
+    {
+        if ($this->syncStatus !== 'running') return;
+
         $defaultPassword = Hash::make('password123');
 
         try {
-            while ($hasNextPage) {
-                $response = $accurateService->fetchCustomers($page, $this->databaseSource);
+            $response = $accurateService->fetchCustomers($this->syncCurrentPage, $this->databaseSource);
 
-                $customers = $response['d'] ?? [];
+            $customers = $response['d'] ?? [];
 
-                foreach ($customers as $cust) {
+            foreach ($customers as $cust) {
                     $customerNo = $cust['customerNo'] ?? null;
                     $name = $cust['name'] ?? null;
                     $email = $cust['email'] ?? null;
@@ -95,17 +104,16 @@ class CustomerAccurateManagement extends Component
                     $this->syncImportedCount++;
                 }
 
-                // Accurate pagination limit is 100 per page. If we got less than 100, it's the last page.
-                if (count($customers) < 100) {
-                    $hasNextPage = false;
-                } else {
-                    $page++;
-                }
+            // Accurate pagination limit is 100 per page. If we got less than 100, it's the last page.
+            if (count($customers) < 100) {
+                $this->syncStatus = 'completed';
+                $this->syncMessage = "Proses selesai! $this->syncImportedCount pelanggan berhasil ditarik.";
+                $this->dispatch('toast', title: 'Berhasil', message: 'Sinkronisasi pelanggan selesai.', type: 'success');
+            } else {
+                $this->syncCurrentPage++;
+                $this->syncMessage = "Menarik data halaman ke-{$this->syncCurrentPage}...";
+                $this->dispatch('trigger-next-page');
             }
-
-            $this->syncStatus = 'completed';
-            $this->syncMessage = "Proses selesai! $this->syncImportedCount pelanggan berhasil ditarik.";
-            $this->dispatch('toast', title: 'Berhasil', message: 'Sinkronisasi pelanggan selesai.', type: 'success');
         } catch (\Exception $e) {
             Log::error('Customer Sync Error: ' . $e->getMessage());
             $this->syncStatus = 'error';

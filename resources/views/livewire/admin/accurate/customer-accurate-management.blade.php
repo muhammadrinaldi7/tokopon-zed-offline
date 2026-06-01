@@ -6,6 +6,14 @@
             <p class="text-sm text-gray-500 mt-1">Tarik data pelanggan dari Accurate Online untuk migrasi awal.</p>
         </div>
         <div class="flex items-center gap-3">
+            @if ($syncStatus !== 'running')
+                <div class="flex items-center gap-2 mr-2">
+                    <label for="syncPage" class="text-sm font-medium text-gray-700">Mulai dari Hal:</label>
+                    <input type="number" id="syncPage" wire:model="syncCurrentPage" min="1"
+                        class="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4]">
+                </div>
+            @endif
+
             <button wire:click="startSync" wire:loading.attr="disabled"
                 class="flex items-center justify-center gap-2 bg-[#1c69d4] hover:bg-[#1556b0] text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm">
                 <svg wire:loading wire:target="startSync" class="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"
