@@ -38,15 +38,17 @@ new class extends Component {
         <nav class="flex-1 flex flex-col gap-4 w-full items-center">
 
             {{-- Item: POS --}}
-            <a href="{{ route('zoffline.pos') }}" wire:navigate
-                class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-[#4E44DB] hover:bg-blue-50 transition-all duration-200">
-                <img src="{{ asset('assets/png/pos2.png') }}" class="w-8 h-auto" alt="">
-                <span
-                    class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
-                    Point of Sale
-                    <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
-                </span>
-            </a>
+            @can('view-pos')
+                <a href="{{ route('zoffline.pos') }}" wire:navigate
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-[#4E44DB] hover:bg-blue-50 transition-all duration-200">
+                    <img src="{{ asset('assets/png/pos2.png') }}" class="w-8 h-auto" alt="">
+                    <span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
+                        Point of Sale
+                        <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
+                    </span>
+                </a>
+            @endcan
 
             {{-- Item: Tukar Tambah --}}
             @can('trade-in')
@@ -87,15 +89,18 @@ new class extends Component {
             </a>
 
             {{-- Item: Riwayat Kasir --}}
-            <a href="{{ route('zoffline.riwayat-kasir') }}" wire:navigate
-                class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200">
-                <img src="{{ asset('assets/png/rk.png') }}" class="w-8 h-auto" alt="">
-                <span
-                    class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
-                    Shift
-                    <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
-                </span>
-            </a>
+            @can('view-pos')
+                <a href="{{ route('zoffline.riwayat-kasir') }}" wire:navigate
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200">
+                    <img src="{{ asset('assets/png/rk.png') }}" class="w-8 h-auto" alt="">
+                    <span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
+                        Shift
+                        <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
+                    </span>
+                </a>
+            @endcan
+
         </nav>
 
         {{-- Profil dengan Dropdown (Alpine.js) --}}

@@ -21,23 +21,24 @@
     <div class="grid grid-cols-1 md:grid-cols-3 max-w-7xl gap-6  w-full">
 
         {{-- Card 1: Zpos --}}
-        <div wire:click="navigateToZPos"
-            class="w-full h-70 md:h-80 bg-linear-to-br from-neutral-950 via-neutral-800/90 to-neutral-900 rounded-2xl relative flex flex-col justify-end overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-700 ease-out border border-neutral-800 hover:border-neutral-700">
+        @can('view-pos')
+            <div wire:click="navigateToZPos"
+                class="w-full h-70 md:h-80 bg-linear-to-br from-neutral-950 via-neutral-800/90 to-neutral-900 rounded-2xl relative flex flex-col justify-end overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-700 ease-out border border-neutral-800 hover:border-neutral-700">
 
-            {{-- Gambar & Logo --}}
-            <div class="absolute inset-0 w-full h-full pointer-events-none">
-                <img src="{{ asset('assets/png/zlogo.png') }}" alt="Zpos Logo"
-                    class="absolute right-4 md:right-6 top-6 md:top-8 w-40 md:w-40 lg:w-50 h-auto transition-all duration-700 ease-out group-hover:scale-110 group-hover:-translate-y-2 z-10 drop-shadow-xl">
+                {{-- Gambar & Logo --}}
+                <div class="absolute inset-0 w-full h-full pointer-events-none">
+                    <img src="{{ asset('assets/png/zlogo.png') }}" alt="Zpos Logo"
+                        class="absolute right-4 md:right-6 top-6 md:top-8 w-40 md:w-40 lg:w-50 h-auto transition-all duration-700 ease-out group-hover:scale-110 group-hover:-translate-y-2 z-10 drop-shadow-xl">
+                </div>
+
+                {{-- Text Content --}}
+                <div class="relative z-20">
+                    <h2 class="text-3xl md:text-4xl text-white font-bold leading-none tracking-tight">
+                        Zpos
+                    </h2>
+                </div>
             </div>
-
-            {{-- Text Content --}}
-            <div class="relative z-20">
-                <h2 class="text-3xl md:text-4xl text-white font-bold leading-none tracking-tight">
-                    Zpos
-                </h2>
-            </div>
-        </div>
-
+        @endcan
         @can('trade-in')
             {{-- Card 2: Trade-In (Tukar Tambah) --}}
             <div wire:click="navigateToTradeIn"
@@ -97,36 +98,58 @@
             </div>
         @endcan
         {{-- Card 4: cekstok --}}
-        <div wire:click="navigateToCekStock"
-            class="w-full h-70 md:h-80 bg-olive-700 hover:bg-olive-800 rounded-2xl relative flex flex-col justify-end overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-700 ease-out">
-            {{-- Gambar & Logo --}}
-            <div class="absolute inset-0 w-full h-full pointer-events-none">
-                <img src="{{ asset('assets/png/stok.png') }}" alt="stok Logo"
-                    class="absolute right-4 md:right-6 top-6 md:top-8 w-35 md:w-35 lg:w-40 h-auto transition-all invert duration-700 ease-out group-hover:scale-110 group-hover:-translate-y-2 z-10 drop-shadow-xl">
-            </div>
+        @can('view-stock')
+            <div wire:click="navigateToCekStock"
+                class="w-full h-70 md:h-80 bg-olive-700 hover:bg-olive-800 rounded-2xl relative flex flex-col justify-end overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-700 ease-out">
+                {{-- Gambar & Logo --}}
+                <div class="absolute inset-0 w-full h-full pointer-events-none">
+                    <img src="{{ asset('assets/png/stok.png') }}" alt="stok Logo"
+                        class="absolute right-4 md:right-6 top-6 md:top-8 w-35 md:w-35 lg:w-40 h-auto transition-all invert duration-700 ease-out group-hover:scale-110 group-hover:-translate-y-2 z-10 drop-shadow-xl">
+                </div>
 
-            {{-- Text Content --}}
-            <div class="relative z-20">
-                <h2 class="text-3xl md:text-4xl text-white font-bold leading-none tracking-tight">
-                    Cek Stock
-                </h2>
+                {{-- Text Content --}}
+                <div class="relative z-20">
+                    <h2 class="text-3xl md:text-4xl text-white font-bold leading-none tracking-tight">
+                        Cek Stock
+                    </h2>
+                </div>
             </div>
-        </div>
-        {{-- Card 5: shift --}}
-        <div wire:click="navigateToShift"
-            class="w-full h-70 md:h-80 bg-teal-800 hover:bg-teal-900 rounded-2xl relative flex flex-col justify-end overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-700 ease-out">
-            {{-- Gambar & Logo --}}
-            <div class="absolute inset-0 w-full h-full pointer-events-none">
-                <img src="{{ asset('assets/png/rk.png') }}" alt="shift Logo"
-                    class="absolute right-4 md:right-6 top-6 md:top-8 w-35 md:w-35 lg:w-40 invert h-auto transition-all duration-700 ease-out group-hover:scale-110 group-hover:-translate-y-2 z-10 drop-shadow-xl">
-            </div>
+        @endcan
+        @can('view-pos')
+            {{-- Card 5: shift --}}
+            <div wire:click="navigateToShift"
+                class="w-full h-70 md:h-80 bg-teal-800 hover:bg-teal-900 rounded-2xl relative flex flex-col justify-end overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-700 ease-out">
+                {{-- Gambar & Logo --}}
+                <div class="absolute inset-0 w-full h-full pointer-events-none">
+                    <img src="{{ asset('assets/png/rk.png') }}" alt="shift Logo"
+                        class="absolute right-4 md:right-6 top-6 md:top-8 w-35 md:w-35 lg:w-40 invert h-auto transition-all duration-700 ease-out group-hover:scale-110 group-hover:-translate-y-2 z-10 drop-shadow-xl">
+                </div>
 
-            {{-- Text Content --}}
-            <div class="relative z-20">
-                <h2 class="text-3xl md:text-4xl text-white font-bold leading-none tracking-tight">
-                    Shift
-                </h2>
+                {{-- Text Content --}}
+                <div class="relative z-20">
+                    <h2 class="text-3xl md:text-4xl text-white font-bold leading-none tracking-tight">
+                        Shift
+                    </h2>
+                </div>
             </div>
-        </div>
+        @endcan
+        @can('view_dashboard')
+            {{-- Card 5: shift --}}
+            <div wire:click="navigateToDashboard"
+                class="w-full h-70 md:h-80 bg-teal-800 hover:bg-teal-900 rounded-2xl relative flex flex-col justify-end overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-700 ease-out">
+                {{-- Gambar & Logo --}}
+                <div class="absolute inset-0 w-full h-full pointer-events-none">
+                    <img src="{{ asset('assets/png/rk.png') }}" alt="shift Logo"
+                        class="absolute right-4 md:right-6 top-6 md:top-8 w-35 md:w-35 lg:w-40 invert h-auto transition-all duration-700 ease-out group-hover:scale-110 group-hover:-translate-y-2 z-10 drop-shadow-xl">
+                </div>
+
+                {{-- Text Content --}}
+                <div class="relative z-20">
+                    <h2 class="text-3xl md:text-4xl text-white font-bold leading-none tracking-tight">
+                        Dashboard
+                    </h2>
+                </div>
+            </div>
+        @endcan
     </div>
 </div>
