@@ -39,7 +39,7 @@
             <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Dashboard</span>
         </a>
 
-        @role('cs')
+        @can('access-cs-chat')
             <a href="/admin/cs-chat" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.cs-chat') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('admin.cs-chat') ? $activeIconClass : $inactiveIconClass }}"
@@ -55,9 +55,7 @@
                     </span>
                 @endif
             </a>
-        @endrole
-
-        </a>
+        @endcan
 
         <a href="#"
             class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->is('admin/services') ? $activeClass : $inactiveClass }}">
@@ -70,6 +68,7 @@
             <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Status Servis</span>
         </a>
 
+        @can('manage-promos')
         <a href="{{ route('admin.promos.index') }}" wire:navigate
             class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.promos.*') ? $activeClass : $inactiveClass }}">
             <svg class="w-5 h-5 {{ request()->routeIs('admin.promos.*') ? $activeIconClass : $inactiveIconClass }}"
@@ -79,22 +78,14 @@
             </svg>
             Promo & Voucher
         </a>
+        @endcan
 
-        {{-- <a href="#"
-            class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->is('admin/tips') ? $activeClass : $inactiveClass }}">
-            <svg class="w-5 h-5 {{ request()->is('admin/tips') ? $activeIconClass : $inactiveIconClass }}"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-            Tips Gadget
-        </a>  --}}
-
-        @hasanyrole('admin|superadmin|fl')
+        @canany(['view-pos', 'view-stock'])
             <div class="px-4 mt-8 mb-2" x-show="!sidebarCollapsed">
                 <p class="text-[13px] font-bold tracking-[1.5px] text-gray-400 uppercase">Toko & Katalog</p>
             </div>
 
+            @can('view-pos')
             <a href="{{ route('zoffline.pos') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.pos') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('zoffline.pos') ? $activeIconClass : $inactiveIconClass }}"
@@ -104,6 +95,9 @@
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kasir (POS)</span>
             </a>
+            @endcan
+
+            @can('view-stock')
             <a href="{{ route('zoffline.cekstock') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.cekstock') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('zoffline.cekstock') ? $activeIconClass : $inactiveIconClass }}"
@@ -115,153 +109,174 @@
 
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Cek Stock</span>
             </a>
+            @endcan
+        @endcanany
 
-            @hasanyrole('admin|superadmin')
-                <div x-data="{ openProducts: {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-customers') ? 'true' : 'false' }} }">
-                    <button @click="openProducts = !openProducts" type="button"
-                        class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-customers') ? $activeClass : $inactiveClass }}">
-                        <div class="flex items-center gap-3">
-                            <svg class="w-5 h-5 {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-customers') ? $activeIconClass : $inactiveIconClass }}"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                            </svg>
-                            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Katalog Pusat</span>
-                        </div>
-                        <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openProducts }"
-                            class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        @can('view-catalog-menu')
+            <div x-data="{ openProducts: {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-customers') ? 'true' : 'false' }} }">
+                <button @click="openProducts = !openProducts" type="button"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-customers') ? $activeClass : $inactiveClass }}">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-customers') ? $activeIconClass : $inactiveIconClass }}"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
-                    </button>
-
-                    <div x-show="openProducts && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
-                        <a href="{{ route('admin.products') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.products.variants') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Katalog Baru
-                        </a>
-                        <a href="{{ route('admin.second-products') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.second-products', 'admin.second-products.variants') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Katalog Second
-                        </a>
-                        <a href="{{ route('admin.categories') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.categories') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Master Kategori
-                        </a>
-                        <a href="{{ route('admin.brands') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.brands') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Master Merek
-                        </a>
-                        <a href="{{ route('admin.accurate-products') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-products') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Produk Accurate
-                        </a>
-                        <a href="{{ route('admin.accurate-customers') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-customers') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Pelanggan Accurate
-                        </a>
-                        <a href="{{ route('admin.warehouse-stocks') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.warehouse-stocks') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Stok Gudang
-                        </a>
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Katalog Pusat</span>
                     </div>
-                </div>
-
-                <a href="/admin/orders" wire:navigate
-                    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.orders.management') ? $activeClass : $inactiveClass }}">
-                    <svg class="w-5 h-5 {{ request()->routeIs('admin.orders.management') ? $activeIconClass : $inactiveIconClass }}"
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openProducts }"
+                        class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
-                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pesanan</span>
-                </a>
-            @endhasanyrole
+                </button>
 
-            <a href="{{ route('admin.trade-ins.index') }}" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.trade-ins.*') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('admin.trade-ins.*') ? $activeIconClass : $inactiveIconClass }}"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Tukar Tambah</span>
-            </a>
-
-            <a href="{{ route('admin.sell-phones.index') }}" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.sell-phones.*') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('admin.sell-phones.*') ? $activeIconClass : $inactiveIconClass }}"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pembelian HP</span>
-            </a>
-
-            @hasanyrole('admin|superadmin')
-                <div x-data="{ openBuyback: {{ request()->routeIs('admin.buyback.*') ? 'true' : 'false' }} }">
-                    <button @click="openBuyback = !openBuyback" type="button"
-                        class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.*') ? $activeClass : $inactiveClass }}">
-                        <div class="flex items-center gap-3">
-                            <svg class="w-5 h-5 {{ request()->routeIs('admin.buyback.*') ? $activeIconClass : $inactiveIconClass }}"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Master Harga</span>
-                        </div>
-                        <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openBuyback }"
-                            class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-
-                    <div x-show="openBuyback && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
-                        <a href="{{ route('admin.buyback.index') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.index', 'admin.buyback.create') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Daftar Perangkat
-                        </a>
-                        <a href="{{ route('admin.buyback.tiers') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.tiers') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Buyback Tiers
-                        </a>
-                    </div>
+                <div x-show="openProducts && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
+                    @can('manage-new-catalog')
+                    <a href="{{ route('admin.products') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.products.variants') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Katalog Baru
+                    </a>
+                    @endcan
+                    @can('manage-second-catalog')
+                    <a href="{{ route('admin.second-products') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.second-products', 'admin.second-products.variants') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Katalog Second
+                    </a>
+                    @endcan
+                    @can('manage-categories')
+                    <a href="{{ route('admin.categories') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.categories') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Master Kategori
+                    </a>
+                    @endcan
+                    @can('manage-brands')
+                    <a href="{{ route('admin.brands') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.brands') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Master Merek
+                    </a>
+                    @endcan
+                    @can('manage-accurate-products')
+                    <a href="{{ route('admin.accurate-products') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-products') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Produk Accurate
+                    </a>
+                    @endcan
+                    @can('manage-accurate-customers')
+                    <a href="{{ route('admin.accurate-customers') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-customers') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Pelanggan Accurate
+                    </a>
+                    @endcan
+                    @can('view-warehouse-stocks')
+                    <a href="{{ route('admin.warehouse-stocks') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.warehouse-stocks') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Stok Gudang
+                    </a>
+                    @endcan
                 </div>
+            </div>
+        @endcan
 
-                <div x-data="{ openQc: {{ request()->routeIs('admin.qc.*') ? 'true' : 'false' }} }">
-                    <button @click="openQc = !openQc" type="button"
-                        class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.qc.*') ? $activeClass : $inactiveClass }}">
-                        <div class="flex items-center gap-3">
-                            <svg class="w-5 h-5 {{ request()->routeIs('admin.qc.*') ? $activeIconClass : $inactiveIconClass }}"
-                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                            </svg>
-                            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">QC & Inspeksi</span>
-                        </div>
-                        <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openQc }"
-                            class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        @can('manage-orders')
+            <a href="/admin/orders" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.orders.management') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.orders.management') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pesanan</span>
+            </a>
+        @endcan
+
+        @can('manage-trade-in')
+        <a href="{{ route('admin.trade-ins.index') }}" wire:navigate
+            class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.trade-ins.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 {{ request()->routeIs('admin.trade-ins.*') ? $activeIconClass : $inactiveIconClass }}"
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Tukar Tambah</span>
+        </a>
+
+        <a href="{{ route('admin.sell-phones.index') }}" wire:navigate
+            class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.sell-phones.*') ? $activeClass : $inactiveClass }}">
+            <svg class="w-5 h-5 {{ request()->routeIs('admin.sell-phones.*') ? $activeIconClass : $inactiveIconClass }}"
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pembelian HP</span>
+        </a>
+        @endcan
+
+        @can('manage-buyback')
+            <div x-data="{ openBuyback: {{ request()->routeIs('admin.buyback.*') ? 'true' : 'false' }} }">
+                <button @click="openBuyback = !openBuyback" type="button"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.*') ? $activeClass : $inactiveClass }}">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 {{ request()->routeIs('admin.buyback.*') ? $activeIconClass : $inactiveIconClass }}"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                    </button>
-
-                    <div x-show="openQc && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
-                        <a href="{{ route('admin.qc.templates') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.templates') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Template QC
-                        </a>
-                        <a href="{{ route('admin.qc.device-search') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device-search') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-
-                            Cek Devices
-                        </a>
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Master Harga</span>
                     </div>
-                </div>
-            @endhasanyrole
-        @endhasanyrole
+                    <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openBuyback }"
+                        class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
 
-        @hasanyrole('admin|super admin')
+                <div x-show="openBuyback && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
+                    <a href="{{ route('admin.buyback.index') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.index', 'admin.buyback.create') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Daftar Perangkat
+                    </a>
+                    <a href="{{ route('admin.buyback.tiers') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.tiers') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Buyback Tiers
+                    </a>
+                </div>
+            </div>
+        @endcan
+
+        @can('manage-qc')
+            <div x-data="{ openQc: {{ request()->routeIs('admin.qc.*') ? 'true' : 'false' }} }">
+                <button @click="openQc = !openQc" type="button"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.qc.*') ? $activeClass : $inactiveClass }}">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 {{ request()->routeIs('admin.qc.*') ? $activeIconClass : $inactiveIconClass }}"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">QC & Inspeksi</span>
+                    </div>
+                    <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openQc }"
+                        class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                <div x-show="openQc && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
+                    <a href="{{ route('admin.qc.templates') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.templates') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Template QC
+                    </a>
+                    <a href="{{ route('admin.qc.device-search') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device-search') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+
+                        Cek Devices
+                    </a>
+                </div>
+            </div>
+        @endcan
+
+        @can('manage-users')
             <div class="px-4 mt-8 mb-2" x-show="!sidebarCollapsed">
                 <p class="text-[13px] font-bold tracking-[1.5px] text-gray-400 uppercase">Administrator</p>
             </div>
@@ -303,20 +318,13 @@
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kelola Role & Akses</span>
             </a>
+        @endcan
 
+        @can('manage-settings')
             <div class="px-4 mt-8 mb-2" x-show="!sidebarCollapsed">
                 <p class="text-[13px] font-bold tracking-[1.5px] text-gray-400 uppercase">Sistem</p>
             </div>
 
-            {{-- <a href="{{ route('admin.settings.payment') }}" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.payment') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.payment') ? $activeIconClass : $inactiveIconClass }}"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan Pembayaran</span>
-            </a> --}}
             <a href="{{ route('admin.settings.payment-methods') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.payment-methods') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.payment-methods') ? $activeIconClass : $inactiveIconClass }}"
@@ -356,6 +364,16 @@
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan Gudang</span>
             </a>
+            
+            <a href="{{ route('admin.settings.pos') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.pos') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.pos') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan POS</span>
+            </a>
 
             <a href="{{ route('admin.adjustment.index') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.adjustment.index') ? $activeClass : $inactiveClass }}">
@@ -366,7 +384,7 @@
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Penyesuaian Stok</span>
             </a>
-        @endhasanyrole
+        @endcan
     </nav>
 
     <div class="p-6">

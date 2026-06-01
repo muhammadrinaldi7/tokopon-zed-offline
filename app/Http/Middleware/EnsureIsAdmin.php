@@ -22,7 +22,8 @@ class EnsureIsAdmin
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$user->hasAnyRole(['admin', 'superadmin', 'cs', 'fl'])) {
+        // Memeriksa apakah user memiliki setidaknya 1 permission apa saja, atau merupakan superadmin
+        if ($user->getAllPermissions()->isEmpty() && !$user->hasRole('superadmin')) {
             return redirect('/')->with('error', 'Anda tidak memiliki akses ke halaman admin.');
         }
 
