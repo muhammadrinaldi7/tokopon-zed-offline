@@ -112,7 +112,7 @@ class StockManagement extends Component
                     // 2. Ambil stok Accurate per gudang
                     // Pastikan Anda memanggil nama fungsi yang tepat (karena Anda membuat fungsi getItemStockPerWarehouse)
                     $stockData = $service->getItemStockPerWarehouse($warehouse->name, $dbSource);
-                    
+
                     if (empty($stockData)) continue;
 
                     // 3. Mapping data array ke Collection berbasis SKU (O(1) lookup di memori)
@@ -177,7 +177,7 @@ class StockManagement extends Component
             // 2. HIT API ACCURATE CUKUP 1 KALI (Di luar looping)
             // Ambil semua stok produk yang ada di gudang ini
             $stockData = $service->getItemStockPerWarehouse($whName, $dbSource);
-
+            // dd($stockData);
             if (empty($stockData)) {
                 $this->dispatch('toast', title: 'Info', message: "Tidak ada data stok di Accurate untuk gudang: $whName", type: 'info');
                 $this->isLoading = false;
@@ -197,7 +197,6 @@ class StockManagement extends Component
             WarehouseStock::where('warehouse_id', $warehouse->id)
                 ->where('variant_type', $variantClass)
                 ->update(['stock' => 0]);
-
             $syncedCount = 0;
             // dd($accurateStockCollection);
             // 6. Lakukan pemetaan data di memori internal (Proses ini sangat cepat < 0.1 detik)

@@ -592,36 +592,54 @@ class AccurateService
         }
     }
 
-    public function getStockPerWarehouse($warehouseName, $databaseSource = 'syihab')
-    {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+    // public function getStockPerWarehouse($warehouseName, $databaseSource = 'syihab')
+    // {
+    //     $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+    //     $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+    //     $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+    //     $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
 
-        $timestamp = now()->toIso8601String();
-        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+    //     $allData = [];
+    //     $page = 1;
+    //     $hasMore = true;
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $token,
-            'X-Api-Timestamp' => $timestamp,
-            'X-Api-Signature'  => $signature,
-            'Content-Type'  => 'application/json',
-        ])->get($host . '/item/list-stock.do', [
-            'sp.pageSize' => 1000,
-            'warehouseName' => $warehouseName
-        ]);
+    //     while ($hasMore) {
+    //         $timestamp = now()->toIso8601String();
+    //         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        if ($response->successful()) {
-            $data = $response->json();
-            if (isset($data['s']) && $data['s'] === false) {
-                throw new \Exception('API Accurate Error: ' . json_encode($data['d']));
-            }
-            return $data['d'] ?? [];
-        } else {
-            throw new \Exception('API Accurate Error: ' . $response->body());
-        }
-    }
+    //         $response = Http::withHeaders([
+    //             'Authorization' => 'Bearer ' . $token,
+    //             'X-Api-Timestamp' => $timestamp,
+    //             'X-Api-Signature'  => $signature,
+    //             'Content-Type'  => 'application/json',
+    //         ])->get($host . '/item/list-stock.do', [
+    //             'sp.pageSize' => 100,
+    //             'sp.page' => $page,
+    //             'warehouseName' => $warehouseName
+    //         ]);
+
+    //         if ($response->successful()) {
+    //             $data = $response->json();
+    //             if (isset($data['s']) && $data['s'] === false) {
+    //                 throw new \Exception('API Accurate Error: ' . json_encode($data['d']));
+    //             }
+
+    //             $chunk = $data['d'] ?? [];
+    //             $allData = array_merge($allData, $chunk);
+
+    //             // Jika jumlah data di halaman ini kurang dari limit (100), berarti sudah mentok di halaman terakhir
+    //             if (count($chunk) < 100) {
+    //                 $hasMore = false;
+    //             } else {
+    //                 $page++;
+    //             }
+    //         } else {
+    //             throw new \Exception('API Accurate Error: ' . $response->body());
+    //         }
+    //     }
+
+    //     return $allData;
+    // }
 
     public function getGlAccounts($databaseSource = 'syihab')
     {
@@ -665,28 +683,46 @@ class AccurateService
         $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
         $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
 
-        $timestamp = now()->toIso8601String();
-        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+        $allData = [];
+        $page = 1;
+        $hasMore = true;
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $token,
-            'X-Api-Timestamp' => $timestamp,
-            'X-Api-Signature'  => $signature,
-            'Content-Type'  => 'application/json',
-        ])->get($host . '/item/list-stock.do', [
-            'sp.pageSize' => 1000,
-            'warehouseName' => $warehouseName
-        ]);
+        while ($hasMore) {
+            $timestamp = now()->toIso8601String();
+            $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        if ($response->successful()) {
-            $data = $response->json();
-            if (isset($data['s']) && $data['s'] === false) {
-                throw new \Exception('API Accurate Error: ' . json_encode($data['d']));
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature'  => $signature,
+                'Content-Type'  => 'application/json',
+            ])->get($host . '/item/list-stock.do', [
+                'sp.pageSize' => 100,
+                'sp.page' => $page,
+                'warehouseName' => $warehouseName
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data['s']) && $data['s'] === false) {
+                    throw new \Exception('API Accurate Error: ' . json_encode($data['d']));
+                }
+
+                $chunk = $data['d'] ?? [];
+                $allData = array_merge($allData, $chunk);
+
+                // Jika jumlah data di halaman ini kurang dari limit (100), berarti sudah mentok di halaman terakhir
+                if (count($chunk) < 100) {
+                    $hasMore = false;
+                } else {
+                    $page++;
+                }
+            } else {
+                throw new \Exception('API Accurate Error: ' . $response->body());
             }
-            return $data['d'] ?? [];
-        } else {
-            throw new \Exception('API Accurate Error: ' . $response->body());
         }
+
+        return $allData;
     }
     public function getStockPerItem($itemNo, $databaseSource = 'syihab')
     {
