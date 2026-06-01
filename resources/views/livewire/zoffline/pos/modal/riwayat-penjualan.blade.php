@@ -3,11 +3,12 @@
     ═══════════════════════════════════════════════════════════ --}}
   @if ($showHistoryModal)
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
+          <div class="bg-white rounded-2xl shadow-xl w-full max-w-5xl overflow-hidden">
               {{-- Header --}}
               <div class="p-5 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
                   <div>
-                      <h3 class="font-black text-gray-900 text-lg">20 Transaksi POS Terakhir</h3>
+                      <h3 class="font-black text-gray-900 text-lg">20 Transaksi POS Terakhir :
+                          {{ Auth::user()->warehouse->name ?? 'Unknown' }}</h3>
                       <p class="text-xs text-gray-400">Daftar penjualan yang berhasil diproses lewat kasir</p>
                   </div>
                   <button wire:click="$set('showHistoryModal', false)" class="text-gray-400 hover:text-gray-600">
@@ -16,7 +17,6 @@
                       </svg>
                   </button>
               </div>
-
               {{-- Table/Content --}}
               <div class="p-5 max-h-[450px] overflow-y-auto">
                   @if (count($historyOrders) > 0)
@@ -26,9 +26,11 @@
                                   <tr
                                       class="border-b border-gray-200 text-gray-400 uppercase font-black tracking-wider bg-gray-50/50">
                                       <th class="p-3">Waktu / No. Order</th>
+                                      <th class="p-3">Kasir</th>
                                       <th class="p-3">Customer</th>
                                       <th class="p-3">Metode</th>
                                       <th class="p-3 text-right">Total Akhir</th>
+                                      <th class="p-3 text-center">Status</th>
                                       <th class="p-3 text-center">Aksi</th>
                                   </tr>
                               </thead>
@@ -38,7 +40,11 @@
                                           <td class="p-3">
                                               <p class="font-bold text-gray-900">{{ $order->order_number }}</p>
                                               <p class="text-[10px] text-gray-400 font-mono">
-                                                  {{ $order->created_at->format('d M Y H:i') }}</p>
+                                                  {{ $order->created_at->format('d M Y H:i') }}
+                                              </p>
+                                          </td>
+                                          <td class="p-3 text-gray-600">
+                                              {{ $order->handledBy->name ?? 'Umum/Cash' }}
                                           </td>
                                           <td class="p-3 text-gray-600">
                                               {{ $order->user->name ?? 'Umum/Cash' }}
@@ -52,6 +58,28 @@
                                           <td class="p-3 text-right font-bold text-gray-900">
                                               Rp {{ number_format($order->grand_total, 0, ',', '.') }}
                                           </td>
+
+                                          <td class="p-3 text-center whitespace-nowrap">
+                                              @if (!empty($order->accurate_invoice_no) || !empty($order->accurate_receipt_no))
+                                                  <div class="inline-flex flex-col gap-1 items-center">
+                                                      <span
+                                                          class="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-bold rounded border border-emerald-200 uppercase">
+                                                          ✓ Tersinkron
+                                                      </span>
+                                                      @if ($order->accurate_invoice_no)
+                                                          <span class="text-[9px] text-gray-400 font-mono"
+                                                              title="Invoice No">Inv:
+                                                              {{ $order->accurate_invoice_no }}</span>
+                                                      @endif
+                                                  </div>
+                                              @else
+                                                  <span
+                                                      class="px-2 py-0.5 bg-amber-50 text-amber-700 text-[9px] font-bold rounded border border-amber-200 uppercase">
+                                                      ⏳ Pending
+                                                  </span>
+                                              @endif
+                                          </td>
+
                                           <td class="p-3 text-center">
                                               <button wire:click="reprintOrder({{ $order->id }})"
                                                   class="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-md text-[11px] font-bold transition-all">
