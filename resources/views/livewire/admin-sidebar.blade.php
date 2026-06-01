@@ -1,6 +1,5 @@
-<aside :class="sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'"
-    class="w-[280px] bg-[#f7f7f7] border-r border-gray-200 flex flex-col h-screen shrink-0 fixed lg:sticky top-0 left-0 z-30 transform transition-transform duration-300 ease-in-out lg:translate-x-0 shadow-sm"
-    :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+<aside :class="(sidebarCollapsed ? 'lg:w-20' : 'lg:w-64') + ' ' + (sidebarOpen ? 'translate-x-0' : '-translate-x-full')"
+    class="w-[280px] bg-[#f7f7f7] border-r border-gray-200 flex flex-col h-screen shrink-0 fixed lg:sticky top-0 left-0 z-40 transform transition-transform duration-300 ease-in-out lg:translate-x-0 shadow-sm">
     <div class="p-8 flex flex-col items-center border-b border-gray-200 relative">
         <button @click="sidebarOpen = false"
             class="lg:hidden absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors">

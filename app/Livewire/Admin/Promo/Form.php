@@ -90,10 +90,10 @@ class Form extends Component
     {
         $pv = \App\Models\ProductVariant::where('sku', $sku)->first();
         if ($pv) {
-            return '[BARU] ' . $pv->product->name . ' ' . $pv->color . ' ' . $pv->storage;
+            return '[HP] ' . $pv->product->name . ' ' . $pv->color . ' ' . $pv->storage;
         }
         $sv = \App\Models\SecondProductVariant::where('sku', $sku)->first();
-        return $sv ? ('[BEKAS] ' . $sv->secondProduct->name . ' ' . $sv->color . ' ' . $sv->storage) : $sku;
+        return $sv ? ('[2ND] ' . $sv->secondProduct->name . ' ' . $sv->color . ' ' . $sv->storage) : $sku;
     }
 
     /**
@@ -102,32 +102,47 @@ class Form extends Component
     private function searchVariants(string $query, array $excludeSkus): array
     {
         $results = [];
+        $terms = array_filter(explode(' ', $query));
 
-        $variants = \App\Models\ProductVariant::with('product')
-            ->where('sku', 'like', "%{$query}%")
-            ->orWhereHas('product', function ($q) use ($query) {
-                $q->where('name', 'like', "%{$query}%");
-            })
-            ->take(5)->get();
+        $variantsQuery = \App\Models\ProductVariant::with('product');
+        foreach ($terms as $term) {
+            $variantsQuery->where(function ($q) use ($term) {
+                $q->where('sku', 'like', "%{$term}%")
+                    ->orWhere('color', 'like', "%{$term}%")
+                    ->orWhere('ram', 'like', "%{$term}%")
+                    ->orWhere('storage', 'like', "%{$term}%")
+                    ->orWhereHas('product', function ($pq) use ($term) {
+                        $pq->where('name', 'like', "%{$term}%");
+                    });
+            });
+        }
+        $variants = $variantsQuery->take(10)->get();
 
         foreach ($variants as $v) {
             $results[] = [
                 'sku' => $v->sku,
-                'name' => '[BARU] ' . $v->product->name . ' ' . $v->color . ' ' . $v->storage
+                'name' => '[HP] ' . $v->product->name . ' ' . $v->color . ' ' . ($v->ram ? $v->ram . ' / ' : '') . $v->storage
             ];
         }
 
-        $secondVariants = \App\Models\SecondProductVariant::with('secondProduct')
-            ->where('sku', 'like', "%{$query}%")
-            ->orWhereHas('secondProduct', function ($q) use ($query) {
-                $q->where('name', 'like', "%{$query}%");
-            })
-            ->take(5)->get();
+        $secondVariantsQuery = \App\Models\SecondProductVariant::with('secondProduct');
+        foreach ($terms as $term) {
+            $secondVariantsQuery->where(function ($q) use ($term) {
+                $q->where('sku', 'like', "%{$term}%")
+                    ->orWhere('color', 'like', "%{$term}%")
+                    ->orWhere('ram', 'like', "%{$term}%")
+                    ->orWhere('storage', 'like', "%{$term}%")
+                    ->orWhereHas('secondProduct', function ($pq) use ($term) {
+                        $pq->where('name', 'like', "%{$term}%");
+                    });
+            });
+        }
+        $secondVariants = $secondVariantsQuery->take(10)->get();
 
         foreach ($secondVariants as $v) {
             $results[] = [
                 'sku' => $v->sku,
-                'name' => '[BEKAS] ' . $v->secondProduct->name . ' ' . $v->color . ' ' . $v->storage
+                'name' => '[2ND] ' . $v->secondProduct->name . ' ' . $v->color . ' ' . ($v->ram ? $v->ram . ' / ' : '') . $v->storage
             ];
         }
 
@@ -262,7 +277,7 @@ class Form extends Component
 
         if ($this->promo && $this->promo->exists) {
             $this->promo->update($data);
-            $message = 'Promo berhasil diperbarui.';
+            $message = 'Promo berhasil diperbharui.';
             $promo = $this->promo;
         } else {
             $promo = Promo::create($data);
