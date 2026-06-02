@@ -1087,26 +1087,19 @@ class Pos extends Component
                 // 1. Tentukan email yang akan divalidasi
                 $emailToValidate = $this->customerEmail ?: ($this->customerPhone . '@pos.tokopun.com');
 
-                // 2. Terapkan Validasi Ketat di Livewire (termasuk cek unik ke database)
+                // 2. Terapkan Validasi Ketat di Livewire
                 try {
                     $this->validate(
                         [
                             'customerName'  => 'required|string|max:255',
                             'customerPhone' => 'required|string|max:20',
-                            // Cek agar email belum pernah dipakai di tabel users
-                            'customerEmail' => [
-                                'nullable',
-                                'email',
-                                \Illuminate\Validation\Rule::unique('users', 'email')->where(function ($query) use ($emailToValidate) {
-                                    return $query->where('email', $emailToValidate);
-                                })
-                            ],
+                            'customerEmail' => 'nullable|email',
                         ],
                         [
                             // Custom pesan error agar ramah dibaca kasir
                             'customerName.required'  => 'Nama customer wajib diisi.',
                             'customerPhone.required' => 'Nomor HP customer wajib diisi.',
-                            'customerEmail.unique'   => 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                            'customerEmail.email'    => 'Format email tidak valid.',
                         ]
                     );
                 } catch (\Illuminate\Validation\ValidationException $e) {
@@ -1115,6 +1108,12 @@ class Pos extends Component
                     $firstErrorMessage = collect($e->errors())->flatten()->first();
                     $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
                     return; // Hentikan proses pembayaran di sini
+                }
+
+                // Cek unik manual karena customerEmail bisa nullable
+                if (\App\Models\User::where('email', $emailToValidate)->exists()) {
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP atau Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.', type: 'error');
+                    return;
                 }
 
                 // 3. Jika validasi aman, barulah proses ke database
@@ -1558,23 +1557,23 @@ class Pos extends Component
                         [
                             'customerName'  => 'required|string|max:255',
                             'customerPhone' => 'required|string|max:20',
-                            'customerEmail' => [
-                                'nullable',
-                                'email',
-                                \Illuminate\Validation\Rule::unique('users', 'email')->where(function ($query) use ($emailToValidate) {
-                                    return $query->where('email', $emailToValidate);
-                                })
-                            ],
+                            'customerEmail' => 'nullable|email',
                         ],
                         [
                             'customerName.required'  => 'Nama customer wajib diisi.',
                             'customerPhone.required' => 'Nomor HP customer wajib diisi.',
-                            'customerEmail.unique'   => 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                            'customerEmail.email'    => 'Format email tidak valid.',
                         ]
                     );
                 } catch (\Illuminate\Validation\ValidationException $e) {
                     $firstErrorMessage = collect($e->errors())->flatten()->first();
                     $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
+                    return;
+                }
+
+                // Cek unik manual karena customerEmail bisa nullable
+                if (\App\Models\User::where('email', $emailToValidate)->exists()) {
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP atau Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.', type: 'error');
                     return;
                 }
 
