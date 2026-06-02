@@ -47,7 +47,7 @@
                                         @endif
                                     </h4>
                                     <p class="text-xs text-gray-500 mt-1">
-                                        {{ $result['storage'] }} - {{ $result['color'] }}
+                                        {{ !empty($result['ram']) ? $result['ram'] . ' / ' . $result['storage'] : $result['storage'] }} - {{ $result['color'] }}
                                     </p>
                                 </div>
                                 <div class="text-right">

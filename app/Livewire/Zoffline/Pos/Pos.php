@@ -302,7 +302,7 @@ class Pos extends Component
                 'color' => $item->variant->color ?? '',
                 'price' => (int) $item->price_at_checkout,
                 'qty' => $item->qty,
-                'discount_amount' => (int) $item->discount_amount,
+                'discount_amount' => (int) $item->discount_amount ?? 0,
                 'serial_numbers' => $snArray,
                 'has_sn' => (bool) ($item->variant->has_sn ?? true),
             ];
@@ -1085,7 +1085,13 @@ class Pos extends Component
             // Jika customer baru, buat user terlebih dahulu
             if ($this->isNewCustomer && !$customerId) {
                 // 1. Tentukan email yang akan divalidasi
-                $emailToValidate = $this->customerEmail ?: ($this->customerPhone . '@pos.tokopun.com');
+                // Cek jika input HANYA berisi angka 0 (satu atau lebih 0 tanpa ada angka/karakter lain)
+                if (preg_match('/^0+$/', (string) $this->customerPhone)) {
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP tidak boleh hanya berisi angka 0.', type: 'error');
+                    return; // Hentikan proses di sini
+                }
+                // Tentukan email yang akan digunakan (Jika kosong: gabungan HP + 4 digit acak + @zpos.com)
+                $emailToValidate = $this->customerEmail ?: ($this->customerPhone . rand(1000, 9999) . '@zpos.com');
 
                 // 2. Terapkan Validasi Ketat di Livewire
                 try {
@@ -1119,12 +1125,13 @@ class Pos extends Component
                 // 3. Jika validasi aman, barulah proses ke database
                 $newUser = User::create([
                     'name' => $this->customerName,
-                    'email' => $this->customerEmail ?: ($this->customerPhone . '@pos.tokopun.com'),
+                    'email' => $emailToValidate,
                     'password' => bcrypt('tokopun' . rand(1000, 9999)),
                 ]);
                 $newUser->assignRole('user');
 
                 if ($this->customerPhone) {
+
                     $newUser->profile()->create([
                         'full_name' => $this->customerName,
                         'phone_number' => $this->customerPhone,
@@ -1277,7 +1284,7 @@ class Pos extends Component
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => $item['discount_amount'] ?? 0,
+                    'discount_amount' => $item['discount_amount'] ?: 0,
                     // 3. Simpan ke database. Jika ada 2 SN, jadinya: "SN001, SN002"
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
@@ -1652,9 +1659,9 @@ class Pos extends Component
 
             if (!$order) {
                 // Generate order number
-                $orderNumber = 'POS-' . now()->format('Ymd') . '-' . str_pad(
+                $orderNumber = 'POS-SYB-' . now()->format('Ymd') . '-' . str_pad(
                     Order::whereDate('created_at', today())->where('order_channel', 'POS')->count() + 1,
-                    3,
+                    4,
                     '0',
                     STR_PAD_LEFT
                 );

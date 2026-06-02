@@ -45,6 +45,7 @@ class CekStock extends Component
                 'id' => $v->id,
                 'type' => 'new',
                 'name' => $v->product->name ?? 'Unknown',
+                'ram' => $v->ram ?? '',
                 'storage' => $v->storage,
                 'color' => $v->color,
                 'sku' => $v->sku,
@@ -57,6 +58,7 @@ class CekStock extends Component
                 'id' => $v->id,
                 'type' => 'second',
                 'name' => $v->secondProduct->name ?? 'Unknown',
+                'ram' => $v->ram ?? '',
                 'storage' => $v->storage,
                 'color' => $v->color,
                 'sku' => $v->sku,
@@ -73,10 +75,12 @@ class CekStock extends Component
 
         if ($type === 'second') {
             $variant = \App\Models\SecondProductVariant::with('warehouseStocks.warehouse', 'secondProduct')->find($id);
-            $this->selectedProduct = ($variant->secondProduct->name ?? 'Unknown') . " ({$variant->storage} - {$variant->color}) [Second]";
+            $ramStorage = !empty($variant->ram) ? $variant->ram . ' / ' . $variant->storage : $variant->storage;
+            $this->selectedProduct = ($variant->secondProduct->name ?? 'Unknown') . " ({$ramStorage} - {$variant->color}) [Second]";
         } else {
             $variant = \App\Models\ProductVariant::with('warehouseStocks.warehouse', 'product')->find($id);
-            $this->selectedProduct = ($variant->product->name ?? 'Unknown') . " ({$variant->storage} - {$variant->color}) [Baru]";
+            $ramStorage = !empty($variant->ram) ? $variant->ram . ' / ' . $variant->storage : $variant->storage;
+            $this->selectedProduct = ($variant->product->name ?? 'Unknown') . " ({$ramStorage} - {$variant->color}) [Baru]";
         }
 
         if ($variant) {

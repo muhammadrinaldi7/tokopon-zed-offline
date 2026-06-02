@@ -77,19 +77,21 @@ new class extends Component {
                 </a>
             @endcan
 
-            {{-- Item: Cek Stock --}}
-            <a href="{{ route('zoffline.cekstock') }}" wire:navigate
-                class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-violet-600 hover:bg-violet-50 transition-all duration-200">
-                <img src="{{ asset('assets/png/stok.png') }}" class="w-8 h-auto" alt="">
-                <span
-                    class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
-                    Cek Stock
-                    <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
-                </span>
-            </a>
+            @can('view-cek-stock')
+                {{-- Item: Cek Stock --}}
+                <a href="{{ route('zoffline.cekstock') }}" wire:navigate
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-violet-600 hover:bg-violet-50 transition-all duration-200">
+                    <img src="{{ asset('assets/png/stok.png') }}" class="w-8 h-auto" alt="">
+                    <span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-gray-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
+                        Cek Stock
+                        <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-800 rotate-45"></div>
+                    </span>
+                </a>
+            @endcan
 
             {{-- Item: Riwayat Kasir --}}
-            @can('view-pos')
+            @can('view-riwayat-kasir')
                 <a href="{{ route('zoffline.riwayat-kasir') }}" wire:navigate
                     class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200">
                     <img src="{{ asset('assets/png/rk.png') }}" class="w-8 h-auto" alt="">
@@ -191,17 +193,21 @@ new class extends Component {
             </a>
         @endcan
 
-        <a href="{{ route('zoffline.cekstock') }}" wire:navigate
-            class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-violet-600 transition-colors">
-            <img src="{{ asset('assets/png/stok.png') }}" class="w-8 h-auto" alt="">
-            <span class="text-[10px] font-medium">Cek Stock</span>
-        </a>
+        @can('view-cek-stock')
+            <a href="{{ route('zoffline.cekstock') }}" wire:navigate
+                class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-violet-600 transition-colors">
+                <img src="{{ asset('assets/png/stok.png') }}" class="w-8 h-auto" alt="">
+                <span class="text-[10px] font-medium">Cek Stock</span>
+            </a>
+        @endcan
 
-        <a href="{{ route('zoffline.riwayat-kasir') }}" wire:navigate
-            class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-blue-600 transition-colors">
-            <img src="{{ asset('assets/png/rk.png') }}" class="w-8 h-auto" alt="">
-            <span class="text-[10px] font-medium">Shift</span>
-        </a>
+        @can('view-riwayat-kasir')
+            <a href="{{ route('zoffline.riwayat-kasir') }}" wire:navigate
+                class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-blue-600 transition-colors">
+                <img src="{{ asset('assets/png/rk.png') }}" class="w-8 h-auto" alt="">
+                <span class="text-[10px] font-medium">Shift</span>
+            </a>
+        @endcan
 
         {{-- Profil dengan Dropdown (Alpine.js) --}}
         <div x-data="{ open: false }" class="relative flex flex-col items-center justify-center w-16 h-full"
