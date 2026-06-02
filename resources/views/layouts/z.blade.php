@@ -260,53 +260,6 @@
             });
         });
 
-        // Ganti isi ini dengan teks dari file digital-certificate.txt Anda
-        qz.security.setCertificatePromise(function(resolve, reject) {
-            resolve(`-----BEGIN CERTIFICATE-----
-MIIDwzCCAqugAwIBAgIUCNTLYO37qbBurUPX86/rOjQAj5YwDQYJKoZIhvcNAQEL
-BQAwcTELMAkGA1UEBhMCaWQxFTATBgNVBAgMDFNvdXRoIEJvcm5lbzETMBEGA1UE
-BwwKQmFuamFyYmFydTEMMAoGA1UECgwDWmVkMQ8wDQYDVQQLDAZSZXRhaWwxFzAV
-BgNVBAMMDnN5aWhhYnN0b3JlLmlkMB4XDTI2MDYwMjAyNTk0MloXDTM2MDUzMDAy
-NTk0MlowcTELMAkGA1UEBhMCaWQxFTATBgNVBAgMDFNvdXRoIEJvcm5lbzETMBEG
-A1UEBwwKQmFuamFyYmFydTEMMAoGA1UECgwDWmVkMQ8wDQYDVQQLDAZSZXRhaWwx
-FzAVBgNVBAMMDnN5aWhhYnN0b3JlLmlkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
-MIIBCgKCAQEAsgW/IqNe+C1U/YAw5HykdF7SI7f9kj3Xnak3kwYZiDWJKJcpdwsL
-eG64npcRuJRvGK6QnTCy0DUmpP/qokynKxWBkj94QoVcQvm4iG0YmynxzbrnDE1X
-XfRI783X7byMfy5WKTxkdLDZc8JFGCeKurrpmxTzpjn5iWmEbsPeK0ZW7KWyVDD9
-rPTmASPbfeRx0Pi9IHvPJv7n0ML49HnOrmCpEXDvCJwgacMcnl7VuxT8KMLEnVHv
-zFhIE5tqwju59FRD9b/fOC+9Rlo0Q8wWc1jzxU+qHs2uFJCXnvsS2k8SXE5w03Kh
-zMh3TwXRHphJ3OMcmhb7JIeBpbfoAaqHbwIDAQABo1MwUTAdBgNVHQ4EFgQUvMad
-k2m9VrbMNaEmt9DDDf2xR+MwHwYDVR0jBBgwFoAUvMadk2m9VrbMNaEmt9DDDf2x
-R+MwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAe1f37J/sAEBF
-b69iDErGHSBeM2muIxa0rSg9qn3OjE9Z4KJ/xFvR+tJV7jUOqyuLS3MYgXwT0NL2
-xurcBOmOmm4Ft7eEta+IYxNHShl7kQBoilviQ39E46szV56h4xwTPyltiNpYhAoy
-rW7wYktZhBhW5LLNOiB2230FH7oWB0XkTIbzmlhxPFRVOd3V5RgxZTD/NxbH31V+
-RvuwHZCvR/Amyb6iCB+JF6zWiecq5VVxrsepHN4VugBv/EGtfbGUt7SosWxVemsr
-ZBsBL/IEurwG65zQP/ambHl7VtQOxicXCbe79OUuaRvpW4PSiyDRmRieExSx8gUp
-uu02HY60xA==
------END CERTIFICATE-----`);
-        });
-        qz.security.setSignatureAlgorithm("SHA512");
-        // Sesuaikan URL '/api/sign-qz' dengan endpoint backend Anda
-        qz.security.setSignaturePromise(function(toSign) {
-            return function(resolve, reject) {
-                fetch('/sign-qz', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
-                                'content')
-                        },
-                        body: JSON.stringify({
-                            request: toSign
-                        })
-                    })
-                    .then(response => response.text())
-                    .then(signature => resolve(signature))
-                    .catch(error => console.error("Gagal mencetak: ", error););
-            };
-        });
-
         function cetakDenganQZ(base64Data) {
             // Pastikan library QZ sudah dimuat sebelumnya
             if (typeof qz === 'undefined') {
