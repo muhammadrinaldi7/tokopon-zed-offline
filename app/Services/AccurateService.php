@@ -555,7 +555,7 @@ class AccurateService
 
             if ($response->successful()) {
                 $data = $response->json();
-                
+
                 if (isset($data['s']) && $data['s'] === false) {
                     \Illuminate\Support\Facades\Log::error("Accurate API Get Employees Error ({$databaseSource}): " . json_encode($data));
                     break;
@@ -563,9 +563,9 @@ class AccurateService
 
                 $chunk = $data['d'] ?? [];
                 $allEmployees = array_merge($allEmployees, $chunk);
-                
+
                 $pageCount = $data['sp']['pageCount'] ?? 1;
-                
+
                 if ($page >= $pageCount || count($chunk) < 100) {
                     $hasMore = false;
                 } else {
@@ -893,7 +893,53 @@ class AccurateService
             return 'error'; // Jika terjadi gangguan server / API timeout
         }
     }
+    private function getHeaders($databaseSource)
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
 
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        return [
+            'host' => $host,
+            'headers' => [
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ]
+        ];
+    }
+    /**
+     * FUNGSI BARU: Mencari SKU (item no) berdasarkan SN saat scanning di POS
+     */
+    public function findSkuBySerialNumber($sn, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        try {
+            $response = Http::withHeaders($config['headers'])
+                ->get($config['host'] . '/item/search-by-item-or-sn.do', [
+                    'keywords' => $sn
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['s']) && $data['s'] === true && !empty($data['d'])) {
+                    // Karena SN umumnya unik, kita ambil properti 'no' (SKU) dari baris pertama
+                    return $data['d'][0]['no'] ?? null;
+                }
+            }
+            return null;
+        } catch (\Exception $e) {
+            Log::error("API Accurate Find SKU by SN ({$databaseSource}) Error: " . $e->getMessage());
+            return 'error';
+        }
+    }
     /**
      * Hit API Bulk Save Penyesuaian Persediaan (Max 100 data)
      * * @param array $chunkData

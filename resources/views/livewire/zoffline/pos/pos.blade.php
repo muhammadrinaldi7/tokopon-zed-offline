@@ -36,16 +36,37 @@
             </div>
 
             {{-- Search Bar --}}
+            {{-- Search & Scan Bar --}}
             <div class="px-6 py-4 bg-white border-b border-gray-100 shrink-0">
-                <div class="relative">
-                    <svg class="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <input type="text" wire:model.live.debounce.300ms="search"
-                        class="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-[#1c69d4] focus:ring-0 text-sm font-medium transition-all"
-                        placeholder="Cari produk atau SKU..." autofocus>
+                <div class="flex flex-col md:flex-row gap-4">
+
+                    {{-- 1. Input Pencarian Manual --}}
+                    <div class="relative w-full">
+                        <svg class="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input type="text" wire:model.live.debounce.300ms="search"
+                            class="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-[#1c69d4] focus:ring-0 text-sm font-medium transition-all"
+                            placeholder="Cari produk atau SKU..." autofocus>
+                    </div>
+
+                    {{-- 2. Input Khusus Scan SN --}}
+                    <div class="relative w-full">
+                        {{-- Icon Barcode/QR Simple --}}
+                        <svg class="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5zM15 15h.008v.008H15V15z" />
+                        </svg>
+                        {{-- Perhatikan: wire:model tidak pakai .live, dan kita pakai wire:keydown.enter --}}
+                        <input type="text" wire:model="scanned_sn" wire:keydown.enter="processScan"
+                            class="w-full pl-12 pr-4 py-3 bg-blue-50 border border-blue-200 rounded-xl focus:border-[#1c69d4] focus:ring-0 text-sm font-medium transition-all"
+                            placeholder="Scan Serial Number (SN) di sini...">
+                    </div>
+
                 </div>
             </div>
 
@@ -154,7 +175,7 @@
 
                             {{-- Tombol Hapus (Muncul saat hover di Desktop) --}}
                             <button wire:click="removeFromCart({{ $index }})"
-                                class="absolute top-2.5 right-2.5 text-gray-300 hover:text-rose-500 transition-all bg-white rounded-full p-1 hover:bg-rose-50 lg:opacity-0 group-hover:opacity-100 z-10">
+                                class="absolute top-2.5 right-2.5 text-red-600 hover:text-rose-500 transition-all bg-red-100 rounded-full p-1 hover:bg-rose-50 lg:opacity-0 group-hover:opacity-100 z-10">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                     stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -168,6 +189,13 @@
                                         <h4 class="font-bold text-gray-800 text-sm leading-tight">{{ $item['name'] }}
                                         </h4>
                                         <div class="flex items-center gap-1.5 flex-wrap">
+                                            {{-- Badge RAM --}}
+                                            @if (!empty($item['ram']) && $item['ram'] !== '-')
+                                                <span
+                                                    class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-bold uppercase tracking-wide">
+                                                    {{ $item['ram'] }}
+                                                </span>
+                                            @endif
                                             <span
                                                 class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-bold uppercase tracking-wide">{{ $item['color'] }}</span>
                                             <span

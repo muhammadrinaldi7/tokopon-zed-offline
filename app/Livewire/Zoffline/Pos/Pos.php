@@ -34,7 +34,7 @@ class Pos extends Component
     // ─── Search & Filter ───────────────────────────────────────
     public $search = '';
     public $productType = 'new'; // all, new, second
-
+    public $scanned_sn = '';
     // ─── Cart (in-memory) ──────────────────────────────────────
     public $cart = []; // [{variant_id, variant_type, name, storage, color, price, qty, serial_number, sku}]
 
@@ -71,6 +71,141 @@ class Pos extends Component
     // ─── History Sales Properties ──────────────────────────────
     public $showHistoryModal = false;
     public $historyOrders = [];
+    public $databaseSource = 'syihab';
+
+    public function processScan(AccurateService $accurateService)
+    {
+        $sn = trim($this->scanned_sn);
+
+        if (empty($sn)) {
+            return;
+        }
+
+        // 1. Hit ke Accurate via Service untuk mendapatkan No SKU
+        $skuFromAccurate = $accurateService->findSkuBySerialNumber($sn, $this->databaseSource);
+
+        if ($skuFromAccurate === 'error') {
+            $this->dispatch('toast', title: 'Error', message: 'Terjadi gangguan koneksi ke Accurate.', type: 'error');
+            return;
+        }
+
+        if (!$skuFromAccurate) {
+            $this->dispatch('toast', title: 'Error', message: "Serial Number '{$sn}' tidak ditemukan di Accurate.", type: 'error');
+            $this->scanned_sn = '';
+            return;
+        }
+
+        // 2. Cek apakah SN ini sudah discan dan ada di cart (Mencegah scan ganda)
+        if ($this->isSnAlreadyInCart($sn)) {
+            $this->dispatch('toast', title: 'Peringatan', message: "Serial Number '{$sn}' sudah ada di dalam keranjang.", type: 'warning');
+            $this->scanned_sn = '';
+            return;
+        }
+
+        // 3. Cari SKU di Database Lokal (Cek Baru, lalu Bekas)
+        $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
+        $isSecond = false;
+        $variantType = \App\Models\ProductVariant::class;
+
+        // Cek di Varian Produk Baru
+        $variant = \App\Models\ProductVariant::with(['product', 'warehouseStocks' => function ($q) use ($warehouseId) {
+            $q->where('warehouse_id', $warehouseId);
+        }])->where('sku', $skuFromAccurate)->first();
+
+        // Jika tidak ada di Baru, Cek di Varian Produk Bekas
+        if (!$variant) {
+            $variant = \App\Models\SecondProductVariant::with(['product', 'warehouseStocks' => function ($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId);
+            }])->where('sku', $skuFromAccurate)->first();
+
+            if ($variant) {
+                $isSecond = true;
+                $variantType = \App\Models\SecondProductVariant::class;
+            }
+        }
+
+        if (!$variant) {
+            $this->dispatch('toast', title: 'Peringatan', message: "Produk (SKU: {$skuFromAccurate}) belum terdaftar di sistem lokal.", type: 'warning');
+            $this->scanned_sn = '';
+            return;
+        }
+
+        // 4. Masukkan ke cart dengan SN yang berhasil discan
+        $this->addScannedVariantToCart($variant, $isSecond, $variantType, $sn);
+
+        // Kosongkan kembali input scanner
+        $this->scanned_sn = '';
+    }
+
+    /**
+     * Memasukkan varian hasil scan ke cart
+     */
+    private function addScannedVariantToCart($variant, $isSecond, $variantType, $sn)
+    {
+        $stock = $variant->warehouseStocks->first()?->stock ?? 0;
+
+        if ($stock <= 0) {
+            $this->dispatch('toast', title: 'Stok Habis', message: 'Varian ini kosong di gudang Anda.', type: 'warning');
+            return;
+        }
+
+        // Cek apakah produk varian ini sudah ada di keranjang
+        $existingIndex = collect($this->cart)->search(
+            fn($item) => $item['variant_id'] == $variant->id && $item['variant_type'] == $variantType
+        );
+
+        if ($existingIndex !== false) {
+            $currentQty = $this->cart[$existingIndex]['qty'];
+
+            if ($currentQty < $stock) {
+                $this->cart[$existingIndex]['qty']++;
+
+                if (!isset($this->cart[$existingIndex]['serial_numbers'])) {
+                    $this->cart[$existingIndex]['serial_numbers'] = [];
+                }
+
+                // PERBEDAAN: Push nilai $sn, BUKAN string kosong ''
+                $this->cart[$existingIndex]['serial_numbers'][] = $sn;
+
+                $this->dispatch('toast', title: 'Sukses', message: 'Kuantitas ditambah & SN tercatat.', type: 'success');
+            } else {
+                $this->dispatch('toast', title: 'Stok Tidak Cukup', message: 'Sudah mencapai batas stok.', type: 'warning');
+            }
+        } else {
+            // Jika produk belum ada di keranjang, buat item baru
+            $this->cart[] = [
+                'variant_id' => $variant->id,
+                'variant_type' => $variantType,
+                'name' => $variant->product->name, // Ambil nama dari relasi 'product'
+                'ram' => $variant->ram ?? '-',
+                'storage' => $variant->storage ?? '-',
+                'color' => $variant->color ?? '-',
+                'price' => (int) $variant->price,
+                'discount_amount' => 0,
+                'qty' => 1,
+                'serial_numbers' => [$sn], // PERBEDAAN: Langsung inisiasi array dengan $sn
+                'sku' => $variant->sku ?? '',
+                'is_second' => $isSecond,
+            ];
+
+            $this->dispatch('toast', title: 'Sukses', message: "Berhasil menambahkan {$variant->product->name} ke keranjang.", type: 'success');
+        }
+
+        $this->syncSinglePaymentAmount();
+    }
+
+    /**
+     * Helper untuk mencegah scan SN yang sama berkali-kali
+     */
+    private function isSnAlreadyInCart($sn)
+    {
+        foreach ($this->cart as $item) {
+            if (isset($item['serial_numbers']) && in_array($sn, $item['serial_numbers'])) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     // Method untuk membuka modal dan memuat data transaksi POS terbaru
     public function openHistory()
