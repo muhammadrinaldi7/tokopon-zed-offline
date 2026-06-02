@@ -257,71 +257,77 @@
                                 @endphp
 
                                 {{-- Bagian Serial Number (SN) --}}
-                                <div class="mt-1 space-y-2.5 bg-gray-50/50 p-2.5 rounded-lg border border-gray-100">
+                                @if(!isset($item['has_sn']) || $item['has_sn'])
+                                    <div class="mt-1 space-y-2.5 bg-gray-50/50 p-2.5 rounded-lg border border-gray-100">
 
-                                    {{-- BARIS 1: Badge SN yang sudah di-scan --}}
-                                    @if (count($snArray) > 0)
-                                        <div class="flex flex-wrap gap-1.5">
-                                            @foreach ($snArray as $snIndex => $snValue)
-                                                <span
-                                                    class="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 text-[11px] font-mono pl-2 pr-1 py-1 rounded-md shadow-sm select-none">
-                                                    {{ $snValue }}
-                                                    <button type="button"
-                                                        wire:click="removeSerialNumber({{ $index }}, {{ $snIndex }})"
-                                                        class="text-gray-400 hover:text-rose-500 font-bold w-4 h-4 flex items-center justify-center rounded hover:bg-rose-50 transition-colors focus:outline-none"
-                                                        title="Hapus SN">
-                                                        &times;
-                                                    </button>
-                                                </span>
-                                            @endforeach
-                                        </div>
-                                    @endif
-
-                                    {{-- BARIS 2: Input & Tombol Scan --}}
-                                    <div class="flex items-center gap-2">
-                                        @if (!$isFull)
-                                            <div class="relative flex-1">
-                                                <div
-                                                    class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                                                    <svg class="w-3.5 h-3.5 text-gray-400" fill="none"
-                                                        stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
-                                                        </path>
-                                                    </svg>
-                                                </div>
-                                                <input type="text"
-                                                    id="sn_input_{{ $index }}_{{ $nextIndex }}"
-                                                    wire:change="updateSerialNumber({{ $index }}, {{ $nextIndex }}, $event.target.value)"
-                                                    class="w-full bg-white border border-gray-300 rounded-md pl-7 pr-2.5 py-1.5 text-[11px] font-mono focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-400 shadow-sm"
-                                                    placeholder="Scan / Ketik SN ke-{{ $nextIndex + 1 }}...">
-                                            </div>
-
-                                            <button type="button"
-                                                onclick="startScanner({{ $index }}, {{ $nextIndex }})"
-                                                class="shrink-0 bg-neutral-600 hover:bg-neutral-700 text-white rounded-md py-1.5 px-2 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-1"
-                                                title="Scan Barcode Kamera">
-                                                <svg fill="#ffffff" width="800px" height="800px" class="size-5"
-                                                    viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
-                                                    <path
-                                                        d="M48.5,32A1.61,1.61,0,0,1,50,33.5v8.85Q50,47,45.5,47h-9a1.55,1.55,0,0,1,0-3.1h8.25c1.66,0,2.25-.61,2.25-2.32V33.5A1.61,1.61,0,0,1,48.5,32Zm-45,0A1.61,1.61,0,0,1,5,33.5H5v8.08c0,1.71.59,2.32,2.25,2.32H15.5a1.55,1.55,0,0,1,0,3.1h-9Q2,47,2,42.35H2V33.5A1.61,1.61,0,0,1,3.5,32ZM20.17,14c.73,0,1.33.45,1.33,1h0V37c0,.55-.6,1-1.33,1H16.83c-.73,0-1.33-.45-1.33-1h0V15c0-.55.6-1,1.33-1h3.34ZM11.5,14a1,1,0,0,1,1,1h0V37a1,1,0,0,1-1,1h-1a1,1,0,0,1-1-1h0V15a1,1,0,0,1,1-1h1Zm15,0a1,1,0,0,1,1,1h0V37a1,1,0,0,1-1,1h-1a1,1,0,0,1-1-1h0V15a1,1,0,0,1,1-1h1Zm15,0a1,1,0,0,1,1,1h0V37a1,1,0,0,1-1,1h-1a1,1,0,0,1-1-1h0V15a1,1,0,0,1,1-1h1Zm-6.33,0c.73,0,1.33.45,1.33,1h0V37c0,.55-.6,1-1.33,1H31.83c-.73,0-1.33-.45-1.33-1h0V15c0-.55.6-1,1.33-1h3.34ZM45.5,5Q50,5,50,9.65h0V18.5a1.5,1.5,0,0,1-3,0h0V10.42c0-1.71-.59-2.32-2.25-2.32H36.5a1.55,1.55,0,0,1,0-3.1h9Zm-30,0a1.55,1.55,0,0,1,0,3.1H7.25C5.59,8.1,5,8.71,5,10.42V18.5A1.61,1.61,0,0,1,3.5,20,1.61,1.61,0,0,1,2,18.5V9.65Q2,5,6.5,5Z" />
-                                                </svg>
-                                            </button>
-                                        @else
-                                            <div
-                                                class="w-full bg-emerald-50 border border-emerald-200 rounded-md px-3 py-1.5 text-[11px] text-emerald-700 font-bold flex items-center justify-center gap-1.5 select-none shadow-sm">
-                                                <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none"
-                                                    stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2.5"
-                                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                                </svg>
-                                                Semua SN sudah terpenuhi ({{ $quantity }}/{{ $quantity }})
+                                        {{-- BARIS 1: Badge SN yang sudah di-scan --}}
+                                        @if (count($snArray) > 0)
+                                            <div class="flex flex-wrap gap-1.5">
+                                                @foreach ($snArray as $snIndex => $snValue)
+                                                    <span
+                                                        class="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 text-[11px] font-mono pl-2 pr-1 py-1 rounded-md shadow-sm select-none">
+                                                        {{ $snValue }}
+                                                        <button type="button"
+                                                            wire:click="removeSerialNumber({{ $index }}, {{ $snIndex }})"
+                                                            class="text-gray-400 hover:text-rose-500 font-bold w-4 h-4 flex items-center justify-center rounded hover:bg-rose-50 transition-colors focus:outline-none"
+                                                            title="Hapus SN">
+                                                            &times;
+                                                        </button>
+                                                    </span>
+                                                @endforeach
                                             </div>
                                         @endif
+
+                                        {{-- BARIS 2: Input & Tombol Scan --}}
+                                        <div class="flex items-center gap-2">
+                                            @if (!$isFull)
+                                                <div class="relative flex-1">
+                                                    <div
+                                                        class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                                                        <svg class="w-3.5 h-3.5 text-gray-400" fill="none"
+                                                            stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2"
+                                                                d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
+                                                            </path>
+                                                        </svg>
+                                                    </div>
+                                                    <input type="text"
+                                                        id="sn_input_{{ $index }}_{{ $nextIndex }}"
+                                                        wire:change="updateSerialNumber({{ $index }}, {{ $nextIndex }}, $event.target.value)"
+                                                        class="w-full bg-white border border-gray-300 rounded-md pl-7 pr-2.5 py-1.5 text-[11px] font-mono focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-400 shadow-sm"
+                                                        placeholder="Scan / Ketik SN ke-{{ $nextIndex + 1 }}...">
+                                                </div>
+
+                                                <button type="button"
+                                                    onclick="startScanner({{ $index }}, {{ $nextIndex }})"
+                                                    class="shrink-0 bg-neutral-600 hover:bg-neutral-700 text-white rounded-md py-1.5 px-2 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-500 focus:ring-offset-1"
+                                                    title="Scan Barcode Kamera">
+                                                    <svg fill="#ffffff" width="800px" height="800px" class="size-5"
+                                                        viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+                                                        <path
+                                                            d="M48.5,32A1.61,1.61,0,0,1,50,33.5v8.85Q50,47,45.5,47h-9a1.55,1.55,0,0,1,0-3.1h8.25c1.66,0,2.25-.61,2.25-2.32V33.5A1.61,1.61,0,0,1,48.5,32Zm-45,0A1.61,1.61,0,0,1,5,33.5H5v8.08c0,1.71.59,2.32,2.25,2.32H15.5a1.55,1.55,0,0,1,0,3.1h-9Q2,47,2,42.35H2V33.5A1.61,1.61,0,0,1,3.5,32ZM20.17,14c.73,0,1.33.45,1.33,1h0V37c0,.55-.6,1-1.33,1H16.83c-.73,0-1.33-.45-1.33-1h0V15c0-.55.6-1,1.33-1h3.34ZM11.5,14a1,1,0,0,1,1,1h0V37a1,1,0,0,1-1,1h-1a1,1,0,0,1-1-1h0V15a1,1,0,0,1,1-1h1Zm15,0a1,1,0,0,1,1,1h0V37a1,1,0,0,1-1,1h-1a1,1,0,0,1-1-1h0V15a1,1,0,0,1,1-1h1Zm15,0a1,1,0,0,1,1,1h0V37a1,1,0,0,1-1,1h-1a1,1,0,0,1-1-1h0V15a1,1,0,0,1,1-1h1Zm-6.33,0c.73,0,1.33.45,1.33,1h0V37c0,.55-.6,1-1.33,1H31.83c-.73,0-1.33-.45-1.33-1h0V15c0-.55.6-1,1.33-1h3.34ZM45.5,5Q50,5,50,9.65h0V18.5a1.5,1.5,0,0,1-3,0h0V10.42c0-1.71-.59-2.32-2.25-2.32H36.5a1.55,1.55,0,0,1,0-3.1h9Zm-30,0a1.55,1.55,0,0,1,0,3.1H7.25C5.59,8.1,5,8.71,5,10.42V18.5A1.61,1.61,0,0,1,3.5,20,1.61,1.61,0,0,1,2,18.5V9.65Q2,5,6.5,5Z" />
+                                                    </svg>
+                                                </button>
+                                            @else
+                                                <div
+                                                    class="w-full bg-emerald-50 border border-emerald-200 rounded-md px-3 py-1.5 text-[11px] text-emerald-700 font-bold flex items-center justify-center gap-1.5 select-none shadow-sm">
+                                                    <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none"
+                                                        stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2.5"
+                                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                    </svg>
+                                                    Semua SN sudah terpenuhi ({{ $quantity }}/{{ $quantity }})
+                                                </div>
+                                            @endif
+                                        </div>
                                     </div>
-                                </div>
+                                @else
+                                    <div class="mt-1 flex items-center gap-1.5 p-2 bg-gray-50 rounded-lg border border-gray-100 text-[10px] font-bold text-gray-500">
+                                        Tidak membutuhkan Serial Number
+                                    </div>
+                                @endif
                                 {{-- Discount Section --}}
                                 <div class="mt-1 space-y-2.5 bg-gray-50/50 p-2.5 rounded-lg border border-gray-100">
                                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Diskon

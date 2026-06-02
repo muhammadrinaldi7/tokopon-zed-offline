@@ -23,6 +23,7 @@ class SecondVariantManagement extends Component
     public $color;
     public $condition = 'Baru';
     public $sku;
+    public $has_sn = true;
 
     // Image properties
     public $variantImage;
@@ -107,6 +108,7 @@ class SecondVariantManagement extends Component
             'sku' => 'nullable|string',
             'variantImage' => 'nullable|image|max:2048',
             'manualPrice' => 'required|numeric|min:0',
+            'has_sn' => 'boolean',
         ]);
 
         $isNew = false;
@@ -119,6 +121,7 @@ class SecondVariantManagement extends Component
                 'storage' => $this->storage,
                 'color' => $this->color,
                 'sku' => $this->sku,
+                'has_sn' => $this->has_sn,
                 // Price & stock handle by observer mostly, but we set initial here
                 'price' => $this->manualPrice > 0 ? $this->manualPrice : ($this->selectedAccurateId ? $this->simulatedPrice : 0),
                 'stock' => $this->selectedAccurateId ? $this->simulatedStock : 0,
@@ -133,6 +136,7 @@ class SecondVariantManagement extends Component
                 'storage' => $this->storage,
                 'color' => $this->color,
                 'sku' => $this->sku,
+                'has_sn' => $this->has_sn,
                 'price' => $this->manualPrice > 0 ? $this->manualPrice : ($this->selectedAccurateId ? $this->simulatedPrice : 0),
                 'stock' => $this->selectedAccurateId ? $this->simulatedStock : 0,
             ]);
@@ -185,6 +189,7 @@ class SecondVariantManagement extends Component
             $this->storage = $variant->storage;
             $this->color = $variant->color;
             $this->sku = $variant->sku;
+            $this->has_sn = $variant->has_sn;
             $this->manualPrice = $variant->price;
             $this->currentVariantImageUrl = $variant->getFirstMediaUrl('variant_image', 'thumb');
 
@@ -237,6 +242,7 @@ class SecondVariantManagement extends Component
         $this->storage = '';
         $this->color = '';
         $this->sku = '';
+        $this->has_sn = true;
         $this->variantImage = null;
         $this->currentVariantImageUrl = null;
         $this->clearAccurate();

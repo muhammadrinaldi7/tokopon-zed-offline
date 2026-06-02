@@ -185,6 +185,7 @@ class Pos extends Component
                 'qty' => 1,
                 'serial_numbers' => [$sn], // PERBEDAAN: Langsung inisiasi array dengan $sn
                 'sku' => $variant->sku ?? '',
+                'has_sn' => (bool) $variant->has_sn,
                 'is_second' => $isSecond,
             ];
 
@@ -296,6 +297,7 @@ class Pos extends Component
                 'qty' => $item->qty,
                 'discount_amount' => (int) $item->discount_amount,
                 'serial_numbers' => $snArray,
+                'has_sn' => (bool) ($item->variant->has_sn ?? true),
             ];
         }
 
@@ -800,6 +802,7 @@ class Pos extends Component
                 'qty' => 1,
                 'serial_numbers' => [''], // array of SNs based on qty
                 'sku' => $variant->sku ?? '',
+                'has_sn' => (bool) $variant->has_sn,
                 'is_second' => $isSecond,
             ];
         }
@@ -1028,16 +1031,19 @@ class Pos extends Component
         }
         // Validate all items have SN
         foreach ($this->cart as $item) {
-            // Ambil array serial_numbers, default ke array kosong jika tidak ada
-            $sns = $item['serial_numbers'] ?? [];
+            // Jika produk tidak membutuhkan SN, lewati validasi
+            if (!isset($item['has_sn']) || $item['has_sn']) {
+                // Ambil array serial_numbers, default ke array kosong jika tidak ada
+                $sns = $item['serial_numbers'] ?? [];
 
-            // array_filter akan membuang elemen yang isinya string kosong '' atau null
-            $validSns = array_filter($sns, fn($value) => trim($value) !== '');
+                // array_filter akan membuang elemen yang isinya string kosong '' atau null
+                $validSns = array_filter($sns, fn($value) => trim($value) !== '');
 
-            // Jika setelah difilter ternyata kosong, atau jumlah SN yang diisi kurang dari QTY
-            if (empty($validSns) || count($validSns) < $item['qty']) {
-                $this->dispatch('toast', title: 'SN Belum Lengkap', message: 'Pastikan semua item sudah diisi Serial Number / IMEI sesuai jumlah barang.', type: 'warning');
-                return;
+                // Jika setelah difilter ternyata kosong, atau jumlah SN yang diisi kurang dari QTY
+                if (empty($validSns) || count($validSns) < $item['qty']) {
+                    $this->dispatch('toast', title: 'SN Belum Lengkap', message: 'Pastikan semua item sudah diisi Serial Number / IMEI sesuai jumlah barang.', type: 'warning');
+                    return;
+                }
             }
         }
 

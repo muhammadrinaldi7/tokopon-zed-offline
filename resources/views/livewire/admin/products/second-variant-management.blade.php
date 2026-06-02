@@ -34,6 +34,11 @@
                                 </h3>
                                 <span
                                     class="text-[10px] font-bold tracking-widest px-2 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{{ $variant->condition_desc }}</span>
+                                @if(!isset($variant->has_sn) || $variant->has_sn)
+                                    <span class="text-[10px] font-bold tracking-widest px-2 py-0.5 rounded bg-indigo-50 text-indigo-500 uppercase">WAJIB SN</span>
+                                @else
+                                    <span class="text-[10px] font-bold tracking-widest px-2 py-0.5 rounded bg-gray-50 text-gray-400 uppercase">TANPA SN</span>
+                                @endif
                             </div>
                             <p class="text-sm text-gray-500">SKU: <span
                                     class="font-mono text-gray-700">{{ $variant->sku ?? '-' }}</span></p>
@@ -175,6 +180,17 @@
                             <input type="text" wire:model="sku"
                                 class="w-full text-[14px] rounded-lg border-gray-300 px-4 py-2.5 shadow-sm focus:ring-4 focus:ring-[#1c69d4]/10 focus:border-[#1c69d4] transition-all">
                         </div>
+                    </div>
+
+                    <div class="p-3 bg-gray-50 border border-gray-100 rounded-lg flex items-center justify-between">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700">Wajib Serial Number (SN)</label>
+                            <p class="text-xs text-gray-500 mt-0.5">Jika diaktifkan, produk ini wajib diisi SN saat checkout di POS.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" wire:model="has_sn" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#1c69d4]/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1c69d4]"></div>
+                        </label>
                     </div>
 
                     {{-- Image Upload --}}

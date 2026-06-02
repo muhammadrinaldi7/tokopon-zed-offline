@@ -286,15 +286,16 @@ ZBsBL/IEurwG65zQP/ambHl7VtQOxicXCbe79OUuaRvpW4PSiyDRmRieExSx8gUp
 uu02HY60xA==
 -----END CERTIFICATE-----`);
         });
-
+        qz.security.setSignatureAlgorithm("SHA512");
         // Sesuaikan URL '/api/sign-qz' dengan endpoint backend Anda
         qz.security.setSignaturePromise(function(toSign) {
             return function(resolve, reject) {
                 fetch('/sign-qz', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
-                            // Tambahkan header CSRF Token di sini jika diperlukan framework (misal Laravel)
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
+                                'content')
                         },
                         body: JSON.stringify({
                             request: toSign
@@ -302,7 +303,7 @@ uu02HY60xA==
                     })
                     .then(response => response.text())
                     .then(signature => resolve(signature))
-                    .catch(error => reject(error));
+                    .catch(error => console.error("Gagal mencetak: ", error););
             };
         });
 
