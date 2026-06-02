@@ -225,7 +225,7 @@ class Pos extends Component
             ->where('shipping_address_snapshot->store', $userWarehouseName)
             ->whereNotIn('order_status', ['DRAFT', 'DRAFT_LOADED', 'CANCELLED', 'RETURNED'])
             ->latest()
-            ->take(20) // Ambil 20 transaksi terakhir
+            ->take(50) // Ambil 20 transaksi terakhir
             ->get();
 
         $this->showHistoryModal = true;
@@ -302,7 +302,7 @@ class Pos extends Component
                 'color' => $item->variant->color ?? '',
                 'price' => (int) $item->price_at_checkout,
                 'qty' => $item->qty,
-                'discount_amount' => (int) $item->discount_amount ?? 0,
+                'discount_amount' => (int) $item->discount_amount,
                 'serial_numbers' => $snArray,
                 'has_sn' => (bool) ($item->variant->has_sn ?? true),
             ];
@@ -1085,13 +1085,7 @@ class Pos extends Component
             // Jika customer baru, buat user terlebih dahulu
             if ($this->isNewCustomer && !$customerId) {
                 // 1. Tentukan email yang akan divalidasi
-                // Cek jika input HANYA berisi angka 0 (satu atau lebih 0 tanpa ada angka/karakter lain)
-                if (preg_match('/^0+$/', (string) $this->customerPhone)) {
-                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP tidak boleh hanya berisi angka 0.', type: 'error');
-                    return; // Hentikan proses di sini
-                }
-                // Tentukan email yang akan digunakan (Jika kosong: gabungan HP + 4 digit acak + @zpos.com)
-                $emailToValidate = $this->customerEmail ?: ($this->customerPhone . rand(1000, 9999) . '@zpos.com');
+                $emailToValidate = $this->customerEmail ?: ($this->customerPhone . '@pos.tokopun.com');
 
                 // 2. Terapkan Validasi Ketat di Livewire
                 try {
@@ -1125,13 +1119,12 @@ class Pos extends Component
                 // 3. Jika validasi aman, barulah proses ke database
                 $newUser = User::create([
                     'name' => $this->customerName,
-                    'email' => $emailToValidate,
+                    'email' => $this->customerEmail ?: ($this->customerPhone . '@pos.tokopun.com'),
                     'password' => bcrypt('tokopun' . rand(1000, 9999)),
                 ]);
                 $newUser->assignRole('user');
 
                 if ($this->customerPhone) {
-
                     $newUser->profile()->create([
                         'full_name' => $this->customerName,
                         'phone_number' => $this->customerPhone,
@@ -1352,9 +1345,6 @@ class Pos extends Component
                             foreach ($cleanSns as $sn) {
                                 $detailSN[] = ['serialNumberNo' => $sn, 'quantity' => 1];
                             }
-                        } else {
-                            // Jika produk non-SN / kosong, fallback ke tanda '-' bawaan sistemmu
-                            $detailSN[] = ['serialNumberNo' => '-', 'quantity' => 1];
                         }
 
                         $detailSalesman = [];
@@ -1728,7 +1718,7 @@ class Pos extends Component
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => $item['discount_amount'] ?? 0,
+                    'discount_amount' => $item['discount_amount'] ?: 0,
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
 
