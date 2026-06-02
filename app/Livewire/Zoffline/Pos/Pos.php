@@ -300,7 +300,7 @@ class Pos extends Component
                 'sku' => $item->variant->sku ?? '',
                 'storage' => $item->variant->storage ?? '',
                 'color' => $item->variant->color ?? '',
-                'price' => (int) $item->variant->price,
+                'price' => (int) $item->price_at_checkout,
                 'qty' => $item->qty,
                 'discount_amount' => (int) $item->discount_amount,
                 'serial_numbers' => $snArray,
@@ -1365,11 +1365,13 @@ class Pos extends Component
                             'quantity' => $item['qty'],
                             'itemCashDiscount' => $item['discount_amount'] ?? 0,
                             // 'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
-                            'detailSerialNumber' => $detailSN,
+                            // 'detailSerialNumber' => $detailSN,
                             'salesmanListNumber' => $detailSalesman,
 
                         ];
-
+                        if (!empty($detailSN)) {
+                            $itemData['detailSerialNumber'] = $detailSN;
+                        }
                         if ($this->loadedAccurateSoId) {
                             $itemData['salesOrderId'] = $this->loadedAccurateSoId;
                         }
