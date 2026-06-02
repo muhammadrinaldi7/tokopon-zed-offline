@@ -15,15 +15,17 @@
                     </svg>
                 </div>
             </div>
-            <button wire:click="exportCsv" wire:loading.attr="disabled"
-                class="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-lg text-sm font-bold flex items-center gap-2 transition">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span wire:loading.remove wire:target="exportCsv">Export CSV</span>
-                <span wire:loading wire:target="exportCsv">Mengekspor...</span>
-            </button>
+            @can('export-history-kasir')
+                <button wire:click="exportCsv" wire:loading.attr="disabled"
+                    class="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-lg text-sm font-bold flex items-center gap-2 transition">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span wire:loading.remove wire:target="exportCsv">Export CSV</span>
+                    <span wire:loading wire:target="exportCsv">Mengekspor...</span>
+                </button>
+            @endcan
             <a href="{{ route('zoffline.pos') }}" wire:navigate
                 class="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-bold flex items-center gap-2 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

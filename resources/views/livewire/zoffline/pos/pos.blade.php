@@ -209,7 +209,7 @@
                                     <div class="text-right">
                                         <p class="text-xs font-black text-[#1c69d4]">Rp
                                             {{ number_format($item['price'] * $item['qty'], 0, ',', '.') }}</p>
-                                        @if (auth()->user()->hasRole(['admin', 'bm']))
+                                        @can('edit_price_transaction')
                                             <div class="mt-0.5 flex items-center justify-end gap-1">
                                                 <span class="text-[10px] text-gray-400 font-medium">@ Rp</span>
                                                 <input type="number"
@@ -220,7 +220,7 @@
                                         @else
                                             <p class="text-[10px] text-gray-400 font-medium mt-0.5">@ Rp
                                                 {{ number_format($item['price'], 0, ',', '.') }}</p>
-                                        @endif
+                                        @endcan
                                     </div>
                                 </div>
 
