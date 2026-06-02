@@ -875,6 +875,12 @@ class AccurateService
                         return 'not_found';
                     }
 
+                    // FILTER BARU: Cek apakah hasil yang ditemukan benar-benar Serial Number
+                    $firstHit = $data['d'][0];
+                    if (isset($firstHit['searchHitType']) && $firstHit['searchHitType'] !== 'serialNumber') {
+                        return 'invalid_type'; // Jika bukan SN (misal: barcode barang), tolak!
+                    }
+
                     // Jika array 'd' ada isinya, kita cek kecocokan SKU
                     foreach ($data['d'] as $accurateItem) {
                         if (isset($accurateItem['no']) && $accurateItem['no'] === $expectedSku) {
@@ -923,20 +929,31 @@ class AccurateService
         try {
             $response = Http::withHeaders($config['headers'])
                 ->get($config['host'] . '/item/search-by-item-or-sn.do', [
-                    'keywords' => $sn
+                    // Tetap pertahankan strtoupper + trim agar aman dari masalah case-sensitive kemarin
+                    'keywords' => strtoupper(trim($sn))
                 ]);
 
             if ($response->successful()) {
                 $data = $response->json();
 
                 if (isset($data['s']) && $data['s'] === true && !empty($data['d'])) {
-                    // Karena SN umumnya unik, kita ambil properti 'no' (SKU) dari baris pertama
-                    return $data['d'][0]['no'] ?? null;
+                    // 1. Ambil data hit pertama dari Accurate
+                    $firstHit = $data['d'][0];
+
+                    // 2. FILTER BARU: Validasi apakah searchHitType benar-benar 'serialNumber'
+                    if (isset($firstHit['searchHitType']) && $firstHit['searchHitType'] === 'serialNumber') {
+                        return $firstHit['no'] ?? null; // Kembalikan SKU jika valid
+                    }
+
+                    // BARU: Jika ketemu tapi BUKAN serialNumber, kembalikan penanda khusus
+                    return 'invalid_type';
+                    // Jika tipenya bukan serialNumber (misal: 'item'), catat log dan otomatis return null (tolak)
+                    \Illuminate\Support\Facades\Log::warning("Scan SN diabaikan karena searchHitType berjenis '" . ($firstHit['searchHitType'] ?? 'unknown') . "' untuk input: {$sn}");
                 }
             }
             return null;
         } catch (\Exception $e) {
-            Log::error("API Accurate Find SKU by SN ({$databaseSource}) Error: " . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error("API Accurate Find SKU by SN ({$databaseSource}) Error: " . $e->getMessage());
             return 'error';
         }
     }

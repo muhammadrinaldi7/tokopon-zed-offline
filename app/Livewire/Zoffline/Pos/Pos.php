@@ -89,6 +89,13 @@ class Pos extends Component
             return;
         }
 
+        // KONDISI B (BARU): Data ada di Accurate, tapi yang di-scan BUKAN Serial Number
+        if ($skuFromAccurate === 'invalid_type') {
+            $this->dispatch('toast', title: 'Peringatan', message: "Kode '{$sn}' terdeteksi sebagai Barcode/SKU barang, mohon scan Serial Number produk.", type: 'warning');
+            $this->scanned_sn = '';
+            return;
+        }
+
         if (!$skuFromAccurate) {
             $this->dispatch('toast', title: 'Error', message: "Serial Number '{$sn}' tidak ditemukan di Accurate.", type: 'error');
             $this->scanned_sn = '';
@@ -887,6 +894,10 @@ class Pos extends Component
                 } elseif ($status === 'mismatch') {
                     $title = 'SN Tidak Sesuai';
                     $message = "SN '{$value}' ada di Accurate, TAPI milik produk/barang lain.";
+                } elseif ($status === 'invalid_type') {
+                    // KONDISI BARU: Menangkap input yang bukan Serial Number
+                    $title = 'Input Salah';
+                    $message = "Kode '{$value}' terdeteksi sebagai Barcode/SKU, harap masukkan Serial Number.";
                 } elseif ($status === 'error') {
                     $title = 'Gangguan Sistem';
                     $message = "Gagal menghubungi Accurate. Silakan coba beberapa saat lagi.";
