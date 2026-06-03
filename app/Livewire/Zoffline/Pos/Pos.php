@@ -2108,7 +2108,15 @@ class Pos extends Component
             $printer->initialize();
 
             $this->generateEscposContent($printer);
+            // ==========================================
+            // TAMBAHKAN PERINTAH POTONG DI SINI
+            // ==========================================
+            // 2. Gulung kertas beberapa baris agar teks terakhir tidak ikut terpotong pisau
+            $printer->feed(1);
 
+            // 3. Perintahkan printer untuk memotong kertas (Partial Cut)
+            $printer->cut();
+            // ==========================================
             $printer->close();
 
             // Mengubah kata 'thermal' menjadi 'dot matrix' atau 'kasir'
@@ -2121,6 +2129,7 @@ class Pos extends Component
 
     private function generateEscposContent($printer)
     {
+
         // Ubah ke 33 karena printer menggunakan Font besar/Font B agar tidak meluber
         $maxColumns = 33;
         $separator = str_repeat("-", $maxColumns) . "\n"; // Otomatis membuat 33 karakter '-'

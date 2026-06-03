@@ -70,6 +70,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/', \App\Livewire\Admin\Reporting\Dashboard::class)->name('index');
         Route::get('/sales', \App\Livewire\Admin\Reporting\SalesReport::class)->name('sales');
         Route::get('/products', \App\Livewire\Admin\Reporting\ProductReport::class)->name('products');
+        Route::get('/stock', \App\Livewire\Admin\Reporting\StockReport::class)->name('stock');
         Route::get('/staff', \App\Livewire\Admin\Reporting\StaffReport::class)->name('staff');
     });
 

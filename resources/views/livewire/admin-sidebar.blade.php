@@ -227,6 +227,10 @@
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.products') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                             Kinerja Produk
                         </a>
+                        <a href="{{ route('admin.reporting.stock') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.stock') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Laporan Stok
+                        </a>
                     @endcan
                     @can('reporting-staff')
                         <a href="{{ route('admin.reporting.staff') }}" wire:navigate

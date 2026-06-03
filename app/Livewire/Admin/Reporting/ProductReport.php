@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Admin\Reporting;
 
+use App\Models\Branch;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Warehouse;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Pagination\Paginator;
@@ -17,10 +19,14 @@ class ProductReport extends Component
     public $dateRange = 'this_month';
     public $startDate;
     public $endDate;
+
+    public $branches;
     public $search = '';
+    public $branchFilter = '';
 
     public function mount()
     {
+        $this->branches = Warehouse::orderBy('name', 'asc')->get();
         $this->setDateRange();
     }
 
@@ -32,9 +38,24 @@ class ProductReport extends Component
         $this->resetPage();
     }
 
-    public function updatedStartDate() { $this->dateRange = 'custom'; $this->resetPage(); }
-    public function updatedEndDate() { $this->dateRange = 'custom'; $this->resetPage(); }
-    public function updatedSearch() { $this->resetPage(); }
+    public function updatedStartDate()
+    {
+        $this->dateRange = 'custom';
+        $this->resetPage();
+    }
+    public function updatedEndDate()
+    {
+        $this->dateRange = 'custom';
+        $this->resetPage();
+    }
+    public function updatedSearch()
+    {
+        $this->resetPage();
+    }
+    public function updatedBranchFilter()
+    {
+        $this->resetPage();
+    }
 
     private function setDateRange()
     {
@@ -73,34 +94,47 @@ class ProductReport extends Component
             ->pluck('id');
 
         $orderItems = OrderItem::whereIn('order_id', $orderIds)
-            ->with(['variant', 'variant.product']) // Asumsi polymorphic variant punya relasi product (bila ada)
+            ->with(['variant', 'variant.product', 'order']) // Asumsi polymorphic variant punya relasi product (bila ada)
             ->get();
 
         $grouped = $orderItems->groupBy(function ($item) {
-            return $item->product_variant_type . '_' . $item->product_variant_id;
+            $branch = $item->order->shipping_address_snapshot['store'] ?? 'Unknown';
+            return $item->product_variant_type . '_' . $item->product_variant_id . '_' . $branch;
         });
 
         $products = $grouped->map(function ($group) {
             $first = $group->first();
             $variant = $first->variant;
-            
+
             $sku = $variant->sku ?? ($variant->imei ?? ($variant->code ?? '-'));
             $name = $variant->name ?? ($variant->product ? $variant->product->name : 'Unknown Product');
-            
+
             // Tambahkan RAM/Storage jika ada
             if (isset($variant->ram) || isset($variant->storage)) {
                 $name .= ' (' . ($variant->ram ?? '') . '/' . ($variant->storage ?? '') . ')';
             }
 
+            $branch = $first->order->shipping_address_snapshot['store'] ?? 'Unknown';
+
             return (object) [
                 'sku' => $sku,
                 'name' => $name,
+                'branch' => $branch,
                 'total_qty' => $group->sum('qty'),
-                'gross_revenue' => $group->sum(function($q) { return $q->price_at_checkout * $q->qty; }),
+                'gross_revenue' => $group->sum(function ($q) {
+                    return $q->price_at_checkout * $q->qty;
+                }),
                 'total_discount' => $group->sum('discount_amount'),
                 'net_revenue' => $group->sum('subtotal')
             ];
         });
+
+        if ($this->branchFilter) {
+            $bFilter = strtolower($this->branchFilter);
+            $products = $products->filter(function ($item) use ($bFilter) {
+                return str_contains(strtolower($item->branch), $bFilter);
+            });
+        }
 
         if ($this->search) {
             $search = strtolower($this->search);
@@ -114,7 +148,7 @@ class ProductReport extends Component
         // Manual Pagination
         $page = $this->getPage();
         $perPage = 20;
-        
+
         return new \Illuminate\Pagination\LengthAwarePaginator(
             $sortedProducts->forPage($page, $perPage),
             $sortedProducts->count(),
@@ -135,29 +169,42 @@ class ProductReport extends Component
             ->pluck('id');
 
         $orderItems = OrderItem::whereIn('order_id', $orderIds)
-            ->with(['variant', 'variant.product'])
+            ->with(['variant', 'variant.product', 'order'])
             ->get();
 
         $grouped = $orderItems->groupBy(function ($item) {
-            return $item->product_variant_type . '_' . $item->product_variant_id;
+            $branch = $item->order->shipping_address_snapshot['store'] ?? 'Unknown';
+            return $item->product_variant_type . '_' . $item->product_variant_id . '_' . $branch;
         });
 
         $products = $grouped->map(function ($group) {
             $first = $group->first();
             $variant = $first->variant;
-            
+
             $sku = $variant->sku ?? ($variant->imei ?? ($variant->code ?? '-'));
             $name = $variant->name ?? ($variant->product ? $variant->product->name : 'Unknown Product');
+
+            $branch = $first->order->shipping_address_snapshot['store'] ?? 'Unknown';
 
             return (object) [
                 'sku' => $sku,
                 'name' => $name,
+                'branch' => $branch,
                 'total_qty' => $group->sum('qty'),
-                'gross_revenue' => $group->sum(function($q) { return $q->price_at_checkout * $q->qty; }),
+                'gross_revenue' => $group->sum(function ($q) {
+                    return $q->price_at_checkout * $q->qty;
+                }),
                 'total_discount' => $group->sum('discount_amount'),
                 'net_revenue' => $group->sum('subtotal')
             ];
         });
+
+        if ($this->branchFilter) {
+            $bFilter = strtolower($this->branchFilter);
+            $products = $products->filter(function ($item) use ($bFilter) {
+                return str_contains(strtolower($item->branch), $bFilter);
+            });
+        }
 
         if ($this->search) {
             $search = strtolower($this->search);
@@ -170,17 +217,23 @@ class ProductReport extends Component
 
         $csvFileName = 'kinerja_produk_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
 
-        return response()->streamDownload(function() use($products) {
+        return response()->streamDownload(function () use ($products) {
             $file = fopen('php://output', 'w');
             fputcsv($file, [
-                'SKU', 'NAMA PRODUK', 'TERJUAL (Qty)', 'GROSS REVENUE (Rp)', 
-                'TOTAL DISKON (Rp)', 'NET REVENUE (Rp)'
+                'SKU',
+                'NAMA PRODUK',
+                'CABANG/GUDANG',
+                'TERJUAL (Qty)',
+                'GROSS REVENUE (Rp)',
+                'TOTAL DISKON (Rp)',
+                'NET REVENUE (Rp)'
             ]);
 
             foreach ($products as $product) {
                 fputcsv($file, [
                     $product->sku,
                     $product->name,
+                    $product->branch,
                     $product->total_qty,
                     $product->gross_revenue,
                     $product->total_discount,
