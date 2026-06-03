@@ -16,6 +16,7 @@ use App\Models\SecondProduct;
 use App\Models\SecondProductVariant;
 use App\Models\User;
 use App\Services\AccurateService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -31,6 +32,8 @@ use Mike42\Escpos\Printer;
 #[Layout('layouts.z', ['title' => 'Point of Sale'])]
 class Pos extends Component
 {
+
+    public $order_date;
     // ─── Search & Filter ───────────────────────────────────────
     public $search = '';
     public $productType = 'new'; // all, new, second
@@ -1411,6 +1414,9 @@ class Pos extends Component
                         'detailItem' => $detailItems,
                         // 'cashDiscount' => $manualDiscountAmount,
                         'inclusiveTax' => true,
+                        'transDate'    => $this->order_date
+                            ? Carbon::parse($this->order_date)->format('d/m/Y')
+                            : now()->format('d/m/Y'),
                         'taxable' => true,
                         'description' => $this->notes
                     ];
@@ -1479,6 +1485,9 @@ class Pos extends Component
                             'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
                             'receiptAmount' => (float) $netReceiptAmount, // Net cash ke bank
                             'chequeAmount' => (float) $netReceiptAmount,
+                            'transDate'    => $this->order_date
+                                ? Carbon::parse($this->order_date)->format('d/m/Y')
+                                : now()->format('d/m/Y'),
                             'detailInvoice' => [
                                 $detailInvoiceItem
                             ],
@@ -1538,6 +1547,7 @@ class Pos extends Component
                 'amount' => 0,
             ]
         ];
+        $this->order_date = null;
     }
 
     public function saveAsDraft()
@@ -1830,6 +1840,9 @@ class Pos extends Component
                     'branchName' => $branchName,
                     'detailItem' => $detailItems,
                     // 'cashDiscount' => $manualDiscountAmount,
+                    'transDate'    => $this->order_date
+                        ? Carbon::parse($this->order_date)->format('d/m/Y')
+                        : now()->format('d/m/Y'),
                     'inclusiveTax' => true,
                     'taxable' => true,
                     'description' => 'DRAFT ' . $this->notes
