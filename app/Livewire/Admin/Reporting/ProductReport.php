@@ -20,13 +20,12 @@ class ProductReport extends Component
     public $startDate;
     public $endDate;
 
-    public $branches;
+
     public $search = '';
     public $branchFilter = '';
 
     public function mount()
     {
-        $this->branches = Warehouse::orderBy('name', 'asc')->get();
         $this->setDateRange();
     }
 
