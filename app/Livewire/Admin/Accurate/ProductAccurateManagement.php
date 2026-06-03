@@ -68,6 +68,7 @@ class ProductAccurateManagement extends Component
                     'item_no'         => $item['no'],
                     'name'            => $item['name'] ?? 'Unknown Item',
                     'base_price'      => (int) round($item['unitPrice'] ?? 0),
+                    'base_cost'       => (int) round($item['balanceUnitCost'] ?? 0),
                     'stock'           => (int) round($item['availableToSell'] ?? 0),
                     'raw_data'        => json_encode($item),
                     'created_at'      => now(),
@@ -79,7 +80,7 @@ class ProductAccurateManagement extends Component
                 ProductAccurate::upsert(
                     $importData,
                     ['accurate_id', 'database_source'],
-                    ['item_no', 'name', 'base_price', 'stock', 'raw_data', 'updated_at']
+                    ['item_no', 'name', 'base_price', 'stock', 'raw_data', 'base_cost', 'updated_at']
                 );
 
                 $this->syncImportedCount += count($importData);
@@ -158,6 +159,7 @@ class ProductAccurateManagement extends Component
                         // Casting untuk membuang nol desimal bawaan Accurate
                         'base_price'      => (int) round($item['unitPrice'] ?? 0),
                         'stock'           => (int) round($item['availableToSell'] ?? 0),
+                        'base_cost'       => (int) round($item['balanceUnitCost'] ?? 0),
                         // raw_data harus di-json_encode jika kolomnya berjenis text/json di MySQL
                         'raw_data'        => json_encode($item),
 
@@ -189,7 +191,7 @@ class ProductAccurateManagement extends Component
                             // Parameter 2: Kunci unik untuk mengecek apakah data sudah ada
                             ['accurate_id', 'database_source'],
                             // Parameter 3: Kolom apa saja yang di-update jika data sudah ada (duplicate key)
-                            ['item_no', 'name', 'base_price', 'stock', 'raw_data', 'updated_at']
+                            ['item_no', 'name', 'base_price', 'stock', 'base_cost', 'raw_data', 'updated_at']
                         );
                     }
                     DB::commit();

@@ -12,6 +12,7 @@ class ProductAccurate extends Model
     protected $casts = [
         'raw_data' => 'array',
         'base_price' => 'decimal:2',
+        'base_cost' => 'decimal:2',
     ];
 
     public function productVariants()

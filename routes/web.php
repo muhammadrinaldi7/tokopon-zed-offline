@@ -65,6 +65,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/orders', \App\Livewire\Admin\Orders\OrderManagement::class)->name('orders.management')->middleware('can:manage-orders');
     Route::get('/orders/import-draft', \App\Livewire\Admin\Orders\ImportDraft::class)->name('orders.import-draft')->middleware('can:manage-orders');
 
+    // Reporting
+    Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
+        Route::get('/', \App\Livewire\Admin\Reporting\Dashboard::class)->name('index');
+        Route::get('/sales', \App\Livewire\Admin\Reporting\SalesReport::class)->name('sales');
+        Route::get('/products', \App\Livewire\Admin\Reporting\ProductReport::class)->name('products');
+        Route::get('/staff', \App\Livewire\Admin\Reporting\StaffReport::class)->name('staff');
+    });
+
     // Settings
     Route::get('/settings/payment', \App\Livewire\Admin\Settings\PaymentSettings::class)->name('settings.payment')->middleware('can:manage-settings');
     Route::get('/settings/payment-methods', \App\Livewire\Admin\Settings\PaymentMethodIndex::class)->name('settings.payment-methods')->middleware('can:manage-settings');

@@ -68,15 +68,15 @@
         </a>
 
         @can('manage-promos')
-        <a href="{{ route('admin.promos.index') }}" wire:navigate
-            class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.promos.*') ? $activeClass : $inactiveClass }}">
-            <svg class="w-5 h-5 {{ request()->routeIs('admin.promos.*') ? $activeIconClass : $inactiveIconClass }}"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-            </svg>
-            Promo & Voucher
-        </a>
+            <a href="{{ route('admin.promos.index') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.promos.*') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.promos.*') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                Promo & Vouchers
+            </a>
         @endcan
 
         @canany(['view-pos', 'view-stock'])
@@ -85,29 +85,29 @@
             </div>
 
             @can('view-pos')
-            <a href="{{ route('zoffline.pos') }}" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.pos') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('zoffline.pos') ? $activeIconClass : $inactiveIconClass }}"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kasir (POS)</span>
-            </a>
+                <a href="{{ route('zoffline.pos') }}" wire:navigate
+                    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.pos') ? $activeClass : $inactiveClass }}">
+                    <svg class="w-5 h-5 {{ request()->routeIs('zoffline.pos') ? $activeIconClass : $inactiveIconClass }}"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kasir (POS)</span>
+                </a>
             @endcan
 
             @can('view-stock')
-            <a href="{{ route('zoffline.cekstock') }}" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.cekstock') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('zoffline.cekstock') ? $activeIconClass : $inactiveIconClass }}"
-                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                    stroke="currentColor" class="size-6">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
-                </svg>
+                <a href="{{ route('zoffline.cekstock') }}" wire:navigate
+                    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.cekstock') ? $activeClass : $inactiveClass }}">
+                    <svg class="w-5 h-5 {{ request()->routeIs('zoffline.cekstock') ? $activeIconClass : $inactiveIconClass }}"
+                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+                    </svg>
 
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Cek Stock</span>
-            </a>
+                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Cek Stock</span>
+                </a>
             @endcan
         @endcanany
 
@@ -132,46 +132,46 @@
 
                 <div x-show="openProducts && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
                     @can('manage-new-catalog')
-                    <a href="{{ route('admin.products') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.products.variants') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Katalog Baru
-                    </a>
+                        <a href="{{ route('admin.products') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.products.variants') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Katalog Baru
+                        </a>
                     @endcan
                     @can('manage-second-catalog')
-                    <a href="{{ route('admin.second-products') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.second-products', 'admin.second-products.variants') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Katalog Second
-                    </a>
+                        <a href="{{ route('admin.second-products') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.second-products', 'admin.second-products.variants') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Katalog Second
+                        </a>
                     @endcan
                     @can('manage-categories')
-                    <a href="{{ route('admin.categories') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.categories') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Master Kategori
-                    </a>
+                        <a href="{{ route('admin.categories') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.categories') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Master Kategori
+                        </a>
                     @endcan
                     @can('manage-brands')
-                    <a href="{{ route('admin.brands') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.brands') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Master Merek
-                    </a>
+                        <a href="{{ route('admin.brands') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.brands') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Master Merek
+                        </a>
                     @endcan
                     @can('manage-accurate-products')
-                    <a href="{{ route('admin.accurate-products') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-products') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Produk Accurate
-                    </a>
+                        <a href="{{ route('admin.accurate-products') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-products') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Produk Accurate
+                        </a>
                     @endcan
                     @can('manage-accurate-customers')
-                    <a href="{{ route('admin.accurate-customers') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-customers') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Pelanggan Accurate
-                    </a>
+                        <a href="{{ route('admin.accurate-customers') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-customers') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Pelanggan Accurate
+                        </a>
                     @endcan
                     @can('view-warehouse-stocks')
-                    <a href="{{ route('admin.warehouse-stocks') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.warehouse-stocks') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Stok Gudang
-                    </a>
+                        <a href="{{ route('admin.warehouse-stocks') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.warehouse-stocks') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Stok Gudang
+                        </a>
                     @endcan
                 </div>
             </div>
@@ -188,26 +188,66 @@
             </a>
         @endcan
 
-        @can('manage-trade-in')
-        <a href="{{ route('admin.trade-ins.index') }}" wire:navigate
-            class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.trade-ins.*') ? $activeClass : $inactiveClass }}">
-            <svg class="w-5 h-5 {{ request()->routeIs('admin.trade-ins.*') ? $activeIconClass : $inactiveIconClass }}"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Tukar Tambah</span>
-        </a>
+        @can('view-reporting')
+            <div x-data="{ openReporting: {{ request()->routeIs('admin.reporting.*') ? 'true' : 'false' }} }">
+                <button @click="openReporting = !openReporting" type="button"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.*') ? $activeClass : $inactiveClass }}">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 {{ request()->routeIs('admin.reporting.*') ? $activeIconClass : $inactiveIconClass }}"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Reporting</span>
+                    </div>
+                    <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openReporting }"
+                        class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
 
-        <a href="{{ route('admin.sell-phones.index') }}" wire:navigate
-            class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.sell-phones.*') ? $activeClass : $inactiveClass }}">
-            <svg class="w-5 h-5 {{ request()->routeIs('admin.sell-phones.*') ? $activeIconClass : $inactiveIconClass }}"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pembelian HP</span>
-        </a>
+                <div x-show="openReporting && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
+                    <a href="{{ route('admin.reporting.index') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.index') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Dashboard
+                    </a>
+                    <a href="{{ route('admin.reporting.sales') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.sales') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Laporan Penjualan
+                    </a>
+                    <a href="{{ route('admin.reporting.products') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.products') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Kinerja Produk
+                    </a>
+                    <a href="{{ route('admin.reporting.staff') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.staff') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Analisa Sales
+                    </a>
+                </div>
+            </div>
+        @endcan
+
+        @can('manage-trade-in')
+            <a href="{{ route('admin.trade-ins.index') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.trade-ins.*') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.trade-ins.*') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Tukar Tambah</span>
+            </a>
+
+            <a href="{{ route('admin.sell-phones.index') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.sell-phones.*') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.sell-phones.*') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pembelian HP</span>
+            </a>
         @endcan
 
         @can('manage-buyback')
@@ -363,7 +403,7 @@
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan Gudang</span>
             </a>
-            
+
             <a href="{{ route('admin.settings.pos') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.pos') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.pos') ? $activeIconClass : $inactiveIconClass }}"
