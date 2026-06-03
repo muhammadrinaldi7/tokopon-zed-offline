@@ -167,10 +167,10 @@
             </div>
 
             <div class="flex-1 overflow-y-auto min-h-0 bg-gray-50">
-                <div class="px-4 py-3 space-y-3 border-b border-gray-100  bg-gray-50/30">
+                {{-- <div class="px-4 py-3 space-y-3 border-b border-gray-100  bg-gray-50/30">
                     <input type="text" wire:model.live="scannedSn" placeholder="Ketik SN di sini..."
                         class="w-full">
-                </div>
+                </div> --}}
                 {{-- Cart Items --}}
                 <div class="px-4 py-3 space-y-3 border-b border-gray-100  bg-gray-50/30">
                     @forelse($cart as $index => $item)
