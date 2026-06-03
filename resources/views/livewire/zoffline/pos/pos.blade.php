@@ -828,13 +828,17 @@
 
 
                     {{-- tanggal transaksi --}}
-                    <div class="p-4">
-                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Tanggal Transaksi
-                        </p>
-                        <input type="date" wire:model.defer="order_date"
-                            class="w-full bg-white border border-gray-200 shadow-sm rounded-lg px-3 py-2 text-xs focus:border-[#1c69d4] focus:ring-0 placeholder-gray-300 resize-none transition"
-                            placeholder="Tanggal Transaksi...">
-                    </div>
+                    @can('backdate-transaction')
+                        <div class="p-4">
+                            <p class="text-sm font-bold text-red-400 uppercase tracking-wider mb-2">*Isi jika ini
+                                transaksi tanggal berlalu
+
+                            </p>
+                            <input type="date" wire:model.defer="order_date"
+                                class="w-full bg-white border border-gray-200 shadow-sm rounded-lg px-3 py-2 text-xs focus:border-[#1c69d4] focus:ring-0 placeholder-gray-300 resize-none transition"
+                                placeholder="Tanggal Transaksi...">
+                        </div>
+                    @endcan
 
                     {{-- Notes Section --}}
                     <div class="p-4">
