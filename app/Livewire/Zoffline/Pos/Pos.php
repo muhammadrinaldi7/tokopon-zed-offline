@@ -1091,62 +1091,72 @@ class Pos extends Component
 
             // Jika customer baru, buat user terlebih dahulu
             if ($this->isNewCustomer && !$customerId) {
-                // 1. Tentukan email yang akan divalidasi
-                // Cek jika input HANYA berisi angka 0 (satu atau lebih 0 tanpa ada angka/karakter lain)
+
+                // 1. Cek jika input HANYA berisi angka 0
                 if (preg_match('/^0+$/', (string) $this->customerPhone)) {
                     $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP tidak boleh hanya berisi angka 0.', type: 'error');
                     return; // Hentikan proses di sini
                 }
-                // Tentukan email yang akan digunakan (Jika kosong: gabungan HP + 4 digit acak + @zpos.com)
+
+                // Tentukan email yang akan digunakan
                 $emailToValidate = $this->customerEmail ?: ($this->customerPhone . rand(1000, 9999) . '@zpos.com');
 
-                // 2. Terapkan Validasi Ketat di Livewire
-                try {
-                    $this->validate(
-                        [
-                            'customerName'  => 'required|string|max:255',
-                            'customerPhone' => 'required|string|max:20',
-                            'customerEmail' => 'nullable|email',
-                        ],
-                        [
-                            // Custom pesan error agar ramah dibaca kasir
-                            'customerName.required'  => 'Nama customer wajib diisi.',
-                            'customerPhone.required' => 'Nomor HP customer wajib diisi.',
-                            'customerEmail.email'    => 'Format email tidak valid.',
-                        ]
-                    );
-                } catch (\Illuminate\Validation\ValidationException $e) {
-                    // JIKA VALIDASI GAGAL: 
-                    // Tangkap pesan pertama dari bag error dan lempar sebagai toast, lalu hentikan eksekusi
-                    $firstErrorMessage = collect($e->errors())->flatten()->first();
+                // 2. Terapkan Validasi menggunakan Validator Facade
+                $validator = \Illuminate\Support\Facades\Validator::make(
+                    [
+                        'customerName'  => $this->customerName,
+                        'customerPhone' => $this->customerPhone,
+                        'customerEmail' => $emailToValidate,
+                    ],
+                    [
+                        'customerName'  => 'required|string|max:255',
+                        // Tambahkan rule unique langsung di sini
+                        'customerPhone' => 'required|string|max:20|unique:user_profiles,phone_number',
+                        'customerEmail' => 'nullable|email|unique:users,email',
+                    ],
+                    [
+                        'customerName.required'  => 'Nama customer wajib diisi.',
+                        'customerPhone.required' => 'Nomor HP customer wajib diisi.',
+                        'customerPhone.unique'   => 'Nomor HP ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                        'customerEmail.email'    => 'Format email tidak valid.',
+                        'customerEmail.unique'   => 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                    ]
+                );
+
+                // JIKA VALIDASI GAGAL
+                if ($validator->fails()) {
+                    $errors = $validator->errors();
+                    $failedRules = $validator->failed();
+                    $firstErrorMessage = $errors->first();
+
+                    // Cek spesifik jika validasi gagal karena nomor HP sudah terdaftar (Rule 'Unique')
+                    if (isset($failedRules['customerPhone']['Unique'])) {
+                        // Lakukan query ke database untuk mengambil nama dari user_profiles
+                        $existingProfile = \Illuminate\Support\Facades\DB::table('user_profiles')
+                            ->where('phone_number', $this->customerPhone)
+                            ->first();
+
+                        if ($existingProfile) {
+                            $namaCustomer = $existingProfile->full_name ?? 'Customer Lain';
+                            $firstErrorMessage = "Nomor HP sudah terdaftar atas nama: {$namaCustomer}. Silakan pilih customer dari daftar pencarian.";
+                        }
+                    }
+
                     $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
                     return; // Hentikan proses pembayaran di sini
                 }
 
-                // Cek unik manual karena customerEmail bisa nullable
-                if (\App\Models\User::where('email', $emailToValidate)->exists()) {
-                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.', type: 'error');
-                    return;
-                }
-
-                // Cek unik manual untuk nomor HP di tabel user_profiles
-                if (\App\Models\UserProfile::where('phone_number', $this->customerPhone)->exists()) {
-                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.', type: 'error');
-                    return;
-                }
-
                 // 3. Jika validasi aman, barulah proses ke database
                 $newUser = User::create([
-                    'name' => $this->customerName,
-                    'email' => $emailToValidate,
+                    'name'     => $this->customerName,
+                    'email'    => $emailToValidate,
                     'password' => bcrypt('tokopun' . rand(1000, 9999)),
                 ]);
                 $newUser->assignRole('user');
 
                 if ($this->customerPhone) {
-
                     $newUser->profile()->create([
-                        'full_name' => $this->customerName,
+                        'full_name'    => $this->customerName,
                         'phone_number' => $this->customerPhone,
                     ]);
                 }
