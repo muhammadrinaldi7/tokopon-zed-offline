@@ -470,9 +470,10 @@ class Pos extends Component
             $methodName = strtolower($method->name);
             $location = strtolower($locationName);
 
-            // SEKARANG: Cek apakah mengandung kata 'tunai' ATAU 'transfer'
-            if (str_contains($methodName, 'tunai') || str_contains($methodName, 'transfer')) {
-                // Hanya tampilkan jika nama metode juga mengandung nama lokasi user (misal: 'banjarbaru' atau 'martapura')
+            // Jika nama metode pembayarannya mengandung kata 'tunai'
+            if (str_contains($methodName, 'tunai')) {
+                // Hanya tampilkan jika nama metode juga mengandung nama lokasi user (misal: 'banjarbaru')
+                // Jika $location kosong, kita asumsikan tidak lolos filter untuk keamanan
                 return $location !== '' && str_contains($methodName, $location);
             }
 
