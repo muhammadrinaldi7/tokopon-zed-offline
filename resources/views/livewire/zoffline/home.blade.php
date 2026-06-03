@@ -115,7 +115,7 @@
                 </div>
             </div>
         @endcan
-        @can('view-pos')
+        @can('view-riwayat-kasir')
             {{-- Card 5: shift --}}
             <div wire:click="navigateToShift"
                 class="w-full h-70 md:h-80 bg-teal-800 hover:bg-teal-900 rounded-2xl relative flex flex-col justify-end overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-700 ease-out">

@@ -49,6 +49,14 @@ class EmployeManage extends Component
             $syncedCount = 0;
 
             foreach ($response as $emp) {
+                $localBranchId = null;
+                if (!empty($emp['branchId'])) {
+                    $branch = \App\Models\Branch::where('branch_id', $emp['branchId'])->first();
+                    if ($branch) {
+                        $localBranchId = $branch->id;
+                    }
+                }
+
                 Employe::updateOrCreate(
                     [
                         'accurate_employee_id' => $emp['id'],
@@ -60,6 +68,7 @@ class EmployeManage extends Component
                         'phone_number' => $emp['mobilePhone'] ?? null,
                         'position'     => $emp['workPositionName'] ?? null,
                         'is_active'    => !($emp['suspended'] ?? false), // suspended true = tidak aktif
+                        'branch_id'    => $localBranchId,
                     ]
                 );
                 $syncedCount++;

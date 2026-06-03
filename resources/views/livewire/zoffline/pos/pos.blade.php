@@ -167,6 +167,10 @@
             </div>
 
             <div class="flex-1 overflow-y-auto min-h-0 bg-gray-50">
+                <div class="px-4 py-3 space-y-3 border-b border-gray-100  bg-gray-50/30">
+                    <input type="text" wire:model.live="scannedSn" placeholder="Ketik SN di sini..."
+                        class="w-full">
+                </div>
                 {{-- Cart Items --}}
                 <div class="px-4 py-3 space-y-3 border-b border-gray-100  bg-gray-50/30">
                     @forelse($cart as $index => $item)
@@ -257,8 +261,9 @@
                                 @endphp
 
                                 {{-- Bagian Serial Number (SN) --}}
-                                @if(!isset($item['has_sn']) || $item['has_sn'])
-                                    <div class="mt-1 space-y-2.5 bg-gray-50/50 p-2.5 rounded-lg border border-gray-100">
+                                @if (!isset($item['has_sn']) || $item['has_sn'])
+                                    <div
+                                        class="mt-1 space-y-2.5 bg-gray-50/50 p-2.5 rounded-lg border border-gray-100">
 
                                         {{-- BARIS 1: Badge SN yang sudah di-scan --}}
                                         @if (count($snArray) > 0)
@@ -324,7 +329,8 @@
                                         </div>
                                     </div>
                                 @else
-                                    <div class="mt-1 flex items-center gap-1.5 p-2 bg-gray-50 rounded-lg border border-gray-100 text-[10px] font-bold text-gray-500">
+                                    <div
+                                        class="mt-1 flex items-center gap-1.5 p-2 bg-gray-50 rounded-lg border border-gray-100 text-[10px] font-bold text-gray-500">
                                         Tidak membutuhkan Serial Number
                                     </div>
                                 @endif
@@ -528,7 +534,7 @@
                                                     class="font-semibold text-gray-800 text-xs group-hover:text-[#1c69d4] transition-colors">
                                                     {{ $sales->name }}</p>
                                                 <p class="text-[10px] text-gray-400 font-medium">NIK:
-                                                    {{ $sales->employee_no ?? 'N/A' }}</p>
+                                                    {{ $sales->employee_no ?? 'N/A' }} {{ $sales->branch->name }}</p>
                                             </div>
                                             <span
                                                 class="text-xs font-bold text-[#1c69d4] opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all">+

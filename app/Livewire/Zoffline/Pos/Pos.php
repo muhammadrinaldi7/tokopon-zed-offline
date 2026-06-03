@@ -502,9 +502,16 @@ class Pos extends Component
     {
         if (strlen($this->searchSales) < 2) return [];
 
-        return Employe::where(function ($q) {
-            $q->where('name', 'like', '%' . $this->searchSales . '%');
-        })->take(5)->get();
+        return Employe::with('branch')
+            ->where(function ($q) {
+                // Filter 1: Jika cabangnya sama
+                $q->where('branch_id', Auth::user()->branch_id)
+                    // Filter 2: ATAU jika namanya mengandung 'Cc_'
+                    ->orWhere('branch_id', 6);
+            })
+            ->where(function ($q) {
+                $q->where('name', 'like', '%' . $this->searchSales . '%');
+            })->take(10)->get();
     }
 
     #[Computed]
@@ -1118,7 +1125,13 @@ class Pos extends Component
 
                 // Cek unik manual karena customerEmail bisa nullable
                 if (\App\Models\User::where('email', $emailToValidate)->exists()) {
-                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP atau Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.', type: 'error');
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.', type: 'error');
+                    return;
+                }
+
+                // Cek unik manual untuk nomor HP di tabel user_profiles
+                if (\App\Models\UserProfile::where('phone_number', $this->customerPhone)->exists()) {
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.', type: 'error');
                     return;
                 }
 
@@ -1284,7 +1297,7 @@ class Pos extends Component
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => $item['discount_amount'] ?: 0,
+                    'discount_amount' => (int) ($item['discount_amount'] ?? 0),
                     // 3. Simpan ke database. Jika ada 2 SN, jadinya: "SN001, SN002"
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
@@ -1528,6 +1541,10 @@ class Pos extends Component
         foreach ($this->cart as $item) {
             $sn = $item['serial_number'] ?? null;
             $sns = $item['serial_numbers'] ?? [];
+            if (empty(trim($item['sku'] ?? ''))) {
+                $this->dispatch('toast', title: 'Data Produk Tidak Valid', message: 'Produk ' . ($item['name'] ?? 'Unknown') . ' tidak memiliki SKU/Kode Barang.', type: 'error');
+                return;
+            }
             if (empty($sn) && empty($sns)) {
                 $this->dispatch('toast', title: 'SN Belum Lengkap', message: 'Pastikan semua item sudah diisi Serial Number / IMEI.', type: 'warning');
                 return;
@@ -1581,7 +1598,13 @@ class Pos extends Component
 
                 // Cek unik manual karena customerEmail bisa nullable
                 if (\App\Models\User::where('email', $emailToValidate)->exists()) {
-                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP atau Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.', type: 'error');
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.', type: 'error');
+                    return;
+                }
+
+                // Cek unik manual untuk nomor HP di tabel user_profiles
+                if (\App\Models\UserProfile::where('phone_number', $this->customerPhone)->exists()) {
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.', type: 'error');
                     return;
                 }
 
@@ -1730,7 +1753,7 @@ class Pos extends Component
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => $item['discount_amount'] ?: 0,
+                    'discount_amount' => (int) ($item['discount_amount'] ?? 0),
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
 

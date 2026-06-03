@@ -18,6 +18,7 @@ class Employe extends Model
         'position',
         'is_active',
         'user_id',
+        'branch_id'
     ];
 
     /**
@@ -32,5 +33,10 @@ class Employe extends Model
     public function orders()
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 }

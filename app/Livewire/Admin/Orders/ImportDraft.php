@@ -52,19 +52,19 @@ class ImportDraft extends Component
 
         try {
             $path = $this->file->getRealPath();
-            
+
             // Auto detect delimiter (comma, semicolon, or tab)
             $content = file_get_contents($path);
             $commas = substr_count($content, ',');
             $semicolons = substr_count($content, ';');
             $tabs = substr_count($content, "\t");
-            
+
             $delimiter = ',';
             if ($semicolons > $commas && $semicolons > $tabs) $delimiter = ';';
             if ($tabs > $commas && $tabs > $semicolons) $delimiter = "\t";
-            
+
             Log::info("Detected delimiter: " . ($delimiter === "\t" ? 'TAB' : $delimiter));
-            
+
             $data = [];
             if (($handle = fopen($path, "r")) !== false) {
                 while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
@@ -152,7 +152,7 @@ class ImportDraft extends Component
             // 1. Resolve Customer
             $customerName = $group['customerName'];
             $customerPhone = $group['customerPhone'];
-            $emailToValidate = $customerPhone ? ($customerPhone . '@pos.tokopun.com') : null;
+            $emailToValidate = $customerPhone ? ($customerPhone . '@zpos.com') : null;
 
             $user = null;
             if ($customerPhone) {
@@ -169,7 +169,7 @@ class ImportDraft extends Component
                 $user = User::create([
                     'name' => $customerName,
                     'email' => $emailToValidate,
-                    'password' => bcrypt('tokopun' . rand(1000, 9999)),
+                    'password' => bcrypt('zpos' . rand(1000, 9999)),
                 ]);
                 $user->assignRole('user');
 
@@ -203,8 +203,8 @@ class ImportDraft extends Component
             $handlerIdentifier = $group['handlerIdentifier'] ?? '';
             if (!empty($handlerIdentifier)) {
                 $sales = \App\Models\Employe::where('name', $handlerIdentifier)
-                            ->orWhere('employee_no', $handlerIdentifier)
-                            ->first();
+                    ->orWhere('employee_no', $handlerIdentifier)
+                    ->first();
                 if ($sales) {
                     $salesId = $sales->id;
                 }
@@ -310,7 +310,7 @@ class ImportDraft extends Component
             // 3. Sync to Accurate (Outside DB Transaction to avoid blocking local save)
             try {
                 // [DISABLED FOR LOCAL TESTING]
-                /*
+
                 $accurateDbSource = $hasSecond ? 'second' : 'syihab';
                 $accurateService->syncCustomer($user, $accurateDbSource);
                 $user->refresh();
@@ -326,14 +326,14 @@ class ImportDraft extends Component
                 ];
 
                 $soResult = $accurateService->postSalesOrder($soData, $accurateDbSource);
-                
+
                 if (isset($soResult['r']['id']) && isset($soResult['r']['number'])) {
                     $order->update([
                         'accurate_so_id' => $soResult['r']['id'],
                         'accurate_so_number' => $soResult['r']['number'],
                     ]);
                 }
-                */
+
 
                 $this->summary['success']++;
                 $this->results[] = [

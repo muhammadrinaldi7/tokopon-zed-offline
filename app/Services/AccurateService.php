@@ -542,7 +542,8 @@ class AccurateService
             $signature = hash_hmac('sha256', $timestamp, $secretKey);
             $paramBody = [
                 "sp.pageSize" => 100,
-                "sp.page" => $page
+                "sp.page" => $page,
+                "fields" => "id,number,name,email,mobilePhone,workPositionName,suspended,branchId"
             ];
 
             // Hit ke endpoint karyawan milik Accurate Online
@@ -930,7 +931,7 @@ class AccurateService
             $response = Http::withHeaders($config['headers'])
                 ->get($config['host'] . '/item/search-by-item-or-sn.do', [
                     // Tetap pertahankan strtoupper + trim agar aman dari masalah case-sensitive kemarin
-                    'keywords' => strtoupper(trim($sn))
+                    'keywords' => trim($sn)
                 ]);
 
             if ($response->successful()) {
