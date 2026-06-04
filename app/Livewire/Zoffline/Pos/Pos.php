@@ -2069,7 +2069,7 @@ class Pos extends Component
                     [
                         'key' => '3',
                         'value' => 'total_tagihan',
-                        'value_text' => 'Rp ' . number_format($order->grand_total, 0, ',', '.')
+                        'value_text' => 'Rp ' . number_format($order->subtotal, 0, ',', '.')
                     ]
                 ]
             ]
@@ -2135,7 +2135,7 @@ class Pos extends Component
     {
 
         // Ubah ke 33 karena printer menggunakan Font besar/Font B agar tidak meluber
-        $maxColumns = 33;
+        $maxColumns = 40;
         $separator = str_repeat("-", $maxColumns) . "\n"; // Otomatis membuat 33 karakter '-'
 
         // Store Title (Center, Large)
