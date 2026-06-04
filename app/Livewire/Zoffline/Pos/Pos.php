@@ -2121,16 +2121,7 @@ class Pos extends Component
             $printer->initialize();
 
             $this->generateEscposContent($printer);
-            // ==========================================
-            // TAMBAHKAN PERINTAH POTONG DI SINI
-            // ==========================================
-            // 2. Gulung kertas beberapa baris agar teks terakhir tidak ikut terpotong pisau
-            $printer->feed(1);
 
-            // 3. Perintahkan printer untuk memotong kertas (Partial Cut)
-            $printer->cut();
-            // ==========================================
-            $printer->close();
 
             // Mengubah kata 'thermal' menjadi 'dot matrix' atau 'kasir'
             $this->dispatch('toast', title: 'Sukses', message: 'Perintah cetak kasir terkirim ke ' . "PrinterKasir", type: 'success');
@@ -2149,10 +2140,18 @@ class Pos extends Component
 
         // Store Title (Center, Large)
         $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
-        $printer->selectPrintMode(\Mike42\Escpos\Printer::MODE_DOUBLE_WIDTH | \Mike42\Escpos\Printer::MODE_DOUBLE_HEIGHT);
+
+        // PERBAIKAN 1: Tambahkan MODE_FONT_B di sini agar ukuran double-nya berbasis Font B
+        $printer->selectPrintMode(
+            \Mike42\Escpos\Printer::MODE_FONT_B |
+                \Mike42\Escpos\Printer::MODE_DOUBLE_WIDTH |
+                \Mike42\Escpos\Printer::MODE_DOUBLE_HEIGHT
+        );
         $printer->text("SYIHAB STORE\n");
 
-        $printer->selectPrintMode();
+        // PERBAIKAN 2: Kembalikan ke MODE_FONT_B standar (jangan dikosongkan)
+        $printer->selectPrintMode(\Mike42\Escpos\Printer::MODE_FONT_B);
+
         $storeName = $this->completedOrder->shipping_address_snapshot['store'] ?? 'Toko';
         $printer->text($storeName . "\n");
         $printer->text($this->completedOrder->created_at->format('d/m/Y H:i') . "\n");
@@ -2257,7 +2256,15 @@ class Pos extends Component
             $printer->initialize();
 
             $this->generateEscposContent($printer);
+            // ==========================================
+            // TAMBAHKAN PERINTAH POTONG DI SINI
+            // ==========================================
+            // 2. Gulung kertas beberapa baris agar teks terakhir tidak ikut terpotong pisau
+            $printer->feed(1);
 
+            // 3. Perintahkan printer untuk memotong kertas (Partial Cut)
+            $printer->cut();
+            // ==========================================
             $data = $connector->getData();
             $base64 = base64_encode($data);
 
