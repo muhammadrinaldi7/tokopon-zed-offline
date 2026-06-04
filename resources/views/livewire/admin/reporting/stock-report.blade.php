@@ -117,7 +117,10 @@
                             </td>
                             <td class="px-5 py-3">
                                 <p class="text-xs font-bold text-gray-800">{{ $item['name'] }}</p>
-                                <p class="text-[11px] text-gray-500 mt-0.5">{{ $item['color'] }}</p>
+                                <p class="text-[11px] text-gray-500 mt-0.5">
+                                    <span class="font-semibold text-gray-600">Color:</span> {{ $item['color'] }} <span class="mx-1">•</span> 
+                                    <span class="font-semibold text-gray-600">Vendor:</span> {{ $item['vendor_name'] ?? '-' }}
+                                </p>
                             </td>
                             <td class="px-5 py-3">
                                 <p class="text-sm font-black {{ $item['stock'] > 0 ? 'text-green-600' : 'text-red-500' }}">{{ $item['stock'] }} Pcs</p>

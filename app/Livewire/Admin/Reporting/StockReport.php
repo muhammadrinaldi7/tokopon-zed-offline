@@ -43,7 +43,7 @@ class StockReport extends Component
         $data = $this->getStockData();
 
         $filename = "laporan_stok_" . date('Ymd_His') . ".csv";
-        
+
         $headers = [
             "Content-type" => "text/csv",
             "Content-Disposition" => "attachment; filename=$filename",
@@ -53,11 +53,19 @@ class StockReport extends Component
         ];
 
         $columns = [
-            'SKU', 'NAMA PRODUK', 'WARNA', 'KATEGORI', 'GUDANG', 'STOK GUDANG', 
-            'HARGA BELI (MODAL)', 'HARGA JUAL', 'UMUR PRODUK (HARI)', 'TANGGAL TARIK STOK'
+            'SKU',
+            'NAMA PRODUK',
+            'WARNA',
+            'KATEGORI',
+            'GUDANG',
+            'STOK GUDANG',
+            'HARGA BELI (MODAL)',
+            'HARGA JUAL',
+            'UMUR PRODUK (HARI)',
+            'TANGGAL TARIK STOK'
         ];
 
-        $callback = function() use ($data, $columns) {
+        $callback = function () use ($data, $columns) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
 
@@ -90,7 +98,7 @@ class StockReport extends Component
             ->flatMap(function ($variant) {
                 $items = [];
                 $baseItem = [
-                    'id' => 'n_'.$variant->id,
+                    'id' => 'n_' . $variant->id,
                     'sku' => $variant->sku ?? '-',
                     'name' => $variant->product->name ?? 'Unknown',
                     'color' => $variant->color ?? '-',
@@ -124,7 +132,7 @@ class StockReport extends Component
             ->flatMap(function ($variant) {
                 $items = [];
                 $baseItem = [
-                    'id' => 's_'.$variant->id,
+                    'id' => 's_' . $variant->id,
                     'sku' => $variant->sku ?? '-',
                     'name' => $variant->secondProduct->name ?? 'Unknown',
                     'color' => $variant->color ?? '-',
@@ -164,8 +172,8 @@ class StockReport extends Component
         if (!empty($this->search)) {
             $searchTerm = strtolower($this->search);
             $allData = $allData->filter(function ($item) use ($searchTerm) {
-                return str_contains(strtolower($item['sku']), $searchTerm) || 
-                       str_contains(strtolower($item['name']), $searchTerm);
+                return str_contains(strtolower($item['sku']), $searchTerm) ||
+                    str_contains(strtolower($item['name']), $searchTerm);
             });
         }
 
@@ -184,7 +192,7 @@ class StockReport extends Component
         // Pagination Manual untuk Collection
         $perPage = 15;
         $page = $this->getPage();
-        
+
         $paginatedData = new LengthAwarePaginator(
             $allData->forPage($page, $perPage),
             $allData->count(),
