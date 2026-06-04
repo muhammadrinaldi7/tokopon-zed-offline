@@ -281,6 +281,7 @@ class Pos extends Component
         $this->discount_amount = (int) $order->discount_amount;
         $this->notes = $order->notes;
 
+        $this->order_date = $order->order_date;
         // Restore promos
         $this->selectedPromos = $order->promos->pluck('id')->toArray();
 
@@ -1230,9 +1231,14 @@ class Pos extends Component
                 }
             }
             if (!$order) {
-                // Generate order number
-                $orderNumber = 'POS-SYB-' . now()->format('Ymd') . '-' . str_pad(
-                    Order::whereDate('created_at', today())->where('order_channel', 'POS')->count() + 1,
+                // 1. Tentukan tanggal yang digunakan (dari input form atau hari ini)
+                $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
+
+                // 2. Generate order number berdasarkan order_date
+                $orderNumber = 'POS-SYB-' . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
+                    Order::whereDate('order_date', $dateToUse->format('Y-m-d')) // <- Menggunakan order_date
+                        ->where('order_channel', 'POS')
+                        ->count() + 1,
                     4,
                     '0',
                     STR_PAD_LEFT
@@ -1242,6 +1248,7 @@ class Pos extends Component
                 $order = Order::create([
                     'user_id' => $customerId,
                     'order_number' => $orderNumber,
+                    'order_date' => $dateToUse->format('Y-m-d'),
                     'total_amount' => $subtotal,
                     'shipping_cost' => 0,
                     'discount_amount' => $totalDiscountAmount,
@@ -1704,8 +1711,13 @@ class Pos extends Component
 
             if (!$order) {
                 // Generate order number
-                $orderNumber = 'POS-SYB-' . now()->format('Ymd') . '-' . str_pad(
-                    Order::whereDate('created_at', today())->where('order_channel', 'POS')->count() + 1,
+                $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
+
+                // 2. Generate order number berdasarkan order_date
+                $orderNumber = 'POS-SYB-' . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
+                    Order::whereDate('order_date', $dateToUse->format('Y-m-d')) // <- Menggunakan order_date
+                        ->where('order_channel', 'POS')
+                        ->count() + 1,
                     4,
                     '0',
                     STR_PAD_LEFT
@@ -1715,6 +1727,7 @@ class Pos extends Component
                 $order = Order::create([
                     'user_id' => $customerId,
                     'order_number' => $orderNumber,
+                    'order_date'                => $dateToUse->format('Y-m-d'),
                     'total_amount' => $subtotal,
                     'shipping_cost' => 0,
                     'discount_amount' => $totalDiscountAmount,

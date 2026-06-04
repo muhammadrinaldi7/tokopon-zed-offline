@@ -13,6 +13,7 @@ class Order extends Model
         'shipping_address_snapshot' => 'array',
         'mdr_percentage' => 'decimal:2',
         'mdr_amount' => 'decimal:2',
+        'order_date' => 'date',
     ];
 
     // ─── Relationships ─────────────────────────────────────────
