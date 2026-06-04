@@ -30,7 +30,7 @@
 
     <ul>
         <li><strong>No. Invoice:</strong> {{ $order->order_number }}</li>
-        <li><strong>Total Tagihan:</strong> Rp {{ number_format($order->grand_total, 0, ',', '.') }}</li>
+        <li><strong>Total Tagihan:</strong> Rp {{ number_format($order->subtotal, 0, ',', '.') }}</li>
         <li><strong>Status Pembayaran:</strong> <span style="color: #2ca01c; font-weight: bold;">Lunas</span></li>
     </ul>
 

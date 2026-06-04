@@ -634,7 +634,7 @@ class PointOfSale extends Component
                     [
                         'key' => '3',
                         'value' => 'total_tagihan',
-                        'value_text' => 'Rp ' . number_format($order->grand_total, 0, ',', '.')
+                        'value_text' => 'Rp ' . number_format($order->subtotal, 0, ',', '.')
                     ]
                 ]
             ]
