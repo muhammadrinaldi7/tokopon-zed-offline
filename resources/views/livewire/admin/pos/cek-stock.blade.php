@@ -84,7 +84,7 @@
                         <div class="relative z-10 flex justify-between items-start">
                             <div>
                                 <p class="text-blue-100 text-xs uppercase tracking-wider font-bold mb-1">Informasi Stok
-                                </p>
+                                    Global</p>
                                 <h3 class="text-xl font-bold leading-tight">{{ $selectedProduct }}</h3>
                             </div>
                             <button wire:click="resetCheck"
@@ -109,45 +109,74 @@
                         @if (count($stockData) > 0)
                             <ul class="space-y-3">
                                 @foreach ($stockData as $data)
+                                    {{-- Modifikasi: Diubah menjadi flex-col agar SN bisa ditaruh di bawahnya --}}
                                     <li
-                                        class="flex justify-between items-center p-4 rounded-xl border transition-all shadow-sm
-                                        {{ $data['is_current_user_warehouse'] ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-500/20' : 'bg-white border-gray-100' }}">
+                                        class="flex flex-col p-4 rounded-xl border transition-all shadow-sm
+                                {{ $data['is_current_user_warehouse'] ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-500/20' : 'bg-white border-gray-100' }}">
 
-                                        <div class="flex items-center gap-3">
+                                        {{-- Baris Utama: Informasi Gudang dan Jumlah Unit --}}
+                                        <div class="flex justify-between items-center w-full">
+                                            <div class="flex items-center gap-3">
+                                                <div
+                                                    class="{{ $data['is_current_user_warehouse'] ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400' }} p-2 rounded-lg">
+                                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                                        stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <span
+                                                        class="block text-sm font-bold {{ $data['is_current_user_warehouse'] ? 'text-blue-900' : 'text-gray-700' }}">
+                                                        {{ $data['warehouse_name'] }}
+                                                        @if ($data['is_current_user_warehouse'])
+                                                            <span
+                                                                class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white uppercase tracking-wider">Lokasi
+                                                                Anda</span>
+                                                        @endif
+                                                    </span>
+                                                    <span class="block text-xs text-gray-500 mt-0.5">Ketersediaan Stok
+                                                        Fisik</span>
+                                                </div>
+                                            </div>
+
+                                            <div class="text-right">
+                                                @if ($data['stock'] > 0)
+                                                    <span
+                                                        class="text-lg font-black {{ $data['is_current_user_warehouse'] ? 'text-blue-600' : 'text-emerald-600' }}">{{ $data['stock'] }}</span>
+                                                    <span class="text-xs text-gray-500 ml-1 font-bold">Unit</span>
+                                                @else
+                                                    <span
+                                                        class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100">Kosong</span>
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        {{-- GANTI DARI SINI: List Serial Number per Gudang --}}
+                                        @if (!empty($data['sns']) && count($data['sns']) > 0)
                                             <div
-                                                class="{{ $data['is_current_user_warehouse'] ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400' }} p-2 rounded-lg">
-                                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
-                                                    stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                                </svg>
+                                                class="mt-3 pt-3 border-t border-dashed {{ $data['is_current_user_warehouse'] ? 'border-blue-200' : 'border-gray-100' }} flex justify-end">
+                                                <button
+                                                    wire:click="openSnModal('{{ $data['warehouse_name'] }}', {{ json_encode($data['sns']) }})"
+                                                    type="button"
+                                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition shadow-sm border 
+            {{ $data['is_current_user_warehouse']
+                ? 'bg-blue-600 text-white hover:bg-blue-700 border-blue-600'
+                : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-200' }}">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
+                                                        stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    </svg>
+                                                    Cek SN
+                                                </button>
                                             </div>
-                                            <div>
-                                                <span
-                                                    class="block text-sm font-bold {{ $data['is_current_user_warehouse'] ? 'text-blue-900' : 'text-gray-700' }}">
-                                                    {{ $data['warehouse_name'] }}
-                                                    @if ($data['is_current_user_warehouse'])
-                                                        <span
-                                                            class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white uppercase tracking-wider">Lokasi
-                                                            Anda</span>
-                                                    @endif
-                                                </span>
-                                                <span class="block text-xs text-gray-500 mt-0.5">Ketersediaan Stok
-                                                    Fisik</span>
-                                            </div>
-                                        </div>
+                                        @endif
 
-                                        <div class="text-right">
-                                            @if ($data['stock'] > 0)
-                                                <span
-                                                    class="text-lg font-black {{ $data['is_current_user_warehouse'] ? 'text-blue-600' : 'text-emerald-600' }}">{{ $data['stock'] }}</span>
-                                                <span class="text-xs text-gray-500 ml-1 font-bold">Unit</span>
-                                            @else
-                                                <span
-                                                    class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100">Kosong</span>
-                                            @endif
-                                        </div>
                                     </li>
                                 @endforeach
                             </ul>
@@ -161,13 +190,15 @@
                                     </svg>
                                 </div>
                                 <h4 class="text-gray-900 font-bold mb-1">Stok Belum Diatur</h4>
-                                <p class="text-gray-500 text-sm">Varian produk ini belum memiliki data ketersediaan stok
+                                <p class="text-gray-500 text-sm">Varian produk ini belum memiliki data ketersediaan
+                                    stok
                                     di seluruh gudang.</p>
                             </div>
                         @endif
                     </div>
                 </div>
             @else
+                {{-- View Empty State default bawaan anda --}}
                 <div
                     class="h-full min-h-[300px] border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-center p-8 bg-gray-50/50">
                     <div class="bg-gray-100 text-gray-400 p-4 rounded-full mb-4">
@@ -183,4 +214,67 @@
             @endif
         </div>
     </div>
+    {{-- MODAL KHUSUS SERIAL NUMBER --}}
+    @if ($showSnModal)
+        <div
+            class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-x-hidden overflow-y-auto outline-none focus:outline-none">
+
+            {{-- Backdrop Efek Blur --}}
+            <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" wire:click="closeSnModal">
+            </div>
+
+            {{-- Konten Modal --}}
+            <div
+                class="relative w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 z-10 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-150">
+
+                {{-- Header Modal --}}
+                <div class="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-900 uppercase tracking-wider">Daftar Serial Number</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Gudang: <span
+                                class="font-semibold text-blue-600">{{ $modalWarehouseName }}</span></p>
+                    </div>
+                    <button wire:click="closeSnModal" type="button"
+                        class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Body Modal (List SN) --}}
+                <div class="p-5 max-h-[300px] overflow-y-auto space-y-2">
+                    @foreach ($modalSns as $index => $sn)
+                        <div
+                            class="flex items-center justify-between p-3 bg-gray-50 border border-gray-200/60 rounded-xl font-mono text-sm text-gray-700 hover:bg-blue-50/40 hover:border-blue-200 transition group">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-400 font-sans font-medium">{{ $index + 1 }}.</span>
+                                <span class="font-semibold tracking-wide">{{ $sn }}</span>
+                            </div>
+
+                            {{-- Tombol Klik Otomatis Salin SN --}}
+                            <button type="button"
+                                onclick="navigator.clipboard.writeText('{{ $sn }}'); alert('SN {{ $sn }} berhasil disalin!')"
+                                class="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-white border border-transparent hover:border-gray-200 transition shadow-none hover:shadow-sm"
+                                title="Salin Nomor Seri">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                </svg>
+                            </button>
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- Footer Modal --}}
+                <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+                    <button wire:click="closeSnModal" type="button"
+                        class="px-4 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
