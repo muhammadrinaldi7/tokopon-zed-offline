@@ -99,6 +99,7 @@ class Pos extends Component
             return;
         }
 
+
         if (!$skuFromAccurate) {
             $this->dispatch('toast', title: 'Error', message: "Serial Number '{$sn}' tidak ditemukan di Accurate.", type: 'error');
             $this->scanned_sn = '';
@@ -114,6 +115,43 @@ class Pos extends Component
 
         // 3. Cari SKU di Database Lokal (Cek Baru, lalu Bekas)
         $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
+
+        // Ambil ID Warehouse dari user yang sedang login
+        $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
+        // =========================================================================
+        // 3. CEK KESESUAIAN WAREHOUSE DI TABEL product_serial_numbers
+        // =========================================================================
+        // Catatan: Pastikan nama kolom 'sn' atau 'serial_number' sesuai dengan yang ada di database-mu
+        $localSnRecord = \Illuminate\Support\Facades\DB::table('product_serial_numbers')
+            ->where('serial_number', $sn)
+            ->first();
+
+        if (!$localSnRecord) {
+            $this->dispatch('toast', title: 'Gagal', message: "Serial Number '{$sn}' tidak ditemukan di ZPOS.", type: 'error');
+            $this->scanned_sn = '';
+            return;
+        }
+
+        if ($localSnRecord->warehouse_id != $warehouseId) {
+            // Ambil nama gudang yang memiliki SN tersebut
+            $actualWarehouseName = \Illuminate\Support\Facades\DB::table('warehouses')
+                ->where('id', $localSnRecord->warehouse_id)
+                ->value('name'); // Ganti 'name' dengan nama kolom gudang di databasemu (misal: 'nama_gudang')
+
+            // Antisipasi jika data gudangnya ternyata tidak ketemu di DB
+            $warehouseTarget = $actualWarehouseName ?? 'Gudang Lain';
+
+            $this->dispatch(
+                'toast',
+                title: 'Gagal',
+                message: "Serial Number '{$sn}' ada di gudang {$warehouseTarget} Silahkan lakukan pemindahan barang di accurate.",
+                type: 'error'
+            );
+
+            $this->scanned_sn = '';
+            return;
+        }
+
         $isSecond = false;
         $variantType = \App\Models\ProductVariant::class;
 
@@ -123,16 +161,16 @@ class Pos extends Component
         }])->where('sku', $skuFromAccurate)->first();
 
         // Jika tidak ada di Baru, Cek di Varian Produk Bekas
-        if (!$variant) {
-            $variant = \App\Models\SecondProductVariant::with(['product', 'warehouseStocks' => function ($q) use ($warehouseId) {
-                $q->where('warehouse_id', $warehouseId);
-            }])->where('sku', $skuFromAccurate)->first();
+        // if (!$variant) {
+        //     $variant = \App\Models\SecondProductVariant::with(['product', 'warehouseStocks' => function ($q) use ($warehouseId) {
+        //         $q->where('warehouse_id', $warehouseId);
+        //     }])->where('sku', $skuFromAccurate)->first();
 
-            if ($variant) {
-                $isSecond = true;
-                $variantType = \App\Models\SecondProductVariant::class;
-            }
-        }
+        //     if ($variant) {
+        //         $isSecond = true;
+        //         $variantType = \App\Models\SecondProductVariant::class;
+        //     }
+        // }
 
         if (!$variant) {
             $this->dispatch('toast', title: 'Peringatan', message: "Produk (SKU: {$skuFromAccurate}) belum terdaftar di sistem lokal.", type: 'warning');
@@ -927,6 +965,43 @@ class Pos extends Component
                 $this->js("document.getElementById('sn_input_{$index}_{$snIndex}').value = '';");
 
                 return; // Gagalkan pengisian SN ke cart
+            }
+            // =================================================================
+
+            // =================================================================
+            // TAMBAHAN: CEK KESESUAIAN WAREHOUSE DI TABEL product_serial_numbers
+            // =================================================================
+            $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
+
+            // Cari record SN di database lokal
+            $localSnRecord = \Illuminate\Support\Facades\DB::table('product_serial_numbers')
+                ->where('serial_number', $value) // sesuaikan kolom jika namanya 'sn'
+                ->first();
+
+            if (!$localSnRecord) {
+                $this->dispatch('toast', title: 'Error', message: "Serial Number '{$value}' tidak ditemukan di database lokal.", type: 'error');
+                $this->js("document.getElementById('sn_input_{$index}_{$snIndex}').value = '';");
+                return;
+            }
+
+            // Cek jika warehouse tidak cocok
+            if ($localSnRecord->warehouse_id != $warehouseId) {
+                $actualWarehouseName = \Illuminate\Support\Facades\DB::table('warehouses')
+                    ->where('id', $localSnRecord->warehouse_id)
+                    ->value('name'); // sesuaikan kolom nama gudang Anda
+
+                $warehouseTarget = $actualWarehouseName ?? 'Gudang Lain';
+
+                $this->dispatch(
+                    'toast',
+                    title: 'Error',
+                    message: "Serial Number '{$value}' ada di gudang {$warehouseTarget}. Silahkan lakukan pemindahan barang di accurate.",
+                    type: 'error'
+                );
+
+                // Kosongkan kembali input di browser jika salah gudang
+                $this->js("document.getElementById('sn_input_{$index}_{$snIndex}').value = '';");
+                return;
             }
             // =================================================================
 
