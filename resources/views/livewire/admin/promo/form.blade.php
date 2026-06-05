@@ -134,19 +134,34 @@
                     <label class="block text-sm font-bold text-gray-700 mb-2">
                         Nilai Diskon <span class="text-red-500">*</span>
                     </label>
-                    <div class="relative">
-                        @if ($discount_type === 'fixed')
+
+                    @if ($discount_type === 'fixed')
+                        {{-- INPUT DENGAN MASK RUPIAH --}}
+                        <div class="relative" wire:key="discount-fixed-container" x-data="{
+                            rawVal: @entangle('discount_value'),
+                            get maskedVal() {
+                                if (!this.rawVal) return '';
+                                return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                            },
+                            set maskedVal(val) {
+                                this.rawVal = val.replace(/\D/g, '');
+                            }
+                        }">
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
-                            <input type="number" wire:model="discount_value"
-                                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                min="0" placeholder="0">
-                        @else
+                            <input type="text" x-model="maskedVal"
+                                class="w-full pl-11 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                placeholder="0">
+                        </div>
+                    @else
+                        {{-- INPUT PERSENTASE BIASA --}}
+                        <div class="relative" wire:key="discount-percentage-container">
                             <input type="number" wire:model="discount_value"
                                 class="w-full pl-4 pr-10 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 min="0" max="100" placeholder="0">
                             <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">%</span>
-                        @endif
-                    </div>
+                        </div>
+                    @endif
+
                     @error('discount_value')
                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                     @enderror
@@ -155,12 +170,24 @@
                 @if ($discount_type === 'percentage')
                     <div class="md:col-span-2">
                         <label class="block text-sm font-bold text-gray-700 mb-2">Maksimal Potongan (Opsional)</label>
-                        <div class="relative max-w-md">
+
+                        {{-- INPUT MAKSIMAL POTONGAN JUGA DIBERI MASK RUPIAH --}}
+                        <div class="relative max-w-md" wire:key="max-discount-container" x-data="{
+                            rawMax: @entangle('max_discount'),
+                            get maskedMax() {
+                                if (!this.rawMax) return '';
+                                return this.rawMax.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                            },
+                            set maskedMax(val) {
+                                this.rawMax = val.replace(/\D/g, '');
+                            }
+                        }">
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
-                            <input type="number" wire:model="max_discount"
-                                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                min="0" placeholder="Biarkan kosong jika tanpa batas">
+                            <input type="text" x-model="maskedMax"
+                                class="w-full pl-11 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                placeholder="Biarkan kosong jika tanpa batas">
                         </div>
+
                         @error('max_discount')
                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                         @enderror
@@ -225,10 +252,28 @@
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Minimal Transaksi (Rp)</label>
-                    <input type="number" wire:model="min_transaction_amount"
-                        class="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        min="0" placeholder="Kosongkan jika tanpa minimal">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Minimal Transaksi</label>
+
+                    <div class="relative" wire:key="min-transaction-container" x-data="{
+                        rawMinTx: @entangle('min_transaction_amount'),
+                        get maskedMinTx() {
+                            if (!this.rawMinTx) return '';
+                            return this.rawMinTx.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                        },
+                        set maskedMinTx(val) {
+                            this.rawMinTx = val.replace(/\D/g, '');
+                        }
+                    }">
+
+                        {{-- Badge Rp di dalam input --}}
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
+
+                        <input type="text" x-model="maskedMinTx"
+                            class="w-full pl-11 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="Kosongkan jika tanpa minimal">
+
+                    </div>
+
                     @error('min_transaction_amount')
                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                     @enderror
@@ -273,21 +318,37 @@
 
                             <div>
                                 <label class="block text-sm font-bold text-amber-900 mb-2">Nilai Diskon Bundle</label>
-                                <div class="relative">
-                                    @if ($bundle_discount_type === 'fixed')
+
+                                @if ($bundle_discount_type === 'fixed')
+                                    {{-- INPUT DENGAN MASK RUPIAH BUNDLE --}}
+                                    <div class="relative" wire:key="bundle-discount-fixed-container"
+                                        x-data="{
+                                            rawBundleVal: @entangle('bundle_discount_value'),
+                                            get maskedBundleVal() {
+                                                if (!this.rawBundleVal) return '';
+                                                return this.rawBundleVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                            },
+                                            set maskedBundleVal(val) {
+                                                this.rawBundleVal = val.replace(/\D/g, '');
+                                            }
+                                        }">
                                         <span
                                             class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
-                                        <input type="number" wire:model="bundle_discount_value"
-                                            class="w-full pl-10 pr-4 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
-                                            min="0" placeholder="0">
-                                    @else
+                                        <input type="text" x-model="maskedBundleVal"
+                                            class="w-full pl-11 pr-4 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                            placeholder="0">
+                                    </div>
+                                @else
+                                    {{-- INPUT PERSENTASE BIASA --}}
+                                    <div class="relative" wire:key="bundle-discount-percentage-container">
                                         <input type="number" wire:model="bundle_discount_value"
                                             class="w-full pl-4 pr-10 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
                                             min="0" max="100" placeholder="0">
                                         <span
                                             class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">%</span>
-                                    @endif
-                                </div>
+                                    </div>
+                                @endif
+
                                 @error('bundle_discount_value')
                                     <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                                 @enderror
@@ -297,13 +358,26 @@
                                 <div class="md:col-span-2">
                                     <label class="block text-sm font-bold text-amber-900 mb-2">Maksimal Potongan Bundle
                                         (Opsional)</label>
-                                    <div class="relative max-w-md">
+
+                                    {{-- INPUT MAKSIMAL POTONGAN BUNDLE DENGAN MASK RUPIAH --}}
+                                    <div class="relative max-w-md" wire:key="bundle-max-discount-container"
+                                        x-data="{
+                                            rawBundleMax: @entangle('bundle_max_discount'),
+                                            get maskedBundleMax() {
+                                                if (!this.rawBundleMax) return '';
+                                                return this.rawBundleMax.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                            },
+                                            set maskedBundleMax(val) {
+                                                this.rawBundleMax = val.replace(/\D/g, '');
+                                            }
+                                        }">
                                         <span
                                             class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
-                                        <input type="number" wire:model="bundle_max_discount"
-                                            class="w-full pl-10 pr-4 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
-                                            min="0" placeholder="Biarkan kosong jika tanpa batas">
+                                        <input type="text" x-model="maskedBundleMax"
+                                            class="w-full pl-11 pr-4 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                            placeholder="Biarkan kosong jika tanpa batas">
                                     </div>
+
                                     @error('bundle_max_discount')
                                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                                     @enderror
