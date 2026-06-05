@@ -13,6 +13,7 @@ class ItemQuantityHandler implements WebhookHandlerInterface
     public function handle(AccurateWebhookLog $log): void
     {
         $payload = $log->payload;
+        $skusToSyncSn = [];
 
         if (isset($payload['data'])) {
             foreach ($payload['data'] as $itemData) {
@@ -22,20 +23,39 @@ class ItemQuantityHandler implements WebhookHandlerInterface
                 $newQuantity = $itemData['quantity'] ?? null;
 
                 if ($itemNo && $warehouseName && $newQuantity !== null) {
-                    $this->updateLocalStock($itemNo, $warehouseName, $newQuantity);
+                    $hasSn = $this->updateLocalStock($itemNo, $warehouseName, $newQuantity);
+                    if ($hasSn) {
+                        $skusToSyncSn[$itemNo] = true;
+                    }
+                }
+            }
+        }
+
+        // Jalankan sinkronisasi SN untuk SKU yang stoknya berubah
+        if (!empty($skusToSyncSn)) {
+            $syncService = app(\App\Services\SerialNumberSyncService::class);
+            foreach (array_keys($skusToSyncSn) as $sku) {
+                try {
+                    $syncService->syncFromAccurate($sku);
+                    \Illuminate\Support\Facades\Log::info("Webhook SN Sync sukses untuk SKU: {$sku}");
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Webhook SN Sync failed for SKU {$sku}: " . $e->getMessage());
                 }
             }
         }
     }
 
-    private function updateLocalStock($itemNo, $warehouseName, $newQuantity)
+    /**
+     * @return bool True jika varian membutuhkan Serial Number, False jika tidak
+     */
+    private function updateLocalStock($itemNo, $warehouseName, $newQuantity): bool
     {
         $warehouse = Warehouse::where('name', $warehouseName)->first();
-        if (!$warehouse) return;
+        if (!$warehouse) return false;
 
-        $variant = ProductVariant::where('sku', $itemNo)->first()
+        $variant = ProductVariant::with('product')->where('sku', $itemNo)->first()
             ?? SecondProductVariant::where('sku', $itemNo)->first();
-        if (!$variant) return;
+        if (!$variant) return false;
 
         // LANGSUNG SIMPAN KE DB LOKAL (0 Detik, Tanpa HTTP Request ke Accurate!)
         WarehouseStock::updateOrCreate(
@@ -48,5 +68,14 @@ class ItemQuantityHandler implements WebhookHandlerInterface
                 'stock'        => (int) $newQuantity
             ]
         );
+
+        // Cek apakah butuh SN
+        if ($variant instanceof SecondProductVariant) {
+            return true;
+        } elseif ($variant instanceof ProductVariant) {
+            return (bool) ($variant->product->has_sn ?? false);
+        }
+
+        return false;
     }
 }

@@ -73,28 +73,15 @@ class SerialNumberSync extends Component
         $this->currentItem = "Sedang memproses SKU: {$sku}";
 
         try {
-            $service = app(AccurateService::class);
-            // Coba ambil dari db source 'syihab' (Produk Baru)
-            $snData = $service->getSerialNumberPerWarehouse($sku, 'syihab');
-
-            // Jika kosong, mungkin dia barang bekas, coba ambil dari db source 'second'
-            if (empty($snData)) {
-                $snData = $service->getSerialNumberPerWarehouse($sku, 'second');
-            }
-
-            if (!empty($snData)) {
-                $this->processSnData($sku, $snData);
-                $this->addLog("[$sku] Tersinkronisasi " . count($snData) . " Serial Number.");
+            $service = app(\App\Services\SerialNumberSyncService::class);
+            $snCount = $service->syncFromAccurate($sku);
+            
+            if ($snCount > 0) {
+                $this->addLog("[$sku] Tersinkronisasi $snCount Serial Number.");
             } else {
-                // Jika masih kosong, berarti SN tidak ada di kedua database
                 $this->addLog("[$sku] Tidak ada data Serial Number di Accurate.");
-                // Jika tadinya ada di DB lokal, kita set Unavailable semua
-                ProductSerialNumber::where('item_no', $sku)
-                    ->where('status', 'Available')
-                    ->update(['status' => 'Unavailable']);
             }
         } catch (\Exception $e) {
-            Log::error("Failed to sync SN for SKU {$sku}: " . $e->getMessage());
             $this->addLog("[$sku] Error: " . $e->getMessage());
         }
 
@@ -102,58 +89,6 @@ class SerialNumberSync extends Component
 
         // Panggil selanjutnya
         $this->dispatch('sync-next-item');
-    }
-
-    private function processSnData($sku, $accurateData)
-    {
-        $existingSnIds = ProductSerialNumber::where('item_no', $sku)
-            ->where('status', 'Available')
-            ->pluck('id', 'serial_number')
-            ->toArray();
-
-        $processedSerialNumbers = [];
-        $upsertData = [];
-        Log::info('data proses serial number: ' . json_encode($accurateData));
-        foreach ($accurateData as $item) {
-            $accurateWarehouseId = $item['warehouse']['id'] ?? null;
-            $serialNumberStr = $item['serialNumber']['number'] ?? null;
-            $accurateSnId = $item['serialNumber']['id'] ?? null;
-
-            if (!$serialNumberStr || !$accurateWarehouseId) continue;
-
-            // Cari ID gudang lokal berdasarkan ID gudang accurate
-            $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)->first();
-            $localWarehouseId = $localWarehouse ? $localWarehouse->id : null;
-
-            $upsertData[] = [
-                'accurate_sn_id' => $accurateSnId,
-                'item_no'        => $sku,
-                'warehouse_id'   => $localWarehouseId,
-                'serial_number'  => $serialNumberStr,
-                'status'         => 'Available',
-                'created_at'     => now(),
-                'updated_at'     => now(),
-            ];
-
-            $processedSerialNumbers[] = $serialNumberStr;
-        }
-
-        // Jalankan Upsert berdasarkan kolom unik serial_number
-        if (count($upsertData) > 0) {
-            ProductSerialNumber::upsert(
-                $upsertData,
-                ['serial_number'],
-                ['accurate_sn_id', 'item_no', 'warehouse_id', 'status', 'updated_at']
-            );
-        }
-
-        // Update status menjadi Unavailable untuk SN yang hilang dari API
-        $missingSnList = array_diff(array_keys($existingSnIds), $processedSerialNumbers);
-        if (count($missingSnList) > 0) {
-            ProductSerialNumber::whereIn('serial_number', $missingSnList)
-                ->where('status', 'Available')
-                ->update(['status' => 'Unavailable']);
-        }
     }
 
     private function addLog($message)
