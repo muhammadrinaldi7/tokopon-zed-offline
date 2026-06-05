@@ -78,7 +78,7 @@ class ItemQuantityHandler implements WebhookHandlerInterface
         if ($variant instanceof SecondProductVariant) {
             return true;
         } elseif ($variant instanceof ProductVariant) {
-            return (bool) ($variant->product->has_sn ?? false);
+            return (bool) ($variant->has_sn ?? false);
         }
 
         return false;

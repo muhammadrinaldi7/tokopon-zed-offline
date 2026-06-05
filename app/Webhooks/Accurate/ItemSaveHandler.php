@@ -51,15 +51,42 @@ class ItemSaveHandler implements WebhookHandlerInterface
             $newPrice = (int) $accurateItem['unitPrice']; // unitPrice adalah harga jual standar di Accurate
 
             try {
-                // Update ke database lokal Laravel
+                // Update ke database lokal Laravel (Tabel Varian)
                 $variant->update([
                     'price' => $newPrice,
-                    // Jika struktur POS Anda menyimpan nama di level parent (Product), 
-                    // Anda mungkin perlu meng-update $variant->product->update(['name' => $newName])
                 ]);
-                Log::info("Webhook Berhasil: Item Updated via Webhook: SKU {$itemNo} | Harga Baru: {$newPrice}");
+
+                // Update base_price di tabel Induk (Product / SecondProduct)
+                if ($variant->product) {
+                    $variant->accurateData->update([
+                        'base_price' => $newPrice
+                    ]);
+                }
+
+                Log::info("Webhook Berhasil: Item Updated via Webhook: SKU {$itemNo} | Harga Jual: {$newPrice} | Harga Modal (base_price): {$newPrice}");
             } catch (\Exception $e) {
                 Log::error("Webhook Gagal: Gagal update harga SKU {$itemNo}. Error: " . $e->getMessage());
+            }
+
+            // --- TAMBAHAN UNTUK STOK AWAL & SN ---
+            // Jika user mengisi Stok Awal dan SN saat membuat/mengedit barang di Accurate,
+            // Accurate HANYA mengirimkan webhook ITEM (bukan INVENTORY_ADJUSTMENT).
+            // Jadi kita harus memaksa pengecekan SN di sini juga!
+            $hasSn = false;
+            if ($variant instanceof SecondProductVariant) {
+                $hasSn = true;
+            } elseif ($variant instanceof ProductVariant) {
+                $hasSn = (bool) ($variant->has_sn ?? false);
+            }
+
+            if ($hasSn) {
+                try {
+                    $syncService = app(\App\Services\SerialNumberSyncService::class);
+                    $syncService->syncFromAccurate($itemNo);
+                    Log::info("Webhook SN Sync sukses (dari ItemSaveHandler) untuk SKU: {$itemNo}");
+                } catch (\Exception $e) {
+                    Log::error("Webhook SN Sync failed (dari ItemSaveHandler) for SKU {$itemNo}: " . $e->getMessage());
+                }
             }
         }
     }

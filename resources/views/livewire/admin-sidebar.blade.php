@@ -109,6 +109,18 @@
                     <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Cek Stock</span>
                 </a>
             @endcan
+            @can('view-warehouse-stocks')
+                <a href="{{ route('admin.check-serial-number') }}" wire:navigate
+                    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.check-serial-number') ? $activeClass : $inactiveClass }}">
+                    <svg class="w-5 h-5 {{ request()->routeIs('admin.check-serial-number') ? $activeIconClass : $inactiveIconClass }}"
+                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+                    </svg>
+                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Cek Lokasi SN</span>
+                </a>
+            @endcan
         @endcanany
 
         @can('view-catalog-menu')
@@ -175,10 +187,6 @@
                         <a href="{{ route('admin.warehouse-stocks') }}" wire:navigate
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.warehouse-stocks') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                             Stok Gudang
-                        </a>
-                        <a href="{{ route('admin.check-serial-number') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.check-serial-number') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Cek Lokasi SN
                         </a>
                     @endcan
                 </div>
