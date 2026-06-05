@@ -57,17 +57,22 @@ class ItemQuantityHandler implements WebhookHandlerInterface
             ?? SecondProductVariant::where('sku', $itemNo)->first();
         if (!$variant) return false;
 
-        // LANGSUNG SIMPAN KE DB LOKAL (0 Detik, Tanpa HTTP Request ke Accurate!)
-        WarehouseStock::updateOrCreate(
-            [
-                'warehouse_id' => $warehouse->id,
-                'variant_id'   => $variant->id,
-                'variant_type' => get_class($variant),
-            ],
-            [
-                'stock'        => (int) $newQuantity
-            ]
-        );
+        try {
+            // LANGSUNG SIMPAN KE DB LOKAL (0 Detik, Tanpa HTTP Request ke Accurate!)
+            WarehouseStock::updateOrCreate(
+                [
+                    'warehouse_id' => $warehouse->id,
+                    'variant_id'   => $variant->id,
+                    'variant_type' => get_class($variant),
+                ],
+                [
+                    'stock'        => (int) $newQuantity
+                ]
+            );
+            \Illuminate\Support\Facades\Log::info("Webhook Berhasil: Update Stok via ITEM_QUANTITY untuk SKU {$itemNo} di Gudang {$warehouseName} menjadi {$newQuantity}");
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Webhook Gagal: Gagal update stok SKU {$itemNo} di Gudang {$warehouseName}. Error: " . $e->getMessage());
+        }
 
         // Cek apakah butuh SN
         if ($variant instanceof SecondProductVariant) {

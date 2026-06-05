@@ -89,11 +89,16 @@ class SerialNumberSyncService
 
         // Jalankan Upsert berdasarkan kolom unik serial_number
         if (count($upsertData) > 0) {
-            ProductSerialNumber::upsert(
-                $upsertData,
-                ['serial_number'],
-                ['accurate_sn_id', 'item_no', 'warehouse_id', 'status', 'updated_at']
-            );
+            try {
+                ProductSerialNumber::upsert(
+                    $upsertData,
+                    ['serial_number'], // <- Acuan Pencarian (Unique)
+                    ['accurate_sn_id', 'item_no', 'warehouse_id', 'status', 'updated_at'] // <- Yang di-update
+                );
+                Log::info("Webhook/Sync Berhasil: Upsert " . count($upsertData) . " Serial Number untuk SKU {$sku}");
+            } catch (\Exception $e) {
+                Log::error("Webhook/Sync Gagal: Gagal upsert Serial Number untuk SKU {$sku}. Error: " . $e->getMessage());
+            }
         }
 
         // Update status menjadi Unavailable untuk SN yang hilang dari API

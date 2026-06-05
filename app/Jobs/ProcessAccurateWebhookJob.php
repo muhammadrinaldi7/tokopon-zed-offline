@@ -62,23 +62,21 @@ class ProcessAccurateWebhookJob implements ShouldQueue
     private function resolveHandler(string $eventType): ?string
     {
         return match ($eventType) {
-            'ITEM' => \App\Webhooks\Accurate\ItemSaveHandler::class,
-            'ITEM_SAVE',
+            'ITEM', 'ITEM_SAVE' => \App\Webhooks\Accurate\ItemSaveHandler::class,
 
-            // KUMPULAN EVENT DOKUMEN HEADER:
-            // Karena tidak membawa sisa stok, kita abaikan saja (di-set ke null)
+            // EVENT DETAIL STOK: 
+            // Membawa key "quantity" secara absolut
+            'ITEM_QUANTITY' => ItemQuantityHandler::class,
+
+            // KUMPULAN EVENT DOKUMEN TRANSAKSI & STOK:
+            // Event ini mengubah stok, kita panggil StockChangeHandler agar memaksa sistem 
+            // menembak API Accurate untuk menarik sisa stok absolut terbaru dan sinkron SN.
             'INVENTORY_ADJUSTMENT',
             'INVENTORY_TRANSFER',
             'PURCHASE_INVOICE',
             'RECEIVE_ITEM',
-            'ITEM_ADJUSTMENT' => null,
-
-            // EVENT DETAIL STOK: 
-            // Ini satu-satunya yang membawa key "quantity" untuk di-update
-            'ITEM_QUANTITY' => ItemQuantityHandler::class,
-
-            // Dimatikan sementara karena belum mengelola SN / IMEI
-            // 'STOCK_MUTATION' => \App\Webhooks\Accurate\StockChangeHandler::class,
+            'ITEM_ADJUSTMENT',
+            'STOCK_MUTATION' => \App\Webhooks\Accurate\StockChangeHandler::class,
 
             // KUMPULAN EVENT PENJUALAN:
             'SALES_INVOICE',

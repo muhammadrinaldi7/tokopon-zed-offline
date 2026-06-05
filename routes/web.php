@@ -2,6 +2,7 @@
 
 use App\Livewire\Admin\Employe\EmployeManage;
 use App\Livewire\Admin\Pos\CekStock;
+use App\Livewire\Admin\Reporting\Dashboard;
 use App\Livewire\Admin\Users\UserOperational;
 use App\Livewire\Pages\SellPhone;
 use App\Livewire\Pages\SellPhoneHistory;
@@ -61,6 +62,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/accurate-customers', \App\Livewire\Admin\Accurate\CustomerAccurateManagement::class)->name('accurate-customers')->middleware('can:manage-accurate-customers');
     Route::get('/accurate-sync-sn', \App\Livewire\Admin\Accurate\SerialNumberSync::class)->name('accurate-sync-sn')->middleware('can:manage-accurate-products');
     Route::get('/warehouse-stocks', \App\Livewire\Admin\Warehouse\StockManagement::class)->name('warehouse-stocks')->middleware('can:view-warehouse-stocks');
+    Route::get('/check-serial-number', \App\Livewire\Admin\Warehouse\CheckSerialNumber::class)->name('check-serial-number')->middleware('can:view-warehouse-stocks');
 
     // Pesanan
     Route::get('/orders', \App\Livewire\Admin\Orders\OrderManagement::class)->name('orders.management')->middleware('can:manage-orders');
@@ -68,7 +70,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Reporting
     Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
-        Route::get('/', \App\Livewire\Admin\Reporting\Dashboard::class)->name('index');
+        Route::get('/', Dashboard::class)->name('index');
         Route::get('/sales', \App\Livewire\Admin\Reporting\SalesReport::class)->name('sales');
         Route::get('/products', \App\Livewire\Admin\Reporting\ProductReport::class)->name('products');
         Route::get('/stock', \App\Livewire\Admin\Reporting\StockReport::class)->name('stock');

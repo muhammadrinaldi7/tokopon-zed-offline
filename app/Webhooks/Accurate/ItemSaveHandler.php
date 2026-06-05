@@ -50,14 +50,17 @@ class ItemSaveHandler implements WebhookHandlerInterface
             $newName = $accurateItem['name'];
             $newPrice = (int) $accurateItem['unitPrice']; // unitPrice adalah harga jual standar di Accurate
 
-            // Update ke database lokal Laravel
-            $variant->update([
-                'price' => $newPrice,
-                // Jika struktur POS Anda menyimpan nama di level parent (Product), 
-                // Anda mungkin perlu meng-update $variant->product->update(['name' => $newName])
-            ]);
-
-            Log::info("Item Updated via Webhook: SKU {$itemNo} | Harga Baru: {$newPrice}");
+            try {
+                // Update ke database lokal Laravel
+                $variant->update([
+                    'price' => $newPrice,
+                    // Jika struktur POS Anda menyimpan nama di level parent (Product), 
+                    // Anda mungkin perlu meng-update $variant->product->update(['name' => $newName])
+                ]);
+                Log::info("Webhook Berhasil: Item Updated via Webhook: SKU {$itemNo} | Harga Baru: {$newPrice}");
+            } catch (\Exception $e) {
+                Log::error("Webhook Gagal: Gagal update harga SKU {$itemNo}. Error: " . $e->getMessage());
+            }
         }
     }
 

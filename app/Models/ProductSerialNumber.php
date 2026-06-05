@@ -12,4 +12,14 @@ class ProductSerialNumber extends Model
     {
         return $this->belongsTo(Warehouse::class);
     }
+
+    public function getVariantAttribute()
+    {
+        $variant = \App\Models\ProductVariant::with('product')->where('sku', $this->item_no)->first();
+        if ($variant) {
+            return $variant;
+        }
+
+        return \App\Models\SecondProductVariant::with('product')->where('sku', $this->item_no)->first();
+    }
 }
