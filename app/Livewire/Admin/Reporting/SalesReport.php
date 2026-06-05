@@ -96,9 +96,9 @@ class SalesReport extends Component
 
     public function exportCsv()
     {
-        $orders = $this->ordersQuery->get();
+        // Eager load relasi payments untuk performa saat generate CSV
+        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'paymentMethodRate'])->get();
         $csvFileName = 'laporan_penjualan_detail_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
-
         return response()->streamDownload(function () use ($orders) {
             $file = fopen('php://output', 'w');
             fputcsv($file, [
@@ -119,9 +119,10 @@ class SalesReport extends Component
                 'SN (SerialNumber)',
                 'QTY',
                 'HARGA SATUAN (Rp)',
+                'DISKON ITEM (Rp)',
                 'SUBTOTAL ITEM (Rp)',
                 'GROSS ORDER (Rp)',
-                'DISKON ORDER (Rp)',
+                'DISKON PROMO ORDER (Rp)',
                 'MDR (Rp)',
                 'TOTAL TRANSAKSI (Rp)',
                 'NET SALES (Rp)'
@@ -130,10 +131,41 @@ class SalesReport extends Component
             foreach ($orders as $order) {
                 $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
 
+                // Menghitung Diskon Promo Order (Total Diskon Order dikurangi Total Diskon Item)
+                $totalItemDiscount = $order->items->sum('discount_amount');
+                $promoDiscount = $order->discount_amount - $totalItemDiscount;
+                if ($promoDiscount < 0) $promoDiscount = 0;
+
+                // Memproses Split Payment
+                $paymentMethods = [];
+                $paymentRates = [];
+                
+                if ($order->payments && $order->payments->count() > 0) {
+                    foreach ($order->payments as $payment) {
+                        $methodName = $payment->paymentMethod ? $payment->paymentMethod->name : '-';
+                        $rateName = $payment->paymentMethodRate ? $payment->paymentMethodRate->name : '-';
+                        $amount = number_format($payment->amount, 0, ',', '.');
+                        
+                        $paymentMethods[] = "{$methodName} (Rp {$amount})";
+                        if ($rateName !== '-') {
+                            $paymentRates[] = $rateName;
+                        }
+                    }
+                } else {
+                    // Fallback jika tidak ada record di order_payments (transaksi lama)
+                    $paymentMethods[] = $order->paymentMethod ? $order->paymentMethod->name : '-';
+                    $paymentRates[] = $order->paymentMethodRate ? $order->paymentMethodRate->name : '-';
+                }
+                
+                $paymentMethodStr = implode(', ', $paymentMethods);
+                $paymentRateStr = !empty($paymentRates) ? implode(', ', array_unique($paymentRates)) : '-';
+
                 if ($order->items->count() > 0) {
                     foreach ($order->items as $item) {
                         $variant = $item->variant;
-                        $name = $variant->name ?? ($variant->product ? $variant->product->name : 'Unknown Product');
+                        // Gunakan null-safe operator (?->) agar tidak error jika variant sudah dihapus
+                        $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
+                        $merk = $variant?->product?->brand?->name ?? 'Unknown';
 
                         fputcsv($file, [
                             $order->created_at->format('Y-m-d H:i'),
@@ -144,18 +176,19 @@ class SalesReport extends Component
                             $order->user ? $order->user->profile->phone_number : '-',
                             $order->salesBy ? $order->salesBy->name : '-',
                             $branch,
-                            $order->paymentMethod ? $order->paymentMethod->name : '-',
-                            $order->paymentMethodRate ? $order->paymentMethodRate->name : '-',
+                            $paymentMethodStr,
+                            $paymentRateStr,
                             $name,
-                            $variant->product->brand ? $variant->product->brand->name : '-',
-                            $variant->color ?? '-',
-                            ($variant->ram ? $variant->ram . ' ' : '') . ($variant->storage ? $variant->storage : '') ?? '-',
+                            $merk,
+                            $variant?->color ?? '-',
+                            ($variant?->ram ? $variant->ram . ' ' : '') . ($variant?->storage ? $variant->storage : '') ?? '-',
                             $item->serial_number ?? '-',
                             $item->qty,
                             $item->price_at_checkout,
+                            $item->discount_amount ?? 0,
                             $item->subtotal,
                             $order->total_amount,
-                            $order->discount_amount,
+                            $promoDiscount,
                             $order->mdr_amount,
                             $order->grand_total,
                             $order->grand_total - $order->mdr_amount
@@ -171,15 +204,19 @@ class SalesReport extends Component
                         $order->user ? $order->user->profile->phone_number : '-',
                         $order->salesBy ? $order->salesBy->name : '-',
                         $branch,
+                        $paymentMethodStr,
+                        $paymentRateStr,
                         '-',
                         '-',
-                        $order->paymentMethod ? $order->paymentMethod->name : '-',
                         '-',
+                        '-',
+                        '-',
+                        '0',
                         '0',
                         '0',
                         '0',
                         $order->total_amount,
-                        $order->discount_amount,
+                        $promoDiscount,
                         $order->mdr_amount,
                         $order->grand_total,
                         $order->grand_total - $order->mdr_amount

@@ -55,9 +55,12 @@ class SerialNumberSyncService
      */
     private function processSnData($sku, $accurateData)
     {
-        $existingSnIds = ProductSerialNumber::where('item_no', $sku)
+        // Ambil list Serial Number yang ada di DB lokal
+        // Jangan gunakan pluck('id', 'serial_number') karena PHP akan mengubah key string angka menjadi integer,
+        // yang akan membuat query WHERE IN() gagal di MySQL saat membandingkan string.
+        $existingSns = ProductSerialNumber::where('item_no', $sku)
             ->where('status', 'Available')
-            ->pluck('id', 'serial_number')
+            ->pluck('serial_number')
             ->toArray();
 
         $processedSerialNumbers = [];
@@ -69,6 +72,9 @@ class SerialNumberSyncService
             $accurateSnId = $item['serialNumber']['id'] ?? null;
 
             if (!$serialNumberStr || !$accurateWarehouseId) continue;
+            
+            // Konversi paksa ke string (berjaga-jaga jika payload API mereturn tipe integer)
+            $serialNumberStr = (string) $serialNumberStr;
 
             // Cari ID gudang lokal berdasarkan ID gudang accurate
             $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)->first();
@@ -102,7 +108,11 @@ class SerialNumberSyncService
         }
 
         // Update status menjadi Unavailable untuk SN yang hilang dari API
-        $missingSnList = array_diff(array_keys($existingSnIds), $processedSerialNumbers);
+        $missingSnList = array_diff($existingSns, $processedSerialNumbers);
+        
+        // Pastikan array hanya berisi string sebelum di binding ke Eloquent (PDO string binding)
+        $missingSnList = array_map('strval', $missingSnList);
+
         if (count($missingSnList) > 0) {
             ProductSerialNumber::whereIn('serial_number', $missingSnList)
                 ->where('status', 'Available')
