@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Pos;
 
+use App\Utils\Format;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -14,6 +15,8 @@ class CekStock extends Component
     public $searchResults = [];
     public $stockData = [];
     public $selectedProduct = '';
+    public $selectedProductId = null;
+    public $selectedProductType = null;
 
     public function updatedSearchQuery()
     {
@@ -25,14 +28,14 @@ class CekStock extends Component
         $term = '%' . $this->searchQuery . '%';
 
         // Cari di Produk Baru
-        $newVariants = \App\Models\ProductVariant::with('product')
+        $newVariants = \App\Models\ProductVariant::with(['product', 'accurateData'])
             ->where('sku', 'like', $term)
             ->orWhereHas('product', function ($q) use ($term) {
                 $q->where('name', 'like', $term);
             })->take(10)->get();
 
         // Cari di Produk Second
-        $secondVariants = \App\Models\SecondProductVariant::with('secondProduct')
+        $secondVariants = \App\Models\SecondProductVariant::with(['secondProduct', 'accurateData'])
             ->where('sku', 'like', $term)
             ->orWhereHas('secondProduct', function ($q) use ($term) {
                 $q->where('name', 'like', $term);
@@ -49,6 +52,8 @@ class CekStock extends Component
                 'storage' => $v->storage,
                 'color' => $v->color,
                 'sku' => $v->sku,
+                'price' => Format::rupiah($v->accurateData->base_price) ?? 0,
+                'allStock' => $v->accurateData->stock ?? 0,
                 'is_second' => false,
             ];
         }
@@ -62,9 +67,12 @@ class CekStock extends Component
                 'storage' => $v->storage,
                 'color' => $v->color,
                 'sku' => $v->sku,
+                'price' => Format::rupiah($v->accurateData->base_price) ?? 0,
+                'allStock' => $v->accurateData->stock ?? 0,
                 'is_second' => true,
             ];
         }
+
 
         $this->searchResults = $results;
     }
@@ -72,6 +80,8 @@ class CekStock extends Component
     public function selectProduct($id, $type)
     {
         $userWarehouseId = Auth::user()->warehouse_id;
+        $this->selectedProductId = $id;
+        $this->selectedProductType = $type;
 
         if ($type === 'second') {
             $variant = \App\Models\SecondProductVariant::with('warehouseStocks.warehouse', 'secondProduct')->find($id);
@@ -97,18 +107,16 @@ class CekStock extends Component
             $this->selectedProduct = '';
             $this->dispatch('toast', title: 'Gagal', message: 'Data varian tidak ditemukan.', type: 'error');
         }
-
-        // Reset pencarian setelah dipilih
-        $this->searchResults = [];
-        $this->searchQuery = '';
     }
 
     public function resetCheck()
     {
-        $this->stockData = [];
-        $this->selectedProduct = '';
         $this->searchQuery = '';
         $this->searchResults = [];
+        $this->stockData = [];
+        $this->selectedProduct = '';
+        $this->selectedProductId = null;
+        $this->selectedProductType = null;
     }
 
     public function render()

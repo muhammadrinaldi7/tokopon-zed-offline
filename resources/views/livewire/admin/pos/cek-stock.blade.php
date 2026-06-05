@@ -32,9 +32,16 @@
             @if (strlen($searchQuery) >= 2)
                 @if (count($searchResults) > 0)
                     <div class="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-100 bg-white">
+                        {{-- @php
+                            dd($searchResults);
+                        @endphp --}}
                         @foreach ($searchResults as $result)
+                            @php
+                                $isSelected =
+                                    $selectedProductId == $result['id'] && $selectedProductType == $result['type'];
+                            @endphp
                             <div wire:click="selectProduct({{ $result['id'] }}, '{{ $result['type'] }}')"
-                                class="p-4 hover:bg-blue-50 cursor-pointer transition flex justify-between items-center group">
+                                class="p-4 cursor-pointer transition flex justify-between items-center group {{ $isSelected ? 'bg-blue-100 border-l-4 border-blue-600' : 'hover:bg-blue-50' }}">
                                 <div>
                                     <h4 class="font-bold text-gray-900 group-hover:text-blue-700 transition">
                                         {{ $result['name'] }}
@@ -47,7 +54,9 @@
                                         @endif
                                     </h4>
                                     <p class="text-xs text-gray-500 mt-1">
-                                        {{ !empty($result['ram']) ? $result['ram'] . ' / ' . $result['storage'] : $result['storage'] }} - {{ $result['color'] }}
+                                        {{ !empty($result['ram']) ? $result['ram'] . ' / ' . $result['storage'] : $result['storage'] }}
+                                        - {{ $result['color'] }} {{ $result['price'] }} Stock :
+                                        {{ $result['allStock'] }}
                                     </p>
                                 </div>
                                 <div class="text-right">
