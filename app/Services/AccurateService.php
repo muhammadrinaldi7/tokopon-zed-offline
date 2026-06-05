@@ -700,6 +700,43 @@ class AccurateService
         }
     }
 
+    /**
+     * Get serial number per warehouse from Accurate report
+     */
+    public function getSerialNumberPerWarehouse($sku, $databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/report/serial-number-per-warehouse.do', [
+            'itemNo' => $sku,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? [];
+            }
+        }
+        Log::info('data proses serial number 2: ' . json_encode($data));
+        return [];
+    }
+
     public function getItemStockPerWarehouse($warehouseName, $databaseSource = 'syihab')
     {
         $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';

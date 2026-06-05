@@ -55,7 +55,7 @@
                                     </h4>
                                     <p class="text-xs text-gray-500 mt-1">
                                         {{ !empty($result['ram']) ? $result['ram'] . ' / ' . $result['storage'] : $result['storage'] }}
-                                        - {{ $result['color'] }} {{ $result['price'] }} Stock :
+                                        - {{ $result['color'] }} {{ $result['price'] }} Stock Jual :
                                         {{ $result['allStock'] }}
                                     </p>
                                 </div>

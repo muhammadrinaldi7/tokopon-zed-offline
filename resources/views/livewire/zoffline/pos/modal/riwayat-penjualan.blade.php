@@ -60,7 +60,12 @@
                                           </td>
 
                                           <td class="p-3 text-center whitespace-nowrap">
-                                              @if (!empty($order->accurate_invoice_no) || !empty($order->accurate_receipt_no))
+                                              @if ($order->order_status === 'DELETED')
+                                                  <span
+                                                      class="px-2 py-0.5 bg-red-50 text-red-700 text-[9px] font-bold rounded border border-red-200 uppercase">
+                                                      🗑️ Dosa
+                                                  </span>
+                                              @elseif (!empty($order->accurate_invoice_no) || !empty($order->accurate_receipt_no))
                                                   <div class="inline-flex flex-col gap-1 items-center">
                                                       <span
                                                           class="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-bold rounded border border-emerald-200 uppercase">
@@ -81,15 +86,17 @@
                                           </td>
 
                                           <td class="p-3 text-center">
-                                              <button wire:click="reprintOrder({{ $order->id }})"
-                                                  class="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-md text-[11px] font-bold transition-all">
-                                                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
-                                                      stroke="currentColor" stroke-width="2">
-                                                      <path stroke-linecap="round" stroke-linejoin="round"
-                                                          d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                                  </svg>
-                                                  Struk
-                                              </button>
+                                              @if ($order->order_status != 'DELETED')
+                                                  <button wire:click="reprintOrder({{ $order->id }})"
+                                                      class="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-md text-[11px] font-bold transition-all">
+                                                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
+                                                          stroke="currentColor" stroke-width="2">
+                                                          <path stroke-linecap="round" stroke-linejoin="round"
+                                                              d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                      </svg>
+                                                      Struk
+                                                  </button>
+                                              @endif
                                           </td>
                                       </tr>
                                   @endforeach

@@ -59,6 +59,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/second-products/{product}/variants', \App\Livewire\Admin\Products\SecondVariantManagement::class)->name('second-products.variants')->middleware('can:manage-second-catalog');
     Route::get('/accurate-products', \App\Livewire\Admin\Accurate\ProductAccurateManagement::class)->name('accurate-products')->middleware('can:manage-accurate-products');
     Route::get('/accurate-customers', \App\Livewire\Admin\Accurate\CustomerAccurateManagement::class)->name('accurate-customers')->middleware('can:manage-accurate-customers');
+    Route::get('/accurate-sync-sn', \App\Livewire\Admin\Accurate\SerialNumberSync::class)->name('accurate-sync-sn')->middleware('can:manage-accurate-products');
     Route::get('/warehouse-stocks', \App\Livewire\Admin\Warehouse\StockManagement::class)->name('warehouse-stocks')->middleware('can:view-warehouse-stocks');
 
     // Pesanan
