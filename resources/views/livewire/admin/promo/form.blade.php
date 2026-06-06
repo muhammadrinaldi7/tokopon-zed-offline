@@ -149,6 +149,7 @@
                         }">
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
                             <input type="text" x-model="maskedVal"
+                                @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
                                 class="w-full pl-11 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 placeholder="0">
                         </div>
@@ -184,6 +185,7 @@
                         }">
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
                             <input type="text" x-model="maskedMax"
+                                @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
                                 class="w-full pl-11 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 placeholder="Biarkan kosong jika tanpa batas">
                         </div>
@@ -269,6 +271,7 @@
                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
 
                         <input type="text" x-model="maskedMinTx"
+                            @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
                             class="w-full pl-11 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                             placeholder="Kosongkan jika tanpa minimal">
 
@@ -335,6 +338,7 @@
                                         <span
                                             class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
                                         <input type="text" x-model="maskedBundleVal"
+                                            @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
                                             class="w-full pl-11 pr-4 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
                                             placeholder="0">
                                     </div>
@@ -374,6 +378,7 @@
                                         <span
                                             class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
                                         <input type="text" x-model="maskedBundleMax"
+                                            @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
                                             class="w-full pl-11 pr-4 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
                                             placeholder="Biarkan kosong jika tanpa batas">
                                     </div>

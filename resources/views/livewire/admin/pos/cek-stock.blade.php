@@ -154,7 +154,7 @@
                                         </div>
 
                                         {{-- GANTI DARI SINI: List Serial Number per Gudang --}}
-                                        @if (!empty($data['sns']) && count($data['sns']) > 0)
+                                        {{-- @if (!empty($data['sns']) && count($data['sns']) > 0)
                                             <div
                                                 class="mt-3 pt-3 border-t border-dashed {{ $data['is_current_user_warehouse'] ? 'border-blue-200' : 'border-gray-100' }} flex justify-end">
                                                 <button
@@ -175,7 +175,7 @@
                                                     Cek SN
                                                 </button>
                                             </div>
-                                        @endif
+                                        @endif --}}
 
                                     </li>
                                 @endforeach
