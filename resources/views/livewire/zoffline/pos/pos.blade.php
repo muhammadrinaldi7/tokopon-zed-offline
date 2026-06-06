@@ -174,7 +174,7 @@
                 {{-- Cart Items --}}
                 <div class="px-4 py-3 space-y-3 border-b border-gray-100  bg-gray-50/30">
                     @forelse($cart as $index => $item)
-                        <div
+                        <div wire:key="cart-item-{{ $item['id'] ?? $index }}"
                             class="bg-white rounded-xl p-3 border border-gray-200 shadow-sm relative group transition-all duration-200 hover:shadow-md hover:border-blue-200">
 
                             {{-- Tombol Hapus (Muncul saat hover di Desktop) --}}
@@ -212,7 +212,8 @@
                                     </div>
                                     <div class="text-right">
                                         <p class="text-xs font-black text-[#1c69d4]">Rp
-                                            {{ number_format($item['price'] * $item['qty'], 0, ',', '.') }}</p>
+                                            {{ number_format((int) $item['price'] * (int) $item['qty'], 0, ',', '.') }}
+                                        </p>
                                         @can('edit_price_transaction')
                                             <div class="mt-0.5 flex items-center justify-end gap-1">
                                                 <span class="text-[10px] text-gray-400 font-medium">@ Rp</span>

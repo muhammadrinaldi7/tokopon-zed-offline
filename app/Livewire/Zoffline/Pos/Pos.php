@@ -544,7 +544,7 @@ class Pos extends Component
     {
         if (strlen($this->searchSales) < 2) return [];
 
-        return Employe::with('branch')
+        return Employe::active()->with('branch')
             ->where(function ($q) {
                 // Filter 1: Jika cabangnya sama
                 $q->where('branch_id', Auth::user()->branch_id)
@@ -604,7 +604,7 @@ class Pos extends Component
     #[Computed]
     public function subtotal()
     {
-        return collect($this->cart)->sum(fn($item) => $item['price'] * $item['qty']);
+        return collect($this->cart)->sum(fn($item) => (int)$item['price'] * (int)$item['qty']);
     }
 
     #[Computed]

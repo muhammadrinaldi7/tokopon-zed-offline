@@ -21,6 +21,10 @@ class Employe extends Model
         'branch_id'
     ];
 
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', 1);
+    }
     /**
      * Hubungan ke User login POS (jika ada)
      */

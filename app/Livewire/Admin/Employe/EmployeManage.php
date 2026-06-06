@@ -55,6 +55,8 @@ class EmployeManage extends Component
                     if ($branch) {
                         $localBranchId = $branch->id;
                     }
+                } else {
+                    $localBranchId = 6;
                 }
 
                 Employe::updateOrCreate(
