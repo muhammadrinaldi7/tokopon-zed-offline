@@ -93,7 +93,7 @@ class CekStock extends Component
                 'storage' => $v->storage,
                 'color' => $v->color,
                 'sku' => $v->sku,
-                'price' => Format::rupiah($v->accurateData->base_price) ?? 0,
+                'price' => Format::rupiah($v->accurateData?->base_price ?? 0),
                 'allStock' => $v->accurateData->stock ?? 0,
                 'is_second' => false,
             ];
