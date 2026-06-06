@@ -27,7 +27,7 @@ class SerialNumberSyncService
         try {
             // Coba ambil dari db source 'syihab' (Produk Baru)
             $snData = $this->accurateService->getSerialNumberPerWarehouse($sku, 'syihab');
-            
+
             // Jika kosong, mungkin dia barang bekas, coba ambil dari db source 'second'
             if (empty($snData)) {
                 $snData = $this->accurateService->getSerialNumberPerWarehouse($sku, 'second');
@@ -41,7 +41,7 @@ class SerialNumberSyncService
                 ProductSerialNumber::where('item_no', $sku)
                     ->where('status', 'Available')
                     ->update(['status' => 'Unavailable']);
-                
+
                 return 0;
             }
         } catch (\Exception $e) {
@@ -72,7 +72,7 @@ class SerialNumberSyncService
             $accurateSnId = $item['serialNumber']['id'] ?? null;
 
             if (!$serialNumberStr || !$accurateWarehouseId) continue;
-            
+
             // Konversi paksa ke string (berjaga-jaga jika payload API mereturn tipe integer)
             $serialNumberStr = (string) $serialNumberStr;
 
@@ -109,7 +109,7 @@ class SerialNumberSyncService
 
         // Update status menjadi Unavailable untuk SN yang hilang dari API
         $missingSnList = array_diff($existingSns, $processedSerialNumbers);
-        
+
         // Pastikan array hanya berisi string sebelum di binding ke Eloquent (PDO string binding)
         $missingSnList = array_map('strval', $missingSnList);
 
@@ -120,5 +120,96 @@ class SerialNumberSyncService
         }
 
         return count($processedSerialNumbers);
+    }
+
+    public function syncFromReceiveItem($receiveItemId, $databaseSource = 'syihab')
+    {
+        try {
+            $detail = $this->accurateService->getReceiveItemDetail($receiveItemId, $databaseSource);
+
+            if (!$detail) {
+                return 0; // Gagal ambil detail
+            }
+
+            $updatedCount = 0;
+
+            // 1. Ekstrak Vendor
+            $vendorName = $detail['vendor']['name'] ?? null;
+            $accurateVendorId = $detail['vendor']['id'] ?? null;
+            $localVendorId = null;
+
+            if ($accurateVendorId) {
+                $localVendor = \App\Models\Vendor::where('accurate_vendor_id', $accurateVendorId)->first();
+                if (!$localVendor && $vendorName) {
+                    $localVendor = \App\Models\Vendor::where('vendor_name', $vendorName)->first();
+                }
+                if ($localVendor) {
+                    $localVendorId = $localVendor->id;
+                }
+            }
+
+            // 2. Iterasi detailItem
+            $detailItems = $detail['detailItem'] ?? [];
+            foreach ($detailItems as $item) {
+                $sku = $item['item']['no'] ?? $item['detailName'] ?? null; // Coba fallback
+                // Pada output receive-item, item no ada di `item.no` namun API return array nested, mari pastikan format:
+                if (isset($item['item']['no'])) {
+                    $sku = $item['item']['no'];
+                } elseif (isset($item['itemNo'])) {
+                    $sku = $item['itemNo'];
+                } elseif (isset($item['no'])) {
+                    $sku = $item['no'];
+                }
+
+                if (!$sku) continue; // Skip jika tidak ada SKU
+
+                $hpp = $item['itemCost'] ?? $item['unitPrice'] ?? 0;
+                $accurateWarehouseId = $item['warehouseId'] ?? ($item['warehouse']['id'] ?? null);
+
+                $localWarehouseId = null;
+                if ($accurateWarehouseId) {
+                    $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)->first();
+                    if ($localWarehouse) {
+                        $localWarehouseId = $localWarehouse->id;
+                    }
+                }
+
+                $snList = $item['detailSerialNumber'] ?? [];
+
+                foreach ($snList as $snItem) {
+                    $sn = $snItem['serialNumber']['number'] ?? null;
+                    if (!$sn) continue;
+                    $sn = (string)$sn;
+
+                    // 3. Proses Update/Insert ke DB Lokal
+                    $existingSn = ProductSerialNumber::where('serial_number', $sn)->first();
+
+                    if ($existingSn) {
+                        // Jika sudah ada, update hpp dan vendor_id (biarkan statusnya tidak berubah)
+                        $existingSn->update([
+                            'hpp' => $hpp,
+                            'vendor_id' => $localVendorId
+                        ]);
+                        $updatedCount++;
+                    } else {
+                        // Jika belum ada, buat baru
+                        ProductSerialNumber::create([
+                            'serial_number' => $sn,
+                            'item_no' => $sku,
+                            'warehouse_id' => $localWarehouseId,
+                            'hpp' => $hpp,
+                            'vendor_id' => $localVendorId,
+                            'status' => 'Available', // Berdasarkan kesepakatan, diset Available
+                        ]);
+                        $updatedCount++;
+                    }
+                }
+            }
+
+            return $updatedCount;
+        } catch (\Exception $e) {
+            Log::error("Failed to sync Receive Item {$receiveItemId}: " . $e->getMessage());
+            throw $e;
+        }
     }
 }

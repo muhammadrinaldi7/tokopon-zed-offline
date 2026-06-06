@@ -16,6 +16,7 @@ use Livewire\Attributes\On;
 class SerialNumberSync extends Component
 {
     public $isSyncing = false;
+    public $isSyncingVendor = false;
     public $itemsToSync = [];
     public $totalItems = 0;
     public $processedItems = 0;
@@ -89,6 +90,79 @@ class SerialNumberSync extends Component
 
         // Panggil selanjutnya
         $this->dispatch('sync-next-item');
+    }
+
+    public function startSyncVendor()
+    {
+        $this->isSyncingVendor = true;
+        $this->processedItems = 0;
+        $this->logs = [];
+        $this->itemsToSync = [];
+
+        $this->addLog("Mengumpulkan seluruh dokumen Penerimaan Barang (Receive Item)...");
+
+        try {
+            $accurateService = app(\App\Services\AccurateService::class);
+            // Kumpulkan id receive item dari source pertama
+            $syihabIds = $accurateService->getReceiveItemList('syihab');
+            // Kumpulkan id receive item dari source kedua (jika dipakai)
+            $secondIds = $accurateService->getReceiveItemList('second');
+
+            // Format data ke dalam array assosiatif untuk menyimpan id dan source-nya
+            $syihabData = array_map(function($id) { return ['id' => $id, 'source' => 'syihab']; }, $syihabIds);
+            $secondData = array_map(function($id) { return ['id' => $id, 'source' => 'second']; }, $secondIds);
+
+            // Gabungkan
+            $this->itemsToSync = array_merge($syihabData, $secondData);
+            $this->totalItems = count($this->itemsToSync);
+
+            if ($this->totalItems == 0) {
+                $this->addLog("Tidak ada dokumen Penerimaan Barang ditemukan.");
+                $this->isSyncingVendor = false;
+                return;
+            }
+
+            $this->addLog("Ditemukan {$this->totalItems} dokumen Penerimaan Barang. Memulai proses...");
+            $this->dispatch('sync-next-vendor-item');
+        } catch (\Exception $e) {
+            $this->addLog("Error mengumpulkan dokumen: " . $e->getMessage());
+            $this->isSyncingVendor = false;
+        }
+    }
+
+    #[On('sync-next-vendor-item')]
+    public function syncNextVendorItem()
+    {
+        if (empty($this->itemsToSync) || !$this->isSyncingVendor) {
+            $this->addLog("Proses sinkronisasi Vendor & HPP via Receive Item selesai!");
+            $this->isSyncingVendor = false;
+            return;
+        }
+
+        // Ambil item pertama di array
+        $task = array_shift($this->itemsToSync);
+        $receiveItemId = $task['id'];
+        $source = $task['source'];
+
+        $this->currentItem = "Sedang memproses dokumen ID: {$receiveItemId} ({$source})";
+
+        try {
+            $service = app(\App\Services\SerialNumberSyncService::class);
+            $snCount = $service->syncFromReceiveItem($receiveItemId, $source);
+            
+            if ($snCount > 0) {
+                $this->addLog("[ID {$receiveItemId}] Berhasil update/insert $snCount Serial Number.");
+            } else {
+                $this->addLog("[ID {$receiveItemId}] Tidak ada Serial Number baru/diperbarui.");
+            }
+        } catch (\Exception $e) {
+            $this->addLog("[ID {$receiveItemId}] Error: " . $e->getMessage());
+        }
+
+        $this->processedItems++;
+
+        // Panggil selanjutnya
+        $this->dispatch('sync-next-vendor-item');
     }
 
     private function addLog($message)
