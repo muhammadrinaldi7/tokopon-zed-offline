@@ -72,6 +72,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
         Route::get('/', Dashboard::class)->name('index');
         Route::get('/sales', \App\Livewire\Admin\Reporting\SalesReport::class)->name('sales');
+        Route::get('/promo', \App\Livewire\Admin\Reporting\PromoReport::class)->name('promo');
         Route::get('/products', \App\Livewire\Admin\Reporting\ProductReport::class)->name('products');
         Route::get('/stock', \App\Livewire\Admin\Reporting\StockReport::class)->name('stock');
         Route::get('/staff', \App\Livewire\Admin\Reporting\StaffReport::class)->name('staff');

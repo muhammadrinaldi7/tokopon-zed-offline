@@ -4,15 +4,17 @@ namespace App\Livewire\Admin\Reporting;
 
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Branch;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class Dashboard extends Component
 {
-    public $dateRange = 'this_month';
+    public $dateRange = 'today';
     public $startDate;
     public $endDate;
+    public $branchFilter = '';
 
     public function mount()
     {
@@ -28,6 +30,7 @@ class Dashboard extends Component
 
     public function updatedStartDate() { $this->dateRange = 'custom'; }
     public function updatedEndDate() { $this->dateRange = 'custom'; }
+    public function updatedBranchFilter() { /* Automatically triggers render */ }
 
     private function setDateRange()
     {
@@ -58,51 +61,7 @@ class Dashboard extends Component
 
     public function exportCsv()
     {
-        $start = Carbon::parse($this->startDate)->startOfDay();
-        $end = Carbon::parse($this->endDate)->endOfDay();
-
-        $orders = Order::whereBetween('created_at', [$start, $end])
-            ->where('order_status', 'COMPLETED')
-            ->with(['sales', 'paymentMethod', 'items'])
-            ->get();
-
-        $csvFileName = 'laporan_penjualan_' . $this->startDate . '_sampai_' . $this->endDate . '.csv';
-
-        return response()->streamDownload(function() use($orders) {
-            $file = fopen('php://output', 'w');
-            
-            // Header
-            fputcsv($file, [
-                'Order ID', 'Tanggal', 'Nomor Invoice', 'Total Gross (Rp)', 
-                'Total Diskon (Rp)', 'Total MDR (Rp)', 'Total Net (Rp)', 
-                'Metode Pembayaran', 'Cabang', 'Sales/Kasir', 'Daftar Produk (SKU - Nama - Qty)'
-            ]);
-
-            // Data
-            foreach ($orders as $order) {
-                $itemsStr = $order->items->map(function($item) {
-                    return $item->sku . ' - ' . $item->name . ' (' . $item->qty . 'x)';
-                })->implode(' | ');
-
-                $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
-
-                fputcsv($file, [
-                    $order->order_number,
-                    $order->created_at->format('Y-m-d H:i:s'),
-                    $order->accurate_invoice_no ?? '-',
-                    $order->total_amount,
-                    $order->discount_amount,
-                    $order->mdr_amount,
-                    $order->grand_total - $order->mdr_amount,
-                    $order->paymentMethod ? $order->paymentMethod->name : '-',
-                    $branch,
-                    $order->sales ? $order->sales->name : '-',
-                    $itemsStr
-                ]);
-            }
-
-            fclose($file);
-        }, $csvFileName);
+        // Tetap ada jika diperlukan
     }
 
     public function render()
@@ -111,91 +70,212 @@ class Dashboard extends Component
         $end = Carbon::parse($this->endDate)->endOfDay();
 
         $query = Order::whereBetween('created_at', [$start, $end])
-            ->where('order_status', 'COMPLETED');
+            ->where('order_status', 'COMPLETED')
+            ->when($this->branchFilter, function($q) {
+                $q->where('shipping_address_snapshot->store', $this->branchFilter);
+            });
 
-        // 1. Sales Overview
+        // --- 1. KPI OVERVIEW ---
         $totalGross = (clone $query)->sum('total_amount');
         $totalDiscount = (clone $query)->sum('discount_amount');
         $totalMdr = (clone $query)->sum('mdr_amount');
         $totalNet = (clone $query)->sum('grand_total') - $totalMdr;
         $totalTransactions = (clone $query)->count();
 
-        // Fetch all orders for memory processing (safe if not millions)
-        // This avoids complex DB-specific JSON extractions for sqlite vs mysql
-        $orders = (clone $query)->with(['paymentMethod', 'salesBy'])->get();
+        $orderIds = (clone $query)->pluck('id');
+        $totalQty = OrderItem::whereIn('order_id', $orderIds)->sum('qty');
 
-        // 2. Trend (Bar Chart Data)
-        $trendDataRaw = $orders->groupBy(function($order) {
-            return $order->created_at->format('Y-m-d');
-        })->map(function($group) {
-            return $group->sum('grand_total');
-        })->sortKeys();
+        // --- 2. MTD (Month To Date) SECTION ---
+        $now = now();
+        $startOfThisMonth = $now->copy()->startOfMonth();
+        $startOfLastMonth = $now->copy()->subMonth()->startOfMonth();
+        $sameDayLastMonth = $now->copy()->subMonth();
 
-        $trendData = [
-            'labels' => $trendDataRaw->keys()->toArray(),
-            'series' => $trendDataRaw->values()->toArray(),
+        $mtdQuery = Order::where('order_status', 'COMPLETED')
+            ->whereBetween('created_at', [$startOfThisMonth, $now])
+            ->when($this->branchFilter, function($q) {
+                $q->where('shipping_address_snapshot->store', $this->branchFilter);
+            });
+        
+        $lastMtdQuery = Order::where('order_status', 'COMPLETED')
+            ->whereBetween('created_at', [$startOfLastMonth, $sameDayLastMonth])
+            ->when($this->branchFilter, function($q) {
+                $q->where('shipping_address_snapshot->store', $this->branchFilter);
+            });
+
+        $mtdNetSales = (clone $mtdQuery)->sum('grand_total') - (clone $mtdQuery)->sum('mdr_amount');
+        $lastMtdNetSales = (clone $lastMtdQuery)->sum('grand_total') - (clone $lastMtdQuery)->sum('mdr_amount');
+        
+        $mtdTransactions = (clone $mtdQuery)->count();
+        $lastMtdTransactions = (clone $lastMtdQuery)->count();
+
+        $mtdOrderIds = (clone $mtdQuery)->pluck('id');
+        $lastMtdOrderIds = (clone $lastMtdQuery)->pluck('id');
+        
+        $mtdQty = OrderItem::whereIn('order_id', $mtdOrderIds)->sum('qty');
+        $lastMtdQty = OrderItem::whereIn('order_id', $lastMtdOrderIds)->sum('qty');
+
+        $mtdDiscount = (clone $mtdQuery)->sum('discount_amount');
+        $lastMtdDiscount = (clone $lastMtdQuery)->sum('discount_amount');
+
+        $calculateGrowth = function($current, $last) {
+            if ($last > 0) {
+                return (($current - $last) / $last) * 100;
+            }
+            return 0;
+        };
+
+        $mtdData = [
+            'net_sales' => ['current' => $mtdNetSales, 'last' => $lastMtdNetSales, 'growth' => round($calculateGrowth($mtdNetSales, $lastMtdNetSales), 2)],
+            'transactions' => ['current' => $mtdTransactions, 'last' => $lastMtdTransactions, 'growth' => round($calculateGrowth($mtdTransactions, $lastMtdTransactions), 2)],
+            'qty' => ['current' => $mtdQty, 'last' => $lastMtdQty, 'growth' => round($calculateGrowth($mtdQty, $lastMtdQty), 2)],
+            'discount' => ['current' => $mtdDiscount, 'last' => $lastMtdDiscount, 'growth' => round($calculateGrowth($mtdDiscount, $lastMtdDiscount), 2)],
         ];
 
-        // 3. Payment Methods
-        $paymentMethodDataRaw = $orders->groupBy('payment_method_id')->map(function($group) {
+        // Fetch all orders for chart processing
+        $orders = (clone $query)->with(['paymentMethod', 'salesBy'])->get();
+
+        // --- 3. TREND DATA (Line/Area Chart) ---
+        $daysDiff = $start->diffInDays($end);
+        $isSingleDay = $start->isSameDay($end);
+        $isYearly = $daysDiff > 60;
+
+        $trendDataRaw = $orders->groupBy(function($order) use ($isSingleDay, $isYearly) {
+            if ($isSingleDay) return $order->created_at->format('H:00');
+            if ($isYearly) return $order->created_at->format('M Y');
+            return $order->created_at->format('d M');
+        })->map(function($group) {
+            return $group->sum('grand_total');
+        })->toArray();
+
+        $filledTrendData = [];
+        if ($isSingleDay) {
+            // Fill store hours with 0
+            for ($i = 8; $i <= 22; $i++) {
+                $hourStr = str_pad($i, 2, '0', STR_PAD_LEFT) . ':00';
+                $filledTrendData[$hourStr] = $trendDataRaw[$hourStr] ?? 0;
+            }
+            // Add any data outside 8-22
+            foreach ($trendDataRaw as $k => $v) {
+                $filledTrendData[$k] = $v;
+            }
+            ksort($filledTrendData);
+        } elseif ($isYearly) {
+            $currentDate = $start->copy()->startOfMonth();
+            while ($currentDate->lte($end)) {
+                $dateStr = $currentDate->format('M Y');
+                $filledTrendData[$dateStr] = $trendDataRaw[$dateStr] ?? 0;
+                $currentDate->addMonth();
+            }
+        } else {
+            $currentDate = $start->copy();
+            while ($currentDate->lte($end)) {
+                $dateStr = $currentDate->format('d M');
+                $filledTrendData[$dateStr] = $trendDataRaw[$dateStr] ?? 0;
+                $currentDate->addDay();
+            }
+        }
+
+        $trendData = [
+            'labels' => array_keys($filledTrendData),
+            'series' => array_values($filledTrendData),
+        ];
+
+        // --- 4. BRAND PROPORTION (Donut Chart) ---
+        $orderItemsForBrand = OrderItem::with('variant.product.brand')
+            ->whereIn('order_id', $orderIds)
+            ->get();
+
+        $brandDataRaw = $orderItemsForBrand->groupBy(function($item) {
+            return $item->variant?->product?->brand?->name ?? 'Unknown';
+        })->map(function($group) {
+            return [
+                'name' => $group->first()->variant?->product?->brand?->name ?? 'Unknown',
+                'total' => $group->sum(function($item) { return $item->price_at_checkout * $item->qty; })
+            ];
+        })->sortByDesc('total')->values();
+
+        $brandProportionData = [
+            'labels' => $brandDataRaw->pluck('name')->toArray(),
+            'series' => $brandDataRaw->pluck('total')->toArray(),
+        ];
+
+        // --- 5. PAYMENT METHOD PROPORTION (Donut Chart) ---
+        $pmData = $orders->groupBy('payment_method_id')->map(function($group) {
             $pm = $group->first()->paymentMethod;
             return [
                 'name' => $pm ? $pm->name : 'Unknown',
-                'total' => $group->sum('grand_total'),
-                'count' => $group->count()
+                'total' => $group->sum('grand_total')
             ];
-        })->sortByDesc('total')->values()->toArray();
+        })->sortByDesc('total')->values();
 
-        // 4. Branch Performance
-        $branchDataRaw = $orders->groupBy(function($order) {
-            return $order->shipping_address_snapshot['store'] ?? 'Unknown';
-        })->map(function($group) {
-            return [
-                'store' => $group->first()->shipping_address_snapshot['store'] ?? 'Unknown',
-                'total' => $group->sum('grand_total'),
-                'count' => $group->count()
-            ];
-        })->sortByDesc('total')->values()->toArray();
+        $paymentMethodData = [
+            'labels' => $pmData->pluck('name')->toArray(),
+            'series' => $pmData->pluck('total')->toArray(),
+        ];
 
-        // 5. Sales Performance
-        $salesDataRaw = $orders->groupBy('sales_id')->map(function($group) {
-            $sales = $group->first()->salesBy;
-            return [
-                'name' => $sales ? $sales->name : 'No Sales',
-                'total' => $group->sum('grand_total'),
-                'count' => $group->count()
-            ];
-        })->sortByDesc('total')->values()->toArray();
+        // --- 6. TOP LISTS (Products, Branches, Sales) ---
+        $topProducts = $orderItemsForBrand->groupBy('product_variant_id')->map(function($group) {
+                $first = $group->first();
+                $variant = $first->variant;
+                $name = $variant?->name ?? $variant?->product?->name ?? $first->product_name ?? 'Unknown Product';
+                $sku = $variant?->sku ?? '-';
 
-        // 6. Top Products
-        $orderIds = $orders->pluck('id');
-        $topProductsRaw = OrderItem::whereIn('order_id', $orderIds)
-            ->get()
-            ->groupBy('sku')
-            ->map(function($group) {
                 return [
-                    'sku' => $group->first()->sku,
-                    'name' => $group->first()->name,
+                    'sku' => $sku,
+                    'name' => $name,
                     'total_qty' => $group->sum('qty'),
                     'total_revenue' => $group->sum(function($item) { return $item->price * $item->qty; })
                 ];
             })
             ->sortByDesc('total_qty')
-            ->take(10)
+            ->take(5)
             ->values()
             ->toArray();
+
+        $topBranches = $orders->groupBy(function($order) {
+            return $order->shipping_address_snapshot['store'] ?? 'Unknown';
+        })->map(function($group) {
+            return [
+                'name' => $group->first()->shipping_address_snapshot['store'] ?? 'Unknown',
+                'total_transactions' => $group->count(),
+                'total_revenue' => $group->sum('grand_total')
+            ];
+        })->sortByDesc('total_revenue')->take(5)->values()->toArray();
+
+        $topSales = $orders->groupBy('sales_id')->map(function($group) {
+            $sales = $group->first()->salesBy;
+            return [
+                'name' => $sales ? $sales->name : 'No Sales',
+                'total_transactions' => $group->count(),
+                'total_revenue' => $group->sum('grand_total')
+            ];
+        })->sortByDesc('total_revenue')->take(5)->values()->toArray();
+
+
+        $availableBranches = Branch::orderBy('name')->pluck('name');
+
+        // Update charts dynamically via event
+        $this->dispatch('update-charts', [
+            'trend' => $trendData,
+            'brandProportion' => $brandProportionData,
+            'paymentMethod' => $paymentMethodData
+        ]);
 
         return view('livewire.admin.reporting.dashboard', [
             'totalGross' => $totalGross,
             'totalDiscount' => $totalDiscount,
-            'totalMdr' => $totalMdr,
             'totalNet' => $totalNet,
             'totalTransactions' => $totalTransactions,
+            'totalQty' => $totalQty,
+            'mtdData' => $mtdData,
             'trendData' => $trendData,
-            'paymentMethodData' => $paymentMethodDataRaw,
-            'branchData' => $branchDataRaw,
-            'salesData' => $salesDataRaw,
-            'topProducts' => $topProductsRaw,
+            'brandProportionData' => $brandProportionData,
+            'paymentMethodData' => $paymentMethodData,
+            'topBranches' => $topBranches,
+            'topSales' => $topSales,
+            'topProducts' => $topProducts,
+            'availableBranches' => $availableBranches
         ])->layout('layouts.admin');
     }
 }

@@ -6,7 +6,7 @@
         </div>
 
         <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <button wire:click="exportCsv" wire:loading.attr="disabled"
+            {{-- <button wire:click="exportCsv" wire:loading.attr="disabled"
                 class="flex items-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
                 <svg wire:loading.remove wire:target="exportCsv" class="w-4 h-4" fill="none" stroke="currentColor"
                     viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -23,9 +23,9 @@
                 </svg>
                 <span wire:loading.remove wire:target="exportCsv">Export CSV (Kolom)</span>
                 <span wire:loading wire:target="exportCsv">Memproses...</span>
-            </button>
+            </button> --}}
 
-            <button wire:click="exportCsvOpsi2" wire:loading.attr="disabled"
+            {{-- <button wire:click="exportCsvOpsi2" wire:loading.attr="disabled"
                 class="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
                 <svg wire:loading.remove wire:target="exportCsvOpsi2" class="w-4 h-4" fill="none" stroke="currentColor"
                     viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -42,7 +42,7 @@
                 </svg>
                 <span wire:loading.remove wire:target="exportCsvOpsi2">Export CSV (Multi-Row)</span>
                 <span wire:loading wire:target="exportCsvOpsi2">Memproses...</span>
-            </button>
+            </button> --}}
 
             <button wire:click="exportCsvOpsi3" wire:loading.attr="disabled"
                 class="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
@@ -59,11 +59,21 @@
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                     </path>
                 </svg>
-                <span wire:loading.remove wire:target="exportCsvOpsi3">Export CSV (Kolom Statis)</span>
+                <span wire:loading.remove wire:target="exportCsvOpsi3">Export CSV</span>
                 <span wire:loading wire:target="exportCsvOpsi3">Memproses...</span>
             </button>
 
             <div class="flex items-center gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+                <select wire:model.live="branchFilter"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-gray-50">
+                    <option value="">Semua Cabang</option>
+                    @foreach($availableBranches as $branch)
+                        <option value="{{ $branch }}">{{ $branch }}</option>
+                    @endforeach
+                </select>
+
+                <div class="h-6 w-px bg-gray-200"></div>
+
                 <select wire:model.live="dateRange"
                     class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-gray-50">
                     <option value="today">Hari Ini</option>

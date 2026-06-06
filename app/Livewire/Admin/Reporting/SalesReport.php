@@ -15,6 +15,7 @@ class SalesReport extends Component
     public $startDate;
     public $endDate;
     public $search = '';
+    public $branchFilter = '';
 
     public function mount()
     {
@@ -40,6 +41,10 @@ class SalesReport extends Component
         $this->resetPage();
     }
     public function updatedSearch()
+    {
+        $this->resetPage();
+    }
+    public function updatedBranchFilter()
     {
         $this->resetPage();
     }
@@ -90,6 +95,9 @@ class SalesReport extends Component
                             $qs->where('name', 'like', '%' . $this->search . '%');
                         });
                 });
+            })
+            ->when($this->branchFilter, function ($query) {
+                $query->where('shipping_address_snapshot->store', $this->branchFilter);
             })
             ->latest();
     }
@@ -217,7 +225,7 @@ class SalesReport extends Component
                             $variant?->color ?? '-',
                             ($variant?->ram ? $variant->ram . ' ' : '') . ($variant?->storage ? $variant->storage : '') ?? '-',
                             $item->serial_number ?? '-',
-                            $order->notes,
+                            str_replace(["\r", "\n", "\t"], ' ', $order->notes),
                             $item->qty,
                             $item->price_at_checkout,
                             $item->discount_amount ?? 0,
@@ -368,7 +376,7 @@ class SalesReport extends Component
                             $variant?->color ?? '-',
                             ($variant?->ram ? $variant->ram . ' ' : '') . ($variant?->storage ? $variant->storage : '') ?? '-',
                             $item->serial_number ?? '-',
-                            $order->notes,
+                            str_replace(["\r", "\n", "\t"], ' ', $order->notes),
                             $item->qty,
                             $item->price_at_checkout,
                             $item->discount_amount ?? 0,
@@ -446,9 +454,9 @@ class SalesReport extends Component
             fputcsv($file, [
                 'TANGGAL', 'NO. ORDER', 'NO. INVOICE', 'KASIR', 'SALES', 'PELANGGAN', 'TELEPON', 'CABANG',
                 'NAMA PRODUK', 'MERK PRODUK', 'WARNA', 'STORAGE', 'SN (SerialNumber)', 'CATATAN',
-                'QTY', 'HARGA SATUAN (Rp)', 'DISKON ITEM (Rp)', 'SUBTOTAL ITEM (Rp)', 'GROSS ORDER (Rp)',
-                'METODE 1', 'NOMINAL 1 (Rp)', 'METODE 2', 'NOMINAL 2 (Rp)', 'METODE 3', 'NOMINAL 3 (Rp)',
-                'PROMO 1', 'DISKON 1 (Rp)', 'PROMO 2', 'DISKON 2 (Rp)',
+                'QTY', 'HARGA SATUAN (Rp)', 'DISKON ITEM (Rp)', 'SUBTOTAL ITEM (Rp)',
+                'METODE 1', 'NOMINAL 1 (Rp)', 'METODE 2', 'NOMINAL 2 (Rp)', 'METODE 3', 'NOMINAL 3 (Rp)', 'METODE 4', 'NOMINAL 4 (Rp)',
+                'PROMO 1', 'DISKON 1 (Rp)', 'PROMO 2', 'DISKON 2 (Rp)', 'PROMO 3', 'DISKON 3 (Rp)',
                 'MDR (Rp)', 'TOTAL TRANSAKSI (Rp)', 'NET SALES (Rp)'
             ]);
 
@@ -484,7 +492,6 @@ class SalesReport extends Component
                 $allocatedPaymentsTracker = [];
                 $allocatedPromosTracker = [];
                 $allocatedMdrTotal = 0;
-                $allocatedGrossTotal = 0;
 
                 $itemCount = $order->items->count();
                 $currentIndex = 0;
@@ -498,14 +505,6 @@ class SalesReport extends Component
                         $variant = $item->variant;
                         $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
                         $merk = $variant?->product?->brand?->name ?? 'Unknown';
-
-                        // Prorata Gross Order
-                        if ($isLastItem) {
-                            $proratedGross = $order->total_amount - $allocatedGrossTotal;
-                        } else {
-                            $proratedGross = round($order->total_amount * $weight);
-                            $allocatedGrossTotal += $proratedGross;
-                        }
 
                         $rowData = [
                             $order->created_at->format('Y-m-d H:i'),
@@ -521,17 +520,16 @@ class SalesReport extends Component
                             $variant?->color ?? '-',
                             ($variant?->ram ? $variant->ram . ' ' : '') . ($variant?->storage ? $variant->storage : '') ?? '-',
                             $item->serial_number ?? '-',
-                            $order->notes,
+                            str_replace(["\r", "\n", "\t"], ' ', $order->notes),
                             $item->qty,
                             $item->price_at_checkout,
                             $item->discount_amount ?? 0,
                             $item->subtotal,
-                            $proratedGross,
                         ];
 
-                        // Proses Slots Pembayaran (Maksimal 3)
+                        // Proses Slots Pembayaran (Maksimal 4)
                         $paymentSlots = array_keys($orderPayments);
-                        for ($i = 0; $i < 3; $i++) {
+                        for ($i = 0; $i < 4; $i++) {
                             if (isset($paymentSlots[$i])) {
                                 $upm = $paymentSlots[$i];
                                 $orderAmount = $orderPayments[$upm];
@@ -550,10 +548,10 @@ class SalesReport extends Component
                             }
                         }
 
-                        // Proses Slots Promo (Maksimal 2)
+                        // Proses Slots Promo (Maksimal 3)
                         $itemPromosTotal = 0;
                         $promoSlots = array_keys($orderPromos);
-                        for ($i = 0; $i < 2; $i++) {
+                        for ($i = 0; $i < 3; $i++) {
                             if (isset($promoSlots[$i])) {
                                 $upr = $promoSlots[$i];
                                 $orderAmount = $orderPromos[$upr];
@@ -597,11 +595,11 @@ class SalesReport extends Component
                         $order->created_at->format('Y-m-d H:i'), $order->order_number, $order->accurate_invoice_no ?? '-',
                         $order->handledBy ? $order->handledBy->name : '-', $order->user ? $order->user->name : 'Walk-in',
                         $order->user ? $order->user->profile->phone_number : '-', $order->salesBy ? $order->salesBy->name : '-',
-                        $branch, '-', '-', '-', '-', '-', '-', '0', '0', '0', '0', $order->total_amount
+                        $branch, '-', '-', '-', '-', '-', '-', '0', '0', '0', '0'
                     ];
                     
                     $paymentSlots = array_keys($orderPayments);
-                    for ($i = 0; $i < 3; $i++) {
+                    for ($i = 0; $i < 4; $i++) {
                         if (isset($paymentSlots[$i])) {
                             $rowData[] = $paymentSlots[$i];
                             $rowData[] = $orderPayments[$paymentSlots[$i]];
@@ -612,7 +610,7 @@ class SalesReport extends Component
 
                     $itemPromosTotal = 0;
                     $promoSlots = array_keys($orderPromos);
-                    for ($i = 0; $i < 2; $i++) {
+                    for ($i = 0; $i < 3; $i++) {
                         if (isset($promoSlots[$i])) {
                             $promoVal = $orderPromos[$promoSlots[$i]];
                             $itemPromosTotal += $promoVal;
@@ -636,12 +634,14 @@ class SalesReport extends Component
     public function render()
     {
         $orders = $this->ordersQuery->paginate(20);
+        $availableBranches = \App\Models\Branch::orderBy('name')->pluck('name');
 
         $totalGross = $this->ordersQuery->sum('total_amount');
         $totalNet = $this->ordersQuery->sum('grand_total') - $this->ordersQuery->sum('mdr_amount');
 
         return view('livewire.admin.reporting.sales-report', [
             'orders' => $orders,
+            'availableBranches' => $availableBranches,
             'summary' => [
                 'count' => $orders->total(),
                 'gross' => $totalGross,
