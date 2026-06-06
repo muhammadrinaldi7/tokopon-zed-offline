@@ -59,7 +59,6 @@ class Pos extends Component
     public $notes = '';
     public $selectedPromos = []; // Menyimpan ID promo yang dipilih
 
-
     // ─── Modals ────────────────────────────────────────────────
     public $showCheckoutModal = false;
     public $showReceiptModal = false;
@@ -384,6 +383,7 @@ class Pos extends Component
             [
                 'payment_method_id' => '',
                 'payment_method_rate_id' => '',
+                'no_kontrak' => '',
                 'amount' => 0,
             ]
         ];
@@ -418,6 +418,7 @@ class Pos extends Component
         $this->payments[] = [
             'payment_method_id' => '',
             'payment_method_rate_id' => '',
+            'no_kontrak' => '',
             'amount' => $remaining,
         ];
     }
@@ -1424,6 +1425,7 @@ class Pos extends Component
                     'status' => 'PAID',
                     'payment_method_id' => $payment['payment_method_id'],
                     'payment_method_rate_id' => $payment['payment_method_rate_id'] ?: null,
+                    'no_kontrak' => $payment['no_kontrak'] ?? null,
                 ]);
             }
 
@@ -1626,6 +1628,7 @@ class Pos extends Component
             [
                 'payment_method_id' => '',
                 'payment_method_rate_id' => '',
+                'no_kontrak' => '',
                 'amount' => 0,
             ]
         ];
@@ -1974,6 +1977,7 @@ class Pos extends Component
             [
                 'payment_method_id' => '',
                 'payment_method_rate_id' => '',
+                'no_kontrak' => '',
                 'amount' => 0,
             ]
         ];

@@ -7,12 +7,14 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\ProductAccurate;
 use App\Services\AccurateService;
+use App\Services\SerialNumberSyncService;
+use App\Traits\GeneratesProductVariant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ProductAccurateManagement extends Component
 {
-    use WithPagination;
+    use WithPagination, GeneratesProductVariant;
 
     public $search = '';
     public $activeTab = 'syihab'; // 'syihab' or 'second'
@@ -241,5 +243,58 @@ class ProductAccurateManagement extends Component
         return view('livewire.admin.accurate.product-accurate-management', [
             'products' => $query->paginate(15)
         ])->layout('layouts.admin');
+    }
+
+    /**
+     * Manual trigger for Auto-Generating Product Variant from ProductAccurate.
+     * Use this in the blade template: wire:click="generateVariantLocally({{ $item->id }})"
+     */
+    public function generateVariantLocally($productAccurateId)
+    {
+        try {
+            $productAccurate = ProductAccurate::findOrFail($productAccurateId);
+
+            // 1. Fetch full details from Accurate
+            $service = app(AccurateService::class);
+            $accurateItemData = $service->itemDetailDo($productAccurate->item_no);
+
+            if (!$accurateItemData || empty($accurateItemData)) {
+                $this->dispatch('toast', title: 'Gagal', message: 'Data detail item tidak ditemukan di Accurate API.', type: 'error');
+                return;
+            }
+
+            // 2. Gunakan Trait GeneratesProductVariant
+            $result = $this->autoGenerateProductAndVariant(
+                $productAccurate->item_no,
+                $accurateItemData,
+                $productAccurate->id
+            );
+
+            if ($result['success']) {
+                $this->dispatch('toast', title: 'Berhasil', message: 'Variant berhasil di-generate dan siap dijual!', type: 'success');
+            } else {
+                $this->dispatch('toast', title: 'Gagal', message: 'Variant gagal di-generate', type: 'error');
+            }
+        } catch (\Exception $e) {
+            Log::error('Gagal generate variant manual: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Variant gagal di-generate', type: 'error');
+        }
+    }
+
+    public function syncSerialNumber($accurateId)
+    {
+        try {
+            $service = app(SerialNumberSyncService::class);
+            $snCount = $service->syncFromAccurate($accurateId);
+
+            if ($snCount > 0) {
+                $this->dispatch('toast', title: 'Berhasil', message: "Berhasil sinkronisasi $snCount Serial Number.", type: 'success');
+            } else {
+                $this->dispatch('toast', title: 'Gagal', message: 'Tidak ada data Serial Number di Accurate.', type: 'error');
+            }
+        } catch (\Exception $e) {
+            Log::error('Gagal sync serial number: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal sync serial number: ' . $e->getMessage(), type: 'error');
+        }
     }
 }

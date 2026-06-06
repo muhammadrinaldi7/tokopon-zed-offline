@@ -755,6 +755,10 @@
                                         </select>
                                     @endif
 
+                                    <input type="text" wire:model.live="payments.{{ $index }}.no_kontrak"
+                                        class="w-full bg-gray-50/50 border border-gray-200 rounded-lg px-2.5 py-2 text-xs font-semibold focus:bg-white focus:border-[#1c69d4] focus:ring-0 transition"
+                                        placeholder="No. Kontrak (Opsional untuk Leasing)">
+
                                     <div class="flex gap-2">
                                         <div class="relative flex-1" x-data="{
                                             rawAmount: @entangle('payments.' . $index . '.amount').live,

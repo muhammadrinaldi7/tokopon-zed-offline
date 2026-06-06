@@ -1,0 +1,118 @@
+<?php
+
+namespace App\Traits;
+
+use App\Models\Brand;
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\ProductAccurate;
+use Illuminate\Support\Str;
+
+trait GeneratesProductVariant
+{
+    /**
+     * Parse the Accurate item name using Regex to extract Parent Name, RAM, Storage, and Color.
+     */
+    public function parseItemName($name)
+    {
+        // 1. Buang kata "HP " di depan jika ada
+        $cleanName = preg_replace('/^HP\s+/i', '', trim($name));
+
+        $parentName = $cleanName;
+        $ram = null;
+        $storage = null;
+        $color = '-';
+
+        // 2. Terapkan Regex pencari pola GB
+        // Contoh: IPHONE 15 PLUS - 512GB - YELLOW
+        if (preg_match('/^(.*?)\s*-?\s*(\d+(?:\/\d+)?\s*GB(?:\/TB)?)\s*-?\s*(.*)$/i', $cleanName, $matches)) {
+            $parentName = trim($matches[1]);
+            $memory = trim($matches[2]);
+            $color = trim($matches[3]);
+
+            // 3. Pisahkan RAM dan Storage jika ada garis miring (Misal: 4/128GB)
+            if (strpos($memory, '/') !== false) {
+                list($r, $s) = explode('/', str_ireplace(['GB', 'TB', ' '], '', $memory));
+                $ram = trim($r) . 'GB';
+                $storage = trim($s) . 'GB';
+            } else {
+                $storage = $memory; // Jika tanpa slash, masuk semua ke Storage
+            }
+        }
+
+        return [
+            'parentName' => $parentName,
+            'ram' => $ram,
+            'storage' => $storage,
+            'color' => $color ?: '-',
+        ];
+    }
+
+    /**
+     * Auto-generate Product and ProductVariant based on full Accurate Item Data
+     */
+    public function autoGenerateProductAndVariant($itemNo, $accurateItem, $productAccurateId = null)
+    {
+        // 1. Validasi Tipe (Opsional: Pastikan ini INVPART atau barang jualan)
+        if (($accurateItem['itemTypeName'] ?? '') !== 'Persediaan') {
+            return [
+                'success' => false,
+                'message' => 'Bukan Inventory Part (INVPART)'
+            ];
+        }
+
+        // 2. Ambil Kategori dari Accurate (Atau default ke Uncategorized)
+        $categoryName = $accurateItem['itemCategory']['name'] ?? 'Uncategorized';
+        $category = Category::firstOrCreate(
+            ['slug' => Str::slug($categoryName)],
+            ['name' => $categoryName]
+        );
+
+        // BRAND
+        $brandName = $accurateItem['itemBrand']['name'] ?? 'Uncategorized';
+        $brand = Brand::firstOrCreate(
+            ['slug' => Str::slug($brandName)],
+            ['name' => $brandName]
+        );
+
+        // TODO: Ekstrak Brand dari Accurate jika ada fieldnya, atau ambil dari kata pertama Parent Name
+
+        // 3. Pecah Nama (Regex)
+        $parsedData = $this->parseItemName($accurateItem['name'] ?? '');
+
+        // 4. Cari atau Buat Induk (Product)
+        $product = Product::firstOrCreate(
+            ['name' => $parsedData['parentName']],
+            [
+                'category_id' => $category->id,
+                'brand_id' => $brand->id,
+                'slug' => Str::slug($parsedData['parentName']),
+                'is_active' => true,
+                'description' => 'Auto-generated from Accurate',
+                'has_active_accurate' => true
+            ]
+        );
+
+        // 5. Buat atau Update Anak (ProductVariant)
+        $variant = ProductVariant::updateOrCreate(
+            ['sku' => $itemNo],
+            [
+                'product_id' => $product->id,
+                'condition' => 'Baru', // Default
+                'color' => $parsedData['color'],
+                'ram' => $parsedData['ram'],
+                'storage' => $parsedData['storage'],
+                'price' => (float) ($accurateItem['unitPrice'] ?? 0),
+                'product_accurate_id' => $productAccurateId,
+            ]
+        );
+
+        return [
+            'success' => true,
+            'message' => 'Variant berhasil di-generate',
+            'product' => $product,
+            'variant' => $variant
+        ];
+    }
+}

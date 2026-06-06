@@ -108,7 +108,16 @@
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="py-4 px-6">
                                 <div class="font-medium text-gray-900">{{ $product->item_no ?? '-' }}</div>
-                                <div class="text-xs text-gray-500 mt-0.5">ID: {{ $product->accurate_id }}</div>
+                                <div class="text-xs text-gray-500 mt-0.5">ID: {{ $product->accurate_id }}
+                                    <button wire:click="generateVariantLocally({{ $product->id }})"
+                                        class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700">
+                                        Generate Variant
+                                    </button>
+                                    <button wire:click="syncSerialNumber({{ $product->accurate_id }})"
+                                        class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700">
+                                        Sync Serial Number
+                                    </button>
+                                </div>
                             </td>
                             <td class="py-4 px-6 font-medium text-gray-800">
                                 {{ $product->name }}

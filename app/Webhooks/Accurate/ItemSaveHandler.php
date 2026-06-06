@@ -6,6 +6,7 @@ use App\Models\AccurateWebhookLog;
 use App\Models\ProductVariant;
 use App\Models\SecondProductVariant;
 use App\Services\AccurateService;
+use App\Services\SerialNumberSyncService;
 use Illuminate\Support\Facades\Log;
 
 class ItemSaveHandler implements WebhookHandlerInterface
@@ -81,7 +82,7 @@ class ItemSaveHandler implements WebhookHandlerInterface
 
             if ($hasSn) {
                 try {
-                    $syncService = app(\App\Services\SerialNumberSyncService::class);
+                    $syncService = app(SerialNumberSyncService::class);
                     $syncService->syncFromAccurate($itemNo);
                     Log::info("Webhook SN Sync sukses (dari ItemSaveHandler) untuk SKU: {$itemNo}");
                 } catch (\Exception $e) {
