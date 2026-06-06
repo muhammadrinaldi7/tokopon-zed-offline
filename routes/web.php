@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Admin\Employe\EmployeManage;
+use App\Livewire\Admin\Vendor\VendorManage;
 use App\Livewire\Admin\Pos\CekStock;
 use App\Livewire\Admin\Reporting\Dashboard;
 use App\Livewire\Admin\Users\UserOperational;
@@ -50,6 +51,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::livewire('/roles', 'pages::admin.role-permission')->name('roles')->middleware('can:manage-users');
     Route::get('/user/operational', UserOperational::class)->name('user.operational')->middleware('can:manage-users');
     Route::get('/user/employes', EmployeManage::class)->name('user.employes')->middleware('can:manage-users');
+    Route::get('/user/vendors', VendorManage::class)->name('user.vendors')->middleware('can:manage-users');
 
     // Katalog Pusat
     Route::get('/products', \App\Livewire\Admin\Products\ProductManagement::class)->name('products')->middleware('can:manage-new-catalog');
@@ -74,6 +76,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/sales', \App\Livewire\Admin\Reporting\SalesReport::class)->name('sales');
         Route::get('/products', \App\Livewire\Admin\Reporting\ProductReport::class)->name('products');
         Route::get('/stock', \App\Livewire\Admin\Reporting\StockReport::class)->name('stock');
+        Route::get('/laporan-stok', \App\Livewire\Admin\Reporting\LaporanStok::class)->name('laporan-stok');
         Route::get('/staff', \App\Livewire\Admin\Reporting\StaffReport::class)->name('staff');
     });
 

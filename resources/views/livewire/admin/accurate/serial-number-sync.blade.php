@@ -11,15 +11,17 @@
                 <p class="text-sm text-gray-500 mt-1">
                     @if($isSyncing)
                         Sedang menyinkronkan data... Jangan tutup halaman ini.
+                    @elseif($isSyncingVendor)
+                        Sedang menyinkronkan data Vendor & HPP... Jangan tutup halaman ini.
                     @else
                         Siap untuk menyinkronkan. Klik tombol di samping untuk memulai.
                     @endif
                 </p>
             </div>
-            <div>
+            <div class="flex items-center gap-2">
                 <button 
                     wire:click="startSync" 
-                    @if($isSyncing) disabled @endif
+                    @if($isSyncing || $isSyncingVendor) disabled @endif
                     class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
                     
                     @if($isSyncing)
@@ -33,6 +35,25 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
                         Mulai Sinkronisasi
+                    @endif
+                </button>
+
+                <button 
+                    wire:click="startSyncVendor" 
+                    @if($isSyncing || $isSyncingVendor) disabled @endif
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
+                    
+                    @if($isSyncingVendor)
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Sinkron Vendor Berjalan...
+                    @else
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                        Sinkron Vendor & HPP
                     @endif
                 </button>
             </div>
@@ -59,7 +80,7 @@
                         <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-in-out" style="width: {{ $percentage }}%"></div>
                     </div>
                     
-                    @if($isSyncing)
+                    @if($isSyncing || $isSyncingVendor)
                         <p class="text-xs text-gray-500 mt-2 font-mono flex items-center gap-2">
                             <span class="relative flex h-2 w-2">
                               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>

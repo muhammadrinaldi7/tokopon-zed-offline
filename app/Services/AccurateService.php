@@ -582,6 +582,62 @@ class AccurateService
         return $allEmployees;
     }
 
+    public function getVendors($databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+
+        // Mengambil konfigurasi environment berdasarkan database source
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        $allVendors = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $timestamp = now()->toIso8601String();
+            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+            $paramBody = [
+                "sp.pageSize" => 100,
+                "sp.page" => $page,
+                "fields" => "id,vendorNo,name,email,mobilePhone,suspended"
+            ];
+
+            $response = Http::withHeaders([
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ])->get($host . '/vendor/list.do', $paramBody);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['s']) && $data['s'] === false) {
+                    \Illuminate\Support\Facades\Log::error("Accurate API Get Vendors Error ({$databaseSource}): " . json_encode($data));
+                    break;
+                }
+
+                $chunk = $data['d'] ?? [];
+                $allVendors = array_merge($allVendors, $chunk);
+
+                $pageCount = $data['sp']['pageCount'] ?? 1;
+
+                if ($page >= $pageCount || count($chunk) < 100) {
+                    $hasMore = false;
+                } else {
+                    $page++;
+                }
+            } else {
+                \Illuminate\Support\Facades\Log::error("Accurate API Get Vendors Failed ({$databaseSource}): " . $response->body());
+                $hasMore = false;
+            }
+        }
+
+        return $allVendors;
+    }
+
     public function postSalesReceipt($salesReceiptData, $databaseSource = 'syihab')
     {
         $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
@@ -1036,5 +1092,93 @@ class AccurateService
         } else {
             throw new \Exception('API Accurate Connection Error: ' . $response->body());
         }
+    }
+
+    public function getReceiveItemList($databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $allIds = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $timestamp = now()->toIso8601String();
+            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+            $response = Http::withHeaders([
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ])->get($host . '/receive-item/list.do', [
+                'sp.pageSize' => 100,
+                'sp.page' => $page,
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data['s']) && $data['s'] === true) {
+                    $chunk = $data['d'] ?? [];
+                    foreach ($chunk as $item) {
+                        if (isset($item['id'])) {
+                            $allIds[] = $item['id'];
+                        }
+                    }
+
+                    $pageCount = $data['sp']['pageCount'] ?? 1;
+                    if ($page >= $pageCount || count($chunk) < 100) {
+                        $hasMore = false;
+                    } else {
+                        $page++;
+                    }
+                } else {
+                    Log::error("Accurate API Get Receive Item List Error ({$databaseSource}): " . json_encode($data));
+                    break;
+                }
+            } else {
+                Log::error("Accurate API Get Receive Item List Failed ({$databaseSource}): " . $response->body());
+                $hasMore = false;
+            }
+        }
+
+        return $allIds;
+    }
+
+    public function getReceiveItemDetail($id, $databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/receive-item/detail.do', [
+            'id' => $id,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? null;
+            }
+        }
+
+        Log::error("Accurate API Get Receive Item Detail Failed ({$databaseSource}): " . $response->body());
+        return null;
     }
 }
