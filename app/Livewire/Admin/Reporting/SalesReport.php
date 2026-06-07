@@ -82,12 +82,12 @@ class SalesReport extends Component
         $end = Carbon::parse($this->endDate)->endOfDay();
 
         return Order::with(['user', 'salesBy', 'paymentMethod', 'items.variant.product', 'promos'])
-            ->whereBetween('created_at', [$start, $end])
-            ->where('order_status', 'COMPLETED')
+            ->whereBetween('orders.created_at', [$start, $end])
+            ->where('orders.order_status', 'COMPLETED')
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
-                    $q->where('order_number', 'like', '%' . $this->search . '%')
-                        ->orWhere('accurate_invoice_no', 'like', '%' . $this->search . '%')
+                    $q->where('orders.order_number', 'like', '%' . $this->search . '%')
+                        ->orWhere('orders.accurate_invoice_no', 'like', '%' . $this->search . '%')
                         ->orWhereHas('user', function ($qc) {
                             $qc->where('name', 'like', '%' . $this->search . '%');
                         })
@@ -97,9 +97,9 @@ class SalesReport extends Component
                 });
             })
             ->when($this->branchFilter, function ($query) {
-                $query->where('shipping_address_snapshot->store', $this->branchFilter);
+                $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
             })
-            ->latest();
+            ->latest('orders.created_at');
     }
 
     public function exportCsv()
@@ -137,9 +137,25 @@ class SalesReport extends Component
 
             // 2. Susun Header Secara Dinamis
             $headers = [
-                'TANGGAL', 'NO. ORDER', 'NO. INVOICE', 'KASIR', 'SALES', 'PELANGGAN', 'TELEPON', 'CABANG',
-                'NAMA PRODUK', 'MERK PRODUK', 'WARNA', 'STORAGE', 'SN (SerialNumber)', 'CATATAN',
-                'QTY', 'HARGA SATUAN (Rp)', 'DISKON ITEM (Rp)', 'SUBTOTAL ITEM (Rp)', 'GROSS ORDER (Rp)',
+                'TANGGAL',
+                'NO. ORDER',
+                'NO. INVOICE',
+                'KASIR',
+                'SALES',
+                'PELANGGAN',
+                'TELEPON',
+                'CABANG',
+                'NAMA PRODUK',
+                'MERK PRODUK',
+                'WARNA',
+                'STORAGE',
+                'SN (SerialNumber)',
+                'CATATAN',
+                'QTY',
+                'HARGA SATUAN (Rp)',
+                'DISKON ITEM (Rp)',
+                'SUBTOTAL ITEM (Rp)',
+                'GROSS ORDER (Rp)',
             ];
 
             foreach ($uniquePayments as $upm) {
@@ -284,12 +300,27 @@ class SalesReport extends Component
                 } else {
                     // Fallback jika tidak ada item (sangat jarang terjadi)
                     $rowData = [
-                        $order->created_at->format('Y-m-d H:i'), $order->order_number, $order->accurate_invoice_no ?? '-',
-                        $order->handledBy ? $order->handledBy->name : '-', $order->user ? $order->user->name : 'Walk-in',
-                        $order->user ? $order->user->profile->phone_number : '-', $order->salesBy ? $order->salesBy->name : '-',
-                        $branch, '-', '-', '-', '-', '-', '-', '0', '0', '0', '0', $order->total_amount
+                        $order->created_at->format('Y-m-d H:i'),
+                        $order->order_number,
+                        $order->accurate_invoice_no ?? '-',
+                        $order->handledBy ? $order->handledBy->name : '-',
+                        $order->user ? $order->user->name : 'Walk-in',
+                        $order->user ? $order->user->profile->phone_number : '-',
+                        $order->salesBy ? $order->salesBy->name : '-',
+                        $branch,
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '0',
+                        '0',
+                        '0',
+                        '0',
+                        $order->total_amount
                     ];
-                    
+
                     $itemPromosTotal = 0;
                     foreach ($uniquePayments as $upm) {
                         $rowData[] = $orderPayments[$upm] ?? 0;
@@ -300,10 +331,12 @@ class SalesReport extends Component
                         $rowData[] = $promoVal;
                     }
 
-                    $rowData[] = $order->mdr_amount ?? 0;
+                    $mdrPct = $order->paymentMethodRate->mdr_percentage ?? 0;
+                    $mdrAmount = ($order->grand_total * $mdrPct) / 100;
+                    $rowData[] = $mdrAmount;
                     $rowData[] = $order->grand_total; // TOTAL TRANSAKSI
-                    $rowData[] = $order->grand_total - ($order->mdr_amount ?? 0); // NET SALES
-                    
+                    $rowData[] = $order->grand_total - $mdrAmount; // NET SALES
+
                     fputcsv($file, $rowData);
                 }
             }
@@ -318,7 +351,7 @@ class SalesReport extends Component
         $csvFileName = 'laporan_penjualan_multi_row_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
         return response()->streamDownload(function () use ($orders) {
             $file = fopen('php://output', 'w');
-            
+
             // Header untuk Opsi 2 (Multi-row)
             fputcsv($file, [
                 'TANGGAL',
@@ -359,7 +392,14 @@ class SalesReport extends Component
                 $sales = $order->salesBy ? $order->salesBy->name : '-';
 
                 $baseRow = [
-                    $orderDate, $orderNo, $invNo, $kasir, $sales, $pelanggan, $telp, $branch
+                    $orderDate,
+                    $orderNo,
+                    $invNo,
+                    $kasir,
+                    $sales,
+                    $pelanggan,
+                    $telp,
+                    $branch
                 ];
 
                 // 1. Tulis Baris Item
@@ -384,16 +424,31 @@ class SalesReport extends Component
                             '-', // METODE BAYAR / PROMO
                             '0', // NOMINAL
                             $order->total_amount, // GROSS
-                            $order->mdr_amount ?? 0,
+                            ($order->grand_total * ($order->paymentMethodRate->mdr_percentage ?? 0)) / 100,
                             $order->grand_total,
-                            $order->grand_total - ($order->mdr_amount ?? 0)
+                            $order->grand_total - (($order->grand_total * ($order->paymentMethodRate->mdr_percentage ?? 0)) / 100)
                         ]);
                         fputcsv($file, $row);
                     }
                 } else {
                     $row = array_merge($baseRow, [
-                        'ITEM', '-', '-', '-', '-', '-', '-', '0', '0', '0', '0', '-', '0',
-                        $order->total_amount, $order->mdr_amount ?? 0, $order->grand_total, $order->grand_total - ($order->mdr_amount ?? 0)
+                        'ITEM',
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '0',
+                        '0',
+                        '0',
+                        '0',
+                        '-',
+                        '0',
+                        $order->total_amount,
+                        ($order->grand_total * ($order->paymentMethodRate->mdr_percentage ?? 0)) / 100,
+                        $order->grand_total,
+                        $order->grand_total - (($order->grand_total * ($order->paymentMethodRate->mdr_percentage ?? 0)) / 100)
                     ]);
                     fputcsv($file, $row);
                 }
@@ -407,11 +462,22 @@ class SalesReport extends Component
 
                         $row = array_merge($baseRow, [
                             'PEMBAYARAN',
-                            '-', '-', '-', '-', '-', '-', // Produk Info Kosong
-                            '0', '0', '0', '0', // Angka Item Kosong
+                            '-',
+                            '-',
+                            '-',
+                            '-',
+                            '-',
+                            '-', // Produk Info Kosong
+                            '0',
+                            '0',
+                            '0',
+                            '0', // Angka Item Kosong
                             $paymentLabel,
                             $payment->amount,
-                            '0', '0', '0', '0' // Angka Order Kosong agar tidak didouble count
+                            '0',
+                            '0',
+                            '0',
+                            '0' // Angka Order Kosong agar tidak didouble count
                         ]);
                         fputcsv($file, $row);
                     }
@@ -419,8 +485,23 @@ class SalesReport extends Component
                     $methodName = $order->paymentMethod ? $order->paymentMethod->name : 'Unknown Payment';
                     if ($methodName !== 'Unknown Payment') {
                         $row = array_merge($baseRow, [
-                            'PEMBAYARAN', '-', '-', '-', '-', '-', '-', '0', '0', '0', '0',
-                            $methodName, $order->grand_total, '0', '0', '0', '0'
+                            'PEMBAYARAN',
+                            '-',
+                            '-',
+                            '-',
+                            '-',
+                            '-',
+                            '-',
+                            '0',
+                            '0',
+                            '0',
+                            '0',
+                            $methodName,
+                            $order->grand_total,
+                            '0',
+                            '0',
+                            '0',
+                            '0'
                         ]);
                         fputcsv($file, $row);
                     }
@@ -430,11 +511,22 @@ class SalesReport extends Component
                 foreach ($order->promos as $promo) {
                     $row = array_merge($baseRow, [
                         'PROMO',
-                        '-', '-', '-', '-', '-', '-', // Produk Info Kosong
-                        '0', '0', '0', '0', // Angka Item Kosong
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '-', // Produk Info Kosong
+                        '0',
+                        '0',
+                        '0',
+                        '0', // Angka Item Kosong
                         $promo->name,
                         $promo->pivot->discount_applied ?? 0,
-                        '0', '0', '0', '0' // Angka Order Kosong
+                        '0',
+                        '0',
+                        '0',
+                        '0' // Angka Order Kosong
                     ]);
                     fputcsv($file, $row);
                 }
@@ -449,15 +541,45 @@ class SalesReport extends Component
         $csvFileName = 'laporan_penjualan_kolom_statis_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
         return response()->streamDownload(function () use ($orders) {
             $file = fopen('php://output', 'w');
-            
+
             // Header untuk Opsi 3 (Kolom Statis)
             fputcsv($file, [
-                'TANGGAL', 'NO. ORDER', 'NO. INVOICE', 'KASIR', 'SALES', 'PELANGGAN', 'TELEPON', 'CABANG',
-                'NAMA PRODUK', 'MERK PRODUK', 'WARNA', 'STORAGE', 'SN (SerialNumber)', 'CATATAN',
-                'QTY', 'HARGA SATUAN (Rp)', 'DISKON ITEM (Rp)', 'SUBTOTAL ITEM (Rp)',
-                'METODE 1', 'NOMINAL 1 (Rp)', 'METODE 2', 'NOMINAL 2 (Rp)', 'METODE 3', 'NOMINAL 3 (Rp)', 'METODE 4', 'NOMINAL 4 (Rp)',
-                'PROMO 1', 'DISKON 1 (Rp)', 'PROMO 2', 'DISKON 2 (Rp)', 'PROMO 3', 'DISKON 3 (Rp)',
-                'MDR (Rp)', 'TOTAL TRANSAKSI (Rp)', 'NET SALES (Rp)'
+                'TANGGAL',
+                'NO. ORDER',
+                'NO. INVOICE',
+                'KASIR',
+                'SALES',
+                'PELANGGAN',
+                'TELEPON',
+                'CABANG',
+                'NAMA PRODUK',
+                'MERK PRODUK',
+                'WARNA',
+                'STORAGE',
+                'SN (SerialNumber)',
+                'CATATAN',
+                'QTY',
+                'HARGA SATUAN (Rp)',
+                'DISKON ITEM (Rp)',
+                'SUBTOTAL ITEM (Rp)',
+                'METODE 1',
+                'NOMINAL 1 (Rp)',
+                'METODE 2',
+                'NOMINAL 2 (Rp)',
+                'METODE 3',
+                'NOMINAL 3 (Rp)',
+                'METODE 4',
+                'NOMINAL 4 (Rp)',
+                'PROMO 1',
+                'DISKON 1 (Rp)',
+                'PROMO 2',
+                'DISKON 2 (Rp)',
+                'PROMO 3',
+                'DISKON 3 (Rp)',
+                'Tipe Beban',
+                'MDR (Rp)',
+                'TOTAL TRANSAKSI (Rp)',
+                'NET SALES (Rp)'
             ]);
 
             foreach ($orders as $order) {
@@ -511,9 +633,9 @@ class SalesReport extends Component
                             $order->order_number,
                             $order->accurate_invoice_no ?? '-',
                             $order->handledBy ? $order->handledBy->name : '-',
+                            $order->salesBy ? $order->salesBy->name : '-',
                             $order->user ? $order->user->name : 'Walk-in',
                             $order->user ? $order->user->profile->phone_number : '-',
-                            $order->salesBy ? $order->salesBy->name : '-',
                             $branch,
                             $name,
                             $merk,
@@ -572,7 +694,9 @@ class SalesReport extends Component
                         }
 
                         // Alokasi MDR
-                        $mdrAmount = $order->mdr_amount ?? 0;
+                        $rowData[] = $order->paymentMethodRate->name ?? '-';
+                        $mdrPct = $order->paymentMethodRate->mdr_percentage ?? 0;
+                        $mdrAmount = ($order->grand_total * $mdrPct) / 100;
                         if ($isLastItem) {
                             $allocatedMdr = $mdrAmount - $allocatedMdrTotal;
                         } else {
@@ -592,19 +716,34 @@ class SalesReport extends Component
                     }
                 } else {
                     $rowData = [
-                        $order->created_at->format('Y-m-d H:i'), $order->order_number, $order->accurate_invoice_no ?? '-',
-                        $order->handledBy ? $order->handledBy->name : '-', $order->user ? $order->user->name : 'Walk-in',
-                        $order->user ? $order->user->profile->phone_number : '-', $order->salesBy ? $order->salesBy->name : '-',
-                        $branch, '-', '-', '-', '-', '-', '-', '0', '0', '0', '0'
+                        $order->created_at->format('Y-m-d H:i'),
+                        $order->order_number,
+                        $order->accurate_invoice_no ?? '-',
+                        $order->handledBy ? $order->handledBy->name : '-',
+                        $order->user ? $order->user->name : 'Walk-in',
+                        $order->user ? $order->user->profile->phone_number : '-',
+                        $order->salesBy ? $order->salesBy->name : '-',
+                        $branch,
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '0',
+                        '0',
+                        '0',
+                        '0'
                     ];
-                    
+
                     $paymentSlots = array_keys($orderPayments);
                     for ($i = 0; $i < 4; $i++) {
                         if (isset($paymentSlots[$i])) {
                             $rowData[] = $paymentSlots[$i];
                             $rowData[] = $orderPayments[$paymentSlots[$i]];
                         } else {
-                            $rowData[] = '-'; $rowData[] = '0';
+                            $rowData[] = '-';
+                            $rowData[] = '0';
                         }
                     }
 
@@ -617,14 +756,17 @@ class SalesReport extends Component
                             $rowData[] = $promoSlots[$i];
                             $rowData[] = $promoVal;
                         } else {
-                            $rowData[] = '-'; $rowData[] = '0';
+                            $rowData[] = '-';
+                            $rowData[] = '0';
                         }
                     }
 
-                    $rowData[] = $order->mdr_amount ?? 0;
+                    $mdrPct = $order->paymentMethodRate->mdr_percentage ?? 0;
+                    $mdrAmount = ($order->grand_total * $mdrPct) / 100;
+                    $rowData[] = $mdrAmount;
                     $rowData[] = $order->grand_total; // TOTAL TRANSAKSI
-                    $rowData[] = $order->grand_total - ($order->mdr_amount ?? 0); // NET SALES
-                    
+                    $rowData[] = $order->grand_total - $mdrAmount; // NET SALES
+
                     fputcsv($file, $rowData);
                 }
             }
@@ -637,7 +779,9 @@ class SalesReport extends Component
         $availableBranches = \App\Models\Branch::orderBy('name')->pluck('name');
 
         $totalGross = $this->ordersQuery->sum('total_amount');
-        $totalNet = $this->ordersQuery->sum('grand_total') - $this->ordersQuery->sum('mdr_amount');
+        $netQuery = clone $this->ordersQuery;
+        $totalNet = $netQuery->leftJoin('payment_method_rates', 'orders.payment_method_rate_id', '=', 'payment_method_rates.id')
+            ->sum(\Illuminate\Support\Facades\DB::raw('orders.grand_total - ((orders.grand_total * COALESCE(payment_method_rates.mdr_percentage, 0)) / 100)'));
 
         return view('livewire.admin.reporting.sales-report', [
             'orders' => $orders,
