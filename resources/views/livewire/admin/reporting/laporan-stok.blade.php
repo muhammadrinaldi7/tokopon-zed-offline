@@ -25,14 +25,31 @@
 
     {{-- Data Table --}}
     <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] overflow-hidden">
-        <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+        <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <h3 class="font-bold text-gray-700 text-sm">Daftar Serial Number</h3>
-            <div class="relative">
-                <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari SN / SKU / Nama Produk..." 
-                    class="w-64 sm:w-80 pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] bg-white">
-                <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
+            
+            <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                {{-- Dropdown Gudang --}}
+                <div class="relative">
+                    <select wire:model.live="warehouseId" class="w-full sm:w-48 pl-3 pr-8 py-2 border border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] bg-white appearance-none cursor-pointer">
+                        <option value="">Semua Gudang</option>
+                        @foreach($warehouses as $warehouse)
+                            <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
+
+                {{-- Input Pencarian --}}
+                <div class="relative">
+                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari SN / SKU / Nama Produk..." 
+                        class="w-full sm:w-80 pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] bg-white">
+                    <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
             </div>
         </div>
         

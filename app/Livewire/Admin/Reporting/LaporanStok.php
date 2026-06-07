@@ -5,16 +5,23 @@ namespace App\Livewire\Admin\Reporting;
 use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\ProductSerialNumber;
+use App\Models\Warehouse;
 
 class LaporanStok extends Component
 {
     use WithPagination;
 
     public $search = '';
+    public $warehouseId = '';
     public $sortField = 'created_at';
     public $sortDirection = 'desc';
 
     public function updatingSearch()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingWarehouseId()
     {
         $this->resetPage();
     }
@@ -40,6 +47,9 @@ class LaporanStok extends Component
                           $q->where('name', 'like', '%' . $this->search . '%');
                       });
                 });
+            })
+            ->when($this->warehouseId, function ($query) {
+                $query->where('warehouse_id', $this->warehouseId);
             })
             ->orderBy($this->sortField, $this->sortDirection);
 
@@ -101,12 +111,17 @@ class LaporanStok extends Component
                       });
                 });
             })
+            ->when($this->warehouseId, function ($query) {
+                $query->where('warehouse_id', $this->warehouseId);
+            })
             ->orderBy($this->sortField, $this->sortDirection);
 
         $stocks = $query->paginate(20);
+        $warehouses = Warehouse::orderBy('name')->get();
 
         return view('livewire.admin.reporting.laporan-stok', [
-            'stocks' => $stocks
+            'stocks' => $stocks,
+            'warehouses' => $warehouses
         ])->layout('layouts.admin');
     }
 }

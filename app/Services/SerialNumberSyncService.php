@@ -192,6 +192,11 @@ class SerialNumberSyncService
                         ]);
                         $updatedCount++;
                     } else {
+                        // CEK EKSTRA: Pastikan SN ini belum pernah terjual (belum ada di order_items)
+                        // order_items menyimpan SN dalam bentuk string dipisah koma
+                        $isAlreadySold = \App\Models\OrderItem::where('serial_number', 'LIKE', '%' . $sn . '%')->exists();
+                        $finalStatus = $isAlreadySold ? 'Unavailable' : 'Available';
+
                         // Jika belum ada, buat baru
                         ProductSerialNumber::create([
                             'serial_number' => $sn,
@@ -199,7 +204,7 @@ class SerialNumberSyncService
                             'warehouse_id' => $localWarehouseId,
                             'hpp' => $hpp,
                             'vendor_id' => $localVendorId,
-                            'status' => 'Available', // Berdasarkan kesepakatan, diset Available
+                            'status' => $finalStatus,
                         ]);
                         $updatedCount++;
                     }
