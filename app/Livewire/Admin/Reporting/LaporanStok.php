@@ -39,6 +39,7 @@ class LaporanStok extends Component
     public function exportCsv()
     {
         $query = ProductSerialNumber::with(['productAccurate', 'warehouse', 'vendor'])
+            ->where('status', 'Available')
             ->when($this->search, function ($query) {
                 $query->where(function($q) {
                     $q->where('serial_number', 'like', '%' . $this->search . '%')
@@ -102,6 +103,7 @@ class LaporanStok extends Component
     public function render()
     {
         $query = ProductSerialNumber::with(['productAccurate', 'warehouse', 'vendor'])
+            ->where('status', 'Available')
             ->when($this->search, function ($query) {
                 $query->where(function($q) {
                     $q->where('serial_number', 'like', '%' . $this->search . '%')
