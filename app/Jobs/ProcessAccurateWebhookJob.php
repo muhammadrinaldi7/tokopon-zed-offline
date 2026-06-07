@@ -74,9 +74,11 @@ class ProcessAccurateWebhookJob implements ShouldQueue
             'INVENTORY_ADJUSTMENT',
             'INVENTORY_TRANSFER',
             'PURCHASE_INVOICE',
-            'RECEIVE_ITEM',
             'ITEM_ADJUSTMENT',
             'STOCK_MUTATION' => \App\Webhooks\Accurate\StockChangeHandler::class,
+
+            // EVENT PENERIMAAN BARANG
+            'RECEIVE_ITEM' => \App\Webhooks\Accurate\ReceiveItemHandler::class,
 
             // KUMPULAN EVENT PENJUALAN:
             'SALES_INVOICE',
