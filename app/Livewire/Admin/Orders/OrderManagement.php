@@ -15,6 +15,10 @@ class OrderManagement extends Component
 
     public $search = '';
     public $statusFilter = '';
+    
+    // Properties for Receipt Modal
+    public $showReceiptModal = false;
+    public $selectedOrderForReceipt = null;
 
     public function updatingSearch(): void
     {
@@ -24,6 +28,27 @@ class OrderManagement extends Component
     public function updatingStatusFilter(): void
     {
         $this->resetPage();
+    }
+
+    public function viewReceipt(int $orderId): void
+    {
+        $this->selectedOrderForReceipt = Order::with([
+            'user.profile', 
+            'items.variant.product', 
+            'items.variant.secondProduct', 
+            'handledBy', 
+            'salesBy', 
+            'payments.paymentMethod', 
+            'payments.paymentMethodRate'
+        ])->find($orderId);
+        
+        $this->showReceiptModal = true;
+    }
+
+    public function closeReceipt(): void
+    {
+        $this->showReceiptModal = false;
+        $this->selectedOrderForReceipt = null;
     }
 
     /**

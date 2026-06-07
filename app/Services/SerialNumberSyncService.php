@@ -131,6 +131,21 @@ class SerialNumberSyncService
                 return 0; // Gagal ambil detail
             }
 
+            // Ekstrak receipt date
+            $transDateStr = $detail['transDate'] ?? null;
+            $receiptDate = null;
+            if ($transDateStr) {
+                try {
+                    $receiptDate = \Carbon\Carbon::createFromFormat('d/m/Y', $transDateStr)->format('Y-m-d');
+                } catch (\Exception $e) {
+                    try {
+                        $receiptDate = \Carbon\Carbon::parse($transDateStr)->format('Y-m-d');
+                    } catch (\Exception $e2) {
+                        $receiptDate = null;
+                    }
+                }
+            }
+
             $updatedCount = 0;
 
             // 1. Ekstrak Vendor
@@ -188,7 +203,8 @@ class SerialNumberSyncService
                         // Jika sudah ada, update hpp dan vendor_id (biarkan statusnya tidak berubah)
                         $existingSn->update([
                             'hpp' => $hpp,
-                            'vendor_id' => $localVendorId
+                            'vendor_id' => $localVendorId,
+                            'receipt_date' => $receiptDate,
                         ]);
                         $updatedCount++;
                     } else {
@@ -205,6 +221,7 @@ class SerialNumberSyncService
                             'hpp' => $hpp,
                             'vendor_id' => $localVendorId,
                             'status' => $finalStatus,
+                            'receipt_date' => $receiptDate,
                         ]);
                         $updatedCount++;
                     }

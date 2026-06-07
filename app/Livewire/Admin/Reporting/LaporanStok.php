@@ -74,7 +74,8 @@ class LaporanStok extends Component
             'HPP',
             'VENDOR',
             'STATUS',
-            'TANGGAL DIBUAT'
+            'TANGGAL TERIMA',
+            'UMUR (HARI)'
         ];
 
         $callback = function () use ($data, $columns) {
@@ -82,6 +83,7 @@ class LaporanStok extends Component
             fputcsv($file, $columns);
 
             foreach ($data as $item) {
+                $umur = $item->receipt_date ? intval(\Carbon\Carbon::parse($item->receipt_date)->startOfDay()->diffInDays(now()->startOfDay())) . ' Hari' : '-';
                 fputcsv($file, [
                     $item->serial_number,
                     $item->item_no,
@@ -90,7 +92,8 @@ class LaporanStok extends Component
                     round($item->hpp ?? 0),
                     $item->vendor->vendor_name ?? '-',
                     $item->status,
-                    $item->created_at ? $item->created_at->format('Y-m-d H:i') : '-'
+                    $item->receipt_date ? \Carbon\Carbon::parse($item->receipt_date)->format('Y-m-d') : '-',
+                    $umur
                 ]);
             }
 

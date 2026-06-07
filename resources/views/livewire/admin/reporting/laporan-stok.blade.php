@@ -77,6 +77,12 @@
                             @endif
                         </th>
                         <th class="px-5 py-4 font-bold">Vendor</th>
+                        <th class="px-5 py-4 font-bold text-center cursor-pointer hover:bg-gray-50" wire:click="sortBy('receipt_date')">
+                            Tanggal Masuk
+                            @if($sortField === 'receipt_date')
+                                <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
+                            @endif
+                        </th>
                         <th class="px-5 py-4 font-bold text-center cursor-pointer hover:bg-gray-50" wire:click="sortBy('status')">
                             Status
                             @if($sortField === 'status')
@@ -109,6 +115,9 @@
                             </td>
                             <td class="px-5 py-3">
                                 <p class="text-xs font-semibold text-gray-600">{{ $item->vendor->vendor_name ?? '-' }}</p>
+                            </td>
+                            <td class="px-5 py-3 text-center">
+                                <p class="text-[11px] font-semibold text-gray-700">{{ $item->receipt_date ? \Carbon\Carbon::parse($item->receipt_date)->format('d M Y') : '-' }}</p>
                             </td>
                             <td class="px-5 py-3 text-center">
                                 @if($item->status == 'Available')
