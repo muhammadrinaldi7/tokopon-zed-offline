@@ -572,7 +572,7 @@ class SalesReport extends Component
                 'NAMA PROMO',
                 'DISKON PROMO (Rp)',
                 'SUBTOTAL ITEM (Rp)',
-                'TOTAL NON PPN',
+                'PENJUALAN BERSIH',
                 'METODE 1',
                 'NOMINAL 1 (Rp)',
                 'MDR 1 (%)',
@@ -589,8 +589,7 @@ class SalesReport extends Component
                 'NOMINAL 4 (Rp)',
                 'MDR 4 (%)',
                 'BEBAN MDR 4 (Rp)',
-                'TOTAL TRANSAKSI (Rp)',
-                'NET SALES (Rp)'
+                'TOTAL PEMBAYARAN'
             ], $separator);
 
             foreach ($orders as $order) {
@@ -603,7 +602,7 @@ class SalesReport extends Component
                         $pmName = $payment->paymentMethod ? $payment->paymentMethod->name : 'Unknown Payment';
                         $pmrPct = $payment->paymentMethodRate ? $payment->paymentMethodRate->mdr_percentage : 0;
                         $mdrAmt = ($payment->amount * $pmrPct) / 100;
-
+                        
                         $key = $pmName . '|' . $pmrPct;
                         if (!isset($orderPayments[$key])) {
                             $orderPayments[$key] = [
@@ -621,7 +620,7 @@ class SalesReport extends Component
                     if ($pmName !== 'Unknown Payment') {
                         $pmrPct = $order->paymentMethodRate ? $order->paymentMethodRate->mdr_percentage : 0;
                         $mdrAmt = ($order->grand_total * $pmrPct) / 100;
-
+                        
                         $key = $pmName . '|' . $pmrPct;
                         $orderPayments[$key] = [
                             'name' => $pmName,
@@ -631,84 +630,104 @@ class SalesReport extends Component
                         ];
                     }
                 }
-                $orderPayments = array_values($orderPayments); // Reset key jadi index numerik 0,1,2,3
+                $orderPayments = array_values($orderPayments);
 
                 // Pra-kalkulasi kelayakan promo
-                $promoEligibleSubtotals = []; // Menyimpan total subtotal item valid untuk masing-masing promo
+                $promoEligibleSubtotals = []; 
                 foreach ($order->promos as $promo) {
                     $promoSkus = $promo->skus->pluck('sku')->toArray();
                     $bundleSkus = $promo->bundleSkus->pluck('sku')->toArray();
-
+                    
                     $validSubtotal = 0;
                     foreach ($order->items as $item) {
                         $sku = $item->variant?->sku;
-                        // Sesuai logic Pos.php: Jika apply_to_all_items true (dan bukan bundle), semua valid
                         $isMainEligible = ($promo->apply_to_all_items && !$promo->is_bundle) || in_array($sku, $promoSkus);
                         $isBundleEligible = $promo->is_bundle && in_array($sku, $bundleSkus);
-
+                        
                         if ($isMainEligible || $isBundleEligible) {
-                            $validSubtotal += $item->subtotal; // subtotal awal (price * qty)
+                            $validSubtotal += $item->subtotal;
                         }
                     }
-                    $promoEligibleSubtotals[$promo->id] = $validSubtotal > 0 ? $validSubtotal : 1; // hindari division by zero
+                    $promoEligibleSubtotals[$promo->id] = $validSubtotal > 0 ? $validSubtotal : 1; 
                 }
 
-                // Total Subtotal Item untuk menghitung bobot prorata pembayaran (non-promo)
-                $totalOrderItemsSubtotal = $order->items->sum('subtotal');
-                if ($totalOrderItemsSubtotal == 0) $totalOrderItemsSubtotal = 1;
-
-                $allocatedPaymentsTracker = []; // Simpan alokasi nominal
-                $allocatedMdrTracker = []; // Simpan alokasi beban mdr
+                // PASS 1: Hitung Subtotal Aktual tiap item untuk Bobot Prorata Nominal Pembayaran
+                $itemPromoData = [];
+                $itemActualSubtotals = [];
+                $totalOrderActualSubtotal = 0;
                 $allocatedPromosTracker = [];
-
+                
                 $itemCount = $order->items->count();
+                $currentIndex = 0;
+
+                foreach ($order->items as $item) {
+                    $currentIndex++;
+                    $isLastItem = ($currentIndex === $itemCount);
+                    $sku = $item->variant?->sku;
+                    
+                    $itemPromosTotal = 0;
+                    $promoNames = [];
+                    
+                    foreach ($order->promos as $promo) {
+                        $promoSkus = $promo->skus->pluck('sku')->toArray();
+                        $bundleSkus = $promo->bundleSkus->pluck('sku')->toArray();
+                        
+                        $isMainEligible = ($promo->apply_to_all_items && !$promo->is_bundle) || in_array($sku, $promoSkus);
+                        $isBundleEligible = $promo->is_bundle && in_array($sku, $bundleSkus);
+                        
+                        if ($isMainEligible || $isBundleEligible) {
+                            $promoWeight = $item->subtotal / $promoEligibleSubtotals[$promo->id];
+                            $orderAmount = $promo->pivot->discount_applied ?? 0;
+                            
+                            if ($isLastItem) {
+                                $allocated = $orderAmount - ($allocatedPromosTracker[$promo->id] ?? 0);
+                            } else {
+                                $allocated = round($orderAmount * $promoWeight);
+                                if (!isset($allocatedPromosTracker[$promo->id])) $allocatedPromosTracker[$promo->id] = 0;
+                                $allocatedPromosTracker[$promo->id] += $allocated;
+                            }
+                            $itemPromosTotal += $allocated;
+                            $promoNames[] = $promo->name;
+                        }
+                    }
+                    
+                    $actualItemSubtotal = $item->subtotal - ($item->discount_amount ?? 0) - $itemPromosTotal;
+                    
+                    $itemPromoData[$item->id] = [
+                        'promo_names' => !empty($promoNames) ? implode(', ', $promoNames) : '-',
+                        'promo_total' => $itemPromosTotal,
+                        'actual_subtotal' => $actualItemSubtotal
+                    ];
+                    
+                    $totalOrderActualSubtotal += $actualItemSubtotal;
+                }
+                
+                if ($totalOrderActualSubtotal == 0) $totalOrderActualSubtotal = 1;
+
+                // PASS 2: Render Baris CSV dengan Bobot Baru
+                $allocatedPaymentsTracker = []; 
+                $allocatedMdrTracker = []; 
                 $currentIndex = 0;
 
                 if ($itemCount > 0) {
                     foreach ($order->items as $item) {
                         $currentIndex++;
                         $isLastItem = ($currentIndex === $itemCount);
-                        $weight = $item->subtotal / $totalOrderItemsSubtotal;
+                        
+                        // Atasan menggunakan bobot berdasarkan Subtotal SETELAH Diskon
+                        $actualItemSubtotal = $itemPromoData[$item->id]['actual_subtotal'];
+                        $weight = $actualItemSubtotal / $totalOrderActualSubtotal;
 
                         $variant = $item->variant;
                         $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
                         $merk = $variant?->accurateData?->brandName ?? 'Unknown';
                         $category = $variant?->accurateData?->categoryName ?? 'Unknown';
+                        
+                        $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
+                        $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];
 
-                        // Hitung Prorata Promo HANYA jika item ini valid
-                        $itemPromosTotal = 0;
-                        $promoNames = [];
-
-                        $sku = $item->variant?->sku;
-
-                        foreach ($order->promos as $promo) {
-                            $promoSkus = $promo->skus->pluck('sku')->toArray();
-                            $bundleSkus = $promo->bundleSkus->pluck('sku')->toArray();
-
-                            $isMainEligible = ($promo->apply_to_all_items && !$promo->is_bundle) || in_array($sku, $promoSkus);
-                            $isBundleEligible = $promo->is_bundle && in_array($sku, $bundleSkus);
-
-                            if ($isMainEligible || $isBundleEligible) {
-                                $promoWeight = $item->subtotal / $promoEligibleSubtotals[$promo->id];
-                                $orderAmount = $promo->pivot->discount_applied ?? 0;
-
-                                if ($isLastItem) {
-                                    $allocated = $orderAmount - ($allocatedPromosTracker[$promo->id] ?? 0);
-                                } else {
-                                    $allocated = round($orderAmount * $promoWeight);
-                                    if (!isset($allocatedPromosTracker[$promo->id])) $allocatedPromosTracker[$promo->id] = 0;
-                                    $allocatedPromosTracker[$promo->id] += $allocated;
-                                }
-                                $itemPromosTotal += $allocated;
-                                $promoNames[] = $promo->name;
-                            }
-                        }
-
-                        $promoNamesStr = !empty($promoNames) ? implode(', ', $promoNames) : '-';
-
-                        // Subtotal Item riil = (Qty * Harga) - diskon item - diskon promo
-                        // (Karena $item->subtotal sudah sama dengan Qty * Harga)
-                        $actualItemSubtotal = $item->subtotal - ($item->discount_amount ?? 0) - $itemPromosTotal;
+                        // Penjualan Bersih = (Qty * Harga / 1.11) - diskon item - diskon promo
+                        $penjualanBersih = ($item->subtotal / 1.11) - ($item->discount_amount ?? 0) - $itemPromosTotal;
 
                         $rowData = [
                             $order->created_at->format('Y-m-d H:i'),
@@ -732,34 +751,36 @@ class SalesReport extends Component
                             $promoNamesStr,
                             $itemPromosTotal,
                             $actualItemSubtotal,
+                            $penjualanBersih,
                         ];
 
                         // Proses Slots Pembayaran (Maksimal 4) dan MDR-nya
-                        $itemTotalMdr = 0;
+                        $itemTotalPembayaranKotor = 0;
                         for ($i = 0; $i < 4; $i++) {
                             if (isset($orderPayments[$i])) {
                                 $upm = $orderPayments[$i];
-
-                                // Alokasi nominal pembayaran
+                                
                                 if ($isLastItem) {
-                                    $allocatedNominal = $upm['amount'] - ($allocatedPaymentsTracker[$i] ?? 0);
+                                    $allocatedNominalKotor = $upm['amount'] - ($allocatedPaymentsTracker[$i] ?? 0);
                                     $allocatedMdr = $upm['mdr_amount'] - ($allocatedMdrTracker[$i] ?? 0);
                                 } else {
-                                    $allocatedNominal = round($upm['amount'] * $weight);
+                                    $allocatedNominalKotor = round($upm['amount'] * $weight);
                                     if (!isset($allocatedPaymentsTracker[$i])) $allocatedPaymentsTracker[$i] = 0;
-                                    $allocatedPaymentsTracker[$i] += $allocatedNominal;
-
+                                    $allocatedPaymentsTracker[$i] += $allocatedNominalKotor;
+                                    
                                     $allocatedMdr = round($upm['mdr_amount'] * $weight);
                                     if (!isset($allocatedMdrTracker[$i])) $allocatedMdrTracker[$i] = 0;
                                     $allocatedMdrTracker[$i] += $allocatedMdr;
                                 }
-                                $rowData[] = $item->price_at_checkout / 1.11;
+                                
+                                $nominalBersih = $allocatedNominalKotor - $allocatedMdr;
+                                
                                 $rowData[] = $upm['name'];
-                                $rowData[] = $allocatedNominal;
+                                $rowData[] = $nominalBersih;
                                 $rowData[] = $upm['mdr_pct'];
                                 $rowData[] = $allocatedMdr;
-
-                                $itemTotalMdr += $allocatedMdr;
+                                
+                                $itemTotalPembayaranKotor += $allocatedNominalKotor;
                             } else {
                                 $rowData[] = '-';
                                 $rowData[] = '0';
@@ -768,12 +789,7 @@ class SalesReport extends Component
                             }
                         }
 
-                        // TOTAL TRANSAKSI (Rp) - Karena sama nilainya dengan Subtotal Riil, kita gunakan nilai yang sama
-                        $rowData[] = $actualItemSubtotal;
-
-                        // NET SALES
-                        $rowData[] = $actualItemSubtotal - $itemTotalMdr;
-
+                        $rowData[] = $itemTotalPembayaranKotor; // TOTAL PEMBAYARAN
                         fputcsv($file, $rowData, $separator);
                     }
                 } else {
@@ -803,17 +819,22 @@ class SalesReport extends Component
                         $promoNamesStr,
                         $itemPromosTotal,
                         '0', // Subtotal
+                        '0', // Penjualan Bersih
                     ];
 
-                    $itemTotalMdr = collect($orderPayments)->sum('mdr_amount');
+                    $itemTotalPembayaranKotor = 0;
 
                     for ($i = 0; $i < 4; $i++) {
                         if (isset($orderPayments[$i])) {
                             $upm = $orderPayments[$i];
+                            $nominalBersih = $upm['amount'] - $upm['mdr_amount'];
+                            
                             $rowData[] = $upm['name'];
-                            $rowData[] = $upm['amount'];
+                            $rowData[] = $nominalBersih;
                             $rowData[] = $upm['mdr_pct'];
                             $rowData[] = $upm['mdr_amount'];
+                            
+                            $itemTotalPembayaranKotor += $upm['amount'];
                         } else {
                             $rowData[] = '-';
                             $rowData[] = '0';
@@ -822,8 +843,7 @@ class SalesReport extends Component
                         }
                     }
 
-                    $rowData[] = $order->grand_total; // TOTAL TRANSAKSI
-                    $rowData[] = $order->grand_total - $itemTotalMdr; // NET SALES
+                    $rowData[] = $itemTotalPembayaranKotor; // TOTAL PEMBAYARAN
 
                     fputcsv($file, $rowData, $separator);
                 }
@@ -831,6 +851,10 @@ class SalesReport extends Component
             fclose($file);
         }, $csvFileName);
     }
+
+
+
+
 
 
 
