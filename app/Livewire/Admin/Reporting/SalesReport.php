@@ -16,6 +16,7 @@ class SalesReport extends Component
     public $endDate;
     public $search = '';
     public $branchFilter = '';
+    public $csvSeparator = ';';
 
     public function mount()
     {
@@ -107,7 +108,8 @@ class SalesReport extends Component
         // Eager load relasi payments untuk performa saat generate CSV
         $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'paymentMethodRate', 'promos'])->get();
         $csvFileName = 'laporan_penjualan_detail_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
-        return response()->streamDownload(function () use ($orders) {
+        $separator = $this->csvSeparator;
+        return response()->streamDownload(function () use ($orders, $separator) {
             $file = fopen('php://output', 'w');
 
             // 1. Kumpulkan semua Nama Metode Pembayaran & Promo unik dari koleksi order ini
@@ -170,7 +172,7 @@ class SalesReport extends Component
             $headers[] = 'TOTAL TRANSAKSI (Rp)';
             $headers[] = 'NET SALES (Rp)';
 
-            fputcsv($file, $headers);
+            fputcsv($file, $headers, $separator);
 
             foreach ($orders as $order) {
                 $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
@@ -297,7 +299,7 @@ class SalesReport extends Component
                         // NET SALES
                         $rowData[] = $itemTotalTransaksi - $allocatedMdr;
 
-                        fputcsv($file, $rowData);
+                        fputcsv($file, $rowData, $separator);
                     }
                 } else {
                     // Fallback jika tidak ada item (sangat jarang terjadi)
@@ -339,7 +341,7 @@ class SalesReport extends Component
                     $rowData[] = $order->grand_total; // TOTAL TRANSAKSI
                     $rowData[] = $order->grand_total - $mdrAmount; // NET SALES
 
-                    fputcsv($file, $rowData);
+                    fputcsv($file, $rowData, $separator);
                 }
             }
             fclose($file);
@@ -351,7 +353,8 @@ class SalesReport extends Component
         // Eager load relasi payments untuk performa saat generate CSV
         $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'paymentMethodRate', 'promos'])->get();
         $csvFileName = 'laporan_penjualan_multi_row_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
-        return response()->streamDownload(function () use ($orders) {
+        $separator = $this->csvSeparator;
+        return response()->streamDownload(function () use ($orders, $separator) {
             $file = fopen('php://output', 'w');
 
             // Header untuk Opsi 2 (Multi-row)
@@ -430,7 +433,7 @@ class SalesReport extends Component
                             $order->grand_total,
                             $order->grand_total - (($order->grand_total * ($order->paymentMethodRate->mdr_percentage ?? 0)) / 100)
                         ]);
-                        fputcsv($file, $row);
+                        fputcsv($file, $row, $separator);
                     }
                 } else {
                     $row = array_merge($baseRow, [
@@ -452,7 +455,7 @@ class SalesReport extends Component
                         $order->grand_total,
                         $order->grand_total - (($order->grand_total * ($order->paymentMethodRate->mdr_percentage ?? 0)) / 100)
                     ]);
-                    fputcsv($file, $row);
+                    fputcsv($file, $row, $separator);
                 }
 
                 // 2. Tulis Baris Pembayaran
@@ -481,7 +484,7 @@ class SalesReport extends Component
                             '0',
                             '0' // Angka Order Kosong agar tidak didouble count
                         ]);
-                        fputcsv($file, $row);
+                        fputcsv($file, $row, $separator);
                     }
                 } else {
                     $methodName = $order->paymentMethod ? $order->paymentMethod->name : 'Unknown Payment';
@@ -505,7 +508,7 @@ class SalesReport extends Component
                             '0',
                             '0'
                         ]);
-                        fputcsv($file, $row);
+                        fputcsv($file, $row, $separator);
                     }
                 }
 
@@ -530,18 +533,20 @@ class SalesReport extends Component
                         '0',
                         '0' // Angka Order Kosong
                     ]);
-                    fputcsv($file, $row);
+                    fputcsv($file, $row, $separator);
                 }
             }
             fclose($file);
         }, $csvFileName);
     }
+
     public function exportCsvOpsi3()
     {
         // Eager load relasi payments untuk performa saat generate CSV
         $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'paymentMethodRate', 'promos'])->get();
         $csvFileName = 'laporan_penjualan_kolom_statis_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
-        return response()->streamDownload(function () use ($orders) {
+        $separator = $this->csvSeparator;
+        return response()->streamDownload(function () use ($orders, $separator) {
             $file = fopen('php://output', 'w');
 
             // Header untuk Opsi 3 (Kolom Statis)
@@ -565,6 +570,7 @@ class SalesReport extends Component
                 'HARGA SATUAN (Rp)',
                 'DISKON ITEM (Rp)',
                 'SUBTOTAL ITEM (Rp)',
+                'TOTAL TAGIHAN (Rp)',
                 'METODE 1',
                 'NOMINAL 1 (Rp)',
                 'METODE 2',
@@ -583,7 +589,7 @@ class SalesReport extends Component
                 'MDR (Rp)',
                 'TOTAL TRANSAKSI (Rp)',
                 'NET SALES (Rp)'
-            ]);
+            ], $separator);
 
             foreach ($orders as $order) {
                 $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
@@ -647,11 +653,14 @@ class SalesReport extends Component
                             $variant?->color ?? '-',
                             ($variant?->ram ? $variant->ram . ' ' : '') . ($variant?->storage ? $variant->storage : '') ?? '-',
                             $item->serial_number ?? '-',
-                            str_replace(["\r", "\n", "\t"], ' ', $order->notes),
+                            str_replace(["
+", "
+", "	"], ' ', $order->notes),
                             $item->qty,
                             $item->price_at_checkout,
                             $item->discount_amount ?? 0,
                             $item->subtotal,
+                            $totalOrderItemsSubtotal,
                         ];
 
                         // Proses Slots Pembayaran (Maksimal 4)
@@ -717,7 +726,7 @@ class SalesReport extends Component
                         // NET SALES
                         $rowData[] = $itemTotalTransaksi - $allocatedMdr;
 
-                        fputcsv($file, $rowData);
+                        fputcsv($file, $rowData, $separator);
                     }
                 } else {
                     $rowData = [
@@ -735,6 +744,7 @@ class SalesReport extends Component
                         '-',
                         '-',
                         '-',
+                        '0',
                         '0',
                         '0',
                         '0',
@@ -772,12 +782,15 @@ class SalesReport extends Component
                     $rowData[] = $order->grand_total; // TOTAL TRANSAKSI
                     $rowData[] = $order->grand_total - $mdrAmount; // NET SALES
 
-                    fputcsv($file, $rowData);
+                    fputcsv($file, $rowData, $separator);
                 }
             }
             fclose($file);
         }, $csvFileName);
     }
+
+
+
     public function render()
     {
         $orders = $this->ordersQuery->paginate(20);
