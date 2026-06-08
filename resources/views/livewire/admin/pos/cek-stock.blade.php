@@ -154,7 +154,7 @@
                                         </div>
 
                                         {{-- GANTI DARI SINI: List Serial Number per Gudang --}}
-                                        {{-- @if (!empty($data['sns']) && count($data['sns']) > 0)
+                                        @if (!empty($data['sns']) && count($data['sns']) > 0)
                                             <div
                                                 class="mt-3 pt-3 border-t border-dashed {{ $data['is_current_user_warehouse'] ? 'border-blue-200' : 'border-gray-100' }} flex justify-end">
                                                 <button
@@ -175,7 +175,7 @@
                                                     Cek SN
                                                 </button>
                                             </div>
-                                        @endif --}}
+                                        @endif
 
                                     </li>
                                 @endforeach
@@ -245,18 +245,41 @@
 
                 {{-- Body Modal (List SN) --}}
                 <div class="p-5 max-h-[300px] overflow-y-auto space-y-2">
-                    @foreach ($modalSns as $index => $sn)
+                    @foreach ($modalSns as $index => $snData)
+                        @php
+                            $sn = is_array($snData) ? $snData['serial_number'] : $snData;
+                            $hpp = is_array($snData) ? $snData['hpp'] : 0;
+                            $vendor = is_array($snData) ? $snData['vendor_name'] : 'Tidak ada';
+                        @endphp
                         <div
                             class="flex items-center justify-between p-3 bg-gray-50 border border-gray-200/60 rounded-xl font-mono text-sm text-gray-700 hover:bg-blue-50/40 hover:border-blue-200 transition group">
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs text-gray-400 font-sans font-medium">{{ $index + 1 }}.</span>
-                                <span class="font-semibold tracking-wide">{{ $sn }}</span>
+                            <div class="flex flex-col gap-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs text-gray-400 font-sans font-medium">{{ $index + 1 }}.</span>
+                                    <span class="font-semibold tracking-wide">{{ $sn }}</span>
+                                </div>
+                                @if(is_array($snData))
+                                <div class="flex flex-col gap-1.5 text-xs text-gray-500 font-sans pl-5 mt-1">
+                                    <span class="flex items-center gap-1.5" title="Vendor">
+                                        <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                        <span class="truncate">{{ $vendor }}</span>
+                                    </span>
+                                    <span class="flex items-center gap-1.5" title="HPP">
+                                        <svg class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {{ \App\Utils\Format::rupiah($hpp) }}
+                                    </span>
+                                </div>
+                                @endif
                             </div>
 
                             {{-- Tombol Klik Otomatis Salin SN --}}
                             <button type="button"
                                 onclick="navigator.clipboard.writeText('{{ $sn }}'); alert('SN {{ $sn }} berhasil disalin!')"
-                                class="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-white border border-transparent hover:border-gray-200 transition shadow-none hover:shadow-sm"
+                                class="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-white border border-transparent hover:border-gray-200 transition shadow-none hover:shadow-sm self-start"
                                 title="Salin Nomor Seri">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

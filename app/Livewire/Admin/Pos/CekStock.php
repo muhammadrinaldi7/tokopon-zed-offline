@@ -168,7 +168,7 @@ class CekStock extends Component
             // =========================================================================
             // AMBIL DAN KELOMPOKKAN SN BERDASARKAN WAREHOUSE_ID
             // =========================================================================
-            $groupedSns = \Illuminate\Support\Facades\DB::table('product_serial_numbers')
+            $groupedSns = \App\Models\ProductSerialNumber::with('vendor')
                 ->where('item_no', $variant->sku)
                 ->get()
                 ->groupBy('warehouse_id'); // Menghasilkan array dengan key berupa warehouse_id
@@ -178,7 +178,13 @@ class CekStock extends Component
 
                 // Ambil SN khusus untuk ID gudang saat ini dari hasil group tadi
                 $currentWarehouseSns = isset($groupedSns[$ws->warehouse_id])
-                    ? $groupedSns[$ws->warehouse_id]->pluck('serial_number')->toArray()
+                    ? $groupedSns[$ws->warehouse_id]->map(function($sn) {
+                        return [
+                            'serial_number' => $sn->serial_number,
+                            'hpp' => $sn->hpp ?? 0,
+                            'vendor_name' => $sn->vendor ? $sn->vendor->vendor_name : 'Tidak ada',
+                        ];
+                    })->toArray()
                     : [];
 
                 return [
