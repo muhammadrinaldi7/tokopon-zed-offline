@@ -15,7 +15,7 @@ class OrderManagement extends Component
 
     public $search = '';
     public $statusFilter = '';
-    
+
     // Properties for Receipt Modal
     public $showReceiptModal = false;
     public $selectedOrderForReceipt = null;
@@ -33,15 +33,15 @@ class OrderManagement extends Component
     public function viewReceipt(int $orderId): void
     {
         $this->selectedOrderForReceipt = Order::with([
-            'user.profile', 
-            'items.variant.product', 
-            'items.variant.secondProduct', 
-            'handledBy', 
-            'salesBy', 
-            'payments.paymentMethod', 
+            'user.profile',
+            'items.variant.product',
+            // 'items.variant.secondProduct', 
+            'handledBy',
+            'salesBy',
+            'payments.paymentMethod',
             'payments.paymentMethodRate'
         ])->find($orderId);
-        
+
         $this->showReceiptModal = true;
     }
 
