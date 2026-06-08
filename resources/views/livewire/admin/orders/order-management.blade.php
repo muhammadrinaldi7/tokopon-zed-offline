@@ -37,6 +37,15 @@
                 <option value="CANCELLED">Dibatalkan</option>
             </select>
         </div>
+        <div class="w-full md:w-64 shrink-0">
+            <select wire:model.live="warehouseFilter"
+                class="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-[#1c69d4]/20 focus:border-[#1c69d4]">
+                <option value="">Semua Warehouse</option>
+                @foreach ($warehouses as $warehouse)
+                    <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+                @endforeach
+            </select>
+        </div>
     </div>
 
     {{-- Orders Table --}}

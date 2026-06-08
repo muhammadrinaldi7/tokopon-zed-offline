@@ -15,6 +15,7 @@ class OrderManagement extends Component
 
     public $search = '';
     public $statusFilter = '';
+    public $warehouseFilter = ''; // Filter per warehouse
 
     // Properties for Receipt Modal
     public $showReceiptModal = false;
@@ -26,6 +27,11 @@ class OrderManagement extends Component
     }
 
     public function updatingStatusFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingWarehouseFilter(): void
     {
         $this->resetPage();
     }
@@ -251,8 +257,15 @@ class OrderManagement extends Component
             $query->where('order_status', $this->statusFilter);
         }
 
+        if ($this->warehouseFilter) {
+            $query->whereHas('handledBy', function ($q) {
+                $q->where('warehouse_id', $this->warehouseFilter);
+            });
+        }
+
         return view('livewire.admin.orders.order-management', [
             'orders' => $query->paginate(10),
+            'warehouses' => \App\Models\Warehouse::all(),
         ]);
     }
 }
