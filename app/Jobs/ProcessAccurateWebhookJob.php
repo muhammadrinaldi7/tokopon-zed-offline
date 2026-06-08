@@ -84,6 +84,9 @@ class ProcessAccurateWebhookJob implements ShouldQueue
             'SALES_INVOICE',
             'SALES_RECEIPT' => \App\Webhooks\Accurate\SalesInvoiceHandler::class,
 
+            // EVENT VENDOR:
+            'VENDOR' => \App\Webhooks\Accurate\VendorSaveHandler::class,
+
             default => null,
         };
     }
