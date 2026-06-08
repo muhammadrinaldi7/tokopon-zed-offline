@@ -363,6 +363,49 @@ class AccurateService
         }
     }
 
+    public function getNearestCost($itemNo, $databaseSource = 'syihab')
+    {
+        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
+        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
+        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $param = [
+            "itemNo" => $itemNo
+        ];
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/item/get-nearest-cost.do', $param);
+
+        Log::info("API Accurate Get Nearest Cost ({$itemNo}) Success: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data['d'])) {
+                return $data['d'];
+            }
+            return null;
+        } else {
+            Log::error("API Accurate Get Nearest Cost Error: " . $response->body());
+            throw new \Exception('API Accurate Get Nearest Cost Error: ' . $response->body());
+        }
+    }
+
     public function fetchCustomers($page = 1, $databaseSource = 'syihab')
     {
         $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';

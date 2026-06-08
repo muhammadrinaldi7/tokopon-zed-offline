@@ -17,6 +17,7 @@ class SerialNumberSync extends Component
 {
     public $isSyncing = false;
     public $isSyncingVendor = false;
+    public $isSyncingHpp = false;
     public $itemsToSync = [];
     public $totalItems = 0;
     public $processedItems = 0;
@@ -163,6 +164,70 @@ class SerialNumberSync extends Component
 
         // Panggil selanjutnya
         $this->dispatch('sync-next-vendor-item');
+    }
+
+    public function startSyncHpp()
+    {
+        $this->isSyncingHpp = true;
+        $this->processedItems = 0;
+        $this->logs = [];
+        $this->itemsToSync = [];
+
+        $this->addLog("Mengumpulkan data Item yang belum memiliki HPP...");
+
+        // Ambil list item_no yang unique dari product_serial_numbers yang hpp-nya 0 atau null
+        $itemNos = \App\Models\ProductSerialNumber::where(function($q) {
+            $q->whereNull('hpp')
+              ->orWhere('hpp', 0)
+              ->orWhere('hpp', '0');
+        })->whereNotNull('item_no')
+          ->distinct()
+          ->pluck('item_no')
+          ->toArray();
+
+        $this->itemsToSync = $itemNos;
+        $this->totalItems = count($this->itemsToSync);
+
+        if ($this->totalItems == 0) {
+            $this->addLog("Tidak ada item yang membutuhkan sinkronisasi HPP.");
+            $this->isSyncingHpp = false;
+            return;
+        }
+
+        $this->addLog("Ditemukan {$this->totalItems} Item unik. Memulai sinkronisasi HPP dari Accurate...");
+        $this->dispatch('sync-next-hpp-item');
+    }
+
+    #[On('sync-next-hpp-item')]
+    public function syncNextHppItem()
+    {
+        if (empty($this->itemsToSync) || !$this->isSyncingHpp) {
+            $this->addLog("Proses sinkronisasi HPP selesai!");
+            $this->isSyncingHpp = false;
+            return;
+        }
+
+        // Ambil item_no pertama di array
+        $itemNo = array_shift($this->itemsToSync);
+        $this->currentItem = "Sedang memproses HPP untuk Item No: {$itemNo}";
+
+        try {
+            $service = app(\App\Services\SerialNumberSyncService::class);
+            $updatedCount = $service->syncHppFromNearestCost($itemNo);
+            
+            if ($updatedCount > 0) {
+                $this->addLog("[{$itemNo}] Berhasil update $updatedCount data HPP.");
+            } else {
+                $this->addLog("[{$itemNo}] Tidak ada data HPP yang diperbarui atau cost 0.");
+            }
+        } catch (\Exception $e) {
+            $this->addLog("[{$itemNo}] Error: " . $e->getMessage());
+        }
+
+        $this->processedItems++;
+
+        // Panggil selanjutnya
+        $this->dispatch('sync-next-hpp-item');
     }
 
     private function addLog($message)

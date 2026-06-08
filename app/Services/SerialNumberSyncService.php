@@ -238,4 +238,63 @@ class SerialNumberSyncService
             throw $e;
         }
     }
+
+    public function syncHppFromNearestCost($itemNo)
+    {
+        try {
+            // Coba ambil dari db source 'syihab' (Produk Baru)
+            $costData = null;
+            try {
+                $costData = $this->accurateService->getNearestCost($itemNo, 'syihab');
+            } catch (\Exception $e) {
+                // ignore
+            }
+
+            if (!$costData) {
+                // Coba ambil dari db source 'second' (Produk Bekas)
+                try {
+                    $costData = $this->accurateService->getNearestCost($itemNo, 'second');
+                } catch (\Exception $e) {
+                    // ignore
+                }
+            }
+
+            if ($costData === null) {
+                return 0;
+            }
+
+            $hpp = 0;
+            if (is_numeric($costData)) {
+                $hpp = (float) $costData;
+            } elseif (is_array($costData)) {
+                // Fallback jika API return array object
+                if (isset($costData['cost'])) {
+                    $hpp = (float) $costData['cost'];
+                } elseif (isset($costData['nearestCost'])) {
+                    $hpp = (float) $costData['nearestCost'];
+                } else {
+                    $hpp = (float) current($costData);
+                }
+            }
+
+            if ($hpp > 0) {
+                // Update HPP di lokal
+                $updatedCount = ProductSerialNumber::where('item_no', $itemNo)
+                    ->where(function($q) {
+                        $q->whereNull('hpp')
+                          ->orWhere('hpp', 0)
+                          ->orWhere('hpp', '0');
+                    })
+                    ->update(['hpp' => $hpp]);
+
+                return $updatedCount;
+            }
+
+            return 0;
+
+        } catch (\Exception $e) {
+            Log::error("Failed to sync HPP for Item {$itemNo}: " . $e->getMessage());
+            throw $e;
+        }
+    }
 }
