@@ -62,6 +62,7 @@ class ProcessAccurateWebhookJob implements ShouldQueue
     private function resolveHandler(string $eventType): ?string
     {
         return match ($eventType) {
+            'CUSTOMER' => \App\Webhooks\Accurate\CustomerSaveHandler::class,
             'ITEM', 'ITEM_SAVE' => \App\Webhooks\Accurate\ItemSaveHandler::class,
 
             // EVENT DETAIL STOK: 
