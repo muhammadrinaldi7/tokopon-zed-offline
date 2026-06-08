@@ -165,7 +165,11 @@ class SerialNumberSyncService
 
             // 2. Iterasi detailItem
             $detailItems = $detail['detailItem'] ?? [];
+            Log::info("ReceiveItem {$receiveItemId}: Ditemukan " . count($detailItems) . " detail item untuk diproses.");
+
             foreach ($detailItems as $item) {
+                Log::info("ReceiveItem {$receiveItemId}: Memproses iterasi item", ['item_data' => $item]);
+
                 $sku = $item['item']['no'] ?? $item['detailName'] ?? null; // Coba fallback
                 // Pada output receive-item, item no ada di `item.no` namun API return array nested, mari pastikan format:
                 if (isset($item['item']['no'])) {
