@@ -44,6 +44,10 @@ class Dashboard extends Component
                 $this->startDate = $now->copy()->subDay()->startOfDay()->format('Y-m-d');
                 $this->endDate = $now->copy()->subDay()->endOfDay()->format('Y-m-d');
                 break;
+            case 'last_7_days':
+                $this->startDate = $now->copy()->subDays(6)->startOfDay()->format('Y-m-d');
+                $this->endDate = $now->copy()->endOfDay()->format('Y-m-d');
+                break;
             case 'this_week':
                 $this->startDate = $now->copy()->startOfWeek()->format('Y-m-d');
                 $this->endDate = $now->copy()->endOfWeek()->format('Y-m-d');
@@ -225,7 +229,7 @@ class Dashboard extends Component
                     'sku' => $sku,
                     'name' => $name,
                     'total_qty' => $group->sum('qty'),
-                    'total_revenue' => $group->sum(function($item) { return $item->price * $item->qty; })
+                    'total_revenue' => $group->sum('subtotal')
                 ];
             })
             ->sortByDesc('total_qty')
