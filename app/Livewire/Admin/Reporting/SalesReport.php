@@ -147,6 +147,7 @@ class SalesReport extends Component
                 'CABANG',
                 'NAMA PRODUK',
                 'MERK PRODUK',
+                'CATEGORY',
                 'WARNA',
                 'STORAGE',
                 'SN (SerialNumber)',
@@ -217,8 +218,8 @@ class SalesReport extends Component
                         $variant = $item->variant;
                         // Gunakan null-safe operator (?->) agar tidak error jika variant sudah dihapus
                         $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
-                        $merk = $variant?->product?->brand?->name ?? 'Unknown';
-
+                        $merk = $variant?->accurateData?->brandName ?? 'Unknown';
+                        $category = $variant?->accurateData?->categoryName ?? 'Unknown';
                         // Prorata Gross Order
                         if ($isLastItem) {
                             $proratedGross = $order->total_amount - $allocatedGrossTotal;
@@ -238,6 +239,7 @@ class SalesReport extends Component
                             $branch,
                             $name,
                             $merk,
+                            $category,
                             $variant?->color ?? '-',
                             ($variant?->ram ? $variant->ram . ' ' : '') . ($variant?->storage ? $variant->storage : '') ?? '-',
                             $item->serial_number ?? '-',
@@ -554,6 +556,7 @@ class SalesReport extends Component
                 'CABANG',
                 'NAMA PRODUK',
                 'MERK PRODUK',
+                'CATEGORY',
                 'WARNA',
                 'STORAGE',
                 'SN (SerialNumber)',
@@ -626,7 +629,8 @@ class SalesReport extends Component
 
                         $variant = $item->variant;
                         $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
-                        $merk = $variant?->product?->brand?->name ?? 'Unknown';
+                        $merk = $variant?->accurateData?->brandName ?? 'Unknown';
+                        $category = $variant?->accurateData?->categoryName ?? 'Unknown';
 
                         $rowData = [
                             $order->created_at->format('Y-m-d H:i'),
@@ -639,6 +643,7 @@ class SalesReport extends Component
                             $branch,
                             $name,
                             $merk,
+                            $category,
                             $variant?->color ?? '-',
                             ($variant?->ram ? $variant->ram . ' ' : '') . ($variant?->storage ? $variant->storage : '') ?? '-',
                             $item->serial_number ?? '-',

@@ -72,6 +72,10 @@ class ProductAccurateManagement extends Component
                     'base_price'      => (int) round($item['unitPrice'] ?? 0),
                     'base_cost'       => (int) round($item['balanceUnitCost'] ?? 0),
                     'stock'           => (int) round($item['availableToSell'] ?? 0),
+                    'id_brand_accurate' => $item['itemBrand']['id'] ?? null,
+                    'brandName' => $item['itemBrand']['name'] ?? null,
+                    'id_category_accurate' => $item['itemCategory']['id'] ?? null,
+                    'categoryName' => $item['itemCategory']['name'] ?? null,
                     'raw_data'        => json_encode($item),
                     'created_at'      => now(),
                     'updated_at'      => now(),
@@ -82,7 +86,7 @@ class ProductAccurateManagement extends Component
                 ProductAccurate::upsert(
                     $importData,
                     ['accurate_id', 'database_source'],
-                    ['item_no', 'name', 'base_price', 'stock', 'raw_data', 'base_cost', 'updated_at']
+                    ['item_no', 'name', 'base_price', 'stock', 'id_brand_accurate', 'brandName', 'id_category_accurate', 'categoryName', 'raw_data', 'base_cost', 'updated_at']
                 );
 
                 $this->syncImportedCount += count($importData);
@@ -147,7 +151,6 @@ class ProductAccurateManagement extends Component
                     $hasMoreData = false;
                     break;
                 }
-
                 foreach ($items as $item) {
                     if (!isset($item['no'])) continue;
 
@@ -162,6 +165,10 @@ class ProductAccurateManagement extends Component
                         'base_price'      => (int) round($item['unitPrice'] ?? 0),
                         'stock'           => (int) round($item['availableToSell'] ?? 0),
                         'base_cost'       => (int) round($item['balanceUnitCost'] ?? 0),
+                        'id_brand_accurate' => $item['itemBrand']['id'] ?? null,
+                        'brandName' => $item['itemBrand']['name'] ?? null,
+                        'id_category_accurate' => $item['itemCategory']['id'] ?? null,
+                        'categoryName' => $item['itemCategory']['name'] ?? null,
                         // raw_data harus di-json_encode jika kolomnya berjenis text/json di MySQL
                         'raw_data'        => json_encode($item),
 
@@ -193,7 +200,19 @@ class ProductAccurateManagement extends Component
                             // Parameter 2: Kunci unik untuk mengecek apakah data sudah ada
                             ['accurate_id', 'database_source'],
                             // Parameter 3: Kolom apa saja yang di-update jika data sudah ada (duplicate key)
-                            ['item_no', 'name', 'base_price', 'stock', 'base_cost', 'raw_data', 'updated_at']
+                            [
+                                'item_no',
+                                'name',
+                                'base_price',
+                                'stock',
+                                'base_cost',
+                                'id_brand_accurate',
+                                'brandName',
+                                'id_category_accurate',
+                                'categoryName',
+                                'raw_data',
+                                'updated_at'
+                            ]
                         );
                     }
                     DB::commit();

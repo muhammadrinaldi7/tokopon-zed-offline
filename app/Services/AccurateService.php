@@ -292,7 +292,7 @@ class AccurateService
         $param = [
             "sp.page"     => $page,
             "sp.pageSize" => $pageSize,
-            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost",
+            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory",
         ];
 
         $response = Http::withHeaders([
@@ -311,6 +311,7 @@ class AccurateService
             }
 
             // PERUBAHAN: Langsung kembalikan array datanya (bagian 'd')
+            Log::info('data accurate products ' . json_encode($data['d']));
             return $data['d'] ?? [];
         } else {
             \Illuminate\Support\Facades\Log::error("API Accurate Get Item List ({$databaseSource}) Error: " . $response->body());
