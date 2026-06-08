@@ -182,7 +182,7 @@ class SerialNumberSyncService
 
                 if (!$sku) continue; // Skip jika tidak ada SKU
 
-                $hpp = $item['itemCost'] ?? $item['unitPrice'] ?? 0;
+                $hpp = $item['item']['unitVendorPrice'] ?? 0;
                 $accurateWarehouseId = $item['warehouseId'] ?? ($item['warehouse']['id'] ?? null);
 
                 $localWarehouseId = null;
