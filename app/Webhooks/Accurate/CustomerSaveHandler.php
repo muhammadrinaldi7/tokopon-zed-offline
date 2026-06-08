@@ -42,7 +42,7 @@ class CustomerSaveHandler extends Controller implements WebhookHandlerInterface
             if ($accurateCustomer) {
                 // Mapping field dari response Accurate
                 $name = $accurateCustomer['name'] ?? null;
-                $email = $accurateCustomer['email'] ?? null;
+                $email = $accurateCustomer['email'] ?: "customer_{$customerNo}@no-email.com";
                 // Kadang field phone ada di mobilePhone atau workPhone
                 $phone = $accurateCustomer['mobilePhone'] ?? $accurateCustomer['workPhone'] ?? null;
                 $accurateCustomerId = $accurateCustomer['id'] ?? $customerId;

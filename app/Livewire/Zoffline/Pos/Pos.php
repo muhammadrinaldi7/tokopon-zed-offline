@@ -115,8 +115,6 @@ class Pos extends Component
         // 3. Cari SKU di Database Lokal (Cek Baru, lalu Bekas)
         $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
 
-        // Ambil ID Warehouse dari user yang sedang login
-        $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
         // =========================================================================
         // 3. CEK KESESUAIAN WAREHOUSE DI TABEL product_serial_numbers
         // =========================================================================
