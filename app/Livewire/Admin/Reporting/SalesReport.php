@@ -577,18 +577,22 @@ class SalesReport extends Component
                 'NOMINAL 1 (Rp)',
                 'MDR 1 (%)',
                 'BEBAN MDR 1 (Rp)',
+                'TIPE BEBAN MDR 1',
                 'METODE 2',
                 'NOMINAL 2 (Rp)',
                 'MDR 2 (%)',
                 'BEBAN MDR 2 (Rp)',
+                'TIPE BEBAN MDR 2',
                 'METODE 3',
                 'NOMINAL 3 (Rp)',
                 'MDR 3 (%)',
                 'BEBAN MDR 3 (Rp)',
+                'TIPE BEBAN MDR 3',
                 'METODE 4',
                 'NOMINAL 4 (Rp)',
                 'MDR 4 (%)',
                 'BEBAN MDR 4 (Rp)',
+                'TIPE BEBAN MDR 4',
                 'TOTAL PEMBAYARAN'
             ], $separator);
 
@@ -601,15 +605,17 @@ class SalesReport extends Component
                     foreach ($order->payments as $payment) {
                         $pmName = $payment->paymentMethod ? $payment->paymentMethod->name : 'Unknown Payment';
                         $pmrPct = $payment->paymentMethodRate ? $payment->paymentMethodRate->mdr_percentage : 0;
+                        $pmrName = $payment->paymentMethodRate ? $payment->paymentMethodRate->name : '-';
                         $mdrAmt = ($payment->amount * $pmrPct) / 100;
                         
-                        $key = $pmName . '|' . $pmrPct;
+                        $key = $pmName . '|' . $pmrPct . '|' . $pmrName;
                         if (!isset($orderPayments[$key])) {
                             $orderPayments[$key] = [
                                 'name' => $pmName,
                                 'amount' => 0,
                                 'mdr_pct' => $pmrPct,
-                                'mdr_amount' => 0
+                                'mdr_amount' => 0,
+                                'mdr_name' => $pmrName
                             ];
                         }
                         $orderPayments[$key]['amount'] += $payment->amount;
@@ -619,14 +625,16 @@ class SalesReport extends Component
                     $pmName = $order->paymentMethod ? $order->paymentMethod->name : 'Unknown Payment';
                     if ($pmName !== 'Unknown Payment') {
                         $pmrPct = $order->paymentMethodRate ? $order->paymentMethodRate->mdr_percentage : 0;
+                        $pmrName = $order->paymentMethodRate ? $order->paymentMethodRate->name : '-';
                         $mdrAmt = ($order->grand_total * $pmrPct) / 100;
                         
-                        $key = $pmName . '|' . $pmrPct;
+                        $key = $pmName . '|' . $pmrPct . '|' . $pmrName;
                         $orderPayments[$key] = [
                             'name' => $pmName,
                             'amount' => $order->grand_total,
                             'mdr_pct' => $pmrPct,
-                            'mdr_amount' => $mdrAmt
+                            'mdr_amount' => $mdrAmt,
+                            'mdr_name' => $pmrName
                         ];
                     }
                 }
@@ -779,6 +787,7 @@ class SalesReport extends Component
                                 $rowData[] = $nominalBersih;
                                 $rowData[] = $upm['mdr_pct'];
                                 $rowData[] = $allocatedMdr;
+                                $rowData[] = $upm['mdr_name'];
                                 
                                 $itemTotalPembayaranKotor += $allocatedNominalKotor;
                             } else {
@@ -786,6 +795,7 @@ class SalesReport extends Component
                                 $rowData[] = '0';
                                 $rowData[] = '0';
                                 $rowData[] = '0';
+                                $rowData[] = '-';
                             }
                         }
 
@@ -833,6 +843,7 @@ class SalesReport extends Component
                             $rowData[] = $nominalBersih;
                             $rowData[] = $upm['mdr_pct'];
                             $rowData[] = $upm['mdr_amount'];
+                            $rowData[] = $upm['mdr_name'];
                             
                             $itemTotalPembayaranKotor += $upm['amount'];
                         } else {
@@ -840,6 +851,7 @@ class SalesReport extends Component
                             $rowData[] = '0';
                             $rowData[] = '0';
                             $rowData[] = '0';
+                            $rowData[] = '-';
                         }
                     }
 
