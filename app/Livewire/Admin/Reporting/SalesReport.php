@@ -606,7 +606,7 @@ class SalesReport extends Component
                         $pmName = $payment->paymentMethod ? $payment->paymentMethod->name : 'Unknown Payment';
                         $pmrPct = $payment->paymentMethodRate ? $payment->paymentMethodRate->mdr_percentage : 0;
                         $pmrName = $payment->paymentMethodRate ? $payment->paymentMethodRate->name : '-';
-                        $mdrAmt = ($payment->amount * $pmrPct) / 100;
+                        $mdrAmt = round(($payment->amount * $pmrPct) / 100);
                         
                         $key = $pmName . '|' . $pmrPct . '|' . $pmrName;
                         if (!isset($orderPayments[$key])) {
@@ -626,7 +626,7 @@ class SalesReport extends Component
                     if ($pmName !== 'Unknown Payment') {
                         $pmrPct = $order->paymentMethodRate ? $order->paymentMethodRate->mdr_percentage : 0;
                         $pmrName = $order->paymentMethodRate ? $order->paymentMethodRate->name : '-';
-                        $mdrAmt = ($order->grand_total * $pmrPct) / 100;
+                        $mdrAmt = round(($order->grand_total * $pmrPct) / 100);
                         
                         $key = $pmName . '|' . $pmrPct . '|' . $pmrName;
                         $orderPayments[$key] = [
@@ -735,7 +735,7 @@ class SalesReport extends Component
                         $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];
 
                         // Penjualan Bersih = (Qty * Harga / 1.11) - diskon item - diskon promo
-                        $penjualanBersih = ($item->subtotal / 1.11) - ($item->discount_amount ?? 0) - $itemPromosTotal;
+                        $penjualanBersih = round(($item->subtotal / 1.11) - ($item->discount_amount ?? 0) - $itemPromosTotal);
 
                         $rowData = [
                             $order->created_at->format('Y-m-d H:i'),
@@ -837,7 +837,7 @@ class SalesReport extends Component
                     for ($i = 0; $i < 4; $i++) {
                         if (isset($orderPayments[$i])) {
                             $upm = $orderPayments[$i];
-                            $nominalBersih = $upm['amount'] - $upm['mdr_amount'];
+                            $nominalBersih = round($upm['amount'] - $upm['mdr_amount']);
                             
                             $rowData[] = $upm['name'];
                             $rowData[] = $nominalBersih;
