@@ -182,7 +182,7 @@ class SerialNumberSyncService
 
                 if (!$sku) continue; // Skip jika tidak ada SKU
 
-                $hpp = $item['item']['unitVendorPrice'] ?? 0;
+                $hpp = $item['itemCost'] ?? 0;
                 $accurateWarehouseId = $item['warehouseId'] ?? ($item['warehouse']['id'] ?? null);
 
                 $localWarehouseId = null;
@@ -280,10 +280,10 @@ class SerialNumberSyncService
             if ($hpp > 0) {
                 // Update HPP di lokal
                 $updatedCount = ProductSerialNumber::where('item_no', $itemNo)
-                    ->where(function($q) {
+                    ->where(function ($q) {
                         $q->whereNull('hpp')
-                          ->orWhere('hpp', 0)
-                          ->orWhere('hpp', '0');
+                            ->orWhere('hpp', 0)
+                            ->orWhere('hpp', '0');
                     })
                     ->update(['hpp' => $hpp]);
 
@@ -291,7 +291,6 @@ class SerialNumberSyncService
             }
 
             return 0;
-
         } catch (\Exception $e) {
             Log::error("Failed to sync HPP for Item {$itemNo}: " . $e->getMessage());
             throw $e;
