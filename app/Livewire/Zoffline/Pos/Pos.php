@@ -73,6 +73,8 @@ class Pos extends Component
     // ─── History Sales Properties ──────────────────────────────
     public $showHistoryModal = false;
     public $historyOrders = [];
+    public $searchHistory = '';
+    public $searchHistoryDate = '';
     public $databaseSource = 'syihab';
 
     public function processScan(AccurateService $accurateService)
@@ -253,19 +255,51 @@ class Pos extends Component
         return false;
     }
 
+    public function loadHistory()
+    {
+        $userWarehouseName = Auth::user()->warehouse->name ?? null;
+
+        $query = Order::with(['items', 'user', 'paymentMethod', 'handledBy'])
+            ->where('order_channel', 'POS')
+            ->where('shipping_address_snapshot->store', $userWarehouseName)
+            ->whereNotIn('order_status', ['DRAFT', 'DRAFT_LOADED', 'CANCELLED', 'RETURNED']);
+
+        if (!empty($this->searchHistory)) {
+            $query->where(function ($q) {
+                $q->where('order_number', 'like', '%' . $this->searchHistory . '%')
+                  ->orWhere('accurate_invoice_no', 'like', '%' . $this->searchHistory . '%')
+                  ->orWhereHas('user', function ($q2) {
+                      $q2->where('name', 'like', '%' . $this->searchHistory . '%')
+                         ->orWhereHas('profile', function($q3) {
+                             $q3->where('phone_number', 'like', '%' . $this->searchHistory . '%');
+                         });
+                  });
+            });
+        }
+
+        if (!empty($this->searchHistoryDate)) {
+            $query->whereDate('created_at', $this->searchHistoryDate);
+        }
+
+        $this->historyOrders = $query->latest()->take(50)->get();
+    }
+
+    public function updatedSearchHistory()
+    {
+        $this->loadHistory();
+    }
+
+    public function updatedSearchHistoryDate()
+    {
+        $this->loadHistory();
+    }
+
     // Method untuk membuka modal dan memuat data transaksi POS terbaru
     public function openHistory()
     {
-        $userWarehouseName = Auth::user()->warehouse->name ?? null;
-        // Mengambil transaksi khusus channel POS handled oleh user aktif / bebas tergantung kebutuhan bisnis
-        $this->historyOrders = Order::with(['items', 'user', 'paymentMethod', 'handledBy'])
-            ->where('order_channel', 'POS')
-            ->where('shipping_address_snapshot->store', $userWarehouseName)
-            ->whereNotIn('order_status', ['DRAFT', 'DRAFT_LOADED', 'CANCELLED', 'RETURNED'])
-            ->latest()
-            ->take(50) // Ambil 20 transaksi terakhir
-            ->get();
-
+        $this->searchHistory = '';
+        $this->searchHistoryDate = '';
+        $this->loadHistory();
         $this->showHistoryModal = true;
     }
 
