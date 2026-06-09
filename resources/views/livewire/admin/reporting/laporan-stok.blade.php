@@ -69,6 +69,8 @@
                                 <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
                             @endif
                         </th>
+                        <th class="px-5 py-4 font-bold">Brand</th>
+                        <th class="px-5 py-4 font-bold">Kategori</th>
                         <th class="px-5 py-4 font-bold">Lokasi Gudang</th>
                         <th class="px-5 py-4 font-bold text-right cursor-pointer hover:bg-gray-50" wire:click="sortBy('hpp')">
                             Harga Pokok (HPP)
@@ -105,6 +107,12 @@
                                 <p class="text-[11px] text-[#1c69d4] font-semibold mt-0.5">{{ $item->item_no }}</p>
                             </td>
                             <td class="px-5 py-3">
+                                <p class="text-[11px] font-semibold text-gray-700">{{ $item->productAccurate->brandName ?? '-' }}</p>
+                            </td>
+                            <td class="px-5 py-3">
+                                <p class="text-[11px] font-semibold text-gray-700">{{ $item->productAccurate->categoryName ?? '-' }}</p>
+                            </td>
+                            <td class="px-5 py-3">
                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 text-[11px] font-bold">
                                     <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                                     {{ $item->warehouse->name ?? 'Belum Dialokasikan' }}
@@ -129,7 +137,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-5 py-8 text-center text-gray-400 text-sm">
+                            <td colspan="8" class="px-5 py-8 text-center text-gray-400 text-sm">
                                 Tidak ada data Serial Number yang ditemukan.
                             </td>
                         </tr>
