@@ -556,7 +556,7 @@
                             <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
                                 Promo / Voucher Terpakai
                             </p>
-                            <div class="space-y-2 max-h-36  pr-1">
+                            <div class="space-y-2 pr-1">
                                 @foreach ($this->activePromos as $promo)
                                     <label
                                         class="flex items-start gap-2.5 bg-white border border-gray-200/60 p-2.5 rounded-xl cursor-pointer shadow-sm hover:border-[#1c69d4]/40 transition group">
