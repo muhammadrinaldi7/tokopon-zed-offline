@@ -434,7 +434,12 @@ class ProductManagement extends Component
         $query = Product::with(['category', 'brand']);
 
         if ($this->search) {
-            $query->where('name', 'like', '%' . $this->search . '%');
+            $query->where(function ($q) {
+                $q->where('name', 'like', '%' . $this->search . '%')
+                  ->orWhereHas('variants', function ($v) {
+                      $v->where('sku', 'like', '%' . $this->search . '%');
+                  });
+            });
         }
 
         if ($this->filterCategory) {

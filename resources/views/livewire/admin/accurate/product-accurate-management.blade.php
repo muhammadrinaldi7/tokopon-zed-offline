@@ -108,11 +108,22 @@
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="py-4 px-6">
                                 <div class="font-medium text-gray-900">{{ $product->item_no ?? '-' }}</div>
-                                <div class="text-xs text-gray-500 mt-0.5">ID: {{ $product->accurate_id }}
-                                    <button wire:click="generateVariantLocally({{ $product->id }})"
-                                        class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700">
-                                        Generate Variant
-                                    </button>
+                                <div class="text-xs text-gray-500 mt-0.5 mb-1">ID: {{ $product->accurate_id }}</div>
+                                <div class="flex items-center gap-2 mt-1">
+                                    @if ($product->product_variants_count == 0)
+                                        <button wire:click="generateVariantLocally({{ $product->id }})"
+                                            class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700">
+                                            Generate Variant
+                                        </button>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800">
+                                            Belum Dibuat
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">
+                                            Selesai
+                                        </span>
+                                    @endif
+                                    
                                     <button wire:click="syncSerialNumber({{ $product->accurate_id }})"
                                         class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700">
                                         Sync Serial Number

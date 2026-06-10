@@ -214,7 +214,7 @@ class SerialNumberSyncService
                     } else {
                         // CEK EKSTRA: Pastikan SN ini belum pernah terjual (belum ada di order_items)
                         // order_items menyimpan SN dalam bentuk string dipisah koma
-                        $isAlreadySold = \App\Models\OrderItem::where('serial_number', 'LIKE', '%' . $sn . '%')->exists();
+                        $isAlreadySold = \App\Models\OrderItem::whereRaw('FIND_IN_SET(?, REPLACE(serial_number, " ", ""))', [$sn])->exists();
                         $finalStatus = $isAlreadySold ? 'Unavailable' : 'Available';
 
                         // Jika belum ada, buat baru

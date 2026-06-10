@@ -248,7 +248,8 @@ class ProductAccurateManagement extends Component
 
     public function render()
     {
-        $query = ProductAccurate::where('database_source', $this->activeTab)
+        $query = ProductAccurate::withCount(['productVariants'])
+            ->where('database_source', $this->activeTab)
             ->orderBy('updated_at', 'desc');
 
         if (!empty($this->search)) {
