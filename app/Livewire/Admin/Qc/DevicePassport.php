@@ -30,6 +30,32 @@ class DevicePassport extends Component
         }
     }
 
+    // Modal state for new QC
+    public $showQcModal = false;
+    public $newQcLabel = 'QC Etalase';
+    public $targetSnId = null;
+
+    protected $listeners = ['qc-inspection-saved' => 'onInspectionSaved'];
+
+    public function openQcModal()
+    {
+        // Cari ProductSerialNumber berdasarkan IMEI
+        $snRecord = \App\Models\ProductSerialNumber::where('serial_number', $this->imei)->first();
+        if ($snRecord) {
+            $this->targetSnId = $snRecord->id;
+            $this->showQcModal = true;
+        } else {
+            $this->dispatch('toast', title: 'Gagal', message: 'Serial Number tidak ditemukan di database.', type: 'error');
+        }
+    }
+
+    public function onInspectionSaved($verdict)
+    {
+        $this->showQcModal = false;
+        $this->dispatch('toast', title: 'Berhasil', message: 'Inspeksi baru berhasil ditambahkan.', type: 'success');
+        unset($this->inspections); // clear computed cache
+    }
+
     #[Computed]
     public function inspections()
     {

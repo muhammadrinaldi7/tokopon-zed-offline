@@ -9,6 +9,33 @@ use Illuminate\Support\Facades\Log;
 
 class AccurateService
 {
+
+    private function getCredentials($databaseSource)
+    {
+        // For backwards compatibility during transition, map "second" to "second" or "gsk"
+        // In our seeder, we created "second" code for GSK.
+        $code = strtolower($databaseSource) === "second" ? "second" : strtolower($databaseSource);
+        
+        $businessUnit = \App\Models\BusinessUnit::where("code", $code)->first();
+        
+        if (!$businessUnit) {
+            // Fallback to "syihab" if default is requested but code is empty or missing
+            if ($code === "" || $code === "syihab") {
+                $businessUnit = \App\Models\BusinessUnit::where("code", "syihab")->first();
+            }
+            if (!$businessUnit) {
+                throw new \Exception("Kredensial Accurate untuk unit usaha {$databaseSource} tidak ditemukan di database.");
+            }
+        }
+
+        return [
+            $businessUnit->accurate_host,
+            $businessUnit->accurate_token,
+            $businessUnit->accurate_secret_key
+        ];
+    }
+
+
     /**
      * Fetch Item Detail from Accurate
      * 
@@ -16,42 +43,30 @@ class AccurateService
      * @return array
      * @throws \Exception
      */
-    public function itemDetailDo($itemNo)
+    public function itemDetailDo($itemNo, $databaseSource = 'syihab')
     {
-        // 1. Siapkan Timestamp (Format ISO 8601 sangat disarankan)
-        $timestamp = now()->toIso8601String();
+        $config = $this->getHeaders($databaseSource);
 
-        // 2. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
-        $signature = hash_hmac('sha256', $timestamp, env('ACCURATE_SECRET_KEY'));
-
-        // CONTOH HIT API MENGGUNAKAN LARAVEL HTTP CLIENT:
-        // Pastikan Anda sudah mengatur ACCURATE_HOST dan ACCURATE_TOKEN di .env Anda
-        // dd($vendorData);
         $param = [
             "no" => $itemNo
         ];
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . env('ACCURATE_TOKEN'),
-            'X-Api-Timestamp' => $timestamp,
-            'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
-            'Content-Type'  => 'application/json',
-        ])->get(env('ACCURATE_HOST') . '/item/detail.do', $param);
+        $response = Http::withHeaders($config['headers'])
+            ->get($config['host'] . '/item/detail.do', $param);
 
-        Log::info('API Accurate Success: ' . $response->body());
+        Log::info("API Accurate Item Detail ({$databaseSource}): " . $response->body());
         if ($response->successful()) {
             $data = $response->json();
             if (isset($data['s']) && $data['s'] === false) {
                 $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
                 throw new \Exception('API Accurate Error: ' . $errorMsg);
             }
-            // Simpan ID dari Accurate ke Database kita
             if (isset($data)) {
                 $result = $data['d'];
                 return $result;
             }
             return [];
         } else {
-            Log::info('API Accurate Error: ' . $response->body());
+            Log::info("API Accurate Item Detail Error ({$databaseSource}): " . $response->body());
             throw new \Exception('API Accurate Error: ' . $response->body());
         }
     }
@@ -69,11 +84,8 @@ class AccurateService
         if ($user->accurate_vendor_id || $user->accurate_vendor_no) {
             return;
         }
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
 
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
 
         // Ambil alamat primary
         $address = $user->addresses()->where('is_primary', true)->first();
@@ -149,26 +161,12 @@ class AccurateService
         //     'accurate_vendor_no' => $simulatedVendorNo,
         // ]);
     }
-    public function getWarehouseList()
+    public function getWarehouseList($databaseSource = 'syihab')
     {
-        // 1. Siapkan Timestamp (Format ISO 8601 sangat disarankan)
-        $timestamp = now()->toIso8601String();
+        $config = $this->getHeaders($databaseSource);
 
-        // 2. Ambil Secret Key dari .env
-        $secretKey = env('ACCURATE_SECRET_KEY');
-
-        // 3. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
-        $signature = hash_hmac('sha256', $timestamp, $secretKey);
-
-        // CONTOH HIT API MENGGUNAKAN LARAVEL HTTP CLIENT:
-        // Pastikan Anda sudah mengatur ACCURATE_HOST dan ACCURATE_TOKEN di .env Anda
-        // dd($vendorData);
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . env('ACCURATE_TOKEN'),
-            'X-Api-Timestamp' => $timestamp,
-            'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
-            'Content-Type'  => 'application/json',
-        ])->get(env('ACCURATE_HOST') . '/warehouse/list.do');
+        $response = Http::withHeaders($config['headers'])
+            ->get($config['host'] . '/warehouse/list.do');
 
         Log::info('API Accurate Success: ' . $response->body());
         if ($response->successful()) {
@@ -188,26 +186,12 @@ class AccurateService
             throw new \Exception('API Accurate Error: ' . $response->body());
         }
     }
-    public function getBranchList()
+    public function getBranchList($databaseSource = 'syihab')
     {
-        // 1. Siapkan Timestamp (Format ISO 8601 sangat disarankan)
-        $timestamp = now()->toIso8601String();
+        $config = $this->getHeaders($databaseSource);
 
-        // 2. Ambil Secret Key dari .env
-        $secretKey = env('ACCURATE_SECRET_KEY');
-
-        // 3. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
-        $signature = hash_hmac('sha256', $timestamp, $secretKey);
-
-        // CONTOH HIT API MENGGUNAKAN LARAVEL HTTP CLIENT:
-        // Pastikan Anda sudah mengatur ACCURATE_HOST dan ACCURATE_TOKEN di .env Anda
-        // dd($vendorData);
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . env('ACCURATE_TOKEN'),
-            'X-Api-Timestamp' => $timestamp,
-            'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
-            'Content-Type'  => 'application/json',
-        ])->get(env('ACCURATE_HOST') . '/branch/list.do');
+        $response = Http::withHeaders($config['headers'])
+            ->get($config['host'] . '/branch/list.do');
 
         Log::info('API Accurate Success: ' . $response->body());
         if ($response->successful()) {
@@ -230,11 +214,8 @@ class AccurateService
 
     public function postPurchaseInvoice($purchaseInvoiceData, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
 
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
 
         if (!$host || !$token) {
             throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
@@ -275,11 +256,8 @@ class AccurateService
     public function getItemList($page = 1, $pageSize = 100, $databaseSource = 'syihab')
     {
         // Tentukan kredensial berdasarkan sumber database
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
 
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
 
         if (!$host || !$token) {
             throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
@@ -322,11 +300,8 @@ class AccurateService
     {
         // Tentukan kredensial berdasarkan sumber database
         // Default (syihab) mengambil dari ACCURATE_TOKEN, sedangkan 'second' dari ACCURATE_TOKEN_SECOND
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
 
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
 
         if (!$host || !$token) {
             throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
@@ -365,10 +340,8 @@ class AccurateService
 
     public function getNearestCost($itemNo, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         if (!$host || !$token) {
             throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
@@ -408,10 +381,8 @@ class AccurateService
 
     public function fetchCustomers($page = 1, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         if (!$host || !$token) {
             throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
@@ -446,11 +417,8 @@ class AccurateService
         if ($user->accurate_customer_id) {
             return;
         }
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
 
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
 
         $address = $user->addresses()->where('is_primary', true)->first();
 
@@ -501,10 +469,8 @@ class AccurateService
 
     public function postSalesOrder($salesOrderData, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
@@ -535,10 +501,8 @@ class AccurateService
 
     public function postSalesInvoice($salesInvoiceData, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
@@ -692,10 +656,8 @@ class AccurateService
      */
     public function getVendorDetail($vendorNo, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         if (!$host || !$token) {
             throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
@@ -734,10 +696,8 @@ class AccurateService
     }
     public function getCustomerDetail($customerNo, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         if (!$host || !$token) {
             throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
@@ -777,10 +737,8 @@ class AccurateService
 
     public function postSalesReceipt($salesReceiptData, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
@@ -860,10 +818,8 @@ class AccurateService
 
     public function getGlAccounts($databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
@@ -898,11 +854,8 @@ class AccurateService
      */
     public function getSerialNumberPerWarehouse($sku, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
 
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
 
         if (!$host || !$token) {
             throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
@@ -932,10 +885,8 @@ class AccurateService
 
     public function getItemStockPerWarehouse($warehouseName, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         $allData = [];
         $page = 1;
@@ -980,10 +931,8 @@ class AccurateService
     }
     public function getStockPerItem($itemNo, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
@@ -1011,10 +960,8 @@ class AccurateService
 
     public function getStockPerItemWarehouse($itemNo, $warehouseName, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
@@ -1079,10 +1026,8 @@ class AccurateService
     // }
     public function checkSerialNumberExistance($sn, $expectedSku, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
@@ -1132,10 +1077,8 @@ class AccurateService
     }
     private function getHeaders($databaseSource)
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
@@ -1233,10 +1176,8 @@ class AccurateService
 
     public function getReceiveItemList($databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         if (!$host || !$token) {
             throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
@@ -1291,10 +1232,8 @@ class AccurateService
 
     public function getReceiveItemDetail($id, $databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
 
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);

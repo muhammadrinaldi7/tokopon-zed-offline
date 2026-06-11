@@ -248,7 +248,7 @@ class ProductAccurateManagement extends Component
 
     public function render()
     {
-        $query = ProductAccurate::withCount(['productVariants'])
+        $query = ProductAccurate::withCount(['productVariants', 'secondProductVariants'])
             ->where('database_source', $this->activeTab)
             ->orderBy('updated_at', 'desc');
 
@@ -276,24 +276,34 @@ class ProductAccurateManagement extends Component
 
             // 1. Fetch full details from Accurate
             $service = app(AccurateService::class);
-            $accurateItemData = $service->itemDetailDo($productAccurate->item_no);
+            $accurateItemData = $service->itemDetailDo($productAccurate->item_no, $this->activeTab);
 
             if (!$accurateItemData || empty($accurateItemData)) {
                 $this->dispatch('toast', title: 'Gagal', message: 'Data detail item tidak ditemukan di Accurate API.', type: 'error');
                 return;
             }
 
-            // 2. Gunakan Trait GeneratesProductVariant
-            $result = $this->autoGenerateProductAndVariant(
-                $productAccurate->item_no,
-                $accurateItemData,
-                $productAccurate->id
-            );
+            // 2. Gunakan Trait GeneratesProductVariant — conditional berdasarkan tab aktif
+            if ($this->activeTab === 'second') {
+                // GSK: Generate SecondProduct + SecondProductVariant
+                $result = $this->autoGenerateSecondProductAndVariant(
+                    $productAccurate->item_no,
+                    $accurateItemData,
+                    $productAccurate->id
+                );
+            } else {
+                // Syihab: Generate Product + ProductVariant (existing)
+                $result = $this->autoGenerateProductAndVariant(
+                    $productAccurate->item_no,
+                    $accurateItemData,
+                    $productAccurate->id
+                );
+            }
 
             if ($result['success']) {
-                $this->dispatch('toast', title: 'Berhasil', message: 'Variant berhasil di-generate dan siap dijual!', type: 'success');
+                $this->dispatch('toast', title: 'Berhasil', message: $result['message'] ?? 'Variant berhasil di-generate dan siap dijual!', type: 'success');
             } else {
-                $this->dispatch('toast', title: 'Gagal', message: 'Variant gagal di-generate', type: 'error');
+                $this->dispatch('toast', title: 'Gagal', message: $result['message'] ?? 'Variant gagal di-generate', type: 'error');
             }
         } catch (\Exception $e) {
             Log::error('Gagal generate variant manual: ' . $e->getMessage());

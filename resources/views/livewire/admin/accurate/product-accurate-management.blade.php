@@ -110,7 +110,12 @@
                                 <div class="font-medium text-gray-900">{{ $product->item_no ?? '-' }}</div>
                                 <div class="text-xs text-gray-500 mt-0.5 mb-1">ID: {{ $product->accurate_id }}</div>
                                 <div class="flex items-center gap-2 mt-1">
-                                    @if ($product->product_variants_count == 0)
+                                    @php
+                                        $variantCount = $activeTab === 'second'
+                                            ? $product->second_product_variants_count
+                                            : $product->product_variants_count;
+                                    @endphp
+                                    @if ($variantCount == 0)
                                         <button wire:click="generateVariantLocally({{ $product->id }})"
                                             class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700">
                                             Generate Variant

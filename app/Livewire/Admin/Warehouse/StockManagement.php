@@ -68,7 +68,10 @@ class StockManagement extends Component
 
                 if (!$warehouseName) continue;
 
-                $warehouse = Warehouse::where('name', $warehouseName)->first();
+                // Handle 'GSK ' prefix from Accurate Second DB
+                $localWarehouseName = $isSecond ? str_replace('GSK ', '', $warehouseName) : $warehouseName;
+
+                $warehouse = Warehouse::where('name', $localWarehouseName)->first();
                 if (!$warehouse) continue;
 
                 WarehouseStock::updateOrCreate(
@@ -110,18 +113,17 @@ class StockManagement extends Component
             foreach ($warehouses as $warehouse) {
                 try {
                     // 2. Ambil stok Accurate per gudang
-                    // Pastikan Anda memanggil nama fungsi yang tepat (karena Anda membuat fungsi getItemStockPerWarehouse)
-                    $stockData = $service->getItemStockPerWarehouse($warehouse->name, $dbSource);
+                    $accurateWarehouseName = $this->activeTab === 'second' ? 'GSK ' . $warehouse->name : $warehouse->name;
+                    $stockData = $service->getItemStockPerWarehouse($accurateWarehouseName, $dbSource);
 
                     if (empty($stockData)) continue;
 
                     // 3. Mapping data array ke Collection berbasis SKU (O(1) lookup di memori)
-                    // Cek struktur array Accurate apakah key-nya 'no' atau 'itemNo'
                     $accurateStockCollection = collect($stockData)->keyBy(function ($item) {
                         return $item['itemNo'] ?? ($item['item']['no'] ?? ($item['no'] ?? null));
                     });
 
-                    // 4. Reset stok khusus gudang INI menjadi 0 dulu (Menghindari barang sisa/ghost stock)
+                    // 4. Reset stok khusus gudang INI menjadi 0 dulu
                     WarehouseStock::where('warehouse_id', $warehouse->id)
                         ->where('variant_type', $variantClass)
                         ->update(['stock' => 0]);
@@ -175,9 +177,9 @@ class StockManagement extends Component
             }
 
             // 2. HIT API ACCURATE CUKUP 1 KALI (Di luar looping)
-            // Ambil semua stok produk yang ada di gudang ini
-            $stockData = $service->getItemStockPerWarehouse($whName, $dbSource);
-            // dd($stockData);
+            $accurateWarehouseName = $this->activeTab === 'second' ? 'GSK ' . $whName : $whName;
+            $stockData = $service->getItemStockPerWarehouse($accurateWarehouseName, $dbSource);
+
             if (empty($stockData)) {
                 $this->dispatch('toast', title: 'Info', message: "Tidak ada data stok di Accurate untuk gudang: $whName", type: 'info');
                 $this->isLoading = false;
@@ -198,13 +200,11 @@ class StockManagement extends Component
                 ->where('variant_type', $variantClass)
                 ->update(['stock' => 0]);
             $syncedCount = 0;
-            // dd($accurateStockCollection);
-            // 6. Lakukan pemetaan data di memori internal (Proses ini sangat cepat < 0.1 detik)
+
+            // 6. Lakukan pemetaan data di memori internal
             foreach ($variants as $variant) {
-                // Cek apakah SKU lokal kita ada di dalam list stok Accurate gudang tersebut
                 if ($accurateStockCollection->has($variant->sku)) {
                     $accurateItem = $accurateStockCollection->get($variant->sku);
-                    Log::info('accurateItem', [$accurateItem]);
                     $qty = $accurateItem['quantity'] ?? 0;
 
                     WarehouseStock::updateOrCreate(

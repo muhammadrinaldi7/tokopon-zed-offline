@@ -5,7 +5,14 @@
             <h1 class="text-2xl font-bold text-gray-800">📱 Device Passport</h1>
             <p class="text-gray-500 text-sm mt-1">Riwayat Inspeksi Fisik & QC Unit</p>
         </div>
-        <div>
+        <div class="flex gap-3 items-center">
+            <button 
+                wire:click="openQcModal" 
+                class="px-3 py-1.5 bg-[#1c69d4] text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition inline-flex items-center gap-1.5"
+            >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                Inspeksi Baru
+            </button>
             <a href="{{ route('admin.dashboard') }}" class="text-sm font-medium text-emerald-600 hover:text-emerald-700">Kembali ke Dashboard</a>
         </div>
     </div>
@@ -246,6 +253,39 @@
                             <p class="text-gray-400 text-sm">Pilih minimal 1 riwayat QC untuk melihat detail</p>
                         </div>
                     @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- QC Modal -->
+    @if($showQcModal && $targetSnId)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+                <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-800">Inspeksi QC Baru</h3>
+                    <button wire:click="$set('showQcModal', false)" class="text-gray-400 hover:text-rose-500 font-bold">&times;</button>
+                </div>
+                <div class="p-4 overflow-y-auto flex-1">
+                    <div class="mb-4">
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Pilih Jenis Inspeksi (Label)</label>
+                        <select wire:model="newQcLabel" class="w-full rounded-lg border-gray-300 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm mb-4">
+                            <option value="QC Etalase">QC Etalase (Pengecekan Berkala)</option>
+                            <option value="QC Retur">QC Retur (Barang Kembali)</option>
+                            <option value="QC Service">QC Service (Masuk Servis)</option>
+                            <option value="QC After Service">QC After Service (Selesai Servis)</option>
+                        </select>
+                    </div>
+                    
+                    {{-- We use key() to force component re-render when targetSnId changes --}}
+                    @livewire('admin.qc.inspection-form', [
+                        'inspectableType' => \App\Models\ProductSerialNumber::class,
+                        'inspectableId' => $targetSnId,
+                        'label' => $newQcLabel
+                    ], key('qc-form-'.$targetSnId))
+                </div>
+                <div class="p-4 border-t border-gray-100 flex justify-end">
+                    <button type="button" wire:click="$set('showQcModal', false)" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition">Batal</button>
                 </div>
             </div>
         </div>

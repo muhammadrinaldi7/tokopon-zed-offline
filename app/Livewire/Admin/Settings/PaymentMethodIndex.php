@@ -15,12 +15,16 @@ class PaymentMethodIndex extends Component
 
     public $methodId;
     public $name;
+    public $business_unit_id;
     public $bank_name;
     public $account_number;
     public $account_owner;
     public $accurate_bank_no;
     public $mdr_percentage = 0;
     public $is_active = true;
+
+    public $businessUnits = [];
+    public $activeTab = 'all';
 
     // State untuk Tarif MDR
     public $showRatesModal = false;
@@ -38,6 +42,7 @@ class PaymentMethodIndex extends Component
 
     protected $rules = [
         'name' => 'required|string|max:255',
+        'business_unit_id' => 'required|exists:business_units,id',
         'bank_name' => 'nullable|string|max:255',
         'account_number' => 'nullable|string|max:255',
         'account_owner' => 'nullable|string|max:255',
@@ -53,8 +58,25 @@ class PaymentMethodIndex extends Component
 
     public function loadData()
     {
-        $this->paymentMethods = PaymentMethod::with('rates')->get();
+        $units = \App\Models\BusinessUnit::where('is_active', true)->get();
+        $this->businessUnits = $units;
+        
+        if (!$this->business_unit_id && $units->count() > 0) {
+            $this->business_unit_id = $units->first()->id;
+        }
+        
+        $query = PaymentMethod::with(['rates', 'businessUnit']);
+        if ($this->activeTab !== 'all') {
+            $query->where('business_unit_id', $this->activeTab);
+        }
+        $this->paymentMethods = $query->get();
+        
         $this->loadGlAccounts();
+    }
+
+    public function updatedActiveTab()
+    {
+        $this->loadData();
     }
 
     public function create()
@@ -70,6 +92,7 @@ class PaymentMethodIndex extends Component
         $method = PaymentMethod::findOrFail($id);
         $this->methodId = $method->id;
         $this->name = $method->name;
+        $this->business_unit_id = $method->business_unit_id;
         $this->bank_name = $method->bank_name;
         $this->account_number = $method->account_number;
         $this->account_owner = $method->account_owner;
@@ -87,6 +110,7 @@ class PaymentMethodIndex extends Component
 
         $data = [
             'name' => $this->name,
+            'business_unit_id' => $this->business_unit_id,
             'bank_name' => $this->bank_name,
             'account_number' => $this->account_number,
             'account_owner' => $this->account_owner,
@@ -125,6 +149,12 @@ class PaymentMethodIndex extends Component
     {
         $this->methodId = null;
         $this->name = '';
+        if (!empty($this->businessUnits)) {
+            // Livewire might cast it to an array, so we use array access or collect()
+            $this->business_unit_id = collect($this->businessUnits)->first()['id'] ?? collect($this->businessUnits)->first()->id ?? null;
+        } else {
+            $this->business_unit_id = null;
+        }
         $this->bank_name = '';
         $this->account_number = '';
         $this->account_owner = '';
@@ -245,26 +275,34 @@ class PaymentMethodIndex extends Component
 
         try {
             $service = app(\App\Services\AccurateService::class);
-            // Anda bisa menambah pengaturan jika butuh database_source 'second'
-            $dbSource = 'syihab';
+            $businessUnits = \App\Models\BusinessUnit::where('is_active', true)->get();
+            $totalSynced = 0;
 
-            $glData = $service->getGlAccounts($dbSource);
+            foreach ($businessUnits as $unit) {
+                $dbSource = $unit->code;
+                try {
+                    $glData = $service->getGlAccounts($dbSource);
 
-            if (!empty($glData)) {
-                // Hapus data lama agar terganti dengan yang baru
-                \App\Models\AccurateGlAccount::where('database_source', $dbSource)->delete();
+                    if (!empty($glData)) {
+                        \App\Models\AccurateGlAccount::where('database_source', $dbSource)->delete();
 
-                foreach ($glData as $gl) {
-                    \App\Models\AccurateGlAccount::create([
-                        'account_no' => $gl['no'],
-                        'name' => $gl['name'],
-                        'account_type' => $gl['accountType'],
-                        'database_source' => $dbSource
-                    ]);
+                        foreach ($glData as $gl) {
+                            \App\Models\AccurateGlAccount::create([
+                                'account_no' => $gl['no'],
+                                'name' => $gl['name'],
+                                'account_type' => $gl['accountType'],
+                                'database_source' => $dbSource
+                            ]);
+                        }
+                        $totalSynced += count($glData);
+                    }
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error("Gagal sync GL Account untuk unit {$unit->name}: " . $e->getMessage());
                 }
+            }
 
-                $count = count($glData);
-                $this->dispatch('toast', title: 'Berhasil', message: "$count GL Account tersinkronisasi.", type: 'success');
+            if ($totalSynced > 0) {
+                $this->dispatch('toast', title: 'Berhasil', message: "$totalSynced GL Account tersinkronisasi dari semua cabang.", type: 'success');
             } else {
                 $this->dispatch('toast', title: 'Info', message: "Tidak ada GL Account CASH_BANK ditemukan.", type: 'info');
             }
@@ -273,7 +311,7 @@ class PaymentMethodIndex extends Component
             $this->dispatch('toast', title: 'Gagal', message: 'Gagal sync GL Account: ' . $e->getMessage(), type: 'error');
         }
 
-        $this->loadGlAccounts();
         $this->isLoadingGl = false;
+        $this->loadGlAccounts();
     }
 }

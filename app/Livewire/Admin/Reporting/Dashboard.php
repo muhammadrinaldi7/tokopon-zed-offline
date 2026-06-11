@@ -15,10 +15,14 @@ class Dashboard extends Component
     public $startDate;
     public $endDate;
     public $branchFilter = '';
+    public $businessUnitFilter = '';
+
+    public $businessUnits = [];
 
     public function mount()
     {
         $this->setDateRange();
+        $this->businessUnits = \App\Models\BusinessUnit::where('is_active', true)->get();
     }
 
     public function updatedDateRange()
@@ -31,6 +35,7 @@ class Dashboard extends Component
     public function updatedStartDate() { $this->dateRange = 'custom'; }
     public function updatedEndDate() { $this->dateRange = 'custom'; }
     public function updatedBranchFilter() { /* Automatically triggers render */ }
+    public function updatedBusinessUnitFilter() { /* Automatically triggers render */ }
 
     private function setDateRange()
     {
@@ -77,6 +82,9 @@ class Dashboard extends Component
             ->where('order_status', 'COMPLETED')
             ->when($this->branchFilter, function($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
+            })
+            ->when($this->businessUnitFilter, function($q) {
+                $q->where('business_unit_id', $this->businessUnitFilter);
             });
 
         // --- 1. KPI OVERVIEW ---
@@ -99,12 +107,18 @@ class Dashboard extends Component
             ->whereBetween('created_at', [$startOfThisMonth, $now])
             ->when($this->branchFilter, function($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
+            })
+            ->when($this->businessUnitFilter, function($q) {
+                $q->where('business_unit_id', $this->businessUnitFilter);
             });
         
         $lastMtdQuery = Order::where('order_status', 'COMPLETED')
             ->whereBetween('created_at', [$startOfLastMonth, $sameDayLastMonth])
             ->when($this->branchFilter, function($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
+            })
+            ->when($this->businessUnitFilter, function($q) {
+                $q->where('business_unit_id', $this->businessUnitFilter);
             });
 
         $mtdNetSales = (clone $mtdQuery)->sum('grand_total') - (clone $mtdQuery)->sum('mdr_amount');

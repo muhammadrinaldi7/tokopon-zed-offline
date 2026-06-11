@@ -11,6 +11,7 @@ class PaymentMethod extends Model
 
     protected $fillable = [
         'name',
+        'business_unit_id',
         'bank_name',
         'account_number',
         'account_owner',
@@ -18,6 +19,11 @@ class PaymentMethod extends Model
         'mdr_percentage',
         'is_active',
     ];
+
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
+    }
 
     protected $casts = [
         'mdr_percentage' => 'decimal:2',

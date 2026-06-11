@@ -349,29 +349,37 @@ class Show extends Component
             if ($this->existingProductId) {
                 $product = \App\Models\SecondProduct::find($this->existingProductId);
             } else {
+                $brand = \App\Models\Brand::where('name', $this->tradeIn->old_phone_brand)->first();
                 $product = \App\Models\SecondProduct::firstOrCreate(
                     ['name' => $productName],
                     [
                         'slug' => Str::slug($productName . ' Second ' . rand(100, 999)),
-                        'brand_id' => null, // Opsional jika punya relasi tabel brands
+                        'brand_id' => $brand?->id, // Opsional jika punya relasi tabel brands
                         'category_id' => \App\Models\Category::first()?->id, // Default ke kategori pertama
-                        'description' => 'Produk unit seken / bekas pakai.',
+                        'description' => 'Produk unit seken / bekas pakai dari Trade-In pelanggan.',
                         'is_active' => true,
                         'starting_price' => $this->sellPrice,
+                        'total_stock' => 0,
+                        'has_active_accurate' => true
                     ]
                 );
             }
+
+            // Generate SKU format for local secondary items
+            $sku = 'GSK-' . str_pad($this->tradeIn->id, 4, '0', STR_PAD_LEFT) . '-' . strtoupper(Str::random(3));
 
             // Buat variant fisiknya
             $variant = SecondProductVariant::create([
                 'second_product_id' => $product->id,
                 'trade_in_id' => $this->tradeIn->id,
+                'sku' => $sku,
                 'storage' => $this->tradeIn->old_phone_storage ?? '-',
                 'color' => '-',
                 'condition_desc' => $this->secondCondition,
-                'weight' => 500, // asumsikan
                 'price' => $this->sellPrice,
+                'buy_price' => $this->tradeIn->appraised_value,
                 'stock' => 1,
+                'has_sn' => true
             ]);
 
             $warehouseId = Auth::user()->warehouse_id ?? \App\Models\Warehouse::first()?->id;
@@ -382,9 +390,20 @@ class Show extends Component
                     'variant_type' => get_class($variant),
                     'stock' => 1,
                 ]);
-            }
 
-            // Tandai Trade In sudah memiliki produk / ter-convert (opsional, bisa dilacak dari trade_in_id di variants)
+                // Update denormalized total stock
+                $product->increment('total_stock');
+
+                // Create Serial Number
+                $imei = $this->tradeIn->imei ?? ('SN-TRD-' . $this->tradeIn->id);
+                \App\Models\ProductSerialNumber::create([
+                    'item_no' => $sku,
+                    'serial_number' => $imei,
+                    'warehouse_id' => $warehouseId,
+                    'status' => 'Available',
+                    'hpp' => $this->tradeIn->appraised_value,
+                ]);
+            }
         });
 
         $this->convertModal = false;

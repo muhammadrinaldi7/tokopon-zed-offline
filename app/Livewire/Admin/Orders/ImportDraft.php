@@ -212,6 +212,7 @@ class ImportDraft extends Component
 
             // Create Order first to get ID
             $order = Order::create([
+                'business_unit_id' => \Illuminate\Support\Facades\Auth::user()->business_unit_id ?? 1,
                 'user_id' => $user->id,
                 'order_number' => $orderNumber,
                 'total_amount' => 0,

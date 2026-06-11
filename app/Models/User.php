@@ -29,13 +29,33 @@ class User extends Authenticatable implements HasMedia
         'avatar',
         'identity',
         'npwp',
-        'accurate_customer_id',
-        'accurate_customer_no',
+        'business_unit_id',
         'accurate_vendor_id',
         'accurate_vendor_no',
         'warehouse_id',
         'branch_id'
     ];
+
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function accurateCustomers()
+    {
+        return $this->hasMany(UserAccurateCustomer::class);
+    }
+
+    public function getAccurateCustomerNo($businessUnitCode = 'syihab')
+    {
+        $pivot = $this->accurateCustomers()
+            ->whereHas('businessUnit', function ($q) use ($businessUnitCode) {
+                $q->where('code', $businessUnitCode);
+            })
+            ->first();
+
+        return $pivot ? $pivot->accurate_customer_no : 'CASH';
+    }
 
     /**
      * The attributes that should be hidden for serialization.

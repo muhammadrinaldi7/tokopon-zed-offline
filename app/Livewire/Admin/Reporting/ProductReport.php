@@ -23,6 +23,7 @@ class ProductReport extends Component
 
     public $search = '';
     public $branchFilter = '';
+    public $businessUnitFilter = '';
 
     public function mount()
     {
@@ -52,6 +53,10 @@ class ProductReport extends Component
         $this->resetPage();
     }
     public function updatedBranchFilter()
+    {
+        $this->resetPage();
+    }
+    public function updatedBusinessUnitFilter()
     {
         $this->resetPage();
     }
@@ -90,6 +95,9 @@ class ProductReport extends Component
 
         $orderIds = Order::whereBetween('created_at', [$start, $end])
             ->where('order_status', 'COMPLETED')
+            ->when($this->businessUnitFilter, function ($q) {
+                $q->where('business_unit_id', $this->businessUnitFilter);
+            })
             ->pluck('id');
 
         $orderItems = OrderItem::whereIn('order_id', $orderIds)
@@ -165,6 +173,9 @@ class ProductReport extends Component
 
         $orderIds = Order::whereBetween('created_at', [$start, $end])
             ->where('order_status', 'COMPLETED')
+            ->when($this->businessUnitFilter, function ($q) {
+                $q->where('business_unit_id', $this->businessUnitFilter);
+            })
             ->pluck('id');
 
         $orderItems = OrderItem::whereIn('order_id', $orderIds)

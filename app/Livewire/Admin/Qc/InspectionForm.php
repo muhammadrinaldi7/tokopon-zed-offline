@@ -120,6 +120,15 @@ class InspectionForm extends Component
         $inspection->calculateCounts(); // Hitung counts sebelum save
         $inspection->save();
 
+        // Update IMEI on SellPhone or TradeIn if applicable
+        $model = $this->getInspectableModel();
+        if ($model instanceof \App\Models\SellPhone || $model instanceof \App\Models\TradeIn) {
+            $model->update(['imei' => $this->imei]);
+        } elseif ($model instanceof \App\Models\ProductSerialNumber) {
+            $newQcStatus = $this->verdict === 'pass' ? 'Passed Inbound' : 'Failed Inbound';
+            $model->update(['qc_status' => $newQcStatus]);
+        }
+
         // Save photos
         foreach ($this->photos as $photo) {
             $inspection->addMedia($photo->getRealPath())

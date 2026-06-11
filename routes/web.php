@@ -82,7 +82,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     });
 
     // Settings
-    Route::get('/settings/payment', \App\Livewire\Admin\Settings\PaymentSettings::class)->name('settings.payment')->middleware('can:manage-settings');
+    Route::get('/settings/business-units', \App\Livewire\Admin\Settings\BusinessUnitIndex::class)->name('settings.business-units')->middleware('can:manage-settings');
     Route::get('/settings/payment-methods', \App\Livewire\Admin\Settings\PaymentMethodIndex::class)->name('settings.payment-methods')->middleware('can:manage-settings');
     Route::get('/settings/shipping', \App\Livewire\Admin\Settings\ShippingSettings::class)->name('settings.shipping')->middleware('can:manage-settings');
     Route::get('/settings/catalog', \App\Livewire\Admin\Settings\CatalogSettings::class)->name('settings.catalog')->middleware('can:manage-settings');
@@ -111,6 +111,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::prefix('qc')->name('qc.')->middleware('can:manage-qc')->group(function () {
         Route::get('/templates', App\Livewire\Admin\Qc\TemplateIndex::class)->name('templates');
+        Route::get('/inbound', App\Livewire\Admin\Qc\VendorInboundQc::class)->name('inbound');
         Route::get('/device', App\Livewire\Admin\Qc\DeviceSearch::class)->name('device-search');
         Route::get('/device/{imei}', App\Livewire\Admin\Qc\DevicePassport::class)->name('device-passport');
         Route::get('/inspect/{secondProductVariant}', App\Livewire\Admin\Qc\InspectionForm::class)->name('inspect');

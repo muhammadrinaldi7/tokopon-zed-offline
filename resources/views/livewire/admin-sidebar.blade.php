@@ -342,12 +342,15 @@
                 <div x-show="openQc && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
                     <a href="{{ route('admin.qc.templates') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.templates') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Template QC
+                        Templates
+                    </a>
+                    <a href="{{ route('admin.qc.inbound') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.inbound') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Antrean Inbound
                     </a>
                     <a href="{{ route('admin.qc.device-search') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device-search') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-
-                        Cek Devices
+                        Pemeriksaan Perangkat
                     </a>
                 </div>
             </div>
@@ -411,6 +414,16 @@
             <div class="px-4 mt-8 mb-2" x-show="!sidebarCollapsed">
                 <p class="text-[13px] font-bold tracking-[1.5px] text-gray-400 uppercase">Sistem</p>
             </div>
+
+            <a href="{{ route('admin.settings.business-units') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.business-units') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.business-units') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Unit Usaha</span>
+            </a>
 
             <a href="{{ route('admin.settings.payment-methods') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.payment-methods') ? $activeClass : $inactiveClass }}">

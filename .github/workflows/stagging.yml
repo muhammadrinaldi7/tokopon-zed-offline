@@ -1,0 +1,117 @@
+name: Deploy Laravel to Stagging Server
+
+on:
+  push:
+    branches:
+      - stagging_prod
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer Dependencies (with dev)
+        run: composer install --no-interaction --optimize-autoloader
+
+      - name: Copy .env.example to .env
+        run: cp .env.example .env
+
+      - name: Generate APP_KEY
+        run: php artisan key:generate
+
+    #   - name: Run PHPUnit tests
+    #     run: vendor/bin/phpunit
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout Repo
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Setup PHP
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+
+      # 2.5 Cache Composer Dependencies
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      # 3. Install Laravel Dependencies
+      - name: Install Composer Dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      # 3.5 Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22 # Sesuaikan dengan versi Node.js yang Anda gunakan
+
+      # 3.6 Cache NPM dependencies
+      - name: Cache NPM dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+
+      # 3.7 Install Node dependencies
+      - name: Install Node dependencies
+        run: npm install
+
+      # 3.8 Build assets for production
+      - name: Build assets
+        run: npm run build
+
+      # 4. Upload Laravel Core (Kecuali `public/`) ke root hosting
+      - name: Upload Laravel Core to Hosting Root
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_SERVER_STAGGING }}
+          username: ${{ secrets.FTP_USERNAME_STAGGING }}
+          password: ${{ secrets.FTP_PASSWORD_STAGGING }}
+          local-dir: ./
+          server-dir: /laravel/
+          exclude: |
+            node_modules/*
+            node_modules
+            node_modules/**
+            vendor/**
+            vendor/
+            vendor
+            .git*
+            .git/*
+            .git/**
+            .github/**
+            .github/*
+            .github/
+            test/*
+            test
+            test/**
+            README.md
+            vite.config.js
+            package.json
+            package-lock.json
+            webpack.mix.js

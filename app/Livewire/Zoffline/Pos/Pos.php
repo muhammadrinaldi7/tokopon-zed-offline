@@ -77,6 +77,51 @@ class Pos extends Component
     public $searchHistoryDate = '';
     public $databaseSource = 'syihab';
 
+    // ─── QC Serah Terima ───────────────────────────────────────
+    public $showQcModal = false;
+    public $targetSnId = null;
+    public $targetImei = '';
+
+    protected $listeners = ['qc-inspection-saved' => 'onInspectionSaved'];
+
+    public function openQcSerahTerima($sn)
+    {
+        $snRecord = \App\Models\ProductSerialNumber::where('serial_number', $sn)->first();
+        if ($snRecord) {
+            $this->targetSnId = $snRecord->id;
+            $this->targetImei = $sn;
+            $this->showQcModal = true;
+        } else {
+            $this->dispatch('toast', title: 'Error', message: 'Serial Number tidak valid.', type: 'error');
+        }
+    }
+
+    public function onInspectionSaved($verdict)
+    {
+        $this->showQcModal = false;
+        // Pengecekan status sudah dilakukan saat openCheckout
+    }
+
+    public $showCustomerQcModal = false;
+    public $customerQcData = null;
+
+    public function openCustomerQcModal($sn)
+    {
+        $inspection = \App\Models\DeviceInspection::with(['inspector', 'media'])
+            ->where('imei', $sn)
+            ->where('label', '!=', 'QC Serah Terima')
+            ->orderBy('inspected_at', 'desc')
+            ->first();
+
+        if (!$inspection) {
+            $this->dispatch('toast', title: 'Info', message: "Belum ada riwayat Sertifikat QC untuk IMEI/SN: {$sn}", type: 'warning');
+            return;
+        }
+
+        $this->customerQcData = $inspection;
+        $this->showCustomerQcModal = true;
+    }
+
     public function processScan(AccurateService $accurateService)
     {
         $sn = trim($this->scanned_sn);
@@ -87,6 +132,17 @@ class Pos extends Component
 
         // 1. Hit ke Accurate via Service untuk mendapatkan No SKU
         $skuFromAccurate = $accurateService->findSkuBySerialNumber($sn, $this->databaseSource);
+
+        $unit = \Illuminate\Support\Facades\Auth::user()->businessUnit?->code ?? 'all';
+
+        // Jika user adalah 'all' dan SN tidak ditemukan di syihab, coba cari di second
+        if ((!$skuFromAccurate || $skuFromAccurate === 'error') && $unit === 'all' && $this->databaseSource === 'syihab') {
+            $skuFromAccurateSecond = $accurateService->findSkuBySerialNumber($sn, 'second');
+            if ($skuFromAccurateSecond && $skuFromAccurateSecond !== 'error' && $skuFromAccurateSecond !== 'invalid_type') {
+                $skuFromAccurate = $skuFromAccurateSecond;
+                $this->databaseSource = 'second'; // Switch source temporarily for this transaction
+            }
+        }
 
         if ($skuFromAccurate === 'error') {
             $this->dispatch('toast', title: 'Error', message: 'Terjadi gangguan koneksi ke Accurate.', type: 'error');
@@ -99,7 +155,6 @@ class Pos extends Component
             $this->scanned_sn = '';
             return;
         }
-
 
         if (!$skuFromAccurate) {
             $this->dispatch('toast', title: 'Error', message: "Serial Number '{$sn}' tidak ditemukan di Accurate.", type: 'error');
@@ -160,16 +215,16 @@ class Pos extends Component
         }])->where('sku', $skuFromAccurate)->first();
 
         // Jika tidak ada di Baru, Cek di Varian Produk Bekas
-        // if (!$variant) {
-        //     $variant = \App\Models\SecondProductVariant::with(['product', 'warehouseStocks' => function ($q) use ($warehouseId) {
-        //         $q->where('warehouse_id', $warehouseId);
-        //     }])->where('sku', $skuFromAccurate)->first();
+        if (!$variant) {
+            $variant = \App\Models\SecondProductVariant::with(['secondProduct', 'warehouseStocks' => function ($q) use ($warehouseId) {
+                $q->where('warehouse_id', $warehouseId);
+            }])->where('sku', $skuFromAccurate)->first();
 
-        //     if ($variant) {
-        //         $isSecond = true;
-        //         $variantType = \App\Models\SecondProductVariant::class;
-        //     }
-        // }
+            if ($variant) {
+                $isSecond = true;
+                $variantType = \App\Models\SecondProductVariant::class;
+            }
+        }
 
         if (!$variant) {
             $this->dispatch('toast', title: 'Peringatan', message: "Produk (SKU: {$skuFromAccurate}) belum terdaftar di sistem lokal.", type: 'warning');
@@ -267,13 +322,13 @@ class Pos extends Component
         if (!empty($this->searchHistory)) {
             $query->where(function ($q) {
                 $q->where('order_number', 'like', '%' . $this->searchHistory . '%')
-                  ->orWhere('accurate_invoice_no', 'like', '%' . $this->searchHistory . '%')
-                  ->orWhereHas('user', function ($q2) {
-                      $q2->where('name', 'like', '%' . $this->searchHistory . '%')
-                         ->orWhereHas('profile', function($q3) {
-                             $q3->where('phone_number', 'like', '%' . $this->searchHistory . '%');
-                         });
-                  });
+                    ->orWhere('accurate_invoice_no', 'like', '%' . $this->searchHistory . '%')
+                    ->orWhereHas('user', function ($q2) {
+                        $q2->where('name', 'like', '%' . $this->searchHistory . '%')
+                            ->orWhereHas('profile', function ($q3) {
+                                $q3->where('phone_number', 'like', '%' . $this->searchHistory . '%');
+                            });
+                    });
             });
         }
 
@@ -411,6 +466,18 @@ class Pos extends Component
 
     public function mount()
     {
+        $unit = \Illuminate\Support\Facades\Auth::user()->businessUnit?->code ?? 'all';
+        if ($unit === 'second') {
+            $this->productType = 'second';
+            $this->databaseSource = 'second';
+        } elseif ($unit === 'syihab') {
+            $this->productType = 'new';
+            $this->databaseSource = 'syihab';
+        } else {
+            $this->productType = 'all';
+            $this->databaseSource = 'syihab'; // Default for all
+        }
+
         $this->payments = [
             [
                 'payment_method_id' => '',
@@ -536,8 +603,13 @@ class Pos extends Component
         $user = Auth::user();
         $locationName = $user->warehouse->name ?? '';
 
-        // 2. Ambil semua metode pembayaran yang aktif
-        $methods = PaymentMethod::where('is_active', true)->get();
+        // 2. Ambil semua metode pembayaran yang aktif sesuai business_unit
+        $methods = PaymentMethod::where('is_active', true)
+            ->where(function ($query) use ($user) {
+                $query->where('business_unit_id', $user->business_unit_id)
+                    ->orWhereNull('business_unit_id');
+            })
+            ->get();
 
         // 3. Filter datanya
         return $methods->filter(function ($method) use ($locationName) {
@@ -596,8 +668,9 @@ class Pos extends Component
 
         $newProducts = collect();
         $secondProducts = collect();
+        $unit = \Illuminate\Support\Facades\Auth::user()->businessUnit?->code ?? 'all';
 
-        if ($this->productType !== 'second') {
+        if ($this->productType !== 'second' && $unit !== 'second') {
             $newProducts = Product::with(['variants', 'brand', 'media'])
                 ->where('is_active', true)
                 ->where(function ($q) {
@@ -613,7 +686,7 @@ class Pos extends Component
                 });
         }
 
-        if ($this->productType !== 'new') {
+        if ($this->productType !== 'new' && $unit !== 'syihab') {
             $secondProducts = SecondProduct::with(['variants', 'brand', 'media'])
                 ->where('is_active', true)
                 ->where(function ($q) {
@@ -1177,6 +1250,24 @@ class Pos extends Component
             }
         }
 
+        // Validate QC Serah Terima for Second items with SN
+        foreach ($this->cart as $item) {
+            if (($item['variant_type'] ?? '') === \App\Models\SecondProductVariant::class && (!isset($item['has_sn']) || $item['has_sn'])) {
+                $sns = array_filter($item['serial_numbers'] ?? [], fn($value) => trim($value) !== '');
+                foreach ($sns as $sn) {
+                    $hasPassedQc = \App\Models\DeviceInspection::where('imei', $sn)
+                        ->where('label', 'QC Serah Terima')
+                        ->where('verdict', 'pass')
+                        ->exists();
+
+                    if (!$hasPassedQc) {
+                        $this->dispatch('toast', title: 'QC Serah Terima Belum Lulus', message: "Serial Number {$sn} belum lulus QC Serah Terima. Silakan lakukan QC dari keranjang belanja.", type: 'warning');
+                        return;
+                    }
+                }
+            }
+        }
+
         if (!$this->selectedCustomerId && !$this->isNewCustomer) {
             $this->dispatch('toast', title: 'Customer Belum Dipilih', message: 'Pilih atau buat data customer terlebih dahulu.', type: 'warning');
             return;
@@ -1354,6 +1445,7 @@ class Pos extends Component
 
                 // Create Order
                 $order = Order::create([
+                    'business_unit_id' => Auth::user()->business_unit_id ?? 1,
                     'user_id' => $customerId,
                     'order_number' => $orderNumber,
                     'order_date' => $dateToUse->format('Y-m-d'),
@@ -1476,6 +1568,10 @@ class Pos extends Component
                 $hasSecond = collect($this->cart)->contains('is_second', true);
                 $dbSource = $hasSecond ? 'second' : 'syihab';
 
+                // Sesuaikan penamaan Cabang & Gudang untuk Accurate GSK
+                $accurateBranchName = $dbSource === 'second' ? 'GSK ' . $branchName : $branchName;
+                $accurateWarehouseName = $dbSource === 'second' ? 'GSK ' . $warehouseName : $warehouseName;
+
                 // Sync Customer to Accurate
                 $accurateService->syncCustomer($customerUser, $dbSource);
                 $customerUser->refresh();
@@ -1505,7 +1601,7 @@ class Pos extends Component
 
                         $itemData = [
                             'itemNo' => $item['sku'] ?: 'ITEM-UNKNOWN',
-                            'warehouseName' => $warehouseName,
+                            'warehouseName' => $accurateWarehouseName,
                             'unitPrice' => $item['price'],
                             'quantity' => $item['qty'],
                             'itemCashDiscount' => $item['discount_amount'] ?? 0,
@@ -1525,8 +1621,8 @@ class Pos extends Component
                     }
 
                     $siData = [
-                        'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
-                        'branchName' => $branchName,
+                        'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
+                        'branchName' => $accurateBranchName,
                         'detailItem' => $detailItems,
                         // 'cashDiscount' => $manualDiscountAmount,
                         'inclusiveTax' => true,
@@ -1564,7 +1660,7 @@ class Pos extends Component
                             $detailDiscounts[] = [
                                 'accountNo' => $rate->accurate_account_no,
                                 'amount' => (float) $rowMdr,
-                                'departmentName' => $branchName,
+                                'departmentName' => $accurateBranchName,
                                 'discountNotes' => 'MDR'
                             ];
                         }
@@ -1577,7 +1673,7 @@ class Pos extends Component
                                     $detailDiscounts[] = [
                                         'accountNo' => $promo->accurate_account_no,
                                         'amount' => (float) $promo->pivot->discount_applied,
-                                        'departmentName' => $branchName,
+                                        'departmentName' => $accurateBranchName,
                                         'discountNotes' => 'Promo: ' . $promo->name
                                     ];
                                     $promoDiscountsTotal += (float) $promo->pivot->discount_applied;
@@ -1596,8 +1692,8 @@ class Pos extends Component
                         }
 
                         $srData = [
-                            'customerNo' => $customerUser->accurate_customer_no ?? 'CASH',
-                            'branchName' => $branchName,
+                            'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
+                            'branchName' => $accurateBranchName,
                             'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
                             'receiptAmount' => (float) $netReceiptAmount, // Net cash ke bank
                             'chequeAmount' => (float) $netReceiptAmount,
@@ -1835,6 +1931,7 @@ class Pos extends Component
 
                 // Create Order
                 $order = Order::create([
+                    'business_unit_id' => Auth::user()->business_unit_id ?? 1,
                     'user_id' => $customerId,
                     'order_number' => $orderNumber,
                     'order_date'                => $dateToUse->format('Y-m-d'),

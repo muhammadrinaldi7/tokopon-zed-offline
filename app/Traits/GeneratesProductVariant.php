@@ -7,6 +7,8 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ProductAccurate;
+use App\Models\SecondProduct;
+use App\Models\SecondProductVariant;
 use Illuminate\Support\Str;
 
 trait GeneratesProductVariant
@@ -47,6 +49,39 @@ trait GeneratesProductVariant
             'storage' => $storage,
             'color' => $color ?: '-',
         ];
+    }
+
+    /**
+     * Deteksi kondisi HP (Second Inter / Second Resmi) dari nama item Accurate.
+     * Keyword: "INTER" → Second Inter, "RESMI" / default → Second Resmi
+     */
+    public function parseConditionFromName(string $name): string
+    {
+        $upperName = strtoupper($name);
+
+        if (str_contains($upperName, 'INTER')) {
+            return 'Second Inter';
+        }
+
+        // Default: jika ada kata RESMI atau tidak ada keyword khusus → Second Resmi
+        return 'Second Resmi';
+    }
+
+    /**
+     * Bersihkan parent name dari keyword kondisi (INTER, RESMI, IBOX, SECOND)
+     * agar nama produk induk bersih dan bisa di-group.
+     * Contoh: "IPHONE 15 PRO MAX INTER" → "IPHONE 15 PRO MAX"
+     */
+    public function cleanParentNameForSecond(string $parentName): string
+    {
+        // Hapus keyword kondisi dari nama (case-insensitive)
+        $cleaned = preg_replace('/\b(INTER|RESMI|IBOX|SECOND)\b/i', '', $parentName);
+
+        // Bersihkan spasi/dash ganda yang tersisa
+        $cleaned = preg_replace('/\s*-\s*-\s*/', ' - ', $cleaned);
+        $cleaned = preg_replace('/\s{2,}/', ' ', $cleaned);
+
+        return trim($cleaned, ' -');
     }
 
     /**
@@ -113,6 +148,83 @@ trait GeneratesProductVariant
             'message' => 'Variant berhasil di-generate',
             'product' => $product,
             'variant' => $variant
+        ];
+    }
+
+    /**
+     * Auto-generate SecondProduct dan SecondProductVariant dari data Accurate GSK.
+     * Digunakan saat admin klik "Generate Variant" di tab 'second'.
+     */
+    public function autoGenerateSecondProductAndVariant($itemNo, $accurateItem, $productAccurateId = null)
+    {
+        // 1. Validasi Tipe
+        if (($accurateItem['itemTypeName'] ?? '') !== 'Persediaan') {
+            return [
+                'success' => false,
+                'message' => 'Bukan Inventory Part (INVPART)'
+            ];
+        }
+
+        $itemName = $accurateItem['name'] ?? '';
+
+        // 2. Ambil Kategori dari Accurate
+        $categoryName = $accurateItem['itemCategory']['name'] ?? 'Uncategorized';
+        $category = Category::firstOrCreate(
+            ['slug' => Str::slug($categoryName)],
+            ['name' => $categoryName]
+        );
+
+        // 3. Ambil Brand dari Accurate
+        $brandName = $accurateItem['itemBrand']['name'] ?? 'Uncategorized';
+        $brand = Brand::firstOrCreate(
+            ['slug' => Str::slug($brandName)],
+            ['name' => $brandName]
+        );
+
+        // 4. Pecah Nama (Regex)
+        $parsedData = $this->parseItemName($itemName);
+
+        // 5. Deteksi kondisi (Second Inter / Second Resmi)
+        $condition = $this->parseConditionFromName($itemName);
+
+        // 6. Bersihkan nama parent dari keyword kondisi agar grouping produk rapi
+        $cleanParentName = $this->cleanParentNameForSecond($parsedData['parentName']);
+
+        // 7. Cari atau Buat Induk (SecondProduct)
+        $product = SecondProduct::firstOrCreate(
+            ['name' => $cleanParentName],
+            [
+                'category_id' => $category->id,
+                'brand_id' => $brand->id,
+                'slug' => Str::slug($cleanParentName),
+                'is_active' => true,
+                'description' => 'Auto-generated from Accurate GSK',
+                'has_active_accurate' => true,
+            ]
+        );
+
+        // 8. Buat atau Update Anak (SecondProductVariant)
+        $variant = SecondProductVariant::updateOrCreate(
+            ['sku' => $itemNo],
+            [
+                'second_product_id' => $product->id,
+                'condition_desc' => $condition,
+                'color' => $parsedData['color'],
+                'ram' => $parsedData['ram'],
+                'storage' => $parsedData['storage'],
+                'price' => (float) ($accurateItem['unitPrice'] ?? 0),
+                'buy_price' => (float) ($accurateItem['balanceUnitCost'] ?? 0),
+                'product_accurate_id' => $productAccurateId,
+                'has_sn' => true, // HP bekas selalu pakai SN/IMEI
+            ]
+        );
+
+        return [
+            'success' => true,
+            'message' => "Variant (SecondProduct) berhasil di-generate — Kondisi: {$condition}",
+            'product' => $product,
+            'variant' => $variant,
+            'condition' => $condition,
         ];
     }
 }

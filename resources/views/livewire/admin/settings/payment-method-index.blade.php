@@ -13,6 +13,20 @@
         </button>
     </div>
 
+    <!-- Tabs Navigasi Unit Usaha -->
+    <div class="mb-4 flex space-x-2 border-b border-gray-200">
+        <button wire:click="$set('activeTab', 'all')"
+            class="px-4 py-2 font-bold text-sm transition-colors {{ $activeTab === 'all' ? 'text-[#1c69d4] border-b-2 border-[#1c69d4]' : 'text-gray-500 hover:text-gray-700' }}">
+            Semua Unit
+        </button>
+        @foreach($businessUnits as $unit)
+            <button wire:click="$set('activeTab', {{ $unit->id }})"
+                class="px-4 py-2 font-bold text-sm transition-colors {{ $activeTab == $unit->id ? 'text-[#1c69d4] border-b-2 border-[#1c69d4]' : 'text-gray-500 hover:text-gray-700' }}">
+                {{ $unit->name }}
+            </button>
+        @endforeach
+    </div>
+
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <table class="w-full text-left border-collapse">
             <thead>
@@ -22,6 +36,7 @@
                     <th class="p-4">Detail Rekening</th>
                     {{-- <th class="p-4">MDR (%)</th> --}}
                     <th class="p-4">Accurate Bank No</th>
+                    <th class="p-4 text-center">Unit Usaha</th>
                     <th class="p-4 text-center">Status</th>
                     <th class="p-4 text-right">Aksi</th>
                 </tr>
@@ -54,6 +69,11 @@
                                         d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                 </svg>
                                 {{ $method->accurate_bank_no }}
+                            </span>
+                        </td>
+                        <td class="p-4 text-center">
+                            <span class="px-2 py-1 text-[10px] font-bold bg-blue-50 text-blue-600 rounded">
+                                {{ $method->businessUnit ? $method->businessUnit->name : 'N/A' }}
                             </span>
                         </td>
                         <td class="p-4 text-center">
@@ -120,15 +140,31 @@
                 </div>
 
                 <div class="p-6 space-y-4">
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1">Nama Tampilan <span
-                                class="text-rose-500">*</span></label>
-                        <input type="text" wire:model="name"
-                            class="w-full p-2 border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm"
-                            placeholder="Contoh: BCA Manual, Kasir Tunai, dll">
-                        @error('name')
-                            <span class="text-xs text-rose-500 mt-1">{{ $message }}</span>
-                        @enderror
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Nama Tampilan <span
+                                    class="text-rose-500">*</span></label>
+                            <input type="text" wire:model="name"
+                                class="w-full p-2 border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm"
+                                placeholder="Contoh: BCA Manual, Kasir Tunai, dll">
+                            @error('name')
+                                <span class="text-xs text-rose-500 mt-1">{{ $message }}</span>
+                            @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Unit Usaha <span
+                                    class="text-rose-500">*</span></label>
+                            <select wire:model.live="business_unit_id"
+                                class="w-full p-2 border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm">
+                                <option value="">-- Pilih Unit Usaha --</option>
+                                @foreach($businessUnits as $unit)
+                                    <option value="{{ $unit->id }}">{{ $unit->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('business_unit_id')
+                                <span class="text-xs text-rose-500 mt-1">{{ $message }}</span>
+                            @enderror
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
@@ -172,7 +208,12 @@
                         <select wire:model="accurate_bank_no"
                             class="w-full p-2 border-amber-200 rounded-lg focus:ring-amber-500 focus:border-amber-500 text-sm font-mono bg-white">
                             <option value="">-- Pilih Akun GL Accurate --</option>
-                            @foreach ($accurateGlAccounts as $gl)
+                            @php
+                                $selectedUnit = collect($businessUnits)->firstWhere('id', $business_unit_id);
+                                $unitCode = $selectedUnit ? $selectedUnit->code : null;
+                                $filteredGlAccounts = collect($accurateGlAccounts)->where('database_source', $unitCode);
+                            @endphp
+                            @foreach ($filteredGlAccounts as $gl)
                                 <option value="{{ $gl->account_no }}">{{ $gl->account_no }} - {{ $gl->name }}
                                 </option>
                             @endforeach

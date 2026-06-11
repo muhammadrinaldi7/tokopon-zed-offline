@@ -25,6 +25,16 @@
             </button>
 
             <div class="flex items-center gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+                <select wire:model.live="businessUnitFilter"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-gray-50">
+                    <option value="">Semua Unit Usaha</option>
+                    @foreach(\App\Models\BusinessUnit::where('is_active', true)->get() as $bu)
+                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                    @endforeach
+                </select>
+
+                <div class="h-6 w-px bg-gray-200"></div>
+
                 <select wire:model.live="brandFilter"
                     class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-gray-50">
                     <option value="">Semua Brand</option>

@@ -12,6 +12,7 @@ class StaffReport extends Component
     public $dateRange = 'this_month';
     public $startDate;
     public $endDate;
+    public $businessUnitFilter = '';
 
     public function mount()
     {
@@ -27,6 +28,7 @@ class StaffReport extends Component
 
     public function updatedStartDate() { $this->dateRange = 'custom'; }
     public function updatedEndDate() { $this->dateRange = 'custom'; }
+    public function updatedBusinessUnitFilter() { /* Trigger render */ }
 
     private function setDateRange()
     {
@@ -63,6 +65,9 @@ class StaffReport extends Component
         // Using eloquent collections due to JSON fields grouping complexity across databases
         $orders = Order::whereBetween('created_at', [$start, $end])
             ->where('order_status', 'COMPLETED')
+            ->when($this->businessUnitFilter, function ($query) {
+                $query->where('business_unit_id', $this->businessUnitFilter);
+            })
             ->with(['salesBy'])
             ->get();
 

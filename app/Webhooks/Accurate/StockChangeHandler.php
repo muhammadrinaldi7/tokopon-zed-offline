@@ -69,7 +69,9 @@ class StockChangeHandler implements WebhookHandlerInterface
     private function syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource): bool
     {
         // 1. Validasi DB Lokal: Pastikan Gudang ada di Laravel Anda
-        $warehouse = Warehouse::where('name', $warehouseName)->first();
+        // Handle 'GSK ' prefix from Accurate Second DB
+        $localWarehouseName = $dbSource === 'second' ? str_replace('GSK ', '', $warehouseName) : $warehouseName;
+        $warehouse = Warehouse::where('name', $localWarehouseName)->first();
         if (!$warehouse) return false;
 
         // 2. Validasi DB Lokal: Pastikan Varian (SKU) ada di Laravel Anda

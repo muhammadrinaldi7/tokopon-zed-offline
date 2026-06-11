@@ -27,14 +27,16 @@ class SerialNumberSyncService
         try {
             // Coba ambil dari db source 'syihab' (Produk Baru)
             $snData = $this->accurateService->getSerialNumberPerWarehouse($sku, 'syihab');
+            $databaseSource = 'syihab';
 
             // Jika kosong, mungkin dia barang bekas, coba ambil dari db source 'second'
             if (empty($snData)) {
                 $snData = $this->accurateService->getSerialNumberPerWarehouse($sku, 'second');
+                $databaseSource = 'second';
             }
 
             if (!empty($snData)) {
-                return $this->processSnData($sku, $snData);
+                return $this->processSnData($sku, $snData, $databaseSource);
             } else {
                 // Jika masih kosong, berarti SN tidak ada di kedua database
                 // Jika tadinya ada di DB lokal, kita set Unavailable semua
@@ -53,7 +55,7 @@ class SerialNumberSyncService
     /**
      * Memproses mapping dan upsert data SN ke database
      */
-    private function processSnData($sku, $accurateData)
+    private function processSnData($sku, $accurateData, $databaseSource = 'syihab')
     {
         // Ambil list Serial Number yang ada di DB lokal
         // Jangan gunakan pluck('id', 'serial_number') karena PHP akan mengubah key string angka menjadi integer,
@@ -77,7 +79,8 @@ class SerialNumberSyncService
             $serialNumberStr = (string) $serialNumberStr;
 
             // Cari ID gudang lokal berdasarkan ID gudang accurate
-            $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)->first();
+            $warehouseColumn = $databaseSource === 'second' ? 'second_warehouse_id' : 'warehouse_id';
+            $localWarehouse = Warehouse::where($warehouseColumn, $accurateWarehouseId)->first();
             $localWarehouseId = $localWarehouse ? $localWarehouse->id : null;
 
             $upsertData[] = [
@@ -187,7 +190,8 @@ class SerialNumberSyncService
 
                 $localWarehouseId = null;
                 if ($accurateWarehouseId) {
-                    $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)->first();
+                    $warehouseColumn = $databaseSource === 'second' ? 'second_warehouse_id' : 'warehouse_id';
+                    $localWarehouse = Warehouse::where($warehouseColumn, $accurateWarehouseId)->first();
                     if ($localWarehouse) {
                         $localWarehouseId = $localWarehouse->id;
                     }
@@ -203,8 +207,12 @@ class SerialNumberSyncService
                     // 3. Proses Update/Insert ke DB Lokal
                     $existingSn = ProductSerialNumber::where('serial_number', $sn)->first();
 
+                    // Tentukan qc_status
+                    $qcStatus = $databaseSource === 'second' ? 'Pending Inbound' : null;
+
                     if ($existingSn) {
                         // Jika sudah ada, update hpp dan vendor_id (biarkan statusnya tidak berubah)
+                        // Jangan ubah qc_status jika barang sudah ada (mungkin sudah di-QC)
                         $existingSn->update([
                             'hpp' => $hpp,
                             'vendor_id' => $localVendorId,
@@ -226,6 +234,7 @@ class SerialNumberSyncService
                             'vendor_id' => $localVendorId,
                             'status' => $finalStatus,
                             'receipt_date' => $receiptDate,
+                            'qc_status' => $qcStatus,
                         ]);
                         $updatedCount++;
                     }

@@ -205,29 +205,38 @@ class Show extends Component
 
             $product = null;
             if ($this->existingProductId) {
-                $product = \App\Models\Product::find($this->existingProductId);
+                $product = \App\Models\SecondProduct::find($this->existingProductId);
             } else {
-                $product = \App\Models\Product::firstOrCreate(
-                    ['name' => $productName, 'is_second' => true],
+                $brand = \App\Models\Brand::where('name', $this->sellPhone->phone_brand)->first();
+                $product = \App\Models\SecondProduct::firstOrCreate(
+                    ['name' => $productName],
                     [
                         'slug' => Str::slug($productName . ' Second ' . rand(100, 999)),
-                        'brand_id' => null,
+                        'brand_id' => $brand?->id,
                         'category_id' => \App\Models\Category::first()?->id,
-                        'description' => 'Produk unit seken / bekas pakai.',
+                        'description' => 'Produk unit seken / bekas pakai dari pembelian pelanggan.',
                         'is_active' => true,
                         'starting_price' => $this->sellPrice,
+                        'total_stock' => 0,
+                        'has_active_accurate' => true
                     ]
                 );
             }
 
-            $variant = ProductVariant::create([
-                'product_id' => $product->id,
+            // Generate SKU format for local secondary items
+            $sku = 'GSK-' . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT) . '-' . strtoupper(Str::random(3));
+
+            $variant = \App\Models\SecondProductVariant::create([
+                'second_product_id' => $product->id,
                 'sell_phone_id' => $this->sellPhone->id,
+                'sku' => $sku,
                 'storage' => $this->sellPhone->phone_storage ?? '-',
                 'color' => '-',
-                'condition' => $this->secondCondition,
+                'condition_desc' => $this->secondCondition,
                 'price' => $this->sellPrice,
+                'buy_price' => $this->sellPhone->appraised_value,
                 'stock' => 1,
+                'has_sn' => true
             ]);
 
             $warehouseId = Auth::user()->warehouse_id ?? \App\Models\Warehouse::first()?->id;
@@ -238,11 +247,24 @@ class Show extends Component
                     'variant_type' => get_class($variant),
                     'stock' => 1,
                 ]);
+
+                // Update denormalized total stock
+                $product->increment('total_stock');
+
+                // Create Serial Number
+                $imei = $this->sellPhone->imei ?? ('SN-SELL-' . $this->sellPhone->id);
+                \App\Models\ProductSerialNumber::create([
+                    'item_no' => $sku,
+                    'serial_number' => $imei,
+                    'warehouse_id' => $warehouseId,
+                    'status' => 'Available',
+                    'hpp' => $this->sellPhone->appraised_value,
+                ]);
             }
         });
 
         $this->convertModal = false;
-        $this->dispatch('toast', title: 'Berhasil', message: 'Unit HP lama masuk ke Katalog Second.', type: 'success');
+        $this->dispatch('toast', title: 'Berhasil', message: 'Unit HP lama masuk ke Katalog Second GSK.', type: 'success');
     }
 
     #[Layout('layouts.admin')]

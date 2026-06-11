@@ -16,6 +16,7 @@ class SalesReport extends Component
     public $endDate;
     public $search = '';
     public $branchFilter = '';
+    public $businessUnitFilter = '';
     public $csvSeparator = ';';
 
     public function mount()
@@ -46,6 +47,10 @@ class SalesReport extends Component
         $this->resetPage();
     }
     public function updatedBranchFilter()
+    {
+        $this->resetPage();
+    }
+    public function updatedBusinessUnitFilter()
     {
         $this->resetPage();
     }
@@ -99,6 +104,9 @@ class SalesReport extends Component
             })
             ->when($this->branchFilter, function ($query) {
                 $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
+            })
+            ->when($this->businessUnitFilter, function ($query) {
+                $query->where('orders.business_unit_id', $this->businessUnitFilter);
             })
             ->latest('orders.created_at');
     }

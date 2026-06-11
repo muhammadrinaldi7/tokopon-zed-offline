@@ -16,6 +16,7 @@ class PromoReport extends Component
     public $endDate;
     public $search = '';
     public $brandFilter = '';
+    public $businessUnitFilter = '';
 
     public function mount()
     {
@@ -45,6 +46,10 @@ class PromoReport extends Component
         $this->resetPage();
     }
     public function updatedBrandFilter()
+    {
+        $this->resetPage();
+    }
+    public function updatedBusinessUnitFilter()
     {
         $this->resetPage();
     }
@@ -103,6 +108,9 @@ class PromoReport extends Component
                 $query->whereHas('items.variant.product.brand', function ($q) {
                     $q->where('name', $this->brandFilter);
                 });
+            })
+            ->when($this->businessUnitFilter, function ($query) {
+                $query->where('business_unit_id', $this->businessUnitFilter);
             })
             ->latest();
     }
