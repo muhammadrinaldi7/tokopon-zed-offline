@@ -14,4 +14,14 @@ class BusinessUnit extends Model
         'accurate_secret_key',
         'is_active',
     ];
+
+    public function branches()
+    {
+        return $this->hasMany(Branch::class);
+    }
+
+    public function warehouses()
+    {
+        return $this->hasMany(Warehouse::class);
+    }
 }

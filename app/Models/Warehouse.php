@@ -12,4 +12,9 @@ class Warehouse extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
+    }
 }

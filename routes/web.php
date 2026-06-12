@@ -70,6 +70,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/orders', \App\Livewire\Admin\Orders\OrderManagement::class)->name('orders.management')->middleware('can:manage-orders');
     Route::get('/orders/import-draft', \App\Livewire\Admin\Orders\ImportDraft::class)->name('orders.import-draft')->middleware('can:manage-orders');
 
+    // Sales Order (Mini Accurate)
+    Route::prefix('sales-orders')->name('sales-orders.')->middleware('can:manage-orders')->group(function () {
+        Route::get('/', \App\Livewire\Admin\Orders\SalesOrder\Index::class)->name('index');
+        Route::get('/create', \App\Livewire\Admin\Orders\SalesOrder\Create::class)->name('create');
+        Route::get('/{order}', \App\Livewire\Admin\Orders\SalesOrder\Show::class)->name('show');
+    });
+
     // Reporting
     Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
         Route::get('/', Dashboard::class)->name('index');
