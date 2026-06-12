@@ -20,7 +20,7 @@ class ProductSerialNumber extends Model
             return $variant;
         }
 
-        return \App\Models\SecondProductVariant::with('product')->where('sku', $this->item_no)->first();
+        return \App\Models\SecondProductVariant::with('secondProduct')->where('sku', $this->item_no)->first();
     }
 
     public function vendor()

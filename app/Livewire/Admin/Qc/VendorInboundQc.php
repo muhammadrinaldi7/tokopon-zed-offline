@@ -13,6 +13,7 @@ class VendorInboundQc extends Component
     use WithPagination;
 
     public $search = '';
+    public $filterQcStatus = 'pending'; // pending, done, all
 
     // Data for modal
     public $selectedSnId = null;
@@ -22,6 +23,11 @@ class VendorInboundQc extends Component
     protected $listeners = ['qc-inspection-saved' => 'onInspectionSaved'];
 
     public function updatingSearch()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterQcStatus()
     {
         $this->resetPage();
     }
@@ -48,8 +54,13 @@ class VendorInboundQc extends Component
         $secondSkus = SecondProductVariant::pluck('sku')->toArray();
 
         $query = ProductSerialNumber::whereIn('item_no', $secondSkus)
-            ->where('qc_status', 'Pending Inbound')
             ->where('status', '!=', 'Sold');
+
+        if ($this->filterQcStatus === 'pending') {
+            $query->where('qc_status', 'Pending Inbound');
+        } elseif ($this->filterQcStatus === 'done') {
+            $query->where('qc_status', '!=', 'Pending Inbound');
+        }
 
         if ($this->search) {
             $query->where(function($q) {

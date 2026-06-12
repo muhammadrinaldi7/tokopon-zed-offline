@@ -7,10 +7,20 @@
         </div>
         <div class="flex items-center gap-3">
             @if ($syncStatus !== 'running')
-                <div class="flex items-center gap-2 mr-2">
-                    <label for="syncPage" class="text-sm font-medium text-gray-700">Mulai dari Hal:</label>
-                    <input type="number" id="syncPage" wire:model="syncCurrentPage" min="1"
-                        class="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4]">
+                <div class="flex items-center gap-3 mr-2">
+                    <div class="flex items-center gap-2">
+                        <label for="dbSource" class="text-sm font-medium text-gray-700">Database:</label>
+                        <select id="dbSource" wire:model="databaseSource" 
+                            class="w-28 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white cursor-pointer appearance-none">
+                            <option value="syihab">Syihab</option>
+                            <option value="second">GSK</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label for="syncPage" class="text-sm font-medium text-gray-700">Mulai Hal:</label>
+                        <input type="number" id="syncPage" wire:model="syncCurrentPage" min="1"
+                            class="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4]">
+                    </div>
                 </div>
             @endif
 
@@ -92,7 +102,16 @@
                     @forelse ($customers as $customer)
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="py-4 px-6 font-medium text-gray-900">
-                                {{ $customer->accurate_customer_no ?? '-' }}
+                                @if($customer->accurateCustomers->count() > 0)
+                                    @foreach($customer->accurateCustomers as $ac)
+                                        <div class="mb-1 text-xs">
+                                            <span class="font-bold text-[#1c69d4]">{{ $ac->accurate_customer_no }}</span>
+                                            <span class="bg-gray-100 text-gray-500 rounded px-1.5 py-0.5 ml-1">{{ $ac->businessUnit->code ?? '' }}</span>
+                                        </div>
+                                    @endforeach
+                                @else
+                                    -
+                                @endif
                             </td>
                             <td class="py-4 px-6 font-medium text-gray-800">
                                 {{ $customer->name }}

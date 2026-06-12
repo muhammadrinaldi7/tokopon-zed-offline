@@ -4,10 +4,15 @@
             <h1 class="text-2xl font-semibold text-gray-900">Antrean QC Inbound (Vendor)</h1>
             <p class="text-sm text-gray-500">Daftar produk second dari penerimaan barang (vendor) yang memerlukan Quality Control.</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-3">
+            <select wire:model.live="filterQcStatus" class="border border-gray-300 rounded-lg text-sm py-2 px-3 focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white cursor-pointer appearance-none">
+                <option value="pending">Belum QC (Antrean)</option>
+                <option value="done">Sudah QC</option>
+                <option value="all">Semua Produk</option>
+            </select>
             <div class="relative">
                 <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari IMEI / SKU..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] w-full">
+                <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari IMEI / SKU..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] w-full min-w-[200px]">
             </div>
         </div>
     </div>
@@ -37,18 +42,32 @@
                                 {{ $item->receipt_date ? \Carbon\Carbon::parse($item->receipt_date)->format('d M Y') : '-' }}
                             </td>
                             <td class="px-6 py-4">
-                                <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded border border-yellow-300">
-                                    {{ $item->qc_status }}
-                                </span>
+                                @if($item->qc_status === 'Pending Inbound')
+                                    <span class="bg-yellow-100 text-yellow-800 text-[11px] font-bold px-2.5 py-1 rounded border border-yellow-300 uppercase">
+                                        Antrean
+                                    </span>
+                                @elseif(str_contains(strtolower($item->qc_status), 'pass'))
+                                    <span class="bg-green-100 text-green-800 text-[11px] font-bold px-2.5 py-1 rounded border border-green-300 uppercase">
+                                        Lolos QC
+                                    </span>
+                                @else
+                                    <span class="bg-red-100 text-red-800 text-[11px] font-bold px-2.5 py-1 rounded border border-red-300 uppercase">
+                                        {{ $item->qc_status }}
+                                    </span>
+                                @endif
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <button type="button"
-                                    wire:click="openQcModal({{ $item->id }}, '{{ $item->serial_number }}')"
-                                    class="px-3 py-1.5 bg-[#1c69d4] text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition inline-flex items-center gap-1"
-                                >
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                                    Lakukan QC
-                                </button>
+                                @if($item->qc_status === 'Pending Inbound')
+                                    <button type="button"
+                                        wire:click="openQcModal({{ $item->id }}, '{{ $item->serial_number }}')"
+                                        class="px-3 py-1.5 bg-[#1c69d4] text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition inline-flex items-center gap-1 shadow-sm"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                                        Lakukan QC
+                                    </button>
+                                @else
+                                    <span class="text-xs text-gray-400 font-semibold italic border border-gray-200 px-3 py-1.5 rounded-lg bg-gray-50">Selesai</span>
+                                @endif
                             </td>
                         </tr>
                     @empty

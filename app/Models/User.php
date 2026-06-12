@@ -63,6 +63,28 @@ class User extends Authenticatable implements HasMedia
         return $pivot ? $pivot->accurate_customer_no : 'CASH';
     }
 
+    public function getAccurateCustomerNoAttribute()
+    {
+        $bu = \App\Models\BusinessUnit::find($this->getActiveBusinessUnitId());
+        $code = $bu ? $bu->code : 'syihab';
+        $pivot = $this->accurateCustomers()->whereHas('businessUnit', function ($q) use ($code) {
+            $q->where('code', $code);
+        })->first();
+
+        return $pivot ? $pivot->accurate_customer_no : null;
+    }
+
+    public function getAccurateCustomerIdAttribute()
+    {
+        $bu = \App\Models\BusinessUnit::find($this->getActiveBusinessUnitId());
+        $code = $bu ? $bu->code : 'syihab';
+        $pivot = $this->accurateCustomers()->whereHas('businessUnit', function ($q) use ($code) {
+            $q->where('code', $code);
+        })->first();
+
+        return $pivot ? $pivot->accurate_customer_id : null;
+    }
+
     public function accurateVendors()
     {
         return $this->hasMany(UserAccurateVendor::class);

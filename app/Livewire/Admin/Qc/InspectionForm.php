@@ -45,6 +45,23 @@ class InspectionForm extends Component
             $this->label = $label;
         }
 
+        // Auto-detect variant ID if not provided
+        if (!$this->secondProductVariantId) {
+            $model = $this->getInspectableModel();
+            if ($model) {
+                if ($model instanceof \App\Models\ProductSerialNumber) {
+                    $variant = $model->variant;
+                    if ($variant instanceof \App\Models\SecondProductVariant) {
+                        $this->secondProductVariantId = $variant->id;
+                    }
+                } elseif ($model instanceof \App\Models\SellPhone) {
+                    $this->secondProductVariantId = $model->second_product_variant_id ?? null;
+                } elseif ($model instanceof \App\Models\TradeIn) {
+                    $this->secondProductVariantId = $model->second_product_variant_id ?? null;
+                }
+            }
+        }
+
         $this->loadTemplate();
     }
 
