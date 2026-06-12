@@ -170,6 +170,7 @@ class CekStock extends Component
             // =========================================================================
             $groupedSns = \App\Models\ProductSerialNumber::with('vendor')
                 ->where('item_no', $variant->sku)
+                ->where('status', 'Available')
                 ->get()
                 ->groupBy('warehouse_id'); // Menghasilkan array dengan key berupa warehouse_id
 
