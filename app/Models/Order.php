@@ -44,6 +44,11 @@ class Order extends Model
         return $this->hasMany(OrderPayment::class);
     }
 
+    public function accurateDocs()
+    {
+        return $this->hasMany(OrderAccurateDoc::class);
+    }
+
     public function shipping()
     {
         // hasOne karena 1 order biasanya 1 pengiriman

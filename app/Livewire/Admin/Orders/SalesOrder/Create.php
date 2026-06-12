@@ -259,8 +259,8 @@ class Create extends Component
         try {
             DB::beginTransaction();
 
-            $businessUnit = BusinessUnit::find($this->business_unit_id);
-            $branchName = $businessUnit->name ?? 'Banjarbaru';
+            $handler = Auth::user();
+            $branchName = $handler->branch->name ?? 'Banjarbaru';
 
             // Create Order
             $order = Order::create([
@@ -302,8 +302,14 @@ class Create extends Component
                 $accurateService = app(AccurateService::class);
                 $customerUser = User::find($this->user_id);
                 $businessUnit = BusinessUnit::find($this->business_unit_id);
-                $branchName = $businessUnit->name ?? 'Banjarbaru';
                 $dbSource = $businessUnit ? $businessUnit->code : 'syihab';
+
+                // Check if we need to append GSK prefix for Accurate Second branch
+                // Accurate Second usually prefixes branch with "GSK " if it's not already there
+                $accurateBranchName = $branchName;
+                if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
+                    $accurateBranchName = 'GSK ' . $accurateBranchName;
+                }
 
                 // Sync Customer to Accurate
                 $accurateService->syncCustomer($customerUser, $dbSource);
@@ -325,7 +331,7 @@ class Create extends Component
 
                 $soData = [
                     'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
-                    'branchName' => $branchName,
+                    'branchName' => $accurateBranchName,
                     'transDate' => Carbon::parse($this->order_date)->format('d/m/Y'),
                     'detailItem' => $detailItems,
                     'inclusiveTax' => true,
@@ -338,6 +344,14 @@ class Create extends Component
                 
                 if (isset($soResult['r']['number'])) {
                     $order->update(['accurate_so_number' => $soResult['r']['number']]);
+                    \App\Models\OrderAccurateDoc::create([
+                        'order_id' => $order->id,
+                        'doc_type' => 'SALES_ORDER',
+                        'doc_number' => $soResult['r']['number'],
+                        'accurate_id' => $soResult['r']['id'] ?? null,
+                        'amount' => $this->grand_total,
+                        'status' => 'SUCCESS',
+                    ]);
                     Log::info('Berhasil Sync SO ke Accurate dengan Nomor: ' . $soResult['r']['number']);
                 }
             } catch (\Exception $e) {

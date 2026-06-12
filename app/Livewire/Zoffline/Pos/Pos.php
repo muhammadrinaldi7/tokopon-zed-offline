@@ -1641,6 +1641,14 @@ class Pos extends Component
                     $siResult = $accurateService->postSalesInvoice($siData, $dbSource);
                     if (isset($siResult['r']['number'])) {
                         $order->update(['accurate_invoice_no' => $siResult['r']['number']]);
+                        \App\Models\OrderAccurateDoc::create([
+                            'order_id' => $order->id,
+                            'doc_type' => 'SALES_INVOICE',
+                            'doc_number' => $siResult['r']['number'],
+                            'accurate_id' => $siResult['r']['id'] ?? null,
+                            'amount' => $this->grand_total,
+                            'status' => 'SUCCESS',
+                        ]);
                     }
                 }
 
@@ -1714,6 +1722,14 @@ class Pos extends Component
                         $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
                         if (isset($srResult['r']['number'])) {
                             $srNumbers[] = $srResult['r']['number'];
+                            \App\Models\OrderAccurateDoc::create([
+                                'order_id' => $order->id,
+                                'doc_type' => 'SALES_RECEIPT',
+                                'doc_number' => $srResult['r']['number'],
+                                'accurate_id' => $srResult['r']['id'] ?? null,
+                                'amount' => (float) $netReceiptAmount,
+                                'status' => 'SUCCESS',
+                            ]);
                         }
                     }
 

@@ -11,13 +11,20 @@
             <p class="text-gray-500 text-sm mt-1">SO Number: {{ $order->order_number }}</p>
         </div>
         
-        <div>
+        <div class="flex items-center gap-3">
             @if($this->getRemainingBalance() > 0)
                 <button type="button" wire:click="$set('showDpModal', true)" class="px-5 py-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold rounded-xl text-sm transition-colors shadow-sm flex items-center gap-2 border border-emerald-200">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                     Terima Pembayaran / DP
+                </button>
+            @elseif(!$order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->exists())
+                <button type="button" wire:click="prosesFakturLunas" wire:confirm="Anda yakin ingin mencairkan pesanan ini menjadi Faktur?" class="px-5 py-2.5 bg-[#1c69d4] text-white hover:bg-blue-700 font-bold rounded-xl text-sm transition-colors shadow-sm flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                    </svg>
+                    Jadikan Faktur (Lunas)
                 </button>
             @endif
         </div>
@@ -33,59 +40,184 @@
         </h3>
         
         <div class="flex items-center justify-start min-w-[800px] py-4">
-            {{-- Node 1: Sales Order --}}
-            <div class="relative group">
-                <div class="w-48 bg-[#eff6ff] border-2 border-[#1c69d4] rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
-                    <div class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider mb-1">Sales Order</div>
-                    <div class="text-xs font-bold text-gray-800 mb-1">{{ $order->order_number }}</div>
-                    <div class="text-[10px] text-gray-500">{{ $order->order_date ? $order->order_date->format('d/m/Y') : '-' }}</div>
+            
+            @php
+                $hasAccurateDocs = $order->accurateDocs->count() > 0;
+            @endphp
+
+            @if($hasAccurateDocs)
+                {{-- Node 1: Sales Order --}}
+                @php $soDoc = $order->accurateDocs->where('doc_type', 'SALES_ORDER')->first(); @endphp
+                <div class="relative group">
+                    <div class="w-48 bg-[#eff6ff] border-2 border-[#1c69d4] rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
+                        <div class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider mb-1">Sales Order</div>
+                        <div class="text-xs font-bold text-gray-800 mb-1">{{ $soDoc ? $soDoc->doc_number : $order->accurate_so_number }}</div>
+                        <div class="text-[10px] text-gray-500">{{ $soDoc ? $soDoc->created_at->format('d/m/Y H:i') : ($order->order_date ? $order->order_date->format('d/m/Y') : '-') }}</div>
+                    </div>
                 </div>
-            </div>
 
-            {{-- Line --}}
-            <div class="w-16 h-0.5 bg-gray-300 relative">
-                <div class="absolute right-0 -top-1.5 w-3 h-3 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
-            </div>
+                {{-- DPs --}}
+                @php $dpDocs = $order->accurateDocs->where('doc_type', 'DP_RECEIPT'); @endphp
+                @if($dpDocs->count() > 0)
+                    {{-- Line --}}
+                    <div class="w-16 h-0.5 bg-gray-300 relative">
+                        <div class="absolute right-0 -top-1.5 w-3 h-3 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
+                    </div>
 
-            {{-- Node 2: Down Payment / Payments --}}
-            <div class="flex flex-col gap-4">
-                @if($order->payments->count() > 0)
-                    @foreach($order->payments as $payment)
-                        <div class="flex items-center">
-                            <div class="relative group">
+                    <div class="flex flex-col gap-4">
+                        @foreach($dpDocs as $dp)
+                            <div class="relative group flex items-center">
                                 <div class="w-48 bg-emerald-50 border-2 border-emerald-500 rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
-                                    <div class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Pembayaran DP</div>
-                                    <div class="text-xs font-bold text-gray-800 mb-1">Rp {{ number_format($payment->amount, 0, ',', '.') }}</div>
-                                    <div class="text-[10px] text-gray-500">{{ $payment->payment_date ? \Carbon\Carbon::parse($payment->payment_date)->format('d/m/Y') : '-' }}</div>
-                                </div>
-                            </div>
-                            
-                            @if($loop->first)
-                                {{-- Line --}}
-                                <div class="w-16 h-0.5 bg-gray-300 relative">
-                                    <div class="absolute right-0 -top-1.5 w-3 h-3 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
+                                    <div class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Down Payment</div>
+                                    <div class="text-[10px] font-semibold text-emerald-800 mb-1">{{ $dp->doc_number }}</div>
+                                    <div class="text-xs font-bold text-gray-800 mb-1">Rp {{ number_format($dp->amount, 0, ',', '.') }}</div>
+                                    <div class="text-[10px] text-gray-500">{{ $dp->created_at->format('d/m/Y H:i') }}</div>
                                 </div>
                                 
-                                {{-- Node 3: Sales Invoice (Mock) --}}
+                                @if($loop->first)
+                                    @php $siDoc = $order->accurateDocs->where('doc_type', 'SALES_INVOICE')->first(); @endphp
+                                    {{-- Line --}}
+                                    <div class="w-16 h-0.5 bg-gray-300 relative">
+                                        <div class="absolute right-0 -top-1.5 w-3 h-3 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
+                                    </div>
+                                    
+                                    {{-- Node 3: Sales Invoice --}}
+                                    <div class="relative group">
+                                        @if($siDoc)
+                                            <div class="w-48 bg-purple-50 border-2 border-purple-500 rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
+                                                <div class="text-[10px] font-bold text-purple-600 uppercase tracking-wider mb-1">Sales Invoice</div>
+                                                <div class="text-[10px] font-semibold text-purple-800 mb-1">{{ $siDoc->doc_number }}</div>
+                                                <div class="text-xs font-bold text-gray-800 mb-1">Rp {{ number_format($siDoc->amount, 0, ',', '.') }}</div>
+                                                <div class="text-[10px] text-gray-500">{{ $siDoc->created_at->format('d/m/Y H:i') }}</div>
+                                            </div>
+                                        @else
+                                            <div class="w-48 bg-gray-50 border-2 border-gray-300 border-dashed rounded-xl p-4 text-center">
+                                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Sales Invoice</div>
+                                                <div class="text-xs font-bold text-gray-400 mb-1">Belum Terbit</div>
+                                                <div class="text-[10px] text-gray-400">Menunggu Pelunasan</div>
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    @if($siDoc)
+                                        @php $srDoc = $order->accurateDocs->where('doc_type', 'SALES_RECEIPT')->first(); @endphp
+                                        @if($srDoc)
+                                            {{-- Line --}}
+                                            <div class="w-16 h-0.5 bg-gray-300 relative">
+                                                <div class="absolute right-0 -top-1.5 w-3 h-3 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
+                                            </div>
+                                            
+                                            {{-- Node 4: Sales Receipt Lunas --}}
+                                            <div class="relative group">
+                                                <div class="w-48 bg-blue-50 border-2 border-blue-500 rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
+                                                    <div class="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Sales Receipt (Lunas)</div>
+                                                    <div class="text-[10px] font-semibold text-blue-800 mb-1">{{ $srDoc->doc_number }}</div>
+                                                    <div class="text-xs font-bold text-gray-800 mb-1">Rp {{ number_format($srDoc->amount, 0, ',', '.') }}</div>
+                                                    <div class="text-[10px] text-gray-500">{{ $srDoc->created_at->format('d/m/Y H:i') }}</div>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    @endif
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    {{-- No DP yet --}}
+                    {{-- Line --}}
+                    <div class="w-16 h-0.5 bg-gray-300 relative">
+                        <div class="absolute right-0 -top-1.5 w-3 h-3 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
+                    </div>
+
+                    @php $siDoc = $order->accurateDocs->where('doc_type', 'SALES_INVOICE')->first(); @endphp
+                    @if($siDoc)
+                        <div class="w-48 bg-purple-50 border-2 border-purple-500 rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
+                            <div class="text-[10px] font-bold text-purple-600 uppercase tracking-wider mb-1">Sales Invoice</div>
+                            <div class="text-[10px] font-semibold text-purple-800 mb-1">{{ $siDoc->doc_number }}</div>
+                            <div class="text-xs font-bold text-gray-800 mb-1">Rp {{ number_format($siDoc->amount, 0, ',', '.') }}</div>
+                            <div class="text-[10px] text-gray-500">{{ $siDoc->created_at->format('d/m/Y H:i') }}</div>
+                        </div>
+
+                        @php $srDoc = $order->accurateDocs->where('doc_type', 'SALES_RECEIPT')->first(); @endphp
+                        @if($srDoc)
+                            {{-- Line --}}
+                            <div class="w-16 h-0.5 bg-gray-300 relative">
+                                <div class="absolute right-0 -top-1.5 w-3 h-3 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
+                            </div>
+                            
+                            {{-- Node 4: Sales Receipt Lunas --}}
+                            <div class="relative group">
+                                <div class="w-48 bg-blue-50 border-2 border-blue-500 rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
+                                    <div class="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Sales Receipt (Lunas)</div>
+                                    <div class="text-[10px] font-semibold text-blue-800 mb-1">{{ $srDoc->doc_number }}</div>
+                                    <div class="text-xs font-bold text-gray-800 mb-1">Rp {{ number_format($srDoc->amount, 0, ',', '.') }}</div>
+                                    <div class="text-[10px] text-gray-500">{{ $srDoc->created_at->format('d/m/Y H:i') }}</div>
+                                </div>
+                            </div>
+                        @endif
+                    @else
+                        <div class="relative group">
+                            <div class="w-48 bg-gray-50 border-2 border-gray-300 border-dashed rounded-xl p-4 text-center">
+                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Uang Muka (DP)</div>
+                                <div class="text-xs font-bold text-gray-400 mb-1">Belum Ada Pembayaran</div>
+                            </div>
+                        </div>
+                    @endif
+                @endif
+            @else
+                {{-- Fallback for Old Orders without accurateDocs --}}
+                <div class="relative group">
+                    <div class="w-48 bg-[#eff6ff] border-2 border-[#1c69d4] rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
+                        <div class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider mb-1">Sales Order</div>
+                        <div class="text-xs font-bold text-gray-800 mb-1">{{ $order->order_number }}</div>
+                        <div class="text-[10px] text-gray-500">{{ $order->order_date ? $order->order_date->format('d/m/Y') : '-' }}</div>
+                    </div>
+                </div>
+
+                {{-- Line --}}
+                <div class="w-16 h-0.5 bg-gray-300 relative">
+                    <div class="absolute right-0 -top-1.5 w-3 h-3 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
+                </div>
+
+                <div class="flex flex-col gap-4">
+                    @if($order->payments->count() > 0)
+                        @foreach($order->payments as $payment)
+                            <div class="flex items-center">
                                 <div class="relative group">
-                                    <div class="w-48 bg-gray-50 border-2 border-gray-300 border-dashed rounded-xl p-4 text-center">
-                                        <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Sales Invoice</div>
-                                        <div class="text-xs font-bold text-gray-400 mb-1">Belum Terbit</div>
-                                        <div class="text-[10px] text-gray-400">Menunggu Pelunasan</div>
+                                    <div class="w-48 bg-emerald-50 border-2 border-emerald-500 rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
+                                        <div class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Pembayaran DP</div>
+                                        <div class="text-xs font-bold text-gray-800 mb-1">Rp {{ number_format($payment->amount, 0, ',', '.') }}</div>
+                                        <div class="text-[10px] text-gray-500">{{ $payment->payment_date ? \Carbon\Carbon::parse($payment->payment_date)->format('d/m/Y') : '-' }}</div>
                                     </div>
                                 </div>
-                            @endif
+                                
+                                @if($loop->first)
+                                    {{-- Line --}}
+                                    <div class="w-16 h-0.5 bg-gray-300 relative">
+                                        <div class="absolute right-0 -top-1.5 w-3 h-3 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
+                                    </div>
+                                    
+                                    {{-- Node 3: Sales Invoice (Mock) --}}
+                                    <div class="relative group">
+                                        <div class="w-48 bg-gray-50 border-2 border-gray-300 border-dashed rounded-xl p-4 text-center">
+                                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Sales Invoice</div>
+                                            <div class="text-xs font-bold text-gray-400 mb-1">Belum Terbit</div>
+                                            <div class="text-[10px] text-gray-400">Menunggu Pelunasan</div>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    @else
+                        <div class="relative group">
+                            <div class="w-48 bg-gray-50 border-2 border-gray-300 border-dashed rounded-xl p-4 text-center">
+                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Uang Muka (DP)</div>
+                                <div class="text-xs font-bold text-gray-400 mb-1">Belum Ada Pembayaran</div>
+                            </div>
                         </div>
-                    @endforeach
-                @else
-                    <div class="relative group">
-                        <div class="w-48 bg-gray-50 border-2 border-gray-300 border-dashed rounded-xl p-4 text-center">
-                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Uang Muka (DP)</div>
-                            <div class="text-xs font-bold text-gray-400 mb-1">Belum Ada Pembayaran</div>
-                        </div>
-                    </div>
-                @endif
-            </div>
+                    @endif
+                </div>
+            @endif
         </div>
     </div>
 
