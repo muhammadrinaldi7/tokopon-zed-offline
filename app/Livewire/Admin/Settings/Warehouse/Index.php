@@ -16,6 +16,8 @@ class Index extends Component
     public $search = '';
     public $warehouse = [];
     public $branch = [];
+    public $businessUnits = [];
+    public $activeTab = null;
     public function getWarehouse()
     {
         try {
@@ -33,20 +35,21 @@ class Index extends Component
             $service = new AccurateService();
             $syihabBranch = $service->getBranchList('syihab');
             $secondBranch = $service->getBranchList('second');
+            $syihabUnitId = \App\Models\BusinessUnit::where('code', 'syihab')->value('id');
+            $secondUnitId = \App\Models\BusinessUnit::where('code', 'second')->value('id');
 
             // Map Syihab branches
             foreach ($syihabBranch['d'] as $item) {
                 Branch::updateOrCreate(
-                    ['name' => $item['name']],
+                    ['name' => $item['name'], 'business_unit_id' => $syihabUnitId],
                     ['branch_id' => $item['id']]
                 );
             }
 
-            // Map Second branches (Strip "GSK " prefix)
+            // Map Second branches
             foreach ($secondBranch['d'] as $item) {
-                $localName = str_replace('GSK ', '', $item['name']);
                 Branch::updateOrCreate(
-                    ['name' => $localName],
+                    ['name' => $item['name'], 'business_unit_id' => $secondUnitId],
                     ['second_branch_id' => $item['id']]
                 );
             }
@@ -64,20 +67,21 @@ class Index extends Component
             $service = new AccurateService();
             $syihabWarehouse = $service->getWarehouseList('syihab');
             $secondWarehouse = $service->getWarehouseList('second');
+            $syihabUnitId = \App\Models\BusinessUnit::where('code', 'syihab')->value('id');
+            $secondUnitId = \App\Models\BusinessUnit::where('code', 'second')->value('id');
 
             // Map Syihab warehouses
             foreach ($syihabWarehouse['d'] as $item) {
                 Warehouse::updateOrCreate(
-                    ['name' => $item['name']],
+                    ['name' => $item['name'], 'business_unit_id' => $syihabUnitId],
                     ['warehouse_id' => $item['id']]
                 );
             }
 
-            // Map Second warehouses (Strip "GSK " prefix)
+            // Map Second warehouses
             foreach ($secondWarehouse['d'] as $item) {
-                $localName = str_replace('GSK ', '', $item['name']);
                 Warehouse::updateOrCreate(
-                    ['name' => $localName],
+                    ['name' => $item['name'], 'business_unit_id' => $secondUnitId],
                     ['second_warehouse_id' => $item['id']]
                 );
             }
@@ -93,6 +97,10 @@ class Index extends Component
     {
         $this->warehouse = Warehouse::all();
         $this->branch = Branch::all();
+        $this->businessUnits = \App\Models\BusinessUnit::all();
+        if (!$this->activeTab && count($this->businessUnits) > 0) {
+            $this->activeTab = $this->businessUnits[0]->id;
+        }
     }
     public function mount()
     {

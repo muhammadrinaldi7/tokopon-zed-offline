@@ -5,6 +5,16 @@
         <p class="text-gray-500 mt-1">Daftar Branch.</p>
     </div> --}}
 
+    {{-- Tabs --}}
+    <div class="flex gap-4 border-b border-gray-200 mb-6 px-2">
+        @foreach($businessUnits as $bu)
+            <button wire:click="$set('activeTab', {{ $bu->id }})" 
+                class="px-4 py-3 font-bold text-sm transition-colors border-b-2 {{ $activeTab == $bu->id ? 'border-[#1c69d4] text-[#1c69d4]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+                {{ $bu->name }}
+            </button>
+        @endforeach
+    </div>
+
     {{-- Main Settings Box --}}
     <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 max-w-3xl">
         <div class="flex flex-col md:flex-row justify-between items-center mb-4">
@@ -23,17 +33,16 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                    @forelse ($warehouse as $item)
+                    @forelse ($warehouse->where('business_unit_id', $activeTab) as $item)
                         <tr class="hover:bg-gray-50 transition">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center gap-2">
-                                    <span class="font-bold text-gray-900">{{ $item['name'] }}</span>
+                                    <span class="font-bold text-gray-900">{{ $item->name }}</span>
                                     <div class="flex gap-1">
-                                        @if($item['warehouse_id'])
-                                            <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded">Syihab</span>
-                                        @endif
-                                        @if($item['second_warehouse_id'])
-                                            <span class="bg-green-100 text-green-800 text-[10px] font-bold px-1.5 py-0.5 rounded">GSK</span>
+                                        @if($item->businessUnit)
+                                            <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded">{{ $item->businessUnit->name }}</span>
+                                        @else
+                                            <span class="bg-gray-100 text-gray-800 text-[10px] font-bold px-1.5 py-0.5 rounded">Unassigned</span>
                                         @endif
                                     </div>
                                 </div>
@@ -80,17 +89,16 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                    @forelse ($branch as $item)
+                    @forelse ($branch->where('business_unit_id', $activeTab) as $item)
                         <tr class="hover:bg-gray-50 transition">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center gap-2">
-                                    <span class="font-bold text-gray-900">{{ $item['name'] }}</span>
+                                    <span class="font-bold text-gray-900">{{ $item->name }}</span>
                                     <div class="flex gap-1">
-                                        @if($item['branch_id'])
-                                            <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded">Syihab</span>
-                                        @endif
-                                        @if($item['second_branch_id'])
-                                            <span class="bg-green-100 text-green-800 text-[10px] font-bold px-1.5 py-0.5 rounded">GSK</span>
+                                        @if($item->businessUnit)
+                                            <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded">{{ $item->businessUnit->name }}</span>
+                                        @else
+                                            <span class="bg-gray-100 text-gray-800 text-[10px] font-bold px-1.5 py-0.5 rounded">Unassigned</span>
                                         @endif
                                     </div>
                                 </div>
