@@ -176,6 +176,8 @@ class PaymentMethodIndex extends Component
     {
         if ($this->selectedPaymentMethodForRates) {
             $this->rates = PaymentMethodRate::where('payment_method_id', $this->selectedPaymentMethodForRates->id)->get();
+            $dbSource = $this->selectedPaymentMethodForRates->businessUnit->code ?? 'syihab';
+            $this->accurateGlAccounts = \App\Models\AccurateGlAccount::where('database_source', $dbSource)->get();
         }
     }
 

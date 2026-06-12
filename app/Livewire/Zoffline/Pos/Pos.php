@@ -593,7 +593,6 @@ class Pos extends Component
     // public function paymentMethods()
     // {
     //     return PaymentMethod::where('is_active', true)->get();
-
     // }
     #[Computed]
     public function paymentMethods()

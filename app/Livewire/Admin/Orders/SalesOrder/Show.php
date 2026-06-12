@@ -243,7 +243,9 @@ class Show extends Component
     public function render()
     {
         return view('livewire.admin.orders.sales-order.show', [
-            'paymentMethods' => PaymentMethod::where('is_active', true)->get()
+            'paymentMethods' => PaymentMethod::where('is_active', true)
+                ->where('business_unit_id', $this->order->business_unit_id)
+                ->get()
         ])->layout('layouts.admin');
     }
 }
