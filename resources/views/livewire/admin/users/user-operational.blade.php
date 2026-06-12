@@ -29,6 +29,13 @@
                 terdaftar.</p>
         </div>
         <div class="flex items-center gap-3">
+            <select wire:model.live="filterBusinessUnitId"
+                class="w-full md:w-auto bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all appearance-none cursor-pointer">
+                <option value="">Semua Unit Usaha</option>
+                @foreach ($businessUnits as $bu)
+                    <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                @endforeach
+            </select>
             <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari nama atau email..."
                 class="w-full md:w-72 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all">
             <button wire:click="openCreateModal"
@@ -49,6 +56,7 @@
                     <tr>
                         <th class="px-6 py-4">Pengguna</th>
                         <th class="px-6 py-4">Email</th>
+                        <th class="px-6 py-4">Unit Usaha</th>
                         <th class="px-6 py-4">Role / Akses</th>
                         <th class="px-6 py-4">Branch/Warehouse</th>
                         <th class="px-6 py-4 text-right">Aksi</th>
@@ -65,6 +73,9 @@
                                 {{ $user->name }}
                             </td>
                             <td class="px-6 py-4">{{ $user->email }}</td>
+                            <td class="px-6 py-4 text-gray-700 font-medium">
+                                {{ $user->businessUnit->name ?? '-' }}
+                            </td>
                             <td class="px-6 py-4">
                                 <div class="flex flex-wrap gap-1.5">
                                     @forelse($user->roles as $role)
@@ -159,7 +170,47 @@
                             </div>
                         </div>
 
-                        <div class="space-y-1">
+                        <div class="space-y-4 mb-6">
+                            {{-- Unit Usaha --}}
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Penugasan Unit Usaha <span class="text-rose-500">*</span></label>
+                                <select wire:model.live="createBusinessUnitId"
+                                    class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all appearance-none cursor-pointer">
+                                    <option value="">-- Pilih Unit Usaha --</option>
+                                    @foreach ($businessUnits as $bu)
+                                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                {{-- Cabang / Branch --}}
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Cabang</label>
+                                    <select wire:model="createBranchId"
+                                        class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all appearance-none cursor-pointer">
+                                        <option value="">-- Pilih Cabang --</option>
+                                        @foreach ($branches as $branch)
+                                            <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                
+                                {{-- Gudang / Warehouse --}}
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Gudang</label>
+                                    <select wire:model="createWarehouseId"
+                                        class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all appearance-none cursor-pointer">
+                                        <option value="">-- Pilih Gudang --</option>
+                                        @foreach ($warehouses as $warehouse)
+                                            <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1 border-t border-gray-100 pt-4">
                             <label class="block text-sm font-semibold text-gray-700 mb-3">Pilih Role
                                 (Multi-select)</label>
 
@@ -271,8 +322,53 @@
                             </div>
                         </div>
 
-                        {{-- Role Selection --}}
+                        {{-- Location Assigments --}}
                         <div class="pt-2 border-t border-gray-100">
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">Penugasan Lokasi</label>
+                            
+                            <div class="space-y-3 mb-4">
+                                {{-- Unit Usaha --}}
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Unit Usaha <span class="text-rose-500">*</span></label>
+                                    <select wire:model.live="createBusinessUnitId" required
+                                        class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all appearance-none cursor-pointer">
+                                        <option value="">-- Pilih Unit Usaha --</option>
+                                        @foreach ($businessUnits as $bu)
+                                            <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3">
+                                    {{-- Cabang / Branch --}}
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">Cabang</label>
+                                        <select wire:model="createBranchId" required
+                                            class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all appearance-none cursor-pointer">
+                                            <option value="">-- Pilih Cabang --</option>
+                                            @foreach ($branches as $branch)
+                                                <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    
+                                    {{-- Gudang / Warehouse --}}
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">Gudang</label>
+                                        <select wire:model="createWarehouseId" required
+                                            class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all appearance-none cursor-pointer">
+                                            <option value="">-- Pilih Gudang --</option>
+                                            @foreach ($warehouses as $warehouse)
+                                                <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Role Selection --}}
+                        <div class="pt-4 border-t border-gray-100">
                             <label class="block text-sm font-semibold text-gray-700 mb-3">Assign Role <span class="text-rose-500">*</span></label>
                             @error('selectedCreateRoles')
                                 <span class="text-xs text-rose-500 font-medium mb-2 block">{{ $message }}</span>

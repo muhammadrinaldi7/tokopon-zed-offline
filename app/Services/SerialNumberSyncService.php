@@ -22,30 +22,40 @@ class SerialNumberSyncService
      * @param string $sku
      * @return int Jumlah Serial Number yang disinkronisasi
      */
-    public function syncFromAccurate($sku)
+    public function syncFromAccurate($sku, $databaseSource = null)
     {
         try {
-            // Coba ambil dari db source 'syihab' (Produk Baru)
-            $snData = $this->accurateService->getSerialNumberPerWarehouse($sku, 'syihab');
-            $databaseSource = 'syihab';
-
-            // Jika kosong, mungkin dia barang bekas, coba ambil dari db source 'second'
-            if (empty($snData)) {
-                $snData = $this->accurateService->getSerialNumberPerWarehouse($sku, 'second');
-                $databaseSource = 'second';
-            }
-
-            if (!empty($snData)) {
-                return $this->processSnData($sku, $snData, $databaseSource);
+            $sources = [];
+            if ($databaseSource) {
+                $sources[] = $databaseSource;
             } else {
-                // Jika masih kosong, berarti SN tidak ada di kedua database
-                // Jika tadinya ada di DB lokal, kita set Unavailable semua
-                ProductSerialNumber::where('item_no', $sku)
-                    ->where('status', 'Available')
-                    ->update(['status' => 'Unavailable']);
-
-                return 0;
+                $sources = \App\Models\BusinessUnit::where('is_active', true)->pluck('code')->toArray();
             }
+
+            foreach ($sources as $source) {
+                $snData = null;
+                try {
+                    $snData = $this->accurateService->getSerialNumberPerWarehouse($sku, $source);
+                } catch (\Exception $e) {
+                    // Ignore error and continue to next source if one fails
+                    Log::warning("Failed to fetch SN for SKU {$sku} from source {$source}: " . $e->getMessage());
+                    continue;
+                }
+
+                if (!empty($snData)) {
+                    // If we found data in one source, process it and return early 
+                    // (Assuming a SKU belongs to one source/DB primarily)
+                    return $this->processSnData($sku, $snData, $source);
+                }
+            }
+
+            // Jika masih kosong setelah cek semua source, berarti SN tidak ada
+            // Jika tadinya ada di DB lokal, kita set Unavailable semua
+            ProductSerialNumber::where('item_no', $sku)
+                ->where('status', 'Available')
+                ->update(['status' => 'Unavailable']);
+
+            return 0;
         } catch (\Exception $e) {
             Log::error("Failed to sync SN for SKU {$sku}: " . $e->getMessage());
             throw $e;
@@ -248,23 +258,25 @@ class SerialNumberSyncService
         }
     }
 
-    public function syncHppFromNearestCost($itemNo)
+    public function syncHppFromNearestCost($itemNo, $databaseSource = null)
     {
         try {
-            // Coba ambil dari db source 'syihab' (Produk Baru)
-            $costData = null;
-            try {
-                $costData = $this->accurateService->getNearestCost($itemNo, 'syihab');
-            } catch (\Exception $e) {
-                // ignore
+            $sources = [];
+            if ($databaseSource) {
+                $sources[] = $databaseSource;
+            } else {
+                $sources = \App\Models\BusinessUnit::where('is_active', true)->pluck('code')->toArray();
             }
 
-            if (!$costData) {
-                // Coba ambil dari db source 'second' (Produk Bekas)
+            $costData = null;
+            foreach ($sources as $source) {
                 try {
-                    $costData = $this->accurateService->getNearestCost($itemNo, 'second');
+                    $costData = $this->accurateService->getNearestCost($itemNo, $source);
+                    if ($costData !== null) {
+                        break;
+                    }
                 } catch (\Exception $e) {
-                    // ignore
+                    // ignore and try next
                 }
             }
 

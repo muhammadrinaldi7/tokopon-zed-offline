@@ -23,6 +23,13 @@ class SerialNumberSync extends Component
     public $processedItems = 0;
     public $currentItem = '';
     public $logs = [];
+    public $businessUnitId = '';
+    public $businessUnits = [];
+
+    public function mount()
+    {
+        $this->businessUnits = \App\Models\BusinessUnit::where('is_active', true)->get();
+    }
 
     #[Layout('layouts.admin')]
     public function render()
@@ -76,7 +83,11 @@ class SerialNumberSync extends Component
 
         try {
             $service = app(\App\Services\SerialNumberSyncService::class);
-            $snCount = $service->syncFromAccurate($sku);
+            $sourceCode = null;
+            if ($this->businessUnitId) {
+                $sourceCode = \App\Models\BusinessUnit::find($this->businessUnitId)?->code;
+            }
+            $snCount = $service->syncFromAccurate($sku, $sourceCode);
             
             if ($snCount > 0) {
                 $this->addLog("[$sku] Tersinkronisasi $snCount Serial Number.");
@@ -104,17 +115,25 @@ class SerialNumberSync extends Component
 
         try {
             $accurateService = app(\App\Services\AccurateService::class);
-            // Kumpulkan id receive item dari source pertama
-            $syihabIds = $accurateService->getReceiveItemList('syihab');
-            // Kumpulkan id receive item dari source kedua (jika dipakai)
-            $secondIds = $accurateService->getReceiveItemList('second');
+            
+            $sources = [];
+            if ($this->businessUnitId) {
+                $bu = \App\Models\BusinessUnit::find($this->businessUnitId);
+                if ($bu) $sources[] = $bu->code;
+            } else {
+                $sources = \App\Models\BusinessUnit::where('is_active', true)->pluck('code')->toArray();
+            }
 
-            // Format data ke dalam array assosiatif untuk menyimpan id dan source-nya
-            $syihabData = array_map(function($id) { return ['id' => $id, 'source' => 'syihab']; }, $syihabIds);
-            $secondData = array_map(function($id) { return ['id' => $id, 'source' => 'second']; }, $secondIds);
+            foreach ($sources as $source) {
+                try {
+                    $ids = $accurateService->getReceiveItemList($source);
+                    $data = array_map(function($id) use ($source) { return ['id' => $id, 'source' => $source]; }, $ids);
+                    $this->itemsToSync = array_merge($this->itemsToSync, $data);
+                } catch (\Exception $e) {
+                    $this->addLog("Gagal ambil receive item dari {$source}: " . $e->getMessage());
+                }
+            }
 
-            // Gabungkan
-            $this->itemsToSync = array_merge($syihabData, $secondData);
             $this->totalItems = count($this->itemsToSync);
 
             if ($this->totalItems == 0) {
@@ -213,7 +232,11 @@ class SerialNumberSync extends Component
 
         try {
             $service = app(\App\Services\SerialNumberSyncService::class);
-            $updatedCount = $service->syncHppFromNearestCost($itemNo);
+            $sourceCode = null;
+            if ($this->businessUnitId) {
+                $sourceCode = \App\Models\BusinessUnit::find($this->businessUnitId)?->code;
+            }
+            $updatedCount = $service->syncHppFromNearestCost($itemNo, $sourceCode);
             
             if ($updatedCount > 0) {
                 $this->addLog("[{$itemNo}] Berhasil update $updatedCount data HPP.");

@@ -30,8 +30,6 @@ class User extends Authenticatable implements HasMedia
         'identity',
         'npwp',
         'business_unit_id',
-        'accurate_vendor_id',
-        'accurate_vendor_no',
         'warehouse_id',
         'branch_id'
     ];
@@ -39,6 +37,14 @@ class User extends Authenticatable implements HasMedia
     public function businessUnit()
     {
         return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function getActiveBusinessUnitId()
+    {
+        if ($this->hasAnyRole(['superadmin', 'admin', 'director'])) {
+            return session('active_business_unit_id', $this->business_unit_id);
+        }
+        return $this->business_unit_id;
     }
 
     public function accurateCustomers()
@@ -55,6 +61,22 @@ class User extends Authenticatable implements HasMedia
             ->first();
 
         return $pivot ? $pivot->accurate_customer_no : 'CASH';
+    }
+
+    public function accurateVendors()
+    {
+        return $this->hasMany(UserAccurateVendor::class);
+    }
+
+    public function getAccurateVendorNo($businessUnitCode = 'syihab')
+    {
+        $pivot = $this->accurateVendors()
+            ->whereHas('businessUnit', function ($q) use ($businessUnitCode) {
+                $q->where('code', $businessUnitCode);
+            })
+            ->first();
+
+        return $pivot ? $pivot->accurate_vendor_no : null;
     }
 
     /**

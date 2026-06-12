@@ -18,8 +18,14 @@ class Employe extends Model
         'position',
         'is_active',
         'user_id',
-        'branch_id'
+        'branch_id',
+        'business_unit_id'
     ];
+
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
+    }
 
     public function scopeActive($query)
     {

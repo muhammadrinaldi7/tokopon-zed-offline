@@ -23,6 +23,9 @@ class EmployeManage extends Component
     public $editingEmployee = null;
     public $selectedUserId = null; // Menyimpan ID user yang dikaitkan ke karyawan
 
+    public $syncBusinessUnitId = '';
+    public $filterBusinessUnitId = '';
+
     public function updatingSearch()
     {
         $this->resetPage();
@@ -37,43 +40,58 @@ class EmployeManage extends Component
 
         try {
             $service = app(AccurateService::class);
-            // Panggil service untuk mengambil list karyawan dari API Accurate
-            $response = $service->getEmployees(); // Pastikan method ini ada di AccurateService Anda
+            
+            $sources = [];
+            if ($this->syncBusinessUnitId) {
+                $bu = \App\Models\BusinessUnit::find($this->syncBusinessUnitId);
+                if ($bu) $sources[] = $bu;
+            } else {
+                $sources = \App\Models\BusinessUnit::where('is_active', true)->get();
+            }
 
-            if (empty($response)) {
-                $this->dispatch('admin-alert', type: 'error', message: 'Gagal mengambil data atau tidak ada data karyawan di Accurate.');
+            if (empty($sources)) {
+                $this->dispatch('admin-alert', type: 'error', message: 'Tidak ada unit usaha yang dipilih atau aktif.');
                 $this->isLoading = false;
                 return;
             }
 
             $syncedCount = 0;
 
-            foreach ($response as $emp) {
-                $localBranchId = null;
-                if (!empty($emp['branchId'])) {
-                    $branch = \App\Models\Branch::where('branch_id', $emp['branchId'])->first();
-                    if ($branch) {
-                        $localBranchId = $branch->id;
-                    }
-                } else {
-                    $localBranchId = 6;
+            foreach ($sources as $bu) {
+                $response = $service->getEmployees($bu->code);
+
+                if (empty($response)) {
+                    continue;
                 }
 
-                Employe::updateOrCreate(
-                    [
-                        'accurate_employee_id' => $emp['id'],
-                    ],
-                    [
-                        'employee_no'  => $emp['number'] ?? null,
-                        'name'         => $emp['name'],
-                        'email'        => $emp['email'] ?? null,
-                        'phone_number' => $emp['mobilePhone'] ?? null,
-                        'position'     => $emp['workPositionName'] ?? null,
-                        'is_active'    => !($emp['suspended'] ?? false), // suspended true = tidak aktif
-                        'branch_id'    => $localBranchId,
-                    ]
-                );
-                $syncedCount++;
+                foreach ($response as $emp) {
+                    $localBranchId = null;
+                    if (!empty($emp['branchId'])) {
+                        $branch = \App\Models\Branch::where('branch_id', $emp['branchId'])->first();
+                        if ($branch) {
+                            $localBranchId = $branch->id;
+                        }
+                    } else {
+                        $localBranchId = 6;
+                    }
+
+                    Employe::updateOrCreate(
+                        [
+                            'accurate_employee_id' => $emp['id'],
+                            'business_unit_id'     => $bu->id,
+                        ],
+                        [
+                            'employee_no'  => $emp['number'] ?? null,
+                            'name'         => $emp['name'],
+                            'email'        => $emp['email'] ?? null,
+                            'phone_number' => $emp['mobilePhone'] ?? null,
+                            'position'     => $emp['workPositionName'] ?? null,
+                            'is_active'    => !($emp['suspended'] ?? false), // suspended true = tidak aktif
+                            'branch_id'    => $localBranchId,
+                        ]
+                    );
+                    $syncedCount++;
+                }
             }
 
             $this->dispatch('admin-alert', type: 'success', message: "Berhasil menyelaraskan $syncedCount data karyawan dengan Accurate.");
@@ -119,7 +137,11 @@ class EmployeManage extends Component
 
     public function render()
     {
-        $query = Employe::with('user')->orderBy('name', 'asc');
+        $query = Employe::with(['user', 'businessUnit'])->orderBy('name', 'asc');
+
+        if ($this->filterBusinessUnitId) {
+            $query->where('business_unit_id', $this->filterBusinessUnitId);
+        }
 
         if ($this->search) {
             $query->where(function ($q) {
@@ -130,6 +152,7 @@ class EmployeManage extends Component
         }
         return view('livewire.admin.employe.employe-manage', [
             'employeesList' => $query->paginate(10),
+            'businessUnits' => \App\Models\BusinessUnit::where('is_active', true)->get(),
             // Mengambil daftar user lokal yang belum dikaitkan ke karyawan manapun, atau user yang sedang dikaitkan saat ini
             'availableUsers' => User::where('id', $this->selectedUserId)
                 ->orderBy('name')

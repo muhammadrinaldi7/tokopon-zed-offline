@@ -185,7 +185,7 @@ class PointOfSale extends Component
 
             // Create Order
             $order = Order::create([
-                'business_unit_id' => \Illuminate\Support\Facades\Auth::user()->business_unit_id ?? 1,
+                'business_unit_id' => \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() ?? 1,
                 'user_id' => $customerId,
                 'order_number' => $orderNumber,
                 'total_amount' => $subtotal,

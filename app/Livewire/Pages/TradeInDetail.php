@@ -69,7 +69,7 @@ class TradeInDetail extends Component
 
             // Build temporary Order
             $order = \App\Models\Order::create([
-                'business_unit_id' => \Illuminate\Support\Facades\Auth::user()->business_unit_id ?? 1,
+                'business_unit_id' => \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() ?? 1,
                 'user_id' => $this->tradeIn->user_id,
                 'order_number' => 'ORD-TRD-' . date('YmdHis') . rand(100, 999),
                 'total_amount' => $topupAmount,

@@ -24,6 +24,7 @@
     </div>
 
     <div class="flex items-center gap-5">
+        <livewire:admin.components.business-unit-switcher />
         <button class="text-yellow-500 hover:text-yellow-600 transition-colors cursor-pointer">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="currentColor">
                 <path

@@ -80,8 +80,12 @@ class AccurateService
      */
     public function syncVendor(User $user, $databaseSource = 'syihab')
     {
+        $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+        if (!$bu) return;
+
         // Jika sudah punya vendor ID, tidak perlu hit API lagi
-        if ($user->accurate_vendor_id || $user->accurate_vendor_no) {
+        $existingVendor = $user->accurateVendors()->where('business_unit_id', $bu->id)->first();
+        if ($existingVendor && ($existingVendor->accurate_vendor_id || $existingVendor->accurate_vendor_no)) {
             return;
         }
         list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
@@ -137,14 +141,16 @@ class AccurateService
                 $result = $data['r']; // Ambil objek 'r'
                 Log::info('data accurate : ' . json_encode($result));
                 // Log::info('data tunggal : ' . json_encode($result['vendorNo']));
-                $idAccurate = json_encode($result['id']);        // Hasilnya: 601
-                $noVendor   = json_encode($result['vendorNo']);  // Hasilnya: "GSK_VENDOR_00002"
+                $idAccurate = $result['id'];        // Hasilnya: 601
+                $noVendor   = $result['vendorNo'];  // Hasilnya: "GSK_VENDOR_00002"
                 // 2. Update database user
-                // Log::info($idAccurate, $noVendor);
-                $user->update([
-                    'accurate_vendor_id' => $idAccurate,
-                    'accurate_vendor_no' => $noVendor,
-                ]);
+                $user->accurateVendors()->updateOrCreate(
+                    ['business_unit_id' => $bu->id],
+                    [
+                        'accurate_vendor_id' => $idAccurate,
+                        'accurate_vendor_no' => $noVendor,
+                    ]
+                );
             }
         } else {
             Log::info('API Accurate Error: ' . $response->body());
@@ -414,22 +420,32 @@ class AccurateService
 
     public function syncCustomer(User $user, $databaseSource = 'syihab')
     {
-        if ($user->accurate_customer_id) {
+        $businessUnit = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+        if (!$businessUnit) {
             return;
         }
+
+        $existingPivot = $user->accurateCustomers()->where('business_unit_id', $businessUnit->id)->first();
+        if ($existingPivot) {
+            return; // Customer is already synced to this business unit
+        }
+
         list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
 
 
         $address = $user->addresses()->where('is_primary', true)->first();
 
+        // Ensure prefix matches the business unit (e.g., SYB_, GSK_)
+        $prefix = $databaseSource === 'second' ? 'GSK_' : 'SYB_';
+
         $customerData = [
-            'name' => 'SYB_CUSTOMER_' . $user ? $user->profile->full_name : $user->name,
-            'customerNo' => 'SYB_CUSTOMER_' . str_pad($user->id, 5, '0', STR_PAD_LEFT),
+            'name' => $prefix . 'CUSTOMER_' . ($user->profile ? $user->profile->full_name : $user->name),
+            'customerNo' => $prefix . 'CUSTOMER_' . str_pad($user->id, 5, '0', STR_PAD_LEFT),
             'currencyCode' => 'IDR',
-            'mobilePhone' => $user->profile->phone_number,
+            'mobilePhone' => $user->profile ? $user->profile->phone_number : null,
             'email' => $user->email,
             'npwpNo' => $user->npwp,
-            'notes' => 'CUSTOMER SYB - NIK:' . $user->identity,
+            'notes' => 'CUSTOMER ' . $prefix . ' - NIK:' . $user->identity,
         ];
 
         if ($address) {
@@ -451,15 +467,24 @@ class AccurateService
         if ($response->successful()) {
             $data = $response->json();
             if (isset($data['s']) && $data['s'] === false) {
+                // If it already exists, Accurate usually returns an error. 
+                // We should handle if the error is "Customer No. already exists"
                 $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
                 throw new \Exception('API Accurate Error: ' . $errorMsg);
             }
             if (isset($data['r'])) {
                 $result = $data['r'];
-                $user->update([
-                    'accurate_customer_id' => $result['id'],
-                    'accurate_customer_no' => $result['customerNo'],
-                ]);
+                
+                \App\Models\UserAccurateCustomer::updateOrCreate(
+                    [
+                        'user_id' => $user->id,
+                        'business_unit_id' => $businessUnit->id,
+                    ],
+                    [
+                        'accurate_customer_id' => $result['id'],
+                        'accurate_customer_no' => $result['customerNo'],
+                    ]
+                );
             }
         } else {
             Log::info('API Accurate Customer Error: ' . $response->body());

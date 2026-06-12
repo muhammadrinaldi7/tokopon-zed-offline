@@ -606,7 +606,7 @@ class Pos extends Component
         // 2. Ambil semua metode pembayaran yang aktif sesuai business_unit
         $methods = PaymentMethod::where('is_active', true)
             ->where(function ($query) use ($user) {
-                $query->where('business_unit_id', $user->business_unit_id)
+                $query->where('business_unit_id', $user->getActiveBusinessUnitId())
                     ->orWhereNull('business_unit_id');
             })
             ->get();
@@ -649,7 +649,12 @@ class Pos extends Component
     {
         if (strlen($this->searchSales) < 2) return [];
 
-        return Employe::active()->with('branch')
+        $user = Auth::user();
+        $businessUnitId = $user->getActiveBusinessUnitId() ?? 1;
+
+        return Employe::active()
+            ->where('business_unit_id', $businessUnitId)
+            ->with('branch')
             ->where(function ($q) {
                 // Filter 1: Jika cabangnya sama
                 $q->where('branch_id', Auth::user()->branch_id)
@@ -1445,7 +1450,7 @@ class Pos extends Component
 
                 // Create Order
                 $order = Order::create([
-                    'business_unit_id' => Auth::user()->business_unit_id ?? 1,
+                    'business_unit_id' => Auth::user()->getActiveBusinessUnitId() ?? 1,
                     'user_id' => $customerId,
                     'order_number' => $orderNumber,
                     'order_date' => $dateToUse->format('Y-m-d'),
@@ -1931,7 +1936,7 @@ class Pos extends Component
 
                 // Create Order
                 $order = Order::create([
-                    'business_unit_id' => Auth::user()->business_unit_id ?? 1,
+                    'business_unit_id' => Auth::user()->getActiveBusinessUnitId() ?? 1,
                     'user_id' => $customerId,
                     'order_number' => $orderNumber,
                     'order_date'                => $dateToUse->format('Y-m-d'),

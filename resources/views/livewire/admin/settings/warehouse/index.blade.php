@@ -26,7 +26,17 @@
                     @forelse ($warehouse as $item)
                         <tr class="hover:bg-gray-50 transition">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="font-bold text-gray-900">{{ $item['name'] }}</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-gray-900">{{ $item['name'] }}</span>
+                                    <div class="flex gap-1">
+                                        @if($item['warehouse_id'])
+                                            <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded">Syihab</span>
+                                        @endif
+                                        @if($item['second_warehouse_id'])
+                                            <span class="bg-green-100 text-green-800 text-[10px] font-bold px-1.5 py-0.5 rounded">GSK</span>
+                                        @endif
+                                    </div>
+                                </div>
                             </td>
                             {{-- <td class="px-6 py-4 text-right">
                                 <a wire:navigate class="text-[#1c69d4] hover:text-[#3f36b8] font-semibold text-sm">
@@ -73,7 +83,17 @@
                     @forelse ($branch as $item)
                         <tr class="hover:bg-gray-50 transition">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="font-bold text-gray-900">{{ $item['name'] }}</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-gray-900">{{ $item['name'] }}</span>
+                                    <div class="flex gap-1">
+                                        @if($item['branch_id'])
+                                            <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded">Syihab</span>
+                                        @endif
+                                        @if($item['second_branch_id'])
+                                            <span class="bg-green-100 text-green-800 text-[10px] font-bold px-1.5 py-0.5 rounded">GSK</span>
+                                        @endif
+                                    </div>
+                                </div>
                             </td>
                             {{-- <td class="px-6 py-4 text-right">
                                 <a wire:navigate class="text-[#1c69d4] hover:text-[#3f36b8] font-semibold text-sm">

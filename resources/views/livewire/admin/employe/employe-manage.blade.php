@@ -29,8 +29,24 @@
                 database Accurate Online.</p>
         </div>
         <div class="flex items-center gap-3">
+            <select wire:model.live="filterBusinessUnitId"
+                class="w-full md:w-auto bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all appearance-none cursor-pointer">
+                <option value="">Semua Unit Usaha</option>
+                @foreach ($businessUnits as $bu)
+                    <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                @endforeach
+            </select>
+
             <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari nama, nik, atau jabatan..."
                 class="w-full md:w-72 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all">
+
+            <select wire:model="syncBusinessUnitId"
+                class="w-full md:w-auto bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all appearance-none cursor-pointer">
+                <option value="">Semua Unit Usaha</option>
+                @foreach ($businessUnits as $bu)
+                    <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                @endforeach
+            </select>
 
             <button wire:click="syncEmployees" wire:loading.attr="disabled"
                 class="flex items-center gap-2 bg-[#4E44DB] text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-[#3c34af] transition-all shadow-md shadow-[#4E44DB]/20 shrink-0 disabled:opacity-50">
@@ -53,6 +69,7 @@
                     <tr>
                         <th class="px-6 py-4">Karyawan</th>
                         <th class="px-6 py-4">No. Karyawan (NIK)</th>
+                        <th class="px-6 py-4">Unit Usaha</th>
                         <th class="px-6 py-4">Jabatan</th>
                         <th class="px-6 py-4">Status Kerja</th>
                         <th class="px-6 py-4">Akun Login POS Lokal</th>
@@ -74,6 +91,11 @@
                                 </div>
                             </td>
                             <td class="px-6 py-4 font-mono text-xs text-gray-700">{{ $employee->employee_no ?? 'N/A' }}
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 rounded-md bg-gray-100 text-gray-700 text-xs font-medium">
+                                    {{ $employee->businessUnit->name ?? '-' }}
+                                </span>
                             </td>
                             <td class="px-6 py-4">
                                 <span class="px-2 py-1 rounded-md bg-gray-100 text-gray-700 text-xs font-medium">

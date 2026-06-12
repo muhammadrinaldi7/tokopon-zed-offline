@@ -22,7 +22,13 @@ class Dashboard extends Component
     public function mount()
     {
         $this->setDateRange();
-        $this->businessUnits = \App\Models\BusinessUnit::where('is_active', true)->get();
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user && $user->hasAnyRole(['superadmin', 'director', 'admin'])) {
+            $this->businessUnits = \App\Models\BusinessUnit::where('is_active', true)->get();
+        } else {
+            $this->businessUnitFilter = $user->business_unit_id;
+            $this->businessUnits = \App\Models\BusinessUnit::where('id', $user->business_unit_id)->get();
+        }
     }
 
     public function updatedDateRange()
@@ -85,6 +91,11 @@ class Dashboard extends Component
             })
             ->when($this->businessUnitFilter, function($q) {
                 $q->where('business_unit_id', $this->businessUnitFilter);
+            }, function($q) {
+                $user = \Illuminate\Support\Facades\Auth::user();
+                if (!$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
+                    $q->where('business_unit_id', $user->business_unit_id);
+                }
             });
 
         // --- 1. KPI OVERVIEW ---
@@ -110,6 +121,11 @@ class Dashboard extends Component
             })
             ->when($this->businessUnitFilter, function($q) {
                 $q->where('business_unit_id', $this->businessUnitFilter);
+            }, function($q) {
+                $user = \Illuminate\Support\Facades\Auth::user();
+                if (!$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
+                    $q->where('business_unit_id', $user->business_unit_id);
+                }
             });
         
         $lastMtdQuery = Order::where('order_status', 'COMPLETED')
@@ -119,6 +135,11 @@ class Dashboard extends Component
             })
             ->when($this->businessUnitFilter, function($q) {
                 $q->where('business_unit_id', $this->businessUnitFilter);
+            }, function($q) {
+                $user = \Illuminate\Support\Facades\Auth::user();
+                if (!$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
+                    $q->where('business_unit_id', $user->business_unit_id);
+                }
             });
 
         $mtdNetSales = (clone $mtdQuery)->sum('grand_total') - (clone $mtdQuery)->sum('mdr_amount');

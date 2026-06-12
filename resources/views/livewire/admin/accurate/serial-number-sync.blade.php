@@ -20,7 +20,16 @@
                     @endif
                 </p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap md:flex-nowrap">
+                <select wire:model.live="businessUnitId"
+                    class="border-gray-200 text-sm font-medium focus:ring-[#1c69d4] focus:border-[#1c69d4] text-gray-700 bg-white py-2 pl-3 pr-8 rounded-lg cursor-pointer">
+                    <option value="">Semua Unit Usaha</option>
+                    @foreach($businessUnits as $bu)
+                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                    @endforeach
+                </select>
+                <div class="h-6 w-px bg-gray-300 hidden md:block"></div>
+
                 <button 
                     wire:click="startSync" 
                     @if($isSyncing || $isSyncingVendor || $isSyncingHpp) disabled @endif

@@ -16,17 +16,23 @@ class UserOperational extends Component
     use WithPagination;
 
     public $search = '';
+    public $filterBusinessUnitId = '';
+
     public $isEditModalOpen = false;
     public $editingUser = null;
     public $selectedRoles = [];
 
     // Create User
+    // Create/Edit User Location Data
     public $isCreateModalOpen = false;
     public $createName = '';
     public $createEmail = '';
     public $createPassword = '';
     public $createPasswordConfirmation = '';
     public $selectedCreateRoles = [];
+    public $createBusinessUnitId = '';
+    public $createBranchId = '';
+    public $createWarehouseId = '';
 
     public function mount()
     {
@@ -40,24 +46,59 @@ class UserOperational extends Component
     public function with()
     {
         return [
-            'users' => User::with(['roles', 'branch', 'warehouse'])
+            'users' => User::with(['roles', 'branch', 'warehouse', 'businessUnit'])
                 // 1. Filter Role: Ambil yang BUKAN customer atau user
                 ->whereHas('roles', function ($q) {
                     $q->whereNotIn('name', ['customer', 'user']);
                 })
-                // 2. Pencarian: Bungkus di dalam closure agar operator OR tidak bocor
+                // 2. Filter Unit Usaha
+                ->when($this->filterBusinessUnitId, function ($q) {
+                    $q->where('business_unit_id', $this->filterBusinessUnitId);
+                })
+                // 3. Pencarian: Bungkus di dalam closure agar operator OR tidak bocor
                 ->when($this->search, function ($q) {
                     $q->where(function ($query) {
                         $query->where('name', 'like', '%' . $this->search . '%')
                             ->orWhere('email', 'like', '%' . $this->search . '%');
                     });
                 })
-                // 3. Pengurutan dan Paginasi
+                // 4. Pengurutan dan Paginasi
                 ->orderByDesc('id')
                 ->paginate(15),
 
-            'availableRoles' => Role::all() // Catatan: Jika role banyak, pertimbangkan select('id', 'name')
+            'availableRoles' => Role::whereNotIn('name', ['customer', 'user'])->get(),
+            'businessUnits' => \App\Models\BusinessUnit::where('is_active', true)->get(),
+            'branches' => $this->getFilteredBranches(),
+            'warehouses' => $this->getFilteredWarehouses()
         ];
+    }
+
+    private function getFilteredBranches()
+    {
+        if (!$this->createBusinessUnitId) {
+            return \App\Models\Branch::all();
+        }
+        $bu = \App\Models\BusinessUnit::find($this->createBusinessUnitId);
+        if (!$bu) return collect();
+
+        if (strtolower($bu->code) === 'second') {
+            return \App\Models\Branch::whereNotNull('second_branch_id')->get();
+        }
+        return \App\Models\Branch::whereNotNull('branch_id')->get();
+    }
+
+    private function getFilteredWarehouses()
+    {
+        if (!$this->createBusinessUnitId) {
+            return \App\Models\Warehouse::all();
+        }
+        $bu = \App\Models\BusinessUnit::find($this->createBusinessUnitId);
+        if (!$bu) return collect();
+
+        if (strtolower($bu->code) === 'second') {
+            return \App\Models\Warehouse::whereNotNull('second_warehouse_id')->get();
+        }
+        return \App\Models\Warehouse::whereNotNull('warehouse_id')->get();
     }
 
     public function updatingSearch()
@@ -69,6 +110,9 @@ class UserOperational extends Component
     {
         $this->editingUser = User::with('roles')->findOrFail($userId);
         $this->selectedRoles = $this->editingUser->roles->pluck('name')->toArray();
+        $this->createBusinessUnitId = $this->editingUser->business_unit_id;
+        $this->createBranchId = $this->editingUser->branch_id;
+        $this->createWarehouseId = $this->editingUser->warehouse_id;
         $this->isEditModalOpen = true;
     }
 
@@ -83,10 +127,18 @@ class UserOperational extends Component
             }
 
             $this->editingUser->syncRoles($this->selectedRoles);
+
+            // Save updated location mapping
+            $this->editingUser->update([
+                'business_unit_id' => $this->createBusinessUnitId ?: null,
+                'branch_id' => $this->createBranchId ?: null,
+                'warehouse_id' => $this->createWarehouseId ?: null,
+            ]);
+
             $this->isEditModalOpen = false;
             $this->editingUser = null;
 
-            $this->dispatch('admin-alert', type: 'success', message: 'Role dan Permission berhasil diperbarui!');
+            $this->dispatch('admin-alert', type: 'success', message: 'Data dan hak akses user berhasil diperbarui!');
         }
     }
 
@@ -94,6 +146,13 @@ class UserOperational extends Component
     {
         $this->isEditModalOpen = false;
         $this->editingUser = null;
+    }
+
+    public function updatedCreateBusinessUnitId()
+    {
+        // Reset the branch and warehouse when BU changes
+        $this->createBranchId = '';
+        $this->createWarehouseId = '';
     }
 
     public function openCreateModal()
@@ -131,6 +190,9 @@ class UserOperational extends Component
             'name' => $this->createName,
             'email' => $this->createEmail,
             'password' => bcrypt($this->createPassword),
+            'business_unit_id' => $this->createBusinessUnitId ?: null,
+            'branch_id' => $this->createBranchId ?: null,
+            'warehouse_id' => $this->createWarehouseId ?: null,
         ]);
 
         $user->syncRoles($this->selectedCreateRoles);
@@ -148,6 +210,9 @@ class UserOperational extends Component
         $this->createPassword = '';
         $this->createPasswordConfirmation = '';
         $this->selectedCreateRoles = [];
+        $this->createBusinessUnitId = '';
+        $this->createBranchId = '';
+        $this->createWarehouseId = '';
     }
     // Di dalam Class Index.php Anda
     #[On('refresh-user-table')]

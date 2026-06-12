@@ -20,45 +20,47 @@
                 Export CSV
             </button>
 
-            <div class="flex items-center gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
-                <select wire:model.live="businessUnitFilter"
-                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-gray-50">
-                    <option value="">Semua Unit Usaha</option>
-                    @foreach ($businessUnits as $bu)
-                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
-                    @endforeach
-                </select>
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                    <select wire:model.live="businessUnitFilter"
+                        class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 pr-6 rounded-lg cursor-pointer">
+                        <option value="">Semua Unit Usaha</option>
+                        @foreach ($businessUnits as $bu)
+                            <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
 
-                <div class="h-6 w-px bg-gray-200"></div>
+                <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                    <select wire:model.live="branchFilter"
+                        class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 pr-6 rounded-lg cursor-pointer">
+                        <option value="">Semua Cabang</option>
+                        @foreach ($availableBranches as $branch)
+                            <option value="{{ $branch }}">{{ $branch }}</option>
+                        @endforeach
+                    </select>
+                </div>
 
-                <select wire:model.live="branchFilter"
-                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-gray-50">
-                    <option value="">Semua Cabang</option>
-                    @foreach ($availableBranches as $branch)
-                        <option value="{{ $branch }}">{{ $branch }}</option>
-                    @endforeach
-                </select>
-
-                <div class="h-6 w-px bg-gray-200"></div>
-
-                <select wire:model.live="dateRange"
-                    class="border-none text-sm font-bold text-blue-600 focus:ring-0 bg-blue-50 py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
-                    <option value="today">Hari Ini (Default)</option>
-                    <option value="yesterday">Kemarin</option>
-                    <option value="last_7_days">7 Hari Terakhir</option>
-                    <option value="this_week">Minggu Ini</option>
-                    <option value="this_month">Bulan Ini</option>
-                    <option value="this_year">Tahun Ini</option>
-                    <option value="custom">Kustom</option>
-                </select>
+                <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                    <select wire:model.live="dateRange"
+                        class="border-none text-sm font-bold text-blue-600 focus:ring-0 bg-transparent p-0 pr-6 rounded-lg cursor-pointer">
+                        <option value="today">Hari Ini</option>
+                        <option value="yesterday">Kemarin</option>
+                        <option value="last_7_days">7 Hari Terakhir</option>
+                        <option value="this_week">Minggu Ini</option>
+                        <option value="this_month">Bulan Ini</option>
+                        <option value="this_year">Tahun Ini</option>
+                        <option value="custom">Kustom</option>
+                    </select>
+                </div>
 
                 @if ($dateRange === 'custom')
-                    <div class="flex items-center gap-2 px-2 border-l border-gray-100">
+                    <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
                         <input type="date" wire:model.live="startDate"
-                            class="border-gray-200 rounded-lg text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] py-1.5">
-                        <span class="text-gray-400 text-sm">-</span>
+                            class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700">
+                        <span class="text-gray-400 text-sm font-bold">-</span>
                         <input type="date" wire:model.live="endDate"
-                            class="border-gray-200 rounded-lg text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] py-1.5">
+                            class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700">
                     </div>
                 @endif
             </div>
