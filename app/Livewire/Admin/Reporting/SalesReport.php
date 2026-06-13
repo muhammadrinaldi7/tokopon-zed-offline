@@ -575,21 +575,25 @@ class SalesReport extends Component
                 'SUBTOTAL ITEM (Rp)',
                 'PENJUALAN BERSIH',
                 'METODE 1',
+                'NO KONTRAK 1',
                 'NOMINAL 1 (Rp)',
                 'MDR 1 (%)',
                 'BEBAN MDR 1 (Rp)',
                 'TIPE BEBAN MDR 1',
                 'METODE 2',
+                'NO KONTRAK 2',
                 'NOMINAL 2 (Rp)',
                 'MDR 2 (%)',
                 'BEBAN MDR 2 (Rp)',
                 'TIPE BEBAN MDR 2',
                 'METODE 3',
+                'NO KONTRAK 3',
                 'NOMINAL 3 (Rp)',
                 'MDR 3 (%)',
                 'BEBAN MDR 3 (Rp)',
                 'TIPE BEBAN MDR 3',
                 'METODE 4',
+                'NO KONTRAK 4',
                 'NOMINAL 4 (Rp)',
                 'MDR 4 (%)',
                 'BEBAN MDR 4 (Rp)',
@@ -608,11 +612,12 @@ class SalesReport extends Component
                         $pmrPct = $payment->paymentMethodRate ? $payment->paymentMethodRate->mdr_percentage : 0;
                         $pmrName = $payment->paymentMethodRate ? $payment->paymentMethodRate->name : '-';
                         $mdrAmt = round(($payment->amount * $pmrPct) / 100);
-
+                        $noKontrak = $payment->no_kontrak ?? 'N/A';
                         $key = $pmName . '|' . $pmrPct . '|' . $pmrName;
                         if (!isset($orderPayments[$key])) {
                             $orderPayments[$key] = [
                                 'name' => $pmName,
+                                'no_kontrak' => $noKontrak,
                                 'amount' => 0,
                                 'mdr_pct' => $pmrPct,
                                 'mdr_amount' => 0,
@@ -632,6 +637,7 @@ class SalesReport extends Component
                         $key = $pmName . '|' . $pmrPct . '|' . $pmrName;
                         $orderPayments[$key] = [
                             'name' => $pmName,
+                            'no_kontrak' => $noKontrak,
                             'amount' => $order->grand_total,
                             'mdr_pct' => $pmrPct,
                             'mdr_amount' => $mdrAmt,
@@ -786,6 +792,7 @@ class SalesReport extends Component
                                 $nominalBersih = $allocatedNominalKotor - $allocatedMdr;
 
                                 $rowData[] = $upm['name'];
+                                $rowData[] = $upm['no_kontrak'] ?? 'N/A';
                                 $rowData[] = $nominalBersih;
                                 $rowData[] = $upm['mdr_pct'];
                                 $rowData[] = $allocatedMdr;
@@ -794,6 +801,7 @@ class SalesReport extends Component
                                 $itemTotalPembayaranKotor += $allocatedNominalKotor;
                             } else {
                                 $rowData[] = '-';
+                                $rowData[] = 'N/A';
                                 $rowData[] = '0';
                                 $rowData[] = '0';
                                 $rowData[] = '0';
