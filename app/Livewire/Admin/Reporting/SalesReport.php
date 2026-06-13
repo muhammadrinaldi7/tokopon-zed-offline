@@ -559,6 +559,7 @@ class SalesReport extends Component
                 'PELANGGAN',
                 'TELEPON',
                 'CABANG',
+                'SKU',
                 'NAMA PRODUK',
                 'MERK PRODUK',
                 'CATEGORY',
@@ -607,7 +608,7 @@ class SalesReport extends Component
                         $pmrPct = $payment->paymentMethodRate ? $payment->paymentMethodRate->mdr_percentage : 0;
                         $pmrName = $payment->paymentMethodRate ? $payment->paymentMethodRate->name : '-';
                         $mdrAmt = round(($payment->amount * $pmrPct) / 100);
-                        
+
                         $key = $pmName . '|' . $pmrPct . '|' . $pmrName;
                         if (!isset($orderPayments[$key])) {
                             $orderPayments[$key] = [
@@ -627,7 +628,7 @@ class SalesReport extends Component
                         $pmrPct = $order->paymentMethodRate ? $order->paymentMethodRate->mdr_percentage : 0;
                         $pmrName = $order->paymentMethodRate ? $order->paymentMethodRate->name : '-';
                         $mdrAmt = round(($order->grand_total * $pmrPct) / 100);
-                        
+
                         $key = $pmName . '|' . $pmrPct . '|' . $pmrName;
                         $orderPayments[$key] = [
                             'name' => $pmName,
@@ -641,22 +642,22 @@ class SalesReport extends Component
                 $orderPayments = array_values($orderPayments);
 
                 // Pra-kalkulasi kelayakan promo
-                $promoEligibleSubtotals = []; 
+                $promoEligibleSubtotals = [];
                 foreach ($order->promos as $promo) {
                     $promoSkus = $promo->skus->pluck('sku')->toArray();
                     $bundleSkus = $promo->bundleSkus->pluck('sku')->toArray();
-                    
+
                     $validSubtotal = 0;
                     foreach ($order->items as $item) {
                         $sku = $item->variant?->sku;
                         $isMainEligible = ($promo->apply_to_all_items && !$promo->is_bundle) || in_array($sku, $promoSkus);
                         $isBundleEligible = $promo->is_bundle && in_array($sku, $bundleSkus);
-                        
+
                         if ($isMainEligible || $isBundleEligible) {
                             $validSubtotal += $item->subtotal;
                         }
                     }
-                    $promoEligibleSubtotals[$promo->id] = $validSubtotal > 0 ? $validSubtotal : 1; 
+                    $promoEligibleSubtotals[$promo->id] = $validSubtotal > 0 ? $validSubtotal : 1;
                 }
 
                 // PASS 1: Hitung Subtotal Aktual tiap item untuk Bobot Prorata Nominal Pembayaran
@@ -664,7 +665,7 @@ class SalesReport extends Component
                 $itemActualSubtotals = [];
                 $totalOrderActualSubtotal = 0;
                 $allocatedPromosTracker = [];
-                
+
                 $itemCount = $order->items->count();
                 $currentIndex = 0;
 
@@ -672,21 +673,21 @@ class SalesReport extends Component
                     $currentIndex++;
                     $isLastItem = ($currentIndex === $itemCount);
                     $sku = $item->variant?->sku;
-                    
+
                     $itemPromosTotal = 0;
                     $promoNames = [];
-                    
+
                     foreach ($order->promos as $promo) {
                         $promoSkus = $promo->skus->pluck('sku')->toArray();
                         $bundleSkus = $promo->bundleSkus->pluck('sku')->toArray();
-                        
+
                         $isMainEligible = ($promo->apply_to_all_items && !$promo->is_bundle) || in_array($sku, $promoSkus);
                         $isBundleEligible = $promo->is_bundle && in_array($sku, $bundleSkus);
-                        
+
                         if ($isMainEligible || $isBundleEligible) {
                             $promoWeight = $item->subtotal / $promoEligibleSubtotals[$promo->id];
                             $orderAmount = $promo->pivot->discount_applied ?? 0;
-                            
+
                             if ($isLastItem) {
                                 $allocated = $orderAmount - ($allocatedPromosTracker[$promo->id] ?? 0);
                             } else {
@@ -698,30 +699,30 @@ class SalesReport extends Component
                             $promoNames[] = $promo->name;
                         }
                     }
-                    
+
                     $actualItemSubtotal = $item->subtotal - ($item->discount_amount ?? 0) - $itemPromosTotal;
-                    
+
                     $itemPromoData[$item->id] = [
                         'promo_names' => !empty($promoNames) ? implode(', ', $promoNames) : '-',
                         'promo_total' => $itemPromosTotal,
                         'actual_subtotal' => $actualItemSubtotal
                     ];
-                    
+
                     $totalOrderActualSubtotal += $actualItemSubtotal;
                 }
-                
+
                 if ($totalOrderActualSubtotal == 0) $totalOrderActualSubtotal = 1;
 
                 // PASS 2: Render Baris CSV dengan Bobot Baru
-                $allocatedPaymentsTracker = []; 
-                $allocatedMdrTracker = []; 
+                $allocatedPaymentsTracker = [];
+                $allocatedMdrTracker = [];
                 $currentIndex = 0;
 
                 if ($itemCount > 0) {
                     foreach ($order->items as $item) {
                         $currentIndex++;
                         $isLastItem = ($currentIndex === $itemCount);
-                        
+
                         // Atasan menggunakan bobot berdasarkan Subtotal SETELAH Diskon
                         $actualItemSubtotal = $itemPromoData[$item->id]['actual_subtotal'];
                         $weight = $actualItemSubtotal / $totalOrderActualSubtotal;
@@ -730,7 +731,7 @@ class SalesReport extends Component
                         $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
                         $merk = $variant?->accurateData?->brandName ?? 'Unknown';
                         $category = $variant?->accurateData?->categoryName ?? 'Unknown';
-                        
+
                         $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
                         $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];
 
@@ -746,6 +747,7 @@ class SalesReport extends Component
                             $order->user ? $order->user->name : 'Walk-in',
                             $order->user ? $order->user->profile->phone_number : '-',
                             $branch,
+                            $sku = $variant?->sku ?? '-',
                             $name,
                             $merk,
                             $category,
@@ -767,7 +769,7 @@ class SalesReport extends Component
                         for ($i = 0; $i < 4; $i++) {
                             if (isset($orderPayments[$i])) {
                                 $upm = $orderPayments[$i];
-                                
+
                                 if ($isLastItem) {
                                     $allocatedNominalKotor = $upm['amount'] - ($allocatedPaymentsTracker[$i] ?? 0);
                                     $allocatedMdr = $upm['mdr_amount'] - ($allocatedMdrTracker[$i] ?? 0);
@@ -775,20 +777,20 @@ class SalesReport extends Component
                                     $allocatedNominalKotor = round($upm['amount'] * $weight);
                                     if (!isset($allocatedPaymentsTracker[$i])) $allocatedPaymentsTracker[$i] = 0;
                                     $allocatedPaymentsTracker[$i] += $allocatedNominalKotor;
-                                    
+
                                     $allocatedMdr = round($upm['mdr_amount'] * $weight);
                                     if (!isset($allocatedMdrTracker[$i])) $allocatedMdrTracker[$i] = 0;
                                     $allocatedMdrTracker[$i] += $allocatedMdr;
                                 }
-                                
+
                                 $nominalBersih = $allocatedNominalKotor - $allocatedMdr;
-                                
+
                                 $rowData[] = $upm['name'];
                                 $rowData[] = $nominalBersih;
                                 $rowData[] = $upm['mdr_pct'];
                                 $rowData[] = $allocatedMdr;
                                 $rowData[] = $upm['mdr_name'];
-                                
+
                                 $itemTotalPembayaranKotor += $allocatedNominalKotor;
                             } else {
                                 $rowData[] = '-';
@@ -838,13 +840,13 @@ class SalesReport extends Component
                         if (isset($orderPayments[$i])) {
                             $upm = $orderPayments[$i];
                             $nominalBersih = round($upm['amount'] - $upm['mdr_amount']);
-                            
+
                             $rowData[] = $upm['name'];
                             $rowData[] = $nominalBersih;
                             $rowData[] = $upm['mdr_pct'];
                             $rowData[] = $upm['mdr_amount'];
                             $rowData[] = $upm['mdr_name'];
-                            
+
                             $itemTotalPembayaranKotor += $upm['amount'];
                         } else {
                             $rowData[] = '-';
