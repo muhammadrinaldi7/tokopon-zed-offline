@@ -23,7 +23,6 @@ class EmployeManage extends Component
     public $editingEmployee = null;
     public $selectedUserId = null; // Menyimpan ID user yang dikaitkan ke karyawan
 
-    public $syncBusinessUnitId = '';
     public $filterBusinessUnitId = '';
 
     public function updatingSearch()
@@ -42,8 +41,8 @@ class EmployeManage extends Component
             $service = app(AccurateService::class);
             
             $sources = [];
-            if ($this->syncBusinessUnitId) {
-                $bu = \App\Models\BusinessUnit::find($this->syncBusinessUnitId);
+            if ($this->filterBusinessUnitId) {
+                $bu = \App\Models\BusinessUnit::find($this->filterBusinessUnitId);
                 if ($bu) $sources[] = $bu;
             } else {
                 $sources = \App\Models\BusinessUnit::where('is_active', true)->get();
@@ -71,8 +70,6 @@ class EmployeManage extends Component
                         if ($branch) {
                             $localBranchId = $branch->id;
                         }
-                    } else {
-                        $localBranchId = 6;
                     }
 
                     Employe::updateOrCreate(

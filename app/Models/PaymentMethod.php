@@ -11,6 +11,7 @@ class PaymentMethod extends Model
 
     protected $fillable = [
         'name',
+        'category',
         'business_unit_id',
         'bank_name',
         'account_number',
