@@ -7,6 +7,7 @@ use App\Models\OrderPayment;
 use App\Models\PaymentMethod;
 use App\Services\AccurateService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
@@ -14,13 +15,18 @@ use Livewire\Component;
 class Show extends Component
 {
     public Order $order;
-    
+
     // DP Form
     public $showDpModal = false;
     public $dp_amount;
     public $payment_method_id;
+    public $payment_method_rate_id;
     public $dp_date;
     public $dp_notes;
+
+    // Invoice Form
+    public $showInvoiceModal = false;
+    public $invoice_sns = [];
 
     public function mount(Order $order)
     {
@@ -35,13 +41,34 @@ class Show extends Component
         return max(0, $this->order->grand_total - $paid);
     }
 
+    public function updatedPaymentMethodId($val)
+    {
+        $this->payment_method_rate_id = null;
+    }
+
+    #[\Livewire\Attributes\Computed]
+    public function getSelectedPaymentMethodProperty()
+    {
+        if (!$this->payment_method_id) return null;
+        return PaymentMethod::with(['rates' => function ($q) {
+            $q->where('is_active', true);
+        }])->find($this->payment_method_id);
+    }
+
     public function saveDp()
     {
-        $this->validate([
+        $rules = [
             'dp_amount' => 'required|numeric|min:1|max:' . $this->getRemainingBalance(),
             'payment_method_id' => 'required',
             'dp_date' => 'required|date',
-        ]);
+        ];
+
+        $pm = $this->selectedPaymentMethod;
+        if ($pm && $pm->rates->count() > 0) {
+            $rules['payment_method_rate_id'] = 'required';
+        }
+
+        $this->validate($rules);
 
         try {
             DB::beginTransaction();
@@ -49,10 +76,14 @@ class Show extends Component
             $payment = OrderPayment::create([
                 'order_id' => $this->order->id,
                 'payment_method_id' => $this->payment_method_id,
+                'payment_method_rate_id' => $this->payment_method_rate_id ?: null,
                 'amount' => $this->dp_amount,
-                'payment_date' => $this->dp_date,
-                'status' => 'paid',
-                'notes' => $this->dp_notes,
+                'status' => 'PAID',
+                'xendit_external_id' => 'DP-MANUAL-' . date('YmdHis') . rand(1000, 9999),
+                'paid_at' => \Carbon\Carbon::parse($this->dp_date),
+                'payment_payload' => [
+                    'notes' => $this->dp_notes,
+                ],
             ]);
 
             // Update Order Status if needed
@@ -73,18 +104,33 @@ class Show extends Component
                 $accurateService = app(AccurateService::class);
                 $customerUser = $this->order->user;
                 $businessUnit = $this->order->businessUnit;
-                $branchName = $businessUnit->name ?? 'Banjarbaru';
                 $dbSource = $businessUnit ? $businessUnit->code : 'syihab';
-                
+
+                $handler = $this->order->handledBy ?? Auth::user();
+                if (!$handler || !$handler->branch) {
+                    throw new \Exception('Staf pembuat SO ini belum dialokasikan ke Cabang (Branch) tertentu.');
+                }
+                $branchName = $handler->branch->name;
+
                 $accurateBranchName = $branchName;
                 if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
                     $accurateBranchName = 'GSK ' . $accurateBranchName;
                 }
 
-                $pm = PaymentMethod::find($this->payment_method_id);
                 // Hitung MDR
-                $rate = $pm->rates()->where('is_active', true)->first(); // Atau ambil dari input jika ada
+                $rate = null;
+                if ($this->payment_method_rate_id) {
+                    $rate = \App\Models\PaymentMethodRate::find($this->payment_method_rate_id);
+                } elseif ($pm->rates()->where('is_active', true)->exists()) {
+                    $rate = $pm->rates()->where('is_active', true)->first();
+                }
+
                 $pct = $rate ? (float) $rate->percentage : 0;
+                // fallback to mdr_percentage column if percentage not found
+                if ($rate && !isset($rate->percentage) && isset($rate->mdr_percentage)) {
+                    $pct = (float) $rate->mdr_percentage;
+                }
+
                 $rowMdr = $pct > 0 ? round((float)$this->dp_amount * $pct / 100, 0) : 0;
                 $netReceiptAmount = (float)$this->dp_amount - $rowMdr;
 
@@ -98,6 +144,39 @@ class Show extends Component
                     ];
                 }
 
+                if (!$this->order->accurate_so_number) {
+                    throw new \Exception('Sales Order ini belum memiliki nomor sinkronisasi Accurate. Harap sinkronkan/buat SO di Accurate terlebih dahulu sebelum mencatat DP.');
+                }
+
+                // STEP 1: Faktur Uang Muka Penjualan (Down Payment Invoice)
+                $dpInvData = [
+                    'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
+                    'branchName' => $accurateBranchName,
+                    'dpAmount'   => (float)$this->dp_amount,
+                    'soNumber'   => $this->order->accurate_so_number,
+                    'transDate'  => Carbon::parse($this->dp_date)->format('d/m/Y'),
+                    'description'=> 'Uang Muka (DP) SO: ' . $this->order->accurate_so_number . '. ' . $this->dp_notes,
+                ];
+
+                Log::info('Accurate DP Invoice Payload: ' . json_encode($dpInvData));
+                $dpInvResult = $accurateService->postDownPaymentInvoice($dpInvData, $dbSource);
+
+                if (!isset($dpInvResult['r']['number'])) {
+                    throw new \Exception('Gagal mendapatkan nomor Faktur Uang Muka dari Accurate.');
+                }
+
+                $dpInvoiceNo = $dpInvResult['r']['number'];
+
+                \App\Models\OrderAccurateDoc::create([
+                    'order_id' => $this->order->id,
+                    'doc_type' => 'DP_INVOICE',
+                    'doc_number' => $dpInvoiceNo,
+                    'accurate_id' => $dpInvResult['r']['id'] ?? null,
+                    'amount' => (float) $this->dp_amount,
+                    'status' => 'SUCCESS',
+                ]);
+
+                // STEP 2: Penerimaan Penjualan (Sales Receipt) untuk Uang Muka
                 $srData = [
                     'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
                     'branchName' => $accurateBranchName,
@@ -105,27 +184,23 @@ class Show extends Component
                     'transDate' => Carbon::parse($this->dp_date)->format('d/m/Y'),
                     'receiptAmount' => (float)$netReceiptAmount,
                     'chequeAmount' => (float)$netReceiptAmount,
-                    'description' => 'Down Payment (DP) SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number) . '. ' . $this->dp_notes
-                ];
-
-                if ($this->order->accurate_so_number) {
-                    $srData['detailDownPayment'] = [
+                    'description' => 'Penerimaan DP SO: ' . $this->order->accurate_so_number . '. ' . $this->dp_notes,
+                    'detailInvoice' => [
                         [
-                            'salesOrderNo' => $this->order->accurate_so_number,
+                            'invoiceNo' => $dpInvoiceNo,
                             'paymentAmount' => (float)$this->dp_amount,
                         ]
-                    ];
-                }
+                    ]
+                ];
+
                 if (!empty($detailDiscounts)) {
-                    $srData['detailDownPayment'][0]['detailDiscount'] = $detailDiscounts;
+                    $srData['detailInvoice'][0]['detailDiscount'] = $detailDiscounts;
                 }
 
-                Log::info('Accurate DP Sync Payload: ' . json_encode($srData));
+                Log::info('Accurate DP Receipt Payload: ' . json_encode($srData));
                 $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
-                
+
                 if (isset($srResult['r']['number'])) {
-                    // $payment->update(['accurate_receipt_no' => $srResult['r']['number']]); // If we had it on payment
-                    
                     \App\Models\OrderAccurateDoc::create([
                         'order_id' => $this->order->id,
                         'doc_type' => 'DP_RECEIPT',
@@ -145,24 +220,31 @@ class Show extends Component
                 Log::error('Accurate DP Sync Error: ' . $e->getMessage());
                 $this->dispatch('toast', title: 'Sync Accurate Gagal', message: 'DP tersimpan di sistem, namun gagal tersinkron ke Accurate: ' . $e->getMessage(), type: 'warning');
             }
-            
+
             $this->showDpModal = false;
             $this->order->refresh();
-            
-            $this->dispatch('toast', title: 'Berhasil', message: 'Uang Muka (DP) berhasil dicatat!', type: 'success');
 
+            $this->dispatch('toast', title: 'Berhasil', message: 'Uang Muka (DP) berhasil dicatat!', type: 'success');
         } catch (\Exception $e) {
             DB::rollBack();
-            session()->flash('error', 'Gagal menyimpan DP: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Error', message: 'Gagal menyimpan DP: ' . $e->getMessage(), type: 'error');
         }
     }
 
-    public function prosesFakturLunas()
+    public function openInvoiceModal()
     {
-        if ($this->getRemainingBalance() > 0) {
-            $this->dispatch('toast', title: 'Belum Lunas', message: 'Tidak dapat membuat faktur karena tagihan belum lunas.', type: 'warning');
-            return;
+        $this->invoice_sns = [];
+        foreach ($this->order->items as $item) {
+            $this->invoice_sns[$item->id] = $item->serial_number ?? '';
         }
+        $this->showInvoiceModal = true;
+    }
+
+    public function submitFaktur()
+    {
+        $this->validate([
+            'invoice_sns.*' => 'nullable|string'
+        ]);
 
         try {
             DB::beginTransaction();
@@ -170,9 +252,14 @@ class Show extends Component
             // Trigger Sync to Accurate (Sales Invoice from SO)
             $accurateService = app(AccurateService::class);
             $businessUnit = $this->order->businessUnit;
-            $branchName = $businessUnit->name ?? 'Banjarbaru';
             $dbSource = $businessUnit ? $businessUnit->code : 'syihab';
-            
+
+            $handler = $this->order->handledBy ?? Auth::user();
+            if (!$handler || !$handler->branch) {
+                throw new \Exception('Staf pembuat SO ini belum dialokasikan ke Cabang (Branch) tertentu.');
+            }
+            $branchName = $handler->branch->name;
+
             $accurateBranchName = $branchName;
             if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
                 $accurateBranchName = 'GSK ' . $accurateBranchName;
@@ -180,16 +267,40 @@ class Show extends Component
 
             $detailItems = [];
             foreach ($this->order->items as $item) {
-                $variant = $item->type === 'new' ? \App\Models\ProductVariant::find($item->variant_id) : \App\Models\SecondProductVariant::find($item->variant_id);
-                $itemName = $item->type === 'new' ? ($variant->product->name ?? 'Unknown') : ($variant->secondProduct->name ?? 'Unknown');
-                
-                $detailItems[] = [
-                    'itemNo' => $variant->sku ?? 'ITEM-UNKNOWN',
-                    'unitPrice' => (float)$item->unit_price,
+                // Update local serial numbers first
+                $snInput = $this->invoice_sns[$item->id] ?? '';
+                if ($snInput !== ($item->serial_number ?? '')) {
+                    $item->update(['serial_number' => $snInput]);
+                }
+
+                $variant = $item->variant;
+                $isNew = $item->product_variant_type === \App\Models\ProductVariant::class;
+                $itemName = $isNew ? ($variant->product->name ?? 'Unknown') : ($variant->secondProduct->name ?? 'Unknown');
+
+                $sku = $variant->sku ?? null;
+                if (empty($sku)) {
+                    throw new \Exception("Gagal: Produk '{$itemName}' belum memiliki SKU (Item No). Harap lengkapi SKU produk di database agar bisa dikirim ke Accurate.");
+                }
+
+                $detailItemData = [
+                    'itemNo' => $sku,
+                    'unitPrice' => (float)$item->price_at_checkout,
                     'quantity' => (float)$item->qty,
                     'detailName' => $itemName . ' ' . ($variant->color ?? '') . ' ' . ($variant->storage ?? ''),
                     'itemCashDiscount' => (float)$item->discount_amount,
                 ];
+
+                // Attach SN payload
+                $cleanSNs = array_filter(array_map('trim', explode(',', $snInput)));
+                if (count($cleanSNs) > 0) {
+                    $detailSNs = [];
+                    foreach ($cleanSNs as $sn) {
+                        $detailSNs[] = ['serialNumberNo' => $sn, 'quantity' => 1];
+                    }
+                    $detailItemData['detailSerialNumber'] = $detailSNs;
+                }
+
+                $detailItems[] = $detailItemData;
             }
 
             $siData = [
@@ -210,9 +321,20 @@ class Show extends Component
                 }
             }
 
+            $dpDocs = $this->order->accurateDocs()->where('doc_type', 'DP_INVOICE')->where('status', 'SUCCESS')->get();
+            if ($dpDocs->count() > 0) {
+                $siData['detailDownPayment'] = [];
+                foreach ($dpDocs as $dpDoc) {
+                    $siData['detailDownPayment'][] = [
+                        'invoiceNumber' => $dpDoc->doc_number,
+                        'paymentAmount' => (float) $dpDoc->amount,
+                    ];
+                }
+            }
+
             Log::info('Accurate SI Sync Payload: ' . json_encode($siData));
             $siResult = $accurateService->postSalesInvoice($siData, $dbSource);
-            
+
             if (isset($siResult['r']['number'])) {
                 $this->order->update([
                     'accurate_invoice_no' => $siResult['r']['number'],
@@ -230,9 +352,9 @@ class Show extends Component
             }
 
             DB::commit();
-            $this->dispatch('toast', title: 'Berhasil', message: 'Pesanan telah dilunaskan dan Faktur Accurate terbit!', type: 'success');
+            $this->showInvoiceModal = false;
+            $this->dispatch('toast', title: 'Berhasil', message: 'Faktur Penjualan diterbitkan dan stok Accurate terpotong!', type: 'success');
             $this->order->refresh();
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Accurate SI Sync Error: ' . $e->getMessage());

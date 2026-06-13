@@ -1292,6 +1292,11 @@ class Pos extends Component
 
     public function processPayment()
     {
+        $handler = Auth::user();
+        if (!$handler || !$handler->branch || !$handler->warehouse) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Akun Anda belum terhubung dengan Cabang (Branch) atau Gudang. Harap hubungi Admin.', type: 'error');
+            return;
+        }
 
         try {
             $customerId = $this->selectedCustomerId;

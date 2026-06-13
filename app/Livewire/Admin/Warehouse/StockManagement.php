@@ -68,8 +68,8 @@ class StockManagement extends Component
 
                 if (!$warehouseName) continue;
 
-                // Handle 'GSK ' prefix from Accurate Second DB
-                $localWarehouseName = $isSecond ? str_replace('GSK ', '', $warehouseName) : $warehouseName;
+                // Accurate warehouse names are now identical to local db
+                $localWarehouseName = $warehouseName;
 
                 $warehouse = Warehouse::where('name', $localWarehouseName)->first();
                 if (!$warehouse) continue;
@@ -103,8 +103,9 @@ class StockManagement extends Component
             $service = app(AccurateService::class);
             $syncedCount = 0;
 
-            // 1. Ambil daftar Gudang lokal & Varian lokal HANYA 1 KALI
-            $warehouses = Warehouse::all();
+            // 1. Ambil daftar Gudang lokal & Varian lokal sesuai Business Unit
+            $buId = $this->activeTab === 'second' ? 2 : 1;
+            $warehouses = Warehouse::where('business_unit_id', $buId)->get();
             $variants = $this->activeTab === 'second'
                 ? SecondProductVariant::whereNotNull('sku')->get()
                 : ProductVariant::whereNotNull('sku')->get();
@@ -112,8 +113,8 @@ class StockManagement extends Component
 
             foreach ($warehouses as $warehouse) {
                 try {
-                    // 2. Ambil stok Accurate per gudang
-                    $accurateWarehouseName = $this->activeTab === 'second' ? 'GSK ' . $warehouse->name : $warehouse->name;
+                    // 2. Ambil stok Accurate per gudang (nama sudah persis sama)
+                    $accurateWarehouseName = $warehouse->name;
                     $stockData = $service->getItemStockPerWarehouse($accurateWarehouseName, $dbSource);
 
                     if (empty($stockData)) continue;
@@ -177,7 +178,8 @@ class StockManagement extends Component
             }
 
             // 2. HIT API ACCURATE CUKUP 1 KALI (Di luar looping)
-            $accurateWarehouseName = $this->activeTab === 'second' ? 'GSK ' . $whName : $whName;
+            // Nama di database lokal sekarang sudah sama persis dengan Accurate
+            $accurateWarehouseName = $whName;
             $stockData = $service->getItemStockPerWarehouse($accurateWarehouseName, $dbSource);
 
             if (empty($stockData)) {
@@ -233,7 +235,8 @@ class StockManagement extends Component
     #[Layout('layouts.admin')]
     public function render()
     {
-        $warehouses = Warehouse::orderBy('name')->get();
+        $buId = $this->activeTab === 'second' ? 2 : 1;
+        $warehouses = Warehouse::where('business_unit_id', $buId)->orderBy('name')->get();
 
         if ($this->activeTab === 'second') {
             $query = SecondProductVariant::with(['secondProduct', 'warehouseStocks'])

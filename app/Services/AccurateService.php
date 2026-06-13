@@ -759,6 +759,37 @@ class AccurateService
             throw new \Exception('API Accurate Get Vendor Detail Error: ' . $response->body());
         }
     }
+    public function postDownPaymentInvoice($data, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-invoice/create-down-payment.do', $data);
+
+        Log::info('API Accurate DP Invoice Success: ' . $response->body());
+        if ($response->successful()) {
+            $responseData = $response->json();
+            if (isset($responseData['s']) && $responseData['s'] === false) {
+                $errorMsg = isset($responseData['d']) && is_array($responseData['d']) ? implode(', ', $responseData['d']) : json_encode($responseData);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($responseData)) {
+                return $responseData;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate DP Invoice Error: ' . $response->body());
+            throw new \Exception('API Accurate DP Invoice Error: ' . $response->body());
+        }
+    }
+
 
     public function postSalesReceipt($salesReceiptData, $databaseSource = 'syihab')
     {
