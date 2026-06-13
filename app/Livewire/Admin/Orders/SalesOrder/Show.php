@@ -349,22 +349,39 @@ class Show extends Component
             ];
 
             if ($this->order->accurate_so_number) {
-                // To link to SO, in Accurate usually we pass salesOrderId per item, but if the API supports it at header level we use it.
-                // Alternatively, we map salesOrderNo to each detailItem
                 foreach ($siData['detailItem'] as &$i) {
-                    $i['salesOrderNo'] = $this->order->accurate_so_number;
+                    $i['salesOrderNumber'] = $this->order->accurate_so_number;
                 }
             }
 
-            $dpDocs = $this->order->accurateDocs()->where('doc_type', 'DP_INVOICE')->where('status', 'SUCCESS')->get();
-            if ($dpDocs->count() > 0) {
-                $siData['detailDownPayment'] = [];
-                foreach ($dpDocs as $dpDoc) {
-                    $siData['detailDownPayment'][] = [
-                        'invoiceNumber' => $dpDoc->doc_number,
-                        'paymentAmount' => (float) $dpDoc->amount,
+            // Apply DP only if the DP was successfully paid (DP_RECEIPT exists)
+            $dpInvoices = $this->order->accurateDocs()
+                ->where('doc_type', 'DP_INVOICE')
+                ->where('status', 'SUCCESS')
+                ->get();
+
+            $validDpInvoices = [];
+            foreach ($dpInvoices as $dpInv) {
+                // Check if this DP Invoice was actually paid via DP_RECEIPT
+                // We link them by checking if there's any successful DP_RECEIPT for this order
+                // Actually, a better way is to verify if there's a DP_RECEIPT created after this DP_INVOICE.
+                // In Accurate, if it's unpaid, it errors out.
+                $hasReceipt = $this->order->accurateDocs()
+                    ->where('doc_type', 'DP_RECEIPT')
+                    ->where('status', 'SUCCESS')
+                    ->where('created_at', '>=', $dpInv->created_at)
+                    ->exists();
+
+                if ($hasReceipt) {
+                    $validDpInvoices[] = [
+                        'invoiceNumber' => $dpInv->doc_number,
+                        'paymentAmount' => (float) $dpInv->amount,
                     ];
                 }
+            }
+
+            if (count($validDpInvoices) > 0) {
+                $siData['detailDownPayment'] = $validDpInvoices;
             }
 
             Log::info('Accurate SI Sync Payload: ' . json_encode($siData));
@@ -404,12 +421,17 @@ class Show extends Component
                     \App\Models\OrderPayment::create([
                         'order_id' => $this->order->id,
                         'payment_method_id' => $this->invoice_payment_method_id,
-                        'payment_method_rate_id' => $this->invoice_payment_method_rate_id,
+                        'payment_method_rate_id' => $this->invoice_payment_method_rate_id ?: null,
                         'amount' => $remBal,
                         'fee_amount' => $feeAmount,
                         'payment_date' => $this->invoice_date,
                         'notes' => $this->invoice_notes,
-                        'status' => 'paid',
+                        'status' => 'PAID',
+                        'xendit_external_id' => 'PELUNASAN-' . date('YmdHis') . rand(1000, 9999),
+                        'paid_at' => \Carbon\Carbon::parse($this->invoice_date),
+                        'payment_payload' => [
+                            'notes' => $this->invoice_notes,
+                        ],
                     ]);
 
                     $srData = [
@@ -429,12 +451,12 @@ class Show extends Component
                     ];
 
                     if ($feeAmount > 0) {
-                        $srData['detailOtherDeposit'] = [
+                        $srData['detailInvoice'][0]['detailDiscount'] = [
                             [
-                                'accountNo' => '7100.04',
+                                'accountNo' => $rate->accurate_account_no ?? '7100.04',
                                 'amount' => (float)$feeAmount,
                                 'departmentName' => $accurateBranchName,
-                                'notes' => 'Potongan MDR ' . ($rate->name ?? 'Payment Gateway'),
+                                'discountNotes' => 'Potongan MDR ' . ($rate->name ?? 'Payment Gateway'),
                             ]
                         ];
                     }
