@@ -195,7 +195,7 @@ class Dashboard extends Component
         })->map(function($group) {
             return [
                 'name' => $group->first()->variant?->product?->brand?->name ?? 'Unknown',
-                'total' => $group->sum(function($item) { return $item->price_at_checkout * $item->qty; })
+                'total' => $group->sum('qty')
             ];
         })->sortByDesc('total')->values();
 
@@ -237,24 +237,27 @@ class Dashboard extends Component
             ->values()
             ->toArray();
 
-        $topBranches = $orders->groupBy(function($order) {
-            return $order->shipping_address_snapshot['store'] ?? 'Unknown';
+        $topBrands = $orderItemsForBrand->groupBy(function($item) {
+            return $item->variant?->product?->brand?->name ?? 'Unknown';
         })->map(function($group) {
             return [
-                'name' => $group->first()->shipping_address_snapshot['store'] ?? 'Unknown',
-                'total_transactions' => $group->count(),
-                'total_revenue' => $group->sum('grand_total')
+                'name' => $group->first()->variant?->product?->brand?->name ?? 'Unknown',
+                'total_qty' => $group->sum('qty'),
+                'total_revenue' => $group->sum(function($item) { return $item->price_at_checkout * $item->qty; })
             ];
-        })->sortByDesc('total_revenue')->take(5)->values()->toArray();
+        })->sortByDesc('total_qty')->take(5)->values()->toArray();
 
-        $topSales = $orders->groupBy('sales_id')->map(function($group) {
+        $topSales = $orders->groupBy('sales_id')->map(function($group) use ($orderItemsForBrand) {
             $sales = $group->first()->salesBy;
+            $salesOrderIds = $group->pluck('id')->toArray();
+            $totalQty = $orderItemsForBrand->whereIn('order_id', $salesOrderIds)->sum('qty');
             return [
                 'name' => $sales ? $sales->name : 'No Sales',
                 'total_transactions' => $group->count(),
-                'total_revenue' => $group->sum('grand_total')
+                'total_revenue' => $group->sum('grand_total'),
+                'total_qty' => $totalQty
             ];
-        })->sortByDesc('total_revenue')->take(5)->values()->toArray();
+        })->sortByDesc('total_qty')->take(5)->values()->toArray();
 
 
         $availableBranches = Branch::orderBy('name')->pluck('name');
@@ -276,7 +279,7 @@ class Dashboard extends Component
             'trendData' => $trendData,
             'brandProportionData' => $brandProportionData,
             'paymentMethodData' => $paymentMethodData,
-            'topBranches' => $topBranches,
+            'topBrands' => $topBrands,
             'topSales' => $topSales,
             'topProducts' => $topProducts,
             'availableBranches' => $availableBranches

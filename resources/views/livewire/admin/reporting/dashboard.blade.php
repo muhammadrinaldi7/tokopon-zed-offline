@@ -57,49 +57,80 @@
 
     {{-- SECTION 1: TOP KPI CARDS (NUMBERS ONLY, BASED ON SELECTED DATE FILTER) --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        {{-- Net Sales --}}
+
+        {{-- Net Sales (Primary Card - Dark/Elegant Theme) --}}
         <div
-            class="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-5 shadow-lg text-white relative overflow-hidden flex flex-col justify-center">
-            <p class="text-xs font-bold text-blue-200 uppercase tracking-wider mb-1">Keuntungan (Net Sales)</p>
-            <h3 class="text-2xl font-black">Rp {{ number_format($totalNet, 0, ',', '.') }}</h3>
+            class="bg-slate-900 rounded-2xl p-5 shadow-lg relative overflow-hidden flex flex-col justify-between group hover:-translate-y-1 transition-transform duration-300">
+            <div
+                class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-5 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500">
+            </div>
+            <div class="flex items-center justify-between mb-3 relative z-10">
+                <p class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Net Sales</p>
+                <div class="p-2 bg-slate-800 rounded-lg text-blue-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                        </path>
+                    </svg>
+                </div>
+            </div>
+            <h3 class="text-2xl font-bold text-white relative z-10">Rp {{ number_format($totalNet, 0, ',', '.') }}</h3>
         </div>
 
         {{-- Gross Sales --}}
         <div
-            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col justify-center">
-            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total Gross</p>
+            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Gross</p>
+                <div class="p-2 bg-emerald-50 rounded-lg text-emerald-500">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                        </path>
+                    </svg>
+                </div>
+            </div>
             <h3 class="text-xl font-bold text-gray-800">Rp {{ number_format($totalGross, 0, ',', '.') }}</h3>
         </div>
 
         {{-- Diskon --}}
         <div
-            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col justify-center">
-            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total Diskon</p>
-            <h3 class="text-xl font-bold text-red-500">- Rp {{ number_format($totalDiscount, 0, ',', '.') }}</h3>
+            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Diskon</p>
+                <div class="p-2 bg-rose-50 rounded-lg text-rose-500">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z">
+                        </path>
+                    </svg>
+                </div>
+            </div>
+            <h3 class="text-xl font-bold text-rose-500">- Rp {{ number_format($totalDiscount, 0, ',', '.') }}</h3>
         </div>
 
         {{-- Total QTY Sold --}}
         <div
-            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col justify-center border-l-4 border-l-yellow-400">
-            <div class="flex items-center justify-between mb-1">
-                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Qty Terjual</p>
-                <div class="text-yellow-500">
+            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty Terjual</p>
+                <div class="p-2 bg-amber-50 rounded-lg text-amber-500">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                     </svg>
                 </div>
             </div>
-            <h3 class="text-2xl font-black text-gray-800">{{ number_format($totalQty, 0, ',', '.') }} <span
-                    class="text-sm font-normal text-gray-500">Pcs</span></h3>
+            <h3 class="text-xl font-bold text-gray-800">{{ number_format($totalQty, 0, ',', '.') }} <span
+                    class="text-sm font-medium text-gray-400">Pcs</span></h3>
         </div>
 
         {{-- Total Transactions --}}
         <div
-            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col justify-center border-l-4 border-l-purple-500">
-            <div class="flex items-center justify-between mb-1">
-                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Transaksi</p>
-                <div class="text-purple-500">
+            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Transaksi</p>
+                <div class="p-2 bg-indigo-50 rounded-lg text-indigo-500">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
@@ -107,101 +138,168 @@
                     </svg>
                 </div>
             </div>
-            <h3 class="text-2xl font-black text-gray-800">{{ number_format($totalTransactions, 0, ',', '.') }} <span
-                    class="text-sm font-normal text-gray-500">Struk</span></h3>
+            <h3 class="text-xl font-bold text-gray-800">{{ number_format($totalTransactions, 0, ',', '.') }} <span
+                    class="text-sm font-medium text-gray-400">Struk</span></h3>
         </div>
+
     </div>
 
-    {{-- SECTION 2: TOP PERFORMERS (LISTS WITH REVENUE) --}}
-    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
-        <svg class="w-5 h-5 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd"
-                d="M10 2a1 1 0 01.932.638l2.164 5.05 5.534.804a1 1 0 01.554 1.706l-4.004 3.902.945 5.51a1 1 0 01-1.451 1.054L10 17.643l-4.947 2.602a1 1 0 01-1.451-1.054l.945-5.51-4.004-3.902a1 1 0 01.554-1.706l5.534-.804 2.164-5.05A1 1 0 0110 2z"
-                clip-rule="evenodd"></path>
-        </svg>
-        Peringkat Tertinggi (Top Performers)
-    </h2>
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {{-- Top Products --}}
-        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
-            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top 5 Produk</h3>
-            <div class="space-y-4">
-                @forelse($topProducts as $index => $tp)
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div
-                                class="w-6 h-6 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs font-bold">
-                                {{ $index + 1 }}</div>
-                            <div>
-                                <p class="text-sm font-bold text-gray-800 line-clamp-1" title="{{ $tp['name'] }}">
-                                    {{ $tp['name'] }}</p>
-                                <p class="text-xs text-gray-500">{{ $tp['total_qty'] }} Pcs Terjual</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-sm font-bold text-green-600">Rp
-                                {{ number_format($tp['total_revenue'], 0, ',', '.') }}</p>
-                        </div>
-                    </div>
-                @empty
-                    <p class="text-sm text-gray-500 text-center py-4">Belum ada data.</p>
-                @endforelse
-            </div>
+    {{-- SECTION 2: TOP PERFORMERS (LISTS WITH REVENUE & RANKED BADGES) --}}
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <svg class="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd"
+                        d="M10 2a1 1 0 01.932.638l2.164 5.05 5.534.804a1 1 0 01.554 1.706l-4.004 3.902.945 5.51a1 1 0 01-1.451 1.054L10 17.643l-4.947 2.602a1 1 0 01-1.451-1.054l.945-5.51-4.004-3.902a1 1 0 01.554-1.706l5.534-.804 2.164-5.05A1 1 0 0110 2z"
+                        clip-rule="evenodd"></path>
+                </svg>
+                Peringkat Tertinggi
+            </h2>
         </div>
 
-        {{-- Top Sales --}}
-        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
-            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top 5 Kasir/Sales
-            </h3>
-            <div class="space-y-4">
-                @forelse($topSales as $index => $ts)
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div
-                                class="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold">
-                                {{ $index + 1 }}</div>
-                            <div>
-                                <p class="text-sm font-bold text-gray-800 line-clamp-1" title="{{ $ts['name'] }}">
-                                    {{ $ts['name'] }}</p>
-                                <p class="text-xs text-gray-500">{{ $ts['total_transactions'] }} Transaksi</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-sm font-bold text-blue-600">Rp
-                                {{ number_format($ts['total_revenue'], 0, ',', '.') }}</p>
-                        </div>
-                    </div>
-                @empty
-                    <p class="text-sm text-gray-500 text-center py-4">Belum ada data.</p>
-                @endforelse
-            </div>
-        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {{-- Top Branches --}}
-        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
-            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top 5 Cabang</h3>
-            <div class="space-y-4">
-                @forelse($topBranches as $index => $tb)
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div
-                                class="w-6 h-6 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center text-xs font-bold">
-                                {{ $index + 1 }}</div>
-                            <div>
-                                <p class="text-sm font-bold text-gray-800 line-clamp-1" title="{{ $tb['name'] }}">
-                                    {{ $tb['name'] }}</p>
-                                <p class="text-xs text-gray-500">{{ $tb['total_transactions'] }} Transaksi</p>
+            {{-- Top Products --}}
+            <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <div class="flex items-center justify-between mb-5 border-b border-gray-50 pb-3">
+                    <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Top 5 Produk</h3>
+                </div>
+                <div class="flex flex-col gap-1">
+                    @forelse($topProducts as $index => $tp)
+                        <div class="flex items-center justify-between py-2 group cursor-default">
+                            <div class="flex items-center gap-4 overflow-hidden">
+                                <span
+                                    class="text-sm font-bold w-4 text-center {{ $index === 0 ? 'text-amber-500' : ($index === 1 ? 'text-slate-400' : ($index === 2 ? 'text-orange-400' : 'text-slate-300')) }}">
+                                    {{ $index + 1 }}
+                                </span>
+                                <div class="overflow-hidden">
+                                    <p class="text-sm font-semibold text-slate-800 truncate transition-colors duration-200
+                                    {{ $index === 0 ? 'group-hover:text-amber-600' : ($index === 1 ? 'group-hover:text-slate-600' : ($index === 2 ? 'group-hover:text-orange-600' : 'group-hover:text-blue-600')) }}"
+                                        title="{{ $tp['name'] }}">
+                                        {{ $tp['name'] }}
+                                    </p>
+                                    <p class="text-xs text-slate-500 mt-0.5">Rp
+                                        {{ number_format($tp['total_revenue'], 0, ',', '.') }}</p>
+                                </div>
+                            </div>
+                            <div class="text-right pl-3 flex-shrink-0">
+                                {{-- RANK-BASED HIGHLIGHTED PCS BADGE --}}
+                                <span
+                                    class="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-sm font-bold border shadow-sm transition-all duration-300
+                                {{ $index === 0
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200 group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500'
+                                    : ($index === 1
+                                        ? 'bg-slate-100 text-slate-700 border-slate-200 group-hover:bg-slate-500 group-hover:text-white group-hover:border-slate-500'
+                                        : ($index === 2
+                                            ? 'bg-orange-50 text-orange-700 border-orange-200 group-hover:bg-orange-500 group-hover:text-white group-hover:border-orange-500'
+                                            : 'bg-gray-50 text-gray-500 border-gray-100 group-hover:bg-gray-500 group-hover:text-white group-hover:border-gray-500')) }}">
+                                    {{ $tp['total_qty'] }} <span
+                                        class="text-[10px] font-medium ml-1 uppercase opacity-80 tracking-wider">Pcs</span>
+                                </span>
                             </div>
                         </div>
-                        <div class="text-right">
-                            <p class="text-sm font-bold text-purple-600">Rp
-                                {{ number_format($tb['total_revenue'], 0, ',', '.') }}</p>
+                    @empty
+                        <div class="flex flex-col items-center justify-center py-8 text-center">
+                            <p class="text-sm text-slate-400">Belum ada data produk.</p>
                         </div>
-                    </div>
-                @empty
-                    <p class="text-sm text-gray-500 text-center py-4">Belum ada data.</p>
-                @endforelse
+                    @endforelse
+                </div>
             </div>
+
+            {{-- Top Sales --}}
+            <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <div class="flex items-center justify-between mb-5 border-b border-gray-50 pb-3">
+                    <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Top 5 Kasir/Sales</h3>
+                </div>
+                <div class="flex flex-col gap-1">
+                    @forelse($topSales as $index => $ts)
+                        <div class="flex items-center justify-between py-2 group cursor-default">
+                            <div class="flex items-center gap-4 overflow-hidden">
+                                <span
+                                    class="text-sm font-bold w-4 text-center {{ $index === 0 ? 'text-amber-500' : ($index === 1 ? 'text-slate-400' : ($index === 2 ? 'text-orange-400' : 'text-slate-300')) }}">
+                                    {{ $index + 1 }}
+                                </span>
+                                <div class="overflow-hidden">
+                                    <p class="text-sm font-semibold text-slate-800 truncate transition-colors duration-200
+                                    {{ $index === 0 ? 'group-hover:text-amber-600' : ($index === 1 ? 'group-hover:text-slate-600' : ($index === 2 ? 'group-hover:text-orange-600' : 'group-hover:text-blue-600')) }}"
+                                        title="{{ $ts['name'] }}">
+                                        {{ $ts['name'] }}
+                                    </p>
+                                    <p class="text-xs text-slate-500 mt-0.5">Rp
+                                        {{ number_format($ts['total_revenue'], 0, ',', '.') }}</p>
+                                </div>
+                            </div>
+                            <div class="text-right pl-3 flex-shrink-0">
+                                {{-- RANK-BASED HIGHLIGHTED PCS BADGE --}}
+                                <span
+                                    class="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-sm font-bold border shadow-sm transition-all duration-300
+                                {{ $index === 0
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200 group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500'
+                                    : ($index === 1
+                                        ? 'bg-slate-100 text-slate-700 border-slate-200 group-hover:bg-slate-500 group-hover:text-white group-hover:border-slate-500'
+                                        : ($index === 2
+                                            ? 'bg-orange-50 text-orange-700 border-orange-200 group-hover:bg-orange-500 group-hover:text-white group-hover:border-orange-500'
+                                            : 'bg-gray-50 text-gray-500 border-gray-100 group-hover:bg-gray-500 group-hover:text-white group-hover:border-gray-500')) }}">
+                                    {{ $ts['total_qty'] }} <span
+                                        class="text-[10px] font-medium ml-1 uppercase opacity-80 tracking-wider">Pcs</span>
+                                </span>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="flex flex-col items-center justify-center py-8 text-center">
+                            <p class="text-sm text-slate-400">Belum ada data kasir.</p>
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
+            {{-- Top Brands --}}
+            <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <div class="flex items-center justify-between mb-5 border-b border-gray-50 pb-3">
+                    <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Top 5 Brand</h3>
+                </div>
+                <div class="flex flex-col gap-1">
+                    @forelse($topBrands as $index => $tb)
+                        <div class="flex items-center justify-between py-2 group cursor-default">
+                            <div class="flex items-center gap-4 overflow-hidden">
+                                <span
+                                    class="text-sm font-bold w-4 text-center {{ $index === 0 ? 'text-amber-500' : ($index === 1 ? 'text-slate-400' : ($index === 2 ? 'text-orange-400' : 'text-slate-300')) }}">
+                                    {{ $index + 1 }}
+                                </span>
+                                <div class="overflow-hidden">
+                                    <p class="text-sm font-semibold text-slate-800 truncate transition-colors duration-200
+                                    {{ $index === 0 ? 'group-hover:text-amber-600' : ($index === 1 ? 'group-hover:text-slate-600' : ($index === 2 ? 'group-hover:text-orange-600' : 'group-hover:text-blue-600')) }}"
+                                        title="{{ $tb['name'] }}">
+                                        {{ $tb['name'] }}
+                                    </p>
+                                    <p class="text-xs text-slate-500 mt-0.5">Rp
+                                        {{ number_format($tb['total_revenue'], 0, ',', '.') }}</p>
+                                </div>
+                            </div>
+                            <div class="text-right pl-3 flex-shrink-0">
+                                {{-- RANK-BASED HIGHLIGHTED PCS BADGE --}}
+                                <span
+                                    class="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-sm font-bold border shadow-sm transition-all duration-300
+                                {{ $index === 0
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200 group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500'
+                                    : ($index === 1
+                                        ? 'bg-slate-100 text-slate-700 border-slate-200 group-hover:bg-slate-500 group-hover:text-white group-hover:border-slate-500'
+                                        : ($index === 2
+                                            ? 'bg-orange-50 text-orange-700 border-orange-200 group-hover:bg-orange-500 group-hover:text-white group-hover:border-orange-500'
+                                            : 'bg-gray-50 text-gray-500 border-gray-100 group-hover:bg-gray-500 group-hover:text-white group-hover:border-gray-500')) }}">
+                                    {{ $tb['total_qty'] }} <span
+                                        class="text-[10px] font-medium ml-1 uppercase opacity-80 tracking-wider">Pcs</span>
+                                </span>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="flex flex-col items-center justify-center py-8 text-center">
+                            <p class="text-sm text-slate-400">Belum ada data brand.</p>
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -220,10 +318,10 @@
                 <div id="chart-brand-proportion" wire:ignore class="w-full flex justify-center items-center"></div>
             </div>
 
-            <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
+            {{-- <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
                 <h2 class="text-lg font-bold text-gray-800 mb-4 text-center">Metode Bayar</h2>
                 <div id="chart-payment-method" wire:ignore class="w-full flex justify-center items-center"></div>
-            </div>
+            </div> --}}
         </div>
     </div>
 
@@ -457,7 +555,7 @@
                         tooltip: {
                             y: {
                                 formatter: function(val) {
-                                    return "Rp " + new Intl.NumberFormat('id-ID').format(val)
+                                    return new Intl.NumberFormat('id-ID').format(val) + " Pcs"
                                 }
                             }
                         }
@@ -497,8 +595,12 @@
 
                 updateCharts(newData) {
                     this.charts.trend.updateOptions({
-                        series: [{ data: newData.trend.series }],
-                        xaxis: { categories: newData.trend.labels }
+                        series: [{
+                            data: newData.trend.series
+                        }],
+                        xaxis: {
+                            categories: newData.trend.labels
+                        }
                     });
 
                     this.charts.brandProportion.updateOptions({
