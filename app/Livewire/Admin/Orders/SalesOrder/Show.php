@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class Show extends Component
@@ -27,6 +28,10 @@ class Show extends Component
     // Invoice Form
     public $showInvoiceModal = false;
     public $invoice_sns = [];
+    public $invoice_payment_method_id;
+    public $invoice_payment_method_rate_id;
+    public $invoice_date;
+    public $invoice_notes;
 
     public function mount(Order $order)
     {
@@ -46,13 +51,27 @@ class Show extends Component
         $this->payment_method_rate_id = null;
     }
 
-    #[\Livewire\Attributes\Computed]
+    #[Computed]
     public function getSelectedPaymentMethodProperty()
     {
         if (!$this->payment_method_id) return null;
-        return PaymentMethod::with(['rates' => function ($q) {
+        return \App\Models\PaymentMethod::with(['rates' => function ($q) {
             $q->where('is_active', true);
         }])->find($this->payment_method_id);
+    }
+
+    public function updatedInvoicePaymentMethodId($val)
+    {
+        $this->invoice_payment_method_rate_id = null;
+    }
+
+    #[Computed]
+    public function getSelectedInvoicePaymentMethodProperty()
+    {
+        if (!$this->invoice_payment_method_id) return null;
+        return \App\Models\PaymentMethod::with(['rates' => function ($q) {
+            $q->where('is_active', true);
+        }])->find($this->invoice_payment_method_id);
     }
 
     public function saveDp()
@@ -155,7 +174,7 @@ class Show extends Component
                     'dpAmount'   => (float)$this->dp_amount,
                     'soNumber'   => $this->order->accurate_so_number,
                     'transDate'  => Carbon::parse($this->dp_date)->format('d/m/Y'),
-                    'description'=> 'Uang Muka (DP) SO: ' . $this->order->accurate_so_number . '. ' . $this->dp_notes,
+                    'description' => 'Uang Muka (DP) SO: ' . $this->order->accurate_so_number . '. ' . $this->dp_notes,
                 ];
 
                 Log::info('Accurate DP Invoice Payload: ' . json_encode($dpInvData));
@@ -237,14 +256,30 @@ class Show extends Component
         foreach ($this->order->items as $item) {
             $this->invoice_sns[$item->id] = $item->serial_number ?? '';
         }
+        $this->invoice_payment_method_id = null;
+        $this->invoice_payment_method_rate_id = null;
+        $this->invoice_date = \Carbon\Carbon::now()->format('Y-m-d');
+        $this->invoice_notes = '';
         $this->showInvoiceModal = true;
     }
 
     public function submitFaktur()
     {
-        $this->validate([
+        $rules = [
             'invoice_sns.*' => 'nullable|string'
-        ]);
+        ];
+
+        $remBal = $this->getRemainingBalance();
+        if ($remBal > 0) {
+            $rules['invoice_payment_method_id'] = 'required';
+            $rules['invoice_date'] = 'required|date';
+            
+            if ($this->selectedInvoicePaymentMethod && $this->selectedInvoicePaymentMethod->rates->count() > 0) {
+                $rules['invoice_payment_method_rate_id'] = 'required';
+            }
+        }
+
+        $this->validate($rules);
 
         try {
             DB::beginTransaction();
@@ -349,11 +384,80 @@ class Show extends Component
                     'amount' => $this->order->grand_total,
                     'status' => 'SUCCESS',
                 ]);
+
+                // Settlement if balance > 0
+                if ($remBal > 0) {
+                    $feeAmount = 0;
+                    $netReceiptAmount = $remBal;
+                    $rate = null;
+                    $pm = $this->selectedInvoicePaymentMethod;
+
+                    if ($pm && $pm->rates->count() > 0 && $this->invoice_payment_method_rate_id) {
+                        $rate = $pm->rates->where('id', $this->invoice_payment_method_rate_id)->first();
+                        if ($rate) {
+                            $feePercentage = $rate->percentage ?? $rate->mdr_percentage;
+                            $feeAmount = ($remBal * $feePercentage) / 100;
+                            $netReceiptAmount = $remBal - $feeAmount;
+                        }
+                    }
+
+                    \App\Models\OrderPayment::create([
+                        'order_id' => $this->order->id,
+                        'payment_method_id' => $this->invoice_payment_method_id,
+                        'payment_method_rate_id' => $this->invoice_payment_method_rate_id,
+                        'amount' => $remBal,
+                        'fee_amount' => $feeAmount,
+                        'payment_date' => $this->invoice_date,
+                        'notes' => $this->invoice_notes,
+                        'status' => 'paid',
+                    ]);
+
+                    $srData = [
+                        'customerNo' => $this->order->user->getAccurateCustomerNo($dbSource),
+                        'branchName' => $accurateBranchName,
+                        'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
+                        'transDate' => \Carbon\Carbon::parse($this->invoice_date)->format('d/m/Y'),
+                        'receiptAmount' => (float)$netReceiptAmount,
+                        'chequeAmount' => (float)$netReceiptAmount,
+                        'description' => 'Pelunasan Faktur SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number) . '. ' . $this->invoice_notes,
+                        'detailInvoice' => [
+                            [
+                                'invoiceNo' => $siResult['r']['number'],
+                                'paymentAmount' => (float)$remBal,
+                            ]
+                        ]
+                    ];
+
+                    if ($feeAmount > 0) {
+                        $srData['detailOtherDeposit'] = [
+                            [
+                                'accountNo' => '7100.04',
+                                'amount' => (float)$feeAmount,
+                                'departmentName' => $accurateBranchName,
+                                'notes' => 'Potongan MDR ' . ($rate->name ?? 'Payment Gateway'),
+                            ]
+                        ];
+                    }
+
+                    Log::info('Accurate SR Invoice Settlement Payload: ' . json_encode($srData));
+                    $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+
+                    if (isset($srResult['r']['number'])) {
+                        \App\Models\OrderAccurateDoc::create([
+                            'order_id' => $this->order->id,
+                            'doc_type' => 'SALES_RECEIPT',
+                            'doc_number' => $srResult['r']['number'],
+                            'accurate_id' => $srResult['r']['id'] ?? null,
+                            'amount' => $remBal,
+                            'status' => 'SUCCESS',
+                        ]);
+                    }
+                }
             }
 
             DB::commit();
             $this->showInvoiceModal = false;
-            $this->dispatch('toast', title: 'Berhasil', message: 'Faktur Penjualan diterbitkan dan stok Accurate terpotong!', type: 'success');
+            $this->dispatch('toast', title: 'Berhasil', message: 'Faktur Penjualan diterbitkan dan pelunasan selesai!', type: 'success');
             $this->order->refresh();
         } catch (\Exception $e) {
             DB::rollBack();

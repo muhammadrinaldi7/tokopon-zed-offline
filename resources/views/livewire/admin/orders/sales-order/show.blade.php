@@ -312,14 +312,15 @@
                                     <div class="text-xs font-normal text-gray-500">{{ $item->variant->storage ?? '' }}
                                         {{ $item->variant->color ?? '' }}</div>
                                 </td>
-                                <td class="p-3 text-sm text-center">{{ $item->quantity }}</td>
-                                <td class="p-3 text-sm text-right">Rp {{ number_format($item->price, 0, ',', '.') }}
+                                <td class="p-3 text-sm text-center">{{ $item->qty }}</td>
+                                <td class="p-3 text-sm text-right">Rp
+                                    {{ number_format($item->price_at_checkout, 0, ',', '.') }}
                                 </td>
                                 <td class="p-3 text-sm text-right text-red-500">
                                     {{ $item->discount_amount > 0 ? '-Rp ' . number_format($item->discount_amount, 0, ',', '.') : '-' }}
                                 </td>
                                 <td class="p-3 text-sm text-right font-bold text-gray-800">Rp
-                                    {{ number_format($item->total_price, 0, ',', '.') }}</td>
+                                    {{ number_format($item->subtotal, 0, ',', '.') }}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -514,7 +515,9 @@
                             @php
                                 $variant = $item->variant;
                                 $isNew = $item->product_variant_type === \App\Models\ProductVariant::class;
-                                $itemName = $isNew ? ($variant->product->name ?? 'Unknown') : ($variant->secondProduct->name ?? 'Unknown');
+                                $itemName = $isNew
+                                    ? $variant->product->name ?? 'Unknown'
+                                    : $variant->secondProduct->name ?? 'Unknown';
                                 $sku = $variant->sku ?? '';
                             @endphp
                             <div
@@ -542,7 +545,8 @@
                                             Qty: {{ $item->qty }}
                                         </div>
                                         <div class="text-xs font-bold text-gray-800">
-                                            Total: Rp {{ number_format($item->price_at_checkout * $item->qty, 0, ',', '.') }}
+                                            Total: Rp
+                                            {{ number_format($item->price_at_checkout * $item->qty, 0, ',', '.') }}
                                         </div>
                                     </div>
                                 </div>
@@ -564,6 +568,54 @@
                             </div>
                         @endforeach
                     </div>
+
+                    @if ($order->remaining_balance > 0)
+                        <div class="pt-6 border-t border-gray-200 mt-4">
+                            <h3 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                Pelunasan Sisa Tagihan (Rp {{ number_format($order->remaining_balance, 0, ',', '.') }})
+                            </h3>
+                            
+                            <div class="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Tanggal Pelunasan *</label>
+                                        <input type="date" wire:model="invoice_date" class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Ke Rekening Bank *</label>
+                                        <select wire:model.live="invoice_payment_method_id" class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm" required>
+                                            <option value="">-- Pilih Rekening --</option>
+                                            @foreach ($paymentMethods as $method)
+                                                <option value="{{ $method->id }}">{{ $method->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('invoice_payment_method_id') <span class="text-xs text-red-500 mt-1">{{ $message }}</span> @enderror
+                                    </div>
+                                </div>
+
+                                @if ($this->selectedInvoicePaymentMethod && $this->selectedInvoicePaymentMethod->rates->count() > 0)
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Pilih Tarif MDR *</label>
+                                        <select wire:model="invoice_payment_method_rate_id" class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm" required>
+                                            <option value="">-- Pilih Tarif MDR --</option>
+                                            @foreach ($this->selectedInvoicePaymentMethod->rates as $rate)
+                                                <option value="{{ $rate->id }}">{{ $rate->name }} ({{ (float) ($rate->percentage ?? $rate->mdr_percentage) }}%)</option>
+                                            @endforeach
+                                        </select>
+                                        @error('invoice_payment_method_rate_id') <span class="text-xs text-red-500 mt-1">{{ $message }}</span> @enderror
+                                    </div>
+                                @endif
+
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Catatan/Referensi</label>
+                                    <input type="text" wire:model="invoice_notes" class="w-full p-2.5 rounded-lg border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm" placeholder="Contoh: Lunas via Transfer BCA">
+                                </div>
+                            </div>
+                        </div>
+                    @endif
 
                     <div class="pt-4 border-t border-gray-100 flex justify-end gap-3">
                         <button type="button" wire:click="$set('showInvoiceModal', false)"
