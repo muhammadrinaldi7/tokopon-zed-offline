@@ -35,7 +35,7 @@
     </style>
 </head>
 
-<body class="min-h-screen bg-gray-50 antialiased flex flex-col">
+<body class="min-h-screen bg-neutral-100 antialiased flex flex-col">
 
     <livewire:sidebar />
     <main class="flex-1 pb-24 lg:pb-0 lg:ml-20">
