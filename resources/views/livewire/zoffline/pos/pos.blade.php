@@ -1,4 +1,4 @@
-<div class="bg-gray-100" x-data="{ showSidebar: false }">
+<div class="" x-data="{ showSidebar: false }">
 
     <div class="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50">
         {{-- Clean Header --}}
@@ -16,7 +16,8 @@
                     @endif
                 </h2>
                 @if ($currentStep == 1)
-                    <p class="text-gray-500 text-sm mt-1">Cari data pelanggan yang sudah terdaftar atau tambahkan pelanggan baru untuk memulai transaksi.</p>
+                    <p class="text-gray-500 text-sm mt-1">Cari data pelanggan yang sudah terdaftar atau tambahkan
+                        pelanggan baru untuk memulai transaksi.</p>
                 @endif
             </div>
 
@@ -25,7 +26,8 @@
                     <p class="text-sm font-bold text-gray-800">{{ Auth::user()->name ?? 'Kasir' }}</p>
                     <p class="text-xs text-gray-500">{{ Auth::user()->businessUnit->name ?? '-' }}</p>
                 </div>
-                <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg uppercase">
+                <div
+                    class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg uppercase">
                     {{ substr(Auth::user()->name ?? 'K', 0, 1) }}
                 </div>
             </div>

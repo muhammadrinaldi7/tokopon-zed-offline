@@ -144,7 +144,7 @@ new class extends Component {
 
             {{-- Tombol Profil --}}
             <button @click="open = !open" class="group relative focus:outline-none flex flex-col items-center">
-                <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-bold border-2 transition-all"
+                <div class="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-gray-600 font-bold border-2 transition-all"
                     :class="open ? 'border-[#4E44DB]' : 'border-transparent group-hover:border-gray-300'">
                     {{ auth()->check() ? substr(auth()->user()->name, 0, 1) : 'A' }}
                 </div>
@@ -164,6 +164,7 @@ new class extends Component {
                 @auth
                     <div class="px-4 py-2 border-b border-gray-100 mb-1">
                         <span class="block text-sm font-bold text-gray-800 truncate">{{ auth()->user()->name }}</span>
+                        <span class="block text-[11px] text-gray-500">{{ auth()->user()->businessUnit->name ?? '' }}</span>
                         <span class="block text-[11px] text-gray-500">{{ auth()->user()->roles->first()->name }}</span>
                     </div>
                 @endauth

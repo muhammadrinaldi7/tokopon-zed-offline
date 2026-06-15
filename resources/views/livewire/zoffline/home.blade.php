@@ -6,7 +6,7 @@
         {{-- Card 1: Zpos --}}
         @can('view-pos')
             <div wire:click="navigateToZPos"
-                class="md:[&:nth-child(3n+1)]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+                class="md:nth-[3n+1]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
 
                 {{-- Ikon tetap di atas --}}
                 <div class="rounded-full w-20 h-20 bg-[#DFE7FF] flex items-center justify-center text-black">
@@ -25,7 +25,7 @@
 
                 {{-- Teks dibungkus div agar kumpul di bawah --}}
                 <div>
-                    <h1 class="text-2xl font-semibold">Transaksi <br> Penjualan</h1>
+                    <h1 class="text-2xl ">Transaksi <br> Penjualan</h1>
                     {{-- line-clamp-2 ditambahkan agar aman jika suatu saat teksnya panjang --}}
                     <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Transaksi Mudah dan Cepat</p>
                 </div>
@@ -49,7 +49,7 @@
 
                 {{-- Bungkus Teks jadi satu div agar ngumpul di bawah --}}
                 <div>
-                    <h1 class="text-2xl font-semibold">Transaksi<br>Pembelian</h1>
+                    <h1 class="text-2xl ">Transaksi<br>Pembelian</h1>
                     {{-- Tambahkan line-clamp-2 agar rapi jika kepanjangan --}}
                     <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Catatan aktivitas pembelian</p>
                 </div>
@@ -78,7 +78,7 @@
 
                 {{-- Bungkus Teks jadi satu div agar ngumpul di bawah --}}
                 <div>
-                    <h1 class="text-2xl font-semibold">Klaim Garansi <br> Retur</h1>
+                    <h1 class="text-2xl ">Klaim Garansi <br> Retur</h1>
                     {{-- Tambahkan line-clamp-2 agar rapi jika kepanjangan --}}
                     <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Ajukan klaim garansi untuk produk yang bermasalah
                     </p>
@@ -101,7 +101,7 @@
 
                 {{-- Bungkus Teks jadi satu div agar ngumpul di bawah --}}
                 <div>
-                    <h1 class="text-2xl font-semibold">Cek <br> Stock</h1>
+                    <h1 class="text-2xl ">Cek <br> Stock</h1>
                     {{-- Tambahkan line-clamp-2 agar rapi jika kepanjangan --}}
                     <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Informasi stok barang yang tersedia
                     </p>
@@ -123,7 +123,7 @@
 
                 {{-- Bungkus Teks jadi satu div agar ngumpul di bawah --}}
                 <div>
-                    <h1 class="text-2xl font-semibold">Closing <br> Kasir</h1>
+                    <h1 class="text-2xl ">Closing <br> Kasir</h1>
                     {{-- Tambahkan line-clamp-2 agar rapi jika kepanjangan --}}
                     <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Rekap dan penutupan kasir harian
                     </p>
@@ -146,7 +146,7 @@
 
                 {{-- Bungkus Teks jadi satu div agar ngumpul di bawah --}}
                 <div>
-                    <h1 class="text-2xl font-semibold">Dashboard</h1>
+                    <h1 class="text-2xl ">Dashboard</h1>
                     {{-- Tambahkan line-clamp-2 agar rapi jika kepanjangan --}}
                     <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Omzet, grafik, dan analitik toko
                     </p>
