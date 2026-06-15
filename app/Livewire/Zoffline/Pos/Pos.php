@@ -47,9 +47,17 @@ class Pos extends Component
     {
         if ($this->currentStep == 1) {
             // Validasi Step 1: Customer dan Sales
-            if (!$this->selectedCustomerId && !$this->isNewCustomer) {
-                $this->dispatch('toast', title: 'Customer Belum Dipilih', message: 'Pilih atau buat data customer terlebih dahulu.', type: 'warning');
-                return;
+            if (!$this->selectedCustomerId) {
+                // Auto set new customer if they filled the search and phone
+                if (strlen($this->searchCustomer) >= 2 && !empty($this->customerPhone)) {
+                    $this->isNewCustomer = true;
+                    $this->customerName = $this->searchCustomer;
+                }
+
+                if (!$this->isNewCustomer) {
+                    $this->dispatch('toast', title: 'Customer Belum Lengkap', message: 'Pilih customer dari daftar, atau lengkapi Nama & Nomor HP untuk membuat pelanggan baru.', type: 'warning');
+                    return;
+                }
             }
             if (empty($this->selectedSales)) {
                 $this->dispatch('toast', title: 'Sales Belum Dipilih', message: 'Pilih minimal 1 tenaga penjual.', type: 'warning');

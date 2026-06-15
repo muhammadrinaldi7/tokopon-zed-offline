@@ -1,170 +1,179 @@
-<div class="space-y-4">
-    {{-- SCANNER AREA --}}
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="p-6">
-            <div class="flex gap-3">
+<div class="space-y-6">
+    {{-- CUSTOMER INFO PILLS (FIGMA STYLE) --}}
+    @if ($selectedCustomerId || $isNewCustomer)
+        @php 
+            $cName = $selectedCustomerId ? (\App\Models\User::find($selectedCustomerId)->name ?? 'Pelanggan') : ($customerName ?: 'Pelanggan Baru');
+            $cPhone = $selectedCustomerId ? (\App\Models\User::with('profile')->find($selectedCustomerId)->profile->phone_number ?? '') : $customerPhone;
+            $cEmail = $selectedCustomerId ? (\App\Models\User::find($selectedCustomerId)->email ?? '') : $customerEmail;
+        @endphp
+        <div class="flex flex-wrap gap-3">
+            <div class="px-5 py-2.5 bg-blue-500 text-white rounded-full text-sm font-bold shadow-sm shadow-blue-500/20">
+                {{ $cName }}
+            </div>
+            @if($cPhone)
+            <div class="px-5 py-2.5 bg-blue-100 text-blue-800 rounded-full text-sm font-bold shadow-sm">
+                {{ $cPhone }}
+            </div>
+            @endif
+            @if($cEmail)
+            <div class="px-5 py-2.5 bg-orange-100 text-orange-800 rounded-full text-sm font-bold shadow-sm">
+                {{ $cEmail }}
+            </div>
+            @endif
+        </div>
+    @endif
+
+    {{-- SCANNER AREA (LARGE VISUAL) --}}
+    <div class="bg-white rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-100 p-8 text-center relative overflow-hidden group">
+        {{-- Decorative bracket icons --}}
+        <div class="absolute inset-0 pointer-events-none flex items-center justify-center opacity-5">
+            <svg class="w-64 h-64 text-[#1c69d4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="0.5">
+                <path stroke-linecap="square" stroke-linejoin="miter" d="M4 6v12M20 6v12M4 6h4M20 6h-4M4 18h4M20 18h-4" />
+            </svg>
+        </div>
+
+        <div class="relative z-10 max-w-xl mx-auto">
+            <div class="w-20 h-20 mx-auto bg-blue-50 text-[#1c69d4] rounded-2xl flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform duration-300">
+                <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+            </div>
+            
+            <div class="flex items-center gap-2 mb-2">
                 <input type="text" wire:model.defer="scanned_sn" wire:keydown.enter="processScan"
                     x-ref="barcodeScanner"
-                    class="flex-1 bg-white border border-gray-300 rounded-xl px-4 py-3 text-lg font-mono focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition"
-                    placeholder="Scan SN / IMEI / Barcode di sini..." autofocus>
-                <button wire:click="processScan"
-                    class="px-6 py-3 bg-[#1c69d4] hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm transition">
-                    Scan
+                    class="flex-1 bg-gray-50 border-0 border-b-2 border-gray-200 focus:border-[#1c69d4] focus:ring-0 px-2 py-3 text-center text-xl font-mono tracking-widest text-gray-800 transition-colors"
+                    placeholder="SCAN SN / BARCODE" autofocus>
+            </div>
+            <p class="text-xs text-gray-400 font-bold uppercase tracking-widest">Arahkan scanner ke barcode atau ketik manual lalu tekan Enter</p>
+            
+            {{-- Manual Search Area (Optional/Fallback) --}}
+            <div class="mt-8 pt-6 border-t border-gray-100 flex items-center justify-center gap-3">
+                <span class="text-sm font-bold text-gray-500">Atau</span>
+                <button onclick="document.getElementById('manual-search').focus()" class="text-[#1c69d4] font-bold text-sm hover:underline flex items-center gap-1">
+                    Cari Produk Manual 
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 </button>
+                <input id="manual-search" type="text" wire:model.live.debounce.300ms="search" class="sr-only"> {{-- Hidden search bound to 'search' --}}
             </div>
 
+            {{-- Manual Search Results Dropdown --}}
+            @if (strlen($search) >= 2)
+                <div class="absolute top-full left-0 w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl max-h-60 overflow-y-auto z-50 text-left">
+                    @forelse($this->searchResults as $product)
+                        <button wire:click="openVariantPicker({{ $product->id }}, {{ $product->is_second_catalog ? 'true' : 'false' }})"
+                            class="w-full p-3 hover:bg-blue-50/50 text-left flex flex-col transition border-b border-gray-50 last:border-0">
+                            <span class="font-bold text-gray-800">{{ $product->name }}</span>
+                            <span class="text-xs text-[#1c69d4] font-bold">Rp {{ number_format($product->price ?? 0, 0, ',', '.') }}</span>
+                        </button>
+                    @empty
+                        <p class="p-4 text-sm text-gray-500 font-medium text-center">Produk tidak ditemukan</p>
+                    @endforelse
+                </div>
+            @endif
         </div>
     </div>
 
-    {{-- CART LIST --}}
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-        <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-            <h3 class="font-bold text-gray-800 flex items-center gap-2">
-                <svg class="w-5 h-5 text-[#1c69d4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                Daftar Belanjaan
-            </h3>
-            <span class="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-md">{{ count($cart) }} Item</span>
-        </div>
+    {{-- CART LIST (CLEAN TABLE) --}}
+    @if (count($cart) > 0)
+        <div class="bg-white rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/30">
+                <h3 class="font-black text-gray-800 text-lg">Konfirmasi Produk Pilihan</h3>
+                <span class="text-xs font-black bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">{{ count($cart) }} Item</span>
+            </div>
 
-        <div class="p-0 overflow-y-auto max-h-[50vh]">
-            @if (count($cart) === 0)
-                <div class="p-12 text-center flex flex-col items-center justify-center text-gray-400">
-                    <svg class="w-16 h-16 mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    <p class="font-bold text-lg text-gray-500">Keranjang masih kosong</p>
-                    <p class="text-sm">Scan barcode untuk mulai menambahkan barang.</p>
-                </div>
-            @else
-                <div class="divide-y divide-gray-100">
-                    @foreach ($cart as $index => $item)
-                        <div class="p-4 hover:bg-gray-50 transition relative group">
-                            <div class="flex gap-4">
-                                {{-- Item Details --}}
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex justify-between items-start mb-1">
-                                        <h4 class="font-bold text-gray-800 text-sm md:text-base leading-tight">
-                                            {{ $item['name'] }}
-                                            @if ($item['is_second'])
-                                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-800">Second</span>
-                                            @endif
-                                        </h4>
-                                        <div class="text-right ml-4">
-                                            <p class="font-bold text-gray-800">Rp {{ number_format($item['price'], 0, ',', '.') }}</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <p class="text-xs text-gray-500 mb-2">
-                                        {{ $item['ram'] }} / {{ $item['storage'] }} / {{ $item['color'] }}
-                                    </p>
-
-                                    {{-- Qty Controls --}}
-                                    <div class="flex items-center justify-between mt-3">
-                                        <div class="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm">
-                                            <button wire:click="decrementCartItem({{ $index }})"
-                                                class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-l-lg transition">
-                                                -
-                                            </button>
-                                            <input type="number" wire:model.lazy="cart.{{ $index }}.qty"
-                                                class="w-12 h-8 text-center border-x border-y-0 border-gray-200 text-sm font-bold p-0 focus:ring-0 focus:border-gray-200"
-                                                min="1">
-                                            <button wire:click="incrementCartItem({{ $index }})"
-                                                class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-r-lg transition">
-                                                +
-                                            </button>
-                                        </div>
-
-                                        <p class="font-bold text-[#1c69d4]">
-                                            Rp {{ number_format($item['price'] * $item['qty'], 0, ',', '.') }}
-                                        </p>
-                                    </div>
-
-                                    {{-- Item Discount --}}
-                                    <div class="flex items-center justify-between mt-3 bg-gray-50 p-2 rounded-lg border border-gray-100">
-                                        <label class="text-xs font-bold text-gray-500 uppercase">Diskon Item (Rp)</label>
-                                        <div class="relative w-32">
-                                            <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">Rp</span>
-                                            <input type="number" wire:model.lazy="cart.{{ $index }}.discount_amount"
-                                                class="w-full h-8 pl-7 pr-2 text-right border border-gray-200 rounded-md text-sm font-bold focus:ring-1 focus:ring-[#1c69d4]/20 focus:border-[#1c69d4]"
-                                                placeholder="0" min="0">
-                                        </div>
-                                    </div>
-
-                                    {{-- SN Input Loop --}}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50/50 text-xs text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100">
+                            <th class="px-6 py-4">Nama Produk / Tipe</th>
+                            <th class="px-6 py-4">Spesifikasi</th>
+                            <th class="px-6 py-4">Serial Number</th>
+                            <th class="px-6 py-4 text-center">Qty</th>
+                            <th class="px-6 py-4 text-right">Harga Satuan</th>
+                            <th class="px-6 py-4"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        @foreach ($cart as $index => $item)
+                            <tr class="hover:bg-gray-50/30 transition-colors group">
+                                <td class="px-6 py-5 align-top">
+                                    <p class="font-bold text-gray-800 text-base leading-tight">{{ $item['name'] }}</p>
+                                    @if ($item['is_second'])
+                                        <span class="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 uppercase tracking-widest">Second</span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-5 align-top">
+                                    <p class="text-sm font-medium text-gray-600">{{ $item['storage'] }} / {{ $item['ram'] }}</p>
+                                    <p class="text-sm font-medium text-gray-600">{{ $item['color'] }}</p>
+                                </td>
+                                <td class="px-6 py-5 align-top min-w-[200px]">
                                     @if ($item['has_sn'])
-                                        <div class="mt-3 space-y-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                            <p class="text-xs font-bold text-gray-600 mb-1">Serial Numbers (Wajib):</p>
+                                        <div class="space-y-2">
                                             @for ($i = 0; $i < $item['qty']; $i++)
                                                 <div class="flex items-center gap-2">
-                                                    <span class="text-xs font-bold text-gray-400 w-4">{{ $i + 1 }}.</span>
                                                     <input type="text"
                                                         wire:model.lazy="cart.{{ $index }}.serial_numbers.{{ $i }}"
-                                                        class="flex-1 bg-white border border-gray-200 rounded-md px-3 py-1.5 text-xs font-mono focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20 transition"
+                                                        class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-mono focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20 transition shadow-sm"
                                                         placeholder="Scan / Ketik SN">
-
-                                                    {{-- QC Buttons: Hanya untuk produk GSK/Second --}}
+                                                    
                                                     @if (($item['is_second'] ?? false) && !empty($item['serial_numbers'][$i] ?? ''))
-                                                        <button type="button"
-                                                            wire:click="openQcSerahTerima('{{ $item['serial_numbers'][$i] }}')"
-                                                            class="shrink-0 text-[10px] font-bold text-emerald-600 hover:text-white bg-emerald-50 hover:bg-emerald-500 border border-emerald-200 hover:border-emerald-500 px-2 py-1 rounded-md transition-all"
-                                                            title="Lakukan QC Serah Terima">
-                                                            🔍 QC
-                                                        </button>
-                                                        <button type="button"
-                                                            wire:click="openCustomerQcModal('{{ $item['serial_numbers'][$i] }}')"
-                                                            class="shrink-0 text-[10px] font-bold text-blue-600 hover:text-white bg-blue-50 hover:bg-blue-500 border border-blue-200 hover:border-blue-500 px-2 py-1 rounded-md transition-all flex items-center gap-0.5"
-                                                            title="Lihat Riwayat QC">
-                                                            📋 Riwayat
+                                                        <button type="button" wire:click="openQcSerahTerima('{{ $item['serial_numbers'][$i] }}')"
+                                                            class="shrink-0 text-[10px] font-bold text-emerald-600 hover:bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md transition-all">
+                                                            QC
                                                         </button>
                                                     @endif
                                                 </div>
                                             @endfor
                                         </div>
+                                    @else
+                                        <span class="text-xs text-gray-400 font-medium italic">Tidak memerlukan SN</span>
                                     @endif
-                                </div>
-                            </div>
-                            
-                            {{-- Delete Button --}}
-                            <button wire:click="removeFromCart({{ $index }})"
-                                class="absolute top-4 right-4 p-1.5 text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition opacity-0 group-hover:opacity-100">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </button>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-        </div>
-        
-        {{-- Total Summary --}}
-        <div class="p-4 bg-blue-50/50 border-t border-blue-100">
-            <div class="flex justify-between items-center text-sm mb-1">
-                <span class="text-gray-600 font-medium">Subtotal Barang:</span>
-                <span class="font-bold text-gray-800">Rp {{ number_format($this->subtotal, 0, ',', '.') }}</span>
+                                </td>
+                                <td class="px-6 py-5 align-top">
+                                    <div class="flex justify-center">
+                                        <div class="flex items-center bg-gray-50 border border-gray-200 rounded-lg shadow-sm w-max">
+                                            <button wire:click="decrementCartItem({{ $index }})" class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-l-lg transition font-black">-</button>
+                                            <input type="number" wire:model.lazy="cart.{{ $index }}.qty" class="w-10 h-8 text-center bg-transparent border-none text-sm font-bold p-0 focus:ring-0" min="1">
+                                            <button wire:click="incrementCartItem({{ $index }})" class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-r-lg transition font-black">+</button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-5 align-top text-right">
+                                    <p class="font-black text-gray-800 text-base">Rp {{ number_format($item['price'], 0, ',', '.') }}</p>
+                                    @if(isset($item['discount_amount']) && $item['discount_amount'] > 0)
+                                        <p class="text-xs font-bold text-rose-500 mt-1">- Rp {{ number_format($item['discount_amount'], 0, ',', '.') }}</p>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-5 align-top text-right">
+                                    <button wire:click="removeFromCart({{ $index }})"
+                                        class="p-2 text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
-            <div class="flex justify-between items-center text-lg mt-2 pt-2 border-t border-blue-200/50">
-                <span class="font-bold text-gray-800">Total Tagihan Sementara:</span>
-                <span class="font-black text-[#1c69d4]">Rp {{ number_format($this->subtotal, 0, ',', '.') }}</span>
+            
+            <div class="p-6 bg-[#1c69d4]/5 border-t border-[#1c69d4]/10 flex justify-between items-center">
+                <span class="font-bold text-gray-500 uppercase tracking-widest text-xs">Total Tagihan Sementara</span>
+                <span class="font-black text-2xl text-[#1c69d4]">Rp {{ number_format($this->subtotal, 0, ',', '.') }}</span>
             </div>
         </div>
-    </div>
+    @endif
 
     {{-- Footer Actions --}}
-    <div class="flex justify-between gap-3 pt-2">
+    <div class="flex justify-between gap-3 pt-6">
         <button wire:click="prevStep"
-            class="px-6 py-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm transition-all flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
+            class="px-8 py-3.5 bg-white hover:bg-gray-50 border-2 border-gray-100 text-gray-700 font-black rounded-xl shadow-sm transition-all flex items-center gap-2">
             Kembali
         </button>
         <button wire:click="nextStep"
-            class="px-8 py-3 bg-[#1c69d4] hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
-            Lanjut ke Promo & Add-ons
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            class="px-8 py-3.5 bg-[#1c69d4] hover:bg-blue-700 text-white font-black rounded-xl shadow-[0_8px_15px_-3px_rgba(28,105,212,0.3)] hover:shadow-[0_12px_20px_-3px_rgba(28,105,212,0.4)] hover:-translate-y-0.5 transition-all flex items-center gap-2">
+            Lanjut
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
         </button>
@@ -174,55 +183,40 @@
 {{-- MODAL KONFIRMASI SCAN --}}
 @if($showScannedItemModal && $scannedItemConfirm)
 <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
-        <div class="bg-[#1c69d4] p-6 text-center relative overflow-hidden">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+        <div class="bg-[#1c69d4] p-8 text-center relative overflow-hidden">
             <div class="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent"></div>
-            <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 backdrop-blur-md">
-                <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
+                <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
             </div>
-            <h3 class="text-xl font-bold text-white relative z-10">Konfirmasi Barang</h3>
-            <p class="text-blue-100 text-sm mt-1 relative z-10">Pastikan barang & harga sesuai sebelum masuk keranjang</p>
+            <h3 class="text-2xl font-black text-white relative z-10">Produk Ditemukan!</h3>
         </div>
 
-        <div class="p-6 space-y-4">
-            <div class="bg-gray-50 border border-gray-100 rounded-xl p-4">
-                <p class="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Nama Produk</p>
-                <p class="text-lg font-bold text-gray-800 leading-tight">{{ $scannedItemConfirm['name'] }}</p>
-                
-                <div class="flex flex-wrap gap-2 mt-3">
-                    <span class="px-2 py-1 bg-white border border-gray-200 rounded text-xs font-bold text-gray-600">{{ $scannedItemConfirm['storage'] }} / {{ $scannedItemConfirm['ram'] }}</span>
-                    <span class="px-2 py-1 bg-white border border-gray-200 rounded text-xs font-bold text-gray-600">{{ $scannedItemConfirm['color'] }}</span>
-                    @if($scannedItemConfirm['isSecond'])
-                        <span class="px-2 py-1 bg-amber-100 text-amber-800 border border-amber-200 rounded text-xs font-bold">Second</span>
-                    @endif
+        <div class="p-8 space-y-5">
+            <div class="text-center">
+                <p class="text-xl font-bold text-gray-800 leading-tight mb-2">{{ $scannedItemConfirm['name'] }}</p>
+                <div class="flex items-center justify-center gap-2 mb-4">
+                    <span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-600">{{ $scannedItemConfirm['storage'] }} / {{ $scannedItemConfirm['ram'] }}</span>
+                    <span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-600">{{ $scannedItemConfirm['color'] }}</span>
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-                <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-4">
-                    <p class="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Harga Jual</p>
-                    <p class="text-lg font-black text-[#1c69d4]">Rp {{ number_format($scannedItemConfirm['price'], 0, ',', '.') }}</p>
-                </div>
-                <div class="bg-gray-50 border border-gray-100 rounded-xl p-4">
-                    <p class="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">SN / IMEI</p>
-                    <p class="text-sm font-mono font-bold text-gray-800 break-all">{{ $scannedItemConfirm['sn'] }}</p>
-                </div>
+            <div class="bg-blue-50/50 border border-blue-100 rounded-2xl p-5 text-center">
+                <p class="text-xs text-blue-600 font-bold uppercase tracking-widest mb-1">Harga Jual</p>
+                <p class="text-2xl font-black text-[#1c69d4]">Rp {{ number_format($scannedItemConfirm['price'], 0, ',', '.') }}</p>
             </div>
         </div>
 
-        <div class="p-6 pt-0 flex gap-3">
+        <div class="p-8 pt-0 flex gap-3">
             <button wire:click="cancelScannedItem"
-                class="flex-1 px-4 py-3 bg-white border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-bold rounded-xl transition-all">
+                class="flex-1 px-4 py-4 bg-white border-2 border-gray-100 hover:bg-gray-50 text-gray-700 font-black rounded-xl transition-all">
                 Batal
             </button>
             <button wire:click="confirmScannedItem"
-                class="flex-1 px-4 py-3 bg-[#1c69d4] hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                Masuk Keranjang
+                class="flex-1 px-4 py-4 bg-[#1c69d4] hover:bg-blue-700 text-white font-black rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2">
+                Tambahkan
             </button>
         </div>
     </div>

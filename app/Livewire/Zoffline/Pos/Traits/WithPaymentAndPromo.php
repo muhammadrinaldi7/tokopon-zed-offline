@@ -23,6 +23,8 @@ trait WithPaymentAndPromo
     public $selectedPromos = []; // Menyimpan ID promo yang dipilih
 
     public $paymentMode = null; // 'tunai', 'non-tunai', 'split'
+    public $paymentWizardStep = 1; // 1: Mode, 2: Method, 3: MDR & Nominal, 'split_dashboard'
+    public $activePaymentIndex = 0;
 
     public function setPaymentMode($mode)
     {
@@ -38,6 +40,8 @@ trait WithPaymentAndPromo
                     'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount()),
                 ]
             ];
+            $this->activePaymentIndex = 0;
+            $this->paymentWizardStep = 2;
         } elseif ($mode === 'non-tunai') {
             $this->payments = [
                 [
@@ -48,23 +52,61 @@ trait WithPaymentAndPromo
                     'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount()),
                 ]
             ];
+            $this->activePaymentIndex = 0;
+            $this->paymentWizardStep = 2;
         } elseif ($mode === 'split') {
-            $this->payments = [
-                [
-                    'category' => '',
-                    'payment_method_id' => '',
-                    'payment_method_rate_id' => '',
-                    'no_kontrak' => '',
-                    'amount' => 0,
-                ],
-                [
-                    'category' => '',
-                    'payment_method_id' => '',
-                    'payment_method_rate_id' => '',
-                    'no_kontrak' => '',
-                    'amount' => 0,
-                ]
-            ];
+            $this->payments = [];
+            $this->paymentWizardStep = 'split_dashboard';
+        }
+    }
+
+    public function addSplitPayment($category) // 'TUNAI' or 'NON-TUNAI'
+    {
+        $remaining = max(0, ($this->subtotal() - (int)$this->totalDiscount()) - $this->paymentsTotalBase());
+        $this->payments[] = [
+            'category' => $category,
+            'payment_method_id' => '',
+            'payment_method_rate_id' => '',
+            'no_kontrak' => '',
+            'amount' => $remaining,
+        ];
+        $this->activePaymentIndex = count($this->payments) - 1;
+        $this->paymentWizardStep = 2;
+    }
+
+    public function selectPaymentMethod($methodId)
+    {
+        $this->payments[$this->activePaymentIndex]['payment_method_id'] = $methodId;
+        $this->payments[$this->activePaymentIndex]['payment_method_rate_id'] = ''; // reset rate
+        $this->paymentWizardStep = 3;
+    }
+
+    public function savePaymentLine()
+    {
+        if ($this->paymentMode === 'split') {
+            $this->paymentWizardStep = 'split_dashboard';
+        }
+    }
+
+    public function prevPaymentWizardStep()
+    {
+        if ($this->paymentWizardStep === 3) {
+            $this->paymentWizardStep = 2;
+        } elseif ($this->paymentWizardStep === 2) {
+            if ($this->paymentMode === 'split') {
+                // Remove the row if it's new and cancelled
+                if (empty($this->payments[$this->activePaymentIndex]['payment_method_id'])) {
+                    unset($this->payments[$this->activePaymentIndex]);
+                    $this->payments = array_values($this->payments);
+                }
+                $this->paymentWizardStep = 'split_dashboard';
+            } else {
+                $this->paymentMode = null;
+                $this->paymentWizardStep = 1;
+            }
+        } elseif ($this->paymentWizardStep === 'split_dashboard') {
+            $this->paymentMode = null;
+            $this->paymentWizardStep = 1;
         }
     }
 

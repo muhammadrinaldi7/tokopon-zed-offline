@@ -63,9 +63,16 @@ trait WithCheckoutAndReceipt
             }
         }
 
-        if (!$this->selectedCustomerId && !$this->isNewCustomer) {
-            $this->dispatch('toast', title: 'Customer Belum Dipilih', message: 'Pilih atau buat data customer terlebih dahulu.', type: 'warning');
-            return;
+        if (!$this->selectedCustomerId) {
+            if (strlen($this->searchCustomer) >= 2 && !empty($this->customerPhone)) {
+                $this->isNewCustomer = true;
+                $this->customerName = $this->searchCustomer;
+            }
+
+            if (!$this->isNewCustomer) {
+                $this->dispatch('toast', title: 'Customer Belum Lengkap', message: 'Pilih customer dari daftar, atau lengkapi Nama & Nomor HP untuk membuat pelanggan baru.', type: 'warning');
+                return;
+            }
         }
 
         if (empty($this->selectedSales)) {
@@ -602,9 +609,16 @@ trait WithCheckoutAndReceipt
             }
         }
 
-        if (!$this->selectedCustomerId && !$this->isNewCustomer) {
-            $this->dispatch('toast', title: 'Customer Belum Dipilih', message: 'Pilih atau buat data customer terlebih dahulu.', type: 'warning');
-            return;
+        if (!$this->selectedCustomerId) {
+            if (strlen($this->searchCustomer) >= 2 && !empty($this->customerPhone)) {
+                $this->isNewCustomer = true;
+                $this->customerName = $this->searchCustomer;
+            }
+
+            if (!$this->isNewCustomer) {
+                $this->dispatch('toast', title: 'Customer Belum Lengkap', message: 'Pilih customer dari daftar, atau lengkapi Nama & Nomor HP untuk membuat pelanggan baru.', type: 'warning');
+                return;
+            }
         }
 
         if (empty($this->selectedSales)) {

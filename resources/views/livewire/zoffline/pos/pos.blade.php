@@ -1,37 +1,33 @@
 <div class="bg-gray-100" x-data="{ showSidebar: false }">
 
     <div class="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50">
-        {{-- Gamified Header --}}
-        <div
-            class="bg-white px-6 py-4 shrink-0 shadow-sm z-10 flex justify-between items-center border-b border-gray-100 relative overflow-hidden">
-            {{-- Progress Background --}}
-            <div class="absolute left-0 top-0 bottom-0 bg-blue-50/50 transition-all duration-500 ease-out"
-                style="width: {{ ($currentStep / 4) * 100 }}%"></div>
-
-            <div class="relative z-10">
-                <p class="text-xs font-bold text-blue-500/70 uppercase tracking-widest mb-1">Fase Transaksi
-                    {{ $currentStep }} / 4</p>
-                <h2 class="text-2xl font-black text-gray-800 flex items-center gap-2">
-                    {{-- @if ($currentStep == 1)
-                        🎯 Customer & Sales
+        {{-- Clean Header --}}
+        <div class="bg-white px-8 py-5 shrink-0 z-10 flex justify-between items-center border-b border-gray-200">
+            <div>
+                <h2 class="text-2xl font-black text-gray-800">
+                    @if ($currentStep == 1)
+                        Siapa Pelanggan Anda Hari Ini?
                     @elseif($currentStep == 2)
-                        🛒 Scan Belanjaan
+                        SCAN BARCODE BARANG
                     @elseif($currentStep == 3)
-                        🎁 Promo Spesial
+                        Tambahkan Proteksi & Paket Pendukung
                     @elseif($currentStep == 4)
-                        💳 Eksekusi Pembayaran
-                    @endif --}}
-                    {{ Auth::user()->businessUnit->name ?? '-' }}
+                        Penyelesaian Pembayaran
+                    @endif
                 </h2>
+                @if ($currentStep == 1)
+                    <p class="text-gray-500 text-sm mt-1">Cari data pelanggan yang sudah terdaftar atau tambahkan pelanggan baru untuk memulai transaksi.</p>
+                @endif
             </div>
 
-            {{-- Modern Progress Indicators --}}
-            <div class="hidden sm:flex items-center gap-2 relative z-10">
-                @for ($i = 1; $i <= 4; $i++)
-                    <div
-                        class="h-2.5 rounded-full transition-all duration-500 ease-out {{ $i === $currentStep ? 'w-10 bg-[#1c69d4] shadow-md shadow-blue-500/30' : ($i < $currentStep ? 'w-4 bg-blue-200' : 'w-4 bg-gray-200') }}">
-                    </div>
-                @endfor
+            <div class="flex items-center gap-4">
+                <div class="text-right hidden sm:block">
+                    <p class="text-sm font-bold text-gray-800">{{ Auth::user()->name ?? 'Kasir' }}</p>
+                    <p class="text-xs text-gray-500">{{ Auth::user()->businessUnit->name ?? '-' }}</p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg uppercase">
+                    {{ substr(Auth::user()->name ?? 'K', 0, 1) }}
+                </div>
             </div>
         </div>
 
