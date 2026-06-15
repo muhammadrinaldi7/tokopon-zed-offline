@@ -66,7 +66,12 @@ class EmployeManage extends Component
                 foreach ($response as $emp) {
                     $localBranchId = null;
                     if (!empty($emp['branchId'])) {
-                        $branch = \App\Models\Branch::where('branch_id', $emp['branchId'])->first();
+                        $branch = \App\Models\Branch::where(function($q) use ($emp) {
+                                $q->where('branch_id', $emp['branchId'])
+                                  ->orWhere('second_branch_id', $emp['branchId']);
+                            })
+                            ->where('business_unit_id', $bu->id)
+                            ->first();
                         if ($branch) {
                             $localBranchId = $branch->id;
                         }
