@@ -22,6 +22,7 @@ trait WithCustomerAndSales
     {
         $this->selectedCustomerId = $id;
         $this->searchCustomer = '';
+        $this->autoAdvanceIfReady();
     }
 
     public function clearSelectedCustomer()
@@ -43,6 +44,7 @@ trait WithCustomerAndSales
             ];
         }
         $this->searchSales = '';
+        $this->autoAdvanceIfReady();
     }
 
     public function removeSales($id)
@@ -53,4 +55,10 @@ trait WithCustomerAndSales
     }
 
 
+    public function autoAdvanceIfReady()
+    {
+        if ($this->selectedCustomerId && count($this->selectedSales) > 0) {
+            $this->nextStep();
+        }
+    }
 }

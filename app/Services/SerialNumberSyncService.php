@@ -89,8 +89,20 @@ class SerialNumberSyncService
             $serialNumberStr = (string) $serialNumberStr;
 
             // Cari ID gudang lokal berdasarkan ID gudang accurate
-            $warehouseColumn = $databaseSource === 'second' ? 'second_warehouse_id' : 'warehouse_id';
-            $localWarehouse = Warehouse::where($warehouseColumn, $accurateWarehouseId)->first();
+            // Untuk source 'second' (GSK), prioritaskan gudang eksklusif GSK
+            // (yang warehouse_id IS NULL, hanya punya second_warehouse_id)
+            // agar tidak salah ambil gudang Syihab yang kebetulan punya second_warehouse_id sama.
+            if ($databaseSource === 'second') {
+                $localWarehouse = Warehouse::where('second_warehouse_id', $accurateWarehouseId)
+                    ->whereNull('warehouse_id')
+                    ->first();
+                // Fallback ke gudang manapun yang cocok jika tidak ada yang eksklusif
+                if (!$localWarehouse) {
+                    $localWarehouse = Warehouse::where('second_warehouse_id', $accurateWarehouseId)->first();
+                }
+            } else {
+                $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)->first();
+            }
             $localWarehouseId = $localWarehouse ? $localWarehouse->id : null;
 
             $upsertData[] = [
@@ -200,8 +212,17 @@ class SerialNumberSyncService
 
                 $localWarehouseId = null;
                 if ($accurateWarehouseId) {
-                    $warehouseColumn = $databaseSource === 'second' ? 'second_warehouse_id' : 'warehouse_id';
-                    $localWarehouse = Warehouse::where($warehouseColumn, $accurateWarehouseId)->first();
+                    // Untuk source 'second' (GSK), prioritaskan gudang eksklusif GSK
+                    if ($databaseSource === 'second') {
+                        $localWarehouse = Warehouse::where('second_warehouse_id', $accurateWarehouseId)
+                            ->whereNull('warehouse_id')
+                            ->first();
+                        if (!$localWarehouse) {
+                            $localWarehouse = Warehouse::where('second_warehouse_id', $accurateWarehouseId)->first();
+                        }
+                    } else {
+                        $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)->first();
+                    }
                     if ($localWarehouse) {
                         $localWarehouseId = $localWarehouse->id;
                     }
@@ -316,5 +337,61 @@ class SerialNumberSyncService
             Log::error("Failed to sync HPP for Item {$itemNo}: " . $e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Sinkronisasi harga jual (unitPrice) dari Accurate ke ProductVariant/SecondProductVariant lokal
+     *
+     * @param string $sku
+     * @param string|null $databaseSource
+     * @return array ['updated' => bool, 'old_price' => int, 'new_price' => int]
+     */
+    public function syncPriceFromAccurate($sku, $databaseSource = null)
+    {
+        $sources = [];
+        if ($databaseSource) {
+            $sources[] = $databaseSource;
+        } else {
+            $sources = \App\Models\BusinessUnit::where('is_active', true)->pluck('code')->toArray();
+        }
+
+        foreach ($sources as $source) {
+            try {
+                $itemDetail = $this->accurateService->itemDetailDo($sku, $source);
+
+                if (!$itemDetail) continue;
+
+                $unitPrice = $itemDetail['unitPrice'] ?? null;
+                if (!$unitPrice || $unitPrice <= 0) continue;
+
+                $unitPrice = (int) $unitPrice;
+
+                // Cari variant lokal berdasarkan SKU
+                $variant = \App\Models\ProductVariant::where('sku', $sku)->first();
+
+                if (!$variant) {
+                    $variant = \App\Models\SecondProductVariant::where('sku', $sku)->first();
+                }
+
+                if (!$variant) continue;
+
+                $oldPrice = (int) $variant->price;
+
+                // Hanya update jika harga berubah
+                if ($oldPrice !== $unitPrice) {
+                    $variant->update(['price' => $unitPrice]);
+                    Log::info("Price Sync [{$sku}]: Harga berubah dari Rp " . number_format($oldPrice) . " → Rp " . number_format($unitPrice) . " (source: {$source})");
+                    return ['updated' => true, 'old_price' => $oldPrice, 'new_price' => $unitPrice];
+                }
+
+                return ['updated' => false, 'old_price' => $oldPrice, 'new_price' => $unitPrice];
+
+            } catch (\Exception $e) {
+                Log::warning("Price Sync [{$sku}] gagal dari source {$source}: " . $e->getMessage());
+                continue;
+            }
+        }
+
+        return ['updated' => false, 'old_price' => 0, 'new_price' => 0];
     }
 }

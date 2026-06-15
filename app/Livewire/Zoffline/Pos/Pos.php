@@ -221,15 +221,6 @@ class Pos extends Component
             $this->productType = 'all';
             $this->databaseSource = 'syihab'; // Default for all
         }
-
-        $this->payments = [
-            [
-                'payment_method_id' => '',
-                'payment_method_rate_id' => '',
-                'no_kontrak' => '',
-                'amount' => 0,
-            ]
-        ];
     }
 
     public function updatedPayments($value, $key)
@@ -255,61 +246,7 @@ class Pos extends Component
         }
     }
 
-    public function addPaymentRow()
-    {
-        $remaining = max(0, ($this->subtotal - (int)$this->totalDiscount) - $this->paymentsTotalBase);
-        $this->payments[] = [
-            'category' => '',
-            'payment_method_id' => '',
-            'payment_method_rate_id' => '',
-            'no_kontrak' => '',
-            'amount' => $remaining,
-        ];
-    }
 
-    public function removePaymentRow($index)
-    {
-        if (count($this->payments) > 1) {
-            unset($this->payments[$index]);
-            $this->payments = array_values($this->payments);
-            $this->syncSinglePaymentAmount();
-        }
-    }
-
-    public function autofillRemaining($index)
-    {
-        $totalOther = 0;
-        foreach ($this->payments as $i => $p) {
-            if ($i !== $index) {
-                $totalOther += (int)$p['amount'];
-            }
-        }
-        $target = max(0, $this->subtotal - (int)$this->totalDiscount);
-        $this->payments[$index]['amount'] = max(0, $target - $totalOther);
-    }
-
-    public function syncSinglePaymentAmount()
-    {
-        if (count($this->payments) === 1) {
-            $this->payments[0]['amount'] = max(0, $this->subtotal - (int)$this->totalDiscount);
-        }
-    }
-
-    public function getMdrPercentage($payment)
-    {
-        $pmId = $payment['payment_method_id'] ?? null;
-        $rateId = $payment['payment_method_rate_id'] ?? null;
-
-        if (!$pmId) return 0;
-
-        if ($rateId) {
-            $rate = \App\Models\PaymentMethodRate::find($rateId);
-            return $rate ? (float) $rate->mdr_percentage : 0;
-        }
-
-        $pm = \App\Models\PaymentMethod::find($pmId);
-        return $pm ? (float) $pm->mdr_percentage : 0;
-    }
 
 
     #[Computed]
@@ -393,6 +330,35 @@ class Pos extends Component
         return $newProducts->concat($secondProducts);
     }
 
+    public $searchAddons = '';
+
+    #[Computed]
+    public function addonsResults()
+    {
+        if (strlen($this->searchAddons) < 2) return collect();
+
+        $newProducts = collect();
+        $unit = \Illuminate\Support\Facades\Auth::user()->businessUnit?->code ?? 'all';
+
+        if ($this->productType !== 'second' && $unit !== 'second') {
+            $newProducts = Product::with(['variants', 'brand', 'media'])
+                ->where('is_active', true)
+                ->where(function ($q) {
+                    $q->where('name', 'like', '%' . $this->searchAddons . '%')
+                        ->orWhereHas('variants', function ($q2) {
+                            $q2->where('sku', 'like', '%' . $this->searchAddons . '%');
+                        });
+                })
+                ->take(10)->get()
+                ->map(function ($p) {
+                    $p->is_second_catalog = false;
+                    return $p;
+                });
+        }
+
+        return $newProducts;
+    }
+
     // ─── Cart Subtotals ────────────────────────────────────────
 
     #[Computed]
@@ -417,19 +383,26 @@ class Pos extends Component
     #[Computed]
     public function grandTotal()
     {
-        return max(0, $this->subtotal() - (int)$this->totalDiscount);
+        return max(0, $this->subtotal() - (int)$this->totalDiscount());
     }
 
     #[Computed]
     public function activePromos()
     {
-        $promos = Promo::with(['skus', 'bundleSkus.variant.product'])
+        $userBranchId = \Illuminate\Support\Facades\Auth::user()->branch_id;
+        $promos = \App\Models\Promo::with(['skus', 'bundleSkus.variant.product', 'branches'])
             ->where('is_active', true)
             ->where(function ($q) {
                 $q->whereNull('start_date')->orWhere('start_date', '<=', now());
             })
             ->where(function ($q) {
                 $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+            })
+            ->where(function ($q) use ($userBranchId) {
+                $q->whereDoesntHave('branches')
+                  ->orWhereHas('branches', function ($bq) use ($userBranchId) {
+                      $bq->where('branches.id', $userBranchId);
+                  });
             })
             ->get();
 
@@ -440,6 +413,7 @@ class Pos extends Component
             } else {
                 if (in_array($promo->id, $this->selectedPromos)) {
                     $this->selectedPromos = array_diff($this->selectedPromos, [$promo->id]);
+                    $this->applyPromosToCart();
                 }
             }
         }
@@ -449,15 +423,14 @@ class Pos extends Component
     #[Computed]
     public function itemDiscountTotal()
     {
-        // Menghitung total diskon manual dari semua item di keranjang
-        return collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
+        // Menghitung total diskon manual DAN diskon promo dari semua item di keranjang
+        return collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0) + (int)($item['promo_discount'] ?? 0));
     }
 
     #[Computed]
     public function totalDiscount()
     {
-        // $itemDiscounts = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
-        return $this->itemDiscountTotal + $this->totalPromoDiscount;
+        return $this->itemDiscountTotal;
     }
 
     // discount
@@ -474,12 +447,13 @@ class Pos extends Component
         if (!$promo->apply_to_all_items && $eligible['qty'] == 0) return false;
         return true;
     }
-    public function calculateEligibleCart($promo, $forBundle = false)
+
+    public function calculateEligibleCart($promo, $forBundle = false, $multiplier = 1)
     {
         $eligibleQty = 0;
         $eligibleAmount = 0;
         if ($promo->apply_to_all_items && !$forBundle) {
-            $eligibleAmount = $this->subtotal;
+            $eligibleAmount = $this->subtotal();
             $eligibleQty = array_sum(array_column($this->cart, 'qty'));
         } else {
             // Jika untuk bundle, cari dari bundleSkus. Jika utama, dari skus.
@@ -492,53 +466,119 @@ class Pos extends Component
                 }
             }
         }
-        // Cap reward qty untuk produk bundle (jika diset max qty-nya)
-        if ($forBundle && $promo->bundle_max_qty && $eligibleQty > $promo->bundle_max_qty) {
+        // Cap reward qty untuk produk bundle (jika diset max qty-nya) - perhatikan multiplier
+        if ($forBundle && $promo->bundle_max_qty && $eligibleQty > ($promo->bundle_max_qty * $multiplier)) {
             $avgPrice = $eligibleQty > 0 ? ($eligibleAmount / $eligibleQty) : 0;
-            $eligibleQty = $promo->bundle_max_qty;
+            $eligibleQty = $promo->bundle_max_qty * $multiplier;
             $eligibleAmount = $eligibleQty * $avgPrice;
         }
         return ['qty' => $eligibleQty, 'amount' => $eligibleAmount];
     }
 
-    #[Computed]
-    public function totalPromoDiscount()
+    public function applyPromosToCart()
     {
-        if (empty($this->selectedPromos)) return 0;
+        // 1. Reset all promo discounts in cart
+        foreach ($this->cart as $key => $item) {
+            $this->cart[$key]['promo_discount'] = 0;
+            $this->cart[$key]['applied_promo_id'] = null;
+        }
 
-        $promos = Promo::with(['skus', 'bundleSkus'])->whereIn('id', $this->selectedPromos)->get();
-        $total = 0;
+        if (empty($this->selectedPromos)) return;
+
+        $promos = \App\Models\Promo::with(['skus', 'bundleSkus'])->whereIn('id', $this->selectedPromos)->get();
+
+        // Cek kombinasi promo
+        $hasNonCombinable = $promos->where('is_combinable', false)->count() > 0;
+        if ($hasNonCombinable && count($this->selectedPromos) > 1) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Ada promo yang tidak dapat digabungkan dengan promo lain.', type: 'error');
+            // Revert ke 1 promo saja (yg pertama)
+            $this->selectedPromos = [$this->selectedPromos[0]];
+            $promos = \App\Models\Promo::with(['skus', 'bundleSkus'])->whereIn('id', $this->selectedPromos)->get();
+        }
+
         foreach ($promos as $promo) {
-            // 1. Kalkulasi Diskon Utama
+            // 2. Kalkulasi Diskon Utama
             $eligibleMain = $this->calculateEligibleCart($promo, false);
-            if ($promo->discount_type === 'fixed') {
-                $total += $promo->discount_value; // Fixed diskon utama (dihitung 1x per transaksi)
-            } else {
-                $calc = $eligibleMain['amount'] * ($promo->discount_value / 100);
-                if ($promo->max_discount) $calc = min($calc, $promo->max_discount);
-                $total += $calc;
-            }
-            // 2. Kalkulasi Diskon Tambahan (Bundle)
-            if ($promo->is_bundle) {
-                $eligibleBundle = $this->calculateEligibleCart($promo, true);
+            if ($eligibleMain['qty'] > 0) {
+                $multiplier = 1;
+                if ($promo->is_multiply && $promo->min_qty > 0) {
+                    $multiplier = floor($eligibleMain['qty'] / $promo->min_qty);
+                }
 
-                // Jika ada barang bundle-nya di keranjang
+                $mainDiscountValue = $promo->discount_type === 'fixed' 
+                    ? ($promo->discount_value * $multiplier)
+                    : ($eligibleMain['amount'] * ($promo->discount_value / 100));
+                
+                if ($promo->max_discount) {
+                    $mainDiscountValue = min($mainDiscountValue, $promo->max_discount * $multiplier);
+                }
+
+                // Distribusikan $mainDiscountValue ke item yang eligible
+                $mainSkus = $promo->apply_to_all_items ? array_column($this->cart, 'sku') : $promo->skus->pluck('sku')->toArray();
+                foreach ($this->cart as $key => $item) {
+                    if (in_array($item['sku'], $mainSkus)) {
+                        $itemAmount = $item['qty'] * $item['price'];
+                        $proportion = $itemAmount / $eligibleMain['amount'];
+                        $itemDiscount = round($mainDiscountValue * $proportion);
+                        $this->cart[$key]['promo_discount'] += $itemDiscount;
+                        $this->cart[$key]['applied_promo_id'] = $promo->id;
+                    }
+                }
+            }
+
+            // 3. Kalkulasi Diskon Bundling
+            if ($promo->is_bundle) {
+                $multiplier = 1;
+                if ($promo->is_multiply && $promo->min_qty > 0) {
+                    $multiplier = floor($eligibleMain['qty'] / $promo->min_qty);
+                }
+
+                $eligibleBundle = $this->calculateEligibleCart($promo, true, $multiplier);
+                
                 if ($eligibleBundle['qty'] > 0) {
-                    if ($promo->bundle_discount_type === 'fixed') {
-                        // Fixed diskon bundle dikalikan dengan jumlah qty barang bundle yg valid
-                        $total += $promo->bundle_discount_value * $eligibleBundle['qty'];
-                    } else {
-                        $calc = $eligibleBundle['amount'] * ($promo->bundle_discount_value / 100);
-                        if ($promo->bundle_max_discount) $calc = min($calc, $promo->bundle_max_discount);
-                        $total += $calc;
+                    $applicableQty = $eligibleBundle['qty'];
+                    $totalQtyApplied = 0;
+                    
+                    $bundleSkusInfo = $promo->bundleSkus->keyBy('sku');
+
+                    foreach ($this->cart as $key => $item) {
+                        if ($bundleSkusInfo->has($item['sku']) && $totalQtyApplied < $applicableQty) {
+                            $bSku = $bundleSkusInfo->get($item['sku']);
+                            
+                            // Ambil prioritas: diskon per item (jika diisi) ATAU fallback ke global
+                            $type = $bSku->discount_value > 0 ? $bSku->discount_type : $promo->bundle_discount_type;
+                            $val = $bSku->discount_value > 0 ? $bSku->discount_value : $promo->bundle_discount_value;
+                            $max = $bSku->discount_value > 0 ? $bSku->max_discount : $promo->bundle_max_discount;
+                            
+                            if (!$val) continue;
+
+                            // Berapa banyak qty item ini yang boleh didiskon
+                            $qtyToDiscount = min($item['qty'], $applicableQty - $totalQtyApplied);
+
+                            // Hitung diskon dasar
+                            $itemDiscount = $type === 'fixed' 
+                                ? ($val * $qtyToDiscount) 
+                                : (($item['price'] * $qtyToDiscount) * ($val / 100));
+
+                            // Terapkan batasan max discount jika ada (dikalikan multiplier karena berlaku per kelipatan bundle)
+                            if ($max && $max > 0) {
+                                $itemDiscount = min($itemDiscount, $max * $multiplier);
+                            }
+
+                            $this->cart[$key]['promo_discount'] += $itemDiscount;
+                            $this->cart[$key]['applied_promo_id'] = $promo->id;
+                            
+                            $totalQtyApplied += $qtyToDiscount;
+                        }
                     }
                 }
             }
         }
-        return $total;
     }
+
     public function updatedSelectedPromos()
     {
+        $this->applyPromosToCart();
         $this->syncSinglePaymentAmount();
     }
 

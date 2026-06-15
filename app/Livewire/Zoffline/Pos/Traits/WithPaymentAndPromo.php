@@ -35,7 +35,7 @@ trait WithPaymentAndPromo
                     'payment_method_id' => '',
                     'payment_method_rate_id' => '',
                     'no_kontrak' => '',
-                    'amount' => max(0, $this->subtotal - $this->totalDiscount),
+                    'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount()),
                 ]
             ];
         } elseif ($mode === 'non-tunai') {
@@ -45,7 +45,7 @@ trait WithPaymentAndPromo
                     'payment_method_id' => '',
                     'payment_method_rate_id' => '',
                     'no_kontrak' => '',
-                    'amount' => max(0, $this->subtotal - $this->totalDiscount),
+                    'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount()),
                 ]
             ];
         } elseif ($mode === 'split') {
@@ -69,16 +69,16 @@ trait WithPaymentAndPromo
     }
 
     #[Computed]
-    public function getPaymentsTotalBaseProperty()
+    public function paymentsTotalBase()
     {
         return collect($this->payments)->sum(fn($p) => (float)($p['amount'] ?? 0));
     }
 
     #[Computed]
-    public function getIsPaymentsValidProperty()
+    public function isPaymentsValid()
     {
         $totalPaid = 0;
-        $grandTotal = $this->grandTotal;
+        $grandTotal = max(0, $this->subtotal() - (int)$this->totalDiscount());
 
         foreach ($this->payments as $p) {
             // Jika kategori kosong, invalid
@@ -95,7 +95,7 @@ trait WithPaymentAndPromo
             if ($p['category'] === 'NON-TUNAI' && empty($p['payment_method_rate_id'])) {
                 // Kecuali Transfer mungkin tidak ada rate, tapi asumsikan harus ada untuk bank
                 $pm = \App\Models\PaymentMethod::find($p['payment_method_id']);
-                if ($pm && count($pm->rates) > 0 && empty($p['payment_method_rate_id'])) {
+                if ($pm && $pm->rates()->where('is_active', true)->count() > 0 && empty($p['payment_method_rate_id'])) {
                     return false;
                 }
             }
@@ -106,8 +106,64 @@ trait WithPaymentAndPromo
         return abs($grandTotal - $totalPaid) < 0.01;
     }
 
+    public function addPaymentRow()
+    {
+        $remaining = max(0, ($this->subtotal() - (int)$this->totalDiscount()) - $this->paymentsTotalBase());
+        $this->payments[] = [
+            'category' => '',
+            'payment_method_id' => '',
+            'payment_method_rate_id' => '',
+            'no_kontrak' => '',
+            'amount' => $remaining,
+        ];
+    }
+
+    public function removePaymentRow($index)
+    {
+        if (count($this->payments) > 1) {
+            unset($this->payments[$index]);
+            $this->payments = array_values($this->payments);
+            $this->syncSinglePaymentAmount();
+        }
+    }
+
+    public function autofillRemaining($index)
+    {
+        $totalOther = 0;
+        foreach ($this->payments as $i => $p) {
+            if ($i !== $index) {
+                $totalOther += (int)$p['amount'];
+            }
+        }
+        $target = max(0, $this->subtotal() - (int)$this->totalDiscount());
+        $this->payments[$index]['amount'] = max(0, $target - $totalOther);
+    }
+
+    public function syncSinglePaymentAmount()
+    {
+        if (count($this->payments) === 1) {
+            $this->payments[0]['amount'] = max(0, $this->subtotal() - (int)$this->totalDiscount());
+        }
+    }
+
+    public function getMdrPercentage($payment)
+    {
+        $pmId = $payment['payment_method_id'] ?? null;
+        $rateId = $payment['payment_method_rate_id'] ?? null;
+
+        if (!$pmId) return 0;
+
+        if ($rateId) {
+            $rate = \App\Models\PaymentMethodRate::find($rateId);
+            return $rate ? (float) $rate->mdr_percentage : 0;
+        }
+
+        $pm = \App\Models\PaymentMethod::find($pmId);
+        return $pm ? (float) $pm->mdr_percentage : 0;
+    }
+
     #[Computed]
-    public function getCashPaymentMethodsProperty()
+    public function cashPaymentMethods()
     {
         $user = Auth::user();
         $businessUnitId = method_exists($user, 'getActiveBusinessUnitId') ? $user->getActiveBusinessUnitId() : ($user->business_unit_id ?? 1);
@@ -122,7 +178,7 @@ trait WithPaymentAndPromo
     }
 
     #[Computed]
-    public function getNonCashPaymentMethodsProperty()
+    public function nonCashPaymentMethods()
     {
         $user = Auth::user();
         $businessUnitId = method_exists($user, 'getActiveBusinessUnitId') ? $user->getActiveBusinessUnitId() : ($user->business_unit_id ?? 1);

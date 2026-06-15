@@ -1,42 +1,44 @@
 <div class="bg-gray-100" x-data="{ showSidebar: false }">
 
     <div class="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50">
-        {{-- Stepper Header --}}
-        <div class="bg-white border-b border-gray-200 px-4 py-4 shrink-0 shadow-sm z-10">
-            <div class="max-w-4xl mx-auto flex items-center justify-between">
-                {{-- Step 1: Customer --}}
-                <div class="flex items-center gap-2 {{ $currentStep >= 1 ? 'text-[#1c69d4]' : 'text-gray-400' }} transition-colors">
-                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold border-2 {{ $currentStep >= 1 ? 'border-[#1c69d4] bg-blue-50' : 'border-gray-200' }}">1</div>
-                    <span class="font-bold text-sm hidden sm:block">Customer & Sales</span>
-                </div>
-                <div class="flex-1 h-0.5 mx-2 md:mx-4 {{ $currentStep >= 2 ? 'bg-[#1c69d4]' : 'bg-gray-200' }} transition-colors"></div>
-                
-                {{-- Step 2: Keranjang --}}
-                <div class="flex items-center gap-2 {{ $currentStep >= 2 ? 'text-[#1c69d4]' : 'text-gray-400' }} transition-colors">
-                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold border-2 {{ $currentStep >= 2 ? 'border-[#1c69d4] bg-blue-50' : 'border-gray-200' }}">2</div>
-                    <span class="font-bold text-sm hidden sm:block">Keranjang</span>
-                </div>
-                <div class="flex-1 h-0.5 mx-2 md:mx-4 {{ $currentStep >= 3 ? 'bg-[#1c69d4]' : 'bg-gray-200' }} transition-colors"></div>
-                
-                {{-- Step 3: Upsell --}}
-                <div class="flex items-center gap-2 {{ $currentStep >= 3 ? 'text-[#1c69d4]' : 'text-gray-400' }} transition-colors">
-                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold border-2 {{ $currentStep >= 3 ? 'border-[#1c69d4] bg-blue-50' : 'border-gray-200' }}">3</div>
-                    <span class="font-bold text-sm hidden sm:block">Add-ons</span>
-                </div>
-                <div class="flex-1 h-0.5 mx-2 md:mx-4 {{ $currentStep >= 4 ? 'bg-[#1c69d4]' : 'bg-gray-200' }} transition-colors"></div>
+        {{-- Gamified Header --}}
+        <div
+            class="bg-white px-6 py-4 shrink-0 shadow-sm z-10 flex justify-between items-center border-b border-gray-100 relative overflow-hidden">
+            {{-- Progress Background --}}
+            <div class="absolute left-0 top-0 bottom-0 bg-blue-50/50 transition-all duration-500 ease-out"
+                style="width: {{ ($currentStep / 4) * 100 }}%"></div>
 
-                {{-- Step 4: Payment --}}
-                <div class="flex items-center gap-2 {{ $currentStep >= 4 ? 'text-[#1c69d4]' : 'text-gray-400' }} transition-colors">
-                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold border-2 {{ $currentStep >= 4 ? 'border-[#1c69d4] bg-blue-50' : 'border-gray-200' }}">4</div>
-                    <span class="font-bold text-sm hidden sm:block">Pembayaran</span>
-                </div>
+            <div class="relative z-10">
+                <p class="text-xs font-bold text-blue-500/70 uppercase tracking-widest mb-1">Fase Transaksi
+                    {{ $currentStep }} / 4</p>
+                <h2 class="text-2xl font-black text-gray-800 flex items-center gap-2">
+                    {{-- @if ($currentStep == 1)
+                        🎯 Customer & Sales
+                    @elseif($currentStep == 2)
+                        🛒 Scan Belanjaan
+                    @elseif($currentStep == 3)
+                        🎁 Promo Spesial
+                    @elseif($currentStep == 4)
+                        💳 Eksekusi Pembayaran
+                    @endif --}}
+                    {{ Auth::user()->businessUnit->name ?? '-' }}
+                </h2>
+            </div>
+
+            {{-- Modern Progress Indicators --}}
+            <div class="hidden sm:flex items-center gap-2 relative z-10">
+                @for ($i = 1; $i <= 4; $i++)
+                    <div
+                        class="h-2.5 rounded-full transition-all duration-500 ease-out {{ $i === $currentStep ? 'w-10 bg-[#1c69d4] shadow-md shadow-blue-500/30' : ($i < $currentStep ? 'w-4 bg-blue-200' : 'w-4 bg-gray-200') }}">
+                    </div>
+                @endfor
             </div>
         </div>
 
         {{-- Main Content Area --}}
         <div class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative">
-            <div class="max-w-4xl mx-auto h-full flex flex-col">
-                @if($currentStep == 1)
+            <div class="max-w-4xl mx-auto min-h-full flex flex-col">
+                @if ($currentStep == 1)
                     @include('livewire.zoffline.pos.partials.wizard.step1-customer')
                 @elseif($currentStep == 2)
                     @include('livewire.zoffline.pos.partials.wizard.step2-cart')
@@ -124,8 +126,7 @@
             <div id="reader" class="w-full bg-black rounded overflow-hidden"></div>
         </div>
     </div> --}}
-    <div id="scanner-modal"
-        class="hidden fixed inset-0 z-50 bg-black/60 items-center justify-center backdrop-blur-sm">
+    <div id="scanner-modal" class="hidden fixed inset-0 z-50 bg-black/60 items-center justify-center backdrop-blur-sm">
         <div class="bg-white p-4 rounded-lg w-11/12 max-w-md shadow-xl">
 
             <div class="flex justify-between items-center mb-4">

@@ -2,7 +2,6 @@
     {{-- SCANNER AREA --}}
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div class="p-6">
-            <h2 class="text-lg font-bold text-gray-800 mb-4">Scan Barcode / SN Produk</h2>
             <div class="flex gap-3">
                 <input type="text" wire:model.defer="scanned_sn" wire:keydown.enter="processScan"
                     x-ref="barcodeScanner"
@@ -82,6 +81,17 @@
                                         </p>
                                     </div>
 
+                                    {{-- Item Discount --}}
+                                    <div class="flex items-center justify-between mt-3 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                        <label class="text-xs font-bold text-gray-500 uppercase">Diskon Item (Rp)</label>
+                                        <div class="relative w-32">
+                                            <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">Rp</span>
+                                            <input type="number" wire:model.lazy="cart.{{ $index }}.discount_amount"
+                                                class="w-full h-8 pl-7 pr-2 text-right border border-gray-200 rounded-md text-sm font-bold focus:ring-1 focus:ring-[#1c69d4]/20 focus:border-[#1c69d4]"
+                                                placeholder="0" min="0">
+                                        </div>
+                                    </div>
+
                                     {{-- SN Input Loop --}}
                                     @if ($item['has_sn'])
                                         <div class="mt-3 space-y-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
@@ -93,6 +103,22 @@
                                                         wire:model.lazy="cart.{{ $index }}.serial_numbers.{{ $i }}"
                                                         class="flex-1 bg-white border border-gray-200 rounded-md px-3 py-1.5 text-xs font-mono focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20 transition"
                                                         placeholder="Scan / Ketik SN">
+
+                                                    {{-- QC Buttons: Hanya untuk produk GSK/Second --}}
+                                                    @if (($item['is_second'] ?? false) && !empty($item['serial_numbers'][$i] ?? ''))
+                                                        <button type="button"
+                                                            wire:click="openQcSerahTerima('{{ $item['serial_numbers'][$i] }}')"
+                                                            class="shrink-0 text-[10px] font-bold text-emerald-600 hover:text-white bg-emerald-50 hover:bg-emerald-500 border border-emerald-200 hover:border-emerald-500 px-2 py-1 rounded-md transition-all"
+                                                            title="Lakukan QC Serah Terima">
+                                                            🔍 QC
+                                                        </button>
+                                                        <button type="button"
+                                                            wire:click="openCustomerQcModal('{{ $item['serial_numbers'][$i] }}')"
+                                                            class="shrink-0 text-[10px] font-bold text-blue-600 hover:text-white bg-blue-50 hover:bg-blue-500 border border-blue-200 hover:border-blue-500 px-2 py-1 rounded-md transition-all flex items-center gap-0.5"
+                                                            title="Lihat Riwayat QC">
+                                                            📋 Riwayat
+                                                        </button>
+                                                    @endif
                                                 </div>
                                             @endfor
                                         </div>

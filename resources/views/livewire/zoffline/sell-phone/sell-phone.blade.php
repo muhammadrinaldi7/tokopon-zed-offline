@@ -39,7 +39,7 @@
 
             <!-- Progress Line Active -->
             <div class="absolute left-0 top-[20px] transform -translate-y-1/2 h-1 bg-violet-600 rounded-full z-0 transition-all duration-500 ease-in-out"
-                :style="'width: ' + ((step - 1) * 50) + '%'"></div>
+                :style="'width: ' + ((step - 1) * 33.33) + '%'"></div>
 
             <!-- Step 1 Dot -->
             <div class="relative z-10 flex flex-col items-center cursor-pointer group" @click="step = 1">
@@ -66,12 +66,12 @@
                 <span
                     class="mt-3 text-[10px] md:text-xs font-bold text-center leading-tight transition-colors duration-300 w-auto"
                     :class="step >= 2 ? 'text-violet-700' : 'text-neutral-400'">
-                    Kondisi
+                    QC Fisik
                 </span>
             </div>
 
             <!-- Step 3 Dot -->
-            <div class="relative z-10 flex flex-col items-center group">
+            <div class="relative z-10 flex flex-col items-center cursor-pointer group" @click="if(step > 3) step = 3">
                 <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 shrink-0"
                     :class="step >= 3 ? 'bg-violet-600 text-white shadow-lg shadow-violet-200 ring-4 ring-violet-50' :
                         'bg-white text-neutral-400 border-2 border-neutral-200'">
@@ -80,6 +80,20 @@
                 <span
                     class="mt-3 text-[10px] md:text-xs font-bold text-center leading-tight transition-colors duration-300 w-sauto"
                     :class="step >= 3 ? 'text-violet-700' : 'text-neutral-400'">
+                    Kondisi
+                </span>
+            </div>
+
+            <!-- Step 4 Dot -->
+            <div class="relative z-10 flex flex-col items-center group">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 shrink-0"
+                    :class="step >= 4 ? 'bg-violet-600 text-white shadow-lg shadow-violet-200 ring-4 ring-violet-50' :
+                        'bg-white text-neutral-400 border-2 border-neutral-200'">
+                    4
+                </div>
+                <span
+                    class="mt-3 text-[10px] md:text-xs font-bold text-center leading-tight transition-colors duration-300 w-sauto"
+                    :class="step >= 4 ? 'text-violet-700' : 'text-neutral-400'">
                     Ringkasan
                 </span>
             </div>
@@ -224,6 +238,131 @@
                 <button type="button" @click="step = 2" {{-- Tambahkan attribute disabled agar benar-benar tidak bisa diklik --}} {{ $isStep1Valid ? '' : 'disabled' }}
                     class="px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-2 shadow-lg active:scale-95
                     {{ $isStep1Valid ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-violet-900/20' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none' }}">
+                    Lanjut QC Kelayakan
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        {{-- STEP 2: QC Kelayakan Fisik --}}
+        <div x-show="step === 2" x-transition:enter="transition ease-out duration-300 delay-100"
+            x-transition:enter-start="opacity-0 translate-x-4" x-transition:enter-end="opacity-100 translate-x-0"
+            style="display: none;" class="space-y-8">
+
+            <h3 class="text-lg md:text-xl uppercase font-black text-neutral-800 px-1">Inspeksi Kelayakan</h3>
+
+            <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl">
+                <p class="text-sm font-bold text-blue-900 mb-1">Cek kelayakan dasar</p>
+                <p class="text-xs text-blue-700">Tahap ini menentukan apakah HP layak dibeli (lolos kualifikasi dasar) sebelum berlanjut ke perhitungan harga. Mohon periksa dengan teliti.</p>
+            </div>
+
+            <div class="space-y-6 bg-white p-6 rounded-2xl shadow-sm border border-neutral-100">
+                <div class="space-y-2">
+                    <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">IMEI Perangkat <span class="text-rose-500">*</span></label>
+                    <input type="text" wire:model.live.debounce.500ms="imei"
+                        placeholder="Scan atau ketik IMEI..."
+                        class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all font-bold text-neutral-700">
+                    @error('imei') <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
+                </div>
+
+                @if(!empty($qc_results))
+                    <div class="space-y-4 mt-6">
+                        <h4 class="text-xs font-black text-neutral-500 uppercase tracking-wider border-b border-neutral-100 pb-2">Checklist Kualifikasi Wajib</h4>
+                        @foreach($qc_results as $index => $item)
+                            <div class="flex items-center justify-between bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                                <span class="text-sm font-bold text-neutral-700">{{ $item['name'] }}</span>
+                                @if($item['type'] === 'boolean')
+                                    <div class="flex items-center gap-2">
+                                        <label class="flex items-center gap-1.5 cursor-pointer">
+                                            <input type="radio" wire:model.live="qc_results.{{ $index }}.value" value="1" class="peer hidden">
+                                            <div class="px-4 py-2 rounded-lg text-xs font-bold border transition-all
+                                                peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500
+                                                text-neutral-400 border-neutral-200 bg-white hover:bg-neutral-50">Ya (Lolos)</div>
+                                        </label>
+                                        <label class="flex items-center gap-1.5 cursor-pointer">
+                                            <input type="radio" wire:model.live="qc_results.{{ $index }}.value" value="0" class="peer hidden">
+                                            <div class="px-4 py-2 rounded-lg text-xs font-bold border transition-all
+                                                peer-checked:bg-rose-500 peer-checked:text-white peer-checked:border-rose-500
+                                                text-neutral-400 border-neutral-200 bg-white hover:bg-neutral-50">Tidak</div>
+                                        </label>
+                                    </div>
+                                @else
+                                    <input type="text" wire:model.lazy="qc_results.{{ $index }}.value"
+                                        class="p-2 text-sm border border-gray-200 rounded-lg focus:ring-violet-500 focus:border-violet-500"
+                                        placeholder="Isi data...">
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="p-6 bg-neutral-50 rounded-xl text-center">
+                        <p class="text-sm text-neutral-500 font-medium">Tidak ada template QC kelayakan untuk produk ini.</p>
+                    </div>
+                @endif
+
+                {{-- Textarea untuk Catatan QC --}}
+                <div class="space-y-2 mt-6 border-t border-neutral-100 pt-6">
+                    <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Catatan Tambahan (Opsional)</label>
+                    <textarea wire:model.live.debounce.500ms="qc_notes" rows="3"
+                        placeholder="Tulis catatan tambahan untuk referensi tim (contoh: kondisi bodi agak menguning)..."
+                        class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all text-sm font-medium text-neutral-700"></textarea>
+                </div>
+            </div>
+
+            @php
+                // Hitung apakah ada yang fail atau kosong
+                $hasFailedQc = false;
+                $isQcCompleted = true;
+                foreach($qc_results as $item) {
+                    if ($item['type'] === 'boolean') {
+                        if ($item['value'] === false || $item['value'] === '0') {
+                            $hasFailedQc = true;
+                        }
+                        if ($item['value'] === '') {
+                            $isQcCompleted = false;
+                        }
+                    }
+                }
+                
+                $isStep2Valid = !empty($imei) && $isQcCompleted && !$hasFailedQc;
+            @endphp
+
+            @if($hasFailedQc)
+                <div class="p-4 bg-rose-50 border border-rose-200 rounded-xl flex flex-col md:flex-row items-center gap-4 animate-in fade-in zoom-in duration-300">
+                    <div class="flex gap-3 flex-1">
+                        <div class="w-10 h-10 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center shrink-0">
+                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-rose-800">Tidak Layak Beli!</h4>
+                            <p class="text-sm text-rose-700 mt-1">Perangkat gagal memenuhi kualifikasi dasar. Proses dihentikan.</p>
+                        </div>
+                    </div>
+                    <button type="button" @click="window.location.reload()" 
+                        class="shrink-0 bg-white border border-rose-200 text-rose-600 hover:bg-rose-100 hover:text-rose-700 font-bold px-6 py-3 rounded-xl transition-all shadow-sm flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        Batalkan Transaksi
+                    </button>
+                </div>
+            @endif
+
+            <div class="flex justify-between pt-4 pb-10">
+                <button type="button" @click="step = 1"
+                    class="text-neutral-500 hover:text-neutral-800 font-bold px-6 py-4 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                    Kembali
+                </button>
+                <button type="button" @click="step = 3" {{ $isStep2Valid ? '' : 'disabled' }}
+                    class="px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-2 shadow-lg active:scale-95
+                    {{ $isStep2Valid ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-violet-900/20' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none' }}">
                     Lanjut Kondisi Fisik
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -233,8 +372,8 @@
             </div>
         </div>
 
-        {{-- STEP 2: Condition & Photos --}}
-        <div x-show="step === 2" x-transition:enter="transition ease-out duration-300 delay-100"
+        {{-- STEP 3: Condition & Photos --}}
+        <div x-show="step === 3" x-transition:enter="transition ease-out duration-300 delay-100"
             x-transition:enter-start="opacity-0 translate-x-4" x-transition:enter-end="opacity-100 translate-x-0"
             style="display: none;" class="space-y-8">
 
@@ -500,11 +639,11 @@
                     }
 
                     // Gabungkan semua kondisi: Foto harus valid DAN semua radio kondisi harus sudah dipilih
-                    $isStep2Valid = $photoValid && $rulesValid;
+                    $isStep3Valid = $photoValid && $rulesValid;
                 @endphp
 
                 <div class="flex justify-between items-center pt-4 pb-10">
-                    <button type="button" @click="step = 1"
+                    <button type="button" @click="step = 2"
                         class="text-neutral-500 hover:text-neutral-800 font-bold px-6 py-4 transition-colors flex items-center gap-2">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -512,9 +651,9 @@
                         </svg>
                         Kembali
                     </button>
-                    <button type="button" @click="step = 3" {{ $isStep2Valid ? '' : 'disabled' }}
+                    <button type="button" @click="step = 4" {{ $isStep3Valid ? '' : 'disabled' }}
                         class="px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-2 shadow-lg active:scale-95
-                    {{ $isStep2Valid ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-violet-900/20' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none' }}">
+                    {{ $isStep3Valid ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-violet-900/20' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none' }}">
                         Cek Ringkasan
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -525,8 +664,8 @@
             </div>
 
         </div>
-        {{-- STEP 3: Summary & Submit --}}
-        <div x-show="step === 3" x-transition:enter="transition ease-out duration-300 delay-100"
+        {{-- STEP 4: Summary & Submit --}}
+        <div x-show="step === 4" x-transition:enter="transition ease-out duration-300 delay-100"
             x-transition:enter-start="opacity-0 translate-x-4" x-transition:enter-end="opacity-100 translate-x-0"
             style="display: none;" class="space-y-6">
             <div
@@ -836,7 +975,7 @@
             </div>
 
             <div class="flex flex-col-reverse md:flex-row justify-between items-center gap-4 pt-2">
-                <button type="button" @click="step = 2"
+                <button type="button" @click="step = 3"
                     class="w-full md:w-auto text-neutral-500 hover:text-neutral-800 font-bold px-6 py-4 transition-colors flex items-center justify-center gap-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

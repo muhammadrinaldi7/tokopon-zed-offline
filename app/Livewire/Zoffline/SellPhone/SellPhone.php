@@ -58,6 +58,12 @@ class SellPhone extends Component
     public $available_storages = [];
     public $buyback_device = null;
 
+    // QC Kelayakan (Step 2 Baru)
+    public $imei = '';
+    public $qc_template = null;
+    public $qc_results = [];
+    public $qc_notes = '';
+
     #[Computed]
     public function customerResults()
     {
@@ -91,6 +97,11 @@ class SellPhone extends Component
         $this->buyback_device_id = null;
         $this->available_storages = [];
         $this->buyback_device = null;
+        
+        $this->imei = '';
+        $this->qc_template = null;
+        $this->qc_results = [];
+        $this->qc_notes = '';
 
         if ($this->selected_brand_id) {
             $this->available_models = \App\Models\BuybackDevice::where('brand_id', $this->selected_brand_id)
@@ -99,6 +110,18 @@ class SellPhone extends Component
                 ->distinct()
                 ->pluck('model_name')
                 ->toArray();
+
+            // Load QC Template untuk Buyback (berdasarkan brand)
+            $this->qc_template = \App\Models\QcTemplate::findForBrand($this->selected_brand_id);
+            if ($this->qc_template) {
+                foreach ($this->qc_template->items as $item) {
+                    $this->qc_results[] = [
+                        'name' => $item['name'],
+                        'type' => $item['type'],
+                        'value' => $item['type'] === 'boolean' ? false : '',
+                    ];
+                }
+            }
         } else {
             $this->available_models = [];
         }
@@ -188,6 +211,7 @@ class SellPhone extends Component
     {
         $rules = [
             'buyback_device_id'         => 'required|exists:buyback_devices,id',
+            'imei'                      => 'required|string|max:255',
             'selected_rules'            => 'required|array|min:1',
             // Aturan Baru: Semua slot wajib berupa gambar dan maksimal 5MB (5120 KB)
             'photo_depan'               => 'required|image|max:5120',
@@ -223,6 +247,7 @@ class SellPhone extends Component
     protected $messages = [
         'buyback_device_id.required'    => 'Silakan pilih model dan kapasitas penyimpanan terlebih dahulu.',
         'buyback_device_id.exists'      => 'Perangkat tidak ditemukan.',
+        'imei.required'                 => 'IMEI perangkat wajib diisi saat proses QC.',
         'selected_rules.required'       => 'Silakan pilih kondisi perangkat Anda.',
         'selected_rules.min'            => 'Setidaknya satu kondisi harus dipilih.',
         // Pesan Error Baru Per Slot
@@ -413,11 +438,29 @@ class SellPhone extends Component
             'phone_model'       => $device->model_name,
             'phone_ram'         => $device->ram,
             'phone_storage'     => $device->storage,
+            'imei'              => $this->imei,
             'minus_desc'        => $minusDesc,
             'appraised_value'   => $this->final_price,
             'status'            => User::findOrFail(Auth::user()->id)->hasRole('fl') ? 'PAYING' : 'WAITING_FOR_DEVICE', // Jika di toko oleh FL, status bisa langsung RECEIVED atau disesuaikan bisnis proses Anda
             'handled_by'        => User::findOrFail(Auth::user()->id)->hasRole('fl') ? Auth::id() : null,
         ]);
+
+        // Simpan Data QC Kelayakan (Device Inspection)
+        if ($this->qc_template) {
+            $inspection = new \App\Models\DeviceInspection([
+                'imei' => $this->imei,
+                'qc_template_id' => $this->qc_template->id,
+                'inspectable_type' => \App\Models\SellPhone::class,
+                'inspectable_id' => $sellPhone->id,
+                'label' => 'QC Kelayakan Buyback',
+                'checklist_results' => $this->qc_results,
+                'verdict' => 'pass', // Dianggap lulus karena jika gagal tidak akan bisa disubmit
+                'inspector_notes' => $this->qc_notes ?: 'QC Kelayakan dilakukan di depan pelanggan (Step 2).',
+                'inspected_by' => Auth::id(),
+            ]);
+            $inspection->calculateCounts();
+            $inspection->save();
+        }
 
         // 1. Petakan semua properti slot ke dalam array beserta label custom-nya
         $slots = [
@@ -463,6 +506,10 @@ class SellPhone extends Component
             'selected_brand_id',
             'selected_model_name',
             'buyback_device_id',
+            'imei',
+            'qc_template',
+            'qc_results',
+            'qc_notes',
             'selected_rules',
             'final_price',
             'old_phone_additional_note',

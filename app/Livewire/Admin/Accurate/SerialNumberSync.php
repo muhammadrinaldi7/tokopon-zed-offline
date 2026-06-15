@@ -94,6 +94,12 @@ class SerialNumberSync extends Component
             } else {
                 $this->addLog("[$sku] Tidak ada data Serial Number di Accurate.");
             }
+
+            // Sync harga jual dari Accurate
+            $priceResult = $service->syncPriceFromAccurate($sku, $sourceCode);
+            if ($priceResult['updated']) {
+                $this->addLog("[$sku] 💰 Harga diperbarui: Rp " . number_format($priceResult['old_price']) . " → Rp " . number_format($priceResult['new_price']));
+            }
         } catch (\Exception $e) {
             $this->addLog("[$sku] Error: " . $e->getMessage());
         }

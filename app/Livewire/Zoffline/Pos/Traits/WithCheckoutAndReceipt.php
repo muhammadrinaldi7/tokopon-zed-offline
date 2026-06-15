@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Zoffline\Pos\Traits;
 
+use App\Mail\SalesReceiptMail;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
@@ -11,6 +12,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Mail;
+use Mike42\Escpos\PrintConnectors\WindowsPrintConnector;
+use Mike42\Escpos\Printer;
 
 trait WithCheckoutAndReceipt
 {
@@ -68,7 +73,7 @@ trait WithCheckoutAndReceipt
             return;
         }
 
-        if (!$this->isPaymentsValid) {
+        if (!$this->isPaymentsValid()) {
             $this->dispatch('toast', title: 'Pembayaran Belum Sesuai', message: 'Pastikan total pembayaran cocok dengan tagihan dan semua metode pembayaran sudah dipilih.', type: 'warning');
             return;
         }
@@ -167,17 +172,35 @@ trait WithCheckoutAndReceipt
                 return;
             }
 
-            if (!$this->isPaymentsValid) {
+            // Validasi Promo vs Metode Pembayaran
+            if (!empty($this->selectedPromos)) {
+                $promos = \App\Models\Promo::with('paymentMethods')->whereIn('id', $this->selectedPromos)->get();
+                $usedPaymentMethodIds = collect($this->payments)->pluck('payment_method_id')->filter()->unique()->toArray();
+                
+                foreach ($promos as $promo) {
+                    if ($promo->paymentMethods->count() > 0) {
+                        $requiredPmIds = $promo->paymentMethods->pluck('id')->toArray();
+                        $hasValidPm = count(array_intersect($usedPaymentMethodIds, $requiredPmIds)) > 0;
+                        if (!$hasValidPm) {
+                            $pmNames = $promo->paymentMethods->pluck('name')->implode(', ');
+                            $this->dispatch('toast', title: 'Promo Tidak Berlaku', message: "Promo {$promo->name} hanya berlaku untuk pembayaran menggunakan: {$pmNames}.", type: 'error');
+                            return;
+                        }
+                    }
+                }
+            }
+
+            if (!$this->isPaymentsValid()) {
                 $this->dispatch('toast', title: 'Error', message: 'Pembayaran belum valid.', type: 'error');
                 return;
             }
 
             $subtotal = $this->subtotal();
             $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
-            $promoDiscountAmount = $this->totalPromoDiscount;
+            $promoDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['promo_discount'] ?? 0));
             $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
 
-            $mdrAmt = $this->mdrAmount;
+            $mdrAmt = $this->mdrAmount();
             $grandTotal = max(0, $subtotal - $totalDiscountAmount);
 
             \Illuminate\Support\Facades\DB::beginTransaction();
@@ -312,7 +335,8 @@ trait WithCheckoutAndReceipt
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => (int) ($item['discount_amount'] ?? 0),
+                    'discount_amount' => (int) ($item['discount_amount'] ?? 0) + (int) ($item['promo_discount'] ?? 0),
+                    'applied_promo_id' => $item['applied_promo_id'] ?? null,
                     // 3. Simpan ke database. Jika ada 2 SN, jadinya: "SN001, SN002"
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
@@ -363,9 +387,9 @@ trait WithCheckoutAndReceipt
                 $hasSecond = collect($this->cart)->contains('is_second', true);
                 $dbSource = $hasSecond ? 'second' : 'syihab';
 
-                // Sesuaikan penamaan Cabang & Gudang untuk Accurate GSK
-                $accurateBranchName = $dbSource === 'second' ? 'GSK ' . $branchName : $branchName;
-                $accurateWarehouseName = $dbSource === 'second' ? 'GSK ' . $warehouseName : $warehouseName;
+                // Gunakan nama Cabang & Gudang asli untuk dikirim ke Accurate
+                $accurateBranchName = $branchName;
+                $accurateWarehouseName = $warehouseName;
 
                 // Sync Customer to Accurate
                 $accurateService->syncCustomer($customerUser, $dbSource);
@@ -436,7 +460,7 @@ trait WithCheckoutAndReceipt
                             'doc_type' => 'SALES_INVOICE',
                             'doc_number' => $siResult['r']['number'],
                             'accurate_id' => $siResult['r']['id'] ?? null,
-                            'amount' => $this->grand_total,
+                            'amount' => $grandTotal,
                             'status' => 'SUCCESS',
                         ]);
                     }
@@ -468,26 +492,9 @@ trait WithCheckoutAndReceipt
                             ];
                         }
 
-                        // 2. Masukkan Semua Promo sebagai potongan SR (hanya di pembayaran pertama)
-                        $promoDiscountsTotal = 0;
-                        if (!$promosAppliedToSR) {
-                            foreach ($order->promos as $promo) {
-                                if ($promo->accurate_account_no && $promo->pivot->discount_applied > 0) {
-                                    $detailDiscounts[] = [
-                                        'accountNo' => $promo->accurate_account_no,
-                                        'amount' => (float) $promo->pivot->discount_applied,
-                                        'departmentName' => $accurateBranchName,
-                                        'discountNotes' => 'Promo: ' . $promo->name
-                                    ];
-                                    $promoDiscountsTotal += (float) $promo->pivot->discount_applied;
-                                }
-                            }
-                            $promosAppliedToSR = true;
-                        }
-
                         $detailInvoiceItem = [
                             'invoiceNo' => $order->accurate_invoice_no,
-                            'paymentAmount' => $rowBaseAmount + $promoDiscountsTotal, // Bayar sisa tagihan invoice = Cash + Promo
+                            'paymentAmount' => $rowBaseAmount, // Bayar sisa tagihan invoice = Cash
                         ];
 
                         if (!empty($detailDiscounts)) {
@@ -678,10 +685,10 @@ trait WithCheckoutAndReceipt
 
             $subtotal = $this->subtotal();
             $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
-            $promoDiscountAmount = $this->totalPromoDiscount;
+            $promoDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['promo_discount'] ?? 0));
             $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
 
-            $mdrAmt = $this->mdrAmount;
+            $mdrAmt = $this->mdrAmount();
             $grandTotal = max(0, $subtotal - $totalDiscountAmount);
             $branchName = Auth::user()->branch->name ?? 'Toko';
 
@@ -796,7 +803,6 @@ trait WithCheckoutAndReceipt
             foreach ($this->cart as $item) {
                 $rawSns = $item['serial_numbers'] ?? (!empty(trim($item['serial_number'] ?? '')) ? [$item['serial_number']] : []);
                 $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
-
                 \App\Models\OrderItem::create([
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
@@ -804,7 +810,8 @@ trait WithCheckoutAndReceipt
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => (int) ($item['discount_amount'] ?? 0),
+                    'discount_amount' => (int) ($item['discount_amount'] ?? 0) + (int) ($item['promo_discount'] ?? 0),
+                    'applied_promo_id' => $item['applied_promo_id'] ?? null,
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
 

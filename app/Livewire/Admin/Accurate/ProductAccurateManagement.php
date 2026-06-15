@@ -89,6 +89,21 @@ class ProductAccurateManagement extends Component
                     ['item_no', 'name', 'base_price', 'stock', 'id_brand_accurate', 'brandName', 'id_category_accurate', 'categoryName', 'raw_data', 'base_cost', 'updated_at']
                 );
 
+                // Sync harga ke ProductVariant / SecondProductVariant lokal
+                foreach ($importData as $imported) {
+                    $sku = $imported['item_no'];
+                    $newPrice = $imported['base_price'];
+                    if ($newPrice <= 0) continue;
+
+                    $variant = \App\Models\ProductVariant::where('sku', $sku)->first();
+                    if (!$variant) {
+                        $variant = \App\Models\SecondProductVariant::where('sku', $sku)->first();
+                    }
+                    if ($variant && (int) $variant->price !== $newPrice) {
+                        $variant->update(['price' => $newPrice]);
+                    }
+                }
+
                 $this->syncImportedCount += count($importData);
             }
 
@@ -317,10 +332,21 @@ class ProductAccurateManagement extends Component
             $service = app(SerialNumberSyncService::class);
             $snCount = $service->syncFromAccurate($accurateId);
 
+            // Sync harga juga
+            $priceResult = $service->syncPriceFromAccurate($accurateId);
+            $priceMsg = '';
+            if ($priceResult['updated']) {
+                $priceMsg = ' | Harga diperbarui: Rp ' . number_format($priceResult['old_price']) . ' → Rp ' . number_format($priceResult['new_price']);
+            }
+
             if ($snCount > 0) {
-                $this->dispatch('toast', title: 'Berhasil', message: "Berhasil sinkronisasi $snCount Serial Number.", type: 'success');
+                $this->dispatch('toast', title: 'Berhasil', message: "Berhasil sinkronisasi $snCount Serial Number." . $priceMsg, type: 'success');
             } else {
-                $this->dispatch('toast', title: 'Gagal', message: 'Tidak ada data Serial Number di Accurate.', type: 'error');
+                $msg = 'Tidak ada data Serial Number di Accurate.';
+                if ($priceResult['updated']) {
+                    $msg = 'SN tidak ada, tapi harga berhasil diperbarui.' . $priceMsg;
+                }
+                $this->dispatch('toast', title: $priceResult['updated'] ? 'Berhasil' : 'Info', message: $msg, type: $priceResult['updated'] ? 'success' : 'warning');
             }
         } catch (\Exception $e) {
             Log::error('Gagal sync serial number: ' . $e->getMessage());

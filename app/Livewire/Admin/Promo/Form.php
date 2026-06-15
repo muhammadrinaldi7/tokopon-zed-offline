@@ -24,6 +24,13 @@ class Form extends Component
     public $end_date;
     public $is_active = true;
 
+    // Promo v2 Features
+    public $is_multiply = false;
+    public $is_combinable = true;
+    public $quota;
+    public $selected_branches = [];
+    public $selected_payment_methods = [];
+
     // Conditions
     public $min_transaction_amount;
     public $min_qty;
@@ -61,6 +68,12 @@ class Form extends Component
             $this->start_date = $promo->start_date ? $promo->start_date->format('Y-m-d') : null;
             $this->end_date = $promo->end_date ? $promo->end_date->format('Y-m-d') : null;
             $this->is_active = $promo->is_active;
+            
+            $this->is_multiply = $promo->is_multiply;
+            $this->is_combinable = $promo->is_combinable;
+            $this->quota = $promo->quota;
+            $this->selected_branches = $promo->branches->pluck('id')->toArray();
+            $this->selected_payment_methods = $promo->paymentMethods->pluck('id')->toArray();
 
             $this->min_transaction_amount = $promo->min_transaction_amount;
             $this->min_qty = $promo->min_qty;
@@ -78,7 +91,13 @@ class Form extends Component
 
             // Load Bundle SKUs (Produk Pendamping)
             $this->selected_bundle_skus = $promo->bundleSkus->map(function ($bundleSku) {
-                return ['sku' => $bundleSku->sku, 'name' => $this->resolveSkuName($bundleSku->sku)];
+                return [
+                    'sku' => $bundleSku->sku, 
+                    'name' => $this->resolveSkuName($bundleSku->sku),
+                    'discount_type' => $bundleSku->discount_type ?: 'fixed',
+                    'discount_value' => $bundleSku->discount_value,
+                    'max_discount' => $bundleSku->max_discount,
+                ];
             })->toArray();
         }
     }
@@ -194,7 +213,13 @@ class Form extends Component
     public function addBundleSku($sku, $name)
     {
         if (!collect($this->selected_bundle_skus)->contains('sku', $sku)) {
-            $this->selected_bundle_skus[] = ['sku' => $sku, 'name' => $name];
+            $this->selected_bundle_skus[] = [
+                'sku' => $sku, 
+                'name' => $name,
+                'discount_type' => 'fixed',
+                'discount_value' => null,
+                'max_discount' => null,
+            ];
         }
         $this->search_bundle_sku = '';
         $this->bundle_sku_search_results = [];
@@ -221,6 +246,11 @@ class Form extends Component
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'is_active' => 'boolean',
+            'is_multiply' => 'boolean',
+            'is_combinable' => 'boolean',
+            'quota' => 'nullable|integer|min:1',
+            'selected_branches' => 'array',
+            'selected_payment_methods' => 'array',
             'min_transaction_amount' => 'nullable|numeric|min:0',
             'min_qty' => 'nullable|integer|min:1',
             'apply_to_all_items' => 'boolean',
@@ -240,15 +270,17 @@ class Form extends Component
             return;
         }
 
-        // Validasi: promo bundle harus punya Bundle SKU dan Diskon
+        // Validasi: promo bundle harus punya Bundle SKU dan Diskon per item
         if ($this->is_bundle) {
             if (count($this->selected_bundle_skus) === 0) {
                 $this->dispatch('toast', title: 'Error', message: 'Promo bundling harus memiliki minimal 1 produk pendamping (bundle).', type: 'error');
                 return;
             }
-            if (!$this->bundle_discount_value || $this->bundle_discount_value <= 0) {
-                $this->dispatch('toast', title: 'Error', message: 'Nilai diskon bundle wajib diisi.', type: 'error');
-                return;
+            foreach($this->selected_bundle_skus as $bs) {
+                if(empty($bs['discount_value']) || $bs['discount_value'] <= 0) {
+                    $this->dispatch('toast', title: 'Error', message: 'Ada item pendamping yang belum diisi nilai diskonnya.', type: 'error');
+                    return;
+                }
             }
         }
 
@@ -264,6 +296,9 @@ class Form extends Component
             'start_date' => $this->start_date ?: null,
             'end_date' => $this->end_date ?: null,
             'is_active' => $this->is_active,
+            'is_multiply' => $this->is_multiply,
+            'is_combinable' => $this->is_combinable,
+            'quota' => $this->quota ?: null,
             'min_transaction_amount' => $this->min_transaction_amount ?: null,
             'min_qty' => $this->min_qty ?: null,
             'apply_to_all_items' => $this->apply_to_all_items,
@@ -297,10 +332,19 @@ class Form extends Component
         $promo->bundleSkus()->delete();
         if ($this->is_bundle) {
             $bundleSkusToInsert = array_map(function ($item) {
-                return ['sku' => $item['sku']];
+                return [
+                    'sku' => $item['sku'],
+                    'discount_type' => $item['discount_type'] ?? 'fixed',
+                    'discount_value' => $item['discount_value'] ?? 0,
+                    'max_discount' => ($item['discount_type'] === 'percentage') ? ($item['max_discount'] ?: null) : null,
+                ];
             }, $this->selected_bundle_skus);
             $promo->bundleSkus()->createMany($bundleSkusToInsert);
         }
+
+        // Sync Promo Branches & Payment Methods
+        $promo->branches()->sync($this->selected_branches);
+        $promo->paymentMethods()->sync($this->selected_payment_methods);
 
         $this->dispatch('toast', title: 'Berhasil', message: $message, type: 'success');
         return $this->redirectRoute('admin.promos.index', navigate: true);
@@ -309,7 +353,9 @@ class Form extends Component
     public function render()
     {
         return view('livewire.admin.promo.form', [
-            'brands' => Brand::orderBy('name')->get()
+            'brands' => Brand::orderBy('name')->get(),
+            'branches' => \App\Models\Branch::orderBy('name')->get(),
+            'paymentMethods' => \App\Models\PaymentMethod::orderBy('name')->get(),
         ]);
     }
 }

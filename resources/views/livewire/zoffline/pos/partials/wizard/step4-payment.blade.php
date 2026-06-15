@@ -1,46 +1,17 @@
 <div class="space-y-6">
     {{-- RANGKUMAN TAGIHAN & PROMO --}}
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div class="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-            <h3 class="font-bold text-gray-800 flex items-center gap-2">
-                <svg class="w-5 h-5 text-[#1c69d4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-                Rincian Tagihan & Promo
-            </h3>
-        </div>
         <div class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {{-- Diskon & Catatan --}}
                 <div class="space-y-4">
-                    <div class="space-y-1.5">
-                        <label class="text-xs font-bold text-gray-600 uppercase">Promo Code / Voucher</label>
-                        <select multiple wire:model.live="selectedPromos"
-                            class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20 min-h-[100px]">
-                            @foreach ($this->availablePromos as $promo)
-                                <option value="{{ $promo->id }}">
-                                    {{ $promo->name }} (Diskon Rp {{ number_format($promo->discount_amount, 0, ',', '.') }})
-                                </option>
-                            @endforeach
-                        </select>
-                        <p class="text-[11px] text-gray-400 font-medium">Tahan tombol CTRL/CMD untuk memilih lebih dari 1 promo.</p>
-                    </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-bold text-gray-600 uppercase">Diskon Tambahan (Rp)</label>
-                            <input type="number" wire:model.lazy="discount_amount"
-                                class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20"
-                                placeholder="0" min="0">
-                        </div>
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-bold text-gray-600 uppercase">Catatan</label>
-                            <input type="text" wire:model.lazy="notes"
-                                class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20"
-                                placeholder="Cttn tambahan...">
-                        </div>
+                    <div class="space-y-1.5 mt-2">
+                        <label class="text-xs font-bold text-gray-600 uppercase">Catatan</label>
+                        <input type="text" wire:model.lazy="notes"
+                            class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20"
+                            placeholder="Cttn tambahan...">
                     </div>
-                </div>
 
                 {{-- Total --}}
                 <div class="bg-gray-50 rounded-xl p-5 border border-gray-100 flex flex-col justify-center space-y-3">
@@ -161,8 +132,8 @@
                                 @endif
 
                                 {{-- Metode Pembayaran (Akun Tunai atau EDC/QRIS) --}}
-                                @if($payment['category'] === 'TUNAI')
-                                    <div class="md:col-span-{{ $paymentMode === 'split' ? '5' : '6' }} space-y-1.5">
+                                @if(($payment['category'] ?? '') === 'TUNAI')
+                                    <div class="{{ $paymentMode === 'split' ? 'md:col-span-5' : 'md:col-span-6' }} space-y-1.5">
                                         <label class="text-xs font-bold text-gray-500 uppercase">Akun Kas Tunai</label>
                                         <select wire:model.live="payments.{{ $index }}.payment_method_id"
                                             class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20">
@@ -172,8 +143,12 @@
                                             @endforeach
                                         </select>
                                     </div>
-                                @elseif($payment['category'] === 'NON-TUNAI')
-                                    <div class="md:col-span-{{ $paymentMode === 'split' ? '3' : '4' }} space-y-1.5">
+                                @elseif(($payment['category'] ?? '') === 'NON-TUNAI')
+                                    @php
+                                        $currentMethod = collect($this->nonCashPaymentMethods)->firstWhere('id', $payment['payment_method_id']);
+                                        $hasRate = $currentMethod && count($currentMethod->rates ?? []) > 0;
+                                    @endphp
+                                    <div class="{{ $paymentMode === 'split' ? ($hasRate ? 'md:col-span-3' : 'md:col-span-5') : ($hasRate ? 'md:col-span-4' : 'md:col-span-6') }} space-y-1.5">
                                         <label class="text-xs font-bold text-gray-500 uppercase">Tipe (EDC/QRIS/Transfer)</label>
                                         <select wire:model.live="payments.{{ $index }}.payment_method_id"
                                             class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20">
@@ -184,13 +159,8 @@
                                         </select>
                                     </div>
                                     
-                                    {{-- Rate / MDR khusus Non-Tunai --}}
-                                    @php
-                                        $currentMethod = collect($this->nonCashPaymentMethods)->firstWhere('id', $payment['payment_method_id']);
-                                    @endphp
-                                    
-                                    @if ($currentMethod && count($currentMethod->rates ?? []) > 0)
-                                        <div class="md:col-span-{{ $paymentMode === 'split' ? '3' : '4' }} space-y-1.5">
+                                    @if ($hasRate)
+                                        <div class="{{ $paymentMode === 'split' ? 'md:col-span-3' : 'md:col-span-4' }} space-y-1.5">
                                             <label class="text-xs font-bold text-gray-500 uppercase">EDC / Bank (MDR)</label>
                                             <select wire:model.live="payments.{{ $index }}.payment_method_rate_id"
                                                 class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20">
@@ -205,8 +175,22 @@
                                     @endif
                                 @endif
 
+                                @php
+                                    $nominalSpan = 'md:col-span-6';
+                                    if ($paymentMode === 'split') {
+                                        if (($payment['category'] ?? '') === 'TUNAI') {
+                                            $nominalSpan = 'md:col-span-4';
+                                        } elseif (($payment['category'] ?? '') === 'NON-TUNAI') {
+                                            $nominalSpan = (isset($hasRate) && $hasRate) ? 'md:col-span-3' : 'md:col-span-4';
+                                        }
+                                    } else {
+                                        if (($payment['category'] ?? '') === 'NON-TUNAI' && isset($hasRate) && $hasRate) {
+                                            $nominalSpan = 'md:col-span-4';
+                                        }
+                                    }
+                                @endphp
                                 {{-- Nominal / Amount --}}
-                                <div class="md:col-span-{{ $paymentMode === 'split' ? '3' : '6' }} space-y-1.5">
+                                <div class="{{ $nominalSpan }} space-y-1.5">
                                     <label class="text-xs font-bold text-gray-500 uppercase">Nominal</label>
                                     <div class="relative">
                                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
@@ -255,7 +239,7 @@
             </svg>
             Kembali
         </button>
-        <button wire:click="processCheckout"
+        <button wire:click="processPayment"
             @if(!$this->isPaymentsValid) disabled @endif
             class="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
             Proses Transaksi

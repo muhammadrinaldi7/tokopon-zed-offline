@@ -21,11 +21,18 @@ class Promo extends Model
         'bundle_max_discount' => 'decimal:2',
         'bundle_max_qty' => 'integer',
         'apply_to_all_items' => 'boolean',
+        'is_multiply' => 'boolean',
+        'is_combinable' => 'boolean',
     ];
 
     public function brand()
     {
         return $this->belongsTo(Brand::class);
+    }
+
+    public function branches()
+    {
+        return $this->belongsToMany(Branch::class, 'promo_branches');
     }
 
     public function orders()
@@ -41,6 +48,11 @@ class Promo extends Model
     public function bundleSkus()
     {
         return $this->hasMany(PromoBundleSku::class);
+    }
+
+    public function paymentMethods()
+    {
+        return $this->belongsToMany(PaymentMethod::class, 'promo_payment_methods');
     }
 }
 

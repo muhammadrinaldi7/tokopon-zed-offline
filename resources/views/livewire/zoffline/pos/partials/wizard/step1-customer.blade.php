@@ -1,9 +1,4 @@
 <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-    <div class="p-6 border-b border-gray-100 bg-gray-50/50">
-        <h2 class="text-lg font-bold text-gray-800">Pilih Customer & Tenaga Penjual</h2>
-        <p class="text-sm text-gray-500 mt-1">Langkah pertama, tentukan siapa pelanggannya dan siapa sales yang melayani transaksi ini.</p>
-    </div>
-
     <div class="p-6 space-y-8">
         {{-- CUSTOMER SECTION --}}
         <div class="space-y-4">

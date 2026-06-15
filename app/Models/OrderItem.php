@@ -21,4 +21,9 @@ class OrderItem extends Model
     {
         return $this->hasOne(ProductReview::class);
     }
+
+    public function appliedPromo()
+    {
+        return $this->belongsTo(Promo::class, 'applied_promo_id');
+    }
 }
