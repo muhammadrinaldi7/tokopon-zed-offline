@@ -59,12 +59,12 @@ trait GeneratesProductVariant
     {
         $upperName = strtoupper($name);
 
-        if (str_contains($upperName, 'INTER')) {
-            return 'Second Inter';
+        if (str_starts_with($upperName, 'DS -') || str_contains($upperName, 'INTER')) {
+            return 'Inter';
         }
 
-        // Default: jika ada kata RESMI atau tidak ada keyword khusus → Second Resmi
-        return 'Second Resmi';
+        // Default: jika ada kata RESMI atau tidak ada keyword khusus atau RL
+        return 'Resmi';
     }
 
     /**
@@ -74,8 +74,11 @@ trait GeneratesProductVariant
      */
     public function cleanParentNameForSecond(string $parentName): string
     {
+        // Remove DS - or RL - prefixes
+        $cleaned = preg_replace('/^(DS|RL)\s*-\s*/i', '', $parentName);
+
         // Hapus keyword kondisi dari nama (case-insensitive)
-        $cleaned = preg_replace('/\b(INTER|RESMI|IBOX|SECOND)\b/i', '', $parentName);
+        $cleaned = preg_replace('/\b(INTER|RESMI|IBOX|SECOND)\b/i', '', $cleaned);
 
         // Bersihkan spasi/dash ganda yang tersisa
         $cleaned = preg_replace('/\s*-\s*-\s*/', ' - ', $cleaned);
@@ -208,7 +211,7 @@ trait GeneratesProductVariant
             ['sku' => $itemNo],
             [
                 'second_product_id' => $product->id,
-                'condition_desc' => $condition,
+                'condition_desc' => $condition, // Ubah ke kolom condition yang benar
                 'color' => $parsedData['color'],
                 'ram' => $parsedData['ram'],
                 'storage' => $parsedData['storage'],

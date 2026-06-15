@@ -20,8 +20,9 @@ class SecondVariantManagement extends Component
     // Form inputs
     public $ram;
     public $storage;
+    public $buy_price;
+    public $condition = 'Resmi';
     public $color;
-    public $condition = 'Baru';
     public $sku;
     public $has_sn = true;
 
@@ -237,10 +238,10 @@ class SecondVariantManagement extends Component
     {
         $this->isEditing = false;
         $this->editingVariantId = null;
-        $this->condition = 'Baru';
         $this->ram = '';
         $this->storage = '';
         $this->color = '';
+        $this->condition = 'Resmi';
         $this->sku = '';
         $this->has_sn = true;
         $this->variantImage = null;

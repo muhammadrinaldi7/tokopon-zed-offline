@@ -215,7 +215,8 @@ trait WithCart
             'sku' => $variant->sku ?? '',
             'has_sn' => (bool) $variant->has_sn,
             'stock' => $stock,
-            'brand_id' => $isSecond ? ($variant->secondProduct->brand_id ?? null) : ($variant->product->brand_id ?? null)
+            'brand_id' => $isSecond ? ($variant->secondProduct->brand_id ?? null) : ($variant->product->brand_id ?? null),
+            'condition' => $variant->condition ?? $variant->condition_desc ?? '',
         ];
 
         $this->showScannedItemModal = true;
@@ -269,6 +270,7 @@ trait WithCart
                 'has_sn' => $itemData['has_sn'],
                 'is_second' => $itemData['isSecond'],
                 'brand_id' => $itemData['brand_id'] ?? null,
+                'condition' => $itemData['condition'] ?? '',
             ];
 
             $this->dispatch('toast', title: 'Sukses', message: "Berhasil menambahkan {$itemData['name']} ke keranjang.", type: 'success');
@@ -457,6 +459,7 @@ trait WithCart
                 'has_sn' => (bool) $variant->has_sn,
                 'is_second' => $isSecond,
                 'brand_id' => $isSecond ? ($product->brand_id ?? null) : ($product->brand_id ?? null),
+                'condition' => $variant->condition ?? $variant->condition_desc ?? '',
             ];
         }
         $this->showVariantModal = false;

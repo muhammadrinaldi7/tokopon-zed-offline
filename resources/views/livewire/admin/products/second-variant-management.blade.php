@@ -167,11 +167,9 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-gray-600 mb-1.5 ml-1">Kondisi</label>
-                            <select wire:model="condition"
-                                class="w-full text-[14px] rounded-lg border-gray-300 px-4 py-2.5 shadow-sm focus:ring-4 focus:ring-[#1c69d4]/10 focus:border-[#1c69d4] transition-all">
-                                <option value="Baru">Baru</option>
-                                <option value="Second">Second</option>
-                                <option value="Bekas Tanda Pemakaian">Bekas Tanda Pemakaian</option>
+                            <select wire:model="condition" id="condition" class="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm rounded-xl focus:ring-blue-500 focus:border-blue-500 block p-3 transition-colors">
+                                <option value="Resmi">Resmi</option>
+                                <option value="Inter">Inter</option>
                             </select>
                         </div>
                         <div>

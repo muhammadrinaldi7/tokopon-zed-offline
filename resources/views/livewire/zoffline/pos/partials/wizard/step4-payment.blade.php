@@ -185,13 +185,6 @@
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
                             Tambahkan ke Split Payment
                         </button>
-                    @else
-                        <button wire:click="processPayment" 
-                            @if(!$this->isPaymentsValid) disabled @endif
-                            class="w-full py-4 mt-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-black rounded-2xl shadow-lg shadow-emerald-600/30 transition-all text-xl flex items-center justify-center gap-2">
-                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                            Proses Transaksi Sekarang
-                        </button>
                     @endif
                 </div>
 

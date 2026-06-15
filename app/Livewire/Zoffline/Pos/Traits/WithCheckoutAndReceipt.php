@@ -183,7 +183,7 @@ trait WithCheckoutAndReceipt
             if (!empty($this->selectedPromos)) {
                 $promos = \App\Models\Promo::with('paymentMethods')->whereIn('id', $this->selectedPromos)->get();
                 $usedPaymentMethodIds = collect($this->payments)->pluck('payment_method_id')->filter()->unique()->toArray();
-                
+
                 foreach ($promos as $promo) {
                     if ($promo->paymentMethods->count() > 0) {
                         $requiredPmIds = $promo->paymentMethods->pluck('id')->toArray();
@@ -404,11 +404,20 @@ trait WithCheckoutAndReceipt
                             'unitPrice' => $item['price'],
                             'quantity' => $item['qty'],
                             'itemCashDiscount' => (int)($item['discount_amount'] ?? 0) + (int)($item['promo_discount'] ?? 0),
-                            // 'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
-                            // 'detailSerialNumber' => $detailSN,
                             'salesmanListNumber' => $detailSalesman,
-
                         ];
+
+                        $condition = $item['condition'] ?? '';
+                        if (in_array($condition, ['Inter', 'Resmi'])) {
+                            // Ekstrak nama kota dari cabang (Misal "GSK - Banjarbaru" atau "GSK Martapura" -> "Banjarbaru")
+                            $city = trim(str_replace(['GSK -', 'GSK '], '', $accurateWarehouseName));
+
+                            // Inter = Distri, Resmi = Retail
+                            $departmentPrefix = ($condition === 'Inter') ? 'Distri' : 'Retail';
+
+                            $itemData['departmentName'] = $departmentPrefix . ' ' . $city;
+                        }
+
                         if (!empty($detailSN)) {
                             $itemData['detailSerialNumber'] = $detailSN;
                         }
@@ -429,6 +438,7 @@ trait WithCheckoutAndReceipt
                             ? Carbon::parse($this->order_date)->format('d/m/Y')
                             : now()->format('d/m/Y'),
                         'taxable' => true,
+                        'useTax1' => true,
                         'description' => $this->notes
                     ];
 
@@ -874,8 +884,7 @@ trait WithCheckoutAndReceipt
 
     public function closeReceipt()
     {
-        $this->showReceiptModal = false;
-        $this->completedOrder = null;
+        $this->newTransaction();
     }
 
     public function newTransaction()
@@ -897,6 +906,16 @@ trait WithCheckoutAndReceipt
         $this->search = '';
         $this->showReceiptModal = false;
         $this->completedOrder = null;
+        
+        // Reset wizard steps to step 1
+        $this->currentStep = 1;
+        $this->paymentWizardStep = 1;
+        $this->paymentMode = null;
+        $this->activePaymentIndex = 0;
+        
+        // Reset promo data
+        $this->selectedPromos = [];
+        $this->promo_discount = 0;
     }
 
     // ─── Kirim Struk via Email (SMTP) ─────────────────────────
