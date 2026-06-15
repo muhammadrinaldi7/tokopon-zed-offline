@@ -295,36 +295,8 @@ trait WithCheckoutAndReceipt
 
             // Save promos to pivot table
             if (!empty($this->selectedPromos)) {
-                $promos = \App\Models\Promo::with(['skus', 'bundleSkus'])->whereIn('id', $this->selectedPromos)->get();
-                foreach ($promos as $promo) {
-                    $applied = 0;
-
-                    // 1. Kalkulasi Diskon Utama
-                    $eligibleMain = $this->calculateEligibleCart($promo, false);
-                    if ($promo->discount_type === 'fixed') {
-                        $applied += $promo->discount_value;
-                    } else {
-                        $calc = $eligibleMain['amount'] * ($promo->discount_value / 100);
-                        if ($promo->max_discount) $calc = min($calc, $promo->max_discount);
-                        $applied += $calc;
-                    }
-
-                    // 2. Kalkulasi Diskon Tambahan (Bundle)
-                    if ($promo->is_bundle) {
-                        $eligibleBundle = $this->calculateEligibleCart($promo, true);
-                        if ($eligibleBundle['qty'] > 0) {
-                            if ($promo->bundle_discount_type === 'fixed') {
-                                $applied += $promo->bundle_discount_value * $eligibleBundle['qty'];
-                            } else {
-                                $calc = $eligibleBundle['amount'] * ($promo->bundle_discount_value / 100);
-                                if ($promo->bundle_max_discount) $calc = min($calc, $promo->bundle_max_discount);
-                                $applied += $calc;
-                            }
-                        }
-                    }
-
-                    $order->promos()->attach($promo->id, ['discount_applied' => $applied]);
-                }
+                $service = app(\App\Services\PromoCalculatorService::class);
+                $service->recordPromosToOrder($order, $this->cart, $this->selectedPromos);
             }
 
 
@@ -342,7 +314,8 @@ trait WithCheckoutAndReceipt
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => (int) ($item['discount_amount'] ?? 0) + (int) ($item['promo_discount'] ?? 0),
+                    'discount_amount' => (int) ($item['discount_amount'] ?? 0),
+                    'promo_discount_amount' => (int) ($item['promo_discount'] ?? 0),
                     'applied_promo_id' => $item['applied_promo_id'] ?? null,
                     // 3. Simpan ke database. Jika ada 2 SN, jadinya: "SN001, SN002"
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
@@ -430,7 +403,7 @@ trait WithCheckoutAndReceipt
                             'warehouseName' => $accurateWarehouseName,
                             'unitPrice' => $item['price'],
                             'quantity' => $item['qty'],
-                            'itemCashDiscount' => $item['discount_amount'] ?? 0,
+                            'itemCashDiscount' => (int)($item['discount_amount'] ?? 0) + (int)($item['promo_discount'] ?? 0),
                             // 'detailName' => $item['name'] . ' ' . $item['color'] . ' ' . $item['storage'],
                             // 'detailSerialNumber' => $detailSN,
                             'salesmanListNumber' => $detailSalesman,
@@ -784,33 +757,8 @@ trait WithCheckoutAndReceipt
 
             // Save promos to pivot table
             if (!empty($this->selectedPromos)) {
-                $promos = \App\Models\Promo::with(['skus', 'bundleSkus'])->whereIn('id', $this->selectedPromos)->get();
-                foreach ($promos as $promo) {
-                    $applied = 0;
-                    $eligibleMain = $this->calculateEligibleCart($promo, false);
-                    if ($promo->discount_type === 'fixed') {
-                        $applied += $promo->discount_value;
-                    } else {
-                        $calc = $eligibleMain['amount'] * ($promo->discount_value / 100);
-                        if ($promo->max_discount) $calc = min($calc, $promo->max_discount);
-                        $applied += $calc;
-                    }
-
-                    if ($promo->is_bundle) {
-                        $eligibleBundle = $this->calculateEligibleCart($promo, true);
-                        if ($eligibleBundle['qty'] > 0) {
-                            if ($promo->bundle_discount_type === 'fixed') {
-                                $applied += $promo->bundle_discount_value * $eligibleBundle['qty'];
-                            } else {
-                                $calc = $eligibleBundle['amount'] * ($promo->bundle_discount_value / 100);
-                                if ($promo->bundle_max_discount) $calc = min($calc, $promo->bundle_max_discount);
-                                $applied += $calc;
-                            }
-                        }
-                    }
-
-                    $order->promos()->attach($promo->id, ['discount_applied' => $applied]);
-                }
+                $service = app(\App\Services\PromoCalculatorService::class);
+                $service->recordPromosToOrder($order, $this->cart, $this->selectedPromos);
             }
 
             // Create Order Items + reduce stock
@@ -824,7 +772,8 @@ trait WithCheckoutAndReceipt
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => (int) ($item['discount_amount'] ?? 0) + (int) ($item['promo_discount'] ?? 0),
+                    'discount_amount' => (int) ($item['discount_amount'] ?? 0),
+                    'promo_discount_amount' => (int) ($item['promo_discount'] ?? 0),
                     'applied_promo_id' => $item['applied_promo_id'] ?? null,
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);

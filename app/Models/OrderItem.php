@@ -26,4 +26,9 @@ class OrderItem extends Model
     {
         return $this->belongsTo(Promo::class, 'applied_promo_id');
     }
+
+    public function getTotalDiscountAttribute()
+    {
+        return (int)$this->discount_amount + (int)$this->promo_discount_amount;
+    }
 }

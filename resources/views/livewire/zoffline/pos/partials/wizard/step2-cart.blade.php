@@ -106,6 +106,28 @@
                                 <td class="px-6 py-5 align-top">
                                     <p class="text-sm font-medium text-gray-600">{{ $item['storage'] }} / {{ $item['ram'] }}</p>
                                     <p class="text-sm font-medium text-gray-600">{{ $item['color'] }}</p>
+                                    
+                                    {{-- MANUAL DISCOUNT PRESETS --}}
+                                    @php
+                                        $presets = $this->getActiveManualDiscountPresets();
+                                        $itemBrandId = $item['brand_id'] ?? null;
+                                        $validPresets = $presets->filter(function($p) use ($itemBrandId) {
+                                            return is_null($p->brand_id) || ($itemBrandId && $p->brand_id == $itemBrandId);
+                                        });
+                                    @endphp
+                                    @if($validPresets->count() > 0)
+                                    <div class="mt-4 pt-3 border-t border-gray-100/50">
+                                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Internal Cashback</p>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            @foreach($validPresets as $preset)
+                                                <button wire:click="toggleManualDiscount({{ $index }}, {{ $preset->amount }})"
+                                                    class="px-2.5 py-1 rounded-md text-[10px] font-black border transition-colors {{ (isset($item['discount_amount']) && $item['discount_amount'] == $preset->amount) ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700' }}">
+                                                    {{ number_format($preset->amount, 0, ',', '.') }}
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-5 align-top min-w-[200px]">
                                     @if ($item['has_sn'])

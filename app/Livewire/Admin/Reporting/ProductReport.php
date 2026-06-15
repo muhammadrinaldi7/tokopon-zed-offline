@@ -131,8 +131,10 @@ class ProductReport extends Component
                 'gross_revenue' => $group->sum(function ($q) {
                     return $q->price_at_checkout * $q->qty;
                 }),
-                'total_discount' => $group->sum('discount_amount'),
-                'net_revenue' => $group->sum('subtotal')
+                'total_discount' => $group->sum('total_discount'),
+                'net_revenue' => $group->sum(function ($q) {
+                    return ($q->price_at_checkout * $q->qty) - $q->total_discount;
+                })
             ];
         });
 
@@ -204,8 +206,10 @@ class ProductReport extends Component
                 'gross_revenue' => $group->sum(function ($q) {
                     return $q->price_at_checkout * $q->qty;
                 }),
-                'total_discount' => $group->sum('discount_amount'),
-                'net_revenue' => $group->sum('subtotal')
+                'total_discount' => $group->sum('total_discount'),
+                'net_revenue' => $group->sum(function ($q) {
+                    return ($q->price_at_checkout * $q->qty) - $q->total_discount;
+                })
             ];
         });
 

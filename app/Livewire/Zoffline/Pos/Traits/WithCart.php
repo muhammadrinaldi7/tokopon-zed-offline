@@ -214,7 +214,8 @@ trait WithCart
             'ram' => $variant->ram ?? '-',
             'sku' => $variant->sku ?? '',
             'has_sn' => (bool) $variant->has_sn,
-            'stock' => $stock
+            'stock' => $stock,
+            'brand_id' => $isSecond ? ($variant->secondProduct->brand_id ?? null) : ($variant->product->brand_id ?? null)
         ];
 
         $this->showScannedItemModal = true;
@@ -267,6 +268,7 @@ trait WithCart
                 'sku' => $itemData['sku'],
                 'has_sn' => $itemData['has_sn'],
                 'is_second' => $itemData['isSecond'],
+                'brand_id' => $itemData['brand_id'] ?? null,
             ];
 
             $this->dispatch('toast', title: 'Sukses', message: "Berhasil menambahkan {$itemData['name']} ke keranjang.", type: 'success');
@@ -454,6 +456,7 @@ trait WithCart
                 'sku' => $variant->sku ?? '',
                 'has_sn' => (bool) $variant->has_sn,
                 'is_second' => $isSecond,
+                'brand_id' => $isSecond ? ($product->brand_id ?? null) : ($product->brand_id ?? null),
             ];
         }
         $this->showVariantModal = false;
@@ -673,6 +676,26 @@ trait WithCart
             $this->cart[$index]['serial_numbers'] = array_values($this->cart[$index]['serial_numbers']);
 
             // Catatan: Bagian "Sinkronisasi ulang data legacy backward compatibility" sudah dihapus total!
+        }
+    }
+
+    // ─── Manual Discount Presets ───────────────────────────────
+    public function getActiveManualDiscountPresets()
+    {
+        return \App\Models\ManualDiscountPreset::where('is_active', true)->get();
+    }
+
+    public function toggleManualDiscount($cartIndex, $amount)
+    {
+        if (isset($this->cart[$cartIndex])) {
+            // Jika amount yang sama diklik lagi, batalkan (toggle off)
+            if (($this->cart[$cartIndex]['discount_amount'] ?? 0) == $amount) {
+                $this->cart[$cartIndex]['discount_amount'] = 0;
+            } else {
+                // Set diskon (hanya salah satu yang terpilih)
+                $this->cart[$cartIndex]['discount_amount'] = (int) $amount;
+            }
+            $this->syncSinglePaymentAmount();
         }
     }
 }

@@ -397,189 +397,61 @@ class Pos extends Component
     #[Computed]
     public function activePromos()
     {
+        $service = app(\App\Services\PromoCalculatorService::class);
         $userBranchId = \Illuminate\Support\Facades\Auth::user()->branch_id;
-        $promos = \App\Models\Promo::with(['skus', 'bundleSkus.variant.product', 'branches'])
-            ->where('is_active', true)
-            ->where(function ($q) {
-                $q->whereNull('start_date')->orWhere('start_date', '<=', now());
-            })
-            ->where(function ($q) {
-                $q->whereNull('end_date')->orWhere('end_date', '>=', now());
-            })
-            ->where(function ($q) use ($userBranchId) {
-                $q->whereDoesntHave('branches')
-                  ->orWhereHas('branches', function ($bq) use ($userBranchId) {
-                      $bq->where('branches.id', $userBranchId);
-                  });
-            })
-            ->get();
+        
+        $eligiblePromos = $service->getEligiblePromos($this->cart, $userBranchId);
 
-        $eligiblePromos = [];
-        foreach ($promos as $promo) {
-            if ($this->isPromoEligible($promo)) {
-                $eligiblePromos[] = $promo;
-            } else {
-                if (in_array($promo->id, $this->selectedPromos)) {
-                    $this->selectedPromos = array_diff($this->selectedPromos, [$promo->id]);
-                    $this->applyPromosToCart();
-                }
+        // Check if previously selected promos are still eligible
+        $eligibleIds = $eligiblePromos->pluck('id')->toArray();
+        $needsUpdate = false;
+        foreach ($this->selectedPromos as $id) {
+            if (!in_array($id, $eligibleIds)) {
+                $this->selectedPromos = array_diff($this->selectedPromos, [$id]);
+                $needsUpdate = true;
             }
         }
-        return collect($eligiblePromos);
+
+        if ($needsUpdate) {
+            $this->applyPromosToCart();
+        }
+
+        return $eligiblePromos;
     }
 
     #[Computed]
     public function itemDiscountTotal()
     {
-        // Menghitung total diskon manual DAN diskon promo dari semua item di keranjang
-        return collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0) + (int)($item['promo_discount'] ?? 0));
+        // Menghitung total diskon manual
+        return collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
+    }
+
+    #[Computed]
+    public function promoDiscountTotal()
+    {
+        // Menghitung total diskon promo
+        return collect($this->cart)->sum(fn($item) => (int)($item['promo_discount'] ?? 0));
     }
 
     #[Computed]
     public function totalDiscount()
     {
-        return $this->itemDiscountTotal;
+        return $this->itemDiscountTotal + $this->promoDiscountTotal;
     }
 
     // discount
 
-    public function isPromoEligible($promo)
-    {
-        // Mengecek kelayakan HANYA berdasarkan Produk Utama (Main Product)
-        $eligible = $this->calculateEligibleCart($promo, false);
-
-        if ($promo->min_qty && $eligible['qty'] < $promo->min_qty) return false;
-        if ($promo->min_transaction_amount && $eligible['amount'] < $promo->min_transaction_amount) return false;
-
-        // Jika tidak apply ke semua produk dan qty produk utama 0 = tidak valid
-        if (!$promo->apply_to_all_items && $eligible['qty'] == 0) return false;
-        return true;
-    }
-
-    public function calculateEligibleCart($promo, $forBundle = false, $multiplier = 1)
-    {
-        $eligibleQty = 0;
-        $eligibleAmount = 0;
-        if ($promo->apply_to_all_items && !$forBundle) {
-            $eligibleAmount = $this->subtotal();
-            $eligibleQty = array_sum(array_column($this->cart, 'qty'));
-        } else {
-            // Jika untuk bundle, cari dari bundleSkus. Jika utama, dari skus.
-            $promoSkus = $forBundle ? $promo->bundleSkus->pluck('sku')->toArray() : $promo->skus->pluck('sku')->toArray();
-
-            foreach ($this->cart as $item) {
-                if (in_array($item['sku'], $promoSkus)) {
-                    $eligibleQty += (int)$item['qty'];
-                    $eligibleAmount += ((int)$item['qty'] * (float)$item['price']);
-                }
-            }
-        }
-        // Cap reward qty untuk produk bundle (jika diset max qty-nya) - perhatikan multiplier
-        if ($forBundle && $promo->bundle_max_qty && $eligibleQty > ($promo->bundle_max_qty * $multiplier)) {
-            $avgPrice = $eligibleQty > 0 ? ($eligibleAmount / $eligibleQty) : 0;
-            $eligibleQty = $promo->bundle_max_qty * $multiplier;
-            $eligibleAmount = $eligibleQty * $avgPrice;
-        }
-        return ['qty' => $eligibleQty, 'amount' => $eligibleAmount];
-    }
-
     public function applyPromosToCart()
     {
-        // 1. Reset all promo discounts in cart
-        foreach ($this->cart as $key => $item) {
-            $this->cart[$key]['promo_discount'] = 0;
-            $this->cart[$key]['applied_promo_id'] = null;
-        }
+        $service = app(\App\Services\PromoCalculatorService::class);
+        $success = $service->applyPromosToCart($this->cart, $this->selectedPromos);
 
-        if (empty($this->selectedPromos)) return;
-
-        $promos = \App\Models\Promo::with(['skus', 'bundleSkus'])->whereIn('id', $this->selectedPromos)->get();
-
-        // Cek kombinasi promo
-        $hasNonCombinable = $promos->where('is_combinable', false)->count() > 0;
-        if ($hasNonCombinable && count($this->selectedPromos) > 1) {
+        if (!$success) {
             $this->dispatch('toast', title: 'Gagal', message: 'Ada promo yang tidak dapat digabungkan dengan promo lain.', type: 'error');
             // Revert ke 1 promo saja (yg pertama)
-            $this->selectedPromos = [$this->selectedPromos[0]];
-            $promos = \App\Models\Promo::with(['skus', 'bundleSkus'])->whereIn('id', $this->selectedPromos)->get();
-        }
-
-        foreach ($promos as $promo) {
-            // 2. Kalkulasi Diskon Utama
-            $eligibleMain = $this->calculateEligibleCart($promo, false);
-            if ($eligibleMain['qty'] > 0) {
-                $multiplier = 1;
-                if ($promo->is_multiply && $promo->min_qty > 0) {
-                    $multiplier = floor($eligibleMain['qty'] / $promo->min_qty);
-                }
-
-                $mainDiscountValue = $promo->discount_type === 'fixed' 
-                    ? ($promo->discount_value * $multiplier)
-                    : ($eligibleMain['amount'] * ($promo->discount_value / 100));
-                
-                if ($promo->max_discount) {
-                    $mainDiscountValue = min($mainDiscountValue, $promo->max_discount * $multiplier);
-                }
-
-                // Distribusikan $mainDiscountValue ke item yang eligible
-                $mainSkus = $promo->apply_to_all_items ? array_column($this->cart, 'sku') : $promo->skus->pluck('sku')->toArray();
-                foreach ($this->cart as $key => $item) {
-                    if (in_array($item['sku'], $mainSkus)) {
-                        $itemAmount = $item['qty'] * $item['price'];
-                        $proportion = $itemAmount / $eligibleMain['amount'];
-                        $itemDiscount = round($mainDiscountValue * $proportion);
-                        $this->cart[$key]['promo_discount'] += $itemDiscount;
-                        $this->cart[$key]['applied_promo_id'] = $promo->id;
-                    }
-                }
-            }
-
-            // 3. Kalkulasi Diskon Bundling
-            if ($promo->is_bundle) {
-                $multiplier = 1;
-                if ($promo->is_multiply && $promo->min_qty > 0) {
-                    $multiplier = floor($eligibleMain['qty'] / $promo->min_qty);
-                }
-
-                $eligibleBundle = $this->calculateEligibleCart($promo, true, $multiplier);
-                
-                if ($eligibleBundle['qty'] > 0) {
-                    $applicableQty = $eligibleBundle['qty'];
-                    $totalQtyApplied = 0;
-                    
-                    $bundleSkusInfo = $promo->bundleSkus->keyBy('sku');
-
-                    foreach ($this->cart as $key => $item) {
-                        if ($bundleSkusInfo->has($item['sku']) && $totalQtyApplied < $applicableQty) {
-                            $bSku = $bundleSkusInfo->get($item['sku']);
-                            
-                            // Ambil prioritas: diskon per item (jika diisi) ATAU fallback ke global
-                            $type = $bSku->discount_value > 0 ? $bSku->discount_type : $promo->bundle_discount_type;
-                            $val = $bSku->discount_value > 0 ? $bSku->discount_value : $promo->bundle_discount_value;
-                            $max = $bSku->discount_value > 0 ? $bSku->max_discount : $promo->bundle_max_discount;
-                            
-                            if (!$val) continue;
-
-                            // Berapa banyak qty item ini yang boleh didiskon
-                            $qtyToDiscount = min($item['qty'], $applicableQty - $totalQtyApplied);
-
-                            // Hitung diskon dasar
-                            $itemDiscount = $type === 'fixed' 
-                                ? ($val * $qtyToDiscount) 
-                                : (($item['price'] * $qtyToDiscount) * ($val / 100));
-
-                            // Terapkan batasan max discount jika ada (dikalikan multiplier karena berlaku per kelipatan bundle)
-                            if ($max && $max > 0) {
-                                $itemDiscount = min($itemDiscount, $max * $multiplier);
-                            }
-
-                            $this->cart[$key]['promo_discount'] += $itemDiscount;
-                            $this->cart[$key]['applied_promo_id'] = $promo->id;
-                            
-                            $totalQtyApplied += $qtyToDiscount;
-                        }
-                    }
-                }
+            if (count($this->selectedPromos) > 0) {
+                $this->selectedPromos = [$this->selectedPromos[0]];
+                $service->applyPromosToCart($this->cart, $this->selectedPromos);
             }
         }
     }

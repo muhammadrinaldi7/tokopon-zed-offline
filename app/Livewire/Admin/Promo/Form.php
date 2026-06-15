@@ -13,6 +13,7 @@ class Form extends Component
     public ?Promo $promo = null;
 
     public $name;
+    public $description;
     public $code;
     public $category = 'internal';
     public $brand_id;
@@ -58,6 +59,7 @@ class Form extends Component
         if ($promo && $promo->exists) {
             $this->promo = $promo;
             $this->name = $promo->name;
+            $this->description = $promo->description;
             $this->code = $promo->code;
             $this->category = $promo->category;
             $this->brand_id = $promo->brand_id;
@@ -236,6 +238,7 @@ class Form extends Component
     {
         $this->validate([
             'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
             'code' => 'nullable|string|max:50|unique:promos,code,' . ($this->promo->id ?? 'NULL'),
             'category' => 'required|in:internal,brand',
             'brand_id' => 'required_if:category,brand|nullable|exists:brands,id',
@@ -286,6 +289,7 @@ class Form extends Component
 
         $data = [
             'name' => $this->name,
+            'description' => $this->description,
             'code' => $this->code,
             'category' => $this->category,
             'brand_id' => $this->category === 'brand' ? $this->brand_id : null,

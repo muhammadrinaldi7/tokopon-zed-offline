@@ -104,6 +104,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/{promo}/edit', App\Livewire\Admin\Promo\Form::class)->name('edit');
     });
 
+    Route::prefix('manual-discount')->name('manual-discount.')->middleware('can:manage-promos')->group(function () {
+        Route::get('/', App\Livewire\Admin\ManualDiscount\Index::class)->name('index');
+        Route::get('/create', App\Livewire\Admin\ManualDiscount\Form::class)->name('create');
+        Route::get('/{id}/edit', App\Livewire\Admin\ManualDiscount\Form::class)->name('edit');
+    });
+
     Route::get('/trade-ins', App\Livewire\Admin\TradeIn\Index::class)->name('trade-ins.index')->middleware('can:manage-trade-in');
     Route::get('/trade-ins/{tradeIn}', App\Livewire\Admin\TradeIn\Show::class)->name('trade-ins.show')->middleware('can:manage-trade-in');
 
