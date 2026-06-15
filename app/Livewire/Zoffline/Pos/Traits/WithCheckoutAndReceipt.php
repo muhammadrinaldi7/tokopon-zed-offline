@@ -915,7 +915,6 @@ trait WithCheckoutAndReceipt
         
         // Reset promo data
         $this->selectedPromos = [];
-        $this->promo_discount = 0;
     }
 
     // ─── Kirim Struk via Email (SMTP) ─────────────────────────

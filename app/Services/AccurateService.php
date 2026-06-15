@@ -558,12 +558,7 @@ class AccurateService
 
     public function getEmployees($databaseSource = 'syihab')
     {
-        $tokenSuffix = strtoupper($databaseSource) === 'SECOND' ? '_SECOND' : '';
-
-        // Mengambil konfigurasi environment berdasarkan database source
-        $host = env('ACCURATE_HOST' . $tokenSuffix, env('ACCURATE_HOST'));
-        $token = env('ACCURATE_TOKEN' . $tokenSuffix, env('ACCURATE_TOKEN'));
-        $secretKey = env('ACCURATE_SECRET_KEY' . $tokenSuffix, env('ACCURATE_SECRET_KEY'));
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
 
         $allEmployees = [];
         $page = 1;
