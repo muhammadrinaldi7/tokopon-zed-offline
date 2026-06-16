@@ -12,20 +12,13 @@ class AccurateService
 
     private function getCredentials($databaseSource)
     {
-        // For backwards compatibility during transition, map "second" to "second" or "gsk"
-        // In our seeder, we created "second" code for GSK.
-        $code = strtolower($databaseSource) === "second" ? "second" : strtolower($databaseSource);
+        // Bersihkan spasi, jadikan huruf kecil, dan berikan default 'syihab' jika kosong
+        $code = trim(strtolower($databaseSource)) ?: 'syihab';
 
         $businessUnit = \App\Models\BusinessUnit::where("code", $code)->first();
 
         if (!$businessUnit) {
-            // Fallback to "syihab" if default is requested but code is empty or missing
-            if ($code === "" || $code === "syihab") {
-                $businessUnit = \App\Models\BusinessUnit::where("code", "syihab")->first();
-            }
-            if (!$businessUnit) {
-                throw new \Exception("Kredensial Accurate untuk unit usaha {$databaseSource} tidak ditemukan di database.");
-            }
+            throw new \Exception("Kredensial Accurate untuk unit usaha '{$databaseSource}' tidak ditemukan di database.");
         }
 
         return [
@@ -94,8 +87,10 @@ class AccurateService
         // Ambil alamat primary
         $address = $user->addresses()->where('is_primary', true)->first();
 
-        // Ensure prefix matches the business unit (e.g., SYB_, GSK_)
-        $prefix = $databaseSource === 'second' ? 'GSK_' : 'SYB_';
+        // Generate prefix dynamically for any new business unit, preserving legacy ones
+        $prefix = strtoupper(trim($databaseSource)) . '_';
+        if (trim(strtolower($databaseSource)) === 'second') $prefix = 'GSK_';
+        if (trim(strtolower($databaseSource)) === 'syihab') $prefix = 'SYB_';
 
         // Data yang akan dikirim ke Accurate
         $vendorData = [
@@ -438,8 +433,10 @@ class AccurateService
 
         $address = $user->addresses()->where('is_primary', true)->first();
 
-        // Ensure prefix matches the business unit (e.g., SYB_, GSK_)
-        $prefix = $databaseSource === 'second' ? 'GSK_' : 'SYB_';
+        // Generate prefix dynamically for any new business unit, preserving legacy ones
+        $prefix = strtoupper(trim($databaseSource)) . '_';
+        if (trim(strtolower($databaseSource)) === 'second') $prefix = 'GSK_';
+        if (trim(strtolower($databaseSource)) === 'syihab') $prefix = 'SYB_';
 
         $customerData = [
             'name' => $prefix . 'CUSTOMER_' . ($user->profile ? $user->profile->full_name : $user->name),
@@ -508,7 +505,10 @@ class AccurateService
 
         list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
 
-        $prefix = $databaseSource === 'second' ? 'GSK_' : 'SYB_';
+        // Generate prefix dynamically for any new business unit, preserving legacy ones
+        $prefix = strtoupper(trim($databaseSource)) . '_';
+        if (trim(strtolower($databaseSource)) === 'second') $prefix = 'GSK_';
+        if (trim(strtolower($databaseSource)) === 'syihab') $prefix = 'SYB_';
 
         $customerData = [
             'id' => $existingPivot->accurate_customer_id, // Sertakan ID untuk UPDATE
