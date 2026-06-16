@@ -54,6 +54,15 @@ class Pos extends Component
                     $this->customerName = $this->searchCustomer;
                 }
 
+                if ($this->isNewCustomer) {
+                    $existingProfile = \App\Models\UserProfile::with('user')->where('phone_number', $this->customerPhone)->first();
+                    if ($existingProfile) {
+                        $this->existingCustomerToUpdate = $existingProfile->user;
+                        $this->showConfirmUpdateCustomerModal = true;
+                        return;
+                    }
+                }
+
                 if (!$this->isNewCustomer) {
                     $this->dispatch('toast', title: 'Customer Belum Lengkap', message: 'Pilih customer dari daftar, atau lengkapi Nama & Nomor HP untuk membuat pelanggan baru.', type: 'warning');
                     return;
@@ -80,7 +89,7 @@ class Pos extends Component
                 }
             }
         }
-        
+
         if ($this->currentStep < 4) {
             $this->currentStep++;
         }
@@ -102,6 +111,65 @@ class Pos extends Component
     public $showCheckoutModal = false;
     public $showReceiptModal = false;
     public $completedOrder = null;
+    public $showConfirmUpdateCustomerModal = false;
+    public $existingCustomerToUpdate = null;
+
+    public function confirmUpdateCustomer()
+    {
+        // 1. Update nama di tabel users
+        $user = $this->existingCustomerToUpdate;
+        $user->name = $this->customerName;
+        $user->save();
+
+        // 2. Update nama di user_profiles jika ada fieldnya, misal full_name
+        if ($user->profile) {
+            $user->profile->full_name = $this->customerName;
+            $user->profile->save();
+        }
+
+        // 3. Update di Accurate
+        $service = app(\App\Services\AccurateService::class);
+        $service->updateCustomer($user, $this->databaseSource);
+
+        // 4. Pilih customer ini untuk transaksi saat ini
+        $this->selectedCustomerId = $user->id;
+        $this->searchCustomer = $user->name;
+        $this->isNewCustomer = false;
+
+        $this->showConfirmUpdateCustomerModal = false;
+        $this->dispatch('toast', title: 'Customer Diperbarui', message: 'Data pelanggan berhasil diperbarui.', type: 'success');
+
+        // Lanjut ke pengecekan sales
+        if (empty($this->selectedSales)) {
+            $this->dispatch('toast', title: 'Sales Belum Dipilih', message: 'Pilih minimal 1 tenaga penjual.', type: 'warning');
+            return;
+        }
+
+        if ($this->currentStep < 4) {
+            $this->currentStep++;
+        }
+    }
+
+    public function cancelUpdateCustomer()
+    {
+        $user = $this->existingCustomerToUpdate;
+        
+        $this->selectedCustomerId = $user->id;
+        $this->searchCustomer = $user->name;
+        $this->isNewCustomer = false;
+        
+        $this->showConfirmUpdateCustomerModal = false;
+
+        // Lanjut ke pengecekan sales
+        if (empty($this->selectedSales)) {
+            $this->dispatch('toast', title: 'Sales Belum Dipilih', message: 'Pilih minimal 1 tenaga penjual.', type: 'warning');
+            return;
+        }
+
+        if ($this->currentStep < 4) {
+            $this->currentStep++;
+        }
+    }
 
     // ─── History Sales Properties ──────────────────────────────
     public $showHistoryModal = false;
@@ -372,7 +440,7 @@ class Pos extends Component
     #[Computed]
     public function subtotal()
     {
-        return collect($this->cart)->sum(fn($item) => (int)$item['price'] * (int)$item['qty']);
+        return collect($this->cart)->sum(fn($item) => ((int)$item['price'] * (int)$item['qty']));
     }
 
     #[Computed]
@@ -399,7 +467,7 @@ class Pos extends Component
     {
         $service = app(\App\Services\PromoCalculatorService::class);
         $userBranchId = \Illuminate\Support\Facades\Auth::user()->branch_id;
-        
+
         $eligiblePromos = $service->getEligiblePromos($this->cart, $userBranchId);
 
         // Check if previously selected promos are still eligible

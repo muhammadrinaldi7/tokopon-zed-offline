@@ -36,7 +36,7 @@ new class extends Component {
         {{-- Menu Navigasi --}}
         <nav class="flex-1 flex flex-col gap-4 w-full items-center justify-center">
             <a href="/" wire:navigate
-                class="group relative flex items-center justify-center w-12 h-12 rounded-xl  shadow-sm  transition-all duration-200 {{ request()->is('/') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800' }}">
+                class="group relative flex items-center justify-center w-12 h-12 rounded-xl  shadow-sm  transition-all duration-500 {{ request()->is('/') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-1 hover:scale-105' }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-auto" viewBox="0 0 24 24">
                     <path d="M0 0h24v24H0z" fill="none" />
                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -52,7 +52,7 @@ new class extends Component {
             {{-- Item: POS --}}
             @can('view-pos')
                 <a href="{{ route('zoffline.pos') }}" wire:navigate
-                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-200 {{ request()->is('zoffline/pos') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800' }}">
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->is('zoffline/pos') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-auto" viewBox="0 0 24 24">
                         <path d="M0 0h24v24H0z" fill="none" />
                         <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -89,7 +89,7 @@ new class extends Component {
             @can('sell-phone')
                 {{-- Item: Jual HP --}}
                 <a href="{{ route('zoffline.sell-phone') }}" wire:navigate
-                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-200 {{ request()->is('zoffline/sell-phone') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800' }}">
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->is('zoffline/sell-phone') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-auto" viewBox="0 0 2048 2048">
                         <path d="M0 0h2048v2048H0z" fill="none" />
                         <path fill="currentColor"
@@ -106,7 +106,7 @@ new class extends Component {
             @can('view-cek-stock')
                 {{-- Item: Cek Stock --}}
                 <a href="{{ route('zoffline.cekstock') }}" wire:navigate
-                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-200 {{ request()->is('zoffline/cekstock') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800' }}">
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->is('zoffline/cekstock') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-auto" viewBox="0 0 15 15">
                         <path d="M0 0h15v15H0z" fill="none" />
                         <path fill="none" stroke="currentColor" stroke-linejoin="round"
@@ -123,7 +123,7 @@ new class extends Component {
             {{-- Item: Riwayat Kasir --}}
             @can('view-riwayat-kasir')
                 <a href="{{ route('zoffline.riwayat-kasir') }}" wire:navigate
-                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-200 {{ request()->is('zoffline/riwayat-kasir') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800' }}">
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->is('zoffline/riwayat-kasir') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-auto" viewBox="0 0 16 16">
                         <path d="M0 0h16v16H0z" fill="none" />
                         <path fill="currentColor"

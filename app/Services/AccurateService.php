@@ -492,6 +492,43 @@ class AccurateService
         }
     }
 
+    public function updateCustomer(User $user, $databaseSource = 'syihab')
+    {
+        $businessUnit = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+        if (!$businessUnit) return;
+
+        $existingPivot = $user->accurateCustomers()->where('business_unit_id', $businessUnit->id)->first();
+        if (!$existingPivot) {
+            // Jika belum ada di Accurate, panggil syncCustomer
+            return $this->syncCustomer($user, $databaseSource);
+        }
+
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $prefix = $databaseSource === 'second' ? 'GSK_' : 'SYB_';
+
+        $customerData = [
+            'id' => $existingPivot->accurate_customer_id, // Sertakan ID untuk UPDATE
+            'name' => $prefix . 'CUSTOMER_' . ($user->profile ? $user->profile->full_name : $user->name),
+            'mobilePhone' => $user->profile ? $user->profile->phone_number : null,
+        ];
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/customer/save.do', $customerData);
+
+        if (!$response->successful()) {
+            Log::error('API Accurate Customer Update Error: ' . $response->body());
+            throw new \Exception('API Accurate Customer Update Error: ' . $response->body());
+        }
+    }
+
     public function postSalesOrder($salesOrderData, $databaseSource = 'syihab')
     {
         list($host, $token, $secretKey) = $this->getCredentials($databaseSource);

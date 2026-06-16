@@ -69,8 +69,8 @@ class UserOperational extends Component
 
             'availableRoles' => Role::whereNotIn('name', ['customer', 'user'])->get(),
             'businessUnits' => \App\Models\BusinessUnit::where('is_active', true)->get(),
-            'branches' => $this->getFilteredBranches(),
-            'warehouses' => $this->getFilteredWarehouses()
+            'branches' => $this->getBranches(),
+            'warehouses' => $this->getWarehouses()
         ];
     }
 

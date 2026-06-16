@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Zoffline\Pos\Traits;
 
+use Livewire\Attributes\Computed;
+
 trait WithCustomerAndSales
 {
     // ─── Customer ──────────────────────────────────────────────
@@ -11,6 +13,33 @@ trait WithCustomerAndSales
     public $customerName = '';
     public $customerPhone = '';
     public $customerEmail = '';
+
+    #[Computed]
+    public function displayCustomerName()
+    {
+        if ($this->selectedCustomerId) {
+            return \App\Models\User::find($this->selectedCustomerId)->name ?? 'Pelanggan';
+        }
+        return $this->customerName ?: 'Pelanggan Baru';
+    }
+
+    #[Computed]
+    public function displayCustomerPhone()
+    {
+        if ($this->selectedCustomerId) {
+            return \App\Models\User::with('profile')->find($this->selectedCustomerId)->profile->phone_number ?? '';
+        }
+        return $this->customerPhone;
+    }
+
+    #[Computed]
+    public function displayCustomerEmail()
+    {
+        if ($this->selectedCustomerId) {
+            return \App\Models\User::find($this->selectedCustomerId)->email ?? '';
+        }
+        return $this->customerEmail;
+    }
 
     // SALES
     public $selectedSales = []; // Array untuk menampung lebih dari 1 sales
@@ -22,7 +51,6 @@ trait WithCustomerAndSales
     {
         $this->selectedCustomerId = $id;
         $this->searchCustomer = '';
-        $this->autoAdvanceIfReady();
     }
 
     public function clearSelectedCustomer()
@@ -44,7 +72,6 @@ trait WithCustomerAndSales
             ];
         }
         $this->searchSales = '';
-        $this->autoAdvanceIfReady();
     }
 
     public function removeSales($id)
@@ -52,13 +79,5 @@ trait WithCustomerAndSales
         $this->selectedSales = array_values(array_filter($this->selectedSales, function ($s) use ($id) {
             return $s['id'] != $id;
         }));
-    }
-
-
-    public function autoAdvanceIfReady()
-    {
-        if ($this->selectedCustomerId && count($this->selectedSales) > 0) {
-            $this->nextStep();
-        }
     }
 }
