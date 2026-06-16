@@ -1,53 +1,22 @@
 <div class="" x-data="{ showSidebar: false }">
 
-    <div class="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50">
-        {{-- Clean Header --}}
-        <div class="bg-white px-8 py-5 shrink-0 z-10 flex justify-between items-center border-b border-gray-200">
-            <div>
-                <h2 class="text-2xl font-black text-gray-800">
-                    @if ($currentStep == 1)
-                        Siapa Pelanggan Anda Hari Ini?
-                    @elseif($currentStep == 2)
-                        SCAN BARCODE BARANG
-                    @elseif($currentStep == 3)
-                        Tambahkan Proteksi & Paket Pendukung
-                    @elseif($currentStep == 4)
-                        Penyelesaian Pembayaran
-                    @endif
-                </h2>
-                @if ($currentStep == 1)
-                    <p class="text-gray-500 text-sm mt-1">Cari data pelanggan yang sudah terdaftar atau tambahkan
-                        pelanggan baru untuk memulai transaksi.</p>
-                @endif
-            </div>
 
-            <div class="flex items-center gap-4">
-                <div class="text-right hidden sm:block">
-                    <p class="text-sm font-bold text-gray-800">{{ Auth::user()->name ?? 'Kasir' }}</p>
-                    <p class="text-xs text-gray-500">{{ Auth::user()->businessUnit->name ?? '-' }}</p>
-                </div>
-                <div
-                    class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg uppercase">
-                    {{ substr(Auth::user()->name ?? 'K', 0, 1) }}
-                </div>
-            </div>
-        </div>
 
-        {{-- Main Content Area --}}
-        <div class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative">
-            <div class="max-w-4xl mx-auto min-h-full flex flex-col">
-                @if ($currentStep == 1)
-                    @include('livewire.zoffline.pos.partials.wizard.step1-customer')
-                @elseif($currentStep == 2)
-                    @include('livewire.zoffline.pos.partials.wizard.step2-cart')
-                @elseif($currentStep == 3)
-                    @include('livewire.zoffline.pos.partials.wizard.step3-upsell')
-                @elseif($currentStep == 4)
-                    @include('livewire.zoffline.pos.partials.wizard.step4-payment')
-                @endif
-            </div>
+    {{-- Main Content Area --}}
+    <div class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative">
+        <div class="max-w-7xl mx-auto min-h-full flex flex-col">
+            @if ($currentStep == 1)
+                @include('livewire.zoffline.pos.partials.wizard.step1-customer')
+            @elseif($currentStep == 2)
+                @include('livewire.zoffline.pos.partials.wizard.step2-cart')
+            @elseif($currentStep == 3)
+                @include('livewire.zoffline.pos.partials.wizard.step3-upsell')
+            @elseif($currentStep == 4)
+                @include('livewire.zoffline.pos.partials.wizard.step4-payment')
+            @endif
         </div>
     </div>
+
 
     @include('livewire.zoffline.pos.modal.variant')
     @include('livewire.zoffline.pos.modal.checkout')

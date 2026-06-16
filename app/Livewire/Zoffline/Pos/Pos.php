@@ -54,6 +54,15 @@ class Pos extends Component
                     $this->customerName = $this->searchCustomer;
                 }
 
+                if ($this->isNewCustomer) {
+                    $existingProfile = \App\Models\UserProfile::with('user')->where('phone_number', $this->customerPhone)->first();
+                    if ($existingProfile) {
+                        $existingName = $existingProfile->user->name ?? 'Pelanggan Lain';
+                        $this->dispatch('toast', title: 'Nomor HP Terdaftar', message: "Nomor HP yang Anda masukkan sudah terdaftar atas nama {$existingName}. Silakan gunakan fitur pencarian untuk memilih pelanggan tersebut.", type: 'error');
+                        return;
+                    }
+                }
+
                 if (!$this->isNewCustomer) {
                     $this->dispatch('toast', title: 'Customer Belum Lengkap', message: 'Pilih customer dari daftar, atau lengkapi Nama & Nomor HP untuk membuat pelanggan baru.', type: 'warning');
                     return;
@@ -80,7 +89,7 @@ class Pos extends Component
                 }
             }
         }
-        
+
         if ($this->currentStep < 4) {
             $this->currentStep++;
         }
@@ -372,7 +381,7 @@ class Pos extends Component
     #[Computed]
     public function subtotal()
     {
-        return collect($this->cart)->sum(fn($item) => (int)$item['price'] * (int)$item['qty']);
+        return collect($this->cart)->sum(fn($item) => ((int)$item['price'] * (int)$item['qty']) - (int)($item['discount_amount'] ?? 0));
     }
 
     #[Computed]
@@ -399,7 +408,7 @@ class Pos extends Component
     {
         $service = app(\App\Services\PromoCalculatorService::class);
         $userBranchId = \Illuminate\Support\Facades\Auth::user()->branch_id;
-        
+
         $eligiblePromos = $service->getEligiblePromos($this->cart, $userBranchId);
 
         // Check if previously selected promos are still eligible

@@ -18,6 +18,7 @@ trait WithCart
     public $scanned_sn = '';
     // ─── Cart (in-memory) ──────────────────────────────────────
     public $cart = []; // [{variant_id, variant_type, name, storage, color, price, qty, serial_number, sku}]
+    public $new_sns = []; // To hold temporary SN inputs per cart item
 
     // ─── Variant Selection ─────────────────────────────────────
     public $showVariantModal = false;
@@ -187,11 +188,8 @@ trait WithCart
         $this->scanned_sn = '';
     }
 
-    public $scannedItemConfirm = null;
-    public $showScannedItemModal = false;
-
     /**
-     * Memasukkan varian hasil scan ke cart (menggunakan Modal Konfirmasi)
+     * Memasukkan varian hasil scan ke cart langsung
      */
     private function addScannedVariantToCart($variant, $isSecond, $variantType, $sn)
     {
@@ -202,39 +200,18 @@ trait WithCart
             return;
         }
 
-        $this->scannedItemConfirm = [
-            'variant' => $variant,
-            'isSecond' => $isSecond,
-            'variantType' => $variantType,
-            'sn' => $sn,
-            'price' => (int) $variant->price,
-            'name' => $variant->product->name,
-            'color' => $variant->color ?? '-',
-            'storage' => $variant->storage ?? '-',
-            'ram' => $variant->ram ?? '-',
-            'sku' => $variant->sku ?? '',
-            'has_sn' => (bool) $variant->has_sn,
-            'stock' => $stock,
-            'brand_id' => $isSecond ? ($variant->secondProduct->brand_id ?? null) : ($variant->product->brand_id ?? null),
-            'condition' => $variant->condition ?? $variant->condition_desc ?? '',
-        ];
+        $price = (int) $variant->price;
+        $name = $variant->product->name ?? ($variant->secondProduct->name ?? 'Unknown');
+        $color = $variant->color ?? '-';
+        $storage = $variant->storage ?? '-';
+        $ram = $variant->ram ?? '-';
+        $sku = $variant->sku ?? '';
+        $has_sn = (bool) $variant->has_sn;
+        $brand_id = $isSecond ? ($variant->secondProduct->brand_id ?? null) : ($variant->product->brand_id ?? null);
+        $condition = $variant->condition ?? $variant->condition_desc ?? '';
 
-        $this->showScannedItemModal = true;
-    }
-
-    public function confirmScannedItem()
-    {
-        if (!$this->scannedItemConfirm) return;
-
-        $itemData = $this->scannedItemConfirm;
-        $variantId = $itemData['variant']->id;
-        $variantType = $itemData['variantType'];
-        $sn = $itemData['sn'];
-        $stock = $itemData['stock'];
-
-        // Cek apakah produk varian ini sudah ada di keranjang
         $existingIndex = collect($this->cart)->search(
-            fn($item) => $item['variant_id'] == $variantId && $item['variant_type'] == $variantType
+            fn($item) => $item['variant_id'] == $variant->id && $item['variant_type'] == $variantType
         );
 
         if ($existingIndex !== false) {
@@ -254,38 +231,28 @@ trait WithCart
                 $this->dispatch('toast', title: 'Stok Tidak Cukup', message: 'Sudah mencapai batas stok.', type: 'warning');
             }
         } else {
-            // Jika produk belum ada di keranjang, buat item baru
             $this->cart[] = [
-                'variant_id' => $variantId,
+                'variant_id' => $variant->id,
                 'variant_type' => $variantType,
-                'name' => $itemData['name'],
-                'ram' => $itemData['ram'],
-                'storage' => $itemData['storage'],
-                'color' => $itemData['color'],
-                'price' => $itemData['price'],
+                'name' => $name,
+                'ram' => $ram,
+                'storage' => $storage,
+                'color' => $color,
+                'price' => $price,
                 'discount_amount' => 0,
                 'qty' => 1,
                 'serial_numbers' => [$sn],
-                'sku' => $itemData['sku'],
-                'has_sn' => $itemData['has_sn'],
-                'is_second' => $itemData['isSecond'],
-                'brand_id' => $itemData['brand_id'] ?? null,
-                'condition' => $itemData['condition'] ?? '',
+                'sku' => $sku,
+                'has_sn' => $has_sn,
+                'is_second' => $isSecond,
+                'brand_id' => $brand_id,
+                'condition' => $condition,
             ];
 
-            $this->dispatch('toast', title: 'Sukses', message: "Berhasil menambahkan {$itemData['name']} ke keranjang.", type: 'success');
+            $this->dispatch('toast', title: 'Sukses', message: "Berhasil menambahkan {$name} ke keranjang.", type: 'success');
         }
 
         $this->syncSinglePaymentAmount();
-        
-        $this->showScannedItemModal = false;
-        $this->scannedItemConfirm = null;
-    }
-
-    public function cancelScannedItem()
-    {
-        $this->showScannedItemModal = false;
-        $this->scannedItemConfirm = null;
     }
 
     /**
@@ -424,22 +391,14 @@ trait WithCart
             return;
         }
 
-        // Check if already in cart
-        $existingIndex = collect($this->cart)->search(
-            fn($item) =>
-            $item['variant_id'] == $variantId && $item['variant_type'] == $variantType
-        );
-
         if ($existingIndex !== false) {
             $currentQty = $this->cart[$existingIndex]['qty'];
             if ($currentQty < $stock) {
                 $this->cart[$existingIndex]['qty']++;
 
-                // PERBAIKAN: Langsung push slot kosong ke array serial_numbers tanpa mengecek legacy
                 if (!isset($this->cart[$existingIndex]['serial_numbers'])) {
                     $this->cart[$existingIndex]['serial_numbers'] = [];
                 }
-                $this->cart[$existingIndex]['serial_numbers'][] = '';
             } else {
                 $this->dispatch('toast', title: 'Stok Tidak Cukup', message: 'Sudah mencapai batas stok.', type: 'warning');
             }
@@ -454,7 +413,7 @@ trait WithCart
                 'price' => (int) $variant->price,
                 'discount_amount' => 0,
                 'qty' => 1,
-                'serial_numbers' => [''], // array of SNs based on qty
+                'serial_numbers' => [], // empty array initially
                 'sku' => $variant->sku ?? '',
                 'has_sn' => (bool) $variant->has_sn,
                 'is_second' => $isSecond,
@@ -509,17 +468,30 @@ trait WithCart
     }
 
 
-    public function updateSerialNumber($index, $snIndex, $value)
+    public function addSerialNumber($index)
     {
-        $value = trim($value);
+        $value = trim($this->new_sns[$index] ?? '');
 
         if (isset($this->cart[$index]) && !empty($value)) {
+            
+            $currentSns = $this->cart[$index]['serial_numbers'] ?? [];
+            if (count($currentSns) >= $this->cart[$index]['qty']) {
+                $this->dispatch('toast', title: 'Peringatan', message: 'Jumlah SN sudah memenuhi Kuantitas (Qty).', type: 'warning');
+                $this->new_sns[$index] = '';
+                return;
+            }
+
+            if (in_array($value, $currentSns)) {
+                $this->dispatch('toast', title: 'Peringatan', message: 'Serial Number ini sudah ditambahkan pada produk ini.', type: 'warning');
+                $this->new_sns[$index] = '';
+                return;
+            }
 
             $expectedSku = $this->cart[$index]['sku'] ?? null;
 
             if (empty($expectedSku)) {
                 $this->dispatch('toast', title: 'Error Data', message: 'SKU untuk produk ini tidak ditemukan di keranjang.', type: 'error');
-                $this->js("document.getElementById('sn_input_{$index}_{$snIndex}').value = '';");
+                $this->new_sns[$index] = '';
                 return;
             }
 
@@ -561,9 +533,7 @@ trait WithCart
                     duration: 4000
                 );
 
-                // Kosongkan input text pencarian di browser
-                $this->js("document.getElementById('sn_input_{$index}_{$snIndex}').value = '';");
-
+                $this->new_sns[$index] = '';
                 return; // Gagalkan pengisian SN ke cart
             }
             // =================================================================
@@ -580,7 +550,7 @@ trait WithCart
 
             if (!$localSnRecord) {
                 $this->dispatch('toast', title: 'Error', message: "Serial Number '{$value}' tidak ditemukan di database lokal.", type: 'error');
-                $this->js("document.getElementById('sn_input_{$index}_{$snIndex}').value = '';");
+                $this->new_sns[$index] = '';
                 return;
             }
 
@@ -599,21 +569,19 @@ trait WithCart
                     type: 'error'
                 );
 
-                // Kosongkan kembali input di browser jika salah gudang
-                $this->js("document.getElementById('sn_input_{$index}_{$snIndex}').value = '';");
+                $this->new_sns[$index] = '';
                 return;
             }
             // =================================================================
 
-            // 2. Pastikan array serial_numbers sudah ada (buat jaga-jaga saja)
+            // 2. Pastikan array serial_numbers sudah ada
             if (!isset($this->cart[$index]['serial_numbers'])) {
                 $this->cart[$index]['serial_numbers'] = [];
             }
 
-            // 3. Langsung masukkan nilai SN baru ke index yang dituju
-            $this->cart[$index]['serial_numbers'][$snIndex] = $value;
-
-            // Catatan: Baris kode step ke-4 (Legacy) sudah dihapus total!
+            // 3. Tambahkan SN ke array
+            $this->cart[$index]['serial_numbers'][] = $value;
+            $this->new_sns[$index] = ''; // clear input
         }
     }
     // ─── Stock Modal Properties ────────────────────────────────
