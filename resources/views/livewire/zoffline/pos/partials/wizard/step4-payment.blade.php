@@ -28,7 +28,7 @@
             @endif
         </div>
 
-        <div class="flex-1 min-h-80">
+        <div class="flex-1 min-h-70">
             @if ($paymentWizardStep === 1)
                 {{-- STEP 1: PILIHAN MODE --}}
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -134,17 +134,17 @@
                                         </svg>
                                     @endif
                                 </div>
+                                <div class="text-center">
+                                    <span
+                                        class="font-bold text-sm text-gray-700 group-hover:text-[#1c69d4] transition-colors">{{ $method->name }}</span>
+                                </div>
                             @endif
-
-                            {{-- <div class="text-center">
-                                <span class="font-bold text-lg text-gray-700 group-hover:text-[#1c69d4] transition-colors">{{ $method->name }}</span>
-                            </div> --}}
                         </button>
                     @endforeach
                 </div>
             @elseif($paymentWizardStep === 3)
                 {{-- STEP 3: MDR & NOMINAL --}}
-                <div class="max-w-xl mx-auto space-y-6">
+                <div class="max-w-7xl mx-auto space-y-6">
                     @php
                         $payment = $payments[$activePaymentIndex] ?? [];
                         $cat = $payment['category'] ?? '';
@@ -155,25 +155,37 @@
                                 : collect($this->nonCashPaymentMethods)->firstWhere('id', $pmId);
 
                         $hasRate = $cat === 'NON-TUNAI' && $methodObj && count($methodObj->rates ?? []) > 0;
+
+                        $imageName = $methodObj ? strtolower(str_replace(' ', '', $methodObj->name)) . '.png' : '';
+                        $imagePath = $imageName ? public_path('assets/png/paymentmethod/' . $imageName) : '';
+                        $hasImage = $imagePath ? file_exists($imagePath) : false;
                     @endphp
 
                     <div class="bg-blue-50 border border-blue-100 p-5 rounded-2xl flex items-center gap-4">
-                        <div
-                            class="w-14 h-14 bg-[#1c69d4] text-white rounded-xl flex items-center justify-center shadow-md">
-                            @if ($cat === 'TUNAI')
-                                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                            @else
-                                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                </svg>
-                            @endif
-                        </div>
+                        @if ($hasImage)
+                            <div
+                                class="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-sm p-2 border border-blue-200">
+                                <img src="{{ asset('assets/png/paymentmethod/' . $imageName) }}"
+                                    alt="{{ $methodObj->name }}" class="max-h-full max-w-full object-contain">
+                            </div>
+                        @else
+                            <div
+                                class="w-14 h-14 bg-[#1c69d4] text-white rounded-xl flex items-center justify-center shadow-md">
+                                @if ($cat === 'TUNAI')
+                                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                @else
+                                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                    </svg>
+                                @endif
+                            </div>
+                        @endif
                         <div>
                             <p class="text-sm font-bold text-blue-500/70">{{ $cat }}</p>
                             <h3 class="text-2xl font-black text-gray-800">{{ $methodObj->name ?? 'Unknown Method' }}
@@ -253,26 +265,38 @@
                                 $rateObj = \App\Models\PaymentMethodRate::find(
                                     $payment['payment_method_rate_id'] ?? null,
                                 );
+                                $imageName = $pmObj ? strtolower(str_replace(' ', '', $pmObj->name)) . '.png' : '';
+                                $imagePath = $imageName ? public_path('assets/png/paymentmethod/' . $imageName) : '';
+                                $hasImage = $imagePath ? file_exists($imagePath) : false;
                             @endphp
                             <div
                                 class="bg-white border-2 border-gray-100 rounded-2xl p-5 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-colors">
                                 <div class="flex items-center gap-5">
-                                    <div
-                                        class="w-14 h-14 rounded-2xl flex items-center justify-center {{ $payment['category'] === 'TUNAI' ? 'bg-emerald-100 text-emerald-600' : 'bg-[#1c69d4]/10 text-[#1c69d4]' }}">
-                                        @if ($payment['category'] === 'TUNAI')
-                                            <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                            </svg>
-                                        @else
-                                            <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                            </svg>
-                                        @endif
-                                    </div>
+                                    @if ($hasImage)
+                                        <div
+                                            class="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-sm p-2 border border-gray-100">
+                                            <img src="{{ asset('assets/png/paymentmethod/' . $imageName) }}"
+                                                alt="{{ $pmObj->name ?? 'Logo' }}"
+                                                class="max-h-full max-w-full object-contain">
+                                        </div>
+                                    @else
+                                        <div
+                                            class="w-14 h-14 rounded-2xl flex items-center justify-center {{ $payment['category'] === 'TUNAI' ? 'bg-emerald-100 text-emerald-600' : 'bg-[#1c69d4]/10 text-[#1c69d4]' }}">
+                                            @if ($payment['category'] === 'TUNAI')
+                                                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                                </svg>
+                                            @else
+                                                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                                </svg>
+                                            @endif
+                                        </div>
+                                    @endif
                                     <div>
                                         <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">
                                             {{ $payment['category'] }}</p>

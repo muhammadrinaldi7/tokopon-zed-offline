@@ -244,7 +244,7 @@
                 class="p-6 bg-gradient-to-r from-gray-50 to-[#1c69d4]/5 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
                 <span class="font-bold text-gray-500 uppercase tracking-widest text-sm">Total Tagihan Sementara</span>
                 <span class="font-black text-3xl text-[#1c69d4]">Rp
-                    {{ number_format($this->subtotal, 0, ',', '.') }}</span>
+                    {{ number_format($this->subtotal - $this->itemDiscountTotal, 0, ',', '.') }}</span>
             </div>
 
         </div>

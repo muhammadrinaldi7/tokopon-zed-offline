@@ -381,7 +381,7 @@ class Pos extends Component
     #[Computed]
     public function subtotal()
     {
-        return collect($this->cart)->sum(fn($item) => ((int)$item['price'] * (int)$item['qty']) - (int)($item['discount_amount'] ?? 0));
+        return collect($this->cart)->sum(fn($item) => ((int)$item['price'] * (int)$item['qty']));
     }
 
     #[Computed]
