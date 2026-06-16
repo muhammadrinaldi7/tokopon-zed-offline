@@ -88,22 +88,14 @@ class SerialNumberSyncService
             // Konversi paksa ke string (berjaga-jaga jika payload API mereturn tipe integer)
             $serialNumberStr = (string) $serialNumberStr;
 
-            // Cari ID gudang lokal berdasarkan ID gudang accurate
-            // Untuk source 'second' (GSK), prioritaskan gudang eksklusif GSK
-            // (yang warehouse_id IS NULL, hanya punya second_warehouse_id)
-            // agar tidak salah ambil gudang Syihab yang kebetulan punya second_warehouse_id sama.
-            if ($databaseSource === 'second') {
-                $localWarehouse = Warehouse::where('second_warehouse_id', $accurateWarehouseId)
-                    ->whereNull('warehouse_id')
+            $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+            $localWarehouseId = null;
+            if ($accurateWarehouseId && $bu) {
+                $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
+                    ->where('business_unit_id', $bu->id)
                     ->first();
-                // Fallback ke gudang manapun yang cocok jika tidak ada yang eksklusif
-                if (!$localWarehouse) {
-                    $localWarehouse = Warehouse::where('second_warehouse_id', $accurateWarehouseId)->first();
-                }
-            } else {
-                $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)->first();
+                $localWarehouseId = $localWarehouse ? $localWarehouse->id : null;
             }
-            $localWarehouseId = $localWarehouse ? $localWarehouse->id : null;
 
             $upsertData[] = [
                 'accurate_sn_id' => $accurateSnId,
@@ -210,19 +202,12 @@ class SerialNumberSyncService
                 $hpp = $item['itemCost'] ?? 0;
                 $accurateWarehouseId = $item['warehouseId'] ?? ($item['warehouse']['id'] ?? null);
 
+                $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
                 $localWarehouseId = null;
-                if ($accurateWarehouseId) {
-                    // Untuk source 'second' (GSK), prioritaskan gudang eksklusif GSK
-                    if ($databaseSource === 'second') {
-                        $localWarehouse = Warehouse::where('second_warehouse_id', $accurateWarehouseId)
-                            ->whereNull('warehouse_id')
-                            ->first();
-                        if (!$localWarehouse) {
-                            $localWarehouse = Warehouse::where('second_warehouse_id', $accurateWarehouseId)->first();
-                        }
-                    } else {
-                        $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)->first();
-                    }
+                if ($accurateWarehouseId && $bu) {
+                    $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
+                        ->where('business_unit_id', $bu->id)
+                        ->first();
                     if ($localWarehouse) {
                         $localWarehouseId = $localWarehouse->id;
                     }

@@ -50,7 +50,7 @@ class Index extends Component
             foreach ($secondBranch['d'] as $item) {
                 Branch::updateOrCreate(
                     ['name' => $item['name'], 'business_unit_id' => $secondUnitId],
-                    ['second_branch_id' => $item['id']]
+                    ['branch_id' => $item['id']]
                 );
             }
 
@@ -82,7 +82,7 @@ class Index extends Component
             foreach ($secondWarehouse['d'] as $item) {
                 Warehouse::updateOrCreate(
                     ['name' => $item['name'], 'business_unit_id' => $secondUnitId],
-                    ['second_warehouse_id' => $item['id']]
+                    ['warehouse_id' => $item['id']]
                 );
             }
 

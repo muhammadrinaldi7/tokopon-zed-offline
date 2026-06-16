@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Users;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -73,32 +74,22 @@ class UserOperational extends Component
         ];
     }
 
-    private function getFilteredBranches()
+    #[Computed]
+    public function getBranches()
     {
         if (!$this->createBusinessUnitId) {
             return \App\Models\Branch::all();
         }
-        $bu = \App\Models\BusinessUnit::find($this->createBusinessUnitId);
-        if (!$bu) return collect();
-
-        if (strtolower($bu->code) === 'second') {
-            return \App\Models\Branch::whereNotNull('second_branch_id')->get();
-        }
-        return \App\Models\Branch::whereNotNull('branch_id')->get();
+        return \App\Models\Branch::where('business_unit_id', $this->createBusinessUnitId)->whereNotNull('branch_id')->get();
     }
 
-    private function getFilteredWarehouses()
+    #[Computed]
+    public function getWarehouses()
     {
         if (!$this->createBusinessUnitId) {
             return \App\Models\Warehouse::all();
         }
-        $bu = \App\Models\BusinessUnit::find($this->createBusinessUnitId);
-        if (!$bu) return collect();
-
-        if (strtolower($bu->code) === 'second') {
-            return \App\Models\Warehouse::whereNotNull('second_warehouse_id')->get();
-        }
-        return \App\Models\Warehouse::whereNotNull('warehouse_id')->get();
+        return \App\Models\Warehouse::where('business_unit_id', $this->createBusinessUnitId)->whereNotNull('warehouse_id')->get();
     }
 
     public function updatingSearch()

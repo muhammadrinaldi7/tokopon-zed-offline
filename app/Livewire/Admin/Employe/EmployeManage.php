@@ -39,7 +39,7 @@ class EmployeManage extends Component
 
         try {
             $service = app(AccurateService::class);
-            
+
             $sources = [];
             if ($this->filterBusinessUnitId) {
                 $bu = \App\Models\BusinessUnit::find($this->filterBusinessUnitId);
@@ -66,10 +66,7 @@ class EmployeManage extends Component
                 foreach ($response as $emp) {
                     $localBranchId = null;
                     if (!empty($emp['branchId'])) {
-                        $branch = \App\Models\Branch::where(function($q) use ($emp) {
-                                $q->where('branch_id', $emp['branchId'])
-                                  ->orWhere('second_branch_id', $emp['branchId']);
-                            })
+                        $branch = \App\Models\Branch::where('branch_id', $emp['branchId'])
                             ->where('business_unit_id', $bu->id)
                             ->first();
                         if ($branch) {
