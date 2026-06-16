@@ -94,16 +94,19 @@ class AccurateService
         // Ambil alamat primary
         $address = $user->addresses()->where('is_primary', true)->first();
 
+        // Ensure prefix matches the business unit (e.g., SYB_, GSK_)
+        $prefix = $databaseSource === 'second' ? 'GSK_' : 'SYB_';
+
         // Data yang akan dikirim ke Accurate
         $vendorData = [
-            'name' => 'GSK_VENDOR_' . $user->profile->full_name,
-            'vendorNo' => 'GSK_VENDOR_' . str_pad($user->id, 5, '0', STR_PAD_LEFT),
+            'name' => $prefix . 'VENDOR_' . ($user->profile ? $user->profile->full_name : $user->name),
+            'vendorNo' => $prefix . 'VENDOR_' . str_pad($user->id, 5, '0', STR_PAD_LEFT),
             // 'transDate' => date('d/m/Y'),
             'currencyCode' => 'IDR',
-            'mobilePhone' => $user->profile->phone_number,
+            'mobilePhone' => $user->profile ? $user->profile->phone_number : null,
             'email' => $user->email,
             'npwpNo' => $user->npwp,
-            'notes' => 'VENDOR GSK - NIK:' . $user->identity,
+            'notes' => 'VENDOR ' . rtrim($prefix, '_') . ' - NIK:' . $user->identity,
         ];
 
         // Opsional: Jika ada alamat, kirimkan juga
