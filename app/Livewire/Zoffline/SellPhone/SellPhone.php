@@ -63,6 +63,7 @@ class SellPhone extends Component
     public $qc_template = null;
     public $qc_results = [];
     public $qc_notes = '';
+    public $qc_verdict = ''; // pass, conditional, fail
 
     #[Computed]
     public function customerResults()
@@ -118,13 +119,43 @@ class SellPhone extends Component
                     $this->qc_results[] = [
                         'name' => $item['name'],
                         'type' => $item['type'],
-                        'value' => $item['type'] === 'boolean' ? false : '',
+                        'value' => $item['type'] === 'boolean' ? null : '',
+                        'category' => $this->getQcCategory($item['name'])
                     ];
                 }
             }
         } else {
-            $this->available_models = [];
         }
+    }
+
+    public function getQcCategory($name)
+    {
+        $map = [
+            'LCD' => 'Layar & Bodi',
+            'Touch Screen' => 'Layar & Bodi',
+            'BackGlass / Housing' => 'Layar & Bodi',
+            'Power On/Off' => 'Tombol & Fisik',
+            'Volume' => 'Tombol & Fisik',
+            'Mute Switch (Silent)' => 'Tombol & Fisik',
+            'Home Button' => 'Tombol & Fisik',
+            'Taptic / Vibrate' => 'Tombol & Fisik',
+            'Tombol' => 'Tombol & Fisik',
+            'Kamera Belakang' => 'Kamera & Biometrik',
+            'Kamera Belakang 1/2/3' => 'Kamera & Biometrik',
+            'Kamera Depan' => 'Kamera & Biometrik',
+            'Flash Light' => 'Kamera & Biometrik',
+            'Touch ID / Face ID' => 'Kamera & Biometrik',
+            'Wifi / Bluetooth' => 'Konektivitas',
+            'Signal' => 'Konektivitas',
+            'Speaker Atas' => 'Audio & Suara',
+            'Speaker Bawah' => 'Audio & Suara',
+            'Microphone' => 'Audio & Suara',
+            'Port Charging' => 'Port & Sensor',
+            'Port Handsfree' => 'Port & Sensor',
+            'Sensor Proximity' => 'Port & Sensor',
+        ];
+
+        return $map[$name] ?? 'Lainnya';
     }
 
     public function updatedSelectedModelName()
@@ -424,8 +455,11 @@ class SellPhone extends Component
         $minusDesc = "{$kondisi}{$catatanText}";
         // Hit API Accurate dengan data user/customer yang sesuai
         try {
-            // dd($userForAccurate);
-            app(\App\Services\AccurateService::class)->syncVendor($userForAccurate);
+            $buId = Auth::user()->getActiveBusinessUnitId();
+            $bu = \App\Models\BusinessUnit::find($buId);
+            $dbSource = $bu ? $bu->code : 'syihab';
+
+            app(\App\Services\AccurateService::class)->syncVendor($userForAccurate, $dbSource);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to sync vendor to Accurate: ' . $e->getMessage());
         }
@@ -441,7 +475,7 @@ class SellPhone extends Component
             'imei'              => $this->imei,
             'minus_desc'        => $minusDesc,
             'appraised_value'   => $this->final_price,
-            'status'            => User::findOrFail(Auth::user()->id)->hasRole('fl') ? 'PAYING' : 'WAITING_FOR_DEVICE', // Jika di toko oleh FL, status bisa langsung RECEIVED atau disesuaikan bisnis proses Anda
+            'status'            => $this->qc_verdict === 'fail' ? 'CANCELLED' : (User::findOrFail(Auth::user()->id)->hasRole('fl') ? 'PAYING' : 'WAITING_FOR_DEVICE'),
             'handled_by'        => User::findOrFail(Auth::user()->id)->hasRole('fl') ? Auth::id() : null,
         ]);
 
@@ -454,7 +488,7 @@ class SellPhone extends Component
                 'inspectable_id' => $sellPhone->id,
                 'label' => 'QC Kelayakan Buyback',
                 'checklist_results' => $this->qc_results,
-                'verdict' => 'pass', // Dianggap lulus karena jika gagal tidak akan bisa disubmit
+                'verdict' => $this->qc_verdict ?: 'pass',
                 'inspector_notes' => $this->qc_notes ?: 'QC Kelayakan dilakukan di depan pelanggan (Step 2).',
                 'inspected_by' => Auth::id(),
             ]);
@@ -510,6 +544,7 @@ class SellPhone extends Component
             'qc_template',
             'qc_results',
             'qc_notes',
+            'qc_verdict',
             'selected_rules',
             'final_price',
             'old_phone_additional_note',

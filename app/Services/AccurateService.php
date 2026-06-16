@@ -15,9 +15,9 @@ class AccurateService
         // For backwards compatibility during transition, map "second" to "second" or "gsk"
         // In our seeder, we created "second" code for GSK.
         $code = strtolower($databaseSource) === "second" ? "second" : strtolower($databaseSource);
-        
+
         $businessUnit = \App\Models\BusinessUnit::where("code", $code)->first();
-        
+
         if (!$businessUnit) {
             // Fallback to "syihab" if default is requested but code is empty or missing
             if ($code === "" || $code === "syihab") {
@@ -474,7 +474,7 @@ class AccurateService
             }
             if (isset($data['r'])) {
                 $result = $data['r'];
-                
+
                 \App\Models\UserAccurateCustomer::updateOrCreate(
                     [
                         'user_id' => $user->id,

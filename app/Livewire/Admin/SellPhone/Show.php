@@ -98,12 +98,16 @@ class Show extends Component
             $this->dispatch('toast', ['type' => 'success', 'title' => 'Inspected', 'message' => 'Status penjualan HP ditandai sebagai Checked.']);
         } else if ($this->sellPhone->status === 'PAYING') {
             $phoneData = $this->phoneData;
+            $flUser = $this->sellPhone->handledBy;
+            $accurateBranchName = $flUser && $flUser->branch ? $flUser->branch->name : 'Banjarbaru';
+            $accurateWarehouseName = $flUser && $flUser->warehouse ? $flUser->warehouse->name : 'Head Office';
+
             // 1. Susun Array untuk detailItem terlebih dahulu agar lebih rapi
             $detailItem = [
                 [
                     // Pastikan memanggil kolom yang sesuai dari tabel devices/sell_phones Anda
                     'itemNo' => $phoneData->buybackDevice->secondProductVariant->sku ?? 'TES-001',
-                    'warehouseName' => Auth::user()->hasRole('fl') ? Auth::user()->warehouse->name : 'Head Office', // Sesuaikan jika dinamis
+                    'warehouseName' => $accurateWarehouseName,
                     'unitPrice' => (int) $this->sellPhone->appraised_value, // Harga yang disepakati
                     'quantity' => 1,
 
@@ -118,10 +122,11 @@ class Show extends Component
             ];
 
             // 2. Masukkan ke dalam parameter utama Purchase Invoice Accurate
+            $vendorNoAwal = $phoneData->user->getAccurateVendorNo('second') ?? 'V-CASH';
             $this->dataParamPurchaseInvoice = [
                 'billNumber' => $billNumber,
-                'vendorNo' => str_replace('"', '', $phoneData->user->accurate_vendor_no),
-                'branchName' => Auth::user()->hasRole('fl') ? Auth::user()->warehouse->name : 'Banjarbaru',
+                'vendorNo' => str_replace('"', '', $vendorNoAwal),
+                'branchName' => $accurateBranchName,
                 // Field tambahan yang Anda tulis sebelumnya (opsional/dibutuhkan Accurate)
                 // 'name' => $phoneData->user->profile->full_name ?? '',
                 'transDate' => date('d/m/Y'),
@@ -143,7 +148,8 @@ class Show extends Component
                 $customerUser->refresh();
 
                 // Update vendor No di param
-                $this->dataParamPurchaseInvoice['vendorNo'] = str_replace('"', '', $customerUser->accurate_vendor_no) ?? 'V-CASH';
+                $vendorNoBaru = $customerUser->getAccurateVendorNo('second') ?? 'V-CASH';
+                $this->dataParamPurchaseInvoice['vendorNo'] = str_replace('"', '', $vendorNoBaru);
 
                 // 4. Hit API menggunakan service yang di-inject JIKA BELUM ADA
                 if (!$this->sellPhone->invoice_number) {
