@@ -310,4 +310,31 @@
             Lanjutkan
         </button>
     </div>
+
+    {{-- Modal Confirm Update Customer --}}
+    @if ($showConfirmUpdateCustomerModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+                <div class="p-6 border-b border-gray-100 bg-blue-50/50">
+                    <h3 class="text-xl font-black text-gray-800">Nomor HP Terdaftar</h3>
+                </div>
+                <div class="p-6">
+                    <p class="text-gray-600 mb-4 leading-relaxed">
+                        Nomor HP <span class="font-bold text-gray-900">{{ $customerPhone }}</span> sudah terdaftar atas nama <span class="font-bold text-gray-900">{{ $existingCustomerToUpdate->name ?? '' }}</span>.<br><br>
+                        Yakin ingin mengubah nama pelanggan tersebut menjadi <span class="font-bold text-[#1c69d4]">{{ $customerName }}</span>?
+                    </p>
+                    <div class="flex flex-col gap-3">
+                        <button wire:click="confirmUpdateCustomer"
+                            class="w-full py-3.5 bg-[#1c69d4] hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition-all">
+                            Ya, Ubah Nama
+                        </button>
+                        <button wire:click="cancelUpdateCustomer"
+                            class="w-full py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors">
+                            Tidak, Gunakan Data Lama
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

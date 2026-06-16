@@ -57,8 +57,8 @@ class Pos extends Component
                 if ($this->isNewCustomer) {
                     $existingProfile = \App\Models\UserProfile::with('user')->where('phone_number', $this->customerPhone)->first();
                     if ($existingProfile) {
-                        $existingName = $existingProfile->user->name ?? 'Pelanggan Lain';
-                        $this->dispatch('toast', title: 'Nomor HP Terdaftar', message: "Nomor HP yang Anda masukkan sudah terdaftar atas nama {$existingName}. Silakan gunakan fitur pencarian untuk memilih pelanggan tersebut.", type: 'error');
+                        $this->existingCustomerToUpdate = $existingProfile->user;
+                        $this->showConfirmUpdateCustomerModal = true;
                         return;
                     }
                 }
@@ -111,6 +111,65 @@ class Pos extends Component
     public $showCheckoutModal = false;
     public $showReceiptModal = false;
     public $completedOrder = null;
+    public $showConfirmUpdateCustomerModal = false;
+    public $existingCustomerToUpdate = null;
+
+    public function confirmUpdateCustomer()
+    {
+        // 1. Update nama di tabel users
+        $user = $this->existingCustomerToUpdate;
+        $user->name = $this->customerName;
+        $user->save();
+
+        // 2. Update nama di user_profiles jika ada fieldnya, misal full_name
+        if ($user->profile) {
+            $user->profile->full_name = $this->customerName;
+            $user->profile->save();
+        }
+
+        // 3. Update di Accurate
+        $service = app(\App\Services\AccurateService::class);
+        $service->updateCustomer($user, $this->databaseSource);
+
+        // 4. Pilih customer ini untuk transaksi saat ini
+        $this->selectedCustomerId = $user->id;
+        $this->searchCustomer = $user->name;
+        $this->isNewCustomer = false;
+
+        $this->showConfirmUpdateCustomerModal = false;
+        $this->dispatch('toast', title: 'Customer Diperbarui', message: 'Data pelanggan berhasil diperbarui.', type: 'success');
+
+        // Lanjut ke pengecekan sales
+        if (empty($this->selectedSales)) {
+            $this->dispatch('toast', title: 'Sales Belum Dipilih', message: 'Pilih minimal 1 tenaga penjual.', type: 'warning');
+            return;
+        }
+
+        if ($this->currentStep < 4) {
+            $this->currentStep++;
+        }
+    }
+
+    public function cancelUpdateCustomer()
+    {
+        $user = $this->existingCustomerToUpdate;
+        
+        $this->selectedCustomerId = $user->id;
+        $this->searchCustomer = $user->name;
+        $this->isNewCustomer = false;
+        
+        $this->showConfirmUpdateCustomerModal = false;
+
+        // Lanjut ke pengecekan sales
+        if (empty($this->selectedSales)) {
+            $this->dispatch('toast', title: 'Sales Belum Dipilih', message: 'Pilih minimal 1 tenaga penjual.', type: 'warning');
+            return;
+        }
+
+        if ($this->currentStep < 4) {
+            $this->currentStep++;
+        }
+    }
 
     // ─── History Sales Properties ──────────────────────────────
     public $showHistoryModal = false;
