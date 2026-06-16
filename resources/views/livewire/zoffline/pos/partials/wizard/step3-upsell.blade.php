@@ -53,7 +53,7 @@
         {{-- ADD-ON SECTION --}}
         <div
             class="bg-white rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-100 p-8 flex flex-col h-100">
-            <h3 class="font-black text-gray-800 text-lg mb-2 shrink-0">Aksesoris / Tambahan Produk</h3>
+            <h3 class="font-black text-gray-800 text-lg mb-2 shrink-0">Add Ons</h3>
             <p class="text-sm text-gray-500 mb-6 shrink-0">Tawarkan produk pelengkap ke pelanggan.</p>
 
             <div class="relative mb-6 shrink-0">
@@ -127,7 +127,7 @@
         {{-- PROMO SECTION --}}
         <div
             class="bg-white rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-100 p-8 flex flex-col h-100">
-            <h3 class="font-black text-gray-800 text-lg mb-2 shrink-0">Promo Code / Voucher Tersedia</h3>
+            <h3 class="font-black text-gray-800 text-lg mb-2 shrink-0">Promo Tersedia</h3>
             <p class="text-sm text-gray-500 mb-6 shrink-0">Pilih promo yang berlaku untuk keranjang Anda saat ini.</p>
 
             <div class="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
