@@ -105,8 +105,8 @@ class Show extends Component
             // 1. Susun Array untuk detailItem terlebih dahulu agar lebih rapi
             $detailItem = [
                 [
-                    // Pastikan memanggil kolom yang sesuai dari tabel devices/sell_phones Anda
-                    'itemNo' => $phoneData->buybackDevice->secondProductVariant->sku ?? 'TES-001',
+                    // Gunakan itemNo dari ProductAccurate yang terkait
+                    'itemNo' => $phoneData->buybackDevice->productAccurate->item_no ?? 'TES-001',
                     'warehouseName' => $accurateWarehouseName,
                     'unitPrice' => (int) $this->sellPhone->appraised_value, // Harga yang disepakati
                     'quantity' => 1,
@@ -121,8 +121,11 @@ class Show extends Component
                 ]
             ];
 
+            // Tentukan database source dari Business Unit kasir/admin
+            $dbSource = $flUser && $flUser->businessUnit ? strtolower($flUser->businessUnit->code) : 'gsk';
+
             // 2. Masukkan ke dalam parameter utama Purchase Invoice Accurate
-            $vendorNoAwal = $phoneData->user->getAccurateVendorNo('second') ?? 'V-CASH';
+            $vendorNoAwal = $phoneData->user->getAccurateVendorNo($dbSource) ?? 'V-CASH';
             $this->dataParamPurchaseInvoice = [
                 'billNumber' => $billNumber,
                 'vendorNo' => str_replace('"', '', $vendorNoAwal),
@@ -144,16 +147,16 @@ class Show extends Component
                 $customerUser = $phoneData->user;
                 // dd($customerUser);
                 $accurateService = app(AccurateService::class);
-                $accurateService->syncVendor($customerUser, 'second');
+                $accurateService->syncVendor($customerUser, $dbSource);
                 $customerUser->refresh();
 
                 // Update vendor No di param
-                $vendorNoBaru = $customerUser->getAccurateVendorNo('second') ?? 'V-CASH';
+                $vendorNoBaru = $customerUser->getAccurateVendorNo($dbSource) ?? 'V-CASH';
                 $this->dataParamPurchaseInvoice['vendorNo'] = str_replace('"', '', $vendorNoBaru);
 
                 // 4. Hit API menggunakan service yang di-inject JIKA BELUM ADA
                 if (!$this->sellPhone->invoice_number) {
-                    $accurateResponse = $accurateService->postPurchaseInvoice($this->dataParamPurchaseInvoice, 'second');
+                    $accurateResponse = $accurateService->postPurchaseInvoice($this->dataParamPurchaseInvoice, $dbSource);
                     Log::info('data invoice yang masuk ke accurate : ', ['data' => $this->dataParamPurchaseInvoice, 'response' => $accurateResponse]);
 
                     if (isset($accurateResponse['r']['number'])) {
@@ -197,84 +200,8 @@ class Show extends Component
         $this->dispatch('toast', title: 'Ditolak', message: 'Pembelian dibatalkan secara sepihak.', type: 'info');
     }
 
-    public function convertToProduct()
-    {
-        if ($this->sellPhone->status !== 'COMPLETED') return;
-
-        $this->validate([
-            'sellPrice' => 'required|numeric|min:1000',
-            'secondCondition' => 'required|string',
-        ]);
-
-        DB::transaction(function () {
-            $productName = $this->sellPhone->phone_brand . ' ' . $this->sellPhone->phone_model;
-
-            $product = null;
-            if ($this->existingProductId) {
-                $product = \App\Models\SecondProduct::find($this->existingProductId);
-            } else {
-                $brand = \App\Models\Brand::where('name', $this->sellPhone->phone_brand)->first();
-                $businessUnitId = $this->sellPhone->handledBy->business_unit_id ?? Auth::user()->getActiveBusinessUnitId();
-
-                $product = \App\Models\SecondProduct::firstOrCreate(
-                    ['name' => $productName],
-                    [
-                        'slug' => Str::slug($productName . ' Second ' . rand(100, 999)),
-                        'brand_id' => $brand?->id,
-                        'category_id' => \App\Models\Category::first()?->id,
-                        'description' => 'Produk unit seken / bekas pakai dari pembelian pelanggan.',
-                        'is_active' => true,
-                        'starting_price' => $this->sellPrice,
-                        'total_stock' => 0,
-                        'has_active_accurate' => true,
-                        'business_unit_id' => $businessUnitId
-                    ]
-                );
-            }
-
-            // Generate SKU format for local secondary items
-            $sku = 'GSK-' . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT) . '-' . strtoupper(Str::random(3));
-
-            $variant = \App\Models\SecondProductVariant::create([
-                'second_product_id' => $product->id,
-                'sell_phone_id' => $this->sellPhone->id,
-                'sku' => $sku,
-                'storage' => $this->sellPhone->phone_storage ?? '-',
-                'color' => '-',
-                'condition_desc' => $this->secondCondition,
-                'price' => $this->sellPrice,
-                'buy_price' => $this->sellPhone->appraised_value,
-                'stock' => 1,
-                'has_sn' => true
-            ]);
-
-            $warehouseId = Auth::user()->warehouse_id ?? \App\Models\Warehouse::first()?->id;
-            if ($warehouseId) {
-                \App\Models\WarehouseStock::create([
-                    'warehouse_id' => $warehouseId,
-                    'variant_id' => $variant->id,
-                    'variant_type' => get_class($variant),
-                    'stock' => 1,
-                ]);
-
-                // Update denormalized total stock
-                $product->increment('total_stock');
-
-                // Create Serial Number
-                $imei = $this->sellPhone->imei ?? ('SN-SELL-' . $this->sellPhone->id);
-                \App\Models\ProductSerialNumber::create([
-                    'item_no' => $sku,
-                    'serial_number' => $imei,
-                    'warehouse_id' => $warehouseId,
-                    'status' => 'Available',
-                    'hpp' => $this->sellPhone->appraised_value,
-                ]);
-            }
-        });
-
-        $this->convertModal = false;
-        $this->dispatch('toast', title: 'Berhasil', message: 'Unit HP lama masuk ke Katalog Second GSK.', type: 'success');
-    }
+    // convertToProduct telah dihapus karena manajemen inventaris kini terpusat pada Accurate
+    // dan ditarik melalui fitur Sinkronisasi Master Data ProductAccurate
 
     #[Layout('layouts.admin')]
     public function render()

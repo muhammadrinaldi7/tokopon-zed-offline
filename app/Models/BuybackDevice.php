@@ -9,8 +9,9 @@ class BuybackDevice extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
-        'is_active'  => 'boolean',
-        'base_price' => 'decimal:2',
+        'is_active'           => 'boolean',
+        'product_accurate_id' => 'integer',
+        'base_price'          => 'decimal:2',
     ];
 
     // Relasi ke Brand
@@ -29,6 +30,11 @@ class BuybackDevice extends Model
     public function secondProductVariant()
     {
         return $this->belongsTo(SecondProductVariant::class, 'second_product_variant_id');
+    }
+
+    public function productAccurate()
+    {
+        return $this->belongsTo(ProductAccurate::class, 'product_accurate_id');
     }
 
     /**

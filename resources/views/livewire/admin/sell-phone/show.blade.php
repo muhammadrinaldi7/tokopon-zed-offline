@@ -230,70 +230,9 @@
                 </div>
             @endif
 
-            {{-- Konversi Inventaris --}}
-            @if ($sellPhone->status === 'COMPLETED' && !\App\Models\ProductVariant::where('sell_phone_id', $sellPhone->id)->exists())
-                <div class="bg-purple-50 rounded-lg border border-purple-100 p-6 animate-in zoom-in duration-300">
-                    <h3 class="font-bold text-lg text-purple-900 mb-2">Masuk Ke Inventaris</h3>
-                    <p class="text-sm text-purple-700 mb-4">Transaksi sudah lunas. Daftarkan HP ini ke etalase toko
-                        sebagai barang seken (Second Hand) agar bisa langsung dibeli orang lain.</p>
-
-                    <button type="button" wire:click="$set('convertModal', true)"
-                        class="w-full bg-purple-600 text-white py-2.5 rounded-lg font-bold hover:bg-purple-700 transition">
-                        Jual Sebagai Barang Second
-                    </button>
-                </div>
-
-                {{-- Modal Konversi --}}
-                @if ($convertModal)
-                    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-                        wire:click.self="$set('convertModal', false)">
-                        <div class="bg-white rounded-3xl shadow-sm w-full max-w-md mx-4 overflow-hidden">
-                            <div class="bg-gradient-to-r from-purple-500 to-#1c69d4 px-6 py-5 text-white">
-                                <h2 class="text-xl font-bold">Daftarkan Produk Second</h2>
-                                <p class="text-purple-100 text-sm mt-1">{{ $sellPhone->phone_brand }}
-                                    {{ $sellPhone->phone_model }}</p>
-                            </div>
-                            <form wire:submit="convertToProduct" class="p-6 space-y-5">
-                                <div class="space-y-4">
-                                    <div>
-                                        <label class="block text-sm font-bold text-gray-700 mb-1">Harga Jual Baru
-                                            (Rp)</label>
-                                        <div class="relative">
-                                            <div
-                                                class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                                <span class="text-gray-500 font-bold">Rp</span>
-                                            </div>
-                                            <input type="number" wire:model="sellPrice"
-                                                class="pl-12 w-full text-lg font-bold rounded-lg border-gray-200 py-3 focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500"
-                                                placeholder="0" required>
-                                        </div>
-                                        @error('sellPrice')
-                                            <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span>
-                                        @enderror
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-bold text-gray-700 mb-1">Kondisi</label>
-                                        <select wire:model="secondCondition"
-                                            class="w-full rounded-lg border-gray-200 py-3 focus:ring-purple-500 focus:border-purple-500">
-                                            <option value="Like New">Like New</option>
-                                            <option value="Bekas (Mulus)">Bekas (Mulus)</option>
-                                            <option value="Bekas (Ada Minus)">Bekas (Ada Minus)</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="mt-6 flex justify-end gap-3">
-                                    <button type="button" wire:click="$set('convertModal', false)"
-                                        class="flex-1 px-4 py-3 font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Batal</button>
-                                    <button type="submit"
-                                        class="flex-1 px-4 py-3 font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition shadow-sm shadow-purple-500/25">Simpan
-                                        ke Katalog</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                @endif
-            @elseif(\App\Models\ProductVariant::where('sell_phone_id', $sellPhone->id)->exists())
-                <div class="bg-emerald-50 rounded-lg border border-emerald-100 p-6 text-center">
+            {{-- Info Inventaris --}}
+            @if ($sellPhone->status === 'COMPLETED')
+                <div class="bg-emerald-50 rounded-lg border border-emerald-100 p-6 text-center animate-in zoom-in duration-300">
                     <div
                         class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -301,9 +240,8 @@
                                 d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
-                    <h3 class="font-bold text-emerald-900">Telah Masuk Katalog</h3>
-                    <p class="text-sm text-emerald-700 mt-1">HP ini sudah didaftarkan sebagai varian produk second dan
-                        siap dijual.</p>
+                    <h3 class="font-bold text-emerald-900">Purchase Invoice Terkirim</h3>
+                    <p class="text-sm text-emerald-700 mt-1">Stok dan SN perangkat ini telah berhasil dicatat di server Accurate. Unit akan muncul di POS setelah Sinkronisasi Master Data berjalan.</p>
                 </div>
             @endif
         </div>

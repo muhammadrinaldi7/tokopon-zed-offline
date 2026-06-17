@@ -75,7 +75,7 @@ class ProductAccurateManagement extends Component
                     'base_price'      => (int) round($item['unitPrice'] ?? 0),
                     'base_cost'       => (int) round($item['balanceUnitCost'] ?? 0),
                     'stock'           => (int) round($item['availableToSell'] ?? 0),
-                    'has_sn'          => (isset($item['serialNumberType']) && $item['serialNumberType'] === 'UNIQUE'),
+                    'has_sn'          => $item['manageSN'],
                     'id_brand_accurate' => $item['itemBrand']['id'] ?? null,
                     'brandName' => $item['itemBrand']['name'] ?? null,
                     'id_category_accurate' => $item['itemCategory']['id'] ?? null,
