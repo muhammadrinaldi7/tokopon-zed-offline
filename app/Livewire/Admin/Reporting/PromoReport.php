@@ -91,7 +91,7 @@ class PromoReport extends Component
 
     public function getOrdersQueryProperty()
     {
-        return Order::with(['items.variant.product.brand', 'promos'])
+        return Order::with(['items.variant', 'promos'])
             ->whereBetween('created_at', [
                 Carbon::parse($this->startDate)->startOfDay(),
                 Carbon::parse($this->endDate)->endOfDay(),
@@ -105,8 +105,16 @@ class PromoReport extends Component
             })
             ->when($this->brandFilter, function ($query) {
                 // Filter order yang punya item dengan brand ini
-                $query->whereHas('items.variant.product.brand', function ($q) {
-                    $q->where('name', $this->brandFilter);
+                $query->whereHas('items', function ($q) {
+                    $q->where(function($qItem) {
+                        $qItem->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($q2) {
+                            $q2->where('brandName', $this->brandFilter);
+                        })->orWhereHasMorph('variant', [\App\Models\ProductVariant::class], function ($q2) {
+                            $q2->whereHas('product.brand', function($q3) {
+                                $q3->where('name', $this->brandFilter);
+                            });
+                        });
+                    });
                 });
             })
             ->when($this->businessUnitFilter, function ($query) {
@@ -164,7 +172,7 @@ class PromoReport extends Component
 
                         $variant = $item->variant;
                         $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
-                        $merk = $variant?->product?->brand?->name ?? 'Unknown';
+                        $merk = $variant?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
 
                         // Filter by brand jika ada
                         if ($this->brandFilter && $merk !== $this->brandFilter) {
@@ -200,7 +208,9 @@ class PromoReport extends Component
         $orders = $this->ordersQuery->paginate(20);
         
         // Ambil list brand yang unik dari order-order yang ada (untuk filter)
-        $availableBrands = \App\Models\Brand::orderBy('name')->pluck('name');
+        $availableBrands = \App\Models\Brand::orderBy('name')->pluck('name')
+            ->merge(\App\Models\ProductAccurate::whereNotNull('brandName')->distinct()->pluck('brandName'))
+            ->unique()->sort()->values();
 
         return view('livewire.admin.reporting.promo-report', compact('orders', 'availableBrands'))->layout('layouts.admin');
     }

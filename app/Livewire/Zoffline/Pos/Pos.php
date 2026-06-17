@@ -367,43 +367,49 @@ class Pos extends Component
     {
         if (strlen($this->search) < 2) return collect();
 
-        $newProducts = collect();
-        $secondProducts = collect();
-        $unit = \Illuminate\Support\Facades\Auth::user()->businessUnit?->code ?? 'all';
+        $results = collect();
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
 
-        if ($this->productType !== 'second' && $unit !== 'second') {
-            $newProducts = Product::with(['variants', 'brand', 'media'])
-                ->where('is_active', true)
-                ->where(function ($q) {
-                    $q->where('name', 'like', '%' . $this->search . '%')
-                        ->orWhereHas('variants', function ($q2) {
-                            $q2->where('sku', 'like', '%' . $this->search . '%');
-                        });
-                })
-                ->take(10)->get()
-                ->map(function ($p) {
-                    $p->is_second_catalog = false;
-                    return $p;
+        // 1. Exact Match Scan Barcode di tabel ProductSerialNumber (Untuk HP / Barang ber-IMEI)
+        $snItems = \App\Models\ProductSerialNumber::where('serial_number', $this->search)
+            ->whereHas('productAccurate', function ($q) use ($buId) {
+                $q->where(function ($q2) use ($buId) {
+                    $q2->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
                 });
+            })
+            ->get();
+
+        foreach ($snItems as $snItem) {
+            $productAccurate = \App\Models\ProductAccurate::where('item_no', $snItem->item_no)->first();
+            if ($productAccurate) {
+                // Lacak Riwayat QC dari tabel sell_phones jika ini adalah HP Tukar Tambah
+                $qcData = \App\Models\SellPhone::where('imei', $snItem->serial_number)->first();
+                $condition = $qcData ? $qcData->minus_desc : 'Bagus / Mulus';
+                $buyPrice = $qcData ? $qcData->appraised_value : $snItem->hpp;
+
+                $productAccurate->is_second_catalog = ($qcData !== null);
+                $productAccurate->matched_sn = $snItem->serial_number;
+                $productAccurate->qc_condition = $condition;
+                $productAccurate->buy_price = $buyPrice;
+                $results->push($productAccurate);
+            }
         }
 
-        if ($this->productType !== 'new' && $unit !== 'syihab') {
-            $secondProducts = SecondProduct::with(['variants', 'brand', 'media'])
-                ->where('is_active', true)
-                ->where(function ($q) {
-                    $q->where('name', 'like', '%' . $this->search . '%')
-                        ->orWhereHas('variants', function ($q2) {
-                            $q2->where('sku', 'like', '%' . $this->search . '%');
-                        });
-                })
-                ->take(10)->get()
-                ->map(function ($p) {
-                    $p->is_second_catalog = true;
-                    return $p;
-                });
+        // 2. Exact Match Scan SKU di tabel ProductAccurate (Untuk Aksesoris / Non-IMEI)
+        $skuItems = \App\Models\ProductAccurate::where('item_no', $this->search)
+            ->where(function ($q) use ($buId) {
+                $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+            })
+            ->get();
+
+        foreach ($skuItems as $skuItem) {
+            if (!$results->contains('id', $skuItem->id)) {
+                $skuItem->is_second_catalog = false;
+                $results->push($skuItem);
+            }
         }
 
-        return $newProducts->concat($secondProducts);
+        return $results;
     }
 
     public $searchAddons = '';
@@ -415,10 +421,14 @@ class Pos extends Component
 
         $newProducts = collect();
         $unit = \Illuminate\Support\Facades\Auth::user()->businessUnit?->code ?? 'all';
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
 
         if ($this->productType !== 'second' && $unit !== 'second') {
             $newProducts = Product::with(['variants', 'brand', 'media'])
                 ->where('is_active', true)
+                ->where(function ($q) use ($buId) {
+                    $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+                })
                 ->where(function ($q) {
                     $q->where('name', 'like', '%' . $this->searchAddons . '%')
                         ->orWhereHas('variants', function ($q2) {

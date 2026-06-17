@@ -87,7 +87,7 @@ class SalesReport extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        return Order::with(['user', 'salesBy', 'paymentMethod', 'items.variant.product', 'promos'])
+        return Order::with(['user', 'salesBy', 'paymentMethod', 'items.variant', 'promos'])
             ->whereBetween('orders.created_at', [$start, $end])
             ->where('orders.order_status', 'COMPLETED')
             ->when($this->search, function ($query) {
@@ -228,8 +228,8 @@ class SalesReport extends Component
                         $variant = $item->variant;
                         // Gunakan null-safe operator (?->) agar tidak error jika variant sudah dihapus
                         $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
-                        $merk = $variant?->accurateData?->brandName ?? 'Unknown';
-                        $category = $variant?->accurateData?->categoryName ?? 'Unknown';
+                        $merk = $variant?->brandName ?? $variant?->accurateData?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
+                        $category = $variant?->categoryName ?? $variant?->accurateData?->categoryName ?? 'Unknown';
                         // Prorata Gross Order
                         if ($isLastItem) {
                             $proratedGross = $order->total_amount - $allocatedGrossTotal;
@@ -420,7 +420,7 @@ class SalesReport extends Component
                     foreach ($order->items as $item) {
                         $variant = $item->variant;
                         $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
-                        $merk = $variant?->product?->brand?->name ?? 'Unknown';
+                        $merk = $variant?->brandName ?? $variant?->accurateData?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
 
                         $row = array_merge($baseRow, [
                             'ITEM', // TIPE BARIS
@@ -656,7 +656,7 @@ class SalesReport extends Component
                     
                     $validSubtotal = 0;
                     foreach ($order->items as $item) {
-                        $sku = $item->variant?->sku;
+                        $sku = $item->variant?->sku ?? $item->variant?->item_no;
                         $isMainEligible = ($promo->apply_to_all_items && !$promo->is_bundle) || in_array($sku, $promoSkus);
                         $isBundleEligible = $promo->is_bundle && in_array($sku, $bundleSkus);
                         
@@ -679,7 +679,7 @@ class SalesReport extends Component
                 foreach ($order->items as $item) {
                     $currentIndex++;
                     $isLastItem = ($currentIndex === $itemCount);
-                    $sku = $item->variant?->sku;
+                    $sku = $item->variant?->sku ?? $item->variant?->item_no;
                     
                     $itemPromosTotal = 0;
                     $promoNames = [];
@@ -736,8 +736,8 @@ class SalesReport extends Component
 
                         $variant = $item->variant;
                         $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
-                        $merk = $variant?->accurateData?->brandName ?? 'Unknown';
-                        $category = $variant?->accurateData?->categoryName ?? 'Unknown';
+                        $merk = $variant?->brandName ?? $variant?->accurateData?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
+                        $category = $variant?->categoryName ?? $variant?->accurateData?->categoryName ?? 'Unknown';
                         
                         $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
                         $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];

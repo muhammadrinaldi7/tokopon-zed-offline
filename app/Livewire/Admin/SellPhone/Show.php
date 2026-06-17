@@ -114,7 +114,7 @@ class Show extends Component
                     // Array di dalam array untuk serial number
                     'detailSerialNumber' => [
                         [
-                            'serialNumberNo' => 'SN-' . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT) ?? 'SN-UNKNOWN', // Kolom IMEI/SN HP
+                            'serialNumberNo' => $this->sellPhone->imei ?? 'NO-IMEI-' . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT), // Kolom IMEI/SN HP
                             'quantity' => 1
                         ]
                     ]
@@ -214,6 +214,8 @@ class Show extends Component
                 $product = \App\Models\SecondProduct::find($this->existingProductId);
             } else {
                 $brand = \App\Models\Brand::where('name', $this->sellPhone->phone_brand)->first();
+                $businessUnitId = $this->sellPhone->handledBy->business_unit_id ?? Auth::user()->getActiveBusinessUnitId();
+
                 $product = \App\Models\SecondProduct::firstOrCreate(
                     ['name' => $productName],
                     [
@@ -224,7 +226,8 @@ class Show extends Component
                         'is_active' => true,
                         'starting_price' => $this->sellPrice,
                         'total_stock' => 0,
-                        'has_active_accurate' => true
+                        'has_active_accurate' => true,
+                        'business_unit_id' => $businessUnitId
                     ]
                 );
             }

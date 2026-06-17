@@ -143,6 +143,7 @@ class SecondProductManagement extends Component
                 'brand_id' => empty($this->brandId) ? null : $this->brandId,
                 'specifications' => empty($specsDict) ? null : $specsDict,
                 'is_active' => true,
+                'business_unit_id' => \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId(),
             ]);
         }
 
@@ -223,6 +224,11 @@ class SecondProductManagement extends Component
     public function render()
     {
         $query = SecondProduct::with(['category', 'brand']);
+
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+        $query->where(function ($q) use ($buId) {
+            $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+        });
 
         if ($this->search) {
             $query->where('name', 'like', '%' . $this->search . '%');

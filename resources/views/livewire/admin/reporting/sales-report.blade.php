@@ -181,9 +181,7 @@
                                     @foreach ($order->items as $item)
                                         @php
                                             $variant = $item->variant;
-                                            $name =
-                                                $variant->name ??
-                                                ($variant->product ? $variant->product->name : 'Unknown Product');
+                                            $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
                                         @endphp
                                         <div class="truncate w-40 sm:w-48" title="{{ $name }}">
                                             {{ $name }} ({{ $item->qty }}x)</div>

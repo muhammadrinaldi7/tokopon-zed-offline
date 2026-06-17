@@ -52,6 +52,11 @@ class Product extends Model implements HasMedia
         return $this->belongsTo(Brand::class);
     }
 
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('cover')

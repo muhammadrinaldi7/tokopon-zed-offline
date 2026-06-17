@@ -13,6 +13,8 @@ class ProductAccurate extends Model
         'raw_data' => 'array',
         'base_price' => 'decimal:2',
         'base_cost' => 'decimal:2',
+        'has_sn' => 'boolean',
+        'business_unit_id' => 'integer',
     ];
 
     public function productVariants()
@@ -23,5 +25,15 @@ class ProductAccurate extends Model
     public function secondProductVariants()
     {
         return $this->hasMany(SecondProductVariant::class, 'product_accurate_id', 'id');
+    }
+
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function warehouseStocks()
+    {
+        return $this->morphMany(WarehouseStock::class, 'variant', 'variant_type', 'variant_id');
     }
 }

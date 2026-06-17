@@ -311,6 +311,7 @@ trait WithCheckoutAndReceipt
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
                     'product_variant_type' => $item['variant_type'],
+                    'product_name' => $item['name'] ?? 'Unknown Product',
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
@@ -364,8 +365,7 @@ trait WithCheckoutAndReceipt
                 $branchName = $handler->branch->name ?? 'Banjarbaru';
                 $warehouseName = $handler->warehouse->name ?? 'Head Office';
 
-                $hasSecond = collect($this->cart)->contains('is_second', true);
-                $dbSource = $hasSecond ? 'second' : 'syihab';
+                $dbSource = $this->cart[0]['database_source'] ?? 'syihab';
 
                 // Gunakan nama Cabang & Gudang asli untuk dikirim ke Accurate
                 $accurateBranchName = $branchName;
@@ -478,7 +478,7 @@ trait WithCheckoutAndReceipt
                                 'accountNo' => $rate->accurate_account_no,
                                 'amount' => (float) $rowMdr,
                                 'departmentName' => $accurateBranchName,
-                                'discountNotes' => 'MDR'
+                                'discountNotes' => 'MDR ' . ($rate->name ?? ' ')
                             ];
                         }
 
@@ -611,8 +611,7 @@ trait WithCheckoutAndReceipt
 
         try {
             $customerId = $this->selectedCustomerId;
-            $hasSecond = collect($this->cart)->contains('is_second', true);
-            $dbSource = $hasSecond ? 'second' : 'syihab';
+            $dbSource = $this->cart[0]['database_source'] ?? 'syihab';
             $accurateService = app(\App\Services\AccurateService::class);
 
             // Jika customer baru, buat user terlebih dahulu
@@ -779,6 +778,7 @@ trait WithCheckoutAndReceipt
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
                     'product_variant_type' => $item['variant_type'],
+                    'product_name' => $item['name'] ?? 'Unknown Product',
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
@@ -906,13 +906,13 @@ trait WithCheckoutAndReceipt
         $this->search = '';
         $this->showReceiptModal = false;
         $this->completedOrder = null;
-        
+
         // Reset wizard steps to step 1
         $this->currentStep = 1;
         $this->paymentWizardStep = 1;
         $this->paymentMode = null;
         $this->activePaymentIndex = 0;
-        
+
         // Reset promo data
         $this->selectedPromos = [];
     }

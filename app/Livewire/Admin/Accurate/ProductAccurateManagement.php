@@ -47,6 +47,8 @@ class ProductAccurateManagement extends Component
         try {
             $service = app(AccurateService::class);
             $pageSize = 100;
+            $bu = \App\Models\BusinessUnit::where('code', $this->activeTab)->first();
+            $buId = $bu ? $bu->id : null;
 
             // Tarik HANYA 1 halaman saja (Super cepat, < 1 detik)
             $items = $service->getItemList($this->syncCurrentPage, $pageSize, $this->activeTab);
@@ -67,11 +69,13 @@ class ProductAccurateManagement extends Component
                 $importData[] = [
                     'accurate_id'     => $item['no'],
                     'database_source' => $this->activeTab,
+                    'business_unit_id' => $buId,
                     'item_no'         => $item['no'],
                     'name'            => $item['name'] ?? 'Unknown Item',
                     'base_price'      => (int) round($item['unitPrice'] ?? 0),
                     'base_cost'       => (int) round($item['balanceUnitCost'] ?? 0),
                     'stock'           => (int) round($item['availableToSell'] ?? 0),
+                    'has_sn'          => (isset($item['serialNumberType']) && $item['serialNumberType'] === 'UNIQUE'),
                     'id_brand_accurate' => $item['itemBrand']['id'] ?? null,
                     'brandName' => $item['itemBrand']['name'] ?? null,
                     'id_category_accurate' => $item['itemCategory']['id'] ?? null,
@@ -81,12 +85,11 @@ class ProductAccurateManagement extends Component
                     'updated_at'      => now(),
                 ];
             }
-
             if (!empty($importData)) {
                 ProductAccurate::upsert(
                     $importData,
                     ['accurate_id', 'database_source'],
-                    ['item_no', 'name', 'base_price', 'stock', 'id_brand_accurate', 'brandName', 'id_category_accurate', 'categoryName', 'raw_data', 'base_cost', 'updated_at']
+                    ['item_no', 'name', 'base_price', 'stock', 'has_sn', 'business_unit_id', 'id_brand_accurate', 'brandName', 'id_category_accurate', 'categoryName', 'raw_data', 'base_cost', 'updated_at']
                 );
 
                 // Sync harga ke ProductVariant / SecondProductVariant lokal
@@ -147,6 +150,8 @@ class ProductAccurateManagement extends Component
 
         try {
             $service = app(AccurateService::class);
+            $bu = \App\Models\BusinessUnit::where('code', $this->activeTab)->first();
+            $buId = $bu ? $bu->id : null;
 
             $page = 1;
             $pageSize = 100; // Limit maksimal Accurate
@@ -173,6 +178,7 @@ class ProductAccurateManagement extends Component
                     $allImportData[] = [
                         'accurate_id'     => $item['no'],
                         'database_source' => $this->activeTab,
+                        'business_unit_id' => $buId,
                         'item_no'         => $item['no'],
                         // Gunakan 'name', bukan 'modifierName'
                         'name'            => $item['name'] ?? 'Unknown Item',
@@ -180,6 +186,7 @@ class ProductAccurateManagement extends Component
                         'base_price'      => (int) round($item['unitPrice'] ?? 0),
                         'stock'           => (int) round($item['availableToSell'] ?? 0),
                         'base_cost'       => (int) round($item['balanceUnitCost'] ?? 0),
+                        'has_sn'          => (isset($item['serialNumberType']) && $item['serialNumberType'] === 'UNIQUE'),
                         'id_brand_accurate' => $item['itemBrand']['id'] ?? null,
                         'brandName' => $item['itemBrand']['name'] ?? null,
                         'id_category_accurate' => $item['itemCategory']['id'] ?? null,
@@ -221,6 +228,8 @@ class ProductAccurateManagement extends Component
                                 'base_price',
                                 'stock',
                                 'base_cost',
+                                'has_sn',
+                                'business_unit_id',
                                 'id_brand_accurate',
                                 'brandName',
                                 'id_category_accurate',

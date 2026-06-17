@@ -6,6 +6,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\ProductVariant;
 use App\Models\SecondProductVariant;
+use App\Models\ProductAccurate;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -160,8 +161,42 @@ class StockReport extends Component
                 return $items;
             });
 
+        // Ambil data dari ProductAccurate (flow POS baru)
+        $accurateProducts = ProductAccurate::with(['warehouseStocks.warehouse', 'businessUnit'])
+            ->get()
+            ->flatMap(function ($variant) {
+                $items = [];
+                $baseItem = [
+                    'id' => 'a_' . $variant->id,
+                    'sku' => $variant->item_no ?? '-',
+                    'name' => $variant->name ?? 'Unknown',
+                    'color' => '-',
+                    'category' => $variant->categoryName ?? 'Lainnya',
+                    'base_cost' => $variant->base_cost ?? 0,
+                    'base_price' => $variant->base_price ?? 0,
+                    'age_days' => $variant->created_at ? round($variant->created_at->diffInDays(now())) : 0,
+                    'created_at' => $variant->created_at,
+                    'sync_date' => $variant->updated_at ? $variant->updated_at->format('Y-m-d') : '-',
+                    'sync_datetime' => $variant->updated_at ? $variant->updated_at->format('Y-m-d H:i:s') : '-',
+                ];
+
+                if ($variant->warehouseStocks->isEmpty()) {
+                    $baseItem['warehouse_name'] = 'Belum Dialokasikan';
+                    $baseItem['stock'] = $variant->stock ?? 0;
+                    $items[] = $baseItem;
+                } else {
+                    foreach ($variant->warehouseStocks as $ws) {
+                        $whItem = $baseItem;
+                        $whItem['warehouse_name'] = $ws->warehouse->name ?? 'Unknown';
+                        $whItem['stock'] = $ws->stock;
+                        $items[] = $whItem;
+                    }
+                }
+                return $items;
+            });
+
         // Gabungkan dan kembalikan
-        return collect($newProducts)->concat($secondProducts);
+        return collect($newProducts)->concat($secondProducts)->concat($accurateProducts);
     }
 
     public function render()

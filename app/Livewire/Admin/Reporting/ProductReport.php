@@ -101,7 +101,7 @@ class ProductReport extends Component
             ->pluck('id');
 
         $orderItems = OrderItem::whereIn('order_id', $orderIds)
-            ->with(['variant', 'variant.product', 'order']) // Asumsi polymorphic variant punya relasi product (bila ada)
+            ->with(['variant']) // Asumsi polymorphic variant punya relasi product (bila ada)
             ->get();
 
         $grouped = $orderItems->groupBy(function ($item) {
@@ -113,7 +113,7 @@ class ProductReport extends Component
             $first = $group->first();
             $variant = $first->variant;
 
-            $sku = $variant->sku ?? ($variant->imei ?? ($variant->code ?? '-'));
+            $sku = $variant->sku ?? ($variant->item_no ?? ($variant->imei ?? ($variant->code ?? '-')));
             $name = $variant->name ?? ($variant->product ? $variant->product->name : 'Unknown Product');
 
             // Tambahkan RAM/Storage jika ada
@@ -181,7 +181,7 @@ class ProductReport extends Component
             ->pluck('id');
 
         $orderItems = OrderItem::whereIn('order_id', $orderIds)
-            ->with(['variant', 'variant.product', 'order'])
+            ->with(['variant'])
             ->get();
 
         $grouped = $orderItems->groupBy(function ($item) {
@@ -193,7 +193,7 @@ class ProductReport extends Component
             $first = $group->first();
             $variant = $first->variant;
 
-            $sku = $variant->sku ?? ($variant->imei ?? ($variant->code ?? '-'));
+            $sku = $variant->sku ?? ($variant->item_no ?? ($variant->imei ?? ($variant->code ?? '-')));
             $name = $variant->name ?? ($variant->product ? $variant->product->name : 'Unknown Product');
 
             $branch = $first->order->shipping_address_snapshot['store'] ?? 'Unknown';

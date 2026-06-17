@@ -98,7 +98,7 @@ class SellPhone extends Component
         $this->buyback_device_id = null;
         $this->available_storages = [];
         $this->buyback_device = null;
-        
+
         $this->imei = '';
         $this->qc_template = null;
         $this->qc_results = [];
@@ -559,7 +559,7 @@ class SellPhone extends Component
             'buyback_device'
         ]);
 
-        return $this->redirect(route('sell-phone-history'), navigate: true);
+        return $this->redirect(route('zoffline.sell-phone-history'), navigate: true);
     }
     public function render()
     {

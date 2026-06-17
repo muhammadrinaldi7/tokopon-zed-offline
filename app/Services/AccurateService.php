@@ -274,7 +274,7 @@ class AccurateService
         $param = [
             "sp.page"     => $page,
             "sp.pageSize" => $pageSize,
-            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory",
+            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory,serialNumberType",
         ];
 
         $response = Http::withHeaders([

@@ -223,6 +223,7 @@ class ProductManagement extends Component
                 $accurateId = null;
                 $finalPrice = $price;
                 $finalStock = $stock;
+                $productBusinessUnitId = null;
 
                 if (!empty($kodeAccurate)) {
                     $accurateData = ProductAccurate::where('item_no', $kodeAccurate)->first();
@@ -231,9 +232,30 @@ class ProductManagement extends Component
                         $finalPrice = (float) $accurateData->base_price;
                         $finalStock = (int) $accurateData->stock;
 
+                        // Get BU from Accurate's database source
+                        $bu = \App\Models\BusinessUnit::where('code', $accurateData->database_source)->first();
+                        if ($bu) {
+                            $productBusinessUnitId = $bu->id;
+                        }
+
                         $product->has_active_accurate = true;
                         $product->save();
                     }
+                }
+
+                if (!$productBusinessUnitId) {
+                    $productBusinessUnitId = Auth::user()->getActiveBusinessUnitId();
+                }
+
+                // Update product BU and optionally category/brand BU if empty
+                $product->business_unit_id = $productBusinessUnitId;
+                $product->save();
+                
+                if (empty($category->business_unit_id)) {
+                    $category->update(['business_unit_id' => $productBusinessUnitId]);
+                }
+                if ($brandId && empty($brand->business_unit_id)) {
+                    $brand->update(['business_unit_id' => $productBusinessUnitId]);
                 }
 
                 // 5. Buat Variant
@@ -352,6 +374,7 @@ class ProductManagement extends Component
                 'brand_id' => empty($this->brandId) ? null : $this->brandId,
                 'specifications' => empty($specsDict) ? null : $specsDict,
                 'is_active' => true,
+                'business_unit_id' => Auth::user()->getActiveBusinessUnitId(),
             ]);
         }
 
@@ -432,6 +455,12 @@ class ProductManagement extends Component
     public function render()
     {
         $query = Product::with(['category', 'brand']);
+
+        // Multi-Tenant Filter
+        $buId = Auth::user()->getActiveBusinessUnitId();
+        $query->where(function ($q) use ($buId) {
+            $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+        });
 
         if ($this->search) {
             $query->where(function ($q) {

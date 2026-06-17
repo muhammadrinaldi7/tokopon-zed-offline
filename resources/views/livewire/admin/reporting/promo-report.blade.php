@@ -118,7 +118,7 @@
                                         @php
                                             $variant = $item->variant;
                                             $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown';
-                                            $merk = $variant?->product?->brand?->name ?? 'Unknown';
+                                            $merk = $variant?->brandName ?? $variant?->accurateData?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
                                         @endphp
                                         <div class="text-sm text-gray-900 flex items-center justify-between gap-4">
                                             <span>

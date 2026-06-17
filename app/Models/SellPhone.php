@@ -25,6 +25,7 @@ class SellPhone extends Model implements HasMedia
         'bank_account_name',
         'invoice_number',
         'handled_by',
+        'imei'
     ];
 
     public function buybackDevice()
