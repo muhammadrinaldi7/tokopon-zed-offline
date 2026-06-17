@@ -99,10 +99,17 @@
     @foreach ($order->items as $item)
         @php
             $v = $item->variant;
-            $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
-            $ram = $v ? $v->ram ?? '' : '';
-            $storage = $v ? $v->storage ?? '' : '';
-            $color = $v ? $v->color ?? '' : '';
+            if ($v instanceof \App\Models\ProductAccurate) {
+                $itemName = $v->name ?? '-';
+                $ram = '';
+                $storage = '';
+                $color = '';
+            } else {
+                $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
+                $ram = $v ? $v->ram ?? '' : '';
+                $storage = $v ? $v->storage ?? '' : '';
+                $color = $v ? $v->color ?? '' : '';
+            }
         @endphp
         <div style="margin-bottom: 6px;">
             <p class="font-bold" style="margin: 0;">{{ $itemName }}

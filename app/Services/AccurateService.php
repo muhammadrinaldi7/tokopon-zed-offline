@@ -257,6 +257,41 @@ class AccurateService
         }
     }
 
+    public function postPurchasePayment($purchasePaymentData, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/purchase-payment/save.do', $purchasePaymentData);
+
+        Log::info('API Accurate Purchase Payment Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Purchase Payment Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Purchase Payment Error: ' . $response->body());
+            throw new \Exception('API Accurate Purchase Payment Error: ' . $response->body());
+        }
+    }
+
     public function getItemList($page = 1, $pageSize = 100, $databaseSource = 'syihab')
     {
         // Tentukan kredensial berdasarkan sumber database

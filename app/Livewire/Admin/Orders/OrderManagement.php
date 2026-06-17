@@ -40,8 +40,12 @@ class OrderManagement extends Component
     {
         $this->selectedOrderForReceipt = Order::with([
             'user.profile',
-            'items.variant.product',
-            // 'items.variant.secondProduct', 
+            'items.variant' => function ($morphTo) {
+                $morphTo->morphWith([
+                    \App\Models\ProductVariant::class => ['product'],
+                    \App\Models\SecondProductVariant::class => ['secondProduct'],
+                ]);
+            },
             'handledBy',
             'salesBy',
             'payments.paymentMethod',

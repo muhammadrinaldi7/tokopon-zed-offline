@@ -14,9 +14,12 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Show extends Component
 {
+    use WithFileUploads;
+
     public SellPhone $sellPhone;
 
     // QC Status
@@ -35,11 +38,22 @@ class Show extends Component
     public $isRevising = false;
     public $revisedAppraisedValue = 0;
 
+    // Payment fields
+    public $paymentReceipt;
+    public $storeBankNo;
+    public $accurateGlAccounts = [];
+
     public function mount(SellPhone $sellPhone)
     {
         $this->sellPhone = $sellPhone->load(['user.bankAccounts', 'buybackDevice.tier']);
         $this->appraisedValue = $this->sellPhone->appraised_value ?? 0;
         $this->qcPassed = $this->sellPhone->hasPassedQc();
+
+        // Load Accurate GL Accounts for Bank selection
+        $this->accurateGlAccounts = \App\Models\AccurateGlAccount::where('account_type', 'CASH_BANK')
+            ->orderBy('name')
+            ->get()
+            ->toArray();
     }
 
     #[On('qc-inspection-saved')]
@@ -97,6 +111,16 @@ class Show extends Component
             $this->sellPhone->update(['status' => 'PAYING']);
             $this->dispatch('toast', ['type' => 'success', 'title' => 'Inspected', 'message' => 'Status penjualan HP ditandai sebagai Checked.']);
         } else if ($this->sellPhone->status === 'PAYING') {
+
+            $this->validate([
+                'paymentReceipt' => 'required|image|max:5120',
+                'storeBankNo' => 'required|string',
+            ], [
+                'paymentReceipt.required' => 'Bukti bayar wajib diunggah.',
+                'paymentReceipt.image' => 'Bukti bayar harus berupa gambar.',
+                'storeBankNo.required' => 'Rekening asal toko wajib dipilih.',
+            ]);
+
             $phoneData = $this->phoneData;
             $flUser = $this->sellPhone->handledBy;
             $accurateBranchName = $flUser && $flUser->branch ? $flUser->branch->name : 'Banjarbaru';
@@ -166,6 +190,29 @@ class Show extends Component
                         // Fallback jika tidak ada number
                         $this->sellPhone->update(['invoice_number' => $billNumber]);
                     }
+                }
+
+                // Hit Purchase Payment
+                if ($this->paymentReceipt && $this->storeBankNo) {
+                    $receiptPath = $this->paymentReceipt->store('payment_receipts', 'public');
+                    $this->sellPhone->update([
+                        'payment_receipt_path' => $receiptPath,
+                        'store_bank_no' => $this->storeBankNo,
+                    ]);
+
+                    $paymentData = [
+                        'bankNo' => $this->storeBankNo,
+                        'vendorNo' => str_replace('"', '', $vendorNoBaru),
+                        'paymentDate' => date('d/m/Y'),
+                        'chequeAmount' => (int) $this->sellPhone->appraised_value,
+                        'detailItem' => [
+                            [
+                                'invoiceNo' => $this->sellPhone->invoice_number,
+                                'paymentAmount' => (int) $this->sellPhone->appraised_value,
+                            ]
+                        ]
+                    ];
+                    $accurateService->postPurchasePayment($paymentData, $dbSource);
                 }
 
                 // JIKA BERHASIL: Update status dan redirect
