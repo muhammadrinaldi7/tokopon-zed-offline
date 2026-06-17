@@ -69,60 +69,47 @@
                     placeholder="Cari aksesoris atau produk lain...">
             </div>
 
-            @if (strlen($searchAddons) >= 2)
-                <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                    <div class="grid grid-cols-1 gap-3">
-                        @forelse($this->addonsResults as $product)
-                            <div wire:click="openVariantPicker({{ $product->id }}, {{ $product->is_second_catalog ? 'true' : 'false' }})"
-                                class="flex items-center gap-4 p-3 rounded-2xl border border-gray-100 hover:border-[#1c69d4] hover:bg-blue-50/50 cursor-pointer transition-all group">
-
-                                <div
-                                    class="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 shrink-0 border border-gray-200">
-                                    @if ($product->media->isNotEmpty())
-                                        <img src="{{ url('storage/' . $product->media->first()->file_path) }}"
-                                            class="w-full h-full object-cover">
-                                    @else
-                                        <div class="w-full h-full flex items-center justify-center text-gray-400">
-                                            <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                        </div>
-                                    @endif
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <h4 class="font-bold text-sm text-gray-800 truncate group-hover:text-[#1c69d4]">
-                                        {{ $product->name }}</h4>
-                                    <p class="text-sm font-black text-gray-600 mt-1">Rp
-                                        {{ number_format($product->price ?? 0, 0, ',', '.') }}</p>
-                                </div>
-                                <div
-                                    class="w-10 h-10 rounded-full bg-blue-50 text-[#1c69d4] flex items-center justify-center group-hover:bg-[#1c69d4] group-hover:text-white transition-colors">
-                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                        stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                <div class="grid grid-cols-1 gap-3">
+                    @forelse($this->addonsResults as $product)
+                        <div wire:click="selectAddon({{ $product->id }})"
+                            class="flex items-center gap-4 p-3 rounded-2xl border border-gray-100 hover:border-[#1c69d4] hover:bg-blue-50/50 cursor-pointer transition-all group">
+                            <div
+                                class="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 shrink-0 border border-gray-200">
+                                <div class="w-full h-full flex items-center justify-center text-gray-400">
+                                    <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                     </svg>
                                 </div>
                             </div>
-                        @empty
-                            <div class="py-8 text-center">
-                                <p class="text-sm text-gray-500 font-bold">Produk tidak ditemukan.</p>
+                            <div class="flex-1 min-w-0">
+                                <h4 class="font-bold text-sm text-gray-800 truncate group-hover:text-[#1c69d4]">
+                                    {{ $product->name }}</h4>
+                                <p class="text-sm font-black text-gray-600 mt-1">Rp
+                                    {{ number_format($product->base_price ?? 0, 0, ',', '.') }}</p>
                             </div>
-                        @endforelse
-                    </div>
+                            <div
+                                class="w-10 h-10 rounded-full bg-blue-50 text-[#1c69d4] flex items-center justify-center group-hover:bg-[#1c69d4] group-hover:text-white transition-colors">
+                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="py-8 text-center flex-1 flex flex-col justify-center items-center">
+                            <svg class="w-12 h-12 mx-auto mb-3 opacity-20" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <p class="text-sm text-gray-500 font-bold">Produk Add-Ons tidak ditemukan.</p>
+                        </div>
+                    @endforelse
                 </div>
-            @else
-                <div class="flex-1 flex flex-col justify-center items-center text-center text-gray-400">
-                    <svg class="w-12 h-12 mx-auto mb-3 opacity-20" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <p class="text-sm font-medium">Mulai ketik untuk mencari produk tambahan</p>
-                </div>
-            @endif
+            </div>
         </div>
         {{-- PROMO SECTION --}}
         <div
@@ -185,4 +172,39 @@
             </svg>
         </button>
     </div>
+
+    {{-- Modal Scan SN Khusus Addon --}}
+    @if ($addonScanModalOpen)
+        <div
+            class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-all">
+            <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4"
+                @click.away="$wire.closeAddonModal()">
+                <div class="text-center">
+                    <div
+                        class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 text-[#1c69d4]">
+                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-black text-gray-800 mb-2">Scan Serial Number</h3>
+                    <p class="text-sm text-gray-500 mb-6">Produk ini mewajibkan pencatatan Serial Number. Silakan scan
+                        atau ketik SN pada kolom di bawah ini.</p>
+                </div>
+                <div class="mb-6 relative">
+                    <input type="text" wire:model="addonSnInput" wire:keydown.enter="submitAddonSn"
+                        x-data="{}" x-init="setTimeout(() => $el.focus(), 100)"
+                        @focus-addon-sn-input.window="setTimeout(() => $el.focus(), 100)"
+                        class="w-full bg-gray-50 border-2 border-gray-200 rounded-2xl px-4 py-4 text-center font-black tracking-wider focus:border-[#1c69d4] focus:bg-white focus:ring-0 transition-all uppercase"
+                        placeholder="SCAN ATAU KETIK SN DI SINI" autocomplete="off">
+                </div>
+                <div class="flex gap-3">
+                    <button wire:click="closeAddonModal"
+                        class="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-all">Batal</button>
+                    <button wire:click="submitAddonSn"
+                        class="flex-1 py-3 bg-[#1c69d4] text-white font-bold rounded-xl hover:bg-blue-700 transition-all">Simpan</button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

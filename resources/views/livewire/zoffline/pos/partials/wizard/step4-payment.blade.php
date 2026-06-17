@@ -107,24 +107,42 @@
                             $hasImage = file_exists($imagePath);
                         @endphp
                         <button wire:click="selectBankGroup('{{ addslashes($group) }}')"
-                            class="p-6 bg-white shadow-sm border-2 border-gray-100 rounded-2xl hover:border-[#1c69d4] hover:shadow-md transition-all flex flex-col items-center justify-center gap-4 group">
+                            class="relative p-5 bg-white shadow-sm border-2 border-gray-100 rounded-2xl hover:border-[#1c69d4] hover:shadow-md transition-all text-left flex flex-col justify-between gap-6 group min-h-[140px]">
 
-                            @if ($hasImage)
-                                <div class="h-16 w-full flex items-center justify-center">
+                            {{-- Kanan Atas: Logo --}}
+                            <div class="flex justify-end w-full">
+                                @if ($hasImage)
                                     <img src="{{ asset('assets/png/paymentmethod/' . $imageName) }}"
                                         alt="{{ $group }}"
-                                        class="max-h-full max-w-full object-contain filter group-hover:brightness-110 transition-all">
-                                </div>
-                            @else
+                                        class="h-8 md:h-10 object-contain filter group-hover:brightness-110 transition-all">
+                                @else
+                                    <div
+                                        class="w-10 h-10 bg-gray-50 border border-gray-100 rounded-full flex items-center justify-center text-gray-400 group-hover:text-[#1c69d4] group-hover:bg-blue-50 group-hover:border-blue-200 transition-all font-black text-sm">
+                                        {{ strtoupper(substr($group, 0, 2)) }}
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- Kiri Bawah: Teks --}}
+                            <div>
+                                {{-- Ubah w-10 h-auto p-2 menjadi w-10 h-10 flex items-center justify-center --}}
                                 <div
-                                    class="w-16 h-16 bg-gray-50 border border-gray-100 rounded-full flex items-center justify-center text-gray-400 group-hover:text-[#1c69d4] group-hover:bg-blue-50 group-hover:border-blue-200 transition-all font-black text-xl">
-                                    {{ strtoupper(substr($group, 0, 2)) }}
+                                    class="bg-neutral-200 text-neutral-800 rounded-full w-10 h-10 flex items-center justify-center shrink-0">
+
+                                    {{-- Ubah w-8 h-auto menjadi w-5 h-5 atau w-6 h-6 agar pas di dalam lingkaran --}}
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24">
+                                        <path d="M0 0h24v24H0z" fill="none" />
+                                        <path fill="currentColor" fill-rule="evenodd"
+                                            d="M9.944 3.25h4.112c1.838 0 3.294 0 4.433.153c1.172.158 2.121.49 2.87 1.238c.748.749 1.08 1.698 1.238 2.87c.09.673.127 1.456.142 2.363a.8.8 0 0 1 .004.23q.009.848.007 1.84v.112c0 1.838 0 3.294-.153 4.433c-.158 1.172-.49 2.121-1.238 2.87c-.749.748-1.698 1.08-2.87 1.238c-1.14.153-2.595.153-4.433.153H9.944c-1.838 0-3.294 0-4.433-.153c-1.172-.158-2.121-.49-2.87-1.238c-.748-.749-1.08-1.698-1.238-2.87c-.153-1.14-.153-2.595-.153-4.433v-.112q-.002-.992.007-1.84a.8.8 0 0 1 .003-.23c.016-.907.053-1.69.143-2.363c.158-1.172.49-2.121 1.238-2.87c.749-.748 1.698-1.08 2.87-1.238c1.14-.153 2.595-.153 4.433-.153m-7.192 7.5q-.002.582-.002 1.25c0 1.907.002 3.262.14 4.29c.135 1.005.389 1.585.812 2.008s1.003.677 2.009.812c1.028.138 2.382.14 4.289.14h4c1.907 0 3.262-.002 4.29-.14c1.005-.135 1.585-.389 2.008-.812s.677-1.003.812-2.009c.138-1.028.14-2.382.14-4.289q0-.668-.002-1.25zm18.472-1.5H2.776c.02-.587.054-1.094.114-1.54c.135-1.005.389-1.585.812-2.008s1.003-.677 2.009-.812c1.028-.138 2.382-.14 4.289-.14h4c1.907 0 3.262.002 4.29.14c1.005.135 1.585.389 2.008.812s.677 1.003.812 2.009c.06.445.094.952.114 1.539M5.25 16a.75.75 0 0 1 .75-.75h4a.75.75 0 0 1 0 1.5H6a.75.75 0 0 1-.75-.75m6.5 0a.75.75 0 0 1 .75-.75H14a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75"
+                                            clip-rule="evenodd" />
+                                    </svg>
                                 </div>
-                                <div class="text-center">
-                                    <span
-                                        class="font-bold text-sm text-gray-700 group-hover:text-[#1c69d4] transition-colors">{{ $group }}</span>
-                                </div>
-                            @endif
+
+                                <p
+                                    class="text-[10px] text-neutral-800 font-medium mt-1.5 uppercase tracking-wide leading-tight">
+                                    Transfer bank atau pembayaran digital
+                                </p>
+                            </div>
                         </button>
                     @empty
                         <div

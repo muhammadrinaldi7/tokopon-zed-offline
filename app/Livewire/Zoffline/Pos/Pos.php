@@ -153,11 +153,11 @@ class Pos extends Component
     public function cancelUpdateCustomer()
     {
         $user = $this->existingCustomerToUpdate;
-        
+
         $this->selectedCustomerId = $user->id;
         $this->searchCustomer = $user->name;
         $this->isNewCustomer = false;
-        
+
         $this->showConfirmUpdateCustomerModal = false;
 
         // Lanjut ke pengecekan sales
@@ -417,30 +417,23 @@ class Pos extends Component
     #[Computed]
     public function addonsResults()
     {
-        if (strlen($this->searchAddons) < 2) return collect();
-
-        $newProducts = collect();
         $unit = \Illuminate\Support\Facades\Auth::user()->businessUnit?->code ?? 'all';
         $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
 
-        if ($this->productType !== 'second' && $unit !== 'second') {
-            $newProducts = Product::with(['variants', 'brand', 'media'])
-                ->where('is_active', true)
-                ->where(function ($q) use ($buId) {
-                    $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
-                })
-                ->where(function ($q) {
-                    $q->where('name', 'like', '%' . $this->searchAddons . '%')
-                        ->orWhereHas('variants', function ($q2) {
-                            $q2->where('sku', 'like', '%' . $this->searchAddons . '%');
-                        });
-                })
-                ->take(10)->get()
-                ->map(function ($p) {
-                    $p->is_second_catalog = false;
-                    return $p;
-                });
+        $query = \App\Models\ProductAccurate::where(function ($q) use ($buId) {
+            $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+        });
+
+        if (strlen($this->searchAddons) >= 2) {
+            $query->where(function ($q) {
+                $q->where('name', 'like', '%' . $this->searchAddons . '%')
+                    ->orWhere('item_no', 'like', '%' . $this->searchAddons . '%');
+            });
+        } else {
+            $query->where('categoryName', 'like', '%ADD ON%');
         }
+
+        $newProducts = $query->take(20)->get();
 
         return $newProducts;
     }

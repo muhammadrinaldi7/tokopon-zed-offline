@@ -54,6 +54,104 @@ trait WithCart
     public $showCustomerQcModal = false;
     public $customerQcData = null;
 
+    // ─── Addons SN Modal ───────────────────────────────────────
+    public $addonScanModalOpen = false;
+    public $selectedAddonForSn = null;
+    public $addonSnInput = '';
+
+    public function selectAddon($id)
+    {
+        $product = \App\Models\ProductAccurate::find($id);
+        if (!$product) return;
+
+        if ($product->has_sn) {
+            $this->selectedAddonForSn = $product->id;
+            $this->addonSnInput = '';
+            $this->addonScanModalOpen = true;
+            $this->dispatch('focus-addon-sn-input');
+        } else {
+            // Langsung tambahkan ke keranjang (tanpa SN)
+            $this->addScannedAccurateToCart($product, null, 1);
+        }
+    }
+
+    public function closeAddonModal()
+    {
+        $this->addonScanModalOpen = false;
+        $this->selectedAddonForSn = null;
+        $this->addonSnInput = '';
+    }
+
+    public function submitAddonSn()
+    {
+        $sn = trim($this->addonSnInput);
+        if (empty($sn)) return;
+
+        $productAccurate = \App\Models\ProductAccurate::find($this->selectedAddonForSn);
+        if (!$productAccurate) {
+            $this->dispatch('toast', title: 'Error', message: 'Produk tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+        $buName = Auth::user()->getActiveBusinessUnit()->code;
+
+        $accurateService = app(\App\Services\AccurateService::class);
+        $skuFromAccurate = $accurateService->findSkuBySerialNumber($sn, $buName);
+
+        if ($skuFromAccurate === 'error') {
+            $this->dispatch('toast', title: 'Warning', message: 'Koneksi ke Accurate bermasalah, mencoba pengecekan lokal.', type: 'warning');
+            $this->closeAddonModal();
+        } else if ($skuFromAccurate === null) {
+            $this->dispatch('toast', title: 'Gagal', message: "SN '{$sn}' tidak ditemukan di Accurate.", type: 'error');
+            $this->closeAddonModal();
+            return;
+        }
+
+        $isConfirmedSn = ($skuFromAccurate && $skuFromAccurate !== 'invalid_type' && $skuFromAccurate !== 'error');
+
+        if ($isConfirmedSn || $skuFromAccurate === 'error') {
+            $localSnRecordGlobal = \App\Models\ProductSerialNumber::with('productAccurate')
+                ->where('serial_number', $sn)
+                ->first();
+
+            if ($localSnRecordGlobal) {
+                // Pastikan SN ini BENAR milik produk Addon yang diklik
+
+                if ($localSnRecordGlobal->productAccurate->id != $this->selectedAddonForSn) {
+                    $this->dispatch('toast', title: 'Gagal', message: "SN '{$sn}' BUKAN milik produk {$productAccurate->name}.", type: 'error');
+                    $this->closeAddonModal();
+                    return;
+                }
+
+                $productBuId = $localSnRecordGlobal->productAccurate->business_unit_id ?? null;
+                if ($productBuId !== null && $productBuId != $buId) {
+                    $this->dispatch('toast', title: 'Gagal', message: "SN '{$sn}' terdaftar untuk Business Unit lain.", type: 'error');
+                    $this->closeAddonModal();
+                    return;
+                }
+
+                if ($localSnRecordGlobal->warehouse_id != $warehouseId) {
+                    $actualWarehouseName = \App\Models\Warehouse::where('id', $localSnRecordGlobal->warehouse_id)->value('name');
+                    $warehouseTarget = $actualWarehouseName ?? 'Gudang Lain';
+                    $this->dispatch('toast', title: 'Gagal', message: "SN '{$sn}' ada di {$warehouseTarget}.", type: 'error');
+                    $this->closeAddonModal();
+                    return;
+                }
+
+                $this->addScannedAccurateToCart($productAccurate, $sn, 1);
+                $this->closeAddonModal();
+                return;
+            } else if ($isConfirmedSn) {
+                $this->dispatch('toast', title: 'Gagal', message: "SN '{$sn}' terdaftar di Accurate, namun belum tersinkronisasi di sistem lokal.", type: 'error');
+                return;
+            }
+        }
+
+        $this->dispatch('toast', title: 'Gagal', message: "SN '{$sn}' tidak ditemukan atau bukan SN yang valid.", type: 'error');
+    }
+
     public function openCustomerQcModal($sn)
     {
         $inspection = \App\Models\DeviceInspection::with(['inspector', 'media'])
@@ -127,13 +225,7 @@ trait WithCart
                 // SN Valid, BU Cocok, dan Gudang Cocok. Ambil ProductAccurate
                 $productAccurate = $localSnRecordGlobal->productAccurate;
 
-                // Cek Riwayat QC (SellPhone)
-                $qcData = \App\Models\SellPhone::where('imei', $sn)->first();
-                $condition = $qcData ? $qcData->minus_desc : 'Bagus / Mulus';
-                $buyPrice = $qcData ? $qcData->appraised_value : $localSnRecordGlobal->hpp;
-                $isSecond = ($qcData !== null);
-
-                $this->addScannedAccurateToCart($productAccurate, $sn, 1, $isSecond, $condition);
+                $this->addScannedAccurateToCart($productAccurate, $sn, 1);
                 $this->scanned_sn = '';
                 return;
             } else if ($isConfirmedSn) {
@@ -167,7 +259,7 @@ trait WithCart
                 return;
             }
 
-            $this->addScannedAccurateToCart($productAccurate, null, $stock, false, 'Bagus / Mulus');
+            $this->addScannedAccurateToCart($productAccurate, null, $stock);
             $this->scanned_sn = '';
             return;
         }
@@ -176,7 +268,7 @@ trait WithCart
         $this->scanned_sn = '';
     }
 
-    private function addScannedAccurateToCart($productAccurate, $sn, $maxStock, $isSecond, $condition)
+    private function addScannedAccurateToCart($productAccurate, $sn, $maxStock)
     {
         $variantType = \App\Models\ProductAccurate::class;
         $variantId = $productAccurate->id;
@@ -216,10 +308,10 @@ trait WithCart
                 'serial_numbers' => $sn ? [$sn] : [],
                 'sku' => $productAccurate->item_no,
                 'has_sn' => (bool) $productAccurate->has_sn,
-                'is_second' => $isSecond,
+                // 'is_second' => false,
                 'database_source' => $productAccurate->database_source,
                 'brand_id' => null, // Accurate doesn't map brand directly this way
-                'condition' => $condition,
+                // 'condition' => '',
             ];
 
             $this->dispatch('toast', title: 'Sukses', message: "Berhasil menambahkan {$productAccurate->name} ke keranjang.", type: 'success');
