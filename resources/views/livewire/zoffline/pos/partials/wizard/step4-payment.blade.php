@@ -403,25 +403,7 @@
                 placeholder="Catatan tambahan...">
         </div>
 
-        {{-- Total --}}
-        <div class="bg-white rounded-2xl p-6 border border-gray-100 flex flex-col justify-center space-y-3 shadow-sm">
-            <div class="flex justify-between items-center">
-                <span class="text-gray-500 font-medium text-sm">Subtotal</span>
-                <span class="font-bold text-gray-800">Rp
-                    {{ number_format($this->subtotal, 0, ',', '.') }}</span>
-            </div>
-            <div class="flex justify-between items-center">
-                <span class="text-gray-500 font-medium text-sm">Total Diskon</span>
-                <span class="font-bold text-rose-500">- Rp
-                    {{ number_format($this->totalDiscount, 0, ',', '.') }}</span>
-            </div>
-            <div class="border-t border-gray-200/60 my-2"></div>
-            <div class="flex justify-between items-center">
-                <span class="text-gray-600 font-bold text-lg">Grand Total</span>
-                <span class="font-black text-3xl md:text-4xl text-[#1c69d4] tracking-tight">Rp
-                    {{ number_format(max(0, $this->subtotal - $this->totalDiscount), 0, ',', '.') }}</span>
-            </div>
-        </div>
+
     </div>
 
     {{-- Footer Actions --}}
@@ -433,12 +415,284 @@
             </svg>
             Kembali
         </button>
-        <button wire:click="processPayment" @if (!$this->isPaymentsValid) disabled @endif
-            class="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
-            Proses Transaksi
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        </button>
+        <div x-data="{ showConfirmModal: false }">
+            <button type="button" @click="showConfirmModal = true" @if (!$this->isPaymentsValid) disabled @endif
+                class="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
+                Proses Transaksi
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </button>
+
+            {{-- MODAL KONFIRMASI PESANAN --}}
+            <template x-teleport="body">
+                <div x-show="showConfirmModal" class="fixed inset-0 z-[100] overflow-y-auto" style="display: none;"
+                    aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                    <div
+                        class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                        <div x-show="showConfirmModal" x-transition:enter="ease-out duration-300"
+                            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                            x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0"
+                            class="fixed inset-0 transition-opacity bg-gray-900/50 backdrop-blur-sm"
+                            aria-hidden="true" @click="showConfirmModal = false"></div>
+
+                        <span class="hidden sm:inline-block sm:align-middle sm:h-screen"
+                            aria-hidden="true">&#8203;</span>
+
+                        <div x-show="showConfirmModal" x-transition:enter="ease-out duration-300"
+                            x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                            x-transition:leave="ease-in duration-200"
+                            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                            class="inline-block w-full max-w-2xl overflow-hidden text-left align-middle transition-all transform bg-white rounded-2xl shadow-2xl sm:my-8 sm:align-middle border border-gray-100 relative">
+
+                            {{-- Header --}}
+                            <div
+                                class="px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-center sticky top-0 z-10">
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <h3 class="text-xl font-black text-gray-800" id="modal-title">Konfirmasi
+                                            Pesanan</h3>
+                                        <span
+                                            class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs font-bold border border-blue-100">{{ $this->displayCustomerName }}</span>
+                                    </div>
+                                    <p class="text-sm text-gray-500 mt-1">Pastikan pesanan dan pembayaran sudah sesuai
+                                    </p>
+                                </div>
+                                <button type="button" @click="showConfirmModal = false"
+                                    class="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 focus:outline-none p-2 rounded-xl transition-all">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            {{-- Body --}}
+                            <div
+                                class="px-6 py-6 space-y-6 max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+
+                                {{-- Daftar Item --}}
+                                <div>
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Daftar
+                                        Item</h4>
+                                    <div class="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                                        @forelse($this->cart as $item)
+                                            <div
+                                                class="flex justify-between items-start gap-4 pb-3 border-b border-gray-200/60 last:border-0 last:pb-0">
+                                                <div class="flex-1">
+                                                    @php
+                                                        $nameParts = explode(' - ', $item['name']);
+
+                                                        // Hapus prefix 'DS' jika ada di awal nama
+                                                        if (
+                                                            isset($nameParts[0]) &&
+                                                            trim(strtoupper($nameParts[0])) === 'DS'
+                                                        ) {
+                                                            array_shift($nameParts);
+                                                        }
+
+                                                        // Hapus prefix 'HP' di awal (bisa 'HP ' atau 'HP' saja)
+                                                        if (isset($nameParts[0])) {
+                                                            if (trim(strtoupper($nameParts[0])) === 'HP') {
+                                                                array_shift($nameParts);
+                                                            } else {
+                                                                $nameParts[0] = preg_replace(
+                                                                    '/^HP\s+/i',
+                                                                    '',
+                                                                    trim($nameParts[0]),
+                                                                );
+                                                            }
+                                                        }
+
+                                                        $parsedStorage = null;
+                                                        $parsedColor = null;
+
+                                                        if (count($nameParts) >= 3) {
+                                                            // Ambil 2 elemen paling belakang sebagai Color dan Storage
+                                                            $parsedColor = trim(array_pop($nameParts));
+                                                            $parsedStorage = trim(array_pop($nameParts));
+                                                            // Sisanya digabung kembali sebagai Base Name
+                                                            $baseName = trim(implode(' - ', $nameParts));
+                                                        } elseif (count($nameParts) == 2) {
+                                                            // Jika cuma 2 elemen, cek apakah elemen terakhir berupa angka/kapasitas
+                                                            $lastPart = trim($nameParts[1]);
+                                                            if (
+                                                                preg_match(
+                                                                    '/^(\d+(GB|TB)?)$/i',
+                                                                    str_replace(' ', '', $lastPart),
+                                                                )
+                                                            ) {
+                                                                $parsedStorage = trim(array_pop($nameParts));
+                                                                $baseName = trim(implode(' - ', $nameParts));
+                                                            } else {
+                                                                $baseName = trim($item['name']);
+                                                            }
+                                                        } else {
+                                                            $baseName = trim($item['name']);
+                                                        }
+
+                                                        $displayRam = $item['ram'] !== '-' ? $item['ram'] : null;
+                                                        $displayStorage =
+                                                            $item['storage'] !== '-'
+                                                                ? $item['storage']
+                                                                : $parsedStorage;
+                                                        $displayColor =
+                                                            $item['color'] !== '-' ? $item['color'] : $parsedColor;
+                                                    @endphp
+                                                    <h4 class="font-bold text-gray-800 text-sm leading-tight">
+                                                        {{ $baseName }}</h4>
+                                                    <div class="text-xs text-gray-500 mt-1.5 flex flex-wrap gap-1">
+                                                        @if ($displayRam || $displayStorage)
+                                                            <span
+                                                                class="bg-white border border-gray-200 px-2 py-0.5 rounded-md shadow-sm">{{ $displayRam ? $displayRam . ' / ' : '' }}{{ $displayStorage ?? '' }}</span>
+                                                        @endif
+                                                        @if ($displayColor)
+                                                            <span
+                                                                class="bg-white border border-gray-200 px-2 py-0.5 rounded-md shadow-sm">{{ $displayColor }}</span>
+                                                        @endif
+                                                        {{-- @if (!empty($item['condition']))
+                                                            <span
+                                                                class="bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-md font-bold shadow-sm">{{ $item['condition'] }}</span>
+                                                        @endif --}}
+                                                    </div>
+                                                    @if (count($item['serial_numbers']) > 0)
+                                                        <div class="mt-2 flex flex-wrap gap-1">
+                                                            @foreach ($item['serial_numbers'] as $sn)
+                                                                <span
+                                                                    class="text-[10px] font-mono bg-blue-50/50 border border-blue-100 text-blue-600 px-1.5 py-0.5 rounded">{{ $sn }}</span>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                                <div class="text-right">
+                                                    <div class="font-black text-gray-800 text-sm">Rp
+                                                        {{ number_format($item['price'], 0, ',', '.') }}</div>
+                                                    <div class="text-xs font-bold text-gray-400 mt-0.5">
+                                                        {{ $item['qty'] }} x</div>
+                                                    @if (isset($item['discount_amount']) && $item['discount_amount'] > 0)
+                                                        <div class="text-xs text-rose-500 font-bold mt-1">- Rp
+                                                            {{ number_format($item['discount_amount'], 0, ',', '.') }}
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @empty
+                                            <div class="text-center py-2 text-gray-400 text-sm font-medium">Keranjang
+                                                kosong</div>
+                                        @endforelse
+                                    </div>
+                                </div>
+
+                                {{-- Informasi Pembayaran --}}
+                                <div>
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Metode
+                                        Pembayaran</h4>
+                                    <div class="bg-white border border-gray-100 rounded-xl p-4 shadow-sm space-y-3">
+                                        @if ($paymentMode === 'split')
+                                            @foreach ($payments as $payment)
+                                                @php
+                                                    $pmObj = \App\Models\PaymentMethod::find(
+                                                        $payment['payment_method_id'] ?? null,
+                                                    );
+                                                @endphp
+                                                <div class="flex justify-between items-center text-sm">
+                                                    <div class="flex items-center gap-2">
+                                                        <span
+                                                            class="w-2 h-2 rounded-full {{ $payment['category'] === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
+                                                        <span
+                                                            class="text-gray-600 font-bold">{{ $pmObj->name ?? $payment['category'] }}</span>
+                                                    </div>
+                                                    <span class="font-black text-gray-800">Rp
+                                                        {{ number_format($payment['amount'], 0, ',', '.') }}</span>
+                                                </div>
+                                            @endforeach
+                                        @else
+                                            @php
+                                                $payment = $payments[0] ?? [];
+                                                $pmObj = \App\Models\PaymentMethod::find(
+                                                    $payment['payment_method_id'] ?? null,
+                                                );
+                                                $methodName = $pmObj
+                                                    ? $pmObj->name
+                                                    : $payment['category'] ?? 'Belum dipilih';
+                                            @endphp
+                                            <div class="flex justify-between items-center text-sm">
+                                                <div class="flex items-center gap-2">
+                                                    <span
+                                                        class="w-2 h-2 rounded-full {{ ($payment['category'] ?? '') === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
+                                                    <span class="text-gray-600 font-bold">{{ $methodName }}</span>
+                                                </div>
+                                                <span class="font-black text-gray-800">Rp
+                                                    {{ number_format($payment['amount'] ?? 0, 0, ',', '.') }}</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                {{-- Rincian Tagihan --}}
+                                <div>
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Rincian
+                                        Tagihan</h4>
+                                    <div class="bg-[#1c69d4]/5 rounded-xl p-4 border border-[#1c69d4]/10 space-y-2">
+                                        <div class="flex justify-between items-center text-sm">
+                                            <span class="text-gray-600 font-medium">Subtotal</span>
+                                            <span class="font-bold text-gray-800">Rp
+                                                {{ number_format($this->subtotal, 0, ',', '.') }}</span>
+                                        </div>
+                                        @if ($this->itemDiscountTotal > 0)
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-500">Diskon Item</span>
+                                                <span class="font-medium text-rose-400">- Rp
+                                                    {{ number_format($this->itemDiscountTotal, 0, ',', '.') }}</span>
+                                            </div>
+                                        @endif
+                                        @if ($this->promoDiscountTotal > 0)
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-500">Promo</span>
+                                                <span class="font-medium text-rose-400">- Rp
+                                                    {{ number_format($this->promoDiscountTotal, 0, ',', '.') }}</span>
+                                            </div>
+                                        @endif
+                                        <div class="flex justify-between items-center text-sm">
+                                            <span class="text-gray-600 font-medium">Total Diskon</span>
+                                            <span class="font-bold text-rose-500">- Rp
+                                                {{ number_format($this->totalDiscount, 0, ',', '.') }}</span>
+                                        </div>
+                                        <div class="border-t border-[#1c69d4]/20 my-2 pt-2">
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-gray-800 font-black">Grand Total</span>
+                                                <span class="font-black text-2xl text-[#1c69d4]">Rp
+                                                    {{ number_format(max(0, $this->subtotal - $this->totalDiscount), 0, ',', '.') }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Footer --}}
+                            <div
+                                class="px-6 py-4 border-t border-gray-100 bg-white flex justify-end gap-3 rounded-b-2xl sticky bottom-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                                <button type="button" @click="showConfirmModal = false"
+                                    class="px-5 py-2.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-all">
+                                    Batal
+                                </button>
+                                <button type="button" wire:click="processPayment" @click="showConfirmModal = false"
+                                    class="px-6 py-2.5 bg-[#1c69d4] hover:bg-blue-700 text-white font-black rounded-xl shadow-md shadow-blue-500/30 transition-all flex items-center gap-2">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Konfirmasi & Bayar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
     </div>

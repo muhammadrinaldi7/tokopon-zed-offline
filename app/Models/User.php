@@ -47,6 +47,14 @@ class User extends Authenticatable implements HasMedia
         return $this->business_unit_id;
     }
 
+    public function getActiveBusinessUnit()
+    {
+        if ($this->hasAnyRole(['superadmin', 'admin', 'director'])) {
+            return BusinessUnit::find($this->getActiveBusinessUnitId());
+        }
+        return $this->business_unit;
+    }
+
     public function accurateCustomers()
     {
         return $this->hasMany(UserAccurateCustomer::class);

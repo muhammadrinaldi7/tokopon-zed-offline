@@ -102,20 +102,70 @@
 
                             {{-- Kiri: Info Produk & Diskon --}}
                             <div class="flex-1 space-y-3">
+                                @php
+                                    $nameParts = explode(' - ', $item['name']);
+                                    
+                                    // Hapus prefix 'DS' jika ada di awal nama
+                                    if (isset($nameParts[0]) && trim(strtoupper($nameParts[0])) === 'DS') {
+                                        array_shift($nameParts);
+                                    }
+
+                                    // Hapus prefix 'HP' di awal (bisa 'HP ' atau 'HP' saja)
+                                    if (isset($nameParts[0])) {
+                                        if (trim(strtoupper($nameParts[0])) === 'HP') {
+                                            array_shift($nameParts);
+                                        } else {
+                                            $nameParts[0] = preg_replace('/^HP\s+/i', '', trim($nameParts[0]));
+                                        }
+                                    }
+                                    
+                                    $parsedStorage = null;
+                                    $parsedColor = null;
+                                    
+                                    if (count($nameParts) >= 3) {
+                                        $parsedColor = trim(array_pop($nameParts));
+                                        $parsedStorage = trim(array_pop($nameParts));
+                                        $baseName = trim(implode(' - ', $nameParts));
+                                    } elseif (count($nameParts) == 2) {
+                                        $lastPart = trim($nameParts[1]);
+                                        if (preg_match('/^(\d+(GB|TB)?)$/i', str_replace(' ', '', $lastPart))) {
+                                            $parsedStorage = trim(array_pop($nameParts));
+                                            $baseName = trim(implode(' - ', $nameParts));
+                                        } else {
+                                            $baseName = trim($item['name']);
+                                        }
+                                    } else {
+                                        $baseName = trim($item['name']);
+                                    }
+                                    
+                                    $displayRam = $item['ram'] !== '-' ? $item['ram'] : null;
+                                    $displayStorage = $item['storage'] !== '-' ? $item['storage'] : $parsedStorage;
+                                    $displayColor = $item['color'] !== '-' ? $item['color'] : $parsedColor;
+                                @endphp
                                 <div>
                                     <div class="flex items-center gap-2 mb-1">
                                         <h4 class="font-bold text-gray-900 text-lg leading-tight pr-8 lg:pr-0">
-                                            {{ $item['name'] }}</h4>
+                                            {{ $baseName }}</h4>
                                         @if ($item['is_second'])
                                             <span
                                                 class="px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 uppercase tracking-widest shrink-0">Second</span>
                                         @endif
                                     </div>
-                                    <div class="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-500">
-                                        <span>{{ $item['storage'] }} / {{ $item['ram'] }}</span>
-                                        <span class="w-1 h-1 rounded-full bg-gray-300"></span>
-                                        <span>{{ $item['color'] }}</span>
-                                    </div>
+                                    @if ($displayRam || $displayStorage || $displayColor)
+                                        <div class="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-500">
+                                            @if ($displayRam || $displayStorage)
+                                                <span>{{ $displayRam ? $displayRam . ' / ' : '' }}{{ $displayStorage ?? '' }}</span>
+                                            @endif
+                                            
+                                            @if (($displayRam || $displayStorage) && $displayColor)
+                                                <span class="w-1 h-1 rounded-full bg-gray-300"></span>
+                                            @endif
+                                            
+                                            @if ($displayColor)
+                                                <span>{{ $displayColor }}</span>
+                                            @endif
+                                        </div>
+                                    @endif
                                 </div>
 
                                 {{-- MANUAL DISCOUNT PRESETS --}}

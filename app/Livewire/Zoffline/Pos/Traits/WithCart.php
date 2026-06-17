@@ -81,41 +81,70 @@ trait WithCart
 
         $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
         $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+        $buName = Auth::user()->getActiveBusinessUnit()->code;
+        // 1. Cek dulu ke Accurate Service
+        $accurateService = app(\App\Services\AccurateService::class);
+        $skuFromAccurate = $accurateService->findSkuBySerialNumber($sn, $buName);
 
-        // 1. Cek di tabel SN (Barang dengan IMEI)
-        $localSnRecord = \App\Models\ProductSerialNumber::where('serial_number', $sn)
-            ->whereHas('productAccurate', function ($q) use ($buId) {
-                $q->where(function ($q2) use ($buId) {
-                    $q2->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
-                });
-            })
-            ->first();
-
-        if ($localSnRecord) {
-            // Validasi Gudang
-            if ($localSnRecord->warehouse_id != $warehouseId) {
-                $actualWarehouseName = \App\Models\Warehouse::where('id', $localSnRecord->warehouse_id)->value('name');
-                $warehouseTarget = $actualWarehouseName ?? 'Gudang Lain';
-                $this->dispatch('toast', title: 'Gagal', message: "Serial Number '{$sn}' ada di gudang {$warehouseTarget}. Silahkan lakukan pemindahan barang di accurate.", type: 'error');
-                $this->scanned_sn = '';
-                return;
-            }
-
-            // SN Valid dan Gudang Cocok. Ambil ProductAccurate
-            $productAccurate = \App\Models\ProductAccurate::where('item_no', $localSnRecord->item_no)->first();
-            
-            // Cek Riwayat QC (SellPhone)
-            $qcData = \App\Models\SellPhone::where('imei', $sn)->first();
-            $condition = $qcData ? $qcData->minus_desc : 'Bagus / Mulus';
-            $buyPrice = $qcData ? $qcData->appraised_value : $localSnRecord->hpp;
-            $isSecond = ($qcData !== null);
-
-            $this->addScannedAccurateToCart($productAccurate, $sn, 1, $isSecond, $condition);
+        if ($skuFromAccurate === 'error') {
+            $this->dispatch('toast', title: 'Warning', message: 'Koneksi ke Accurate bermasalah, mencoba pengecekan lokal.', type: 'warning');
+        } else if ($skuFromAccurate === null) {
+            $this->dispatch('toast', title: 'Gagal', message: "Barcode / SN '{$sn}' tidak ditemukan di Accurate.", type: 'error');
             $this->scanned_sn = '';
             return;
         }
 
-        // 2. Jika bukan SN, coba cari sebagai SKU (Untuk Non-SN/Aksesoris)
+        // Cek apakah hasil Accurate terkonfirmasi sebagai Serial Number yang valid
+        $isConfirmedSn = ($skuFromAccurate && $skuFromAccurate !== 'invalid_type' && $skuFromAccurate !== 'error');
+
+        // 2. Jika valid SN atau sedang offline (error), coba cari di tabel SN lokal
+        if ($isConfirmedSn || $skuFromAccurate === 'error') {
+            // Cari data SN secara global tanpa memfilter Business Unit (BU) ID terlebih dahulu
+            $localSnRecordGlobal = \App\Models\ProductSerialNumber::with('productAccurate')
+                ->where('serial_number', $sn)
+                ->first();
+
+            if ($localSnRecordGlobal) {
+                // Cek apakah Business Unit (BU) Sesuai
+                $productBuId = $localSnRecordGlobal->productAccurate->business_unit_id ?? null;
+
+                if ($productBuId !== null && $productBuId != $buId) {
+                    // SN Terdaftar tapi milik Business Unit (Cabang) lain
+                    $this->dispatch('toast', title: 'Gagal', message: "Serial Number '{$sn}' terdaftar untuk Business Unit / Cabang lain.", type: 'error');
+                    $this->scanned_sn = '';
+                    return;
+                }
+
+                // BU Sesuai, lanjut Validasi Gudang
+                if ($localSnRecordGlobal->warehouse_id != $warehouseId) {
+                    $actualWarehouseName = \App\Models\Warehouse::where('id', $localSnRecordGlobal->warehouse_id)->value('name');
+                    $warehouseTarget = $actualWarehouseName ?? 'Gudang Lain';
+                    $this->dispatch('toast', title: 'Gagal', message: "Serial Number '{$sn}' ada di gudang {$warehouseTarget}. Silahkan lakukan pemindahan barang di accurate.", type: 'error');
+                    $this->scanned_sn = '';
+                    return;
+                }
+
+                // SN Valid, BU Cocok, dan Gudang Cocok. Ambil ProductAccurate
+                $productAccurate = $localSnRecordGlobal->productAccurate;
+
+                // Cek Riwayat QC (SellPhone)
+                $qcData = \App\Models\SellPhone::where('imei', $sn)->first();
+                $condition = $qcData ? $qcData->minus_desc : 'Bagus / Mulus';
+                $buyPrice = $qcData ? $qcData->appraised_value : $localSnRecordGlobal->hpp;
+                $isSecond = ($qcData !== null);
+
+                $this->addScannedAccurateToCart($productAccurate, $sn, 1, $isSecond, $condition);
+                $this->scanned_sn = '';
+                return;
+            } else if ($isConfirmedSn) {
+                // SN valid di Accurate tapi belum tersinkron di tabel lokal sama sekali.
+                $this->dispatch('toast', title: 'Gagal', message: "Serial Number '{$sn}' terdaftar di Accurate, namun belum tersinkronisasi di sistem lokal. Pastikan sudah di-receive atau di-transfer ke sistem.", type: 'error');
+                $this->scanned_sn = '';
+                return;
+            }
+        }
+
+        // 3. Jika bukan SN (invalid_type) atau error tapi tidak ketemu di lokal, cari sebagai SKU
         $productAccurate = \App\Models\ProductAccurate::where('item_no', $sn)
             ->where(function ($q) use ($buId) {
                 $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
@@ -130,10 +159,13 @@ trait WithCart
                 return;
             }
 
-            // Karena kita bypass tabel produk/varian lokal, kita gunakan stok global dari Accurate 
-            // ATAU kita asumsikan jika fisik ada untuk di-scan, maka stok ada.
-            // Kita ambil base stock dari ProductAccurate
-            $stock = $productAccurate->stock > 0 ? $productAccurate->stock : 999; // Allow POS to scan if physically present
+            $stock = (int) $productAccurate->stock;
+
+            if ($stock <= 0) {
+                $this->dispatch('toast', title: 'Stok Kosong', message: "Stok untuk produk '{$productAccurate->name}' saat ini habis (0).", type: 'error');
+                $this->scanned_sn = '';
+                return;
+            }
 
             $this->addScannedAccurateToCart($productAccurate, null, $stock, false, 'Bagus / Mulus');
             $this->scanned_sn = '';
@@ -164,7 +196,7 @@ trait WithCart
                     }
                     $this->cart[$existingIndex]['serial_numbers'][] = $sn;
                 }
-                
+
                 $this->cart[$existingIndex]['qty']++;
                 $this->dispatch('toast', title: 'Sukses', message: 'Kuantitas ditambah.', type: 'success');
             } else {
@@ -406,7 +438,7 @@ trait WithCart
         $value = trim($this->new_sns[$index] ?? '');
 
         if (isset($this->cart[$index]) && !empty($value)) {
-            
+
             $currentSns = $this->cart[$index]['serial_numbers'] ?? [];
             if (count($currentSns) >= $this->cart[$index]['qty']) {
                 $this->dispatch('toast', title: 'Peringatan', message: 'Jumlah SN sudah memenuhi Kuantitas (Qty).', type: 'warning');
