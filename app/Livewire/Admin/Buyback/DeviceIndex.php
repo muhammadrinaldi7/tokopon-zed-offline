@@ -13,7 +13,14 @@ class DeviceIndex extends Component
     public $editingDeviceId = null;
     public $editModelName = '';
     public $editBasePrice = 0;
+    public $editRam = '';
+    public $editStorage = '';
     public $editIsActive = true;
+
+    // Sync Master Data
+    public $showSyncAccurateModal = false;
+    public $syncTargetBuId = null;
+    public $syncKeyword = '';
 
     public function editDevice($id)
     {
@@ -21,6 +28,8 @@ class DeviceIndex extends Component
         if ($device) {
             $this->editingDeviceId = $id;
             $this->editModelName = $device->model_name;
+            $this->editRam = $device->ram ?? '';
+            $this->editStorage = $device->storage ?? '';
             $this->editBasePrice = $device->base_price;
             $this->editIsActive = $device->is_active;
             $this->showEditModal = true;
@@ -32,12 +41,16 @@ class DeviceIndex extends Component
         $this->validate([
             'editModelName' => 'required|string|max:255',
             'editBasePrice' => 'required|numeric|min:0',
+            'editRam' => 'nullable|string|max:255',
+            'editStorage' => 'nullable|string|max:255',
         ]);
 
         $device = BuybackDevice::find($this->editingDeviceId);
         if ($device) {
             $device->update([
                 'model_name' => $this->editModelName,
+                'ram' => $this->editRam,
+                'storage' => $this->editStorage,
                 'base_price' => $this->editBasePrice,
                 'is_active' => $this->editIsActive,
             ]);
@@ -73,35 +86,88 @@ class DeviceIndex extends Component
         );
     }
 
-    public function syncFromSecondCatalog()
+    public function openSyncAccurateModal()
     {
-        $variants = \App\Models\SecondProductVariant::with('secondProduct')->get();
+        $this->syncTargetBuId = \App\Models\BusinessUnit::first()->id ?? null;
+        $this->syncKeyword = '';
+        $this->showSyncAccurateModal = true;
+    }
+
+    public function processSyncAccurate()
+    {
+        $query = \App\Models\ProductAccurate::query();
+
+        if ($this->syncTargetBuId) {
+            $query->where('business_unit_id', $this->syncTargetBuId);
+            $query->where('categoryName', 'HandPhone');
+        }
+
+        if (!empty($this->syncKeyword)) {
+            $query->where(function ($q) {
+                $q->where('name', 'like', '%' . $this->syncKeyword . '%')
+                    ->orWhere('item_no', 'like', '%' . $this->syncKeyword . '%');
+            });
+        }
+
+        $products = $query->get();
         $count = 0;
 
-        foreach ($variants as $variant) {
-            if (!$variant->secondProduct) continue;
+        foreach ($products as $prod) {
+            // Jangan sinkronisasi jika sudah ada
+            $existing = BuybackDevice::where('product_accurate_id', $prod->id)
+                ->orWhere('model_name', $prod->name)
+                ->first();
 
-            $existing = BuybackDevice::where('second_product_variant_id', $variant->id)->first();
             if (!$existing) {
+                // Coba cocokan Brand atau buat baru
+                $brandId = null;
+                $brandName = trim($prod->brandName);
+
+                if (empty($brandName)) {
+                    $brandName = 'Lainnya'; // Fallback jika kosong
+                }
+
+                // Cari brand atau buat baru jika belum ada berdasarkan slug
+                $slug = \Illuminate\Support\Str::slug($brandName);
+                $brand = \App\Models\Brand::firstOrCreate(
+                    ['slug' => $slug],
+                    ['name' => ucwords(strtolower($brandName))]
+                );
+                $brandId = $brand->id;
+
                 BuybackDevice::create([
-                    'brand_id' => $variant->secondProduct->brand_id,
-                    'second_product_variant_id' => $variant->id,
-                    'model_name' => $variant->secondProduct->name,
-                    'ram' => $variant->ram,
-                    'storage' => $variant->storage,
-                    'base_price' => 0, // Set 0 agar staf mengisi manual
-                    'is_active' => true,
+                    'brand_id'            => $brandId,
+                    'product_accurate_id' => $prod->id,
+                    'model_name'          => $prod->name,
+                    'ram'                 => null,
+                    'storage'             => '-', // Default
+                    'base_price'          => $prod->base_price ?? 0,
+                    'is_active'           => true,
                 ]);
+
                 $count++;
             }
         }
 
+        // Auto assign tier untuk semua data
+        $this->syncTierDeviceSilently();
+
+        $this->showSyncAccurateModal = false;
+
         $this->dispatch(
             'toast',
-            title: 'Sinkronisasi Berhasil',
-            message: "Berhasil menambahkan {$count} perangkat baru dari Katalog Second.",
+            title: 'Sinkronisasi Selesai',
+            message: "Berhasil menambahkan {$count} perangkat baru dari Master Data Accurate.",
             type: 'success'
         );
+    }
+
+    public function syncTierDeviceSilently()
+    {
+        $devices = BuybackDevice::whereNotNull('base_price')->where('base_price', '>', 0)->get();
+        foreach ($devices as $device) {
+            $device->assignTierByPrice();
+        }
     }
     public function render()
     {

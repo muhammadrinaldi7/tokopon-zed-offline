@@ -35,7 +35,7 @@
                     <th class="p-4">Nama Metode</th>
                     <th class="p-4">Detail Rekening</th>
                     {{-- <th class="p-4">MDR (%)</th> --}}
-                    <th class="p-4">Accurate Bank No</th>
+                    <th class="p-4">Kategori</th>
                     <th class="p-4 text-center">Unit Usaha</th>
                     <th class="p-4 text-center">Status</th>
                     <th class="p-4 text-right">Aksi</th>
@@ -48,29 +48,28 @@
                             <p class="font-bold text-gray-900">{{ $method->name }}</p>
                         </td>
                         <td class="p-4">
-                            @if ($method->bank_name || $method->account_number)
-                                <p class="text-sm font-bold text-gray-800">{{ $method->bank_name }}</p>
+                            @if($method->category === 'NON-TUNAI')
+                                <p class="text-sm font-bold text-gray-800">{{ $method->bank_name ?: 'Belum diset' }}</p>
                                 <p class="text-sm text-gray-500 font-mono mt-0.5">{{ $method->account_number }}</p>
-                                <p class="text-xs text-gray-400 mt-0.5 uppercase tracking-wide">a.n
-                                    {{ $method->account_owner }}</p>
+                                <p class="text-xs text-gray-400 mt-0.5 uppercase tracking-wide">a.n {{ $method->account_owner }}</p>
                             @else
-                                <span class="text-sm text-gray-400 italic">Kas Tunai / Bebas</span>
+                                <span class="text-sm text-gray-400 italic">Akun Tunai / Barter</span>
                             @endif
                         </td>
-                        {{-- <td class="p-4">
-                            <span class="font-bold text-gray-900">{{ $method->mdr_percentage }}%</span>
-                        </td> --}}
                         <td class="p-4">
-                            <span
-                                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                <svg class="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
-                                {{ $method->accurate_bank_no }}
+                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-bold {{ $method->category === 'TUNAI' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200' }} border">
+                                {{ $method->category }}
                             </span>
+                            <div class="mt-1">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <svg class="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    </svg>
+                                    GL: {{ $method->accurate_bank_no }}
+                                </span>
+                            </div>
                         </td>
+
                         <td class="p-4 text-center">
                             <span class="px-2 py-1 text-[10px] font-bold bg-blue-50 text-blue-600 rounded">
                                 {{ $method->businessUnit ? $method->businessUnit->name : 'N/A' }}
@@ -140,13 +139,23 @@
                 </div>
 
                 <div class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Kategori Pembayaran <span class="text-rose-500">*</span></label>
+                        <select wire:model.live="category" class="w-full p-2 border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm">
+                            <option value="NON-TUNAI">NON-TUNAI (Bank, Finance, EDC, Transfer)</option>
+                            <option value="TUNAI">TUNAI (Kas Tunai, Tukar Tambah)</option>
+                        </select>
+                        @error('category') <span class="text-xs text-rose-500 mt-1">{{ $message }}</span> @enderror
+                    </div>
+
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1">Nama Tampilan <span
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Nama Metode (Level 2) <span
                                     class="text-rose-500">*</span></label>
+                            <p class="text-[10px] text-gray-500 leading-tight mb-1">Contoh: Transfer, QRIS, EDC Debit. Muncul di Kasir setelah grup dipilih.</p>
                             <input type="text" wire:model="name"
                                 class="w-full p-2 border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm"
-                                placeholder="Contoh: BCA Manual, Kasir Tunai, dll">
+                                placeholder="Contoh: Transfer BCA">
                             @error('name')
                                 <span class="text-xs text-rose-500 mt-1">{{ $message }}</span>
                             @enderror
@@ -167,27 +176,32 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1">Nama Bank (Opsional)</label>
+                    @if($category === 'NON-TUNAI')
+                        <div class="p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                            <label class="block text-sm font-bold text-blue-900 mb-1">Grup POS (Level 1)</label>
+                            <p class="text-[10px] text-blue-700 leading-tight mb-2">Contoh: BCA, Mandiri, Home Credit. Ini akan jadi menu kontak pertama di Kasir POS (mengelompokkan bank).</p>
                             <input type="text" wire:model="bank_name"
-                                class="w-full p-2 border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm"
-                                placeholder="Contoh: BCA">
+                                class="w-full p-2 border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm bg-white"
+                                placeholder="Ketik nama grup (Contoh: BCA)">
                         </div>
-                        <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1">Atas Nama (Opsional)</label>
-                            <input type="text" wire:model="account_owner"
-                                class="w-full p-2 border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm"
-                                placeholder="Contoh: PT TokoPun">
-                        </div>
-                    </div>
 
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1">Nomor Rekening (Opsional)</label>
-                        <input type="text" wire:model="account_number"
-                            class="w-full p-2 border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm font-mono"
-                            placeholder="1234567890">
-                    </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Nomor Rekening (Opsional)</label>
+                                <input type="text" wire:model="account_number"
+                                    class="w-full p-2 border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm font-mono"
+                                    placeholder="1234567890">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Atas Nama (Opsional)</label>
+                                <input type="text" wire:model="account_owner"
+                                    class="w-full p-2 border-gray-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm"
+                                    placeholder="Contoh: PT TokoPun">
+                            </div>
+                        </div>
+                    @endif
+
+
 
                     {{-- <div>
                         <label class="block text-sm font-bold text-gray-700 mb-1">Beban MDR (%) <span
@@ -251,8 +265,8 @@
                     <div>
                         <h3 class="font-bold text-lg text-gray-900">Kelola Tarif MDR -
                             {{ $selectedPaymentMethodForRates->name }}</h3>
-                        <p class="text-xs text-gray-400">Atur tarif MDR khusus kartu debit/kredit/cicilan untuk EDC
-                            ini.</p>
+                        <p class="text-xs text-blue-600 font-bold mt-1 bg-blue-50 px-2 py-1 rounded inline-block">INFO PENTING: Ini adalah LEVEL 3 di Kasir.</p>
+                        <p class="text-xs text-gray-500 mt-1">Tambahkan varian tarif (contoh: Akrilik, Mesin EDC, Cicilan 3x) yang akan dipilih kasir pada tahap akhir POS.</p>
                     </div>
                     <button wire:click="$set('showRatesModal', false)" class="text-gray-400 hover:text-gray-600">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"

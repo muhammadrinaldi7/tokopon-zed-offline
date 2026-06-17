@@ -6,6 +6,8 @@
                 <h2 class="text-2xl font-black text-gray-800">
                     @if ($paymentWizardStep === 1)
                         Pilih Mode Pembayaran
+                    @elseif($paymentWizardStep == 1.5)
+                        Pilih Grup Bank
                     @elseif($paymentWizardStep === 2)
                         Pilih Metode Pembayaran
                     @elseif($paymentWizardStep === 3)
@@ -95,11 +97,57 @@
                         </div>
                     </button>
                 </div>
+            @elseif($paymentWizardStep == 1.5)
+                {{-- STEP 1.5: PILIH GRUP BANK (HANYA NON-TUNAI) --}}
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    @forelse ($this->nonCashBankGroups as $group)
+                        @php
+                            $imageName = strtolower(str_replace(' ', '', $group)) . '.png';
+                            $imagePath = public_path('assets/png/paymentmethod/' . $imageName);
+                            $hasImage = file_exists($imagePath);
+                        @endphp
+                        <button wire:click="selectBankGroup('{{ addslashes($group) }}')"
+                            class="p-6 bg-white shadow-sm border-2 border-gray-100 rounded-2xl hover:border-[#1c69d4] hover:shadow-md transition-all flex flex-col items-center justify-center gap-4 group">
+
+                            @if ($hasImage)
+                                <div class="h-16 w-full flex items-center justify-center">
+                                    <img src="{{ asset('assets/png/paymentmethod/' . $imageName) }}"
+                                        alt="{{ $group }}"
+                                        class="max-h-full max-w-full object-contain filter group-hover:brightness-110 transition-all">
+                                </div>
+                            @else
+                                <div
+                                    class="w-16 h-16 bg-gray-50 border border-gray-100 rounded-full flex items-center justify-center text-gray-400 group-hover:text-[#1c69d4] group-hover:bg-blue-50 group-hover:border-blue-200 transition-all font-black text-xl">
+                                    {{ strtoupper(substr($group, 0, 2)) }}
+                                </div>
+                                <div class="text-center">
+                                    <span
+                                        class="font-bold text-sm text-gray-700 group-hover:text-[#1c69d4] transition-colors">{{ $group }}</span>
+                                </div>
+                            @endif
+                        </button>
+                    @empty
+                        <div
+                            class="col-span-full p-8 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                            <p class="text-gray-500 font-bold">Belum ada grup bank metode Non-Tunai yang aktif.</p>
+                        </div>
+                    @endforelse
+                </div>
             @elseif($paymentWizardStep === 2)
                 {{-- STEP 2: PILIHAN METODE (KAS/BANK) --}}
                 @php
-                    $cat = $payments[$activePaymentIndex]['category'] ?? '';
-                    $methods = $cat === 'TUNAI' ? $this->cashPaymentMethods : $this->nonCashPaymentMethods;
+                    $paymentInfo = $payments[$activePaymentIndex] ?? [];
+                    $cat = $paymentInfo['category'] ?? '';
+                    $selectedBank = $paymentInfo['bank_name'] ?? '';
+
+                    if ($cat === 'TUNAI') {
+                        $methods = $this->cashPaymentMethods;
+                    } else {
+                        // Filter Non-Tunai by selected bank group
+                        $methods = collect($this->nonCashPaymentMethods)->filter(function ($m) use ($selectedBank) {
+                            return $m->bank_name === $selectedBank;
+                        });
+                    }
                 @endphp
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     @foreach ($methods as $method)

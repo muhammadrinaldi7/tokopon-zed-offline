@@ -12,6 +12,7 @@ trait WithPaymentAndPromo
     public $payments = [
         [
             'category' => '', // 'TUNAI' or 'NON-TUNAI'
+            'bank_name' => '', // Selected Bank Group (e.g. BCA, QRIS)
             'payment_method_id' => '',
             'payment_method_rate_id' => '',
             'no_kontrak' => '',
@@ -34,6 +35,7 @@ trait WithPaymentAndPromo
             $this->payments = [
                 [
                     'category' => 'TUNAI',
+                    'bank_name' => '',
                     'payment_method_id' => '',
                     'payment_method_rate_id' => '',
                     'no_kontrak' => '',
@@ -41,11 +43,12 @@ trait WithPaymentAndPromo
                 ]
             ];
             $this->activePaymentIndex = 0;
-            $this->paymentWizardStep = 2;
+            $this->paymentWizardStep = 2; // Langsung pilih Kas Tunai
         } elseif ($mode === 'non-tunai') {
             $this->payments = [
                 [
                     'category' => 'NON-TUNAI',
+                    'bank_name' => '',
                     'payment_method_id' => '',
                     'payment_method_rate_id' => '',
                     'no_kontrak' => '',
@@ -53,7 +56,7 @@ trait WithPaymentAndPromo
                 ]
             ];
             $this->activePaymentIndex = 0;
-            $this->paymentWizardStep = 2;
+            $this->paymentWizardStep = 1.5; // Pilih Bank Group dulu
         } elseif ($mode === 'split') {
             $this->payments = [];
             $this->paymentWizardStep = 'split_dashboard';
@@ -65,13 +68,25 @@ trait WithPaymentAndPromo
         $remaining = max(0, ($this->subtotal() - (int)$this->totalDiscount()) - $this->paymentsTotalBase());
         $this->payments[] = [
             'category' => $category,
+            'bank_name' => '',
             'payment_method_id' => '',
             'payment_method_rate_id' => '',
             'no_kontrak' => '',
             'amount' => $remaining,
         ];
         $this->activePaymentIndex = count($this->payments) - 1;
-        $this->paymentWizardStep = 2;
+        
+        if ($category === 'NON-TUNAI') {
+            $this->paymentWizardStep = 1.5; // Pilih Bank Group dulu
+        } else {
+            $this->paymentWizardStep = 2; // Langsung pilih metode Tunai
+        }
+    }
+
+    public function selectBankGroup($bankName)
+    {
+        $this->payments[$this->activePaymentIndex]['bank_name'] = $bankName;
+        $this->paymentWizardStep = 2; // Lanjut ke pemilihan metode
     }
 
     public function selectPaymentMethod($methodId)
@@ -93,8 +108,24 @@ trait WithPaymentAndPromo
         if ($this->paymentWizardStep === 3) {
             $this->paymentWizardStep = 2;
         } elseif ($this->paymentWizardStep === 2) {
+            $cat = $this->payments[$this->activePaymentIndex]['category'] ?? '';
+            if ($cat === 'NON-TUNAI') {
+                $this->payments[$this->activePaymentIndex]['bank_name'] = '';
+                $this->paymentWizardStep = 1.5; // Mundur ke Pilih Bank Group
+            } else {
+                if ($this->paymentMode === 'split') {
+                    if (empty($this->payments[$this->activePaymentIndex]['payment_method_id'])) {
+                        unset($this->payments[$this->activePaymentIndex]);
+                        $this->payments = array_values($this->payments);
+                    }
+                    $this->paymentWizardStep = 'split_dashboard';
+                } else {
+                    $this->paymentMode = null;
+                    $this->paymentWizardStep = 1;
+                }
+            }
+        } elseif ($this->paymentWizardStep == 1.5) {
             if ($this->paymentMode === 'split') {
-                // Remove the row if it's new and cancelled
                 if (empty($this->payments[$this->activePaymentIndex]['payment_method_id'])) {
                     unset($this->payments[$this->activePaymentIndex]);
                     $this->payments = array_values($this->payments);
@@ -153,6 +184,7 @@ trait WithPaymentAndPromo
         $remaining = max(0, ($this->subtotal() - (int)$this->totalDiscount()) - $this->paymentsTotalBase());
         $this->payments[] = [
             'category' => '',
+            'bank_name' => '',
             'payment_method_id' => '',
             'payment_method_rate_id' => '',
             'no_kontrak' => '',
@@ -232,5 +264,16 @@ trait WithPaymentAndPromo
                     ->orWhereNull('business_unit_id');
             })
             ->get();
+    }
+
+    #[Computed]
+    public function nonCashBankGroups()
+    {
+        return $this->nonCashPaymentMethods()
+            ->pluck('bank_name')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
     }
 }

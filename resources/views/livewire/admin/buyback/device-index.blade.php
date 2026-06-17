@@ -5,22 +5,21 @@
             <p class="text-sm text-gray-500 mt-1">Kelola data harga dasar HP untuk fitur Tukar Tambah & Jual HP.</p>
         </div>
         <div class="flex items-center gap-3">
-            <button wire:click="syncFromSecondCatalog" wire:loading.attr="disabled"
-                class="flex items-center gap-2 bg-[#f59e0b] hover:bg-[#d97706] text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all">
-                <svg wire:loading.remove wire:target="syncFromSecondCatalog" class="w-4 h-4" fill="none"
+            <button wire:click="openSyncAccurateModal" wire:loading.attr="disabled"
+                class="flex items-center gap-2 bg-[#f59e0b] hover:bg-[#d97706] text-white px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all">
+                <svg wire:loading.remove wire:target="openSyncAccurateModal" class="w-4 h-4" fill="none"
                     stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
-                <svg wire:loading wire:target="syncFromSecondCatalog" class="w-4 h-4 animate-spin" fill="none"
+                <svg wire:loading wire:target="openSyncAccurateModal" class="w-4 h-4 animate-spin" fill="none"
                     viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                        stroke-width="4"></circle>
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor"
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                     </path>
                 </svg>
-                Sync dari Katalog Second
+                Sync Master Accurate
             </button>
             <button wire:click="syncTierDevice" wire:loading.attr="disabled"
                 wire:confirm="Anda yakin ingin menyesuaikan tier semua perangkat dengan aturan harga saat ini?"
@@ -188,6 +187,25 @@
                         @enderror
                     </div>
 
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Kapasitas RAM</label>
+                            <input type="text" wire:model="editRam" placeholder="Cth: 8GB"
+                                class="w-full text-[15px] bg-white/60 border border-gray-200/70 focus:bg-white focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/10 rounded-lg px-4 py-3 shadow-sm transition-all text-gray-800">
+                            @error('editRam')
+                                <span class="text-xs text-rose-500 font-medium mt-1 block">{{ $message }}</span>
+                            @enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Kapasitas Storage</label>
+                            <input type="text" wire:model="editStorage" placeholder="Cth: 256GB"
+                                class="w-full text-[15px] bg-white/60 border border-gray-200/70 focus:bg-white focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/10 rounded-lg px-4 py-3 shadow-sm transition-all text-gray-800">
+                            @error('editStorage')
+                                <span class="text-xs text-rose-500 font-medium mt-1 block">{{ $message }}</span>
+                            @enderror
+                        </div>
+                    </div>
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Harga Dasar Beli (Kondisi
                             Mulus)</label>
@@ -230,6 +248,69 @@
                         <button type="submit"
                             class="flex-1 bg-[#1c69d4] text-white py-3 rounded-lg text-[15px] font-semibold hover:bg-[#3f36b8] hover:shadow-sm hover:shadow-[#1c69d4]/30 active:scale-[0.98] transition-all">
                             Simpan Perubahan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- Sync Accurate Modal --}}
+    @if ($showSyncAccurateModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+            <div wire:click="$set('showSyncAccurateModal', false)" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm"></div>
+
+            <div class="relative transform overflow-hidden rounded-2xl bg-white border border-white shadow-xl text-left w-full max-w-lg">
+                {{-- Header --}}
+                <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900">Sync Master Data Accurate</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">Tarik data item Accurate secara massal menjadi Perangkat Buyback</p>
+                    </div>
+                    <button wire:click="$set('showSyncAccurateModal', false)" class="text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Body --}}
+                <form wire:submit.prevent="processSyncAccurate" class="p-6 space-y-5">
+                    <div class="bg-blue-50 border border-blue-100 p-4 rounded-xl text-sm text-blue-800">
+                        Pilih <strong>Business Unit</strong> target, lalu masukkan kata kunci (misal: <code class="font-bold">Bekas</code> atau <code class="font-bold">iPhone</code>) untuk memfilter produk yang akan ditarik.
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1.5">Target Business Unit</label>
+                        <select wire:model="syncTargetBuId" required class="w-full rounded-lg border-gray-200 py-2.5 focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm text-gray-800">
+                            <option value="">-- Pilih BU --</option>
+                            @foreach(\App\Models\BusinessUnit::all() as $bu)
+                                <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1.5">Kata Kunci Filter (Opsional)</label>
+                        <input type="text" wire:model="syncKeyword" placeholder="Cth: Bekas, Samsung..."
+                            class="w-full rounded-lg border-gray-200 py-2.5 focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm text-gray-800">
+                        <p class="text-xs text-gray-400 mt-1">Kosongkan jika ingin menarik SEMUA item di BU tersebut (Tidak disarankan jika data ribuan).</p>
+                    </div>
+
+                    {{-- Actions --}}
+                    <div class="pt-4 flex gap-3 border-t border-gray-100">
+                        <button type="button" wire:click="$set('showSyncAccurateModal', false)"
+                            class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl text-[15px] font-bold transition-all">
+                            Batal
+                        </button>
+                        <button type="submit" wire:loading.attr="disabled"
+                            class="flex-[2] flex items-center justify-center gap-2 bg-[#f59e0b] text-white py-3 rounded-xl text-[15px] font-bold hover:bg-[#d97706] shadow-sm transition-all">
+                            <svg wire:loading wire:target="processSyncAccurate" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span wire:loading.remove wire:target="processSyncAccurate">Mulai Sinkronisasi Massal</span>
+                            <span wire:loading wire:target="processSyncAccurate">Menyinkronkan...</span>
                         </button>
                     </div>
                 </form>

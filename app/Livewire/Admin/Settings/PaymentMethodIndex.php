@@ -22,6 +22,7 @@ class PaymentMethodIndex extends Component
     public $accurate_bank_no;
     public $mdr_percentage = 0;
     public $is_active = true;
+    public $category = 'NON-TUNAI';
 
     public $businessUnits = [];
     public $activeTab = 'all';
@@ -49,6 +50,7 @@ class PaymentMethodIndex extends Component
         'accurate_bank_no' => 'required|string|max:255',
         'mdr_percentage' => 'required|numeric|min:0|max:100',
         'is_active' => 'boolean',
+        'category' => 'required|in:TUNAI,NON-TUNAI',
     ];
 
     public function mount()
@@ -99,6 +101,7 @@ class PaymentMethodIndex extends Component
         $this->accurate_bank_no = $method->accurate_bank_no;
         $this->mdr_percentage = $method->mdr_percentage;
         $this->is_active = $method->is_active;
+        $this->category = $method->category ?? 'NON-TUNAI';
 
         $this->isEdit = true;
         $this->showModal = true;
@@ -117,6 +120,7 @@ class PaymentMethodIndex extends Component
             'accurate_bank_no' => $this->accurate_bank_no,
             'mdr_percentage' => $this->mdr_percentage,
             'is_active' => $this->is_active,
+            'category' => $this->category,
         ];
 
         if ($this->isEdit) {
@@ -161,6 +165,7 @@ class PaymentMethodIndex extends Component
         $this->accurate_bank_no = '';
         $this->mdr_percentage = 0;
         $this->is_active = true;
+        $this->category = 'NON-TUNAI';
     }
 
     // ─── MDR Rates CRUD ─────────────────────────────────────────
