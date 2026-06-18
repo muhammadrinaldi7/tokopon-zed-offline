@@ -179,11 +179,12 @@ trait WithCart
 
         $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
         $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
-        $buName = Auth::user()->getActiveBusinessUnit()->code;
+
+        $activeBu = Auth::user()->getActiveBusinessUnit();
+        $buName = $activeBu ? $activeBu->code : 'second'; // Default ke syihab jika null
         // 1. Cek dulu ke Accurate Service
         $accurateService = app(\App\Services\AccurateService::class);
         $skuFromAccurate = $accurateService->findSkuBySerialNumber($sn, $buName);
-
         if ($skuFromAccurate === 'error') {
             $this->dispatch('toast', title: 'Warning', message: 'Koneksi ke Accurate bermasalah, mencoba pengecekan lokal.', type: 'warning');
         } else if ($skuFromAccurate === null) {
