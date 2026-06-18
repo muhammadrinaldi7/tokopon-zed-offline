@@ -25,6 +25,11 @@ class Home extends Component
     {
         return $this->redirectRoute('zoffline.sell-phone', navigate: true);
     }
+
+    public function navigateToWarrantyActivation()
+    {
+        return $this->redirectRoute('zoffline.warranty-activation', navigate: true);
+    }
     public function navigateToDashboard()
     {
         return $this->redirectRoute('admin.dashboard', navigate: true);

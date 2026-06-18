@@ -31,4 +31,9 @@ class OrderItem extends Model
     {
         return (int)$this->discount_amount + (int)$this->promo_discount_amount;
     }
+
+    public function inspections()
+    {
+        return $this->morphMany(DeviceInspection::class, 'inspectable');
+    }
 }

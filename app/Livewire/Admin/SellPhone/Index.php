@@ -18,7 +18,7 @@ class Index extends Component
     {
         $this->resetPage();
     }
-    
+
     public function updatingStatus()
     {
         $this->resetPage();
@@ -27,19 +27,25 @@ class Index extends Component
     #[Layout('layouts.admin')]
     public function render()
     {
-        $query = SellPhone::with(['user'])->latest();
+        $activeUnitId = \App\Models\User::findOrFail(\Illuminate\Support\Facades\Auth::id())->getActiveBusinessUnitId();
+
+        $query = SellPhone::with(['user', 'handledBy', 'businessUnit'])
+            ->where('business_unit_id', $activeUnitId)
+            ->latest();
 
         if ($this->search) {
-            $query->whereHas('user', function ($q) {
-                $q->where('name', 'like', '%' . $this->search . '%');
-            })->orWhere('phone_model', 'like', '%' . $this->search . '%')
-              ->orWhere('phone_brand', 'like', '%' . $this->search . '%');
+            $query->where(function ($q) {
+                $q->whereHas('user', function ($q2) {
+                    $q2->where('name', 'like', '%' . $this->search . '%');
+                })->orWhere('phone_model', 'like', '%' . $this->search . '%')
+                  ->orWhere('phone_brand', 'like', '%' . $this->search . '%');
+            });
         }
 
         if ($this->status) {
             $query->where('status', $this->status);
         }
-
+        // dd($query->get());
         return view('livewire.admin.sell-phone.index', [
             'sellPhones' => $query->paginate(10)
         ]);

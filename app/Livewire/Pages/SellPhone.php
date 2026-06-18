@@ -418,6 +418,7 @@ class SellPhone extends Component
             'appraised_value'   => $this->final_price,
             'status'            => User::findOrFail(Auth::user()->id)->hasRole('fl') ? 'PAYING' : 'WAITING_FOR_DEVICE', // Jika di toko oleh FL, status bisa langsung RECEIVED atau disesuaikan bisnis proses Anda
             'handled_by'        => User::findOrFail(Auth::user()->id)->hasRole('fl') ? Auth::id() : null,
+            'business_unit_id'  => User::findOrFail(Auth::user()->id)->getActiveBusinessUnitId(),
         ]);
 
         // 1. Petakan semua properti slot ke dalam array beserta label custom-nya

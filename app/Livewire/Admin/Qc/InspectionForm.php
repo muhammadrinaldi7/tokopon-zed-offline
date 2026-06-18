@@ -28,8 +28,9 @@ class InspectionForm extends Component
     public $template;
     public $checklistResults = [];
     public $isSaved = false;
+    public $hideVerdict = false;
 
-    public function mount($inspectableType = null, $inspectableId = null, $secondProductVariantId = null, $label = 'QC Inbound')
+    public function mount($inspectableType = null, $inspectableId = null, $secondProductVariantId = null, $label = 'QC Inbound', $hideVerdict = false, $imei = '')
     {
         // Handle route model binding for standalone page
         if ($inspectableType instanceof \App\Models\SecondProductVariant) {
@@ -43,6 +44,8 @@ class InspectionForm extends Component
             $this->inspectableId = $inspectableId;
             $this->secondProductVariantId = $secondProductVariantId;
             $this->label = $label;
+            $this->hideVerdict = $hideVerdict;
+            $this->imei = $imei ?: '';
         }
 
         // Auto-detect variant ID if not provided

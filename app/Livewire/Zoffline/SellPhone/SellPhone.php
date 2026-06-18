@@ -105,6 +105,9 @@ class SellPhone extends Component
         $this->qc_notes = '';
 
         if ($this->selected_brand_id) {
+            $brand = \App\Models\Brand::find($this->selected_brand_id);
+            $isApple = $brand && strtolower($brand->name) === 'apple';
+
             $this->available_models = \App\Models\BuybackDevice::where('brand_id', $this->selected_brand_id)
                 ->where('is_active', true)
                 ->select('model_name')
@@ -116,6 +119,10 @@ class SellPhone extends Component
             $this->qc_template = \App\Models\QcTemplate::findForBrand($this->selected_brand_id);
             if ($this->qc_template) {
                 foreach ($this->qc_template->items as $item) {
+                    if ($item['name'] === 'Health Battery' && !$isApple) {
+                        continue; // Skip Health Battery for non-Apple brands
+                    }
+
                     $this->qc_results[] = [
                         'name' => $item['name'],
                         'type' => $item['type'],
@@ -128,12 +135,60 @@ class SellPhone extends Component
         }
     }
 
+    public function calculateAutoVerdict()
+    {
+        $fatalParts = [
+            'Touch ID / Face ID',
+            'Wifi / Bluetooth',
+            'Signal',
+        ];
+
+        $serviceableFailuresCount = 0;
+        $hasFatalFailure = false;
+        $allPass = true;
+        
+        $this->qc_notes = ''; // Reset notes
+
+        foreach ($this->qc_results as $item) {
+            $val = $item['value'];
+            
+            if ($item['name'] === 'Health Battery') {
+                if ($val !== '' && is_numeric($val) && $val < 85) {
+                    $allPass = false;
+                    $serviceableFailuresCount++;
+                    $this->qc_notes .= "- Battery Health (" . $val . "%) terdeteksi di bawah standar.\n";
+                }
+            } elseif ($item['type'] === 'boolean') {
+                if ($val === '0' || $val === false || $val === 0) { // Failed
+                    $allPass = false;
+                    if (in_array($item['name'], $fatalParts)) {
+                        $hasFatalFailure = true;
+                        $this->qc_notes .= "- FATAL: " . $item['name'] . " rusak/bermasalah.\n";
+                    } else {
+                        $serviceableFailuresCount++;
+                        $this->qc_notes .= "- " . $item['name'] . " rusak/bermasalah.\n";
+                    }
+                }
+            }
+        }
+
+        if ($hasFatalFailure || $serviceableFailuresCount > 3) {
+            $this->qc_verdict = 'fail';
+        } elseif ($serviceableFailuresCount > 0) {
+            $this->qc_verdict = 'conditional';
+        } else {
+            $this->qc_verdict = 'pass';
+            $this->qc_notes = "Semua komponen berfungsi normal.";
+        }
+    }
+
     public function getQcCategory($name)
     {
         $map = [
             'LCD' => 'Layar & Bodi',
             'Touch Screen' => 'Layar & Bodi',
             'BackGlass / Housing' => 'Layar & Bodi',
+            'Health Battery' => 'Baterai',
             'Power On/Off' => 'Tombol & Fisik',
             'Volume' => 'Tombol & Fisik',
             'Mute Switch (Silent)' => 'Tombol & Fisik',
@@ -477,6 +532,7 @@ class SellPhone extends Component
             'appraised_value'   => $this->final_price,
             'status'            => $this->qc_verdict === 'fail' ? 'CANCELLED' : (User::findOrFail(Auth::user()->id)->hasRole('fl') ? 'PAYING' : 'WAITING_FOR_DEVICE'),
             'handled_by'        => User::findOrFail(Auth::user()->id)->hasRole('fl') ? Auth::id() : null,
+            'business_unit_id'  => User::findOrFail(Auth::user()->id)->getActiveBusinessUnitId(),
         ]);
 
         // Simpan Data QC Kelayakan (Device Inspection)

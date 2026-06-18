@@ -117,57 +117,59 @@
 
             {{-- Keputusan & Catatan --}}
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-3">Keputusan Akhir (Verdict)
-                        *</label>
-                    <div class="flex flex-wrap gap-4">
-                        <label class="flex-1 min-w-[150px] cursor-pointer">
-                            <input type="radio" wire:model="verdict" value="pass" class="peer sr-only">
-                            <div
-                                class="px-4 py-4 rounded-xl border-2 border-gray-100 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 hover:bg-gray-50 transition-all text-center">
-                                <span class="block text-emerald-600 mb-1">
-                                    <svg class="w-6 h-6 mx-auto" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                                            d="M5 13l4 4L19 7" />
-                                    </svg>
-                                </span>
-                                <span class="text-sm font-bold text-gray-900 block">LAYAK BELI (PASS)</span>
-                                <span class="text-[10px] text-gray-500">Unit memenuhi standar QC</span>
-                            </div>
-                        </label>
-                        <label class="flex-1 min-w-[150px] cursor-pointer">
-                            <input type="radio" wire:model="verdict" value="fail" class="peer sr-only">
-                            <div
-                                class="px-4 py-4 rounded-xl border-2 border-gray-100 peer-checked:border-rose-500 peer-checked:bg-rose-50 hover:bg-gray-50 transition-all text-center">
-                                <span class="block text-rose-500 mb-1">
-                                    <svg class="w-6 h-6 mx-auto" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                                            d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </span>
-                                <span class="text-sm font-bold text-gray-900 block">TIDAK LAYAK (FAIL)</span>
-                                <span class="text-[10px] text-gray-500">Tolak atau kembalikan</span>
-                            </div>
-                        </label>
-                        <label class="flex-1 min-w-[150px] cursor-pointer">
-                            <input type="radio" wire:model="verdict" value="conditional" class="peer sr-only">
-                            <div
-                                class="px-4 py-4 rounded-xl border-2 border-gray-100 peer-checked:border-amber-500 peer-checked:bg-amber-50 hover:bg-gray-50 transition-all text-center">
-                                <span class="block text-amber-500 mb-1">
-                                    <svg class="w-6 h-6 mx-auto" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                </span>
-                                <span class="text-sm font-bold text-gray-900 block">BERSYARAT</span>
-                                <span class="text-[10px] text-gray-500">Perlu negosiasi ulang harga</span>
-                            </div>
-                        </label>
+                @if (!$hideVerdict)
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-3">Keputusan Akhir (Verdict)
+                            *</label>
+                        <div class="flex flex-wrap gap-4">
+                            <label class="flex-1 min-w-[150px] cursor-pointer">
+                                <input type="radio" wire:model="verdict" value="pass" class="peer sr-only">
+                                <div
+                                    class="px-4 py-4 rounded-xl border-2 border-gray-100 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 hover:bg-gray-50 transition-all text-center">
+                                    <span class="block text-emerald-600 mb-1">
+                                        <svg class="w-6 h-6 mx-auto" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                                d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </span>
+                                    <span class="text-sm font-bold text-gray-900 block">LAYAK BELI (PASS)</span>
+                                    <span class="text-[10px] text-gray-500">Unit memenuhi standar QC</span>
+                                </div>
+                            </label>
+                            <label class="flex-1 min-w-[150px] cursor-pointer">
+                                <input type="radio" wire:model="verdict" value="fail" class="peer sr-only">
+                                <div
+                                    class="px-4 py-4 rounded-xl border-2 border-gray-100 peer-checked:border-rose-500 peer-checked:bg-rose-50 hover:bg-gray-50 transition-all text-center">
+                                    <span class="block text-rose-500 mb-1">
+                                        <svg class="w-6 h-6 mx-auto" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                                d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </span>
+                                    <span class="text-sm font-bold text-gray-900 block">TIDAK LAYAK (FAIL)</span>
+                                    <span class="text-[10px] text-gray-500">Tolak atau kembalikan</span>
+                                </div>
+                            </label>
+                            <label class="flex-1 min-w-[150px] cursor-pointer">
+                                <input type="radio" wire:model="verdict" value="conditional" class="peer sr-only">
+                                <div
+                                    class="px-4 py-4 rounded-xl border-2 border-gray-100 peer-checked:border-amber-500 peer-checked:bg-amber-50 hover:bg-gray-50 transition-all text-center">
+                                    <span class="block text-amber-500 mb-1">
+                                        <svg class="w-6 h-6 mx-auto" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                    </span>
+                                    <span class="text-sm font-bold text-gray-900 block">BERSYARAT</span>
+                                    <span class="text-[10px] text-gray-500">Perlu negosiasi ulang harga</span>
+                                </div>
+                            </label>
+                        </div>
                     </div>
-                </div>
+                @endif
 
                 <div>
                     <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Upload Foto Bukti (4-6

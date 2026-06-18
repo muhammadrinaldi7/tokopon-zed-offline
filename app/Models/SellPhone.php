@@ -25,7 +25,9 @@ class SellPhone extends Model implements HasMedia
         'bank_account_name',
         'invoice_number',
         'handled_by',
-        'imei'
+        'imei',
+        'business_unit_id',
+        'reject_reason'
     ];
 
     public function buybackDevice()
@@ -51,6 +53,11 @@ class SellPhone extends Model implements HasMedia
     public function handledBy()
     {
         return $this->belongsTo(User::class, 'handled_by');
+    }
+
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
     }
 
     public function inspections()

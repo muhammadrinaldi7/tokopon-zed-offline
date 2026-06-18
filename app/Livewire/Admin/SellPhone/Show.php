@@ -43,14 +43,21 @@ class Show extends Component
     public $storeBankNo;
     public $accurateGlAccounts = [];
 
+    // Reject Form
+    public $isRejecting = false;
+    public $rejectReason = '';
+
     public function mount(SellPhone $sellPhone)
     {
-        $this->sellPhone = $sellPhone->load(['user.bankAccounts', 'buybackDevice.tier']);
+        $this->sellPhone = $sellPhone->load(['user.bankAccounts', 'buybackDevice.tier', 'businessUnit']);
         $this->appraisedValue = $this->sellPhone->appraised_value ?? 0;
         $this->qcPassed = $this->sellPhone->hasPassedQc();
 
+        $dbSource = $this->sellPhone->businessUnit ? strtolower($this->sellPhone->businessUnit->code) : 'gsk';
+
         // Load Accurate GL Accounts for Bank selection
         $this->accurateGlAccounts = \App\Models\AccurateGlAccount::where('account_type', 'CASH_BANK')
+            ->where('database_source', $dbSource)
             ->orderBy('name')
             ->get()
             ->toArray();
@@ -126,11 +133,17 @@ class Show extends Component
             $accurateBranchName = $flUser && $flUser->branch ? $flUser->branch->name : 'Banjarbaru';
             $accurateWarehouseName = $flUser && $flUser->warehouse ? $flUser->warehouse->name : 'Head Office';
 
+            $itemNo = $phoneData->buybackDevice->productAccurate->item_no ?? null;
+            if (!$itemNo || $itemNo === 'TES-001') {
+                $this->dispatch('toast', ['type' => 'error', 'title' => 'Gagal', 'message' => 'Barang (Master HP Bekas) belum disinkronkan dari Accurate. Item No tidak valid.']);
+                return;
+            }
+
             // 1. Susun Array untuk detailItem terlebih dahulu agar lebih rapi
             $detailItem = [
                 [
                     // Gunakan itemNo dari ProductAccurate yang terkait
-                    'itemNo' => $phoneData->buybackDevice->productAccurate->item_no ?? 'TES-001',
+                    'itemNo' => $itemNo,
                     'warehouseName' => $accurateWarehouseName,
                     'unitPrice' => (int) $this->sellPhone->appraised_value, // Harga yang disepakati
                     'quantity' => 1,
@@ -205,12 +218,14 @@ class Show extends Component
                         'vendorNo' => str_replace('"', '', $vendorNoBaru),
                         'paymentDate' => date('d/m/Y'),
                         'chequeAmount' => (int) $this->sellPhone->appraised_value,
-                        'detailItem' => [
+                        'branchName' => Auth::user()->branch->name,
+                        'detailInvoice' => [
                             [
                                 'invoiceNo' => $this->sellPhone->invoice_number,
                                 'paymentAmount' => (int) $this->sellPhone->appraised_value,
                             ]
-                        ]
+                        ],
+
                     ];
                     $accurateService->postPurchasePayment($paymentData, $dbSource);
                 }
@@ -243,8 +258,20 @@ class Show extends Component
 
     public function reject()
     {
-        $this->sellPhone->update(['status' => 'CANCELLED']);
-        $this->dispatch('toast', title: 'Ditolak', message: 'Pembelian dibatalkan secara sepihak.', type: 'info');
+        $this->validate([
+            'rejectReason' => 'required|string|max:500'
+        ], [
+            'rejectReason.required' => 'Alasan pembatalan wajib diisi.',
+            'rejectReason.max' => 'Alasan pembatalan terlalu panjang (maksimal 500 karakter).'
+        ]);
+
+        $this->sellPhone->update([
+            'status' => 'CANCELLED',
+            'reject_reason' => $this->rejectReason
+        ]);
+
+        $this->isRejecting = false;
+        $this->dispatch('toast', ['title' => 'Ditolak', 'message' => 'Pembelian dibatalkan secara sepihak.', 'type' => 'info']);
     }
 
     // convertToProduct telah dihapus karena manajemen inventaris kini terpusat pada Accurate

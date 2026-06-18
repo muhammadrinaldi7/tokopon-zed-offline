@@ -1,14 +1,17 @@
-<div>
+<div class="relative min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 p-4 sm:p-8">
+    {{-- Decorative Background Elements --}}
+    <div class="absolute top-0 left-0 w-full h-96 bg-gradient-to-br from-blue-600/5 to-purple-600/5 blur-3xl pointer-events-none -z-10"></div>
+    
     <div class="flex items-center justify-between mb-8">
         <div>
             <a href="{{ route('admin.sell-phones.index') }}" wire:navigate
-                class="text-sm font-bold text-gray-400 hover:text-[#1c69d4] mb-2 inline-flex items-center gap-1 transition-colors">
+                class="text-sm font-bold text-slate-400 hover:text-blue-600 mb-2 inline-flex items-center gap-1 transition-colors">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
                 Kembali
             </a>
-            <h1 class="text-2xl font-bold text-gray-900 mt-1">Detail Penjualan HP #SPL-{{ $sellPhone->id }}</h1>
+            <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-700 tracking-tight mt-1">Detail Penjualan HP #SPL-{{ $sellPhone->id }}</h1>
         </div>
         <div>
             @php
@@ -33,7 +36,7 @@
         {{-- Kolom Kiri: Detail Pengajuan --}}
         <div class="lg:col-span-2 space-y-6">
             {{-- Info Perangkat --}}
-            <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div class="bg-white/70 backdrop-blur-xl rounded-2xl shadow-sm border border-white/50 p-6">
                 <h3 class="font-bold text-lg text-gray-900 border-b border-gray-100 pb-3 mb-4">Informasi Perangkat</h3>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -46,11 +49,20 @@
                         <p class="font-medium text-gray-900">{{ $sellPhone->phone_ram ?? '-' }} RAM /
                             {{ $sellPhone->phone_storage ?? '-' }} Storage</p>
                     </div>
-                    <div class="col-span-2 mt-2">
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Nomor IMEI</p>
-                        <p class="font-mono text-gray-900 bg-gray-100 px-3 py-1.5 rounded-lg inline-block font-bold">
-                            {{ $sellPhone->imei ?? 'Belum ada IMEI' }}
-                        </p>
+                    <div class="col-span-2 mt-2 flex flex-wrap gap-6">
+                        <div>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Nomor IMEI</p>
+                            <p class="font-mono text-gray-900 bg-gray-100 px-3 py-1.5 rounded-lg inline-block font-bold">
+                                {{ $sellPhone->imei ?? 'Belum ada IMEI' }}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Ditangani Oleh (Frontliner)</p>
+                            <p class="font-medium text-gray-900 bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1.5 rounded-lg inline-flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                {{ optional($sellPhone->handledBy)->name ?? 'Sistem / Pelanggan' }}
+                            </p>
+                        </div>
                     </div>
                     <div class="col-span-2 mt-2" x-data="{ showQcModal: false }">
                         <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Deskripsi Kondisi
@@ -157,7 +169,7 @@
             </div>
 
             {{-- Info Pelanggan & Rekening --}}
-            <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div class="bg-white/70 backdrop-blur-xl rounded-2xl shadow-sm border border-white/50 p-6">
                 <h3 class="font-bold text-lg text-gray-900 border-b border-gray-100 pb-3 mb-4">Informasi Pelanggan &
                     Pembayaran</h3>
                 <div class="grid grid-cols-2 gap-4">
@@ -188,7 +200,7 @@
         {{-- Kolom Kanan: Aksi --}}
         <div class="space-y-6">
             {{-- Form Penaksiran Harga / Harga Akhir --}}
-            <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div class="bg-white/70 backdrop-blur-xl rounded-2xl shadow-sm border border-white/50 p-6">
                 <h3 class="font-bold text-lg text-gray-900 border-b border-gray-100 pb-3 mb-4">Harga Akhir / Penawaran
                 </h3>
 
@@ -205,7 +217,7 @@
 
             {{-- Aksi Lainnya --}}
             @if (in_array($sellPhone->status, ['PENDING', 'OFFERED', 'PAYING', 'WAITING_FOR_DEVICE', 'INSPECTING']))
-                <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+                <div class="bg-white/70 backdrop-blur-xl rounded-2xl shadow-sm border border-white/50 p-6">
                     <h3 class="font-bold text-lg text-gray-900 border-b border-gray-100 pb-3 mb-4">Aksi Transaksi</h3>
 
                     @if ($sellPhone->status === 'INSPECTING')
@@ -241,8 +253,7 @@
                                     Fisik Tidak Sesuai
                                 </button>
 
-                                <button type="button" wire:click="reject"
-                                    wire:confirm="Yakin menolak transaksi ini mentah-mentah dan mengembalikan unit ke pelanggan?"
+                                <button type="button" wire:click="$set('isRejecting', true)"
                                     class="w-full bg-white border-2 border-rose-100 text-rose-600 py-2.5 rounded-lg font-bold hover:bg-rose-50 transition mt-2">
                                     Tolak
                                 </button>
@@ -303,10 +314,20 @@
                                     <div wire:loading wire:target="paymentReceipt" class="text-xs text-blue-600 mt-1">Mengunggah...</div>
                                     @error('paymentReceipt') <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span> @enderror
                                     
-                                    @if ($paymentReceipt)
-                                        <div class="mt-2 rounded-lg overflow-hidden border border-blue-200 aspect-video relative">
-                                            <img src="{{ $paymentReceipt->temporaryUrl() }}" class="w-full h-full object-cover">
-                                        </div>
+                                    @if ($paymentReceipt && !is_string($paymentReceipt))
+                                        @php
+                                            $previewUrl = null;
+                                            try {
+                                                $previewUrl = $paymentReceipt->temporaryUrl();
+                                            } catch (\Exception $e) {
+                                                $previewUrl = null;
+                                            }
+                                        @endphp
+                                        @if($previewUrl)
+                                            <div class="mt-2 rounded-lg overflow-hidden border border-blue-200 aspect-video relative">
+                                                <img src="{{ $previewUrl }}" class="w-full h-full object-cover">
+                                            </div>
+                                        @endif
                                     @endif
                                 </div>
                             </div>
@@ -320,8 +341,7 @@
                                 Tandai Selesai / Lunas (Hit Accurate)
                             </button>
 
-                            <button type="button" wire:click="reject"
-                                wire:confirm="Yakin ingin membatalkan transaksi ini mentah-mentah?"
+                            <button type="button" wire:click="$set('isRejecting', true)"
                                 class="w-full bg-white border-2 border-rose-100 text-rose-600 py-2.5 rounded-lg font-bold hover:bg-rose-50 transition">
                                 Batalkan Transaksi
                             </button>
@@ -334,8 +354,7 @@
                                 Proses Selanjutnya
                             </button>
 
-                            <button type="button" wire:click="reject"
-                                wire:confirm="Yakin ingin membatalkan transaksi ini?"
+                            <button type="button" wire:click="$set('isRejecting', true)"
                                 class="w-full bg-white border-2 border-rose-100 text-rose-600 py-2.5 rounded-lg font-bold hover:bg-rose-50 transition">
                                 Tolak / Batalkan
                             </button>
@@ -376,6 +395,32 @@
         <div class="mt-8">
             <livewire:admin.qc.inspection-form :inspectable-type="get_class($sellPhone)" :inspectable-id="$sellPhone->id"
                 label="QC Inbound - Beli HP Bekas" />
+        </div>
+    @endif
+
+    {{-- Rejection Modal --}}
+    @if ($isRejecting)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 animate-in zoom-in duration-200">
+                <h3 class="font-bold text-xl text-rose-600 mb-2">Batalkan Transaksi / Tolak</h3>
+                <p class="text-sm text-gray-600 mb-4">Silakan masukkan alasan penolakan. Alasan ini akan tercatat dalam sistem dan dapat dilihat oleh pelanggan.</p>
+                
+                <form wire:submit="reject">
+                    <div class="mb-4">
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Alasan Penolakan</label>
+                        <textarea wire:model="rejectReason" rows="3" class="w-full border-gray-200 rounded-lg focus:ring-rose-500 focus:border-rose-500 bg-gray-50" placeholder="Misal: Layar pecah parah, icloud terkunci, dll..."></textarea>
+                        @error('rejectReason') <span class="text-xs text-rose-500 mt-1">{{ $message }}</span> @enderror
+                    </div>
+                    
+                    <div class="flex justify-end gap-2">
+                        <button type="button" wire:click="$set('isRejecting', false)" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200 transition">Kembali</button>
+                        <button type="submit" class="px-4 py-2 bg-rose-600 text-white rounded-lg font-bold hover:bg-rose-700 transition flex items-center gap-2">
+                            <svg wire:loading wire:target="reject" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Konfirmasi Tolak
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     @endif
 </div>

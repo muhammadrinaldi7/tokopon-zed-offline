@@ -56,8 +56,8 @@
             </div>
         @endcan
         @can('sell-phone')
-            {{-- Card 3: Sell Phone (Jual HP) --}}
-            <div wire:click="navigateToSellPhone" {{-- Ubah justify-end menjadi justify-between di sini --}}
+            {{-- Card 3: Aktivasi Garansi (QC Unboxing) --}}
+            <div wire:click="navigateToWarrantyActivation"
                 class="md:nth-[3n+1]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
 
                 {{-- Ikon akan tertahan di atas --}}
@@ -78,9 +78,9 @@
 
                 {{-- Bungkus Teks jadi satu div agar ngumpul di bawah --}}
                 <div>
-                    <h1 class="text-2xl ">Klaim Garansi <br> Retur</h1>
+                    <h1 class="text-2xl ">Aktivasi <br> Garansi</h1>
                     {{-- Tambahkan line-clamp-2 agar rapi jika kepanjangan --}}
-                    <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Ajukan klaim garansi untuk produk yang bermasalah
+                    <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Catat kondisi barang baru (Unboxing QC) untuk keperluan garansi
                     </p>
                 </div>
             </div>

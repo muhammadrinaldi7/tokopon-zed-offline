@@ -401,46 +401,46 @@
 
                 {{-- QC SUB-STEP N+1: VERDICT --}}
                 <div x-show="qcStep === {{ $maxQcStep }}" x-transition.opacity style="display: none;" class="space-y-6">
-                    <h4 class="text-lg font-black text-violet-700 uppercase tracking-wider border-b border-neutral-100 pb-2">Kesimpulan Kelayakan</h4>
-                    <p class="text-sm text-neutral-500">Berdasarkan inspeksi yang Anda lakukan, apakah perangkat ini layak untuk dibeli?</p>
+                    <h4 class="text-lg font-black text-violet-700 uppercase tracking-wider border-b border-neutral-100 pb-2">Kesimpulan Sistem (Auto-Verdict)</h4>
+                    <p class="text-sm text-neutral-500">Berdasarkan data inspeksi yang Anda masukkan, sistem menentukan bahwa perangkat ini:</p>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <label class="cursor-pointer group">
-                            <input type="radio" wire:model.live="qc_verdict" value="pass" class="peer hidden">
-                            <div class="h-full flex flex-col items-center justify-center p-6 border-2 border-neutral-200 rounded-2xl transition-all peer-checked:border-emerald-500 peer-checked:bg-emerald-50 hover:bg-neutral-50">
-                                <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                                </div>
-                                <h5 class="font-bold text-emerald-700 text-center">Layak Beli</h5>
-                                <p class="text-xs text-center text-neutral-500 mt-1">Lanjut ke tahap penilaian harga</p>
+                    <div class="mt-4">
+                        {{-- Tampilan Dinamis Berdasarkan qc_verdict --}}
+                        <div x-show="$wire.qc_verdict === 'pass'" class="p-6 border-2 border-emerald-500 bg-emerald-50 rounded-2xl flex flex-col items-center justify-center text-center">
+                            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="radio" wire:model.live="qc_verdict" value="conditional" class="peer hidden">
-                            <div class="h-full flex flex-col items-center justify-center p-6 border-2 border-neutral-200 rounded-2xl transition-all peer-checked:border-amber-500 peer-checked:bg-amber-50 hover:bg-neutral-50">
-                                <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-3">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                                </div>
-                                <h5 class="font-bold text-amber-700 text-center">Perlu Perbaikan</h5>
-                                <p class="text-xs text-center text-neutral-500 mt-1">Lanjut dengan catatan minus berat</p>
+                            <h5 class="text-xl font-black text-emerald-700 mb-1">LAYAK BELI (PASS)</h5>
+                            <p class="text-sm text-emerald-600 font-medium">Seluruh komponen perangkat berfungsi 100% normal.</p>
+                        </div>
+
+                        <div x-show="$wire.qc_verdict === 'conditional'" class="p-6 border-2 border-amber-500 bg-amber-50 rounded-2xl flex flex-col items-center justify-center text-center">
+                            <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                             </div>
-                        </label>
-                        <label class="cursor-pointer group">
-                            <input type="radio" wire:model.live="qc_verdict" value="fail" class="peer hidden">
-                            <div class="h-full flex flex-col items-center justify-center p-6 border-2 border-neutral-200 rounded-2xl transition-all peer-checked:border-rose-500 peer-checked:bg-rose-50 hover:bg-neutral-50">
-                                <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-3">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                </div>
-                                <h5 class="font-bold text-rose-700 text-center">Tidak Layak</h5>
-                                <p class="text-xs text-center text-neutral-500 mt-1">Batalkan & hentikan transaksi</p>
+                            <h5 class="text-xl font-black text-amber-700 mb-1">BERSYARAT (NEEDS SERVICE)</h5>
+                            <p class="text-sm text-amber-700/80 font-medium whitespace-pre-line" x-text="$wire.qc_notes"></p>
+                        </div>
+
+                        <div x-show="$wire.qc_verdict === 'fail'" class="p-6 border-2 border-rose-500 bg-rose-50 rounded-2xl flex flex-col items-center justify-center text-center">
+                            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </div>
-                        </label>
+                            <h5 class="text-xl font-black text-rose-700 mb-1">TIDAK LAYAK (FAIL)</h5>
+                            <p class="text-sm text-rose-700/80 font-medium whitespace-pre-line" x-text="$wire.qc_notes"></p>
+                        </div>
+
+                        {{-- Loading State saat hitung verdict --}}
+                        <div x-show="!$wire.qc_verdict" class="p-10 border-2 border-dashed border-neutral-200 bg-neutral-50 rounded-2xl flex flex-col items-center justify-center text-center">
+                            <span class="animate-spin w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full mb-4"></span>
+                            <p class="text-sm text-neutral-500 font-bold">Sistem sedang menganalisa data inspeksi...</p>
+                        </div>
                     </div>
 
                     <div class="space-y-2 mt-6 border-t border-neutral-100 pt-6">
-                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Catatan Akhir QC (Opsional)</label>
-                        <textarea wire:model.live.debounce.500ms="qc_notes" rows="3"
-                            placeholder="Tulis ringkasan hasil inspeksi jika perlu..."
+                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Tambahan Catatan Manual (Opsional)</label>
+                        <textarea wire:model.live.debounce.500ms="old_phone_additional_note" rows="3"
+                            placeholder="Ketik catatan tambahan di luar analisa sistem jika ada..."
                             class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all text-sm font-medium text-neutral-700"></textarea>
                     </div>
                 </div>
@@ -477,7 +477,8 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                         </button>
 
-                        <button x-show="qcStep > 0 && qcStep < {{ $maxQcStep }}" type="button" @click="qcStep++"
+                        <button x-show="qcStep > 0 && qcStep < {{ $maxQcStep }}" type="button" 
+                            @click="if (qcStep === {{ $maxQcStep - 1 }}) { $wire.calculateAutoVerdict().then(() => qcStep++) } else { qcStep++ }"
                             class="px-6 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 w-full md:w-auto">
                             Lanjut
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
