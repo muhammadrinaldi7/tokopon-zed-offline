@@ -197,20 +197,22 @@
                    <div class="border-t border-dashed border-gray-300 my-2"></div>
 
                    @foreach ($completedOrder->items as $item)
-                        @php
-                            $v = $item->variant;
-                            if ($v instanceof \App\Models\ProductAccurate) {
-                                $itemName = $v->name ?? '-';
-                                $ram = '';
-                                $storage = '';
-                                $color = '';
-                            } else {
-                                $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
-                                $ram = $v ? $v->ram ?? '' : '';
-                                $storage = $v ? $v->storage ?? '' : '';
-                                $color = $v ? $v->color ?? '' : '';
-                            }
-                        @endphp
+                       @php
+                           $v = $item->variant;
+                           if ($v instanceof \App\Models\ProductAccurate) {
+                               $itemName = $v->name ?? '-';
+                               $ram = '';
+                               $storage = '';
+                               $color = '';
+                           } else {
+                               $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
+                               $ram = $v ? $v->ram ?? '' : '';
+                               $storage = $v ? $v->storage ?? '' : '';
+                               $color = $v ? $v->color ?? '' : '';
+                           }
+                           // Bersihkan awalan nama
+                           $itemName = preg_replace('/^(?:DS\s*-\s*HP\s*|DS\s*-\s*|HP\s*-\s*|HP\s*)/i', '', trim($itemName));
+                       @endphp
                        <div class="mb-1">
                            <p class="font-bold">{{ $itemName }}
                                @if ($ram != null)

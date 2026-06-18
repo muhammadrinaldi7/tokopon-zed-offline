@@ -5,9 +5,11 @@
             <p class="text-gray-500 text-sm mt-1">Pantau dan kelola seluruh transaksi pelanggan.</p>
         </div>
         <div class="flex gap-2">
-            <a href="{{ route('admin.orders.import-draft') }}" wire:navigate class="px-4 py-2 bg-[#1c69d4] text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-bold flex items-center gap-2">
+            <a href="{{ route('admin.orders.import-draft') }}" wire:navigate
+                class="px-4 py-2 bg-[#1c69d4] text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-bold flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
                 Import via Draft
             </a>
@@ -17,8 +19,8 @@
     {{-- Filters --}}
     <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 mb-6">
         <div class="flex-1 relative">
-            <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24"
-                stroke="currentColor">
+            <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none"
+                viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -202,17 +204,20 @@
                         <p class="font-bold text-sm">SYIHAB STORE</p>
                         <p class="text-[10px] text-gray-500">
                             {{ $selectedOrderForReceipt->shipping_address_snapshot['store'] ?? 'Toko' }}</p>
-                        <p class="text-[10px] text-gray-400">{{ $selectedOrderForReceipt->created_at->format('d/m/Y H:i') }}
+                        <p class="text-[10px] text-gray-400">
+                            {{ $selectedOrderForReceipt->created_at->format('d/m/Y H:i') }}
                         </p>
                     </div>
                     <div class="border-t border-dashed border-gray-300 my-2"></div>
                     <p class="text-[10px] text-gray-500">Tanggal:
                         {{ $selectedOrderForReceipt->created_at->format('d/m/Y H:i') }}</p>
                     <p class="text-[10px] text-gray-500">No: {{ $selectedOrderForReceipt->order_number }}</p>
-                    <p class="text-[10px] text-gray-500">Kasir: {{ $selectedOrderForReceipt->handledBy->name ?? '-' }}</p>
+                    <p class="text-[10px] text-gray-500">Kasir: {{ $selectedOrderForReceipt->handledBy->name ?? '-' }}
+                    </p>
                     <p class="text-[10px] text-gray-500">Sales: {{ $selectedOrderForReceipt->salesBy->name ?? '-' }}
                     </p>
-                    <p class="text-[10px] text-gray-500">Customer: {{ $selectedOrderForReceipt->user->name ?? '-' }}</p>
+                    <p class="text-[10px] text-gray-500">Customer: {{ $selectedOrderForReceipt->user->name ?? '-' }}
+                    </p>
                     <p class="text-[10px] text-gray-500">Customer No:
                         {{ $selectedOrderForReceipt->user->profile->phone_number ?? '-' }}
                     </p>
@@ -221,10 +226,19 @@
                     @foreach ($selectedOrderForReceipt->items as $item)
                         @php
                             $v = $item->variant;
-                            $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
-                            $ram = $v ? $v->ram ?? '' : '';
-                            $storage = $v ? $v->storage ?? '' : '';
-                            $color = $v ? $v->color ?? '' : '';
+                            if ($v instanceof \App\Models\ProductAccurate) {
+                                $itemName = $v->name ?? '-';
+                                $ram = '';
+                                $storage = '';
+                                $color = '';
+                            } else {
+                                $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
+                                $ram = $v ? $v->ram ?? '' : '';
+                                $storage = $v ? $v->storage ?? '' : '';
+                                $color = $v ? $v->color ?? '' : '';
+                            }
+                            // Bersihkan awalan nama
+                            $itemName = preg_replace('/^(?:DS\s*-\s*HP\s*|DS\s*-\s*|HP\s*-\s*|HP\s*)/i', '', trim($itemName));
                         @endphp
                         <div class="mb-1">
                             <p class="font-bold">{{ $itemName }}
@@ -267,7 +281,8 @@
                         @endforeach
                     </div>
                     @if ($selectedOrderForReceipt->accurate_invoice_no)
-                        <p class="text-[10px] text-gray-400">Inv: {{ $selectedOrderForReceipt->accurate_invoice_no }}</p>
+                        <p class="text-[10px] text-gray-400">Inv: {{ $selectedOrderForReceipt->accurate_invoice_no }}
+                        </p>
                     @endif
                     <div class="text-start mt-2">
                         <p class="text-[10px] text-gray-400">Catatan : {{ $selectedOrderForReceipt->notes ?? '' }}</p>
