@@ -562,6 +562,8 @@ trait WithCheckoutAndReceipt
         $this->search = '';
         $this->payments = [
             [
+                'category' => '',
+                'bank_name' => '',
                 'payment_method_id' => '',
                 'payment_method_rate_id' => '',
                 'no_kontrak' => '',

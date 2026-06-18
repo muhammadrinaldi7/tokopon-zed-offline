@@ -25,7 +25,7 @@
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
                     </svg>
-                    Kembali
+                    Reset
                 </button>
             @endif
         </div>
@@ -210,22 +210,70 @@
                 </div>
             @elseif($paymentWizardStep === 3)
                 {{-- STEP 3: MDR & NOMINAL --}}
-                <div class="max-w-7xl mx-auto space-y-6">
-                    @php
-                        $payment = $payments[$activePaymentIndex] ?? [];
-                        $cat = $payment['category'] ?? '';
-                        $pmId = $payment['payment_method_id'] ?? '';
-                        $methodObj =
-                            $cat === 'TUNAI'
-                                ? collect($this->cashPaymentMethods)->firstWhere('id', $pmId)
-                                : collect($this->nonCashPaymentMethods)->firstWhere('id', $pmId);
+                @php
+                    $payment = $payments[$activePaymentIndex] ?? [];
+                    $cat = $payment['category'] ?? '';
+                    $pmId = $payment['payment_method_id'] ?? '';
+                    $methodObj =
+                        $cat === 'TUNAI'
+                            ? collect($this->cashPaymentMethods)->firstWhere('id', $pmId)
+                            : collect($this->nonCashPaymentMethods)->firstWhere('id', $pmId);
 
-                        $hasRate = $cat === 'NON-TUNAI' && $methodObj && count($methodObj->rates ?? []) > 0;
+                    $hasRate = $cat === 'NON-TUNAI' && $methodObj && count($methodObj->rates ?? []) > 0;
 
-                        $imageName = $methodObj ? strtolower(str_replace(' ', '', $methodObj->name)) . '.png' : '';
-                        $imagePath = $imageName ? public_path('assets/png/paymentmethod/' . $imageName) : '';
-                        $hasImage = $imagePath ? file_exists($imagePath) : false;
-                    @endphp
+                    $imageName = $methodObj ? strtolower(str_replace(' ', '', $methodObj->name)) . '.png' : '';
+                    $imagePath = $imageName ? public_path('assets/png/paymentmethod/' . $imageName) : '';
+                    $hasImage = $imagePath ? file_exists($imagePath) : false;
+                @endphp
+                <div class="max-w-7xl mx-auto space-y-6"
+                    wire:key="payment-step3-{{ $activePaymentIndex }}"
+                    x-data="{
+                        rawAmount: @entangle('payments.' . $activePaymentIndex . '.amount'),
+                        rateId: @entangle('payments.' . $activePaymentIndex . '.payment_method_rate_id'),
+                        hasRate: {{ $hasRate ? 'true' : 'false' }},
+                        isSplit: {{ $paymentMode === 'split' ? 'true' : 'false' }},
+                        formattedAmount: '',
+                        
+                        init() {
+                            this.formattedAmount = this.formatNumber(this.rawAmount);
+                            
+                            $watch('rawAmount', value => {
+                                if(document.activeElement !== this.$refs.amountInput) {
+                                    this.formattedAmount = this.formatNumber(value);
+                                }
+                            });
+                        },
+                        
+                        formatNumber(val) {
+                            if (!val) return '';
+                            let num = parseInt(String(val).replace(/\D/g, ''), 10);
+                            return isNaN(num) ? '' : num.toLocaleString('id-ID');
+                        },
+                        
+                        updateAmount(e) {
+                            if (!this.isSplit) return;
+                            
+                            let val = e.target.value;
+                            let num = parseInt(val.replace(/\D/g, ''), 10);
+                            if(isNaN(num)) num = 0;
+                            
+                            this.formattedAmount = this.formatNumber(num);
+                            this.rawAmount = num;
+                        },
+
+                        saveLine() {
+                            if (!this.canSave) return;
+                            $wire.set('payments.' + {{ $activePaymentIndex }} + '.amount', this.rawAmount).then(() => {
+                                $wire.savePaymentLine();
+                            });
+                        },
+
+                        get canSave() {
+                            let amountValid = this.rawAmount > 0;
+                            let rateValid = !this.hasRate || (this.rateId !== '' && this.rateId !== null);
+                            return amountValid && rateValid;
+                        }
+                    }">
 
                     <div class="bg-blue-50 border border-blue-100 p-5 rounded-2xl flex items-center gap-4">
                         @if ($hasImage)
@@ -261,12 +309,12 @@
 
                     @if ($hasRate)
                         <div class="space-y-3">
-                            <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Pilih Tipe EDC / MDR
-                                Rate</label>
+                            <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Pilih Mesin
+                                EDC</label>
                             <div class="grid grid-cols-2 gap-3">
                                 @foreach ($methodObj->rates->where('is_active', true) as $rate)
                                     <label
-                                        class="relative flex cursor-pointer rounded-2xl border-2 {{ ($payment['payment_method_rate_id'] ?? '') == $rate->id ? 'border-[#1c69d4] bg-blue-50/50 shadow-sm' : 'border-gray-200 hover:border-blue-300' }} p-4 transition-all group">
+                                        class="relative flex cursor-pointer rounded-2xl border-2 {{ ($payment['payment_method_rate_id'] ?? '') == $rate->id ? 'border-[#1c69d4] bg-white shadow-md ring-1 ring-[#1c69d4]/50' : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-gray-50/50' }} p-4 transition-all group">
                                         <input type="radio"
                                             wire:model.live="payments.{{ $activePaymentIndex }}.payment_method_rate_id"
                                             value="{{ $rate->id }}" class="sr-only">
@@ -304,15 +352,19 @@
                         <div class="relative">
                             <span
                                 class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-black text-2xl">Rp</span>
-                            <input type="number" wire:model.lazy="payments.{{ $activePaymentIndex }}.amount"
-                                class="w-full bg-white border-2 border-gray-300 rounded-2xl pl-16 pr-5 py-5 text-4xl font-black text-gray-800 focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/20 transition-all text-right"
-                                min="0">
+                            <input type="text" x-ref="amountInput" x-model="formattedAmount"
+                                @input="updateAmount($event)"
+                                x-bind:readonly="!isSplit"
+                                :class="!isSplit ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'text-gray-800'"
+                                class="w-full bg-white border-2 border-gray-300 rounded-2xl pl-16 pr-5 py-5 text-4xl font-black focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/20 transition-all text-right"
+                                placeholder="0">
                         </div>
                     </div>
 
                     @if ($paymentMode === 'split')
-                        <button wire:click="savePaymentLine"
-                            class="w-full py-4 mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-lg shadow-emerald-600/30 transition-all text-xl flex items-center justify-center gap-2">
+                        <button @click="saveLine"
+                            x-bind:disabled="!canSave"
+                            class="w-full py-4 mt-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 disabled:hover:bg-gray-400 disabled:cursor-not-allowed text-white font-black rounded-2xl shadow-lg shadow-emerald-600/30 transition-all text-xl flex items-center justify-center gap-2">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
@@ -347,8 +399,8 @@
                                         </div>
                                     @else
                                         <div
-                                            class="w-14 h-14 rounded-2xl flex items-center justify-center {{ $payment['category'] === 'TUNAI' ? 'bg-emerald-100 text-emerald-600' : 'bg-[#1c69d4]/10 text-[#1c69d4]' }}">
-                                            @if ($payment['category'] === 'TUNAI')
+                                            class="w-14 h-14 rounded-2xl flex items-center justify-center {{ ($payment['category'] ?? '') === 'TUNAI' ? 'bg-emerald-100 text-emerald-600' : 'bg-[#1c69d4]/10 text-[#1c69d4]' }}">
+                                            @if (($payment['category'] ?? '') === 'TUNAI')
                                                 <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24"
                                                     stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -365,7 +417,7 @@
                                     @endif
                                     <div>
                                         <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                            {{ $payment['category'] }}</p>
+                                            {{ $payment['category'] ?? '' }}</p>
                                         <h4 class="text-xl font-black text-gray-800">
                                             {{ $pmObj->name ?? 'Unknown Method' }}</h4>
                                         @if ($rateObj)

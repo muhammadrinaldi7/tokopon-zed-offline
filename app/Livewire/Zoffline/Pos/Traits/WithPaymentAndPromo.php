@@ -215,6 +215,10 @@ trait WithPaymentAndPromo
 
     public function syncSinglePaymentAmount()
     {
+        if ($this->paymentMode === 'split') {
+            return;
+        }
+
         if (count($this->payments) === 1) {
             $this->payments[0]['amount'] = max(0, $this->subtotal() - (int)$this->totalDiscount());
         }
