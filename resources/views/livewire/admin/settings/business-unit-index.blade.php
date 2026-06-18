@@ -34,7 +34,7 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-900">{{ $unit->accurate_host ?: '-' }}</div>
-                            <div class="text-xs text-gray-500">DB: {{ $unit->accurate_db ?: '-' }}</div>
+                            <div class="text-xs text-gray-500">DB ID: {{ $unit->accurate_database_id ?: '-' }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <button wire:click="toggleActive({{ $unit->id }})" 
@@ -99,19 +99,19 @@
                                     class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-gray-700 mb-1">Accurate Database Source</label>
-                                <input type="text" wire:model="accurate_db" placeholder="ID Database"
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Accurate Database ID (Pencocokan Webhook)</label>
+                                <input type="text" wire:model="accurate_database_id" placeholder="Contoh: 123456"
                                     class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-700 mb-1">Accurate User/Token</label>
-                                    <input type="text" wire:model="accurate_user" 
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">Accurate Token (OAuth)</label>
+                                    <input type="text" wire:model="accurate_token" 
                                         class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-gray-700 mb-1">Accurate Password</label>
-                                    <input type="password" wire:model="accurate_password" 
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">Accurate Secret Key</label>
+                                    <input type="password" wire:model="accurate_secret_key" 
                                         class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
                                 </div>
                             </div>

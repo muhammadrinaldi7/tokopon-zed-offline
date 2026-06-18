@@ -14,9 +14,9 @@ class BusinessUnitIndex extends Component
     public $name;
     public $code;
     public $accurate_host;
-    public $accurate_db;
-    public $accurate_user;
-    public $accurate_password;
+    public $accurate_token;
+    public $accurate_secret_key;
+    public $accurate_database_id;
     public $is_active = true;
 
     public $showModal = false;
@@ -37,9 +37,9 @@ class BusinessUnitIndex extends Component
         $this->name = '';
         $this->code = '';
         $this->accurate_host = '';
-        $this->accurate_db = '';
-        $this->accurate_user = '';
-        $this->accurate_password = '';
+        $this->accurate_token = '';
+        $this->accurate_secret_key = '';
+        $this->accurate_database_id = '';
         $this->is_active = true;
     }
 
@@ -62,9 +62,9 @@ class BusinessUnitIndex extends Component
         $this->name = $unit->name;
         $this->code = $unit->code;
         $this->accurate_host = $unit->accurate_host;
-        $this->accurate_db = $unit->accurate_db;
-        $this->accurate_user = $unit->accurate_user;
-        $this->accurate_password = $unit->accurate_password;
+        $this->accurate_token = $unit->accurate_token;
+        $this->accurate_secret_key = $unit->accurate_secret_key;
+        $this->accurate_database_id = $unit->accurate_database_id;
         $this->is_active = $unit->is_active;
         $this->showModal = true;
     }
@@ -82,9 +82,9 @@ class BusinessUnitIndex extends Component
                 'name' => $this->name,
                 'code' => $this->code,
                 'accurate_host' => $this->accurate_host,
-                'accurate_db' => $this->accurate_db,
-                'accurate_user' => $this->accurate_user,
-                'accurate_password' => $this->accurate_password,
+                'accurate_token' => $this->accurate_token,
+                'accurate_secret_key' => $this->accurate_secret_key,
+                'accurate_database_id' => $this->accurate_database_id,
                 'is_active' => $this->is_active,
             ]
         );

@@ -12,6 +12,7 @@ class BusinessUnit extends Model
         'accurate_host',
         'accurate_token',
         'accurate_secret_key',
+        'accurate_database_id',
         'is_active',
     ];
 
