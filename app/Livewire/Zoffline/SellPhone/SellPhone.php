@@ -64,6 +64,7 @@ class SellPhone extends Component
     public $qc_results = [];
     public $qc_notes = '';
     public $qc_verdict = ''; // pass, conditional, fail
+    public $qc_max_weight_threshold = 3;
 
     #[Computed]
     public function customerResults()
@@ -103,6 +104,7 @@ class SellPhone extends Component
         $this->qc_template = null;
         $this->qc_results = [];
         $this->qc_notes = '';
+        $this->qc_max_weight_threshold = 3;
 
         if ($this->selected_brand_id) {
             $brand = \App\Models\Brand::find($this->selected_brand_id);
@@ -118,6 +120,8 @@ class SellPhone extends Component
             // Load QC Template untuk Buyback (berdasarkan brand)
             $this->qc_template = \App\Models\QcTemplate::findForBrand($this->selected_brand_id);
             if ($this->qc_template) {
+                $this->qc_max_weight_threshold = $this->qc_template->max_weight_threshold ?? 3;
+                
                 foreach ($this->qc_template->items as $item) {
                     if ($item['name'] === 'Health Battery' && !$isApple) {
                         continue; // Skip Health Battery for non-Apple brands
@@ -127,6 +131,8 @@ class SellPhone extends Component
                         'name' => $item['name'],
                         'type' => $item['type'],
                         'value' => $item['type'] === 'boolean' ? null : '',
+                        'weight' => $item['weight'] ?? 1,
+                        'is_fatal' => $item['is_fatal'] ?? false,
                         'category' => $this->getQcCategory($item['name'])
                     ];
                 }
@@ -137,13 +143,7 @@ class SellPhone extends Component
 
     public function calculateAutoVerdict()
     {
-        $fatalParts = [
-            'Touch ID / Face ID',
-            'Wifi / Bluetooth',
-            'Signal',
-        ];
-
-        $serviceableFailuresCount = 0;
+        $totalWeightDeduction = 0;
         $hasFatalFailure = false;
         $allPass = true;
         
@@ -155,26 +155,34 @@ class SellPhone extends Component
             if ($item['name'] === 'Health Battery') {
                 if ($val !== '' && is_numeric($val) && $val < 85) {
                     $allPass = false;
-                    $serviceableFailuresCount++;
-                    $this->qc_notes .= "- Battery Health (" . $val . "%) terdeteksi di bawah standar.\n";
+                    $weight = $item['weight'] ?? 1;
+                    $totalWeightDeduction += $weight;
+                    if (!empty($item['is_fatal'])) {
+                        $hasFatalFailure = true;
+                        $this->qc_notes .= "- FATAL: Battery Health (" . $val . "%) terdeteksi di bawah standar.\n";
+                    } else {
+                        $this->qc_notes .= "- Battery Health (" . $val . "%) terdeteksi di bawah standar (Bobot: {$weight}).\n";
+                    }
                 }
             } elseif ($item['type'] === 'boolean') {
                 if ($val === '0' || $val === false || $val === 0) { // Failed
                     $allPass = false;
-                    if (in_array($item['name'], $fatalParts)) {
+                    $weight = $item['weight'] ?? 1;
+                    $totalWeightDeduction += $weight;
+                    
+                    if (!empty($item['is_fatal'])) {
                         $hasFatalFailure = true;
                         $this->qc_notes .= "- FATAL: " . $item['name'] . " rusak/bermasalah.\n";
                     } else {
-                        $serviceableFailuresCount++;
-                        $this->qc_notes .= "- " . $item['name'] . " rusak/bermasalah.\n";
+                        $this->qc_notes .= "- " . $item['name'] . " rusak/bermasalah (Bobot: {$weight}).\n";
                     }
                 }
             }
         }
 
-        if ($hasFatalFailure || $serviceableFailuresCount > 3) {
+        if ($hasFatalFailure || $totalWeightDeduction > $this->qc_max_weight_threshold) {
             $this->qc_verdict = 'fail';
-        } elseif ($serviceableFailuresCount > 0) {
+        } elseif ($totalWeightDeduction > 0) {
             $this->qc_verdict = 'conditional';
         } else {
             $this->qc_verdict = 'pass';

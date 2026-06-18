@@ -380,9 +380,31 @@
                     @if($sellPhone->payment_receipt_path)
                         <div class="mt-4 border-t border-emerald-200 pt-4">
                             <p class="text-xs font-bold text-emerald-800 uppercase tracking-widest mb-2">Bukti Transfer Pelunasan</p>
-                            <a href="{{ asset('storage/' . $sellPhone->payment_receipt_path) }}" target="_blank" class="inline-block rounded-lg overflow-hidden border border-emerald-200 aspect-video w-48 mx-auto hover:opacity-80 transition cursor-zoom-in">
+                            <a href="{{ asset('storage/' . $sellPhone->payment_receipt_path) }}" target="_blank" class="inline-block rounded-lg overflow-hidden border border-emerald-200 aspect-video w-48 mx-auto hover:opacity-80 transition cursor-zoom-in mb-3">
                                 <img src="{{ asset('storage/' . $sellPhone->payment_receipt_path) }}" class="w-full h-full object-cover">
                             </a>
+                        </div>
+                    @else
+                        <div class="mt-4 border-t border-emerald-200 pt-4">
+                            <p class="text-xs font-bold text-rose-600 uppercase tracking-widest mb-2">Bukti Transfer Belum Ada</p>
+                        </div>
+                    @endif
+                    
+                    @if(!$isReuploading)
+                        <button type="button" wire:click="$set('isReuploading', true)" class="text-xs font-bold text-emerald-700 underline hover:text-emerald-800">
+                            {{ $sellPhone->payment_receipt_path ? 'Upload Ulang Bukti Transfer' : 'Upload Bukti Transfer Sekarang' }}
+                        </button>
+                    @else
+                        <div class="mt-4 text-left bg-white p-4 rounded-xl border border-emerald-200">
+                            <label class="block text-sm font-bold text-emerald-900 mb-1">Pilih Bukti Transfer Baru</label>
+                            <input type="file" wire:model="paymentReceipt" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-100 file:text-emerald-700 hover:file:bg-emerald-200 mb-2">
+                            <div wire:loading wire:target="paymentReceipt" class="text-xs text-emerald-600 mt-1 mb-2">Mengunggah file...</div>
+                            @error('paymentReceipt') <span class="text-xs text-rose-500 mt-1 mb-2 block">{{ $message }}</span> @enderror
+                            
+                            <div class="flex gap-2 mt-2">
+                                <button type="button" wire:click="$set('isReuploading', false)" class="flex-1 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-bold hover:bg-gray-200 transition">Batal</button>
+                                <button type="button" wire:click="reuploadReceipt" class="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition">Simpan File</button>
+                            </div>
                         </div>
                     @endif
                 </div>

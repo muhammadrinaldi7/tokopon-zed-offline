@@ -183,28 +183,37 @@
                                     @endforeach
                                 </select>
                             </div>
-                            
-                            <div class="flex flex-col gap-3 justify-end pb-1">
-                                <label class="flex items-center gap-3 cursor-pointer group">
-                                    <div class="relative flex items-center">
-                                        <input type="checkbox" wire:model="is_default" class="sr-only peer">
-                                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#1c69d4]/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1c69d4]"></div>
-                                    </div>
-                                    <div>
-                                        <span class="text-sm font-bold text-gray-900 block group-hover:text-[#1c69d4] transition-colors">Jadikan Default</span>
-                                        <span class="text-xs text-gray-500 font-medium">Gunakan jika tidak ada template khusus brand.</span>
-                                    </div>
-                                </label>
-                                <label class="flex items-center gap-3 cursor-pointer group">
-                                    <div class="relative flex items-center">
-                                        <input type="checkbox" wire:model="is_active" class="sr-only peer">
-                                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                    </div>
-                                    <div>
-                                        <span class="text-sm font-bold text-gray-900 block group-hover:text-emerald-600 transition-colors">Template Aktif</span>
-                                    </div>
-                                </label>
+
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Maksimal Bobot Minus (Treshold) *</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" wire:model="max_weight_threshold" required min="0"
+                                        class="w-full bg-gray-50 border-transparent rounded-lg py-3 px-4 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all font-semibold text-gray-900">
+                                    <span class="text-xs text-gray-500 w-full">Jika total bobot kerusakan melebihi angka ini, otomatis FAIL.</span>
+                                </div>
+                                @error('max_weight_threshold') <span class="text-xs font-bold text-rose-500 mt-1.5 block">{{ $message }}</span> @enderror
                             </div>
+                        </div>
+
+                        <div class="flex gap-5 pt-2">
+                            <label class="flex items-center gap-3 cursor-pointer group">
+                                <div class="relative flex items-center">
+                                    <input type="checkbox" wire:model="is_default" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#1c69d4]/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1c69d4]"></div>
+                                </div>
+                                <div>
+                                    <span class="text-sm font-bold text-gray-900 block group-hover:text-[#1c69d4] transition-colors">Jadikan Default</span>
+                                </div>
+                            </label>
+                            <label class="flex items-center gap-3 cursor-pointer group">
+                                <div class="relative flex items-center">
+                                    <input type="checkbox" wire:model="is_active" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                </div>
+                                <div>
+                                    <span class="text-sm font-bold text-gray-900 block group-hover:text-emerald-600 transition-colors">Template Aktif</span>
+                                </div>
+                            </label>
                         </div>
                     </div>
 
@@ -224,27 +233,40 @@
 
                         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-2">
                             @foreach ($items as $index => $item)
-                                <div class="flex items-center gap-3 bg-gray-50/50 p-2 rounded-lg border border-gray-100 group">
-                                    <div class="flex flex-col items-center justify-center w-8 text-gray-400 cursor-move hover:text-gray-600 transition-colors">
+                                <div class="flex items-center gap-3 bg-gray-50/50 p-2 rounded-lg border border-gray-100 group flex-wrap md:flex-nowrap">
+                                    <div class="flex flex-col items-center justify-center w-8 text-gray-400 cursor-move hover:text-gray-600 transition-colors shrink-0">
                                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" /></svg>
                                         <span class="text-[10px] font-black leading-none mt-0.5">{{ $index + 1 }}</span>
                                     </div>
                                     
-                                    <div class="flex-1">
+                                    <div class="flex-1 min-w-[200px]">
                                         <input type="text" wire:model="items.{{ $index }}.name" placeholder="Nama Pengecekan (cth: LCD, Baterai, Face ID)" required
                                             class="w-full bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm font-semibold focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all">
                                     </div>
 
-                                    <div class="w-40 shrink-0">
+                                    <div class="w-full md:w-32 shrink-0">
                                         <select wire:model="items.{{ $index }}.type"
                                             class="w-full bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm font-semibold focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all">
-                                            <option value="boolean">Pilihan: OK / NOT OK</option>
-                                            <option value="text">Input Teks Bebas</option>
+                                            <option value="boolean">OK / NOT OK</option>
+                                            <option value="text">Input Teks</option>
                                         </select>
+                                    </div>
+                                    
+                                    <div class="w-full md:w-24 shrink-0 flex items-center gap-2">
+                                        <label class="text-[10px] font-bold text-gray-400 uppercase">Bobot</label>
+                                        <input type="number" wire:model="items.{{ $index }}.weight" required min="0" title="Bobot minus jika rusak"
+                                            class="w-full bg-white border border-gray-200 rounded-lg py-2 px-2 text-sm font-semibold text-center focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all">
+                                    </div>
+                                    
+                                    <div class="w-full md:w-24 shrink-0 flex items-center justify-center gap-2">
+                                        <label class="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" wire:model="items.{{ $index }}.is_fatal" class="w-4 h-4 text-rose-500 border-gray-300 rounded focus:ring-rose-500">
+                                            <span class="text-xs font-bold text-rose-600">Fatal</span>
+                                        </label>
                                     </div>
 
                                     <button type="button" wire:click="removeItem({{ $index }})"
-                                        class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition opacity-0 group-hover:opacity-100" title="Hapus Item">
+                                        class="w-8 h-8 shrink-0 flex items-center justify-center text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition md:opacity-0 group-hover:opacity-100" title="Hapus Item">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                     </button>
                                 </div>

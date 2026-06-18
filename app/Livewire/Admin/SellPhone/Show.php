@@ -42,6 +42,7 @@ class Show extends Component
     public $paymentReceipt;
     public $storeBankNo;
     public $accurateGlAccounts = [];
+    public $isReuploading = false;
 
     // Reject Form
     public $isRejecting = false;
@@ -147,7 +148,7 @@ class Show extends Component
                     'warehouseName' => $accurateWarehouseName,
                     'unitPrice' => (int) $this->sellPhone->appraised_value, // Harga yang disepakati
                     'quantity' => 1,
-
+                    'useTax1' => false,
                     // Array di dalam array untuk serial number
                     'detailSerialNumber' => [
                         [
@@ -167,6 +168,7 @@ class Show extends Component
                 'billNumber' => $billNumber,
                 'vendorNo' => str_replace('"', '', $vendorNoAwal),
                 'branchName' => $accurateBranchName,
+                'inclusiveTax' => false,
                 // Field tambahan yang Anda tulis sebelumnya (opsional/dibutuhkan Accurate)
                 // 'name' => $phoneData->user->profile->full_name ?? '',
                 'transDate' => date('d/m/Y'),
@@ -254,6 +256,28 @@ class Show extends Component
         } else {
             return;
         }
+    }
+
+    public function reuploadReceipt()
+    {
+        $this->validate([
+            'paymentReceipt' => 'required|image|max:5120',
+        ], [
+            'paymentReceipt.required' => 'Bukti bayar wajib diunggah.',
+            'paymentReceipt.image' => 'Bukti bayar harus berupa gambar.',
+        ]);
+
+        $receiptPath = $this->paymentReceipt->store('payment_receipts', 'public');
+        $this->sellPhone->update([
+            'payment_receipt_path' => $receiptPath,
+        ]);
+
+        $this->isReuploading = false;
+        $this->dispatch('toast', [
+            'type' => 'success',
+            'title' => 'Success',
+            'message' => 'Bukti transfer berhasil diunggah ulang.'
+        ]);
     }
 
     public function reject()

@@ -196,6 +196,22 @@
                 </button>
             </div>
         @endif
+        @if ($sellPhone->payment_receipt_path)
+            <div class="mt-4">
+                <h4 class="text-sm font-bold text-gray-700 mb-2">Bukti Pembayaran (Transfer)</h4>
+                <div class="rounded-xl overflow-hidden border border-gray-200">
+                    {{-- Menggunakan Storage::url() untuk memanggil gambar dari folder public --}}
+                    <img src="{{ Storage::url($sellPhone->payment_receipt_path) }}" alt="Bukti Pembayaran"
+                        class="w-full h-auto object-cover max-w-sm">
+                </div>
+                <div class="mt-2 text-xs text-gray-500">
+                    Dibayarkan menggunakan Rekening Toko: <span
+                        class="font-bold">{{ $sellPhone->store_bank_no }}</span>
+                </div>
+            </div>
+        @else
+            <p class="text-xs text-gray-400 italic">Bukti pembayaran belum diunggah oleh Admin.</p>
+        @endif
 
         {{-- Info Readonly Resi / Bank Customer --}}
         @if (in_array($sellPhone->status, ['INSPECTING', 'PAYING', 'COMPLETED']))

@@ -27,7 +27,9 @@ class SellPhone extends Model implements HasMedia
         'handled_by',
         'imei',
         'business_unit_id',
-        'reject_reason'
+        'reject_reason',
+        'payment_receipt_path',
+        'store_bank_no'
     ];
 
     public function buybackDevice()

@@ -143,7 +143,7 @@ class SellPhoneDetail extends Component
         }
     }
 
-    #[Layout('layouts.app', ['title' => 'Detail Penjualan HP'])]
+    #[Layout('layouts.z', ['title' => 'Detail Penjualan HP'])]
     public function render()
     {
         return view('livewire.pages.sell-phone-detail');

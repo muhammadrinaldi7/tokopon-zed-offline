@@ -19,8 +19,9 @@ class TemplateIndex extends Component
     public $brand_id = '';
     public $is_default = false;
     public $is_active  = true;
+    public $max_weight_threshold = 3;
 
-    // Checklist items editor: [{name, type}]
+    // Checklist items editor: [{name, type, weight, is_fatal}]
     public $items = [];
 
     // ──────────────────────────────────────────────
@@ -46,7 +47,15 @@ class TemplateIndex extends Component
         $this->brand_id     = $template->brand_id ?? '';
         $this->is_default   = $template->is_default;
         $this->is_active    = $template->is_active;
-        $this->items        = $template->items ?? [];
+        $this->max_weight_threshold = $template->max_weight_threshold ?? 3;
+        
+        $loadedItems = $template->items ?? [];
+        // Inject default weight and is_fatal if editing an old template
+        $this->items = collect($loadedItems)->map(function ($item) {
+            $item['weight'] = $item['weight'] ?? 1;
+            $item['is_fatal'] = $item['is_fatal'] ?? false;
+            return $item;
+        })->toArray();
 
         if (empty($this->items)) {
             $this->loadDefaultItems();
@@ -59,11 +68,20 @@ class TemplateIndex extends Component
     {
         $this->validate([
             'name' => 'required|string|max:255',
+            'max_weight_threshold' => 'required|numeric|min:0',
         ]);
 
-        // Filter out empty items
+        // Filter out empty items and ensure weight/is_fatal exists
         $cleanItems = collect($this->items)
             ->filter(fn($item) => !empty(trim($item['name'] ?? '')))
+            ->map(function ($item) {
+                return [
+                    'name' => $item['name'],
+                    'type' => $item['type'] ?? 'boolean',
+                    'weight' => (int) ($item['weight'] ?? 1),
+                    'is_fatal' => (bool) ($item['is_fatal'] ?? false),
+                ];
+            })
             ->values()
             ->toArray();
 
@@ -79,6 +97,7 @@ class TemplateIndex extends Component
                 'brand_id'   => $this->brand_id ?: null,
                 'is_default' => $this->is_default,
                 'is_active'  => $this->is_active,
+                'max_weight_threshold' => $this->max_weight_threshold,
                 'items'      => $cleanItems,
             ]
         );
@@ -107,6 +126,7 @@ class TemplateIndex extends Component
             'brand_id'   => $original->brand_id,
             'is_default' => false,
             'is_active'  => true,
+            'max_weight_threshold' => $original->max_weight_threshold,
             'items'      => $original->items,
         ]);
         $this->dispatch('toast', title: 'Berhasil', message: 'Template berhasil diduplikat.', type: 'success');
@@ -118,7 +138,7 @@ class TemplateIndex extends Component
 
     public function addItem()
     {
-        $this->items[] = ['name' => '', 'type' => 'boolean'];
+        $this->items[] = ['name' => '', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false];
     }
 
     public function removeItem($index)
@@ -133,28 +153,28 @@ class TemplateIndex extends Component
     private function loadDefaultItems(): void
     {
         $this->items = [
-            ['name' => 'LCD', 'type' => 'boolean'],
-            ['name' => 'Touch Screen', 'type' => 'boolean'],
-            ['name' => 'Health Battery', 'type' => 'text'],
-            ['name' => 'Kamera Belakang 1/2/3', 'type' => 'boolean'],
-            ['name' => 'Kamera Depan', 'type' => 'boolean'],
-            ['name' => 'Power On/Off', 'type' => 'boolean'],
-            ['name' => 'Volume', 'type' => 'boolean'],
-            ['name' => 'Mute Switch (Silent)', 'type' => 'boolean'],
-            ['name' => 'Home Button', 'type' => 'boolean'],
-            ['name' => 'Touch ID / Face ID', 'type' => 'boolean'],
-            ['name' => 'Microphone', 'type' => 'boolean'],
-            ['name' => 'Sensor Proximity', 'type' => 'boolean'],
-            ['name' => 'Speaker Atas', 'type' => 'boolean'],
-            ['name' => 'Speaker Bawah', 'type' => 'boolean'],
-            ['name' => 'Port Charging', 'type' => 'boolean'],
-            ['name' => 'Port Handsfree', 'type' => 'boolean'],
-            ['name' => 'Flash Light', 'type' => 'boolean'],
-            ['name' => 'Taptic / Vibrate', 'type' => 'boolean'],
-            ['name' => 'Wifi / Bluetooth', 'type' => 'boolean'],
-            ['name' => 'Signal', 'type' => 'boolean'],
-            ['name' => 'BackGlass / Housing', 'type' => 'boolean'],
-            ['name' => 'Tombol', 'type' => 'boolean'],
+            ['name' => 'LCD', 'type' => 'boolean', 'weight' => 2, 'is_fatal' => false],
+            ['name' => 'Touch Screen', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Health Battery', 'type' => 'text', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Kamera Belakang 1/2/3', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Kamera Depan', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Power On/Off', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Volume', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Mute Switch (Silent)', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Home Button', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Touch ID / Face ID', 'type' => 'boolean', 'weight' => 0, 'is_fatal' => true],
+            ['name' => 'Microphone', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Sensor Proximity', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Speaker Atas', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Speaker Bawah', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Port Charging', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Port Handsfree', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Flash Light', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Taptic / Vibrate', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Wifi / Bluetooth', 'type' => 'boolean', 'weight' => 0, 'is_fatal' => true],
+            ['name' => 'Signal', 'type' => 'boolean', 'weight' => 0, 'is_fatal' => true],
+            ['name' => 'BackGlass / Housing', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['name' => 'Tombol', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
         ];
     }
 
@@ -175,6 +195,7 @@ class TemplateIndex extends Component
         $this->brand_id   = '';
         $this->is_default = false;
         $this->is_active  = true;
+        $this->max_weight_threshold = 3;
         $this->items      = [];
     }
 

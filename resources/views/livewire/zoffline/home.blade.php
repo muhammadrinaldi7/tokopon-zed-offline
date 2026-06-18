@@ -80,7 +80,7 @@
                 <div>
                     <h1 class="text-2xl ">Aktivasi <br> Garansi</h1>
                     {{-- Tambahkan line-clamp-2 agar rapi jika kepanjangan --}}
-                    <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Catat kondisi barang baru (Unboxing QC) untuk keperluan garansi
+                    <p class="text-neutral-500 text-sm mt-3 line-clamp-2">QC untuk aktivasi garansi
                     </p>
                 </div>
             </div>
