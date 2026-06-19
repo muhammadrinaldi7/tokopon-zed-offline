@@ -79,7 +79,7 @@
         </div>
     @endif
 
-    @include('livewire.zoffline.pos.modal.draft-penjualan')
+    {{-- @include('livewire.zoffline.pos.modal.draft-penjualan') --}}
     @include('livewire.zoffline.pos.modal.receipt-struk')
     @include('livewire.zoffline.pos.modal.stok-gudang')
 
