@@ -85,17 +85,17 @@
                 </form>
 
                 {{-- Divider --}}
-                <div class="relative my-7">
+                {{-- <div class="relative my-7">
                     <div class="absolute inset-0 flex items-center">
                         <div class="w-full border-t border-neutral-150"></div>
                     </div>
                     <div class="relative flex justify-center text-xs uppercase tracking-wider">
                         <span class="bg-white px-3 text-neutral-400 font-medium">atau</span>
                     </div>
-                </div>
+                </div> --}}
 
                 {{-- Google Login --}}
-                <a href="{{ route('auth.google') }}"
+                {{-- <a href="{{ route('auth.google') }}"
                     class="w-full flex items-center justify-center gap-3 py-3 text-sm font-medium text-neutral-700 bg-white border border-neutral-200 rounded-xl transition duration-150 hover:bg-neutral-50 hover:border-neutral-300 hover:text-neutral-900 shadow-sm active:scale-[0.98]">
                     <svg class="w-5 h-5" viewBox="0 0 24 24">
                         <path
@@ -112,17 +112,17 @@
                             fill="#EA4335" />
                     </svg>
                     Masuk dengan Google
-                </a>
+                </a> --}}
             </div>
         </div>
 
-        {{-- Register Link --}}
+        {{-- Register Link
         <p class="mt-6 pb-5 text-center text-sm text-neutral-500">
             Belum punya akun?
             <a href="/register" wire:navigate
                 class="font-semibold text-neutral-900 hover:underline underline-offset-4 transition">
                 Daftar sekarang
             </a>
-        </p>
+        </p> --}}
     </div>
 </div>

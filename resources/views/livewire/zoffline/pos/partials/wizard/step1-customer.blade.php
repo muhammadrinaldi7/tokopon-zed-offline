@@ -27,36 +27,53 @@
                     Cari Nama /
                     No
                     Telpon</label>
-                <div class="relative flex items-center">
-                    {{-- Input Field --}}
-                    <input type="text" wire:model.live.debounce.300ms="searchCustomer"
-                        {{ $selectedCustomerId ? 'disabled' : '' }}
-                        class="peer w-full bg-neutral-50/80 border-2 border-neutral-200 hover:border-neutral-300 rounded-xl pl-14 pr-12 py-3 text-lg focus:border-[#1c69d4] focus:bg-white focus:ring-4 focus:ring-[#1c69d4]/10 transition-all font-normal text-gray-700 placeholder-gray-400 outline-none {{ $selectedCustomerId ? 'opacity-70 bg-gray-100 border-gray-200 cursor-not-allowed hover:border-gray-200' : '' }}"
-                        placeholder="{{ $selectedCustomerId ? ($customerName ?: 'Pelanggan Terpilih') : 'Ketik nama pelanggan di sini...' }}">
+                <div
+                    class="relative flex items-center bg-neutral-50/80 border-2 border-neutral-200 rounded-xl min-h-[56px] transition-all hover:border-neutral-300 focus-within:border-[#1c69d4] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#1c69d4]/10">
 
                     {{-- Icon User (Kiri) --}}
-                    <span
-                        class="absolute left-5 text-gray-400 transition-colors duration-200 peer-focus:text-neutral-800 pointer-events-none">
+                    <span class="absolute left-5 text-gray-400 pointer-events-none">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24">
                             <path d="M0 0h24v24H0z" fill="none" />
                             <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                 stroke-width="1.5"
                                 d="M19.523 21.99H4.488c-1.503 0-2.663-1.134-2.466-2.624l.114-.869c.207-1.2 1.305-1.955 2.497-2.214L11.928 15h.144l7.295 1.283c1.212.28 2.29.993 2.497 2.214l.114.88c.197 1.49-.963 2.623-2.466 2.623zM17 7A5 5 0 1 1 7 7a5 5 0 0 1 10 0" />
                         </svg>
-
                     </span>
 
+                    @if ($selectedCustomerId)
+                        <div class="pl-14 pr-4 py-2 w-full flex items-center">
+                            <div
+                                class="inline-flex items-center gap-2 bg-[#BDCEFF] text-neutral-800 px-3 py-1.5 rounded-lg shadow-sm">
+                                <span class="font-bold text-sm tracking-wide">{{ $customerName }}</span>
+                                <button wire:click="clearSelectedCustomer"
+                                    class="hover:text-red-200 hover:bg-white/20 rounded-full p-0.5 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    @else
+                        {{-- Input Field --}}
+                        <input type="text" wire:model.live.debounce.300ms="searchCustomer"
+                            class="w-full bg-transparent pl-14 pr-12 py-3 text-lg font-normal text-gray-700 placeholder-gray-400 outline-none"
+                            placeholder="Ketik nama pelanggan di sini...">
+                    @endif
+
                     {{-- Loading Spinner Livewire (Kanan) --}}
-                    <div wire:loading wire:target="searchCustomer" class="absolute right-5">
-                        <svg class="animate-spin w-5 h-5 text-neutral-800" xmlns="http://www.w3.org/2000/svg"
-                            fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                stroke-width="3"></circle>
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                            </path>
-                        </svg>
-                    </div>
+                    @if (!$selectedCustomerId)
+                        <div wire:loading wire:target="searchCustomer" class="absolute right-5">
+                            <svg class="animate-spin w-5 h-5 text-neutral-800" xmlns="http://www.w3.org/2000/svg"
+                                fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="3"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                        </div>
+                    @endif
                 </div>
 
                 @if (strlen($searchCustomer) >= 2 && !$selectedCustomerId)
@@ -133,44 +150,63 @@
                     Nomor
                     WhatsApp</label>
 
-                <div class="relative flex items-center">
-                    {{-- Input Field --}}
-                    <input type="text" wire:model="customerPhone" {{ $selectedCustomerId ? 'readonly' : '' }}
-                        class="peer w-full bg-gray-50/80 border-2 border-gray-200 hover:border-gray-300 rounded-xl pl-14 pr-6 py-3 text-lg focus:border-[#1c69d4] focus:bg-white focus:ring-4 focus:ring-[#1c69d4]/10 transition-all font-normal text-gray-700 placeholder-gray-400 outline-none {{ $selectedCustomerId ? 'opacity-70 bg-gray-100 border-gray-200 cursor-not-allowed hover:border-gray-200' : '' }}"
-                        placeholder="0812...">
-
+                <div
+                    class="relative flex items-center bg-gray-50/80 border-2 border-gray-200 rounded-xl min-h-[56px] transition-all hover:border-gray-300 focus-within:border-[#1c69d4] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#1c69d4]/10">
                     {{-- Icon Phone (Kiri) --}}
-                    <span
-                        class="absolute left-5 text-gray-400 transition-colors duration-200 peer-focus:text-[#1c69d4] pointer-events-none">
+                    <span class="absolute left-5 text-gray-400 pointer-events-none">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                             stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                         </svg>
                     </span>
+
+                    @if ($selectedCustomerId && $customerPhone)
+                        <div class="pl-14 pr-4 py-2 w-full flex items-center">
+                            <div
+                                class="inline-flex items-center bg-[#D4F1FF] border border-emerald-200 text-neutral-800 px-3 py-1.5 rounded-lg shadow-sm">
+                                <span class="font-bold text-sm  tracking-wide">{{ $customerPhone }}</span>
+                            </div>
+                        </div>
+                    @else
+                        {{-- Input Field --}}
+                        <input type="text" wire:model="customerPhone"
+                            class="w-full bg-transparent pl-14 pr-6 py-3 text-lg font-normal text-gray-700 placeholder-gray-400 outline-none"
+                            placeholder="0812...">
+                    @endif
                 </div>
             </div>
 
             {{-- Email Input --}}
             <div class="relative md:col-span-1">
-                <label class="block text-xs lg:text-sm font-semibold text-gray-700 mb-3 uppercase tracking-widest">Email
+                <label
+                    class="block text-xs lg:text-sm font-semibold text-gray-700 mb-3 uppercase tracking-widest">Email
                     (Opsional)</label>
 
-                <div class="relative flex items-center">
-                    {{-- Input Field --}}
-                    <input type="email" wire:model="customerEmail" {{ $selectedCustomerId ? 'readonly' : '' }}
-                        class="peer w-full bg-gray-50/80 border-2 border-gray-200 hover:border-gray-300 rounded-xl pl-14 pr-6 py-3 text-lg focus:border-[#1c69d4] focus:bg-white focus:ring-4 focus:ring-[#1c69d4]/10 transition-all font-normal text-gray-700 placeholder-gray-400 outline-none {{ $selectedCustomerId ? 'opacity-70 bg-gray-100 border-gray-200 cursor-not-allowed hover:border-gray-200' : '' }}"
-                        placeholder="nama@email.com">
-
+                <div
+                    class="relative flex items-center bg-gray-50/80 border-2 border-gray-200 rounded-xl min-h-[56px] transition-all hover:border-gray-300 focus-within:border-[#1c69d4] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#1c69d4]/10">
                     {{-- Icon Email (Kiri) --}}
-                    <span
-                        class="absolute left-5 text-gray-400 transition-colors duration-200 peer-focus:text-[#1c69d4] pointer-events-none">
+                    <span class="absolute left-5 text-gray-400 pointer-events-none">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                             stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
                     </span>
+
+                    @if ($selectedCustomerId && $customerEmail)
+                        <div class="pl-14 pr-4 py-2 w-full flex items-center">
+                            <div
+                                class="inline-flex items-center bg-[#FFCDA2] border border-gray-300 text-neutral-800 px-3 py-1.5 rounded-lg shadow-sm">
+                                <span class="font-bold  text-sm tracking-wide">{{ $customerEmail }}</span>
+                            </div>
+                        </div>
+                    @else
+                        {{-- Input Field --}}
+                        <input type="email" wire:model="customerEmail"
+                            class="w-full bg-transparent pl-14 pr-6 py-3 text-lg font-normal text-gray-700 placeholder-gray-400 outline-none"
+                            placeholder="nama@email.com">
+                    @endif
                 </div>
             </div>
 
@@ -180,15 +216,10 @@
                     Pilih Tenaga
                     Penjual (Sales)</label>
 
-                <div class="relative flex items-center">
-                    {{-- Input Field --}}
-                    <input type="text" wire:model.live.debounce.300ms="searchSales"
-                        class="peer w-full bg-gray-50/80 border-2 border-gray-200 hover:border-gray-300 rounded-2xl pl-14 pr-12 py-3 text-lg focus:border-[#1c69d4] focus:bg-white focus:ring-4 focus:ring-[#1c69d4]/10 transition-all font-normal text-gray-700 placeholder-gray-400 outline-none"
-                        placeholder="Ketik nama sales...">
-
+                <div
+                    class="relative flex items-center bg-gray-50/80 border-2 border-gray-200 rounded-2xl min-h-[56px] transition-all hover:border-gray-300 focus-within:border-[#1c69d4] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#1c69d4]/10">
                     {{-- Icon Users (Kiri) --}}
-                    <span
-                        class="absolute left-5 text-gray-400 transition-colors duration-200 peer-focus:text-[#1c69d4] pointer-events-none">
+                    <span class="absolute left-5 text-gray-400 pointer-events-none">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                             stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -196,21 +227,46 @@
                         </svg>
                     </span>
 
+                    @if (count($selectedSales) > 0)
+                        <div class="pl-14 pr-4 py-2 w-full flex items-center">
+                            @php $sales = $selectedSales[0]; @endphp
+                            <div
+                                class="inline-flex items-center gap-2 bg-neutral-100 text-neutral-800 px-3 py-1.5 rounded-lg shadow-sm">
+                                <span class="font-bold text-sm tracking-wide">{{ $sales['name'] }}</span>
+                                <button wire:click="removeSales({{ $sales['id'] }})"
+                                    class="hover:text-red-200 hover:bg-white/20 rounded-full p-0.5 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    @else
+                        {{-- Input Field --}}
+                        <input type="text" wire:model.live.debounce.300ms="searchSales"
+                            class="w-full bg-transparent pl-14 pr-12 py-3 text-lg font-normal text-gray-700 placeholder-gray-400 outline-none"
+                            placeholder="Ketik nama sales...">
+                    @endif
+
                     {{-- Loading Spinner Livewire (Kanan) --}}
-                    <div wire:loading wire:target="searchSales" class="absolute right-5">
-                        <svg class="animate-spin w-5 h-5 text-[#1c69d4]" xmlns="http://www.w3.org/2000/svg"
-                            fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                stroke-width="3"></circle>
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                            </path>
-                        </svg>
-                    </div>
+                    @if (count($selectedSales) == 0)
+                        <div wire:loading wire:target="searchSales" class="absolute right-5">
+                            <svg class="animate-spin w-5 h-5 text-[#1c69d4]" xmlns="http://www.w3.org/2000/svg"
+                                fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10"
+                                    stroke="currentColor" stroke-width="3"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                        </div>
+                    @endif
                 </div>
 
                 {{-- Dropdown Hasil Pencarian Sales --}}
-                @if (strlen($searchSales) >= 2)
+                @if (strlen($searchSales) >= 2 && count($selectedSales) == 0)
                     <div
                         class="absolute top-full left-0 w-full mt-3 bg-white border border-gray-100 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] max-h-60 overflow-y-auto z-50 ring-1 ring-black/5">
                         @forelse($this->salesResults as $sales)
@@ -230,92 +286,7 @@
             </div>
         </div>
 
-        {{-- Info Area & Selected Badges --}}
-        <div
-            class="mt-8 flex flex-col md:flex-row gap-6 items-center justify-between bg-white border border-gray-200 shadow-sm p-5 rounded-2xl">
 
-            {{-- Selected Customer Info --}}
-            <div class="w-full md:w-auto flex-shrink-0">
-                @if ($selectedCustomerId)
-                    @php $customer = \App\Models\User::with('profile')->find($selectedCustomerId); @endphp
-                    @if ($customer)
-                        <div
-                            class="inline-flex items-center gap-4 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all px-4 py-3 rounded-xl w-full md:w-auto group">
-                            {{-- Avatar --}}
-                            <div
-                                class="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg uppercase shrink-0 shadow-inner">
-                                {{ substr($customer->name, 0, 1) }}
-                            </div>
-
-                            {{-- Info --}}
-                            <div class="flex-1 pr-3">
-                                <span
-                                    class="block text-sm font-bold text-gray-900 tracking-tight">{{ $customer->name }}</span>
-                                <span
-                                    class="block text-xs font-medium text-gray-500">{{ $customer->profile->phone_number ?? 'Belum ada nomor' }}</span>
-                            </div>
-
-                            {{-- Tombol Hapus --}}
-                            <button wire:click="clearSelectedCustomer" title="Ganti Pelanggan"
-                                class="w-8 h-8 rounded-full text-gray-400 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition-all shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                    stroke-width="2" stroke="currentColor" class="w-4 h-4">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                    @endif
-                @elseif($isNewCustomer)
-                    {{-- State Pelanggan Baru --}}
-                    <div
-                        class="inline-flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl w-full md:w-auto">
-                        <div class="bg-emerald-100 p-2 rounded-full shrink-0">
-                            <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24"
-                                stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                        </div>
-                        <div>
-                            <span class="block text-sm font-bold text-emerald-800">Pelanggan Baru Disimpan</span>
-                            <span class="block text-xs font-medium text-emerald-600">Sistem otomatis
-                                mendaftarkan</span>
-                        </div>
-                    </div>
-                @else
-                    {{-- Empty State --}}
-                    <div class="flex items-center gap-2 text-gray-400">
-                        <svg class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-                        </svg>
-                        <p class="text-sm font-medium italic">Pilih pelanggan dan sales untuk melanjutkan...</p>
-                    </div>
-                @endif
-            </div>
-
-            {{-- Selected Sales Badges --}}
-            @if (count($selectedSales) > 0)
-                <div
-                    class="flex flex-wrap gap-2 items-center justify-start md:justify-end w-full md:w-auto mt-2 md:mt-0">
-                    <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mr-1">Sales:</span>
-
-                    @foreach ($selectedSales as $sales)
-                        <div
-                            class="flex items-center gap-1.5 bg-gray-50 border border-gray-200 text-gray-700 rounded-full pl-3 pr-1 py-1 shadow-sm hover:border-gray-300 transition-colors">
-                            <span class="font-semibold text-xs">{{ $sales['name'] }}</span>
-                            <button wire:click="removeSales({{ $sales['id'] }})"
-                                class="w-5 h-5 rounded-full flex items-center justify-center text-gray-400 hover:text-rose-600 hover:bg-rose-100 transition-colors">
-                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                    stroke-width="2.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-        </div>
 
         {{-- Lanjutkan Button (Massive) --}}
         @php

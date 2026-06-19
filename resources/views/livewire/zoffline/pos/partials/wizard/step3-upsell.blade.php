@@ -16,7 +16,7 @@
             </div>
             <p class="text-sm text-neutral-500">Transaksi Penjualan</p>
         </div>
-        <h1 class="text-3xl font-semibold  text-neutral-800 mt-4">Tambahkan Promo & Paket Pendukung</h1>
+        <h1 class="text-3xl font-semibold  text-neutral-800 mt-2">Tambahkan Promo & Paket Pendukung</h1>
     </div>
     {{-- CUSTOMER INFO PILLS (FIGMA STYLE) --}}
     @if ($selectedCustomerId || $isNewCustomer)
@@ -48,13 +48,12 @@
         </div>
     @endif
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {{-- ADD-ON SECTION --}}
-        <div
-            class="bg-white rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-100 p-8 flex flex-col h-100">
+        <div class="bg-white rounded-3xl lg:col-span-2 shadow-sm border border-gray-100 p-6 flex flex-col h-120">
             <h3 class="font-black text-gray-800 text-lg mb-2 shrink-0">Add Ons</h3>
-            <p class="text-sm text-gray-500 mb-6 shrink-0">Tawarkan produk pelengkap ke pelanggan.</p>
+            <p class="text-xs text-gray-500 mb-6 shrink-0">Tawarkan produk pelengkap ke pelanggan.</p>
 
             <div class="relative mb-6 shrink-0">
                 <span class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -69,32 +68,47 @@
                     placeholder="Cari aksesoris atau produk lain...">
             </div>
 
-            <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                <div class="grid grid-cols-1 gap-3">
+            <div class="flex-1 overflow-y-auto pr-2 no-scrollbar">
+                <div class="grid grid-cols-2 md:grid-cols-3  gap-3">
                     @forelse($this->addonsResults as $product)
+                        @php
+                            $isInCart = collect($this->cart)->contains(function ($item) use ($product) {
+                                return $item['variant_id'] == $product->id &&
+                                    $item['variant_type'] == \App\Models\ProductAccurate::class;
+                            });
+                        @endphp
                         <div wire:click="selectAddon({{ $product->id }})"
-                            class="flex items-center gap-4 p-3 rounded-2xl border border-gray-100 hover:border-[#1c69d4] hover:bg-blue-50/50 cursor-pointer transition-all group">
-                            <div
-                                class="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 shrink-0 border border-gray-200">
+                            class="relative flex items-center gap-4 p-3 rounded-xl border shadow-sm cursor-pointer transition-all group {{ $isInCart ? 'border-[#1c69d4] bg-blue-50/50 ring-1 ring-[#1c69d4]/50' : 'border-gray-100 hover:border-[#1c69d4] hover:bg-blue-50/50' }}">
+
+                            @if ($isInCart)
+                                <div class="absolute top-2 right-2 bg-[#1c69d4] text-white rounded-full p-1 shadow-md">
+                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="4">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                            @endif
+
+                            <div class="w-7 h-7 rounded-xl overflow-hidden bg-gray-100 shrink-0 border border-gray-200">
                                 <div class="w-full h-full flex items-center justify-center text-neutral-800">
                                     @php $productNameLower = strtolower($product->name); @endphp
                                     @if (str_contains($productNameLower, 'care'))
-                                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                                 d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                                         </svg>
                                     @elseif(str_contains($productNameLower, 'adapter'))
-                                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                                 d="M13 10V3L4 14h7v7l9-11h-7z" />
                                         </svg>
                                     @elseif(str_contains($productNameLower, 'case'))
-                                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                                 d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                         </svg>
                                     @else
-                                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                         </svg>
@@ -102,18 +116,10 @@
                                 </div>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <h4 class="font-bold text-sm text-gray-800 truncate group-hover:text-[#1c69d4]">
+                                <h4 class="font-semibold text-xs text-gray-800 truncate group-hover:text-[#1c69d4]">
                                     {{ $product->name }}</h4>
-                                <p class="text-sm font-black text-gray-600 mt-1">Rp
+                                <p class="text-[10px] font-semibold text-blue-600 mt-1">Rp
                                     {{ number_format($product->base_price ?? 0, 0, ',', '.') }}</p>
-                            </div>
-                            <div
-                                class="w-10 h-10 rounded-full bg-blue-50 text-[#1c69d4] flex items-center justify-center group-hover:bg-[#1c69d4] group-hover:text-white transition-colors">
-                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
                             </div>
                         </div>
                     @empty
@@ -131,31 +137,32 @@
         </div>
         {{-- PROMO SECTION --}}
         <div
-            class="bg-white rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-100 p-8 flex flex-col h-100">
+            class="bg-white rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-100 p-6 flex flex-col h-120">
             <h3 class="font-black text-gray-800 text-lg mb-2 shrink-0">Promo Tersedia</h3>
-            <p class="text-sm text-gray-500 mb-6 shrink-0">Pilih promo yang berlaku untuk keranjang Anda saat ini.</p>
+            <p class="text-xs text-gray-500 mb-6 shrink-0">Pilih promo yang berlaku untuk keranjang Anda saat ini.</p>
 
             <div class="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
                 @forelse ($this->activePromos as $promo)
                     <label
-                        class="flex items-start gap-4 p-4 rounded-2xl border-2 {{ in_array($promo->id, $selectedPromos) ? 'border-[#1c69d4] bg-blue-50/50' : 'border-gray-100 hover:border-blue-200 hover:bg-gray-50' }} cursor-pointer transition-all">
+                        class="flex items-start gap-4 p-3 rounded-xl  {{ in_array($promo->id, $selectedPromos) ? 'border-[#1c69d4] border-2 bg-blue-50/50' : 'border-gray-100 border hover:border-blue-200 hover:bg-gray-50' }} cursor-pointer shadow-sm transition-all">
                         <div class="mt-1">
                             <input type="checkbox" wire:model.live="selectedPromos" value="{{ $promo->id }}"
                                 class="w-5 h-5 text-[#1c69d4] border-gray-300 rounded focus:ring-[#1c69d4]">
                         </div>
                         <div class="flex-1">
-                            <h4 class="font-bold text-gray-800 text-base">{{ $promo->name }}</h4>
-                            <p class="text-xs text-gray-500 mt-1 line-clamp-2">
+                            <h4 class="font-semibold text-gray-800  text-xs">{{ $promo->name }}</h4>
+                            <p class="text-[10px] text-gray-500 mt-1 line-clamp-2">
                                 {{ $promo->description ?? 'Nikmati potongan harga spesial.' }}</p>
                         </div>
                         <div class="text-right shrink-0">
                             @if ($promo->discount_type === 'fixed')
-                                <span class="block font-black text-rose-500">-Rp
+                                <span class="block text-sm font-semibold text-rose-500">-Rp
                                     {{ number_format($promo->discount_value, 0, ',', '.') }}</span>
                             @else
-                                <span class="block font-black text-rose-500">-{{ $promo->discount_value }}%</span>
+                                <span
+                                    class="block text-sm font-semibold text-rose-500">-{{ $promo->discount_value }}%</span>
                             @endif
-                            <span class="text-[10px] font-bold text-gray-400 uppercase">Potongan</span>
+                            <span class="text-[10px] text-xs font-semibold text-gray-400 uppercase">Potongan</span>
                         </div>
                     </label>
                 @empty
@@ -185,13 +192,18 @@
         <button wire:click="nextStep" wire:loading.attr="disabled" wire:target="nextStep"
             class="px-8 py-3.5 bg-[#668DFF] hover:bg-[#4f7df8] text-white font-black rounded-xl shadow-[0_8px_15px_-3px_rgba(28,105,212,0.3)] hover:shadow-[0_12px_20px_-3px_rgba(28,105,212,0.4)] hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-75 disabled:cursor-wait">
             <span wire:loading.remove wire:target="nextStep">Lanjut</span>
-            <svg wire:loading.remove wire:target="nextStep" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+            <svg wire:loading.remove wire:target="nextStep" class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor" stroke-width="3">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
             <span wire:loading.inline-flex wire:target="nextStep" class="items-center gap-2">
-                <svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                        stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
                 </svg>
                 Memproses...
             </span>

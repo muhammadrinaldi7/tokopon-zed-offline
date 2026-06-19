@@ -50,12 +50,21 @@ trait WithCustomerAndSales
     public function selectCustomer($id)
     {
         $this->selectedCustomerId = $id;
+        $customer = \App\Models\User::with('profile')->find($id);
+        if ($customer) {
+            $this->customerName = $customer->name;
+            $this->customerPhone = $customer->profile->phone_number ?? '';
+            $this->customerEmail = $customer->email ?? '';
+        }
         $this->searchCustomer = '';
     }
 
     public function clearSelectedCustomer()
     {
         $this->selectedCustomerId = null;
+        $this->customerName = '';
+        $this->customerPhone = '';
+        $this->customerEmail = '';
         $this->isNewCustomer = false;
     }
 
@@ -64,12 +73,12 @@ trait WithCustomerAndSales
     public function selectSales($id)
     {
         $sales = \App\Models\Employe::find($id);
-        if ($sales && !collect($this->selectedSales)->contains('id', $id)) {
-            $this->selectedSales[] = [
+        if ($sales) {
+            $this->selectedSales = [[
                 'id' => $sales->id,
                 'name' => $sales->name,
                 'employee_no' => $sales->employee_no
-            ];
+            ]];
         }
         $this->searchSales = '';
     }

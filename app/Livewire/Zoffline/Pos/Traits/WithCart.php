@@ -71,7 +71,12 @@ trait WithCart
             $this->dispatch('focus-addon-sn-input');
         } else {
             // Langsung tambahkan ke keranjang (tanpa SN)
-            $this->addScannedAccurateToCart($product, null, 1);
+            $stock = (int) $product->stock;
+            if ($stock <= 0) {
+                $this->dispatch('toast', title: 'Stok Kosong', message: "Stok untuk produk '{$product->name}' saat ini habis (0).", type: 'error');
+                return;
+            }
+            $this->addScannedAccurateToCart($product, null, $stock);
         }
     }
 

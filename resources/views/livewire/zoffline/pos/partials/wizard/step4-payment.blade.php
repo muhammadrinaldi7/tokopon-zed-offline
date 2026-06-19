@@ -225,49 +225,48 @@
                     $imagePath = $imageName ? public_path('assets/png/paymentmethod/' . $imageName) : '';
                     $hasImage = $imagePath ? file_exists($imagePath) : false;
                 @endphp
-                <div class="max-w-7xl mx-auto space-y-6"
-                    wire:key="payment-step3-{{ $activePaymentIndex }}"
+                <div class="max-w-7xl mx-auto space-y-6" wire:key="payment-step3-{{ $activePaymentIndex }}"
                     x-data="{
                         rawAmount: @entangle('payments.' . $activePaymentIndex . '.amount'),
                         rateId: @entangle('payments.' . $activePaymentIndex . '.payment_method_rate_id'),
                         hasRate: {{ $hasRate ? 'true' : 'false' }},
                         isSplit: {{ $paymentMode === 'split' ? 'true' : 'false' }},
                         formattedAmount: '',
-                        
+                    
                         init() {
                             this.formattedAmount = this.formatNumber(this.rawAmount);
-                            
+                    
                             $watch('rawAmount', value => {
-                                if(document.activeElement !== this.$refs.amountInput) {
+                                if (document.activeElement !== this.$refs.amountInput) {
                                     this.formattedAmount = this.formatNumber(value);
                                 }
                             });
                         },
-                        
+                    
                         formatNumber(val) {
                             if (!val) return '';
                             let num = parseInt(String(val).replace(/\D/g, ''), 10);
                             return isNaN(num) ? '' : num.toLocaleString('id-ID');
                         },
-                        
+                    
                         updateAmount(e) {
                             if (!this.isSplit) return;
-                            
+                    
                             let val = e.target.value;
                             let num = parseInt(val.replace(/\D/g, ''), 10);
-                            if(isNaN(num)) num = 0;
-                            
+                            if (isNaN(num)) num = 0;
+                    
                             this.formattedAmount = this.formatNumber(num);
                             this.rawAmount = num;
                         },
-
+                    
                         saveLine() {
                             if (!this.canSave) return;
                             $wire.set('payments.' + {{ $activePaymentIndex }} + '.amount', this.rawAmount).then(() => {
                                 $wire.savePaymentLine();
                             });
                         },
-
+                    
                         get canSave() {
                             let amountValid = this.rawAmount > 0;
                             let rateValid = !this.hasRate || (this.rateId !== '' && this.rateId !== null);
@@ -353,8 +352,7 @@
                             <span
                                 class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-black text-2xl">Rp</span>
                             <input type="text" x-ref="amountInput" x-model="formattedAmount"
-                                @input="updateAmount($event)"
-                                x-bind:readonly="!isSplit"
+                                @input="updateAmount($event)" x-bind:readonly="!isSplit"
                                 :class="!isSplit ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'text-gray-800'"
                                 class="w-full bg-white border-2 border-gray-300 rounded-2xl pl-16 pr-5 py-5 text-4xl font-black focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/20 transition-all text-right"
                                 placeholder="0">
@@ -362,8 +360,7 @@
                     </div>
 
                     @if ($paymentMode === 'split')
-                        <button @click="saveLine"
-                            x-bind:disabled="!canSave"
+                        <button @click="saveLine" x-bind:disabled="!canSave"
                             class="w-full py-4 mt-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 disabled:hover:bg-gray-400 disabled:cursor-not-allowed text-white font-black rounded-2xl shadow-lg shadow-emerald-600/30 transition-all text-xl flex items-center justify-center gap-2">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                 stroke-width="2.5">
