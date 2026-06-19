@@ -294,7 +294,7 @@
         @endphp
         <button wire:click="nextStep" @if (!$isReady) disabled @endif wire:loading.attr="disabled"
             wire:target="nextStep"
-            class="w-full mt-8 px-8 py-5 font-semibold text-xl rounded-2xl transition-all flex items-center justify-center gap-3 {{ $isReady ? 'bg-[#668DFF] hover:bg-[#1c69d4] text-white shadow-[0_8px_15px_-3px_rgba(28,105,212,0.3)] hover:shadow-[0_12px_20px_-3px_rgba(28,105,212,0.4)] hover:-translate-y-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed' }} disabled:opacity-75 disabled:cursor-wait">
+            class="w-full mt-8 px-8 py-5 font-semibold text-xl rounded-2xl transition-all flex items-center justify-center gap-3 {{ $isReady ? 'bg-[#668DFF] hover:bg-[#1c69d4] text-white shadow-[0_8px_15px_-3px_rgba(28,105,212,0.3)] hover:shadow-[0_12px_20px_-3px_rgba(28,105,212,0.4)] hover:-translate-y-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed' }} disabled:opacity-75 ">
             <span wire:loading.remove wire:target="nextStep">Lanjutkan</span>
             <span wire:loading.inline-flex wire:target="nextStep" class="items-center gap-2">
                 <svg class="animate-spin h-6 w-6 text-current" xmlns="http://www.w3.org/2000/svg" fill="none"

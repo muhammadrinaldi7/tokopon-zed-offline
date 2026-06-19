@@ -1,7 +1,4 @@
 <div class="" x-data="{ showSidebar: false }">
-
-
-
     {{-- Main Content Area --}}
     <div class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative">
         <div class="max-w-7xl mx-auto min-h-full flex flex-col">
@@ -16,26 +13,6 @@
             @endif
         </div>
     </div>
-
-
-    @include('livewire.zoffline.pos.modal.variant')
-    @include('livewire.zoffline.pos.modal.checkout')
-    @include('livewire.zoffline.pos.modal.riwayat-penjualan')
-    @if ($showHistoryModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
-                <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h3 class="font-bold text-gray-800">Riwayat Transaksi POS (Hari Ini)</h3>
-                    <button wire:click="$set('showHistoryModal', false)"
-                        class="text-gray-400 hover:text-rose-500 font-bold">&times;</button>
-                </div>
-                <div class="p-4 overflow-y-auto">
-                    @include('livewire.zoffline.pos.partials.history-modal')
-                </div>
-            </div>
-        </div>
-    @endif
-
     <!-- Modal QC Serah Terima -->
     @if ($showQcModal && $targetSnId)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -78,21 +55,7 @@
             </div>
         </div>
     @endif
-
-    {{-- @include('livewire.zoffline.pos.modal.draft-penjualan') --}}
     @include('livewire.zoffline.pos.modal.receipt-struk')
-    @include('livewire.zoffline.pos.modal.stok-gudang')
-
-    {{-- <div id="scanner-modal"
-        class="hidden fixed inset-0 z-50 bg-black/60  items-center justify-center backdrop-blur-sm">
-        <div class="bg-white p-4 rounded-lg w-11/12 max-w-md shadow-xl">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-gray-700">Arahkan Kamera ke Barcode</h3>
-                <button onclick="closeScanner()" class="text-red-500 hover:text-red-700 font-bold p-1">Tutup</button>
-            </div>
-            <div id="reader" class="w-full bg-black rounded overflow-hidden"></div>
-        </div>
-    </div> --}}
     <div id="scanner-modal" class="hidden fixed inset-0 z-50 bg-black/60 items-center justify-center backdrop-blur-sm">
         <div class="bg-white p-4 rounded-lg w-11/12 max-w-md shadow-xl">
 
@@ -205,8 +168,7 @@
                                             </span>
                                         @endif
                                     @else
-                                        <span
-                                            class="text-sm font-bold text-gray-800">{{ $item['value'] ?? '-' }}</span>
+                                        <span class="text-sm font-bold text-gray-800">{{ $item['value'] ?? '-' }}</span>
                                     @endif
                                 </div>
                             @endforeach
