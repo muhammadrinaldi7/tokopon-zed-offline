@@ -24,7 +24,7 @@ class VendorSaveHandler implements WebhookHandlerInterface
                     if ($action === 'WRITE') {
                         $this->syncVendorDetail($vendorNo, $vendorId, $dbSource);
                     } elseif ($action === 'DELETE') {
-                        $this->handleDeletedVendor($vendorNo);
+                        $this->handleDeletedVendor($vendorNo, $dbSource);
                     }
                 }
             }
@@ -48,7 +48,8 @@ class VendorSaveHandler implements WebhookHandlerInterface
                 Vendor::updateOrCreate(
                     [
                         // Kita gunakan vendor_no sebagai acuan pencarian yang utama atau accurate_vendor_id
-                        'accurate_vendor_id' => $accurateVendorId
+                        'accurate_vendor_id' => $accurateVendorId,
+                        'database_source' => $dbSource,
                     ],
                     [
                         'vendor_no' => $accurateVendor['vendorNo'] ?? $vendorNo,
@@ -65,14 +66,16 @@ class VendorSaveHandler implements WebhookHandlerInterface
         }
     }
 
-    private function handleDeletedVendor($vendorNo)
+    private function handleDeletedVendor($vendorNo, $dbSource)
     {
         try {
-            $vendor = Vendor::where('vendor_no', $vendorNo)->first();
+            $vendor = Vendor::where('vendor_no', $vendorNo)
+                            ->where('database_source', $dbSource)
+                            ->first();
             if ($vendor) {
                 // Hapus langsung vendor di DB lokal sesuai konfirmasi User
                 $vendor->delete();
-                Log::info("Vendor Dihapus via Webhook Accurate: Vendor No {$vendorNo}");
+                Log::info("Vendor Dihapus via Webhook Accurate: Vendor No {$vendorNo} ({$dbSource})");
             }
         } catch (\Exception $e) {
             Log::error("Webhook Gagal: Gagal menghapus vendor Vendor No {$vendorNo}. Error: " . $e->getMessage());

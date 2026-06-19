@@ -1369,6 +1369,32 @@ class AccurateService
             }
         }
 
+        return null;
+    }
+
+    public function getPurchaseInvoiceDetail($id, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/purchase-invoice/detail.do', [
+            'id' => $id,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? null;
+            }
+        }
+
         Log::error("Accurate API Get Receive Item Detail Failed ({$databaseSource}): " . $response->body());
         return null;
     }

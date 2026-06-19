@@ -220,12 +220,12 @@
                             @endif
                         </div>
 
-                        <div x-show="editingPrice" style="display: none;" class="mt-3 text-left bg-white p-3 rounded-lg border border-emerald-200">
-                            <label class="block text-xs font-bold text-emerald-900 mb-1">Nominal Harga Baru (Rp)</label>
+                        <div x-show="editingPrice" style="display: none;" class="mt-3 text-left bg-white p-4 rounded-xl border border-emerald-200 shadow-sm">
+                            <label class="block text-xs font-bold text-emerald-900 mb-2">Nominal Harga Baru (Rp)</label>
+                            <input type="number" wire:model="appraisedValue" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm bg-white font-mono mb-3 outline-none transition-all">
                             <div class="flex gap-2">
-                                <input type="number" wire:model="appraisedValue" class="w-full p-2 border-emerald-200 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm bg-white font-mono">
-                                <button type="button" wire:click="updatePrice" @click="editingPrice = false" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors">Simpan</button>
-                                <button type="button" @click="editingPrice = false; $wire.set('appraisedValue', {{ $sellPhone->appraised_value }})" class="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">Batal</button>
+                                <button type="button" wire:click="updatePrice" @click="editingPrice = false" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-sm transition-colors">Simpan</button>
+                                <button type="button" @click="editingPrice = false; $wire.set('appraisedValue', {{ $sellPhone->appraised_value }})" class="flex-1 bg-white border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">Batal</button>
                             </div>
                         </div>
                     </div>

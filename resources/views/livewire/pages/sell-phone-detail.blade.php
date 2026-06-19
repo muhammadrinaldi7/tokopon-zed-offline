@@ -76,9 +76,13 @@
             @if ($sellPhone->appraised_value)
                 <h2 class="text-4xl font-black text-emerald-600">Rp
                     {{ number_format($sellPhone->appraised_value, 0, ',', '.') }}</h2>
-                @if($sellPhone->is_price_adjusted)
-                    <p class="text-xs font-bold text-amber-500 mt-2 bg-amber-50 inline-block px-2 py-1 rounded-md border border-amber-200 flex items-center w-fit gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                @if ($sellPhone->is_price_adjusted)
+                    <p
+                        class="text-xs font-bold text-amber-500 mt-2 bg-amber-50 inline-block px-2 py-1 rounded-md border border-amber-200 flex items-center w-fit gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
                         Nominal disesuaikan oleh Admin
                     </p>
                 @endif
@@ -88,6 +92,83 @@
         </div>
     </div>
 
+
+    {{-- ========================================== --}}
+    {{-- 4. AREA AKSI & FLOW --}}
+    {{-- ========================================== --}}
+    <div class="pt-2">
+        @if ($sellPhone->status === 'PENDING')
+            <button wire:click="cancel" wire:confirm="Batalkan pengajuan ini?"
+                class="w-full py-4 bg-white border border-rose-200 text-rose-500 rounded-2xl font-bold text-sm hover:bg-rose-50 transition shadow-sm">
+                Batalkan Pengajuan Ini
+            </button>
+        @elseif (in_array($sellPhone->status, ['OFFERED', 'REVISED_OFFER']))
+            <div class="flex gap-3">
+                <button wire:click="cancel" wire:confirm="Tolak tawaran?"
+                    class="w-1/3 py-4 bg-white border border-neutral-200 text-neutral-600 rounded-2xl font-bold hover:bg-neutral-50 transition shadow-sm">Tolak</button>
+                <button wire:click="acceptOffer" wire:confirm="Terima tawaran?"
+                    class="w-2/3 py-4 bg-emerald-500 text-white rounded-2xl font-bold text-lg hover:bg-emerald-600 transition shadow-lg shadow-emerald-500/25">Terima
+                    Tawaran</button>
+            </div>
+        @elseif ($sellPhone->status === 'WAITING_FOR_DEVICE')
+            <div class="bg-blue-50 border border-blue-200 rounded-3xl p-6 md:p-8 shadow-sm">
+                <p class="font-bold text-blue-900 mb-2">Input Resi Kurir Anda</p>
+                <p class="text-sm text-blue-700 mb-6">Kirim HP Anda ke <strong>TokoPun Pusat (Setiabudi)</strong>, lalu
+                    masukkan nomor resinya di bawah ini.</p>
+                <form wire:submit="submitReceipt" class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" wire:model="customerShippingReceipt"
+                        class="flex-1 px-4 py-3.5 rounded-xl border border-blue-300 bg-white font-mono text-sm focus:ring-blue-500"
+                        placeholder="Ketik Nomor Resi...">
+                    <button type="submit"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-xl font-bold transition shadow-md shadow-blue-600/20 shrink-0">Kirim
+                        Resi</button>
+                </form>
+                @error('customerShippingReceipt')
+                    <span class="text-xs text-rose-500 font-bold block mt-2">{{ $message }}</span>
+                @enderror
+            </div>
+        @elseif (Auth::user()->hasRole('fl') && $sellPhone->status === 'PAYING')
+            <div class="bg-white border border-neutral-200 rounded-3xl p-6 shadow-sm mb-4 text-center">
+                <p class="text-teal-600 font-bold text-sm">Pencairan Dana Sedang Diproses</p>
+                {{-- <button wire:click="submitComplete"
+                    class="w-full py-4 bg-teal-500 text-white rounded-2xl font-bold hover:bg-teal-600 transition shadow-lg shadow-teal-500/25">
+                    Tandai Transaksi Selesai
+                </button> --}}
+            </div>
+        @endif
+        @if ($sellPhone->payment_receipt_path)
+            <div class="mt-4">
+                <h4 class="text-sm font-bold text-gray-700 mb-2">Bukti Pembayaran (Transfer)</h4>
+                <div class="rounded-xl overflow-hidden border border-gray-200">
+                    {{-- Menggunakan Storage::url() untuk memanggil gambar dari folder public --}}
+                    <img src="{{ Storage::url($sellPhone->payment_receipt_path) }}" alt="Bukti Pembayaran"
+                        class="w-full h-auto object-cover max-w-sm">
+                </div>
+                <div class="mt-2 text-xs text-gray-500">
+                    Dibayarkan menggunakan Rekening Toko: <span
+                        class="font-bold">{{ $sellPhone->store_bank_no }}</span>
+                </div>
+            </div>
+        @else
+            <p class="text-xs text-gray-400 italic">Bukti pembayaran belum diunggah oleh Admin.</p>
+        @endif
+
+        {{-- Info Readonly Resi / Bank Customer --}}
+        @if (in_array($sellPhone->status, ['INSPECTING', 'PAYING', 'COMPLETED']))
+            <div class="mt-6 text-center bg-white border border-neutral-200 rounded-2xl p-4">
+                @if (Auth::user()->hasRole('fl'))
+                    <p class="text-xs text-neutral-400 font-medium">Customer: <strong
+                            class="text-neutral-700">{{ $sellPhone->user->name }}</strong> • Rekening: <strong
+                            class="text-neutral-700">{{ $sellPhone->user->bankAccounts->first()->bank_name }}
+                            ({{ $sellPhone->user->bankAccounts->first()->account_number }})</strong></p>
+                @else
+                    <p class="text-xs text-neutral-400 font-medium">Nomor Resi Pengiriman: <strong
+                            class="font-mono text-neutral-700 text-sm">{{ $sellPhone->customer_shipping_receipt ?? '-' }}</strong>
+                    </p>
+                @endif
+            </div>
+        @endif
+    </div>
     {{-- ========================================== --}}
     {{-- 3. KONDISI & FOTO UNIT --}}
     {{-- ========================================== --}}
@@ -158,82 +239,4 @@
             <p class="text-sm text-neutral-400 italic">Tidak ada foto terlampir.</p>
         @endif
     </div>
-
-    {{-- ========================================== --}}
-    {{-- 4. AREA AKSI & FLOW --}}
-    {{-- ========================================== --}}
-    <div class="pt-2">
-        @if ($sellPhone->status === 'PENDING')
-            <button wire:click="cancel" wire:confirm="Batalkan pengajuan ini?"
-                class="w-full py-4 bg-white border border-rose-200 text-rose-500 rounded-2xl font-bold text-sm hover:bg-rose-50 transition shadow-sm">
-                Batalkan Pengajuan Ini
-            </button>
-        @elseif (in_array($sellPhone->status, ['OFFERED', 'REVISED_OFFER']))
-            <div class="flex gap-3">
-                <button wire:click="cancel" wire:confirm="Tolak tawaran?"
-                    class="w-1/3 py-4 bg-white border border-neutral-200 text-neutral-600 rounded-2xl font-bold hover:bg-neutral-50 transition shadow-sm">Tolak</button>
-                <button wire:click="acceptOffer" wire:confirm="Terima tawaran?"
-                    class="w-2/3 py-4 bg-emerald-500 text-white rounded-2xl font-bold text-lg hover:bg-emerald-600 transition shadow-lg shadow-emerald-500/25">Terima
-                    Tawaran</button>
-            </div>
-        @elseif ($sellPhone->status === 'WAITING_FOR_DEVICE')
-            <div class="bg-blue-50 border border-blue-200 rounded-3xl p-6 md:p-8 shadow-sm">
-                <p class="font-bold text-blue-900 mb-2">Input Resi Kurir Anda</p>
-                <p class="text-sm text-blue-700 mb-6">Kirim HP Anda ke <strong>TokoPun Pusat (Setiabudi)</strong>, lalu
-                    masukkan nomor resinya di bawah ini.</p>
-                <form wire:submit="submitReceipt" class="flex flex-col sm:flex-row gap-3">
-                    <input type="text" wire:model="customerShippingReceipt"
-                        class="flex-1 px-4 py-3.5 rounded-xl border border-blue-300 bg-white font-mono text-sm focus:ring-blue-500"
-                        placeholder="Ketik Nomor Resi...">
-                    <button type="submit"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-xl font-bold transition shadow-md shadow-blue-600/20 shrink-0">Kirim
-                        Resi</button>
-                </form>
-                @error('customerShippingReceipt')
-                    <span class="text-xs text-rose-500 font-bold block mt-2">{{ $message }}</span>
-                @enderror
-            </div>
-        @elseif (Auth::user()->hasRole('fl') && $sellPhone->status === 'PAYING')
-            <div class="bg-white border border-neutral-200 rounded-3xl p-6 shadow-sm mb-4 text-center">
-                <p class="text-teal-600 font-bold text-sm mb-4">Pencairan Dana Sedang Diproses</p>
-                <button wire:click="submitComplete"
-                    class="w-full py-4 bg-teal-500 text-white rounded-2xl font-bold hover:bg-teal-600 transition shadow-lg shadow-teal-500/25">
-                    Tandai Transaksi Selesai
-                </button>
-            </div>
-        @endif
-        @if ($sellPhone->payment_receipt_path)
-            <div class="mt-4">
-                <h4 class="text-sm font-bold text-gray-700 mb-2">Bukti Pembayaran (Transfer)</h4>
-                <div class="rounded-xl overflow-hidden border border-gray-200">
-                    {{-- Menggunakan Storage::url() untuk memanggil gambar dari folder public --}}
-                    <img src="{{ Storage::url($sellPhone->payment_receipt_path) }}" alt="Bukti Pembayaran"
-                        class="w-full h-auto object-cover max-w-sm">
-                </div>
-                <div class="mt-2 text-xs text-gray-500">
-                    Dibayarkan menggunakan Rekening Toko: <span
-                        class="font-bold">{{ $sellPhone->store_bank_no }}</span>
-                </div>
-            </div>
-        @else
-            <p class="text-xs text-gray-400 italic">Bukti pembayaran belum diunggah oleh Admin.</p>
-        @endif
-
-        {{-- Info Readonly Resi / Bank Customer --}}
-        @if (in_array($sellPhone->status, ['INSPECTING', 'PAYING', 'COMPLETED']))
-            <div class="mt-6 text-center bg-white border border-neutral-200 rounded-2xl p-4">
-                @if (Auth::user()->hasRole('fl'))
-                    <p class="text-xs text-neutral-400 font-medium">Customer: <strong
-                            class="text-neutral-700">{{ $sellPhone->user->name }}</strong> • Rekening: <strong
-                            class="text-neutral-700">{{ $sellPhone->user->bankAccounts->first()->bank_name }}
-                            ({{ $sellPhone->user->bankAccounts->first()->account_number }})</strong></p>
-                @else
-                    <p class="text-xs text-neutral-400 font-medium">Nomor Resi Pengiriman: <strong
-                            class="font-mono text-neutral-700 text-sm">{{ $sellPhone->customer_shipping_receipt ?? '-' }}</strong>
-                    </p>
-                @endif
-            </div>
-        @endif
-    </div>
-
 </div>

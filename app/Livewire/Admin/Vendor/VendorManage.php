@@ -31,32 +31,40 @@ class VendorManage extends Component
 
         try {
             $service = app(AccurateService::class);
-            $response = $service->getVendors();
-
-            if (empty($response)) {
-                $this->dispatch('admin-alert', type: 'error', message: 'Gagal mengambil data atau tidak ada data vendor di Accurate.');
-                $this->isLoading = false;
-                return;
-            }
-
+            $bus = \App\Models\BusinessUnit::where('is_active', true)->get();
             $syncedCount = 0;
 
-            foreach ($response as $vnd) {
-                Vendor::updateOrCreate(
-                    [
-                        'accurate_vendor_id' => $vnd['id'],
-                    ],
-                    [
-                        'vendor_no'   => $vnd['vendorNo'] ?? '',
-                        'vendor_name' => $vnd['name'],
-                        'email'       => $vnd['email'] ?? null,
-                        'phone'       => $vnd['mobilePhone'] ?? null,
-                    ]
-                );
-                $syncedCount++;
+            foreach ($bus as $bu) {
+                try {
+                    $response = $service->getVendors($bu->code);
+
+                    if (!empty($response)) {
+                        foreach ($response as $vnd) {
+                            Vendor::updateOrCreate(
+                                [
+                                    'accurate_vendor_id' => $vnd['id'],
+                                    'database_source' => $bu->code,
+                                ],
+                                [
+                                    'vendor_no'   => $vnd['vendorNo'] ?? '',
+                                    'vendor_name' => $vnd['name'],
+                                    'email'       => $vnd['email'] ?? null,
+                                    'phone'       => $vnd['mobilePhone'] ?? null,
+                                ]
+                            );
+                            $syncedCount++;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::error("Gagal Sinkronisasi Vendor untuk BU {$bu->code}: " . $e->getMessage());
+                }
             }
 
-            $this->dispatch('admin-alert', type: 'success', message: "Berhasil menyelaraskan $syncedCount data vendor dengan Accurate.");
+            if ($syncedCount > 0) {
+                $this->dispatch('admin-alert', type: 'success', message: "Berhasil menyelaraskan $syncedCount data vendor dari semua unit usaha.");
+            } else {
+                $this->dispatch('admin-alert', type: 'warning', message: 'Tidak ada data vendor baru yang disinkronisasi.');
+            }
         } catch (\Exception $e) {
             Log::error('Gagal Sinkronisasi Vendor: ' . $e->getMessage());
             $this->dispatch('admin-alert', type: 'error', message: 'Gagal sinkronisasi: ' . $e->getMessage());
@@ -68,6 +76,12 @@ class VendorManage extends Component
     public function render()
     {
         $query = Vendor::orderBy('vendor_name', 'asc');
+
+        // Multi-Tenant Filter
+        $buCode = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitCode();
+        if ($buCode) {
+            $query->where('database_source', $buCode);
+        }
 
         if ($this->search) {
             $query->where(function ($q) {

@@ -171,9 +171,13 @@ class SerialNumberSyncService
             $localVendorId = null;
 
             if ($accurateVendorId) {
-                $localVendor = \App\Models\Vendor::where('accurate_vendor_id', $accurateVendorId)->first();
+                $localVendor = \App\Models\Vendor::where('accurate_vendor_id', $accurateVendorId)
+                                                 ->where('database_source', $databaseSource)
+                                                 ->first();
                 if (!$localVendor && $vendorName) {
-                    $localVendor = \App\Models\Vendor::where('vendor_name', $vendorName)->first();
+                    $localVendor = \App\Models\Vendor::where('vendor_name', $vendorName)
+                                                     ->where('database_source', $databaseSource)
+                                                     ->first();
                 }
                 if ($localVendor) {
                     $localVendorId = $localVendor->id;
@@ -263,6 +267,131 @@ class SerialNumberSyncService
             throw $e;
         }
     }
+
+    public function syncFromPurchaseInvoice($purchaseInvoiceId, $databaseSource = 'syihab')
+    {
+        try {
+            $detail = $this->accurateService->getPurchaseInvoiceDetail($purchaseInvoiceId, $databaseSource);
+
+            if (!$detail) {
+                return 0; // Gagal ambil detail
+            }
+
+            // Ekstrak receipt date
+            $transDateStr = $detail['transDate'] ?? null;
+            $receiptDate = null;
+            if ($transDateStr) {
+                try {
+                    $receiptDate = \Carbon\Carbon::createFromFormat('d/m/Y', $transDateStr)->format('Y-m-d');
+                } catch (\Exception $e) {
+                    try {
+                        $receiptDate = \Carbon\Carbon::parse($transDateStr)->format('Y-m-d');
+                    } catch (\Exception $e2) {
+                        $receiptDate = null;
+                    }
+                }
+            }
+
+            $updatedCount = 0;
+
+            // 1. Ekstrak Vendor
+            $vendorName = $detail['vendor']['name'] ?? null;
+            $accurateVendorId = $detail['vendor']['id'] ?? null;
+            $localVendorId = null;
+
+            if ($accurateVendorId) {
+                $localVendor = \App\Models\Vendor::where('accurate_vendor_id', $accurateVendorId)
+                                                 ->where('database_source', $databaseSource)
+                                                 ->first();
+                if (!$localVendor && $vendorName) {
+                    $localVendor = \App\Models\Vendor::where('vendor_name', $vendorName)
+                                                     ->where('database_source', $databaseSource)
+                                                     ->first();
+                }
+                if ($localVendor) {
+                    $localVendorId = $localVendor->id;
+                }
+            }
+
+            // 2. Iterasi detailItem
+            $detailItems = $detail['detailItem'] ?? [];
+            Log::info("PurchaseInvoice {$purchaseInvoiceId}: Ditemukan " . count($detailItems) . " detail item untuk diproses.");
+
+            foreach ($detailItems as $item) {
+                Log::info("PurchaseInvoice {$purchaseInvoiceId}: Memproses iterasi item", ['item_data' => $item]);
+
+                $sku = $item['item']['no'] ?? $item['detailName'] ?? null; // Coba fallback
+                if (isset($item['item']['no'])) {
+                    $sku = $item['item']['no'];
+                } elseif (isset($item['itemNo'])) {
+                    $sku = $item['itemNo'];
+                } elseif (isset($item['no'])) {
+                    $sku = $item['no'];
+                }
+
+                if (!$sku) continue; // Skip jika tidak ada SKU
+
+                $hpp = $item['unitPrice'] ?? $item['itemCost'] ?? 0;
+                $accurateWarehouseId = $item['warehouseId'] ?? ($item['warehouse']['id'] ?? null);
+
+                $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+                $localWarehouseId = null;
+                if ($accurateWarehouseId && $bu) {
+                    $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
+                        ->where('business_unit_id', $bu->id)
+                        ->first();
+                    if ($localWarehouse) {
+                        $localWarehouseId = $localWarehouse->id;
+                    }
+                }
+
+                $snList = $item['detailSerialNumber'] ?? [];
+
+                foreach ($snList as $snItem) {
+                    $sn = $snItem['serialNumber']['number'] ?? null;
+                    if (!$sn) continue;
+                    $sn = (string)$sn;
+
+                    // 3. Proses Update/Insert ke DB Lokal
+                    $existingSn = ProductSerialNumber::where('serial_number', $sn)->first();
+
+                    // Tentukan qc_status
+                    $qcStatus = $databaseSource === 'second' ? 'Pending Inbound' : null;
+
+                    if ($existingSn) {
+                        $existingSn->update([
+                            'hpp' => $hpp,
+                            'vendor_id' => $localVendorId,
+                            'receipt_date' => $receiptDate,
+                        ]);
+                        $updatedCount++;
+                    } else {
+                        // CEK EKSTRA: Pastikan SN ini belum pernah terjual (belum ada di order_items)
+                        $isAlreadySold = \App\Models\OrderItem::whereRaw('FIND_IN_SET(?, REPLACE(serial_number, " ", ""))', [$sn])->exists();
+                        $finalStatus = $isAlreadySold ? 'Unavailable' : 'Available';
+
+                        ProductSerialNumber::create([
+                            'serial_number' => $sn,
+                            'item_no' => $sku,
+                            'warehouse_id' => $localWarehouseId,
+                            'hpp' => $hpp,
+                            'vendor_id' => $localVendorId,
+                            'status' => $finalStatus,
+                            'receipt_date' => $receiptDate,
+                            'qc_status' => $qcStatus,
+                        ]);
+                        $updatedCount++;
+                    }
+                }
+            }
+
+            return $updatedCount;
+        } catch (\Exception $e) {
+            Log::error("Failed to sync Purchase Invoice {$purchaseInvoiceId}: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
 
     public function syncHppFromNearestCost($itemNo, $databaseSource = null)
     {
