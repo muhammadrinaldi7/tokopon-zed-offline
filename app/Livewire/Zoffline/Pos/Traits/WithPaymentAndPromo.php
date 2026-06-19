@@ -30,7 +30,7 @@ trait WithPaymentAndPromo
     public function setPaymentMode($mode)
     {
         $this->paymentMode = $mode;
-        
+
         if ($mode === 'tunai') {
             $this->payments = [
                 [
@@ -72,10 +72,10 @@ trait WithPaymentAndPromo
             'payment_method_id' => '',
             'payment_method_rate_id' => '',
             'no_kontrak' => '',
-            'amount' => $remaining,
+            'amount' => 0,
         ];
         $this->activePaymentIndex = count($this->payments) - 1;
-        
+
         if ($category === 'NON-TUNAI') {
             $this->paymentWizardStep = 1.5; // Pilih Bank Group dulu
         } else {
@@ -106,6 +106,10 @@ trait WithPaymentAndPromo
     public function prevPaymentWizardStep()
     {
         if ($this->paymentWizardStep === 3) {
+            if (isset($this->payments[$this->activePaymentIndex])) {
+                $this->payments[$this->activePaymentIndex]['payment_method_id'] = '';
+                $this->payments[$this->activePaymentIndex]['payment_method_rate_id'] = '';
+            }
             $this->paymentWizardStep = 2;
         } elseif ($this->paymentWizardStep === 2) {
             $cat = $this->payments[$this->activePaymentIndex]['category'] ?? '';
@@ -121,6 +125,16 @@ trait WithPaymentAndPromo
                     $this->paymentWizardStep = 'split_dashboard';
                 } else {
                     $this->paymentMode = null;
+                    $this->payments = [
+                        [
+                            'category' => '',
+                            'bank_name' => '',
+                            'payment_method_id' => '',
+                            'payment_method_rate_id' => '',
+                            'no_kontrak' => '',
+                            'amount' => 0,
+                        ]
+                    ];
                     $this->paymentWizardStep = 1;
                 }
             }
@@ -133,10 +147,30 @@ trait WithPaymentAndPromo
                 $this->paymentWizardStep = 'split_dashboard';
             } else {
                 $this->paymentMode = null;
+                $this->payments = [
+                    [
+                        'category' => '',
+                        'bank_name' => '',
+                        'payment_method_id' => '',
+                        'payment_method_rate_id' => '',
+                        'no_kontrak' => '',
+                        'amount' => 0,
+                    ]
+                ];
                 $this->paymentWizardStep = 1;
             }
         } elseif ($this->paymentWizardStep === 'split_dashboard') {
             $this->paymentMode = null;
+            $this->payments = [
+                [
+                    'category' => '',
+                    'bank_name' => '',
+                    'payment_method_id' => '',
+                    'payment_method_rate_id' => '',
+                    'no_kontrak' => '',
+                    'amount' => 0,
+                ]
+            ];
             $this->paymentWizardStep = 1;
         }
     }
@@ -194,7 +228,7 @@ trait WithPaymentAndPromo
 
     public function removePaymentRow($index)
     {
-        if (count($this->payments) > 1) {
+        if ($this->paymentMode === 'split' || count($this->payments) > 1) {
             unset($this->payments[$index]);
             $this->payments = array_values($this->payments);
             $this->syncSinglePaymentAmount();

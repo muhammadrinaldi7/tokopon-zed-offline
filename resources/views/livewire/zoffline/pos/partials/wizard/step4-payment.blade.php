@@ -299,8 +299,23 @@
                                 @endif
                             </div>
                         @endif
-                        <div>
-                            <p class="text-sm font-bold text-blue-500/70">{{ $cat }}</p>
+                        <div class="flex-1">
+                            <div class="flex flex-wrap items-center gap-2 mb-1">
+                                <p class="text-sm font-bold text-blue-500/70 uppercase">{{ $cat }}</p>
+                                @if (!empty($payment['bank_name']))
+                                    <span
+                                        class="px-2 py-0.5 bg-[#1c69d4]/10 text-[#1c69d4] rounded-md text-[10px] font-black uppercase tracking-widest">{{ $payment['bank_name'] }}</span>
+                                @endif
+                                @if ($hasRate)
+                                    <template x-for="rate in @js($methodObj->rates->where('is_active', true)->values())" :key="rate.id">
+                                        <span x-show="rateId == rate.id" style="display: none;"
+                                            class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-black uppercase tracking-widest">
+                                            Tarif: <span x-text="rate.name"></span> (<span
+                                                x-text="parseFloat(rate.mdr_percentage)"></span>%)
+                                        </span>
+                                    </template>
+                                @endif
+                            </div>
                             <h3 class="text-2xl font-black text-gray-800">{{ $methodObj->name ?? 'Unknown Method' }}
                             </h3>
                         </div>
@@ -308,8 +323,7 @@
 
                     @if ($hasRate)
                         <div class="space-y-3">
-                            <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Pilih Mesin
-                                EDC</label>
+                            <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Pilih Tarif</label>
                             <div class="grid grid-cols-2 gap-3">
                                 @foreach ($methodObj->rates->where('is_active', true) as $rate)
                                     <label
@@ -413,14 +427,23 @@
                                         </div>
                                     @endif
                                     <div>
-                                        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                            {{ $payment['category'] ?? '' }}</p>
+                                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                                {{ $payment['category'] ?? '' }}</p>
+                                            @if (!empty($payment['bank_name']))
+                                                <span
+                                                    class="px-2 py-0.5 bg-[#1c69d4]/10 text-[#1c69d4] rounded-md text-[10px] font-black uppercase tracking-widest">{{ $payment['bank_name'] }}</span>
+                                            @endif
+                                            @if ($rateObj)
+                                                <span
+                                                    class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-black uppercase tracking-widest">
+                                                    Tarif: {{ $rateObj->name }}
+                                                    ({{ (float) $rateObj->mdr_percentage }}%)
+                                                </span>
+                                            @endif
+                                        </div>
                                         <h4 class="text-xl font-black text-gray-800">
                                             {{ $pmObj->name ?? 'Unknown Method' }}</h4>
-                                        @if ($rateObj)
-                                            <p class="text-sm font-bold text-blue-500 mt-0.5">MDR:
-                                                {{ $rateObj->name }} ({{ (float) $rateObj->mdr_percentage }}%)</p>
-                                        @endif
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-6">
@@ -707,22 +730,40 @@
                                 <div>
                                     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Metode
                                         Pembayaran</h4>
-                                    <div class="bg-white border border-gray-100 rounded-xl p-4 shadow-sm space-y-3">
+                                    <div class="bg-white border border-gray-100 rounded-xl p-4 shadow-sm space-y-4">
                                         @if ($paymentMode === 'split')
                                             @foreach ($payments as $payment)
                                                 @php
                                                     $pmObj = \App\Models\PaymentMethod::find(
                                                         $payment['payment_method_id'] ?? null,
                                                     );
+                                                    $rateObj = \App\Models\PaymentMethodRate::find(
+                                                        $payment['payment_method_rate_id'] ?? null,
+                                                    );
                                                 @endphp
-                                                <div class="flex justify-between items-center text-sm">
-                                                    <div class="flex items-center gap-2">
-                                                        <span
-                                                            class="w-2 h-2 rounded-full {{ $payment['category'] === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
-                                                        <span
-                                                            class="text-gray-600 font-bold">{{ $pmObj->name ?? $payment['category'] }}</span>
+                                                <div
+                                                    class="flex justify-between items-start text-sm border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+                                                    <div class="flex flex-col gap-1.5">
+                                                        <div class="flex items-center gap-2">
+                                                            <span
+                                                                class="w-2 h-2 rounded-full {{ $payment['category'] === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
+                                                            <span
+                                                                class="text-gray-700 font-bold">{{ $pmObj->name ?? $payment['category'] }}</span>
+                                                        </div>
+                                                        <div class="flex flex-wrap items-center gap-1.5 pl-4">
+                                                            @if (!empty($payment['bank_name']))
+                                                                <span
+                                                                    class="px-1.5 py-0.5 bg-[#1c69d4]/10 text-[#1c69d4] rounded text-[9px] font-black uppercase tracking-widest">{{ $payment['bank_name'] }}</span>
+                                                            @endif
+                                                            @if ($rateObj)
+                                                                <span
+                                                                    class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">Tarif:
+                                                                    {{ $rateObj->name }}
+                                                                </span>
+                                                            @endif
+                                                        </div>
                                                     </div>
-                                                    <span class="font-black text-gray-800">Rp
+                                                    <span class="font-black text-gray-800 pt-0.5">Rp
                                                         {{ number_format($payment['amount'], 0, ',', '.') }}</span>
                                                 </div>
                                             @endforeach
@@ -732,17 +773,35 @@
                                                 $pmObj = \App\Models\PaymentMethod::find(
                                                     $payment['payment_method_id'] ?? null,
                                                 );
+                                                $rateObj = \App\Models\PaymentMethodRate::find(
+                                                    $payment['payment_method_rate_id'] ?? null,
+                                                );
                                                 $methodName = $pmObj
                                                     ? $pmObj->name
                                                     : $payment['category'] ?? 'Belum dipilih';
                                             @endphp
-                                            <div class="flex justify-between items-center text-sm">
-                                                <div class="flex items-center gap-2">
-                                                    <span
-                                                        class="w-2 h-2 rounded-full {{ ($payment['category'] ?? '') === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
-                                                    <span class="text-gray-600 font-bold">{{ $methodName }}</span>
+                                            <div class="flex justify-between items-start text-sm">
+                                                <div class="flex flex-col gap-1.5">
+                                                    <div class="flex items-center gap-2">
+                                                        <span
+                                                            class="w-2 h-2 rounded-full {{ ($payment['category'] ?? '') === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
+                                                        <span
+                                                            class="text-gray-700 font-bold">{{ $methodName }}</span>
+                                                    </div>
+                                                    <div class="flex flex-wrap items-center gap-1.5 pl-4">
+                                                        @if (!empty($payment['bank_name']))
+                                                            <span
+                                                                class="px-1.5 py-0.5 bg-[#1c69d4]/10 text-[#1c69d4] rounded text-[9px] font-black uppercase tracking-widest">{{ $payment['bank_name'] }}</span>
+                                                        @endif
+                                                        @if ($rateObj)
+                                                            <span
+                                                                class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">Tarif:
+                                                                {{ $rateObj->name }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
                                                 </div>
-                                                <span class="font-black text-gray-800">Rp
+                                                <span class="font-black text-gray-800 pt-0.5">Rp
                                                     {{ number_format($payment['amount'] ?? 0, 0, ',', '.') }}</span>
                                             </div>
                                         @endif
