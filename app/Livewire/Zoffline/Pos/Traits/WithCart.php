@@ -376,119 +376,119 @@ trait WithCart
 
     // ─── Cart Actions ──────────────────────────────────────────
 
-    public function openVariantPicker($productId, $isSecond = false)
-    {
-        $warehouseId = Auth::user()->warehouse_id;
+    // public function openVariantPicker($productId, $isSecond = false)
+    // {
+    //     $warehouseId = Auth::user()->warehouse_id;
 
-        if ($isSecond) {
-            $product = SecondProduct::with([
-                'variants' => function ($q) use ($warehouseId) {
-                    $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
-                        $q2->where('warehouse_id', $warehouseId);
-                    }]);
-                },
-                'brand'
-            ])->find($productId);
+    //     if ($isSecond) {
+    //         $product = SecondProduct::with([
+    //             'variants' => function ($q) use ($warehouseId) {
+    //                 $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
+    //                     $q2->where('warehouse_id', $warehouseId);
+    //                 }]);
+    //             },
+    //             'brand'
+    //         ])->find($productId);
 
-            $this->variantModalVariants = $product->variants->map(fn($v) => [
-                'id' => $v->id,
-                // PERBAIKAN DI SINI
-                'label' => trim(($v->ram ? $v->ram . ' / ' : '') . $v->storage . ' ' . $v->color),
-                'condition' => $v->condition ?? '',
-                'price' => $v->price,
-                'stock' => $v->warehouseStocks->first()?->stock ?? 0,
-                'sku' => $v->sku ?? '',
-            ])->toArray();
-        } else {
-            $product = Product::with([
-                'variants' => function ($q) use ($warehouseId) {
-                    $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
-                        $q2->where('warehouse_id', $warehouseId);
-                    }]);
-                },
-                'brand'
-            ])->find($productId);
+    //         $this->variantModalVariants = $product->variants->map(fn($v) => [
+    //             'id' => $v->id,
+    //             // PERBAIKAN DI SINI
+    //             'label' => trim(($v->ram ? $v->ram . ' / ' : '') . $v->storage . ' ' . $v->color),
+    //             'condition' => $v->condition ?? '',
+    //             'price' => $v->price,
+    //             'stock' => $v->warehouseStocks->first()?->stock ?? 0,
+    //             'sku' => $v->sku ?? '',
+    //         ])->toArray();
+    //     } else {
+    //         $product = Product::with([
+    //             'variants' => function ($q) use ($warehouseId) {
+    //                 $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
+    //                     $q2->where('warehouse_id', $warehouseId);
+    //                 }]);
+    //             },
+    //             'brand'
+    //         ])->find($productId);
 
-            $this->variantModalVariants = $product->variants->map(fn($v) => [
-                'id' => $v->id,
-                // PERBAIKAN DI SINI
-                'label' => trim(($v->ram ? $v->ram . ' / ' : '') . $v->storage . ' ' . $v->color),
-                'condition' => '',
-                'price' => $v->price,
-                'stock' => $v->warehouseStocks->first()?->stock ?? 0,
-                'sku' => $v->sku ?? '',
-            ])->toArray();
-        }
-        $this->variantModalProduct = $product;
-        $this->variantModalIsSecond = $isSecond;
-        $this->showVariantModal = true;
-    }
+    //         $this->variantModalVariants = $product->variants->map(fn($v) => [
+    //             'id' => $v->id,
+    //             // PERBAIKAN DI SINI
+    //             'label' => trim(($v->ram ? $v->ram . ' / ' : '') . $v->storage . ' ' . $v->color),
+    //             'condition' => '',
+    //             'price' => $v->price,
+    //             'stock' => $v->warehouseStocks->first()?->stock ?? 0,
+    //             'sku' => $v->sku ?? '',
+    //         ])->toArray();
+    //     }
+    //     $this->variantModalProduct = $product;
+    //     $this->variantModalIsSecond = $isSecond;
+    //     $this->showVariantModal = true;
+    // }
 
-    public function addVariantToCart($variantId)
-    {
-        $isSecond = $this->variantModalIsSecond;
-        $product = $this->variantModalProduct;
-        $warehouseId = Auth::user()->warehouse_id;
+    // public function addVariantToCart($variantId)
+    // {
+    //     $isSecond = $this->variantModalIsSecond;
+    //     $product = $this->variantModalProduct;
+    //     $warehouseId = Auth::user()->warehouse_id;
 
-        if ($isSecond) {
-            $variant = SecondProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
-                $q->where('warehouse_id', $warehouseId);
-            }])->find($variantId);
-            $variantType = SecondProductVariant::class;
-        } else {
-            $variant = ProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
-                $q->where('warehouse_id', $warehouseId);
-            }])->find($variantId);
-            $variantType = ProductVariant::class;
-        }
+    //     if ($isSecond) {
+    //         $variant = SecondProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
+    //             $q->where('warehouse_id', $warehouseId);
+    //         }])->find($variantId);
+    //         $variantType = SecondProductVariant::class;
+    //     } else {
+    //         $variant = ProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
+    //             $q->where('warehouse_id', $warehouseId);
+    //         }])->find($variantId);
+    //         $variantType = ProductVariant::class;
+    //     }
 
-        $stock = $variant ? ($variant->warehouseStocks->first()?->stock ?? 0) : 0;
+    //     $stock = $variant ? ($variant->warehouseStocks->first()?->stock ?? 0) : 0;
 
-        if (!$variant || $stock <= 0) {
-            $this->dispatch('toast', title: 'Stok Habis', message: 'Varian ini tidak tersedia.', type: 'warning');
-            return;
-        }
+    //     if (!$variant || $stock <= 0) {
+    //         $this->dispatch('toast', title: 'Stok Habis', message: 'Varian ini tidak tersedia.', type: 'warning');
+    //         return;
+    //     }
 
-        $existingIndex = collect($this->cart)->search(
-            fn($item) => $item['variant_id'] == $variant->id && $item['variant_type'] == $variantType
-        );
+    //     $existingIndex = collect($this->cart)->search(
+    //         fn($item) => $item['variant_id'] == $variant->id && $item['variant_type'] == $variantType
+    //     );
 
-        if ($existingIndex !== false) {
-            $currentQty = $this->cart[$existingIndex]['qty'];
-            if ($currentQty < $stock) {
-                $this->cart[$existingIndex]['qty']++;
+    //     if ($existingIndex !== false) {
+    //         $currentQty = $this->cart[$existingIndex]['qty'];
+    //         if ($currentQty < $stock) {
+    //             $this->cart[$existingIndex]['qty']++;
 
-                if (!isset($this->cart[$existingIndex]['serial_numbers'])) {
-                    $this->cart[$existingIndex]['serial_numbers'] = [];
-                }
-            } else {
-                $this->dispatch('toast', title: 'Stok Tidak Cukup', message: 'Sudah mencapai batas stok.', type: 'warning');
-            }
-        } else {
-            $this->cart[] = [
-                'variant_id' => $variant->id,
-                'variant_type' => $variantType,
-                'name' => $product->name,
-                'ram' => $variant->ram ?? '-',
-                'storage' => $variant->storage ?? '-',
-                'color' => $variant->color ?? '-',
-                'price' => (int) $variant->price,
-                'discount_amount' => 0,
-                'qty' => 1,
-                'serial_numbers' => [], // empty array initially
-                'sku' => $variant->sku ?? '',
-                'has_sn' => (bool) $variant->has_sn,
-                'is_second' => $isSecond,
-                'database_source' => $isSecond ? 'second' : 'syihab',
-                'brand_id' => $isSecond ? ($product->brand_id ?? null) : ($product->brand_id ?? null),
-                'condition' => $variant->condition ?? $variant->condition_desc ?? '',
-            ];
-        }
-        $this->showVariantModal = false;
-        $this->variantModalProduct = null;
-        $this->variantModalVariants = [];
-        $this->syncSinglePaymentAmount();
-    }
+    //             if (!isset($this->cart[$existingIndex]['serial_numbers'])) {
+    //                 $this->cart[$existingIndex]['serial_numbers'] = [];
+    //             }
+    //         } else {
+    //             $this->dispatch('toast', title: 'Stok Tidak Cukup', message: 'Sudah mencapai batas stok.', type: 'warning');
+    //         }
+    //     } else {
+    //         $this->cart[] = [
+    //             'variant_id' => $variant->id,
+    //             'variant_type' => $variantType,
+    //             'name' => $product->name,
+    //             'ram' => $variant->ram ?? '-',
+    //             'storage' => $variant->storage ?? '-',
+    //             'color' => $variant->color ?? '-',
+    //             'price' => (int) $variant->price,
+    //             'discount_amount' => 0,
+    //             'qty' => 1,
+    //             'serial_numbers' => [], // empty array initially
+    //             'sku' => $variant->sku ?? '',
+    //             'has_sn' => (bool) $variant->has_sn,
+    //             'is_second' => $isSecond,
+    //             'database_source' => $isSecond ? 'second' : 'syihab',
+    //             'brand_id' => $isSecond ? ($product->brand_id ?? null) : ($product->brand_id ?? null),
+    //             'condition' => $variant->condition ?? $variant->condition_desc ?? '',
+    //         ];
+    //     }
+    //     $this->showVariantModal = false;
+    //     $this->variantModalProduct = null;
+    //     $this->variantModalVariants = [];
+    //     $this->syncSinglePaymentAmount();
+    // }
 
     public function removeFromCart($index)
     {
@@ -629,44 +629,44 @@ trait WithCart
     public $stockModalData = [];
     public $stockModalItemTitle = '';
 
-    public function checkStock($index)
-    {
-        // 1. Pastikan item ada di keranjang
-        if (!isset($this->cart[$index])) {
-            $this->dispatch('toast', title: 'Error', message: 'Item tidak ditemukan di keranjang.', type: 'error');
-            return;
-        }
+    // public function checkStock($index)
+    // {
+    //     // 1. Pastikan item ada di keranjang
+    //     if (!isset($this->cart[$index])) {
+    //         $this->dispatch('toast', title: 'Error', message: 'Item tidak ditemukan di keranjang.', type: 'error');
+    //         return;
+    //     }
 
-        $item = $this->cart[$index];
-        $userWarehouseId = Auth::user()->warehouse_id;
+    //     $item = $this->cart[$index];
+    //     $userWarehouseId = Auth::user()->warehouse_id;
 
-        // 2. Ambil data varian beserta SEMUA stok gudang. 
-        // Pastikan relasi 'warehouse' ada di model WarehouseStock kamu.
-        if (isset($item['is_second']) && $item['is_second']) {
-            $variant = SecondProductVariant::with(['warehouseStocks.warehouse'])->find($item['variant_id']);
-        } else {
-            $variant = ProductVariant::with(['warehouseStocks.warehouse'])->find($item['variant_id']);
-        }
+    //     // 2. Ambil data varian beserta SEMUA stok gudang. 
+    //     // Pastikan relasi 'warehouse' ada di model WarehouseStock kamu.
+    //     if (isset($item['is_second']) && $item['is_second']) {
+    //         $variant = SecondProductVariant::with(['warehouseStocks.warehouse'])->find($item['variant_id']);
+    //     } else {
+    //         $variant = ProductVariant::with(['warehouseStocks.warehouse'])->find($item['variant_id']);
+    //     }
 
-        // 3. Mapping data untuk ditampilkan di modal
-        if ($variant) {
-            $this->stockModalItemTitle = "{$item['name']} ({$item['color']} - {$item['storage']})";
+    //     // 3. Mapping data untuk ditampilkan di modal
+    //     if ($variant) {
+    //         $this->stockModalItemTitle = "{$item['name']} ({$item['color']} - {$item['storage']})";
 
-            $this->stockModalData = $variant->warehouseStocks->map(function ($ws) use ($userWarehouseId) {
-                return [
-                    // Sesuaikan 'name' jika field nama gudang di tabelmu beda (misal: nama_gudang)
-                    'warehouse_name' => $ws->warehouse->name ?? 'Gudang Tidak Diketahui',
-                    'stock' => $ws->stock,
-                    'is_current_user_warehouse' => $ws->warehouse_id === $userWarehouseId,
-                ];
-            })->toArray();
+    //         $this->stockModalData = $variant->warehouseStocks->map(function ($ws) use ($userWarehouseId) {
+    //             return [
+    //                 // Sesuaikan 'name' jika field nama gudang di tabelmu beda (misal: nama_gudang)
+    //                 'warehouse_name' => $ws->warehouse->name ?? 'Gudang Tidak Diketahui',
+    //                 'stock' => $ws->stock,
+    //                 'is_current_user_warehouse' => $ws->warehouse_id === $userWarehouseId,
+    //             ];
+    //         })->toArray();
 
-            // Tampilkan Modal
-            $this->showStockModal = true;
-        } else {
-            $this->dispatch('toast', title: 'Gagal', message: 'Data varian tidak ditemukan di database.', type: 'error');
-        }
-    }
+    //         // Tampilkan Modal
+    //         $this->showStockModal = true;
+    //     } else {
+    //         $this->dispatch('toast', title: 'Gagal', message: 'Data varian tidak ditemukan di database.', type: 'error');
+    //     }
+    // }
 
     public function closeStockModal()
     {

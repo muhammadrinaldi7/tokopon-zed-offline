@@ -339,10 +339,10 @@ class ProductAccurateManagement extends Component
     {
         try {
             $service = app(SerialNumberSyncService::class);
-            $snCount = $service->syncFromAccurate($accurateId);
+            $snCount = $service->syncFromAccurate($accurateId, $this->activeTab);
 
             // Sync harga juga
-            $priceResult = $service->syncPriceFromAccurate($accurateId);
+            $priceResult = $service->syncPriceFromAccurate($accurateId, $this->activeTab);
             $priceMsg = '';
             if ($priceResult['updated']) {
                 $priceMsg = ' | Harga diperbarui: Rp ' . number_format($priceResult['old_price']) . ' → Rp ' . number_format($priceResult['new_price']);

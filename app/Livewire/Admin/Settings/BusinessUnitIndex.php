@@ -16,6 +16,7 @@ class BusinessUnitIndex extends Component
     public $accurate_host;
     public $accurate_token;
     public $accurate_secret_key;
+    public $accurate_webhook_token;
     public $accurate_database_id;
     public $is_active = true;
 
@@ -39,6 +40,7 @@ class BusinessUnitIndex extends Component
         $this->accurate_host = '';
         $this->accurate_token = '';
         $this->accurate_secret_key = '';
+        $this->accurate_webhook_token = '';
         $this->accurate_database_id = '';
         $this->is_active = true;
     }
@@ -64,6 +66,7 @@ class BusinessUnitIndex extends Component
         $this->accurate_host = $unit->accurate_host;
         $this->accurate_token = $unit->accurate_token;
         $this->accurate_secret_key = $unit->accurate_secret_key;
+        $this->accurate_webhook_token = $unit->accurate_webhook_token;
         $this->accurate_database_id = $unit->accurate_database_id;
         $this->is_active = $unit->is_active;
         $this->showModal = true;
@@ -84,6 +87,7 @@ class BusinessUnitIndex extends Component
                 'accurate_host' => $this->accurate_host,
                 'accurate_token' => $this->accurate_token,
                 'accurate_secret_key' => $this->accurate_secret_key,
+                'accurate_webhook_token' => $this->accurate_webhook_token,
                 'accurate_database_id' => $this->accurate_database_id,
                 'is_active' => $this->is_active,
             ]

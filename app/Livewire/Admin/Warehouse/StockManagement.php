@@ -2,8 +2,7 @@
 
 namespace App\Livewire\Admin\Warehouse;
 
-use App\Models\ProductVariant;
-use App\Models\SecondProductVariant;
+use App\Models\ProductAccurate;
 use App\Models\Warehouse;
 use App\Models\WarehouseStock;
 use App\Services\AccurateService;
@@ -17,7 +16,7 @@ class StockManagement extends Component
     use WithPagination;
 
     public $search = '';
-    public $activeTab = 'new'; // 'new' atau 'second'
+    public $activeTab = 'syihab'; // 'syihab' atau 'second'
     public $isLoading = false;
 
     public function updatingSearch()
@@ -31,115 +30,48 @@ class StockManagement extends Component
         $this->search = '';
     }
 
-    public function syncVariantStock($variantId, $isSecond = false)
-    {
-        $this->isLoading = true;
-
-        try {
-            $variant = $isSecond
-                ? SecondProductVariant::findOrFail($variantId)
-                : ProductVariant::findOrFail($variantId);
-
-            if (empty($variant->sku)) {
-                $this->dispatch('toast', title: 'Error', message: 'Varian ini tidak memiliki SKU untuk dicocokkan ke Accurate.', type: 'error');
-                $this->isLoading = false;
-                return;
-            }
-
-            $dbSource = $isSecond ? 'second' : 'syihab';
-
-            $service = app(AccurateService::class);
-            $stockData = $service->getItemStockPerWarehouse($variant->sku, $dbSource);
-
-            if (empty($stockData)) {
-                $this->dispatch('toast', title: 'Info', message: 'Tidak ada data stok di Accurate untuk SKU ' . $variant->sku, type: 'info');
-                $this->isLoading = false;
-                return;
-            }
-
-            // Reset current warehouse stock for this variant to 0 first (in case Accurate doesn't return some warehouses anymore)
-            WarehouseStock::where('variant_id', $variant->id)
-                ->where('variant_type', get_class($variant))
-                ->update(['stock' => 0]);
-
-            foreach ($stockData as $stockItem) {
-                $warehouseName = $stockItem['warehouseName'] ?? ($stockItem['warehouse']['name'] ?? null);
-                $qty = $stockItem['quantity'] ?? ($stockItem['qty'] ?? 0);
-
-                if (!$warehouseName) continue;
-
-                // Accurate warehouse names are now identical to local db
-                $localWarehouseName = $warehouseName;
-
-                $warehouse = Warehouse::where('name', $localWarehouseName)->first();
-                if (!$warehouse) continue;
-
-                WarehouseStock::updateOrCreate(
-                    [
-                        'warehouse_id' => $warehouse->id,
-                        'variant_id' => $variant->id,
-                        'variant_type' => get_class($variant),
-                    ],
-                    [
-                        'stock' => $qty
-                    ]
-                );
-            }
-
-            $this->dispatch('toast', title: 'Berhasil', message: 'Stok varian ' . $variant->sku . ' berhasil disinkronkan.', type: 'success');
-        } catch (\Exception $e) {
-            $this->dispatch('toast', title: 'Gagal', message: 'Gagal sinkronisasi: ' . $e->getMessage(), type: 'error');
-        }
-
-        $this->isLoading = false;
-    }
-
     public function syncAllStocks()
     {
         $this->isLoading = true;
 
         try {
-            $dbSource = $this->activeTab === 'second' ? 'second' : 'syihab';
+            $dbSource = $this->activeTab;
             $service = app(AccurateService::class);
             $syncedCount = 0;
 
-            // 1. Ambil daftar Gudang lokal & Varian lokal sesuai Business Unit
+            // 1. Ambil daftar Gudang lokal sesuai Business Unit (1 = Syihab, 2 = Second)
             $buId = $this->activeTab === 'second' ? 2 : 1;
             $warehouses = Warehouse::where('business_unit_id', $buId)->get();
-            $variants = $this->activeTab === 'second'
-                ? SecondProductVariant::whereNotNull('sku')->get()
-                : ProductVariant::whereNotNull('sku')->get();
-            $variantClass = $this->activeTab === 'second' ? SecondProductVariant::class : ProductVariant::class;
+            $products = ProductAccurate::where('database_source', $dbSource)->get();
 
             foreach ($warehouses as $warehouse) {
                 try {
-                    // 2. Ambil stok Accurate per gudang (nama sudah persis sama)
-                    $accurateWarehouseName = $warehouse->name;
-                    $stockData = $service->getItemStockPerWarehouse($accurateWarehouseName, $dbSource);
+                    // 2. Ambil stok Accurate per gudang
+                    $stockData = $service->getItemStockPerWarehouse($warehouse->name, $dbSource);
 
                     if (empty($stockData)) continue;
 
-                    // 3. Mapping data array ke Collection berbasis SKU (O(1) lookup di memori)
+                    // 3. Mapping data array ke Collection berbasis SKU (item_no)
                     $accurateStockCollection = collect($stockData)->keyBy(function ($item) {
                         return $item['itemNo'] ?? ($item['item']['no'] ?? ($item['no'] ?? null));
                     });
 
-                    // 4. Reset stok khusus gudang INI menjadi 0 dulu
+                    // 4. Reset stok khusus gudang INI untuk ProductAccurate menjadi 0 dulu
                     WarehouseStock::where('warehouse_id', $warehouse->id)
-                        ->where('variant_type', $variantClass)
+                        ->where('variant_type', ProductAccurate::class)
                         ->update(['stock' => 0]);
 
-                    // 5. Looping varian dan simpan data stok
-                    foreach ($variants as $variant) {
-                        if ($accurateStockCollection->has($variant->sku)) {
-                            $accurateItem = $accurateStockCollection->get($variant->sku);
+                    // 5. Looping produk accurate lokal dan simpan data stok per gudang
+                    foreach ($products as $product) {
+                        if ($accurateStockCollection->has($product->item_no)) {
+                            $accurateItem = $accurateStockCollection->get($product->item_no);
                             $qty = $accurateItem['quantity'] ?? ($accurateItem['qty'] ?? 0);
 
                             WarehouseStock::updateOrCreate(
                                 [
                                     'warehouse_id' => $warehouse->id,
-                                    'variant_id'   => $variant->id,
-                                    'variant_type' => $variantClass,
+                                    'variant_id'   => $product->id,
+                                    'variant_type' => ProductAccurate::class,
                                 ],
                                 [
                                     'stock'        => $qty
@@ -149,11 +81,11 @@ class StockManagement extends Component
                         }
                     }
                 } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed to sync Warehouse {$warehouse->name} during bulk sync: " . $e->getMessage());
+                    Log::error("Failed to sync Warehouse {$warehouse->name} during bulk sync: " . $e->getMessage());
                 }
             }
 
-            $this->dispatch('toast', title: 'Selesai', message: "Berhasil menyelaraskan total $syncedCount item dari seluruh gudang dengan Accurate.", type: 'success');
+            $this->dispatch('toast', title: 'Selesai', message: "Berhasil menyelaraskan total $syncedCount stok item dari seluruh gudang dengan Accurate.", type: 'success');
         } catch (\Exception $e) {
             $this->dispatch('toast', title: 'Gagal', message: 'Gagal sinkronisasi massal: ' . $e->getMessage(), type: 'error');
         }
@@ -166,7 +98,7 @@ class StockManagement extends Component
         $this->isLoading = true;
 
         try {
-            $dbSource = $this->activeTab === 'second' ? 'second' : 'syihab';
+            $dbSource = $this->activeTab;
             $service = app(AccurateService::class);
 
             // 1. Validasi Gudang Lokal
@@ -177,10 +109,8 @@ class StockManagement extends Component
                 return;
             }
 
-            // 2. HIT API ACCURATE CUKUP 1 KALI (Di luar looping)
-            // Nama di database lokal sekarang sudah sama persis dengan Accurate
-            $accurateWarehouseName = $whName;
-            $stockData = $service->getItemStockPerWarehouse($accurateWarehouseName, $dbSource);
+            // 2. HIT API ACCURATE
+            $stockData = $service->getItemStockPerWarehouse($whName, $dbSource);
 
             if (empty($stockData)) {
                 $this->dispatch('toast', title: 'Info', message: "Tidak ada data stok di Accurate untuk gudang: $whName", type: 'info');
@@ -188,32 +118,31 @@ class StockManagement extends Component
                 return;
             }
 
-            // 3. Ambil data varian lokal sesuai tab aktif
-            $variants = $this->activeTab === 'second'
-                ? SecondProductVariant::whereNotNull('sku')->get()
-                : ProductVariant::whereNotNull('sku')->get();
+            // 3. Ambil data produk lokal sesuai tab
+            $products = ProductAccurate::where('database_source', $dbSource)->get();
 
-            // 4. Ubah array response Accurate menjadi Laravel Collection agar mudah di-search
-            $accurateStockCollection = collect($stockData)->keyBy('no');
+            // 4. Ubah array response Accurate menjadi Laravel Collection
+            $accurateStockCollection = collect($stockData)->keyBy(function ($item) {
+                return $item['itemNo'] ?? ($item['item']['no'] ?? ($item['no'] ?? null));
+            });
 
-            // 5. Reset semua stok di gudang INI khusus untuk jenis varian terkait menjadi 0 dahulu
-            $variantClass = $this->activeTab === 'second' ? SecondProductVariant::class : ProductVariant::class;
+            // 5. Reset semua stok di gudang INI khusus untuk ProductAccurate
             WarehouseStock::where('warehouse_id', $warehouse->id)
-                ->where('variant_type', $variantClass)
+                ->where('variant_type', ProductAccurate::class)
                 ->update(['stock' => 0]);
             $syncedCount = 0;
 
-            // 6. Lakukan pemetaan data di memori internal
-            foreach ($variants as $variant) {
-                if ($accurateStockCollection->has($variant->sku)) {
-                    $accurateItem = $accurateStockCollection->get($variant->sku);
-                    $qty = $accurateItem['quantity'] ?? 0;
+            // 6. Pemetaan data ke lokal
+            foreach ($products as $product) {
+                if ($accurateStockCollection->has($product->item_no)) {
+                    $accurateItem = $accurateStockCollection->get($product->item_no);
+                    $qty = $accurateItem['quantity'] ?? ($accurateItem['qty'] ?? 0);
 
                     WarehouseStock::updateOrCreate(
                         [
                             'warehouse_id' => $warehouse->id,
-                            'variant_id'   => $variant->id,
-                            'variant_type' => get_class($variant),
+                            'variant_id'   => $product->id,
+                            'variant_type' => ProductAccurate::class,
                         ],
                         [
                             'stock'        => $qty
@@ -223,7 +152,7 @@ class StockManagement extends Component
                 $syncedCount++;
             }
 
-            $this->dispatch('toast', title: 'Selesai', message: "Berhasil menyelaraskan $syncedCount varian untuk gudang $whName.", type: 'success');
+            $this->dispatch('toast', title: 'Selesai', message: "Berhasil menyelaraskan stok untuk gudang $whName.", type: 'success');
         } catch (\Exception $e) {
             Log::error("Gagal sinkronisasi per gudang ($whName): " . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Gagal sinkronisasi per gudang: ' . $e->getMessage(), type: 'error');
@@ -238,40 +167,21 @@ class StockManagement extends Component
         $buId = $this->activeTab === 'second' ? 2 : 1;
         $warehouses = Warehouse::where('business_unit_id', $buId)->orderBy('name')->get();
 
-        if ($this->activeTab === 'second') {
-            $query = SecondProductVariant::with(['secondProduct', 'warehouseStocks'])
-                ->orderBy('id', 'desc');
+        $query = ProductAccurate::with(['warehouseStocks'])
+            ->where('database_source', $this->activeTab)
+            ->orderBy('id', 'desc');
 
-            if ($this->search) {
-                $query->where(function ($q) {
-                    $q->where('sku', 'like', '%' . $this->search . '%')
-                        ->orWhere('storage', 'like', '%' . $this->search . '%')
-                        ->orWhere('color', 'like', '%' . $this->search . '%')
-                        ->orWhereHas('secondProduct', function ($q2) {
-                            $q2->where('name', 'like', '%' . $this->search . '%');
-                        });
-                });
-            }
-        } else {
-            $query = ProductVariant::with(['product', 'warehouseStocks'])
-                ->orderBy('id', 'desc');
-
-            if ($this->search) {
-                $query->where(function ($q) {
-                    $q->where('sku', 'like', '%' . $this->search . '%')
-                        ->orWhere('storage', 'like', '%' . $this->search . '%')
-                        ->orWhere('color', 'like', '%' . $this->search . '%')
-                        ->orWhereHas('product', function ($q2) {
-                            $q2->where('name', 'like', '%' . $this->search . '%');
-                        });
-                });
-            }
+        if ($this->search) {
+            $query->where(function ($q) {
+                $q->where('item_no', 'like', '%' . $this->search . '%')
+                  ->orWhere('name', 'like', '%' . $this->search . '%');
+            });
         }
 
-        $variantsList = $query->paginate(15);
+        $productList = $query->paginate(15);
 
         return view('livewire.admin.warehouse.stock-management', [
-            'variantsList' => $variantsList,
+            'productList' => $productList,
             'warehouses' => $warehouses,
         ]);
     }

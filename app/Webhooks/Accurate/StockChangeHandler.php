@@ -57,7 +57,7 @@ class StockChangeHandler implements WebhookHandlerInterface
             $syncService = app(\App\Services\SerialNumberSyncService::class);
             foreach (array_keys($skusToSyncSn) as $sku) {
                 try {
-                    $syncService->syncFromAccurate($sku);
+                    $syncService->syncFromAccurate($sku, $log->database_source);
                     Log::info("Webhook SN Sync sukses (dari StockChangeHandler) untuk SKU: {$sku}");
                 } catch (\Exception $e) {
                     Log::error("Webhook SN Sync failed for SKU {$sku}: " . $e->getMessage());

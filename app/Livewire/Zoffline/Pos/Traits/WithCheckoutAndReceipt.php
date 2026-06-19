@@ -323,19 +323,19 @@ trait WithCheckoutAndReceipt
                 ]);
 
                 // Reduce stock
-                $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
-                    [
-                        'warehouse_id' => Auth::user()->warehouse_id,
-                        'variant_id' => $item['variant_id'],
-                        'variant_type' => $item['variant_type'],
-                    ],
-                    [
-                        'stock' => 0
-                    ]
-                );
-                $warehouseStock->update([
-                    'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
-                ]);
+                // $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
+                //     [
+                //         'warehouse_id' => Auth::user()->warehouse_id,
+                //         'variant_id' => $item['variant_id'],
+                //         'variant_type' => $item['variant_type'],
+                //     ],
+                //     [
+                //         'stock' => 0
+                //     ]
+                // );
+                // $warehouseStock->update([
+                //     'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
+                // ]);
             }
 
             // Create OrderPayments (for each split payment row)

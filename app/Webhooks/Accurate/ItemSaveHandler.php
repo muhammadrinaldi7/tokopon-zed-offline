@@ -35,55 +35,91 @@ class ItemSaveHandler implements WebhookHandlerInterface
     }
     private function syncItemDetail($itemNo, $dbSource)
     {
-        // Cari varian di database lokal
+        // 1. Tarik detail terbaru dari Accurate
+        $service = app(AccurateService::class);
+        $accurateItem = $service->itemDetailDo($itemNo, $dbSource);
+
+        if (!$accurateItem) return;
+
+        // 2. Mapping field dari response Accurate
+        $newName = $accurateItem['name'];
+        $newPrice = (int) ($accurateItem['unitPrice'] ?? 0);
+        $newCost = (int) ($accurateItem['balanceUnitCost'] ?? 0);
+        $stock = (int) ($accurateItem['availableToSell'] ?? 0);
+        $hasSnAccurate = (bool) (isset($accurateItem['manageSN']) && $accurateItem['manageSN'] === true);
+        
+        // Pengecekan fallback untuk has_sn dari serialNumberType jika manageSN tidak ada
+        if (!isset($accurateItem['manageSN']) && isset($accurateItem['serialNumberType'])) {
+            $hasSnAccurate = ($accurateItem['serialNumberType'] === 'UNIQUE');
+        }
+
+        $idBrand = $accurateItem['itemBrand']['id'] ?? null;
+        $brandName = $accurateItem['itemBrand']['name'] ?? null;
+        $idCategory = $accurateItem['itemCategory']['id'] ?? null;
+        $categoryName = $accurateItem['itemCategory']['name'] ?? null;
+
+        $buId = \App\Models\BusinessUnit::where('code', $dbSource)->value('id');
+
+        // 3. Update Master Data (ProductAccurate) - INI YANG UTAMA
+        try {
+            $productAccurate = \App\Models\ProductAccurate::updateOrCreate(
+                [
+                    'accurate_id' => $accurateItem['no'],
+                    'database_source' => $dbSource,
+                ],
+                [
+                    'item_no' => $itemNo,
+                    'business_unit_id' => $buId,
+                    'name' => $newName,
+                    'base_price' => $newPrice,
+                    'base_cost' => $newCost,
+                    'stock' => $stock,
+                    'has_sn' => $hasSnAccurate,
+                    'id_brand_accurate' => $idBrand,
+                    'brandName' => $brandName,
+                    'id_category_accurate' => $idCategory,
+                    'categoryName' => $categoryName,
+                    'raw_data' => json_encode($accurateItem),
+                ]
+            );
+            Log::info("Webhook Berhasil: Master ProductAccurate diupdate untuk SKU {$itemNo} | Nama: {$newName}");
+        } catch (\Exception $e) {
+            Log::error("Webhook Gagal: Gagal update ProductAccurate SKU {$itemNo}. Error: " . $e->getMessage());
+        }
+
+        // 4. Update ke Database POS lokal JIKA BARANG SUDAH DI-GENERATE
         $variant = ProductVariant::where('sku', $itemNo)->first()
             ?? SecondProductVariant::where('sku', $itemNo)->first();
 
-        // Jika barang tidak ada di POS lokal, abaikan (mungkin itu aset internal, bukan barang jualan)
-        if (!$variant) return;
-
-        // Tarik harga dan nama terbaru dari Accurate
-        $service = app(AccurateService::class);
-        $accurateItem = $service->itemDetailDo($itemNo);
-
-        if ($accurateItem) {
-            // Mapping field dari response Accurate
-            $newName = $accurateItem['name'];
-            $newPrice = (int) $accurateItem['unitPrice']; // unitPrice adalah harga jual standar di Accurate
-
+        if ($variant) {
             try {
-                // Update ke database lokal Laravel (Tabel Varian)
-                $variant->update([
-                    'price' => $newPrice,
-                ]);
+                // Update harga varian
+                $variant->update(['price' => $newPrice]);
 
-                // Update base_price di tabel Induk (Product / SecondProduct)
-                if ($variant->product) {
-                    $variant->accurateData->update([
-                        'base_price' => $newPrice
-                    ]);
+                // Update nama di tabel Induk agar seragam dengan Accurate
+                if ($variant instanceof ProductVariant && $variant->product) {
+                    $variant->product->update(['name' => $newName]);
+                } elseif ($variant instanceof SecondProductVariant && $variant->secondProduct) {
+                    $variant->secondProduct->update(['name' => $newName]);
                 }
 
-                Log::info("Webhook Berhasil: Item Updated via Webhook: SKU {$itemNo} | Harga Jual: {$newPrice} | Harga Modal (base_price): {$newPrice}");
+                Log::info("Webhook Berhasil: Varian POS SKU {$itemNo} ikut diupdate.");
             } catch (\Exception $e) {
-                Log::error("Webhook Gagal: Gagal update harga SKU {$itemNo}. Error: " . $e->getMessage());
+                Log::error("Webhook Gagal: Gagal update varian POS SKU {$itemNo}. Error: " . $e->getMessage());
             }
 
-            // --- TAMBAHAN UNTUK STOK AWAL & SN ---
-            // Jika user mengisi Stok Awal dan SN saat membuat/mengedit barang di Accurate,
-            // Accurate HANYA mengirimkan webhook ITEM (bukan INVENTORY_ADJUSTMENT).
-            // Jadi kita harus memaksa pengecekan SN di sini juga!
-            $hasSn = false;
+            // 5. Sync Serial Number Jika Perlu
+            $needsSn = false;
             if ($variant instanceof SecondProductVariant) {
-                $hasSn = true;
+                $needsSn = true;
             } elseif ($variant instanceof ProductVariant) {
-                $hasSn = (bool) ($variant->has_sn ?? false);
+                $needsSn = (bool) ($variant->has_sn ?? false);
             }
 
-            if ($hasSn) {
+            if ($needsSn) {
                 try {
                     $syncService = app(SerialNumberSyncService::class);
-                    $syncService->syncFromAccurate($itemNo);
+                    $syncService->syncFromAccurate($itemNo, $dbSource);
                     Log::info("Webhook SN Sync sukses (dari ItemSaveHandler) untuk SKU: {$itemNo}");
                 } catch (\Exception $e) {
                     Log::error("Webhook SN Sync failed (dari ItemSaveHandler) for SKU {$itemNo}: " . $e->getMessage());
