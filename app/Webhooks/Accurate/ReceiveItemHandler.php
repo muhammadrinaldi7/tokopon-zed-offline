@@ -66,11 +66,13 @@ class ReceiveItemHandler implements WebhookHandlerInterface
         if (!$warehouse) return;
 
         // 2. Validasi DB Lokal: Pastikan Varian (SKU) ada di Laravel Anda
-        // Wajib menggunakan ProductVariant atau SecondProductVariant karena tabel warehouse_stocks 
-        // berelasi polymorphic (morphTo) ke variant_id dan variant_type milik Varian, bukan ProductAccurate.
-        $variant = ProductVariant::with('product')->where('sku', $itemNo)->first()
-            ?? SecondProductVariant::where('sku', $itemNo)->first();
-        if (!$variant) return;
+        // Wajib menggunakan ProductAccurate karena tabel warehouse_stocks 
+        // berelasi polymorphic (morphTo) ke variant_id dan variant_type milik ProductAccurate.
+        $productAccurate = \App\Models\ProductAccurate::where('item_no', $itemNo)
+            ->where('database_source', $dbSource)
+            ->first();
+            
+        if (!$productAccurate) return;
 
         // 3. Tembak API Accurate (Hanya dieksekusi jika gudang & produk valid)
         $service = app(AccurateService::class);
@@ -83,8 +85,8 @@ class ReceiveItemHandler implements WebhookHandlerInterface
             WarehouseStock::updateOrCreate(
                 [
                     'warehouse_id' => $warehouse->id,
-                    'variant_id'   => $variant->id,
-                    'variant_type' => get_class($variant),
+                    'variant_id'   => $productAccurate->id,
+                    'variant_type' => get_class($productAccurate),
                 ],
                 [
                     'stock'        => (int) $qty

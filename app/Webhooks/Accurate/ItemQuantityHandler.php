@@ -23,7 +23,7 @@ class ItemQuantityHandler implements WebhookHandlerInterface
                 $newQuantity = $itemData['quantity'] ?? null;
 
                 if ($itemNo && $warehouseName && $newQuantity !== null) {
-                    $hasSn = $this->updateLocalStock($itemNo, $warehouseName, $newQuantity);
+                    $hasSn = $this->updateLocalStock($itemNo, $warehouseName, $newQuantity, $log->database_source);
                     if ($hasSn) {
                         $skusToSyncSn[$itemNo] = true;
                     }
@@ -48,22 +48,24 @@ class ItemQuantityHandler implements WebhookHandlerInterface
     /**
      * @return bool True jika varian membutuhkan Serial Number, False jika tidak
      */
-    private function updateLocalStock($itemNo, $warehouseName, $newQuantity): bool
+    private function updateLocalStock($itemNo, $warehouseName, $newQuantity, $databaseSource): bool
     {
         $warehouse = Warehouse::where('name', $warehouseName)->first();
         if (!$warehouse) return false;
 
-        $variant = ProductVariant::with('product')->where('sku', $itemNo)->first()
-            ?? SecondProductVariant::where('sku', $itemNo)->first();
-        if (!$variant) return false;
+        $productAccurate = \App\Models\ProductAccurate::where('item_no', $itemNo)
+            ->where('database_source', $databaseSource)
+            ->first();
+
+        if (!$productAccurate) return false;
 
         try {
             // LANGSUNG SIMPAN KE DB LOKAL (0 Detik, Tanpa HTTP Request ke Accurate!)
             WarehouseStock::updateOrCreate(
                 [
                     'warehouse_id' => $warehouse->id,
-                    'variant_id'   => $variant->id,
-                    'variant_type' => get_class($variant),
+                    'variant_id'   => $productAccurate->id,
+                    'variant_type' => get_class($productAccurate),
                 ],
                 [
                     'stock'        => (int) $newQuantity
@@ -75,12 +77,6 @@ class ItemQuantityHandler implements WebhookHandlerInterface
         }
 
         // Cek apakah butuh SN
-        if ($variant instanceof SecondProductVariant) {
-            return true;
-        } elseif ($variant instanceof ProductVariant) {
-            return (bool) ($variant->has_sn ?? false);
-        }
-
-        return false;
+        return (bool) ($productAccurate->has_sn ?? false);
     }
 }

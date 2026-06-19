@@ -74,10 +74,11 @@ class StockChangeHandler implements WebhookHandlerInterface
         $warehouse = Warehouse::where('name', $localWarehouseName)->first();
         if (!$warehouse) return false;
 
-        // 2. Validasi DB Lokal: Pastikan Varian (SKU) ada di Laravel Anda
-        $variant = ProductVariant::with('product')->where('sku', $itemNo)->first()
-            ?? SecondProductVariant::where('sku', $itemNo)->first();
-        if (!$variant) return false;
+        // 2. Validasi DB Lokal: Pastikan Produk (item_no) ada di Laravel Anda
+        $productAccurate = \App\Models\ProductAccurate::where('item_no', $itemNo)
+            ->where('database_source', $dbSource)
+            ->first();
+        if (!$productAccurate) return false;
 
         // 3. Tembak API Accurate (Hanya dieksekusi jika gudang & produk valid)
         $service = app(AccurateService::class);
@@ -92,8 +93,8 @@ class StockChangeHandler implements WebhookHandlerInterface
             WarehouseStock::updateOrCreate(
                 [
                     'warehouse_id' => $warehouse->id,
-                    'variant_id'   => $variant->id,
-                    'variant_type' => get_class($variant),
+                    'variant_id'   => $productAccurate->id,
+                    'variant_type' => get_class($productAccurate),
                 ],
                 [
                     // Lakukan casting ke (int) agar 5.000000 menjadi 5 di database Laravel Anda
@@ -106,12 +107,6 @@ class StockChangeHandler implements WebhookHandlerInterface
         }
 
         // Cek apakah butuh SN
-        if ($variant instanceof SecondProductVariant) {
-            return true;
-        } elseif ($variant instanceof ProductVariant) {
-            return (bool) ($variant->product->has_sn ?? false);
-        }
-
-        return false;
+        return (bool) ($productAccurate->has_sn ?? false);
     }
 }
