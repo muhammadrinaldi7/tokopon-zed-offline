@@ -76,6 +76,12 @@
                         @if ($item->appraised_value)
                             <p class="text-sm font-bold text-emerald-600 mt-2">Nilai Taksiran: Rp
                                 {{ number_format($item->appraised_value, 0, ',', '.') }}</p>
+                            @if($item->is_price_adjusted)
+                                <p class="text-[10px] font-bold text-amber-500 mt-1 flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Nominal disesuaikan Admin
+                                </p>
+                            @endif
                         @else
                             <p class="text-xs text-gray-400 mt-2 italic">Belum ada taksiran harga</p>
                         @endif

@@ -18,6 +18,7 @@ class SellPhone extends Model implements HasMedia
         'phone_storage',
         'minus_desc',
         'appraised_value',
+        'is_price_adjusted',
         'status',
         'customer_shipping_receipt',
         'bank_name',

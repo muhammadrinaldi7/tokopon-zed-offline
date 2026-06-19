@@ -90,6 +90,22 @@ class Show extends Component
         $this->dispatch('show-toast', type: 'success', message: 'Penawaran berhasil disimpan dan dikirim ke pengguna.');
     }
 
+    public function updatePrice()
+    {
+        $this->validate([
+            'appraisedValue' => 'required|numeric|min:1000'
+        ]);
+
+        $this->sellPhone->update([
+            'appraised_value' => $this->appraisedValue,
+            'is_price_adjusted' => true
+        ]);
+
+        // Refresh the local model just to be safe
+        $this->sellPhone->refresh();
+        $this->dispatch('toast', ['type' => 'success', 'title' => 'Sukses', 'message' => 'Harga disepakati berhasil diperbarui.']);
+    }
+
     public function submitRevision()
     {
         $this->validate([

@@ -325,7 +325,7 @@ class SellPhone extends Component
                 $rules['name']        = 'required|string|max:255';
                 $rules['mobilePhone'] = 'required|string|max:15';
                 $rules['email']       = 'required|email|unique:users,email';
-                $rules['nik']         = 'required|numeric|digits:16|unique:users,nik'; // Sesuaikan field NIK di table user Anda
+                $rules['nik']         = 'required|numeric|digits:16|unique:users,identity'; // Sesuaikan field NIK di table user Anda
                 $rules['npwp']        = 'nullable|string|max:20';
                 $rules['foto_ktp']    = 'required|image|max:2048'; // Max 2MB
                 $rules['account_number'] = 'required|string|max:20';
@@ -402,7 +402,7 @@ class SellPhone extends Component
                     'name'         => $this->name,
                     // 'mobile_phone' => $this->mobilePhone, // Sesuaikan nama kolom table users Anda
                     'email'        => $this->email,
-                    'nik'          => $this->nik,
+                    'identity'     => $this->nik,
                     'npwp'         => $this->npwp,
                     'password'     => \Illuminate\Support\Facades\Hash::make($this->nik), // Hash otomatis dari NIK
                 ]);

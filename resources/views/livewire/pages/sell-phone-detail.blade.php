@@ -76,6 +76,12 @@
             @if ($sellPhone->appraised_value)
                 <h2 class="text-4xl font-black text-emerald-600">Rp
                     {{ number_format($sellPhone->appraised_value, 0, ',', '.') }}</h2>
+                @if($sellPhone->is_price_adjusted)
+                    <p class="text-xs font-bold text-amber-500 mt-2 bg-amber-50 inline-block px-2 py-1 rounded-md border border-amber-200 flex items-center w-fit gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Nominal disesuaikan oleh Admin
+                    </p>
+                @endif
             @else
                 <h2 class="text-4xl font-black text-neutral-300">Menunggu...</h2>
             @endif

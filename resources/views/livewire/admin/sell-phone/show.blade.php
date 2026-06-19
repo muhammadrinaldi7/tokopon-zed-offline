@@ -205,12 +205,29 @@
                 </h3>
 
                 @if ($sellPhone->appraised_value)
-                    <div class="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-lg text-center">
+                    <div class="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-lg text-center" x-data="{ editingPrice: false }">
                         <p class="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">Nilai Disepakati /
                             Penawaran</p>
-                        <p class="text-2xl font-black text-emerald-700">Rp
-                            {{ number_format($sellPhone->appraised_value, 0, ',', '.') }}</p>
-                        <p class="text-xs text-emerald-600 mt-2">Dihitung otomatis dari Base Price & Rules.</p>
+                        
+                        <div x-show="!editingPrice">
+                            <p class="text-2xl font-black text-emerald-700">Rp
+                                {{ number_format($sellPhone->appraised_value, 0, ',', '.') }}</p>
+                            
+                            @if($sellPhone->status === 'PAYING')
+                                <button type="button" @click="editingPrice = true" class="mt-2 text-xs font-bold text-emerald-600 underline hover:text-emerald-800 focus:outline-none">Ubah Harga</button>
+                            @else
+                                <p class="text-xs text-emerald-600 mt-2">Dihitung otomatis dari Base Price & Rules.</p>
+                            @endif
+                        </div>
+
+                        <div x-show="editingPrice" style="display: none;" class="mt-3 text-left bg-white p-3 rounded-lg border border-emerald-200">
+                            <label class="block text-xs font-bold text-emerald-900 mb-1">Nominal Harga Baru (Rp)</label>
+                            <div class="flex gap-2">
+                                <input type="number" wire:model="appraisedValue" class="w-full p-2 border-emerald-200 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm bg-white font-mono">
+                                <button type="button" wire:click="updatePrice" @click="editingPrice = false" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors">Simpan</button>
+                                <button type="button" @click="editingPrice = false; $wire.set('appraisedValue', {{ $sellPhone->appraised_value }})" class="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">Batal</button>
+                            </div>
+                        </div>
                     </div>
                 @endif
             </div>

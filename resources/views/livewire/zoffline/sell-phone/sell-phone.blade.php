@@ -306,32 +306,55 @@
                                     $hasError = $errors->has($propertyName);
                                 @endphp
 
-                                <div class="relative aspect-square rounded-3xl overflow-hidden transition-all duration-300 group
+                                <div x-data="{ localPreview: null }" class="relative aspect-square rounded-3xl overflow-hidden transition-all duration-300 group
                                  {{ $photoFile ? 'border border-neutral-100 shadow-sm' : 'border-2 border-dashed bg-neutral-50/50 hover:bg-neutral-50/100 cursor-pointer' }}
                                 {{ $hasError ? 'border-rose-300 bg-rose-50/20' : 'border-neutral-200 hover:border-neutral-300' }}">
 
                                     @if ($photoFile)
-                                        <img src="{{ $photoFile->temporaryUrl() }}"
+                                        @php
+                                            // Membaca file temporary secara lokal dan mengubahnya ke Base64
+                                            $base64Image = '';
+                                            if (file_exists($photoFile->getRealPath())) {
+                                                $base64Image = 'data:' . $photoFile->getMimeType() . ';base64,' . base64_encode(@file_get_contents($photoFile->getRealPath()));
+                                            }
+                                        @endphp
+                                        <img src="{{ $base64Image }}"
                                             class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
                                         <div class="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-xs py-2 px-3 text-center pointer-events-none z-10">
                                             <span class="text-[11px] font-bold text-white tracking-wide block truncate">{{ $label }}</span>
                                         </div>
-                                        <button type="button" wire:click="$set('{{ $propertyName }}', null)"
+                                        <button type="button" wire:click="$set('{{ $propertyName }}', null)" x-on:click="localPreview = null"
                                             class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-10 flex items-center justify-center">
                                             <svg class="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-16v1M4 7h16" /></svg>
                                         </button>
                                     @else
+                                        {{-- INSTANT LOCAL PREVIEW (WHILE COMPRESSING & UPLOADING) --}}
+                                        <template x-if="localPreview">
+                                            <div class="absolute inset-0 z-20">
+                                                <img :src="localPreview" class="w-full h-full object-cover opacity-60">
+                                                <div class="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px]">
+                                                    <svg class="animate-spin w-8 h-8 text-[#1c69d4]" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                        </template>
+
                                         {{-- CAMERA ONLY UPLOAD --}}
-                                        <label class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center select-none overflow-hidden cursor-pointer z-10">
-                                            <input type="file" accept="image/*" capture="environment" class="hidden" @change="customCompressHandler($event, 'photo_{{ $key }}')">
+                                        <label x-show="!localPreview" class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center select-none overflow-hidden cursor-pointer z-10">
+                                            <input type="file" accept="image/*" capture="environment" class="hidden" 
+                                                @change="if($event.target.files.length > 0) { localPreview = URL.createObjectURL($event.target.files[0]); } customCompressHandler($event, 'photo_{{ $key }}')">
                                             <div class="absolute inset-0 flex items-center justify-center z-0 group-hover:scale-110 transition-transform duration-300">
                                                 <img src="{{ asset('assets/png/' . $key . '.png') }}" alt="{{ $label }}" class="w-50 h-auto object-contain drop-shadow-sm {{ $hasError ? 'opacity-20' : 'opacity-30' }}" onerror="this.onerror=null; this.src='{{ asset('assets/png/default.png') }}';">
                                             </div>
-                                            <div class="relative z-10 flex flex-col items-center justify-center">
-                                                <h4 class="font-bold text-xs tracking-tight {{ $hasError ? 'text-rose-700' : 'text-neutral-800' }}">{{ $label }}</h4>
-                                                <div class="mt-1 bg-white/80 backdrop-blur-sm rounded-full p-1.5 shadow-sm">
-                                                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><circle cx="12" cy="13" r="3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></circle></svg>
-                                                </div>
+                                            <div class="absolute bottom-3 inset-x-0">
+                                                <span class="block text-[11px] font-bold tracking-wide {{ $hasError ? 'text-rose-500' : 'text-neutral-500 group-hover:text-neutral-700' }}">
+                                                    {{ $label }}
+                                                </span>
+                                                @error($propertyName)
+                                                    <span class="block text-[10px] text-rose-500 mt-0.5 leading-tight">{{ $message }}</span>
+                                                @enderror
                                             </div>
                                         </label>
                                     @endif
@@ -478,10 +501,24 @@
                         </button>
 
                         <button x-show="qcStep > 0 && qcStep < {{ $maxQcStep }}" type="button" 
-                            @click="if (qcStep === {{ $maxQcStep - 1 }}) { $wire.calculateAutoVerdict().then(() => qcStep++) } else { qcStep++ }"
-                            class="px-6 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200 w-full md:w-auto">
-                            Lanjut
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                            x-data="{ isCalculating: false }"
+                            @click="if (qcStep === {{ $maxQcStep - 1 }}) { isCalculating = true; $wire.calculateAutoVerdict().then(() => { qcStep++; isCalculating = false; }) } else { qcStep++ }"
+                            :disabled="isCalculating"
+                            class="px-6 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 w-full md:w-auto"
+                            :class="isCalculating ? 'bg-violet-400 text-white cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200'">
+                            
+                            <span x-show="!isCalculating" class="flex items-center gap-2">
+                                Lanjut
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                            </span>
+                            
+                            <span x-show="isCalculating" class="flex items-center gap-2" style="display: none;">
+                                <svg class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Memproses Kesimpulan...
+                            </span>
                         </button>
 
                         <button x-show="qcStep === {{ $maxQcStep }}" type="button" 
