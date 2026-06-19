@@ -88,6 +88,242 @@ trait WithCheckoutAndReceipt
         $this->showCheckoutModal = true;
     }
 
+    public function saveDraft()
+    {
+        $handler = Auth::user();
+        if (!$handler || !$handler->branch || !$handler->warehouse) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Akun Anda belum terhubung dengan Cabang (Branch) atau Gudang. Harap hubungi Admin.', type: 'error');
+            return;
+        }
+
+        // Jalankan validasi Customer (sama seperti Checkout)
+        if (!$this->selectedCustomerId) {
+            if (strlen($this->searchCustomer) >= 2 && !empty($this->customerPhone)) {
+                $this->isNewCustomer = true;
+                $this->customerName = $this->searchCustomer;
+            }
+
+            if (!$this->isNewCustomer) {
+                $this->dispatch('toast', title: 'Customer Belum Lengkap', message: 'Pilih customer dari daftar, atau lengkapi Nama & Nomor HP untuk membuat pelanggan baru sebelum menyimpan draft.', type: 'warning');
+                return;
+            }
+        }
+
+        try {
+            $customerId = $this->selectedCustomerId;
+
+            // Jika customer baru, buat user terlebih dahulu
+            if ($this->isNewCustomer && !$customerId) {
+                if (preg_match('/^0+$/', (string) $this->customerPhone)) {
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP tidak boleh hanya berisi angka 0.', type: 'error');
+                    return;
+                }
+
+                $emailToValidate = $this->customerEmail ?: ($this->customerPhone . rand(1000, 9999) . '@zpos.com');
+
+                $validator = \Illuminate\Support\Facades\Validator::make(
+                    [
+                        'customerName'  => $this->customerName,
+                        'customerPhone' => $this->customerPhone,
+                        'customerEmail' => $emailToValidate,
+                    ],
+                    [
+                        'customerName'  => 'required|string|max:255',
+                        'customerPhone' => 'required|string|max:20|unique:user_profiles,phone_number',
+                        'customerEmail' => 'nullable|email|unique:users,email',
+                    ]
+                );
+
+                if ($validator->fails()) {
+                    $errors = $validator->errors();
+                    $failedRules = $validator->failed();
+                    $firstErrorMessage = $errors->first();
+
+                    if (isset($failedRules['customerPhone']['Unique'])) {
+                        $existingProfile = \Illuminate\Support\Facades\DB::table('user_profiles')
+                            ->where('phone_number', $this->customerPhone)
+                            ->first();
+
+                        if ($existingProfile) {
+                            $namaCustomer = $existingProfile->full_name ?? 'Customer Lain';
+                            $firstErrorMessage = "Nomor HP sudah terdaftar atas nama: {$namaCustomer}. Silakan pilih customer dari daftar pencarian.";
+                        }
+                    }
+
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
+                    return;
+                }
+
+                $newUser = User::create([
+                    'name'     => $this->customerName,
+                    'email'    => $emailToValidate,
+                    'password' => bcrypt('tokopun' . rand(1000, 9999)),
+                ]);
+                $newUser->assignRole('user');
+
+                if ($this->customerPhone) {
+                    $newUser->profile()->create([
+                        'full_name'    => $this->customerName,
+                        'phone_number' => $this->customerPhone,
+                    ]);
+                }
+
+                $customerId = $newUser->id;
+            }
+
+            if (!$customerId) {
+                $this->dispatch('toast', title: 'Error', message: 'Customer belum dipilih.', type: 'error');
+                return;
+            }
+
+            $subtotal = $this->subtotal();
+            $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
+            $promoDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['promo_discount'] ?? 0));
+            $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
+            $grandTotal = max(0, $subtotal - $totalDiscountAmount);
+
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
+            $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
+
+            // Jika sebelumnya meload draft, kita update draft yang sudah ada
+            $order = null;
+            if ($this->loadedDraftId) {
+                $order = Order::find($this->loadedDraftId);
+                if ($order) {
+                    // Kembalikan stock dari item draft lama dulu sebelum diisi yang baru
+                    foreach ($order->items as $oldItem) {
+                        $warehouseStock = \App\Models\WarehouseStock::where([
+                            'warehouse_id' => Auth::user()->warehouse_id,
+                            'variant_id' => $oldItem->product_variant_id,
+                            'variant_type' => $oldItem->product_variant_type,
+                        ])->first();
+                        if ($warehouseStock) {
+                            $warehouseStock->update([
+                                'stock' => $warehouseStock->stock + (int)$oldItem->qty
+                            ]);
+                        }
+                        
+                        // Kembalikan status SN lama menjadi Available
+                        if (!empty($oldItem->serial_number)) {
+                            $oldSns = explode(',', $oldItem->serial_number);
+                            $cleanOldSns = array_values(array_filter(array_map('trim', $oldSns)));
+                            if (!empty($cleanOldSns)) {
+                                \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanOldSns)
+                                    ->update(['status' => 'Available']);
+                            }
+                        }
+                    }
+                    $order->items()->delete();
+                    $order->promos()->detach();
+                    
+                    $order->update([
+                        'user_id' => $customerId,
+                        'order_date' => $dateToUse->format('Y-m-d'),
+                        'total_amount' => $subtotal,
+                        'shipping_cost' => 0,
+                        'discount_amount' => $totalDiscountAmount,
+                        'mdr_percentage' => 0,
+                        'mdr_amount' => 0,
+                        'grand_total' => $grandTotal,
+                        'order_status' => 'DRAFT', // Tetap DRAFT
+                        'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
+                        'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
+                        'notes' => $this->notes,
+                    ]);
+                }
+            }
+
+            if (!$order) {
+                // Buat Order Number baru jika belum ada
+                $orderNumber = 'POS-DRF-' . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
+                    Order::whereDate('order_date', $dateToUse->format('Y-m-d'))
+                        ->where('order_channel', 'POS')
+                        ->count() + 1,
+                    4,
+                    '0',
+                    STR_PAD_LEFT
+                );
+
+                // Create Order DRAFT baru
+                $order = Order::create([
+                    'business_unit_id' => Auth::user()->getActiveBusinessUnitId() ?? 1,
+                    'user_id' => $customerId,
+                    'order_number' => $orderNumber,
+                    'order_date' => $dateToUse->format('Y-m-d'),
+                    'total_amount' => $subtotal,
+                    'shipping_cost' => 0,
+                    'discount_amount' => $totalDiscountAmount,
+                    'mdr_percentage' => 0,
+                    'mdr_amount' => 0,
+                    'grand_total' => $grandTotal,
+                    'order_status' => 'DRAFT',
+                    'order_channel' => 'POS',
+                    'handled_by' => Auth::id(),
+                    'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
+                    'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
+                    'notes' => $this->notes,
+                ]);
+            }
+
+            // Save promos to pivot table
+            if (!empty($this->selectedPromos)) {
+                $service = app(\App\Services\PromoCalculatorService::class);
+                $service->recordPromosToOrder($order, $this->cart, $this->selectedPromos);
+            }
+
+            // Create Order Items + reduce stock (Kunci Stock Opsi B)
+            foreach ($this->cart as $item) {
+                $rawSns = $item['serial_numbers'] ?? [];
+                $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
+
+                // Update status SN menjadi Unavailable
+                if (!empty($cleanSns)) {
+                    \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanSns)
+                        ->update(['status' => 'Unavailable']);
+                }
+
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_variant_id' => $item['variant_id'],
+                    'product_variant_type' => $item['variant_type'],
+                    'product_name' => $item['name'] ?? 'Unknown Product',
+                    'qty' => $item['qty'],
+                    'price_at_checkout' => $item['price'],
+                    'subtotal' => $item['price'] * $item['qty'],
+                    'discount_amount' => (int) ($item['discount_amount'] ?? 0),
+                    'promo_discount_amount' => (int) ($item['promo_discount'] ?? 0),
+                    'applied_promo_id' => $item['applied_promo_id'] ?? null,
+                    'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
+                ]);
+
+                // Reduce stock locally
+                $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
+                    [
+                        'warehouse_id' => Auth::user()->warehouse_id,
+                        'variant_id' => $item['variant_id'],
+                        'variant_type' => $item['variant_type'],
+                    ],
+                    [
+                        'stock' => 0
+                    ]
+                );
+                $warehouseStock->update([
+                    'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
+                ]);
+            }
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            $this->resetCheckout();
+            $this->dispatch('toast', title: 'Draft Disimpan', message: 'Transaksi berhasil disimpan sebagai Draft dan stok telah dikunci.', type: 'success');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            Log::error('POS Save Draft Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal menyimpan draft: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
     public function processPayment()
     {
         $handler = Auth::user();
@@ -212,40 +448,97 @@ trait WithCheckoutAndReceipt
 
             \Illuminate\Support\Facades\DB::beginTransaction();
 
-            // 1. Tentukan tanggal yang digunakan (dari input form atau hari ini)
             $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
 
-            // 2. Generate order number berdasarkan order_date
-            $orderNumber = 'POS-SYB-' . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
-                Order::whereDate('order_date', $dateToUse->format('Y-m-d')) // <- Menggunakan order_date
-                    ->where('order_channel', 'POS')
-                    ->count() + 1,
-                4,
-                '0',
-                STR_PAD_LEFT
-            );
+            $order = null;
+            if ($this->loadedDraftId) {
+                $order = Order::find($this->loadedDraftId);
+                if ($order) {
+                    // Kembalikan stock dari item draft yang lama
+                    foreach ($order->items as $oldItem) {
+                        $warehouseStock = \App\Models\WarehouseStock::where([
+                            'warehouse_id' => Auth::user()->warehouse_id,
+                            'variant_id' => $oldItem->product_variant_id,
+                            'variant_type' => $oldItem->product_variant_type,
+                        ])->first();
+                        if ($warehouseStock) {
+                            $warehouseStock->update([
+                                'stock' => $warehouseStock->stock + (int)$oldItem->qty
+                            ]);
+                        }
+                        
+                        // Kembalikan status SN lama menjadi Available
+                        if (!empty($oldItem->serial_number)) {
+                            $oldSns = explode(',', $oldItem->serial_number);
+                            $cleanOldSns = array_values(array_filter(array_map('trim', $oldSns)));
+                            if (!empty($cleanOldSns)) {
+                                \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanOldSns)
+                                    ->update(['status' => 'Available']);
+                            }
+                        }
+                    }
+                    $order->items()->delete();
+                    $order->promos()->detach();
+                    $order->payments()->delete(); // in case there are payments attached to draft
 
-            // Create Order
-            $order = Order::create([
-                'business_unit_id' => Auth::user()->getActiveBusinessUnitId() ?? 1,
-                'user_id' => $customerId,
-                'order_number' => $orderNumber,
-                'order_date' => $dateToUse->format('Y-m-d'),
-                'total_amount' => $subtotal,
-                'shipping_cost' => 0,
-                'discount_amount' => $totalDiscountAmount,
-                'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
-                'mdr_amount' => $mdrAmt,
-                'grand_total' => $grandTotal,
-                'order_status' => 'COMPLETED',
-                'order_channel' => 'POS',
-                'handled_by' => Auth::id(),
-                'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
-                'payment_method_id' => $this->payments[0]['payment_method_id'] ?: null,
-                'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
-                'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
-                'notes' => $this->notes,
-            ]);
+                    $order->update([
+                        'user_id' => $customerId,
+                        'order_date' => $dateToUse->format('Y-m-d'),
+                        'total_amount' => $subtotal,
+                        'shipping_cost' => 0,
+                        'discount_amount' => $totalDiscountAmount,
+                        'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
+                        'mdr_amount' => $mdrAmt,
+                        'grand_total' => $grandTotal,
+                        'order_status' => 'COMPLETED',
+                        'order_channel' => 'POS',
+                        'handled_by' => Auth::id(),
+                        'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
+                        'payment_method_id' => $this->payments[0]['payment_method_id'] ?: null,
+                        'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
+                        'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
+                        'notes' => $this->notes,
+                    ]);
+                    $orderNumber = $order->order_number;
+                }
+            }
+
+            if (!$order) {
+                // 1. Tentukan tanggal yang digunakan (dari input form atau hari ini)
+                $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
+
+                // 2. Generate order number berdasarkan order_date
+                $orderNumber = 'POS-SYB-' . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
+                    Order::whereDate('order_date', $dateToUse->format('Y-m-d')) // <- Menggunakan order_date
+                        ->where('order_channel', 'POS')
+                        ->count() + 1,
+                    4,
+                    '0',
+                    STR_PAD_LEFT
+                );
+
+                // Create Order
+                $order = Order::create([
+                    'business_unit_id' => Auth::user()->getActiveBusinessUnitId() ?? 1,
+                    'user_id' => $customerId,
+                    'order_number' => $orderNumber,
+                    'order_date' => $dateToUse->format('Y-m-d'),
+                    'total_amount' => $subtotal,
+                    'shipping_cost' => 0,
+                    'discount_amount' => $totalDiscountAmount,
+                    'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
+                    'mdr_amount' => $mdrAmt,
+                    'grand_total' => $grandTotal,
+                    'order_status' => 'COMPLETED',
+                    'order_channel' => 'POS',
+                    'handled_by' => Auth::id(),
+                    'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
+                    'payment_method_id' => $this->payments[0]['payment_method_id'] ?: null,
+                    'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
+                    'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
+                    'notes' => $this->notes,
+                ]);
+            }
 
             // Save promos to pivot table
             if (!empty($this->selectedPromos)) {
@@ -526,6 +819,8 @@ trait WithCheckoutAndReceipt
             ]
         ];
         $this->order_date = null;
+        $this->currentStep = 1;
+        $this->loadedDraftId = null;
     }
 
     public function closeReceipt()

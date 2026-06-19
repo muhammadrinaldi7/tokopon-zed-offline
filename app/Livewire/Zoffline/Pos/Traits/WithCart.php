@@ -145,16 +145,25 @@ trait WithCart
                     return;
                 }
 
+                if ($localSnRecordGlobal->status === 'Unavailable') {
+                    $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$sn}' sudah dalam status Draft atau Terjual.", type: 'warning');
+                    $this->scanned_sn = '';
+                    $this->closeAddonModal();
+                    return;
+                }
+
                 $this->addScannedAccurateToCart($productAccurate, $sn, 1);
                 $this->closeAddonModal();
                 return;
             } else if ($isConfirmedSn) {
                 $this->dispatch('toast', title: 'Gagal', message: "SN '{$sn}' terdaftar di Accurate, namun belum tersinkronisasi di sistem lokal.", type: 'error');
+                $this->closeAddonModal();
                 return;
             }
         }
 
         $this->dispatch('toast', title: 'Gagal', message: "SN '{$sn}' tidak ditemukan atau bukan SN yang valid.", type: 'error');
+        $this->closeAddonModal();
     }
 
     public function openCustomerQcModal($sn)
@@ -224,6 +233,13 @@ trait WithCart
                     $actualWarehouseName = \App\Models\Warehouse::where('id', $localSnRecordGlobal->warehouse_id)->value('name');
                     $warehouseTarget = $actualWarehouseName ?? 'Gudang Lain';
                     $this->dispatch('toast', title: 'Gagal', message: "Serial Number '{$sn}' ada di gudang {$warehouseTarget}. Silahkan lakukan pemindahan barang di accurate.", type: 'error');
+                    $this->scanned_sn = '';
+                    return;
+                }
+
+                // Cek apakah SN statusnya Unavailable (sudah di draft / terjual)
+                if ($localSnRecordGlobal->status === 'Unavailable') {
+                    $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$sn}' sudah dalam status Draft atau Terjual.", type: 'warning');
                     $this->scanned_sn = '';
                     return;
                 }

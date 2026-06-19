@@ -171,6 +171,135 @@ class Pos extends Component
         }
     }
 
+    // ─── Draft Sales Properties ──────────────────────────────
+    public $showDraftModal = false;
+    public $draftOrders = [];
+    public $loadedDraftId = null;
+
+    public function openDraft()
+    {
+        $this->draftOrders = Order::with(['user'])
+            ->where('order_channel', 'POS')
+            ->where('order_status', 'DRAFT')
+            ->latest()
+            ->take(20)
+            ->get();
+
+        $this->showDraftModal = true;
+    }
+
+    public function loadDraft($orderId)
+    {
+        $order = Order::with(['items.variant', 'user.profile', 'promos'])->find($orderId);
+        if (!$order) {
+            $this->dispatch('toast', title: 'Error', message: 'Draft tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        // Restore customer
+        $this->selectedCustomerId = $order->user_id;
+        $this->isNewCustomer = false;
+        if ($order->user) {
+            $this->customerName = $order->user->name;
+            $this->customerPhone = $order->user->profile->phone_number ?? '';
+            $this->customerEmail = $order->user->email ?? '';
+        }
+
+        // Restore sales (jika ada)
+        if ($order->sales_id) {
+            $sales = \App\Models\Employe::find($order->sales_id);
+            if ($sales) {
+                $this->selectedSales = [[
+                    'id' => $sales->id,
+                    'name' => $sales->name,
+                    'employee_no' => $sales->employee_no
+                ]];
+            }
+        }
+
+        // Restore manual discount
+        $this->discount_amount = (int) $order->discount_amount;
+        $this->notes = $order->notes;
+
+        $this->order_date = $order->order_date;
+        // Restore promos
+        $this->selectedPromos = $order->promos->pluck('id')->toArray();
+
+        // Restore cart
+        $this->cart = [];
+        foreach ($order->items as $item) {
+            $snArray = array_values(array_filter(array_map('trim', explode(',', $item->serial_number))));
+
+            $variant = $item->variant; // Instance dari ProductAccurate
+
+            $this->cart[] = [
+                'variant_id' => $item->product_variant_id,
+                'variant_type' => $item->product_variant_type,
+                'name' => $variant->name ?? 'Unknown',
+                'sku' => $variant->item_no ?? ($variant->sku ?? ''),
+                'ram' => '-',
+                'storage' => '-',
+                'color' => '-',
+                'price' => (int) $item->price_at_checkout,
+                'qty' => $item->qty,
+                'discount_amount' => (int) $item->discount_amount,
+                'promo_discount' => (int) $item->promo_discount_amount,
+                'applied_promo_id' => $item->applied_promo_id,
+                'serial_numbers' => $snArray,
+                'has_sn' => (bool) ($variant->has_sn ?? true),
+                'database_source' => $variant->database_source ?? 'syihab',
+            ];
+        }
+
+        // Set the loaded draft ID so we can update it later
+        $this->loadedDraftId = $order->id;
+        $this->syncSinglePaymentAmount();
+        $this->showDraftModal = false;
+        $this->dispatch('toast', title: 'Berhasil', message: 'Draft berhasil dimuat.', type: 'success');
+    }
+
+    public function deleteDraft($orderId)
+    {
+        $order = Order::with(['items'])->find($orderId);
+        if (!$order) {
+            $this->dispatch('toast', title: 'Error', message: 'Draft tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        // Return stock
+        foreach ($order->items as $item) {
+            $warehouseStock = \App\Models\WarehouseStock::where([
+                'warehouse_id' => Auth::user()->warehouse_id,
+                'variant_id' => $item->product_variant_id,
+                'variant_type' => $item->product_variant_type,
+            ])->first();
+
+            if ($warehouseStock) {
+                $warehouseStock->update([
+                    'stock' => $warehouseStock->stock + (int)$item->qty
+                ]);
+            }
+
+            // Return SN
+            if (!empty($item->serial_number)) {
+                $sns = explode(',', $item->serial_number);
+                $cleanSns = array_values(array_filter(array_map('trim', $sns)));
+                if (!empty($cleanSns)) {
+                    \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanSns)
+                        ->update(['status' => 'Available']);
+                }
+            }
+        }
+
+        $order->items()->delete();
+        $order->promos()->detach();
+        $order->delete();
+
+        // Refresh list draft
+        $this->openDraft();
+        $this->dispatch('toast', title: 'Berhasil', message: 'Draft berhasil dihapus dan stok dikembalikan.', type: 'success');
+    }
+
     // ─── History Sales Properties ──────────────────────────────
     public $showHistoryModal = false;
     public $historyOrders = [];

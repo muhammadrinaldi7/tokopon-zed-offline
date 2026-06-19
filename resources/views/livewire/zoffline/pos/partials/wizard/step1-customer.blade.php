@@ -1,22 +1,35 @@
 <div>
-    <div class="mb-6 px-2">
-        <div class="flex gap-2 items-center">
-            <div class="rounded-full w-8 h-8 bg-[#DFE7FF] flex items-center justify-center text-black">
+    <div class="mb-6 px-2 flex justify-between items-start">
+        <div>
+            <div class="flex gap-2 items-center">
+                <div class="rounded-full w-8 h-8 bg-[#DFE7FF] flex items-center justify-center text-black">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-auto" viewBox="0 0 24 24">
+                        <path d="M0 0h24v24H0z" fill="none" />
+                        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="1.2">
+                            <path d="M14.5 10.5a2.5 2.5 0 1 1-5 0a2.5 2.5 0 0 1 5 0" />
+                            <path
+                                d="M16 3.5c2.48 0 4.19.384 5.133.676c.543.169.867.683.867 1.251v9.755c0 1.115-1.228 1.954-2.324 1.748c-.94-.178-2.165-.32-3.676-.32c-4.75 0-5.89 1.805-12.855.27A1.47 1.47 0 0 1 2 15.437V5.421c0-.976.92-1.687 1.878-1.497C10.197 5.177 11.421 3.5 16 3.5" />
+                            <path
+                                d="M2 7.5c1.951 0 3.705-1.595 3.929-3.246M18.5 4c0 2.04 1.765 3.969 3.5 3.969m0 5.531c-1.9 0-3.74 1.31-3.898 3.098M6 16.996a4 4 0 0 0-4-4m17 6.737a18.5 18.5 0 0 0-3-.233c-4.294 0-5.638 1.66-11 .703" />
+                        </g>
+                    </svg>
+                </div>
+                <p class="text-sm text-neutral-500">Transaksi Penjualan</p>
+            </div>
+            <h1 class="text-3xl font-semibold  text-neutral-800 mt-4">Siapa Pelanggan Anda Hari ini?</h1>
+        </div>
+        <div>
+            <button wire:click="openDraft"
+                class="p-4 bg-amber-200 text-amber-700 hover:bg-amber-300 rounded-full font-bold flex items-center gap-2 transition-all shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-auto" viewBox="0 0 24 24">
                     <path d="M0 0h24v24H0z" fill="none" />
-                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                        stroke-width="1.2">
-                        <path d="M14.5 10.5a2.5 2.5 0 1 1-5 0a2.5 2.5 0 0 1 5 0" />
-                        <path
-                            d="M16 3.5c2.48 0 4.19.384 5.133.676c.543.169.867.683.867 1.251v9.755c0 1.115-1.228 1.954-2.324 1.748c-.94-.178-2.165-.32-3.676-.32c-4.75 0-5.89 1.805-12.855.27A1.47 1.47 0 0 1 2 15.437V5.421c0-.976.92-1.687 1.878-1.497C10.197 5.177 11.421 3.5 16 3.5" />
-                        <path
-                            d="M2 7.5c1.951 0 3.705-1.595 3.929-3.246M18.5 4c0 2.04 1.765 3.969 3.5 3.969m0 5.531c-1.9 0-3.74 1.31-3.898 3.098M6 16.996a4 4 0 0 0-4-4m17 6.737a18.5 18.5 0 0 0-3-.233c-4.294 0-5.638 1.66-11 .703" />
-                    </g>
+                    <path fill="currentColor" d="M13 12H7v-2h6zm4-4H7V6h10z" />
+                    <path fill="currentColor"
+                        d="M21 13h2v9H1v-9h2V2h18zM5 13h3.901l.194.751a3.001 3.001 0 0 0 5.81 0L15.1 13H19V4H5z" />
                 </svg>
-            </div>
-            <p class="text-sm text-neutral-500">Transaksi Penjualan</p>
+            </button>
         </div>
-        <h1 class="text-3xl font-semibold  text-neutral-800 mt-4">Siapa Pelanggan Anda Hari ini?</h1>
     </div>
 
     <div class="bg-white rounded-3xl shadow-sm p-8 md:p-10">
