@@ -71,13 +71,13 @@
     </div>
     <!-- Customer QC Modal (Sertifikat QC) -->
     @if ($showCustomerQcModal && $customerQcData)
-        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div class="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div
                 class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden relative">
 
                 {{-- Aksen Header Cantik --}}
                 <div
-                    class="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white shrink-0 relative overflow-hidden">
+                    class="bg-linear-to-r from-blue-600 to-indigo-600 p-6 text-white shrink-0 relative overflow-hidden">
                     <div class="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                     <div class="relative z-10 flex items-start justify-between">
                         <div>

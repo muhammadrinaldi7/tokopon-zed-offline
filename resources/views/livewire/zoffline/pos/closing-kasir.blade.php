@@ -49,7 +49,7 @@
             </div>
             <div
                 class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col relative overflow-hidden">
-                <div class="absolute right-0 top-0 w-16 h-16 bg-indigo-50 rounded-bl-full -z-0"></div>
+                <div class="absolute right-0 top-0 w-16 h-16 bg-indigo-50 rounded-bl-full z-0"></div>
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 relative z-10">Total
                     Penjualan</span>
                 <span class="text-lg font-black text-indigo-700 relative z-10">
@@ -75,29 +75,29 @@
                         <div class="grid grid-cols-1 gap-3">
                             @foreach ($denominations as $denom => $qty)
                                 @php
+                                    // Mengubah jadi border kiri (border-l) karena formatnya sekarang list horizontal memanjang
                                     $colorClass = match ($denom) {
-                                        100000 => 'border-rose-500 hover:shadow-rose-100',
-                                        50000 => 'border-blue-500 hover:shadow-blue-100',
-                                        20000 => 'border-emerald-500 hover:shadow-emerald-100',
-                                        10000 => 'border-purple-500 hover:shadow-purple-100',
-                                        5000 => 'border-amber-500 hover:shadow-amber-100',
-                                        2000 => 'border-slate-400 hover:shadow-slate-100',
-                                        1000 => 'border-lime-500 hover:shadow-lime-100',
+                                        100000 => 'border-rose-300 hover:shadow-rose-100',
+                                        50000 => 'border-blue-300 hover:shadow-blue-100',
+                                        20000 => 'border-emerald-300 hover:shadow-emerald-100',
+                                        10000 => 'border-purple-300 hover:shadow-purple-100',
+                                        5000 => 'border-orange-300 hover:shadow-amber-100',
+                                        2000 => 'border-slate-300 hover:shadow-slate-100',
                                         default => 'border-gray-300 hover:shadow-gray-100',
                                     };
                                 @endphp
 
                                 <div
-                                    class="group bg-white rounded-xl border border-slate-200 border-l-4 {{ $colorClass }} p-3 sm:p-4 shadow-sm hover:shadow-md transition-all duration-200 flex flex-row items-center justify-between focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent gap-2 sm:gap-4">
-                                    <div class="w-28 sm:w-36 flex-shrink-0">
+                                    class="group bg-white rounded-xl border  border-l-4 {{ $colorClass }} p-3 sm:p-4 shadow-sm hover:shadow-md transition-all duration-200 flex flex-row items-center justify-between focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent gap-2 sm:gap-4">
+                                    <div class="w-28 sm:w-36 shrink-0">
                                         <span class="font-extrabold text-base sm:text-lg text-slate-800 tracking-tight">
                                             Rp {{ number_format($denom, 0, ',', '.') }}
                                         </span>
                                     </div>
                                     <div
-                                        class="hidden sm:block flex-grow border-b-2 border-dashed border-slate-100 mx-2 group-hover:border-slate-200 transition-colors">
+                                        class="hidden sm:block grow border-b-2 border-dashed border-slate-100 mx-2 group-hover:border-slate-200 transition-colors">
                                     </div>
-                                    <div class="flex items-center justify-end flex-grow sm:flex-grow-0 gap-3 sm:gap-6">
+                                    <div class="flex items-center justify-end grow sm:grow-0 gap-3 sm:gap-6">
                                         <div class="flex items-center gap-1.5 sm:gap-2">
                                             <span class="text-slate-400 font-bold text-xs sm:text-sm">x</span>
                                             <input wire:model.live.debounce.500ms="denominations.{{ $denom }}"
@@ -201,35 +201,53 @@
         </div>
     @endif
     <!-- Simple Status Modal -->
-    <div x-data="{ show: @entangle('showStatusModal') }" x-show="show" class="relative z-[100]" aria-labelledby="modal-title" role="dialog" aria-modal="true" style="display: none;">
-        <div x-show="show" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+    <div x-data="{ show: @entangle('showStatusModal') }" x-show="show" class="relative z-100" aria-labelledby="modal-title" role="dialog"
+        aria-modal="true" style="display: none;">
+        <div x-show="show" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
         <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
             <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-                <div x-show="show" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-sm border border-slate-200">
+                <div x-show="show" x-transition:enter="ease-out duration-300"
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                    x-transition:leave="ease-in duration-200"
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                    x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-sm border border-slate-200">
                     <div class="px-4 pb-4 pt-5 sm:p-6 sm:pb-4 text-center">
-                        @if($statusType === 'success')
-                            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-4">
-                                <svg class="h-10 w-10 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        @if ($statusType === 'success')
+                            <div
+                                class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-4">
+                                <svg class="h-10 w-10 text-emerald-600" fill="none" viewBox="0 0 24 24"
+                                    stroke-width="2" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </div>
                             <h3 class="text-xl font-extrabold leading-6 text-slate-900 mb-2">Sukses</h3>
                         @else
-                            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 mb-4">
-                                <svg class="h-10 w-10 text-amber-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            <div
+                                class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 mb-4">
+                                <svg class="h-10 w-10 text-amber-600" fill="none" viewBox="0 0 24 24"
+                                    stroke-width="2" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
                             </div>
                             <h3 class="text-xl font-extrabold leading-6 text-slate-900 mb-2">Perhatian</h3>
                         @endif
-                        
+
                         <p class="text-sm text-slate-600 mb-6">{{ $statusMessage }}</p>
 
                         <div class="flex flex-col gap-2">
-                            <a href="{{ route('zoffline.pos') }}" class="w-full justify-center inline-flex items-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-md hover:bg-indigo-700 transition-all text-center">
+                            <a href="{{ route('zoffline.pos') }}"
+                                class="w-full justify-center inline-flex items-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-md hover:bg-indigo-700 transition-all text-center">
                                 Kembali ke Dashboard POS
                             </a>
-                            <button @click="show = false" type="button" class="w-full justify-center rounded-xl bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition-all">
+                            <button @click="show = false" type="button"
+                                class="w-full justify-center rounded-xl bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition-all">
                                 Tutup
                             </button>
                         </div>

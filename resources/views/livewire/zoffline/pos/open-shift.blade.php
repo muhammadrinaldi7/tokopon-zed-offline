@@ -15,7 +15,7 @@
         <div class="lg:col-span-8">
             @if ($hasActiveShift)
                 <div
-                    class="bg-white border border-indigo-100 rounded-3xl p-10 text-center shadow-sm flex flex-col justify-center items-center min-h-[400px] relative overflow-hidden">
+                    class="bg-white border border-indigo-100 rounded-3xl p-10 text-center shadow-sm flex flex-col justify-center items-center min-h-100 relative overflow-hidden">
                     <div class="absolute inset-0 bg-indigo-50/50"></div>
                     <div class="relative z-10">
                         <div
@@ -52,22 +52,21 @@
                                     @php
                                         // Mengubah jadi border kiri (border-l) karena formatnya sekarang list horizontal memanjang
                                         $colorClass = match ($denom) {
-                                            100000 => 'border-rose-500 hover:shadow-rose-100',
-                                            50000 => 'border-blue-500 hover:shadow-blue-100',
-                                            20000 => 'border-emerald-500 hover:shadow-emerald-100',
-                                            10000 => 'border-purple-500 hover:shadow-purple-100',
-                                            5000 => 'border-amber-500 hover:shadow-amber-100',
-                                            2000 => 'border-slate-400 hover:shadow-slate-100',
-                                            1000 => 'border-lime-500 hover:shadow-lime-100',
+                                            100000 => 'border-rose-300 hover:shadow-rose-100',
+                                            50000 => 'border-blue-300 hover:shadow-blue-100',
+                                            20000 => 'border-emerald-300 hover:shadow-emerald-100',
+                                            10000 => 'border-purple-300 hover:shadow-purple-100',
+                                            5000 => 'border-orange-300 hover:shadow-amber-100',
+                                            2000 => 'border-slate-300 hover:shadow-slate-100',
                                             default => 'border-gray-300 hover:shadow-gray-100',
                                         };
                                     @endphp
 
                                     <div
-                                        class="group bg-white rounded-xl border border-slate-200 border-l-4 {{ $colorClass }} p-3 sm:p-4 shadow-sm hover:shadow-md transition-all duration-200 flex flex-row items-center justify-between focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent gap-2 sm:gap-4">
+                                        class="group bg-white rounded-xl border  border-l-4 {{ $colorClass }} p-3 sm:p-4 shadow-sm hover:shadow-md transition-all duration-200 flex flex-row items-center justify-between focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent gap-2 sm:gap-4">
 
                                         <!-- Kiri: Nominal Pecahan -->
-                                        <div class="w-28 sm:w-36 flex-shrink-0">
+                                        <div class="w-28 sm:w-36 shrink-0">
                                             <span
                                                 class="font-extrabold text-base sm:text-lg text-slate-800 tracking-tight">
                                                 Rp {{ number_format($denom, 0, ',', '.') }}
@@ -76,12 +75,11 @@
 
                                         <!-- Tengah: Garis Penghubung (Hanya tampil di layar agak besar biar mirip buku kas) -->
                                         <div
-                                            class="hidden sm:block flex-grow border-b-2 border-dashed border-slate-100 mx-2 group-hover:border-slate-200 transition-colors">
+                                            class="hidden sm:block grow border-b-2 border-dashed border-slate-100 mx-2 group-hover:border-slate-200 transition-colors">
                                         </div>
 
                                         <!-- Kanan: Grup Input & Subtotal -->
-                                        <div
-                                            class="flex items-center justify-end flex-grow sm:flex-grow-0 gap-3 sm:gap-6">
+                                        <div class="flex items-center justify-end grow sm:grow-0 gap-3 sm:gap-6">
 
                                             <!-- Kotak Input Quantity -->
                                             <div class="flex items-center gap-1.5 sm:gap-2">
@@ -236,8 +234,8 @@
 
     </div>
     <!-- Simple Status Modal -->
-    <div x-data="{ show: @entangle('showStatusModal') }" x-show="show" class="relative z-[100]" aria-labelledby="modal-title"
-        role="dialog" aria-modal="true" style="display: none;">
+    <div x-data="{ show: @entangle('showStatusModal') }" x-show="show" class="relative z-100" aria-labelledby="modal-title" role="dialog"
+        aria-modal="true" style="display: none;">
         <div x-show="show" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
             x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200"
             x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
