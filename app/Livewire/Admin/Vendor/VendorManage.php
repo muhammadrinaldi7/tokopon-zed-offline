@@ -9,12 +9,13 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-#[Layout('layouts.admin', ['title' => 'Kelola Vendor - TokoPun'])]
+#[Layout('layouts.admin', ['title' => 'Kelola Vendor - ZedPOS'])]
 class VendorManage extends Component
 {
     use WithPagination;
 
     public $search = '';
+    public $filterBusinessUnitId = '';
     public $isLoading = false;
 
     public function updatingSearch()
@@ -31,27 +32,59 @@ class VendorManage extends Component
 
         try {
             $service = app(AccurateService::class);
-            $bus = \App\Models\BusinessUnit::where('is_active', true)->get();
+
+            $sources = [];
+            if ($this->filterBusinessUnitId) {
+                $bu = \App\Models\BusinessUnit::find($this->filterBusinessUnitId);
+                if ($bu) $sources[] = $bu;
+            } else {
+                $sources = \App\Models\BusinessUnit::where('is_active', true)->get();
+            }
+
+            if (empty($sources)) {
+                $this->dispatch('admin-alert', type: 'error', message: 'Tidak ada unit usaha yang dipilih atau aktif.');
+                $this->isLoading = false;
+                return;
+            }
+
             $syncedCount = 0;
 
-            foreach ($bus as $bu) {
+            foreach ($sources as $bu) {
                 try {
                     $response = $service->getVendors($bu->code);
 
                     if (!empty($response)) {
                         foreach ($response as $vnd) {
-                            Vendor::updateOrCreate(
-                                [
-                                    'accurate_vendor_id' => $vnd['id'],
-                                    'database_source' => $bu->code,
-                                ],
-                                [
-                                    'vendor_no'   => $vnd['vendorNo'] ?? '',
-                                    'vendor_name' => $vnd['name'],
-                                    'email'       => $vnd['email'] ?? null,
-                                    'phone'       => $vnd['mobilePhone'] ?? null,
-                                ]
-                            );
+                            $vendorNo = $vnd['vendorNo'] ?? '';
+
+                            if ($vendorNo !== '') {
+                                Vendor::updateOrCreate(
+                                    [
+                                        'vendor_no' => $vendorNo,
+                                    ],
+                                    [
+                                        'accurate_vendor_id' => $vnd['id'],
+                                        'database_source' => $bu->code,
+                                        'vendor_name' => $vnd['name'],
+                                        'email'       => $vnd['email'] ?? null,
+                                        'phone'       => $vnd['mobilePhone'] ?? null,
+                                    ]
+                                );
+                            } else {
+                                Vendor::updateOrCreate(
+                                    [
+                                        'accurate_vendor_id' => $vnd['id'],
+                                        'database_source' => $bu->code,
+                                    ],
+                                    [
+                                        'vendor_no'   => $vendorNo,
+                                        'vendor_name' => $vnd['name'],
+                                        'email'       => $vnd['email'] ?? null,
+                                        'phone'       => $vnd['mobilePhone'] ?? null,
+                                    ]
+                                );
+                            }
+
                             $syncedCount++;
                         }
                     }
@@ -78,10 +111,17 @@ class VendorManage extends Component
         $query = Vendor::orderBy('vendor_name', 'asc');
 
         // Multi-Tenant Filter
-        $bu = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
-        $buCode = $bu ? $bu->code : 'syihab';
-        if ($buCode) {
-            $query->where('database_source', $buCode);
+        if ($this->filterBusinessUnitId) {
+            $bu = \App\Models\BusinessUnit::find($this->filterBusinessUnitId);
+            if ($bu) {
+                $query->where('database_source', $bu->code);
+            }
+        } else {
+            $bu = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
+            $buCode = $bu ? $bu->code : 'syihab';
+            if ($buCode) {
+                $query->where('database_source', $buCode);
+            }
         }
 
         if ($this->search) {
@@ -94,7 +134,8 @@ class VendorManage extends Component
         }
 
         return view('livewire.admin.vendor.vendor-manage', [
-            'vendorsList' => $query->paginate(10)
+            'vendorsList' => $query->paginate(10),
+            'businessUnits' => \App\Models\BusinessUnit::where('is_active', true)->get()
         ]);
     }
 }

@@ -27,7 +27,7 @@ class Index extends Component
         $buCode = $bu ? $bu->code : 'syihab';
 
         Artisan::call('accurate:sync-pos', ['bu_code' => $buCode]);
-        $this->dispatch('admin-alert', type: 'success', message: 'Sinkronisasi PO berhasil.');
+        $this->dispatch('toast', title: 'Berhasil', message: 'Sinkronisasi PO berhasil.', type: 'success');
     }
 
     public function render()

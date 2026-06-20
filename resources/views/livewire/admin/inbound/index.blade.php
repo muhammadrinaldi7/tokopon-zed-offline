@@ -1,8 +1,13 @@
 <div>
     <div class="mb-4 flex items-center justify-between">
         <h2 class="text-xl font-bold text-gray-800">Inbound (Purchase Orders)</h2>
-        <button wire:click="syncPos" class="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700">
-            <i class="fas fa-sync-alt mr-2"></i> Sinkronisasi PO
+        <button wire:click="syncPos" wire:loading.attr="disabled" class="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700">
+            <span wire:loading.remove wire:target="syncPos">
+                <i class="fas fa-sync-alt mr-2"></i> Sinkronisasi PO
+            </span>
+            <span wire:loading wire:target="syncPos">
+                <i class="fas fa-spinner fa-spin mr-2"></i> Menyinkronkan...
+            </span>
         </button>
     </div>
 

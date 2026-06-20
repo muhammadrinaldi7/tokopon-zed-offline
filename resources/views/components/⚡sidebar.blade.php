@@ -116,10 +116,26 @@ new class extends Component {
                 </a>
             @endcan
 
-            @can('view-cek-stock')
-                {{-- Item: Cek Stock --}}
-                <a href="{{ route('zoffline.cekstock') }}" wire:navigate
-                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->is('zoffline/cekstock') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
+            @can('warranty-activation')
+            {{-- Item: QC Unboxing --}}
+            <a href="{{ route('zoffline.warranty-activation') }}" wire:navigate
+                class="group relative flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-500 shadow-sm {{ request()->routeIs('zoffline.warranty-activation') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-1 hover:scale-105' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-auto" viewBox="0 0 24 24">
+                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                        stroke-width="1.5" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9l2 2l4-4" />
+                </svg>
+                <span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
+                    Aktivasi Garansi
+                    <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-neutral-800 rotate-45"></div>
+                </span>
+            </a>
+            @endcan
+
+            @can('view-stock')
+                {{-- Item: Cek Stok --}}
+                <a href="{{ route('zoffline.cek-stock') }}" wire:navigate
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->routeIs('zoffline.cek-stock') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-auto" viewBox="0 0 15 15">
                         <path d="M0 0h15v15H0z" fill="none" />
                         <path fill="none" stroke="currentColor" stroke-linejoin="round"

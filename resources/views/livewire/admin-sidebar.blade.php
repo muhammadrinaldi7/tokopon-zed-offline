@@ -339,7 +339,7 @@
             </div>
         @endcan
 
-        @can('manage-qc')
+        @canany(['manage-inbound', 'manage-qc-templates', 'manage-qc-inspections'])
             <div x-data="{ openQc: {{ request()->routeIs('admin.qc.*', 'admin.inbound.*') ? 'true' : 'false' }} }">
                 <button @click="openQc = !openQc" type="button"
                     class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.qc.*', 'admin.inbound.*') ? $activeClass : $inactiveClass }}">
@@ -359,14 +359,19 @@
                 </button>
 
                 <div x-show="openQc && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
+                    @can('manage-qc-templates')
                     <a href="{{ route('admin.qc.templates') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.templates') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                         Templates
                     </a>
+                    @endcan
+                    @can('manage-inbound')
                     <a href="{{ route('admin.inbound.index') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.inbound.*') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                         Inbound PO (Grosir)
                     </a>
+                    @endcan
+                    @can('manage-qc-inspections')
                     <a href="{{ route('admin.qc.inbound') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.inbound') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                         Antrean Inbound
@@ -375,9 +380,10 @@
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device-search') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                         Pemeriksaan Perangkat
                     </a>
+                    @endcan
                 </div>
             </div>
-        @endcan
+        @endcanany
 
         @can('manage-users')
             <div class="px-4 mt-8 mb-2" x-show="!sidebarCollapsed">

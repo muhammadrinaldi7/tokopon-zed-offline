@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use App\Services\AccurateService;
+use Illuminate\Support\Facades\Log;
 
 #[Layout('layouts.admin', ['title' => 'Inbound QC - TokoPun'])]
 class Scan extends Component
@@ -20,6 +21,7 @@ class Scan extends Component
     public $activeItemNo = null; // Item yang sedang discan SKU nya
     public $barcodeInput = '';
     public $errorMessage = '';
+    public $successMessage = '';
 
     // Detailed QC State
     public $scannedImei = '';
@@ -33,6 +35,7 @@ class Scan extends Component
     public function processScan()
     {
         $this->errorMessage = '';
+        $this->successMessage = '';
         $barcode = trim($this->barcodeInput);
         if (empty($barcode)) return;
 
@@ -44,6 +47,22 @@ class Scan extends Component
                 $this->barcodeInput = '';
                 return;
             }
+
+            // Cek apakah produk ini membutuhkan SN
+            $productAccurate = \App\Models\ProductAccurate::where('item_no', $barcode)
+                ->where('database_source', $this->po->database_source)
+                ->first();
+
+            $hasSn = $productAccurate ? $productAccurate->has_sn : true; // Default true jika tidak ada data
+
+            if (!$hasSn) {
+                $item->increment('quantity_received');
+                $this->po->refresh();
+                $this->barcodeInput = '';
+                $this->successMessage = "1 {$item->item_name} berhasil ditambahkan.";
+                return;
+            }
+
             $this->activeItemNo = $barcode;
             $this->barcodeInput = '';
             return;
@@ -129,27 +148,52 @@ class Scan extends Component
 
             $detailItem = [];
             foreach ($this->po->items as $item) {
-                if ($item->quantity_received > 0) {
+                // Hitung selisih kuantitas yang belum di-push
+                $qtyToPush = $item->quantity_received - $item->quantity_pushed;
+
+                if ($qtyToPush > 0) {
                     $serialNumbers = [];
                     foreach ($item->inspections as $ins) {
-                        $serialNumbers[] = [
-                            'serialNumberNo' => $ins->imei,
-                            'quantity' => 1
-                        ];
+                        // Hanya push inspection yang belum pernah di-push
+                        if (!$ins->is_pushed) {
+                            $serialNumbers[] = [
+                                'serialNumberNo' => $ins->imei,
+                                'quantity' => 1
+                            ];
+                        }
                     }
 
-                    $detailItem[] = [
+                    $detailItemData = [
                         'itemNo' => $item->item_no,
                         'unitPrice' => (float)$item->unit_price,
-                        'quantity' => (float)$item->quantity_received,
+                        'quantity' => (float)$qtyToPush,
                         'purchaseOrderNumber' => $this->po->po_number,
-                        'detailSerialNumber' => $serialNumbers
                     ];
+
+                    if (!empty($serialNumbers)) {
+                        $detailItemData['detailSerialNumber'] = $serialNumbers;
+                    }
+
+                    $detailItem[] = $detailItemData;
                 }
             }
 
+            if (empty($detailItem)) {
+                $this->dispatch('toast', title: 'Info', message: 'Semua item yang discan sudah berhasil dikirim ke Accurate sebelumnya.', type: 'info');
+                return;
+            }
+
+            $baseSj = 'SJ-' . $this->po->po_number;
+            $suffix = '-' . date('His');
+            
+            // Maksimal karakter di Accurate adalah 30.
+            // Potong string base agar tidak melampaui batas saat digabung dengan suffix
+            $maxBaseLen = 30 - strlen($suffix);
+            $receiveNumber = substr($baseSj, 0, $maxBaseLen) . $suffix;
+
             $payload = [
-                'receiveNumber' => 'SJ-' . $this->po->po_number . '-' . date('dmY'),
+                // Gunakan timestamp (His) untuk mencegah bentrok SJ ganda di hari yang sama
+                'receiveNumber' => $receiveNumber,
                 'vendorNo' => $this->po->vendor->vendor_no ?? '',
                 'detailItem' => $detailItem,
                 'branchName' => Auth::user()->branch->name ?? null
@@ -165,20 +209,37 @@ class Scan extends Component
                 'Content-Type'    => 'application/json',
             ])->post($host . '/receive-item/save.do', $payload);
 
-            if ($response->successful()) {
-                $data = $response->json();
-                if (isset($data['s']) && $data['s'] === true) {
-                    $this->po->update(['status' => $status]);
-                    session()->flash('success', 'Receive Item berhasil dikirim ke Accurate.');
-                    return redirect()->route('admin.inbound.index');
-                } else {
-                    $this->errorMessage = "Gagal kirim ke Accurate: " . json_encode($data);
+            if ($response->successful() && isset($response->json()['s']) && $response->json()['s'] === true) {
+                $this->po->update(['status' => $status]);
+
+                // Update tracking
+                foreach ($this->po->items as $item) {
+                    if ($item->quantity_received > $item->quantity_pushed) {
+                        $item->quantity_pushed = $item->quantity_received;
+                        $item->save();
+
+                        foreach ($item->inspections as $ins) {
+                            if (!$ins->is_pushed) {
+                                $ins->is_pushed = true;
+                                $ins->save();
+                            }
+                        }
+                    }
                 }
+
+                $this->dispatch('toast', title: 'Berhasil', message: 'Sinkronisasi Penerimaan Barang ke Accurate berhasil.', type: 'success');
             } else {
-                $this->errorMessage = "Gagal kirim ke Accurate: " . $response->body();
+                $errorMsg = 'Terjadi kesalahan tidak terduga dari Accurate.';
+                if (isset($response->json()['d']) && is_array($response->json()['d'])) {
+                    $errorMsg = implode(', ', $response->json()['d']);
+                }
+
+                Log::error('Accurate Receive Item Error: ' . $response->body());
+                $this->dispatch('toast', title: 'Gagal', message: 'Gagal kirim ke Accurate: ' . $errorMsg, type: 'error');
             }
         } catch (\Exception $e) {
             $this->errorMessage = "Error: " . $e->getMessage();
+            $this->dispatch('toast', title: 'Error', message: $e->getMessage(), type: 'error');
         }
     }
 

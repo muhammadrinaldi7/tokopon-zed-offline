@@ -28,6 +28,14 @@
             <p class="text-sm text-gray-500 mt-1">Pantau dan sinkronisasi data vendor/pemasok dari database Accurate Online.</p>
         </div>
         <div class="flex items-center gap-3">
+            <select wire:model.live="filterBusinessUnitId"
+                class="w-full md:w-48 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all cursor-pointer">
+                <option value="">Semua Unit Usaha</option>
+                @foreach ($businessUnits as $bu)
+                    <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                @endforeach
+            </select>
+            
             <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari nama, kode, email, atau telepon..."
                 class="w-full md:w-72 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all">
 

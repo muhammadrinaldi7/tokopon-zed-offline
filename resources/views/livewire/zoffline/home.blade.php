@@ -55,7 +55,7 @@
                 </div>
             </div>
         @endcan
-        @can('sell-phone')
+        @can('warranty-activation')
             {{-- Card 3: Aktivasi Garansi (QC Unboxing) --}}
             <div wire:click="navigateToWarrantyActivation"
                 class="md:nth-[3n+1]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">

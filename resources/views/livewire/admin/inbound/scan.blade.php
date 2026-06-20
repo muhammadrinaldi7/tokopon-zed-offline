@@ -28,6 +28,12 @@
         </div>
     @endif
 
+    @if($successMessage)
+        <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
+            <p>{{ $successMessage }}</p>
+        </div>
+    @endif
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <!-- Panel Kiri: Scanner -->
         <div class="md:col-span-1">

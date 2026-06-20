@@ -35,17 +35,30 @@ class PermissionSeeder extends Seeder
             'manage-accurate-customers',
             'view-warehouse-stocks',
 
+            // Inbound & QC
+            'manage-inbound',
+            'manage-qc-inspections',
+            'manage-qc-templates',
+
+            // Laporan
+            'view-reporting',
+            'reporting-dashboard',
+            'reporting-sales',
+            'reporting-products',
+            'reporting-staff',
+
             // Pendukung Lainnya
             'manage-trade-in',
             'manage-buyback',
-            'manage-qc',
             'manage-users',
             'manage-settings',
             'view_dashboard',
 
-            // Client / Frontend
+            // Client / Frontend (Zoffline)
             'trade-in',
-            'sell-phone'
+            'sell-phone',
+            'warranty-activation',
+            'view-riwayat-kasir'
         ];
 
         foreach ($permissions as $permission) {
@@ -66,6 +79,10 @@ class PermissionSeeder extends Seeder
         // Admin gets most operational tasks but not users/settings
         $admin->syncPermissions([
             'view-pos',
+            'view-riwayat-kasir',
+            'sell-phone',
+            'trade-in',
+            'warranty-activation',
             'view-stock',
             'manage-orders',
             'manage-promos',
@@ -77,9 +94,16 @@ class PermissionSeeder extends Seeder
             'manage-accurate-products',
             'manage-accurate-customers',
             'view-warehouse-stocks',
+            'manage-inbound',
+            'manage-qc-inspections',
+            'manage-qc-templates',
+            'view-reporting',
+            'reporting-dashboard',
+            'reporting-sales',
+            'reporting-products',
+            'reporting-staff',
             'manage-trade-in',
             'manage-buyback',
-            'manage-qc',
             'view_dashboard'
         ]);
 
@@ -87,13 +111,19 @@ class PermissionSeeder extends Seeder
         $cs->syncPermissions([
             'access-cs-chat',
             'view-stock',
+            'manage-orders',
             'manage-promos'
         ]);
 
-        // FL (Frontliner) gets POS and Stock
+        // FL (Frontliner) gets POS, Stock, and basic sales
         $fl->syncPermissions([
             'view-pos',
-            'view-stock'
+            'view-riwayat-kasir',
+            'view-stock',
+            'manage-orders',
+            'sell-phone',
+            'trade-in',
+            'warranty-activation'
         ]);
 
         $this->command->info('Base permissions seeded and assigned to roles successfully.');

@@ -46,16 +46,17 @@ class SerialNumberSync extends Component
 
         $this->addLog("Mengumpulkan data SKU yang membutuhkan Serial Number...");
 
-        // Ambil SKU Produk Baru yang has_sn = true
-        $newSkus = ProductVariant::whereHas('product', function ($q) {
-            $q->where('has_sn', true);
-        })->whereNotNull('sku')->where('sku', '!=', '')->pluck('sku')->toArray();
+        // Ambil SKU (item_no) dari ProductAccurate yang has_sn = true
+        $query = \App\Models\ProductAccurate::where('has_sn', true)
+            ->whereNotNull('item_no')
+            ->where('item_no', '!=', '');
 
-        // Ambil SKU Produk Bekas
-        $secondSkus = SecondProductVariant::whereNotNull('sku')->where('sku', '!=', '')->pluck('sku')->toArray();
+        if ($this->businessUnitId) {
+            $query->where('business_unit_id', $this->businessUnitId);
+        }
 
-        // Gabungkan SKU & pastikan unique
-        $this->itemsToSync = array_values(array_unique(array_merge($newSkus, $secondSkus)));
+        // Ambil list item_no (SKU) dan pastikan unique
+        $this->itemsToSync = array_values(array_unique($query->pluck('item_no')->toArray()));
         $this->totalItems = count($this->itemsToSync);
 
         if ($this->totalItems == 0) {

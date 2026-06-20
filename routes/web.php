@@ -21,10 +21,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/pos/closing-kasir', \App\Livewire\Zoffline\Pos\ClosingKasir::class)->name('zoffline.pos.closing-kasir')->middleware('can:view-pos');
     Route::get('/zoffline/pos/riwayat', \App\Livewire\Zoffline\Pos\RiwayatPenjualan::class)->name('zoffline.pos.riwayat')->middleware('can:view-pos');
     Route::get('/zoffline/riwayat-kasir', \App\Livewire\Admin\Pos\RiwayatKasir::class)->name('zoffline.riwayat-kasir')->middleware('can:view-riwayat-kasir');
-    Route::get('/zoffline/trade-in', \App\Livewire\Zoffline\TradeIn\TradeIn::class)->name('zoffline.trade-in');
-    Route::get('/zoffline/sell-phone', \App\Livewire\Zoffline\SellPhone\SellPhone::class)->name('zoffline.sell-phone');
-    Route::get('/zoffline/sell-phone-history', \App\Livewire\Zoffline\SellPhone\History::class)->name('zoffline.sell-phone-history');
-    Route::get('/zoffline/warranty-activation', \App\Livewire\Zoffline\Qc\WarrantyActivation::class)->name('zoffline.warranty-activation');
+    Route::get('/zoffline/trade-in', \App\Livewire\Zoffline\TradeIn\TradeIn::class)->name('zoffline.trade-in')->middleware('can:trade-in');
+    Route::get('/zoffline/sell-phone', \App\Livewire\Zoffline\SellPhone\SellPhone::class)->name('zoffline.sell-phone')->middleware('can:sell-phone');
+    Route::get('/zoffline/sell-phone-history', \App\Livewire\Zoffline\SellPhone\History::class)->name('zoffline.sell-phone-history')->middleware('can:sell-phone');
+    Route::get('/zoffline/warranty-activation', \App\Livewire\Zoffline\Qc\WarrantyActivation::class)->name('zoffline.warranty-activation')->middleware('can:warranty-activation');
     Route::get('/zoffline/cekstock', CekStock::class)->name('zoffline.cekstock')->middleware('can:view-stock');
 });
 
@@ -127,15 +127,17 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     });
 
     // Inbound PO
-    Route::get('/inbound', \App\Livewire\Admin\Inbound\Index::class)->name('inbound.index');
-    Route::get('/inbound/{po}/scan', \App\Livewire\Admin\Inbound\Scan::class)->name('inbound.scan');
+    Route::middleware('can:manage-inbound')->group(function () {
+        Route::get('/inbound', \App\Livewire\Admin\Inbound\Index::class)->name('inbound.index');
+        Route::get('/inbound/{po}/scan', \App\Livewire\Admin\Inbound\Scan::class)->name('inbound.scan');
+    });
 
-    Route::prefix('qc')->name('qc.')->middleware('can:manage-qc')->group(function () {
-        Route::get('/templates', App\Livewire\Admin\Qc\TemplateIndex::class)->name('templates');
-        Route::get('/inbound', App\Livewire\Admin\Qc\VendorInboundQc::class)->name('inbound');
-        Route::get('/device', App\Livewire\Admin\Qc\DeviceSearch::class)->name('device-search');
-        Route::get('/device/{imei}', App\Livewire\Admin\Qc\DevicePassport::class)->name('device-passport');
-        Route::get('/inspect/{secondProductVariant}', App\Livewire\Admin\Qc\InspectionForm::class)->name('inspect');
+    Route::prefix('qc')->name('qc.')->group(function () {
+        Route::get('/templates', App\Livewire\Admin\Qc\TemplateIndex::class)->name('templates')->middleware('can:manage-qc-templates');
+        Route::get('/inbound', App\Livewire\Admin\Qc\VendorInboundQc::class)->name('inbound')->middleware('can:manage-qc-inspections');
+        Route::get('/device', App\Livewire\Admin\Qc\DeviceSearch::class)->name('device-search')->middleware('can:manage-qc-inspections');
+        Route::get('/device/{imei}', App\Livewire\Admin\Qc\DevicePassport::class)->name('device-passport')->middleware('can:manage-qc-inspections');
+        Route::get('/inspect/{secondProductVariant}', App\Livewire\Admin\Qc\InspectionForm::class)->name('inspect')->middleware('can:manage-qc-inspections');
     });
 });
 
