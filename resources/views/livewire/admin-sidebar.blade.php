@@ -107,7 +107,7 @@
             @endcan
 
             @can('view-stock')
-                <a href="{{ route('zoffline.cekstock') }}" wire:navigate
+                <a href="{{ route('zoffline.cek-stock') }}" wire:navigate
                     class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.cekstock') ? $activeClass : $inactiveClass }}">
                     <svg class="w-5 h-5 {{ request()->routeIs('zoffline.cekstock') ? $activeIconClass : $inactiveIconClass }}"
                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
@@ -217,9 +217,11 @@
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.sales-orders.*') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('admin.sales-orders.*') ? $activeIconClass : $inactiveIconClass }}"
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pesanan & Tagihan (SO)</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pesanan & Tagihan
+                    (SO)</span>
             </a>
         @endcan
 
@@ -360,26 +362,26 @@
 
                 <div x-show="openQc && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
                     @can('manage-qc-templates')
-                    <a href="{{ route('admin.qc.templates') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.templates') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Templates
-                    </a>
+                        <a href="{{ route('admin.qc.templates') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.templates') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Templates
+                        </a>
                     @endcan
                     @can('manage-inbound')
-                    <a href="{{ route('admin.inbound.index') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.inbound.*') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Inbound PO (Grosir)
-                    </a>
+                        <a href="{{ route('admin.inbound.index') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.inbound.*') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Inbound PO (Grosir)
+                        </a>
                     @endcan
                     @can('manage-qc-inspections')
-                    <a href="{{ route('admin.qc.inbound') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.inbound') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Antrean Inbound
-                    </a>
-                    <a href="{{ route('admin.qc.device-search') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device-search') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Pemeriksaan Perangkat
-                    </a>
+                        <a href="{{ route('admin.qc.inbound') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.inbound') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Antrean Inbound
+                        </a>
+                        <a href="{{ route('admin.qc.device-search') }}" wire:navigate
+                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device-search') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            Pemeriksaan Perangkat
+                        </a>
                     @endcan
                 </div>
             </div>

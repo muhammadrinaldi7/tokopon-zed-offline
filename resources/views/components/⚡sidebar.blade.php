@@ -117,19 +117,20 @@ new class extends Component {
             @endcan
 
             @can('warranty-activation')
-            {{-- Item: QC Unboxing --}}
-            <a href="{{ route('zoffline.warranty-activation') }}" wire:navigate
-                class="group relative flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-500 shadow-sm {{ request()->routeIs('zoffline.warranty-activation') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-1 hover:scale-105' }}">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-auto" viewBox="0 0 24 24">
-                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                        stroke-width="1.5" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9l2 2l4-4" />
-                </svg>
-                <span
-                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
-                    Aktivasi Garansi
-                    <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-neutral-800 rotate-45"></div>
-                </span>
-            </a>
+                {{-- Item: QC Unboxing --}}
+                <a href="{{ route('zoffline.warranty-activation') }}" wire:navigate
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-500 shadow-sm {{ request()->routeIs('zoffline.warranty-activation') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-1 hover:scale-105' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-auto" viewBox="0 0 24 24">
+                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="1.5"
+                            d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9l2 2l4-4" />
+                    </svg>
+                    <span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
+                        Aktivasi Garansi
+                        <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-neutral-800 rotate-45"></div>
+                    </span>
+                </a>
             @endcan
 
             @can('view-stock')
@@ -153,8 +154,10 @@ new class extends Component {
             @can('view-pos')
                 <a href="{{ route('zoffline.pos.open-shift') }}" wire:navigate
                     class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm transition-all duration-500 {{ request()->routeIs('zoffline.pos.open-shift') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
                     </svg>
                     <span
                         class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
@@ -208,7 +211,8 @@ new class extends Component {
                 @auth
                     <div class="px-4 py-2 border-b border-gray-100 mb-1">
                         <span class="block text-sm font-bold text-gray-800 truncate">{{ auth()->user()->name }}</span>
-                        <span class="block text-[11px] text-gray-500">{{ auth()->user()->businessUnit->name ?? '' }}</span>
+                        <span
+                            class="block text-[11px] text-gray-500">{{ auth()->user()->businessUnit->name ?? '' }}</span>
                         <span class="block text-[11px] text-gray-500">{{ auth()->user()->roles->first()->name }}</span>
                     </div>
                 @endauth
@@ -278,7 +282,7 @@ new class extends Component {
         @endcan
 
         @can('view-cek-stock')
-            <a href="{{ route('zoffline.cekstock') }}" wire:navigate
+            <a href="{{ route('zoffline.cek-stock') }}" wire:navigate
                 class="flex flex-col items-center justify-center w-16 h-full gap-1 text-gray-400 hover:text-violet-600 transition-colors">
                 <img src="{{ asset('assets/png/stok.png') }}" class="w-8 h-auto" alt="">
                 <span class="text-[10px] font-medium">Cek Stock</span>
