@@ -37,7 +37,7 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <!-- Panel Kiri: Scanner -->
         <div class="md:col-span-1">
-            <div class="bg-white rounded-lg shadow p-6 sticky top-6">
+            <div class="bg-white rounded-3xl shadow-sm border border-neutral-100 p-6 lg:p-8 sticky top-6">
                 <div class="text-center mb-6">
                     <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
                         <i class="fas fa-barcode text-3xl"></i>
@@ -74,7 +74,7 @@
                     $isDone = $item->quantity_received >= $item->quantity_ordered;
                     $isActive = $activeItemNo === $item->item_no;
                 @endphp
-                <div class="bg-white rounded-lg shadow overflow-hidden {{ $isActive ? 'ring-2 ring-blue-500' : '' }}">
+                <div class="bg-white rounded-2xl shadow-sm border border-neutral-100 overflow-hidden {{ $isActive ? 'ring-2 ring-blue-500' : '' }}">
                     <div class="p-4 {{ $isDone ? 'bg-green-50' : 'bg-white' }} flex justify-between items-center border-b">
                         <div>
                             <div class="flex items-center gap-2">
@@ -152,3 +152,5 @@
         </div>
     @endif
 </div>
+
+

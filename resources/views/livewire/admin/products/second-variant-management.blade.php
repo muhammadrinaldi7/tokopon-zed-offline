@@ -116,7 +116,7 @@
                         @if (!empty($searchResults) && !$selectedAccurateId)
 
                             <div
-                                class="absolute z-10 w-full bg-white mt-1 border border-gray-200 rounded-lg shadow-sm max-h-48 overflow-y-auto">
+                                class="absolute z-10 w-full bg-white mt-1 border border-gray-200 rounded-2xl shadow-sm border border-neutral-100-sm max-h-48 overflow-y-auto">
                                 @forelse($searchResults as $res)
                                     @php
                                         $kode = $res->item_no ?? '';
@@ -267,3 +267,4 @@
         </div>
     </div>
 </div>
+

@@ -40,7 +40,7 @@
                             </svg>
                         </div>
                         @if (strlen($searchCustomer) >= 2)
-                            <div class="bg-white border rounded-lg shadow-lg max-h-32 overflow-y-auto divide-y mt-1">
+                            <div class="bg-white border rounded-2xl shadow-sm border border-neutral-100-lg max-h-32 overflow-y-auto divide-y mt-1">
                                 @forelse($this->customerResults as $user)
                                     <button wire:click="selectCustomer({{ $user->id }})"
                                         class="w-full p-2 hover:bg-gray-50 text-left flex justify-between items-center">
@@ -99,7 +99,7 @@
                         </div>
                         @if (strlen($searchSales) >= 2)
                             <div
-                                class="absolute z-10 w-full bg-white border rounded-lg shadow-lg max-h-40 overflow-y-auto divide-y mt-1">
+                                class="absolute z-10 w-full bg-white border rounded-2xl shadow-sm border border-neutral-100-lg max-h-40 overflow-y-auto divide-y mt-1">
                                 @forelse($this->salesResults as $sales)
                                     <button wire:click="selectSales({{ $sales->id }})"
                                         class="w-full p-2 hover:bg-gray-50 text-left flex justify-between items-center group transition">
@@ -117,3 +117,4 @@
                         @endif
                     </div>
                 </div>
+

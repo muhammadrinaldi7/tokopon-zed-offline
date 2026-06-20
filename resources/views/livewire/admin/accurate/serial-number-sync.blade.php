@@ -33,7 +33,7 @@
                 <button 
                     wire:click="startSync" 
                     @if($isSyncing || $isSyncingVendor || $isSyncingHpp) disabled @endif
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:-translate-y-1 hover:shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
                     
                     @if($isSyncing)
                         <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -137,3 +137,4 @@
         </div>
     </div>
 </div>
+

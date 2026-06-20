@@ -5,7 +5,7 @@
             <p class="text-sm text-gray-500">Kelola master data unit usaha dan pengaturan integrasi Accurate.</p>
         </div>
         <button wire:click="openModal"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow transition">
+            class="bg-neutral-800 hover:-translate-y-1 hover:shadow-md transition-all duration-300 text-white px-4 py-2 rounded-lg font-medium shadow transition">
             + Tambah Unit Usaha
         </button>
     </div>
@@ -84,7 +84,7 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Nama Unit Usaha</label>
                                 <input type="text" wire:model="name" required placeholder="Contoh: Syihab Phone"
-                                    class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    class="w-full border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
                                 @error('name')
                                     <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
                                 @enderror
@@ -92,7 +92,7 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Kode Unik</label>
                                 <input type="text" wire:model="code" required placeholder="Contoh: syihab"
-                                    class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    class="w-full border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
                                 @error('code')
                                     <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
                                 @enderror
@@ -116,26 +116,26 @@
                                     <label class="block text-xs font-medium text-gray-700 mb-1">Accurate Host</label>
                                     <input type="text" wire:model="accurate_host"
                                         placeholder="https://zeus.accurate.id/..."
-                                        class="w-full p-2 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        class="w-full p-2 text-sm border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-700 mb-1">Accurate Database ID
                                         (Pencocokan Webhook)</label>
                                     <input type="text" wire:model="accurate_database_id" placeholder="Contoh: 123456"
-                                        class="w-full p-2 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        class="w-full p-2 text-sm border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
                                         <label class="block text-xs font-medium text-gray-700 mb-1">Accurate Token
                                             (OAuth)</label>
                                         <input type="text" wire:model="accurate_token"
-                                            class="w-full p-2 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                            class="w-full p-2 text-sm border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
                                     </div>
                                     <div>
                                         <label class="block text-xs font-medium text-gray-700 mb-1">Accurate Secret
                                             Key</label>
                                         <input type="password" wire:model="accurate_secret_key"
-                                            class="w-full p-2 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                            class="w-full p-2 text-sm border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
                                     </div>
                                 </div>
                                 <div>
@@ -143,7 +143,7 @@
                                         (Token URL)</label>
                                     <input type="text" wire:model="accurate_webhook_token"
                                         placeholder="Opsional, jika webhook memakai URL token (AppKey)"
-                                        class="w-full p-2 text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                        class="w-full p-2 text-sm border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
                                 </div>
                             </div>
                         </div>
@@ -172,3 +172,4 @@
         </div>
     @endif
 </div>
+

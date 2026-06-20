@@ -1,4 +1,4 @@
-<header class="bg-transparent px-4 lg:px-8 py-2 lg:py-4 flex items-center justify-between">
+<header class="bg-white shadow-sm border-b border-gray-100 rounded-2xl mx-4 lg:mx-8 mt-4 mb-6 px-4 lg:px-6 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3 lg:gap-4">
         <!-- Hamburger Menu (Mobile) -->
         <button @click="sidebarOpen = true"
@@ -39,3 +39,4 @@
         </button>
     </div>
 </header>
+

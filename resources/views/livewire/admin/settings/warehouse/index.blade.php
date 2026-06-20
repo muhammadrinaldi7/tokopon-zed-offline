@@ -16,7 +16,7 @@
     </div>
 
     {{-- Main Settings Box --}}
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 max-w-3xl">
+    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 p-6 max-w-3xl">
         <div class="flex flex-col md:flex-row justify-between items-center mb-4">
             <h2 class="text-2xl font-bold text-gray-800">List Warehouse</h2>
             <button wire:click="synchronizeWarehouse"
@@ -72,7 +72,7 @@
             </table>
         </div>
     </div>
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 max-w-3xl">
+    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 p-6 max-w-3xl">
         <div class="flex flex-col md:flex-row justify-between items-center mb-4">
             <h2 class="text-2xl font-bold text-gray-800">List Branch</h2>
             <button wire:click="synchronizeBranch" wire:loading.attr="disabled"
@@ -129,3 +129,4 @@
         </div>
     </div>
 </div>
+

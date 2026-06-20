@@ -17,7 +17,7 @@
     </div>
 
     {{-- Filters --}}
-    <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 mb-6">
+    <div class="bg-white p-4 rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 flex flex-col md:flex-row gap-4 mb-6">
         <div class="flex-1 relative">
             <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none"
                 viewBox="0 0 24 24" stroke="currentColor">
@@ -51,7 +51,7 @@
     </div>
 
     {{-- Orders Table --}}
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
@@ -296,3 +296,4 @@
         </div>
     @endif
 </div>
+

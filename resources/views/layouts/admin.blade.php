@@ -24,20 +24,20 @@
     }
 </style>
 
-<body class="bg-[#ffffff] text-[#262626] font-sans antialiased overflow-hidden" x-data="{ sidebarOpen: false, sidebarCollapsed: false }">
-    <div class="flex h-screen w-full relative">
+<body class="bg-neutral-50 text-neutral-800 font-sans antialiased overflow-hidden" x-data="{ sidebarOpen: false, sidebarCollapsed: false }">
+    <div class="flex h-screen w-full relative overflow-hidden">
         {{-- Overlay for mobile --}}
         <div x-show="sidebarOpen" x-transition.opacity @click="sidebarOpen = false"
-            class="fixed inset-0 bg-gray-900/50 z-20 lg:hidden" style="display: none;" x-cloak></div>
+            class="fixed inset-0 bg-neutral-900/50 z-20 lg:hidden" style="display: none;" x-cloak></div>
 
         {{-- Sidebar --}}
         <livewire:admin-sidebar />
 
         {{-- Main Content --}}
-        <div class="flex-1 flex flex-col h-screen overflow-hidden">
+        <div class="flex-1 flex flex-col h-full w-full overflow-hidden">
             <x-admin.topbar />
 
-            <main class="flex-1 overflow-y-auto px-4 lg:px-8 pb-8">
+            <main class="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:px-8 pb-8 scroll-smooth">
                 {{ $slot }}
             </main>
         </div>

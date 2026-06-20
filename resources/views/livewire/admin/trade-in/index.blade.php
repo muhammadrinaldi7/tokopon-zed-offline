@@ -6,7 +6,7 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 overflow-hidden">
         {{-- Filters --}}
         <div class="p-4 border-b border-gray-100 flex flex-col sm:flex-row gap-4">
             <div class="relative flex-1">
@@ -99,3 +99,4 @@
         @endif
     </div>
 </div>
+

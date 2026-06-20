@@ -1,7 +1,7 @@
 <div>
     <div class="mb-4 flex items-center justify-between">
         <h2 class="text-xl font-bold text-gray-800">Inbound (Purchase Orders)</h2>
-        <button wire:click="syncPos" wire:loading.attr="disabled" class="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700">
+        <button wire:click="syncPos" wire:loading.attr="disabled" class="px-4 py-2 bg-neutral-800 text-white rounded-xl shadow hover:-translate-y-1 hover:shadow-md transition-all duration-300">
             <span wire:loading.remove wire:target="syncPos">
                 <i class="fas fa-sync-alt mr-2"></i> Sinkronisasi PO
             </span>
@@ -11,15 +11,15 @@
         </button>
     </div>
 
-    <div class="bg-white rounded-lg shadow p-6">
+    <div class="bg-white rounded-3xl shadow-sm border border-neutral-100 p-6 lg:p-8">
         <div class="mb-4">
-            <input type="text" wire:model.live.debounce.500ms="search" placeholder="Cari PO Number atau Vendor..." class="w-full max-w-md p-2 border rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="text" wire:model.live.debounce.500ms="search" placeholder="Cari PO Number atau Vendor..." class="w-full max-w-md p-2 border border-neutral-200 bg-neutral-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-neutral-800 transition-all">
         </div>
 
         <div class="overflow-x-auto">
             <table class="w-full border-collapse">
                 <thead>
-                    <tr class="bg-gray-100 text-left text-sm text-gray-600 border-b border-gray-200">
+                    <tr class="bg-neutral-50/50 text-left text-sm font-semibold text-neutral-800 border-b border-neutral-100">
                         <th class="p-3">Tanggal PO</th>
                         <th class="p-3">No. PO</th>
                         <th class="p-3">Vendor</th>
@@ -57,7 +57,7 @@
                                 @endif
                             </td>
                             <td class="p-3 text-right">
-                                <a href="{{ route('admin.inbound.scan', $po->id) }}" class="inline-block px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition">
+                                <a href="{{ route('admin.inbound.scan', $po->id) }}" class="inline-block px-3 py-1 bg-neutral-100 text-neutral-800 rounded-lg hover:bg-neutral-200 font-bold transition">
                                     Mulai QC <i class="fas fa-barcode ml-1"></i>
                                 </a>
                             </td>
@@ -75,3 +75,4 @@
         </div>
     </div>
 </div>
+

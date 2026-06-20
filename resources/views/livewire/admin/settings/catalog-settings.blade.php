@@ -6,7 +6,7 @@
     </div>
 
     {{-- Main Settings Box --}}
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 max-w-3xl">
+    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 p-6 max-w-3xl">
         <form wire:submit.prevent="save">
             <h2 class="text-lg font-bold text-gray-800 mb-4 border-b border-gray-50 pb-2">Ambang Batas Stok</h2>
             
@@ -34,3 +34,4 @@
         </form>
     </div>
 </div>
+

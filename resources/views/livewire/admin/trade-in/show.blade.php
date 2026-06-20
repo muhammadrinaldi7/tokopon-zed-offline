@@ -32,7 +32,7 @@
         
         {{-- LEFT PANEL: Customer Old Phone Details --}}
         <div class="lg:col-span-1 space-y-6">
-            <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 p-6">
                 <h3 class="font-bold text-gray-900 text-lg mb-4 flex items-center gap-2">
                     <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                     Informasi HP Lama (Milik User)
@@ -74,7 +74,7 @@
             </div>
 
             {{-- Photos --}}
-            <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 p-6">
                 <h3 class="font-bold text-gray-900 text-lg mb-4">Foto Fisik Unit Asli</h3>
                 @php $photos = $tradeIn->getMedia('customer_unit_photos'); @endphp
                 @if($photos->count() > 0)
@@ -107,7 +107,7 @@
             
             @if(in_array($tradeIn->status, ['WAITING_FOR_DEVICE', 'INSPECTING']))
                 {{-- Form Pilih Variant --}}
-                <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 {{ $tradeIn->status === 'INSPECTING' ? 'mt-6 border-amber-200 bg-amber-50/30' : '' }}">
+                <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 p-6 {{ $tradeIn->status === 'INSPECTING' ? 'mt-6 border-amber-200 bg-amber-50/30' : '' }}">
                     <div class="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
                         <h3 class="font-bold text-gray-900 text-xl">
                             Harga Disepakati
@@ -213,7 +213,7 @@
 
             
             @if($tradeIn->status === 'OFFERED')
-                <div class="bg-amber-50 rounded-lg shadow-sm border border-amber-200 p-6 mt-6">
+                <div class="bg-amber-50 rounded-2xl shadow-sm border border-neutral-100-sm border border-amber-200 p-6 mt-6">
                     <h3 class="font-bold text-amber-800 mb-2 text-xl flex items-center gap-2">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         Menunggu Persetujuan Pelanggan
@@ -232,7 +232,7 @@
             @endif
             
             @if(in_array($tradeIn->status, ['WAITING_PAYMENT', 'PAYING', 'COMPLETED', 'CANCELLED']))
-                <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 opacity-70">
+                <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 p-6 opacity-70">
                     <h3 class="font-bold text-gray-900 mb-2">Penawaran yang Terkunci</h3>
                     <p class="text-sm text-gray-500 mb-4">Konsumen sudah menyetujui unit atau transaksi sudah berjalan melebihi tahap penawaran.</p>
                     <div class="text-2xl font-black text-emerald-600 mb-4">
@@ -400,3 +400,4 @@
             </div>
     @endif
 </div>
+

@@ -6,7 +6,7 @@
         </button>
     </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 overflow-hidden">
         <table class="w-full text-left text-sm whitespace-nowrap">
             <thead class="bg-gray-50 text-gray-600 font-semibold border-b border-gray-100">
                 <tr>
@@ -94,3 +94,4 @@
         </div>
     @endif
 </div>
+

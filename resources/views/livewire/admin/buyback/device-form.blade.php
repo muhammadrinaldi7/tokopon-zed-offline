@@ -290,7 +290,7 @@
 
     {{-- All Tiers Reference --}}
     @if ($allTiers->count() > 0)
-        <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-5">
+        <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 p-5">
             <p class="text-sm font-bold text-gray-700 mb-3">Referensi Tier yang Tersedia</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 @foreach ($allTiers as $tier)
@@ -306,3 +306,4 @@
         </div>
     @endif
 </div>
+

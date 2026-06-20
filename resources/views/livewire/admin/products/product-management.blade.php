@@ -45,7 +45,7 @@
         </select>
     </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm whitespace-nowrap">
                 <thead class="bg-gray-50 text-gray-600 font-semibold border-b border-gray-100">
@@ -512,7 +512,7 @@
                         </p>
                         <div class="flex flex-col sm:flex-row gap-2">
                             <button type="button" wire:click="downloadTemplateCsv" wire:loading.attr="disabled"
-                                class="bg-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-blue-100 transition inline-flex items-center justify-center gap-1.5 w-full sm:w-auto">
+                                class="bg-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-2xl shadow-sm border border-neutral-100-sm hover:bg-blue-100 transition inline-flex items-center justify-center gap-1.5 w-full sm:w-auto">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                     stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -521,7 +521,7 @@
                                 Download Template CSV
                             </button>
                             <button type="button" wire:click="exportAccurateDataCsv" wire:loading.attr="disabled"
-                                class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-emerald-100 transition inline-flex items-center justify-center gap-1.5 w-full sm:w-auto">
+                                class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-2xl shadow-sm border border-neutral-100-sm hover:bg-emerald-100 transition inline-flex items-center justify-center gap-1.5 w-full sm:w-auto">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                     stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -558,3 +558,4 @@
         </div>
     @endif
 </div>
+
