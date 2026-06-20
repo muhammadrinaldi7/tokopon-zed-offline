@@ -37,6 +37,16 @@ class Pos extends Component
     use Traits\WithPaymentAndPromo;
     use Traits\WithCheckoutAndReceipt;
 
+    #[Computed]
+    public function activeShift()
+    {
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+        return \App\Models\CashierShift::where('business_unit_id', $buId)
+            ->where('user_id', \Illuminate\Support\Facades\Auth::id())
+            ->where('status', 'open')
+            ->first();
+    }
+
 
     public $order_date;
 

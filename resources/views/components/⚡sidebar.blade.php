@@ -74,7 +74,8 @@ new class extends Component {
                 <a href="{{ route('zoffline.pos.riwayat') }}" wire:navigate
                     class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm transition-all duration-500 {{ request()->routeIs('zoffline.pos.riwayat') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span
                         class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
@@ -132,10 +133,25 @@ new class extends Component {
                 </a>
             @endcan
 
-            {{-- Item: Riwayat Kasir --}}
-            @can('view-riwayat-kasir')
-                <a href="{{ route('zoffline.riwayat-kasir') }}" wire:navigate
-                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->is('zoffline/riwayat-kasir') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
+            {{-- Item: Buka Shift --}}
+            @can('view-pos')
+                <a href="{{ route('zoffline.pos.open-shift') }}" wire:navigate
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm transition-all duration-500 {{ request()->routeIs('zoffline.pos.open-shift') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                    </svg>
+                    <span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
+                        Buka Shift
+                        <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-neutral-800 rotate-45"></div>
+                    </span>
+                </a>
+            @endcan
+
+            {{-- Item: Riwayat Kasir / Closing Kasir --}}
+            @can('view-pos')
+                <a href="{{ route('zoffline.pos.closing-kasir') }}" wire:navigate
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->routeIs('zoffline.pos.closing-kasir') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-auto" viewBox="0 0 16 16">
                         <path d="M0 0h16v16H0z" fill="none" />
                         <path fill="currentColor"

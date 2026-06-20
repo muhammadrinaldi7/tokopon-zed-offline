@@ -19,7 +19,14 @@
             </div>
             <h1 class="text-3xl font-semibold  text-neutral-800 mt-4">Siapa Pelanggan Anda Hari ini?</h1>
         </div>
-        <div>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('zoffline.pos.closing-kasir') }}"
+                class="px-4 py-3 bg-red-100 text-red-700 hover:bg-red-200 rounded-xl font-bold flex items-center gap-2 transition-all shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Tutup Shift
+            </a>
             <button wire:click="openDraft"
                 class="p-4 bg-amber-200 text-amber-700 hover:bg-amber-300 rounded-full font-bold flex items-center gap-2 transition-all shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-auto" viewBox="0 0 24 24">
