@@ -25,7 +25,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/sell-phone', \App\Livewire\Zoffline\SellPhone\SellPhone::class)->name('zoffline.sell-phone')->middleware('can:sell-phone');
     Route::get('/zoffline/sell-phone-history', \App\Livewire\Zoffline\SellPhone\History::class)->name('zoffline.sell-phone-history')->middleware('can:sell-phone');
     Route::get('/zoffline/warranty-activation', \App\Livewire\Zoffline\Qc\WarrantyActivation::class)->name('zoffline.warranty-activation')->middleware('can:warranty-activation');
-    Route::get('/zoffline/cekstock', CekStock::class)->name('zoffline.cekstock')->middleware('can:view-stock');
+    Route::get('/zoffline/cek-stock', CekStock::class)->name('zoffline.cek-stock')->middleware('can:view-stock');
 });
 
 // ─── Trade In & Sell Phone Client Pages (accessible by authenticated users, e.g. FL or customer) ───
