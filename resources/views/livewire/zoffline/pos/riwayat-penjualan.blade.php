@@ -67,7 +67,7 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="text-sm font-bold text-emerald-600">Rp
-                                        {{ number_format($order->total_amount, 0, ',', '.') }}</div>
+                                        {{ number_format($order->grand_total, 0, ',', '.') }}</div>
                                     <div class="text-xs text-neutral-500 mt-1">
                                         {{ $order->paymentMethod->name ?? 'Tunai' }}
                                     </div>

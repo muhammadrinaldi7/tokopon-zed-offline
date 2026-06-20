@@ -352,6 +352,15 @@
                         </div>
                     @endif
 
+                    @if (strtolower($methodObj->bank_name ?? '') === 'finance')
+                        <div class="space-y-3">
+                            <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Nomor Kontrak (Opsional)</label>
+                            <input type="text" wire:model.live.debounce.500ms="payments.{{ $activePaymentIndex }}.no_kontrak"
+                                class="w-full bg-white border-2 border-gray-300 rounded-2xl px-5 py-4 text-xl font-bold text-gray-800 focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/20 transition-all"
+                                placeholder="Masukkan Nomor Kontrak">
+                        </div>
+                    @endif
+
                     <div class="space-y-3">
                         <div class="flex justify-between items-end">
                             <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Nominal

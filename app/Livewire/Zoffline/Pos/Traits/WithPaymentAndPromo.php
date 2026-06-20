@@ -279,14 +279,29 @@ trait WithPaymentAndPromo
     {
         $user = Auth::user();
         $businessUnitId = method_exists($user, 'getActiveBusinessUnitId') ? $user->getActiveBusinessUnitId() : ($user->business_unit_id ?? 1);
+        $warehouseName = $user->warehouse ? trim(strtolower($user->warehouse->name)) : null;
 
-        return \App\Models\PaymentMethod::where('is_active', true)
+        $methods = \App\Models\PaymentMethod::where('is_active', true)
             ->where('category', 'TUNAI')
             ->where(function ($query) use ($businessUnitId) {
                 $query->where('business_unit_id', $businessUnitId)
                     ->orWhereNull('business_unit_id');
             })
             ->get();
+
+        if ($warehouseName) {
+            return $methods->filter(function ($method) use ($warehouseName) {
+                // Ekstrak nama lokasi dari payment method (contoh: "Tunai Banjarbaru" -> "banjarbaru")
+                $methodLocation = trim(str_replace('tunai', '', strtolower($method->name)));
+                
+                if (empty($methodLocation)) return false;
+
+                // Gunakan str_contains agar "gsk - banjarbaru" bisa cocok dengan "banjarbaru"
+                return str_contains($warehouseName, $methodLocation);
+            })->values();
+        }
+
+        return $methods;
     }
 
     #[Computed]
