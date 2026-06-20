@@ -20,15 +20,29 @@
             <h1 class="text-3xl font-semibold  text-neutral-800 mt-4">Siapa Pelanggan Anda Hari ini?</h1>
         </div>
         <div class="flex items-center gap-3">
-            <a href="{{ route('zoffline.pos.closing-kasir') }}"
-                class="px-4 py-3 bg-red-100 text-red-700 hover:bg-red-200 rounded-xl font-bold flex items-center gap-2 transition-all shadow-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Tutup Shift
-            </a>
+            @if ($this->activeShift)
+                <a href="{{ route('zoffline.pos.closing-kasir') }}"
+                    class="p-4  bg-red-100 text-red-700 hover:bg-red-200 rounded-full  flex items-center gap-2 transition-all shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-auto" viewBox="0 0 24 24">
+                        <path d="M0 0h24v24H0z" fill="none" />
+                        <path fill="currentColor"
+                            d="M17 9V7c0-2.8-2.2-5-5-5S7 4.2 7 7v2c-1.7 0-3 1.3-3 3v7c0 1.7 1.3 3 3 3h10c1.7 0 3-1.3 3-3v-7c0-1.7-1.3-3-3-3M9 7c0-1.7 1.3-3 3-3s3 1.3 3 3v2H9zm4.1 8.5l-.1.1V17c0 .6-.4 1-1 1s-1-.4-1-1v-1.4c-.6-.6-.7-1.5-.1-2.1s1.5-.7 2.1-.1c.6.5.7 1.5.1 2.1" />
+                    </svg>
+
+
+                </a>
+            @else
+                <a href="{{ route('zoffline.pos.open-shift') }}"
+                    class="p-4 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-full flex items-center gap-2 transition-all shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-auto" viewBox="-5 -2 24 24">
+                        <path d="M-5 -2h24v24H-5z" fill="none" />
+                        <path fill="currentColor"
+                            d="M12 5h-2a3 3 0 1 0-6 0v5h8a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2V5a5 5 0 1 1 10 0M7 17a2 2 0 1 0 0-4a2 2 0 0 0 0 4" />
+                    </svg>
+                </a>
+            @endif
             <button wire:click="openDraft"
-                class="p-4 bg-amber-200 text-amber-700 hover:bg-amber-300 rounded-full font-bold flex items-center gap-2 transition-all shadow-sm">
+                class="p-4 bg-amber-200 text-amber-700 hover:bg-amber-300 rounded-full  flex items-center gap-2 transition-all shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-auto" viewBox="0 0 24 24">
                     <path d="M0 0h24v24H0z" fill="none" />
                     <path fill="currentColor" d="M13 12H7v-2h6zm4-4H7V6h10z" />
@@ -310,12 +324,18 @@
 
         {{-- Lanjutkan Button (Massive) --}}
         @php
-            $isReady = ($selectedCustomerId || !empty($customerPhone)) && count($selectedSales) > 0;
+            $isReady = ($selectedCustomerId || !empty($customerPhone)) && count($selectedSales) > 0 && $this->activeShift;
         @endphp
         <button wire:click="nextStep" @if (!$isReady) disabled @endif wire:loading.attr="disabled"
             wire:target="nextStep"
             class="w-full mt-8 px-8 py-5 font-semibold text-xl rounded-2xl transition-all flex items-center justify-center gap-3 {{ $isReady ? 'bg-[#668DFF] hover:bg-[#1c69d4] text-white shadow-[0_8px_15px_-3px_rgba(28,105,212,0.3)] hover:shadow-[0_12px_20px_-3px_rgba(28,105,212,0.4)] hover:-translate-y-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed' }} disabled:opacity-75 ">
-            <span wire:loading.remove wire:target="nextStep">Lanjutkan</span>
+            <span wire:loading.remove wire:target="nextStep">
+                @if(!$this->activeShift)
+                    Buka Shift Dahulu
+                @else
+                    Lanjutkan
+                @endif
+            </span>
             <span wire:loading.inline-flex wire:target="nextStep" class="items-center gap-2">
                 <svg class="animate-spin h-6 w-6 text-current" xmlns="http://www.w3.org/2000/svg" fill="none"
                     viewBox="0 0 24 24">

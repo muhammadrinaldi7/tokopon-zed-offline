@@ -30,6 +30,10 @@ class Home extends Component
     {
         return $this->redirectRoute('zoffline.warranty-activation', navigate: true);
     }
+    public function navigateToClosingKasir()
+    {
+        return $this->redirectRoute('zoffline.pos.closing-kasir', navigate: true);
+    }
     public function navigateToDashboard()
     {
         return $this->redirectRoute('admin.dashboard', navigate: true);

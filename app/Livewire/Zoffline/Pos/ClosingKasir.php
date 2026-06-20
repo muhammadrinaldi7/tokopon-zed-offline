@@ -126,7 +126,7 @@ class ClosingKasir extends Component
             ->where('handled_by', Auth::id())
             ->where('order_channel', 'POS')
             ->where('order_status', 'COMPLETED')
-            ->where('updated_at', '>=', $shift->opened_at)
+            ->where('created_at', '>=', $shift->opened_at)
             ->with('payments.paymentMethod')
             ->get();
 

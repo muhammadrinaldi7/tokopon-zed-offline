@@ -235,4 +235,57 @@
         </div>
 
     </div>
+    <!-- Simple Status Modal -->
+    <div x-data="{ show: @entangle('showStatusModal') }" x-show="show" class="relative z-[100]" aria-labelledby="modal-title"
+        role="dialog" aria-modal="true" style="display: none;">
+        <div x-show="show" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+        <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+            <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                <div x-show="show" x-transition:enter="ease-out duration-300"
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                    x-transition:leave="ease-in duration-200"
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                    x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-sm border border-slate-200">
+                    <div class="px-4 pb-4 pt-5 sm:p-6 sm:pb-4 text-center">
+                        @if ($statusType === 'success')
+                            <div
+                                class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-4">
+                                <svg class="h-10 w-10 text-emerald-600" fill="none" viewBox="0 0 24 24"
+                                    stroke-width="2" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-extrabold leading-6 text-slate-900 mb-2">{{ $statusTitle }}</h3>
+                        @else
+                            <div
+                                class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 mb-4">
+                                <svg class="h-10 w-10 text-amber-600" fill="none" viewBox="0 0 24 24"
+                                    stroke-width="2" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-extrabold leading-6 text-slate-900 mb-2">{{ $statusTitle }}</h3>
+                        @endif
+
+                        <p class="text-sm text-slate-600 mb-6">{{ $statusMessage }}</p>
+
+                        <div class="flex flex-col gap-2">
+                            <a href="{{ route('zoffline.pos') }}"
+                                class="w-full justify-center inline-flex items-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-md hover:bg-indigo-700 transition-all text-center">
+                                Lanjut ke Transaksi Penjualan
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>

@@ -26,6 +26,11 @@ class OpenShift extends Component
     public $openingNotes = '';
     public $hasActiveShift = false;
 
+    public $showStatusModal = false;
+    public $statusMessage = '';
+    public $statusTitle = '';
+    public $statusType = 'success';
+
     #[Computed]
     public function getTotalCashProperty(): int
     {
@@ -101,8 +106,11 @@ class OpenShift extends Component
             }
         }
 
-        $this->dispatch('toast', title: 'Shift Berhasil Dibuka', message: 'Selamat bertugas!', type: 'success');
-        return redirect()->route('zoffline.pos');
+        $this->hasActiveShift = true;
+        $this->statusTitle = 'Shift Berhasil Dibuka';
+        $this->statusMessage = 'Selamat bertugas, arigatogozaimas!';
+        $this->statusType = 'success';
+        $this->showStatusModal = true;
     }
 
     #[Computed]

@@ -110,7 +110,7 @@
         @endcan
         @can('view-riwayat-kasir')
             {{-- Card 5: shift --}}
-            <div wire:click="navigateToShift"
+            <div wire:click="navigateToClosingKasir"
                 class="md:nth-[3n+1]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
                 {{-- Ikon akan tertahan di atas --}}
                 <div class="rounded-full w-20 h-20 bg-[#FFF1D8] flex items-center justify-center text-black">
