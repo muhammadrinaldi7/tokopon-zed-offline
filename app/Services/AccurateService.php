@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 class AccurateService
 {
 
-    private function getCredentials($databaseSource)
+    public function getCredentials($databaseSource)
     {
         // Bersihkan spasi, jadikan huruf kecil, dan berikan default 'syihab' jika kosong
         $code = trim(strtolower($databaseSource)) ?: 'syihab';
@@ -1395,7 +1395,87 @@ class AccurateService
             }
         }
 
-        Log::error("Accurate API Get Receive Item Detail Failed ({$databaseSource}): " . $response->body());
+        Log::error("Accurate API Get Purchase Invoice Detail Failed ({$databaseSource}): " . $response->body());
+        return null;
+    }
+
+    public function getPurchaseOrders($databaseSource = 'syihab', $status = null)
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $allOrders = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $timestamp = now()->toIso8601String();
+            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+            $params = [
+                'sp.pageSize' => 100,
+                'sp.page' => $page,
+                'sp.sort' => 'id|desc'
+            ];
+
+            // Filter for unreceived POs typically status is OPEN or PARTIAL, wait we will just pull list and filter if needed
+            // Accurate PO statuses: UNAPPROVED, APPROVED, CLOSED, REJECTED, WAITING_RECEIPT
+
+            $response = Http::withHeaders([
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ])->get($host . '/purchase-order/list.do', $params);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data['s']) && $data['s'] === true) {
+                    $chunk = $data['d'] ?? [];
+                    $allOrders = array_merge($allOrders, $chunk);
+
+                    $pageCount = $data['sp']['pageCount'] ?? 1;
+                    if ($page >= $pageCount || count($chunk) < 100) {
+                        $hasMore = false;
+                    } else {
+                        $page++;
+                    }
+                } else {
+                    Log::error("Accurate API Get Purchase Order List Error ({$databaseSource}): " . json_encode($data));
+                    break;
+                }
+            } else {
+                Log::error("Accurate API Get Purchase Order List Failed ({$databaseSource}): " . $response->body());
+                $hasMore = false;
+            }
+        }
+
+        return $allOrders;
+    }
+
+    public function getPurchaseOrderDetail($id, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/purchase-order/detail.do', [
+            'id' => $id,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? null;
+            }
+        }
+
+        Log::error("Accurate API Get Purchase Order Detail Failed ({$databaseSource}): " . $response->body());
         return null;
     }
 }

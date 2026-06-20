@@ -340,11 +340,11 @@
         @endcan
 
         @can('manage-qc')
-            <div x-data="{ openQc: {{ request()->routeIs('admin.qc.*') ? 'true' : 'false' }} }">
+            <div x-data="{ openQc: {{ request()->routeIs('admin.qc.*', 'admin.inbound.*') ? 'true' : 'false' }} }">
                 <button @click="openQc = !openQc" type="button"
-                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.qc.*') ? $activeClass : $inactiveClass }}">
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.qc.*', 'admin.inbound.*') ? $activeClass : $inactiveClass }}">
                     <div class="flex items-center gap-3">
-                        <svg class="w-5 h-5 {{ request()->routeIs('admin.qc.*') ? $activeIconClass : $inactiveIconClass }}"
+                        <svg class="w-5 h-5 {{ request()->routeIs('admin.qc.*', 'admin.inbound.*') ? $activeIconClass : $inactiveIconClass }}"
                             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -362,6 +362,10 @@
                     <a href="{{ route('admin.qc.templates') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.templates') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                         Templates
+                    </a>
+                    <a href="{{ route('admin.inbound.index') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.inbound.*') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Inbound PO (Grosir)
                     </a>
                     <a href="{{ route('admin.qc.inbound') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.inbound') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">

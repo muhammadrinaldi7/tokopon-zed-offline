@@ -78,7 +78,8 @@ class VendorManage extends Component
         $query = Vendor::orderBy('vendor_name', 'asc');
 
         // Multi-Tenant Filter
-        $buCode = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitCode();
+        $bu = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
+        $buCode = $bu ? $bu->code : 'syihab';
         if ($buCode) {
             $query->where('database_source', $buCode);
         }

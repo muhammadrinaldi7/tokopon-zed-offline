@@ -29,8 +29,10 @@ class InspectionForm extends Component
     public $checklistResults = [];
     public $isSaved = false;
     public $hideVerdict = false;
+    public $hideHeader = false;
+    public $qc_max_weight_threshold = 3;
 
-    public function mount($inspectableType = null, $inspectableId = null, $secondProductVariantId = null, $label = 'QC Inbound', $hideVerdict = false, $imei = '')
+    public function mount($inspectableType = null, $inspectableId = null, $secondProductVariantId = null, $label = 'QC Inbound', $hideVerdict = false, $hideHeader = false, $imei = '')
     {
         // Handle route model binding for standalone page
         if ($inspectableType instanceof \App\Models\SecondProductVariant) {
@@ -45,6 +47,7 @@ class InspectionForm extends Component
             $this->secondProductVariantId = $secondProductVariantId;
             $this->label = $label;
             $this->hideVerdict = $hideVerdict;
+            $this->hideHeader = $hideHeader;
             $this->imei = $imei ?: '';
         }
 
@@ -88,13 +91,97 @@ class InspectionForm extends Component
         $this->template = QcTemplate::findForBrand($brandId);
 
         if ($this->template) {
+            $this->qc_max_weight_threshold = $this->template->max_weight_threshold ?? 3;
+            
             foreach ($this->template->items as $item) {
                 $this->checklistResults[] = [
                     'name' => $item['name'],
                     'type' => $item['type'],
                     'value' => $item['type'] === 'boolean' ? false : '', // default values
+                    'weight' => $item['weight'] ?? 1,
+                    'is_fatal' => $item['is_fatal'] ?? false,
+                    'category' => $this->getQcCategory($item['name'])
                 ];
             }
+        }
+    }
+
+    public function getQcCategory($name)
+    {
+        $map = [
+            'LCD' => 'Layar & Bodi',
+            'Touch Screen' => 'Layar & Bodi',
+            'BackGlass / Housing' => 'Layar & Bodi',
+            'Health Battery' => 'Baterai',
+            'Power On/Off' => 'Tombol & Fisik',
+            'Volume' => 'Tombol & Fisik',
+            'Mute Switch (Silent)' => 'Tombol & Fisik',
+            'Home Button' => 'Tombol & Fisik',
+            'Taptic / Vibrate' => 'Tombol & Fisik',
+            'Tombol' => 'Tombol & Fisik',
+            'Kamera Belakang' => 'Kamera & Biometrik',
+            'Kamera Belakang 1/2/3' => 'Kamera & Biometrik',
+            'Kamera Depan' => 'Kamera & Biometrik',
+            'Flash Light' => 'Kamera & Biometrik',
+            'Touch ID / Face ID' => 'Kamera & Biometrik',
+            'Wifi / Bluetooth' => 'Konektivitas',
+            'Signal' => 'Konektivitas',
+            'Speaker Atas' => 'Audio & Suara',
+            'Speaker Bawah' => 'Audio & Suara',
+            'Mic' => 'Audio & Suara',
+            'Layar' => 'Layar & Bodi',
+            'Bodi' => 'Layar & Bodi',
+            'Baterai' => 'Baterai',
+            'Kamera' => 'Kamera & Biometrik',
+        ];
+        return $map[$name] ?? 'Fungsi Lainnya';
+    }
+
+    public function calculateAutoVerdict()
+    {
+        $totalWeightDeduction = 0;
+        $hasFatalFailure = false;
+        
+        $this->inspectorNotes = ''; // Reset notes
+
+        foreach ($this->checklistResults as $item) {
+            $val = $item['value'];
+            
+            if ($item['name'] === 'Health Battery') {
+                if ($val !== '' && is_numeric($val) && $val < 85) {
+                    $weight = $item['weight'] ?? 1;
+                    $totalWeightDeduction += $weight;
+                    if (!empty($item['is_fatal'])) {
+                        $hasFatalFailure = true;
+                        $this->inspectorNotes .= "- FATAL: Battery Health (" . $val . "%) terdeteksi di bawah standar.\n";
+                    } else {
+                        $this->inspectorNotes .= "- Battery Health (" . $val . "%) terdeteksi di bawah standar (Bobot: {$weight}).\n";
+                    }
+                }
+            } elseif ($item['type'] === 'boolean') {
+                if ($val === '0' || $val === false || $val === 0) { // Failed (Not OK is falsy here because default is false, wait! In boolean type, value is true if PASS. If it's false, it means NOT OK / Failed.)
+                    // Wait, in my UI: value ? 'OK' : 'TIDAK OK'.
+                    // If the user doesn't check it, it is false (TIDAK OK). So false means failed.
+                    $weight = $item['weight'] ?? 1;
+                    $totalWeightDeduction += $weight;
+                    
+                    if (!empty($item['is_fatal'])) {
+                        $hasFatalFailure = true;
+                        $this->inspectorNotes .= "- FATAL: " . $item['name'] . " rusak/bermasalah.\n";
+                    } else {
+                        $this->inspectorNotes .= "- " . $item['name'] . " rusak/bermasalah (Bobot: {$weight}).\n";
+                    }
+                }
+            }
+        }
+
+        if ($hasFatalFailure || $totalWeightDeduction > $this->qc_max_weight_threshold) {
+            $this->verdict = 'fail';
+        } elseif ($totalWeightDeduction > 0) {
+            $this->verdict = 'conditional';
+        } else {
+            $this->verdict = 'pass';
+            $this->inspectorNotes = "Semua komponen berfungsi normal.";
         }
     }
 

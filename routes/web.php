@@ -124,6 +124,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/tiers', App\Livewire\Admin\Buyback\TierIndex::class)->name('tiers');
     });
 
+    // Inbound PO
+    Route::get('/inbound', \App\Livewire\Admin\Inbound\Index::class)->name('inbound.index');
+    Route::get('/inbound/{po}/scan', \App\Livewire\Admin\Inbound\Scan::class)->name('inbound.scan');
+
     Route::prefix('qc')->name('qc.')->middleware('can:manage-qc')->group(function () {
         Route::get('/templates', App\Livewire\Admin\Qc\TemplateIndex::class)->name('templates');
         Route::get('/inbound', App\Livewire\Admin\Qc\VendorInboundQc::class)->name('inbound');
