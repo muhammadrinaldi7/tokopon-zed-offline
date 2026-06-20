@@ -236,7 +236,10 @@ trait WithCheckoutAndReceipt
 
             if (!$order) {
                 // Buat Order Number baru jika belum ada
-                $orderNumber = 'POS-DRF-' . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
+                $buCode = \Illuminate\Support\Facades\Auth::user()->businessUnit->code ?? 'syihab';
+                $draftPrefix = ($buCode === 'second') ? 'POS-DRF-GSK-' : 'POS-DRF-SYB-';
+
+                $orderNumber = $draftPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
                     Order::whereDate('order_date', $dateToUse->format('Y-m-d'))
                         ->where('order_channel', 'POS')
                         ->count() + 1,
@@ -508,7 +511,10 @@ trait WithCheckoutAndReceipt
                 $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
 
                 // 2. Generate order number berdasarkan order_date
-                $orderNumber = 'POS-SYB-' . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
+                $buCode = \Illuminate\Support\Facades\Auth::user()->businessUnit->code ?? 'syihab';
+                $completedPrefix = ($buCode === 'second') ? 'POS-GSK-' : 'POS-SYB-';
+
+                $orderNumber = $completedPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
                     Order::whereDate('order_date', $dateToUse->format('Y-m-d')) // <- Menggunakan order_date
                         ->where('order_channel', 'POS')
                         ->count() + 1,
@@ -1095,7 +1101,8 @@ trait WithCheckoutAndReceipt
                 \Mike42\Escpos\Printer::MODE_DOUBLE_WIDTH |
                 \Mike42\Escpos\Printer::MODE_DOUBLE_HEIGHT
         );
-        $printer->text("SYIHAB STORE\n");
+        $storeTitle = optional($this->completedOrder->businessUnit)->code === 'second' ? 'GSK STORE' : 'SYIHAB STORE';
+        $printer->text($storeTitle . "\n");
 
         // PERBAIKAN 2: Kembalikan ke MODE_FONT_B standar (jangan dikosongkan)
         $printer->selectPrintMode(\Mike42\Escpos\Printer::MODE_FONT_B);
@@ -1117,31 +1124,28 @@ trait WithCheckoutAndReceipt
         // Items List
         foreach ($this->completedOrder->items as $item) {
             $v = $item->variant;
-            $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
-            // SINKRONISASI LOGIKA DARI BLADE
-            if ($v) {
-                $ram = $v->ram ?? '';
-                $storage = $v->storage ?? '';
-                $color = $v->color ?? '';
+            
+            if ($v instanceof \App\Models\ProductAccurate) {
+                $itemName = $v->name ?? '-';
+                $ram = '';
+                $storage = '';
+                $color = '';
+            } else {
+                $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
+                $ram = $v ? $v->ram ?? '' : '';
+                $storage = $v ? $v->storage ?? '' : '';
+                $color = $v ? $v->color ?? '' : '';
+            }
+            
+            // Bersihkan awalan nama
+            $itemName = preg_replace('/^(?:DS\s*-\s*HP\s*|DS\s*-\s*|HP\s*-\s*|HP\s*)/i', '', trim($itemName));
 
-                // Buat penampung string varian
+            if ($v && !($v instanceof \App\Models\ProductAccurate)) {
                 $variantDetails = "";
-
-                if ($ram != null && $ram !== '') {
-                    $variantDetails .= $ram . "/";
-                }
-
+                if ($ram != null && $ram !== '') $variantDetails .= $ram . "/";
                 $variantDetails .= $storage;
-
-                if ($color != null && $color !== '') {
-                    $variantDetails .= " " . $color;
-                }
-
-                // Gabungkan ke nama item (Mengikuti gaya Blade tanpa tanda kurung)
-                // Contoh hasil: "iPhone 13 8GB/256GB Black"
-                if (trim($variantDetails) !== '') {
-                    $itemName .= " " . trim($variantDetails);
-                }
+                if ($color != null && $color !== '') $variantDetails .= " " . $color;
+                if (trim($variantDetails) !== '') $itemName .= " " . trim($variantDetails);
             }
 
             $printer->text($itemName . "\n");
@@ -1158,8 +1162,17 @@ trait WithCheckoutAndReceipt
         }
         $printer->text($separator);
 
-        // Subtotal
-        $printer->text($this->formatLine("Total", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), $maxColumns) . "\n");
+        // Total Section
+        $isGsk = optional($this->completedOrder->businessUnit)->code === 'second';
+        if ($isGsk) {
+            $printer->text($this->formatLine("Subtotal", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), $maxColumns) . "\n");
+            if ($this->completedOrder->discount_amount > 0) {
+                $printer->text($this->formatLine("Diskon", "-Rp " . number_format($this->completedOrder->discount_amount, 0, ',', '.'), $maxColumns) . "\n");
+            }
+            $printer->text($this->formatLine("TOTAL", "Rp " . number_format($this->completedOrder->grand_total, 0, ',', '.'), $maxColumns) . "\n");
+        } else {
+            $printer->text($this->formatLine("Total", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), $maxColumns) . "\n");
+        }
         $printer->text($separator);
 
         // // Grand Total (Bold)

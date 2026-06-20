@@ -60,7 +60,7 @@
 <body>
 
     <div class="text-center">
-        <p class="font-bold" style="font-size: 14px; margin: 0 0 2px 0;">SYIHAB STORE</p>
+        <p class="font-bold" style="font-size: 14px; margin: 0 0 2px 0;">{{ optional($order->businessUnit)->code === 'second' ? 'GSK STORE' : 'SYIHAB STORE' }}</p>
         <p style="margin: 0 0 2px 0;">{{ $order->shipping_address_snapshot['store'] ?? 'Toko' }}</p>
         <p style="margin: 0; font-size: 11px;">{{ $order->created_at->format('d/m/Y H:i') }}</p>
     </div>
@@ -133,10 +133,27 @@
     <div class="divider"></div>
 
     <table class="item-table">
-        <tr>
-            <td>TOTAL</td>
-            <td class="text-right">{{ number_format($order->total_amount, 0, ',', '.') }}</td>
-        </tr>
+        @if (optional($order->businessUnit)->code === 'second')
+            <tr>
+                <td>Subtotal</td>
+                <td class="text-right">{{ number_format($order->total_amount, 0, ',', '.') }}</td>
+            </tr>
+            @if ($order->discount_amount > 0)
+                <tr>
+                    <td>Diskon</td>
+                    <td class="text-right">-{{ number_format($order->discount_amount, 0, ',', '.') }}</td>
+                </tr>
+            @endif
+            <tr>
+                <td class="font-bold">TOTAL</td>
+                <td class="text-right font-bold">{{ number_format($order->grand_total, 0, ',', '.') }}</td>
+            </tr>
+        @else
+            <tr>
+                <td>TOTAL</td>
+                <td class="text-right">{{ number_format($order->total_amount, 0, ',', '.') }}</td>
+            </tr>
+        @endif
     </table>
 
     <div class="divider"></div>

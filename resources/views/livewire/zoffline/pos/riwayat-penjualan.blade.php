@@ -148,5 +148,5 @@
         </div>
     </div>
 
-    @include('livewire.zoffline.pos.modal.riwayat-receipt')
+    @include('livewire.zoffline.pos.modal.receipt-struk')
 </div>

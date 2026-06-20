@@ -177,7 +177,7 @@
                {{-- Receipt Preview --}}
                <div id="receipt-content" class="p-5 font-mono text-xs leading-relaxed overflow-y-auto h-125">
                    <div class="text-center mb-3">
-                       <p class="font-bold text-sm">SYIHAB STORE</p>
+                       <p class="font-bold text-sm">{{ optional($completedOrder->businessUnit)->code === 'second' ? 'GSK STORE' : 'SYIHAB STORE' }}</p>
                        <p class="text-[10px] text-gray-500">
                            {{ $completedOrder->shipping_address_snapshot['store'] ?? 'Toko' }}</p>
                        <p class="text-[10px] text-gray-400">{{ $completedOrder->created_at->format('d/m/Y H:i') }}
@@ -247,7 +247,7 @@
                        @foreach ($completedOrder->payments as $payment)
                            <div class="flex justify-between text-[10px] text-gray-500">
                                <span>Bayar
-                                   ({{ $payment->paymentMethod->name ?? 'Cash' }}{{ $payment->paymentMethodRate ? ' - ' . $payment->paymentMethodRate->name : '' }})
+                                   ({{ $payment->paymentMethod->name ?? 'Cash' }}{{ optional($payment->paymentMethod)->bank_name ? ' - ' . $payment->paymentMethod->bank_name : '' }}{{ $payment->paymentMethodRate ? ' - ' . $payment->paymentMethodRate->name : '' }})
                                    :</span>
                                <span>Rp {{ number_format($payment->amount, 0, ',', '.') }}</span>
                            </div>
