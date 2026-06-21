@@ -56,148 +56,111 @@ class CekStock extends Component
             ->toArray();
         // =========================================================================
 
-        // 2. Cari di Produk Baru (Berdasarkan SKU, Nama Produk, atau Hasil SKU dari SN)
-        $newVariants = \App\Models\ProductVariant::with(['product', 'accurateData'])
+        // 2. Cari di ProductAccurate sebagai sumber kebenaran tunggal (Single Source of Truth)
+        $products = \App\Models\ProductAccurate::with('businessUnit')
             ->where(function ($query) use ($term, $snSkus) {
-                $query->where('sku', 'like', $term)
-                    ->orWhereHas('product', function ($q) use ($term) {
-                        $q->where('name', 'like', $term);
-                    });
+                $query->where('item_no', 'like', $term)
+                    ->orWhere('name', 'like', $term);
 
                 if (!empty($snSkus)) {
-                    $query->orWhereIn('sku', $snSkus);
+                    $query->orWhereIn('item_no', $snSkus);
                 }
-            })->take(10)->get();
-
-        // 3. Cari di Produk Second (Berdasarkan SKU, Nama Produk, atau Hasil SKU dari SN)
-        $secondVariants = \App\Models\SecondProductVariant::with(['secondProduct', 'accurateData'])
-            ->where(function ($query) use ($term, $snSkus) {
-                $query->where('sku', 'like', $term)
-                    ->orWhereHas('secondProduct', function ($q) use ($term) {
-                        $q->where('name', 'like', $term);
-                    });
-
-                if (!empty($snSkus)) {
-                    $query->orWhereIn('sku', $snSkus);
-                }
-            })->take(10)->get();
+            })->take(20)->get();
 
         $results = [];
 
-        foreach ($newVariants as $v) {
-            $results[] = [
-                'id' => $v->id,
-                'type' => 'new',
-                'name' => $v->product->name ?? 'Unknown',
-                'ram' => $v->ram ?? '',
-                'storage' => $v->storage,
-                'color' => $v->color,
-                'sku' => $v->sku,
-                'price' => Format::rupiah($v->accurateData?->base_price ?? 0),
-                'allStock' => $v->accurateData->stock ?? 0,
-                'is_second' => false,
-            ];
-        }
+        foreach ($products as $p) {
+            // Tentukan is_second berdasarkan Business Unit (Asumsi BU ID 2 atau nama 'Second')
+            $is_second = $p->businessUnit && (stripos($p->businessUnit->name, 'Second') !== false || $p->business_unit_id == 2);
 
-        foreach ($secondVariants as $v) {
             $results[] = [
-                'id' => $v->id,
-                'type' => 'second',
-                'name' => $v->secondProduct->name ?? 'Unknown',
-                'ram' => $v->ram ?? '',
-                'storage' => $v->storage,
-                'color' => $v->color,
-                'sku' => $v->sku,
-                'price' => Format::rupiah($v->accurateData->base_price) ?? 0,
-                'allStock' => $v->accurateData->stock ?? 0,
-                'is_second' => true,
+                'id' => $p->id,
+                'type' => 'accurate',
+                'name' => $p->name ?? 'Unknown',
+                'ram' => '', // ProductAccurate biasanya tidak nyimpan RAM/Storage terpisah
+                'storage' => '',
+                'color' => '',
+                'sku' => $p->item_no,
+                'price' => Format::rupiah($p->base_price ?? 0),
+                'allStock' => $p->stock ?? 0,
+                'is_second' => $is_second,
             ];
         }
 
         $this->searchResults = $results;
     }
 
-    // public function selectProduct($id, $type)
-    // {
-    //     $userWarehouseId = Auth::user()->warehouse_id;
-    //     $this->selectedProductId = $id;
-    //     $this->selectedProductType = $type;
-
-    //     if ($type === 'second') {
-    //         $variant = \App\Models\SecondProductVariant::with('warehouseStocks.warehouse', 'secondProduct')->find($id);
-    //         $ramStorage = !empty($variant->ram) ? $variant->ram . ' / ' . $variant->storage : $variant->storage;
-    //         $this->selectedProduct = ($variant->secondProduct->name ?? 'Unknown') . " ({$ramStorage} - {$variant->color}) [Second]";
-    //     } else {
-    //         $variant = \App\Models\ProductVariant::with('warehouseStocks.warehouse', 'product')->find($id);
-    //         $ramStorage = !empty($variant->ram) ? $variant->ram . ' / ' . $variant->storage : $variant->storage;
-    //         $this->selectedProduct = ($variant->product->name ?? 'Unknown') . " ({$ramStorage} - {$variant->color}) [Baru]";
-    //     }
-
-    //     if ($variant) {
-    //         // Mapping data stok
-    //         $this->stockData = $variant->warehouseStocks->map(function ($ws) use ($userWarehouseId) {
-    //             return [
-    //                 'warehouse_name' => $ws->warehouse->name ?? 'Gudang Tidak Diketahui',
-    //                 'stock' => $ws->stock,
-    //                 'is_current_user_warehouse' => $ws->warehouse_id === $userWarehouseId,
-    //             ];
-    //         })->toArray();
-    //     } else {
-    //         $this->stockData = [];
-    //         $this->selectedProduct = '';
-    //         $this->dispatch('toast', title: 'Gagal', message: 'Data varian tidak ditemukan.', type: 'error');
-    //     }
-    // }
     public function selectProduct($id, $type)
     {
         $userWarehouseId = Auth::user()->warehouse_id;
         $this->selectedProductId = $id;
         $this->selectedProductType = $type;
 
-        if ($type === 'second') {
-            $variant = \App\Models\SecondProductVariant::with('warehouseStocks.warehouse', 'secondProduct')->find($id);
-            $ramStorage = !empty($variant->ram) ? $variant->ram . ' / ' . $variant->storage : $variant->storage;
-            $this->selectedProduct = ($variant->secondProduct->name ?? 'Unknown') . " ({$ramStorage} - {$variant->color}) [Second]";
-        } else {
-            $variant = \App\Models\ProductVariant::with('warehouseStocks.warehouse', 'product')->find($id);
-            $ramStorage = !empty($variant->ram) ? $variant->ram . ' / ' . $variant->storage : $variant->storage;
-            $this->selectedProduct = ($variant->product->name ?? 'Unknown') . " ({$ramStorage} - {$variant->color}) [Baru]";
-        }
+        $accurate = \App\Models\ProductAccurate::with([
+            'productVariants.warehouseStocks.warehouse',
+            'secondProductVariants.warehouseStocks.warehouse',
+            'businessUnit'
+        ])->find($id);
 
-        if ($variant) {
+        if ($accurate) {
+            $is_second = $accurate->businessUnit && (stripos($accurate->businessUnit->name, 'Second') !== false || $accurate->business_unit_id == 2);
+            $this->selectedProduct = ($accurate->name ?? 'Unknown') . " [" . ($is_second ? 'Second' : 'Baru') . "]";
+
             // =========================================================================
             // AMBIL DAN KELOMPOKKAN SN BERDASARKAN WAREHOUSE_ID
             // =========================================================================
             $groupedSns = \App\Models\ProductSerialNumber::with('vendor')
-                ->where('item_no', $variant->sku)
+                ->where('item_no', $accurate->item_no)
+                ->where('status', '!=', 'Unavailable')
                 ->get()
                 ->groupBy('warehouse_id'); // Menghasilkan array dengan key berupa warehouse_id
 
-            // Mapping data stok
-            $this->stockData = $variant->warehouseStocks->map(function ($ws) use ($userWarehouseId, $groupedSns) {
+            // =========================================================================
+            // GABUNGKAN STOCK DARI VARIANT LAMA JIKA ADA
+            // =========================================================================
+            $allStocks = collect();
+            foreach ($accurate->productVariants as $pv) {
+                foreach ($pv->warehouseStocks as $ws) {
+                    $allStocks->push($ws);
+                }
+            }
+            foreach ($accurate->secondProductVariants as $sv) {
+                foreach ($sv->warehouseStocks as $ws) {
+                    $allStocks->push($ws);
+                }
+            }
 
-                // Ambil SN khusus untuk ID gudang saat ini dari hasil group tadi
-                $currentWarehouseSns = isset($groupedSns[$ws->warehouse_id])
-                    ? $groupedSns[$ws->warehouse_id]->map(function($sn) {
-                        return [
-                            'serial_number' => $sn->serial_number,
-                            'hpp' => $sn->hpp ?? 0,
-                            'vendor_name' => $sn->vendor ? $sn->vendor->vendor_name : 'Tidak ada',
-                        ];
-                    })->toArray()
-                    : [];
+            $groupedStocks = $allStocks->groupBy('warehouse_id');
+            $warehouses = \App\Models\Warehouse::all();
 
-                return [
-                    'warehouse_name' => $ws->warehouse->name ?? 'Gudang Tidak Diketahui',
-                    'stock' => $ws->stock,
-                    'is_current_user_warehouse' => $ws->warehouse_id === $userWarehouseId,
-                    'sns' => $currentWarehouseSns, // Hanya berisi SN milik gudang ini saja
-                ];
-            })->toArray();
+            $this->stockData = [];
+
+            foreach ($warehouses as $wh) {
+                $whSns = isset($groupedSns[$wh->id]) ? $groupedSns[$wh->id] : collect();
+                $whStockItems = isset($groupedStocks[$wh->id]) ? $groupedStocks[$wh->id] : collect();
+
+                $totalStock = $whStockItems->sum('stock');
+
+                // Tampilkan gudang jika ada stok di tabel warehouse_stocks ATAU memiliki SN aktif
+                if ($totalStock > 0 || $whSns->count() > 0) {
+                    $this->stockData[] = [
+                        'warehouse_name' => $wh->name ?? 'Gudang Tidak Diketahui',
+                        'stock' => max($totalStock, $whSns->count()), // Ambil yang paling besar untuk antisipasi beda data
+                        'is_current_user_warehouse' => $wh->id === $userWarehouseId,
+                        'sns' => $whSns->map(function ($sn) {
+                            return [
+                                'serial_number' => $sn->serial_number,
+                                'hpp' => $sn->hpp ?? 0,
+                                'vendor_name' => $sn->vendor ? $sn->vendor->vendor_name : 'Tidak ada',
+                            ];
+                        })->toArray(),
+                    ];
+                }
+            }
         } else {
             $this->stockData = [];
             $this->selectedProduct = '';
-            $this->dispatch('toast', title: 'Gagal', message: 'Data varian tidak ditemukan.', type: 'error');
+            $this->dispatch('toast', title: 'Gagal', message: 'Data produk tidak ditemukan.', type: 'error');
         }
     }
 

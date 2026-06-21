@@ -49,6 +49,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/pos', \App\Livewire\Admin\Pos\PointOfSale::class)->name('pos')->middleware('can:view-pos');
     Route::livewire('/dashboard', 'pages::admin.dashboard')->name('dashboard')->middleware('can:view_dashboard');
+    Route::get('/purchase-invoice-export', \App\Livewire\Admin\Accurate\AccurateInvoiceExport::class)->name('purchase-invoice-export');
 
     // Administrator
     Route::livewire('/users', 'pages::admin.user-management')->name('users')->middleware('can:manage-users');

@@ -20,10 +20,11 @@ class PurchaseInvoiceHandler implements WebhookHandlerInterface
         // Accurate mengirimkan detail event di dalam array 'data'
         if (isset($payload['data']) && is_array($payload['data'])) {
             foreach ($payload['data'] as $itemData) {
-                // Untuk PURCHASE_INVOICE, webhook memberikan 'purchaseInvoiceId' atau dokumen ID sejenis
-                // Terkadang fieldnya bernama id atau purchaseInvoiceId, mari kita ambil dari 'id'
-                if (isset($itemData['id'])) {
-                    $purchaseInvoiceId = $itemData['id'];
+
+                // PERBAIKAN: Ambil dari 'purchaseInvoiceId' terlebih dahulu, jika tidak ada baru cari 'id'
+                $purchaseInvoiceId = $itemData['purchaseInvoiceId'] ?? $itemData['id'] ?? null;
+
+                if ($purchaseInvoiceId) {
 
                     // 1. Sinkronisasi SN, HPP, dan Vendor menggunakan service yang sudah ada
                     try {
@@ -35,13 +36,12 @@ class PurchaseInvoiceHandler implements WebhookHandlerInterface
 
                     // 2. Sinkronisasi Total Stok Gudang (WarehouseStock)
                     $apiData = $service->getPurchaseInvoiceDetail($purchaseInvoiceId, $dbSource);
-                    
+
                     if ($apiData && isset($apiData['detailItem']) && is_array($apiData['detailItem'])) {
                         foreach ($apiData['detailItem'] as $detail) {
                             $itemNo = $detail['item']['no'] ?? $detail['itemNo'] ?? null;
-                            // Nama gudang bisa ada di level detail atau di level header dokumen
                             $warehouseName = $detail['warehouse']['name'] ?? $apiData['warehouse']['name'] ?? null;
-                            
+
                             if ($itemNo) {
                                 $this->syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource);
                             }
@@ -70,7 +70,7 @@ class PurchaseInvoiceHandler implements WebhookHandlerInterface
         $productAccurate = \App\Models\ProductAccurate::where('item_no', $itemNo)
             ->where('database_source', $dbSource)
             ->first();
-            
+
         if (!$productAccurate) return;
 
         // 3. Tembak API Accurate (Hanya dieksekusi jika gudang & produk valid)

@@ -54,12 +54,19 @@ class VendorInboundQc extends Component
         $secondSkus = SecondProductVariant::pluck('sku')->toArray();
 
         $query = ProductSerialNumber::whereIn('item_no', $secondSkus)
-            ->where('status', '!=', 'Sold');
+            ->where('status', '!=', 'Sold')
+            ->whereHas('warehouse.businessUnit', function ($q) {
+                $q->where('code', 'second')->orWhere('name', 'like', '%GSK%');
+            });
 
         if ($this->filterQcStatus === 'pending') {
-            $query->where('qc_status', 'Pending Inbound');
+            $query->where(function ($q) {
+                $q->where('qc_status', 'Pending Inbound')
+                  ->orWhereNull('qc_status');
+            });
         } elseif ($this->filterQcStatus === 'done') {
-            $query->where('qc_status', '!=', 'Pending Inbound');
+            $query->whereNotNull('qc_status')
+                  ->where('qc_status', '!=', 'Pending Inbound');
         }
 
         if ($this->search) {

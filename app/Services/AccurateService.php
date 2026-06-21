@@ -63,6 +63,43 @@ class AccurateService
             throw new \Exception('API Accurate Error: ' . $response->body());
         }
     }
+
+    /**
+     * Save Purchase Invoice to Accurate
+     * * @param array $payload
+     * @param string $databaseSource
+     * @return array|bool
+     * @throws \Exception
+     */
+    public function savePurchaseInvoiceDo(array $payload, $databaseSource = 'syihab')
+    {
+        // Memanfaatkan fungsi getHeaders() yang sudah Anda miliki
+        $config = $this->getHeaders($databaseSource);
+
+        // API tujuan adalah purchase-invoice/save.do dengan method POST
+        $response = Http::withHeaders($config['headers'])
+            ->post($config['host'] . '/purchase-invoice/save.do', $payload);
+
+        Log::info("API Accurate Save PI ({$databaseSource}) Payload: " . json_encode($payload));
+        Log::info("API Accurate Save PI ({$databaseSource}) Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+
+            // Validasi sukses/gagal dari struktur JSON Accurate
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+
+            // Mengembalikan data hasil save (biasanya berisi id dan number faktur baru)
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Save PI Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
     /**
      * Hit Accurate Online API to save User as Vendor
      * 
