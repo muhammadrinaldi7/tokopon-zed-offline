@@ -1,22 +1,28 @@
-NAMA PERUSAHAAN,CABANG,NAMA,EMAIL,NO HP
-Syihab Jaya Utama,Martapura,Khizkia aulia,khizkiaaulia.04@gmail.com,082157940375
-Syihab Jaya Utama,Martapura,Nurhaliza silvyana,inayla63@gmail.com,08971720673
-Syihab Jaya Utama,Martapura,Dety yuliana Rosa,detyyuliana04@gmail.com,081349559115
-Syihab Jaya Utama,Premium,Anita Aulia,Anitaaulia637@gmail.com,085821373639
-Syihab Jaya Utama,Premium,Naisylla Larassaty,naisylla89@gmail.com,083839944528
-Syihab Jaya Utama,Banjarbaru,Wanda Hamidah,wandahamidah572@gmail.com,085752253680
-Galery Second Kalimantan,Banjarbaru,Najwa Syabila,najwasyabila4@gmail.com,085654964982
-Galery Second Kalimantan,Banjarbaru,Aisyaniva Galuh Liant Nihkma,aisyanivagln05@gmail.com,085820413220
-Galery Second Kalimantan,Banjarbaru,Nor Lini Apriyanti,norlini16@gmail.com,0823-5097-4649
-Syihab Jaya Utama,Banjarbaru,Annisa Karimah,anisashp18@gmail.com,0831-4223-4572
-Syihab Jaya Utama,Banjarbaru,Nur sa'diyah,yahdiyyah@gmail.com,0838-6588-6942
-Syihab Jaya Utama,Banjarbaru,Norlina,linalina.id2000@gmail.com,0823-5097-4649
-Syihab Jaya Utama,Banjarbaru,Nurul Hidayah,nurulhiiiidayah@gmail.com,0856-5010-351
-Syihab Jaya Utama,Banjarbaru,Nur Nisrina,nisrinaaa.nur@gmail.com,0838-7309-7794
-Syihab Jaya Utama,Banjarbaru,Nur Hassanah,nurhassanah40@gmail.com,0853-4880-7720
-Syihab Jaya Utama,Sultan Adam,Ria Yuniarti,reaananda1717@gmail.com,087779177771
-Syihab Jaya Utama,Sultan Adam,Adis Angrayini,adisrayinii@gmail.com,088242302396
-Syihab Jaya Utama,Sultan Adam,Herlina,herlinaaza150@gmail.com,083159252120
-Syihab Jaya Utama,Veteran,Gusti Khairima,gustikhairima12@gmail.com,081256474237
-Syihab Jaya Utama,Veteran,Noor Vitasari,noorvitasari88@gmail.com,085754161344
-Syihab Jaya Utama,Veteran,Julyana Nur Azizah,julianajr2805@gmail.com,089683592959
+Timestamp,CABANG,NAMA LENGKAP,EMAIL,NO HP,POSISI(ROLE)
+20/06/2026 19:38:01,GSK - Sultan Adam,Muhammad Abdu,abdu1212025@gmail.com,089655553733,SPV
+20/06/2026 19:38:17,GSK - Sultan Adam,Fitriani,fitrianiasri27@gmail.com,083845094013,KASIR
+20/06/2026 19:38:24,GSK - Kayutangi,Naura Syamsa,naurasyamsa05@gmail.com,081250996579,KASIR
+20/06/2026 19:38:25,GSK - Martapura,JARATUNISA,14cacaq123@gmail.com,087735018284,KASIR
+20/06/2026 19:38:56,GSK - Veteran,Norfaujia Hani,faujiahani99@gmail.com,0895340497182,KASIR
+20/06/2026 19:39:37,GSK - Sultan Adam,Rahmah,rahhmahh2904@gmail.com,083141537557,KASIR
+20/06/2026 19:41:13,GSK - Veteran,Farid Ansyori,faridbjm0@gmail.com,083840838043,SPV
+20/06/2026 19:42:35,GSK - Kayutangi,Eliza Listiana Nurzakiah,elizalistiana876@gmail.com,087722252369,KASIR
+20/06/2026 19:42:54,GSK - Sultan Adam,Sarifah Fatimah Azzahra,ifahzahra63@gmail.com,087797881113,KASIR
+20/06/2026 19:42:58,GSK - Banjarbaru,Nor Lini Apriyanti ,norlini16@gmail.com,082350974649,KASIR
+20/06/2026 19:43:28,GSK - Veteran,Gita Rahayu Ningrum,gitarn887@gmail.com,0896-9206-0056,KASIR
+20/06/2026 19:43:54,GSK - Martapura,Zakiya Nabila,zakiyanabilaa@gmail.com,085654841378,KASIR
+20/06/2026 19:44:08,GSK - Kayutangi,Hayatun,hay9atun@gmail.com,+62 814-4584-7760,KASIR
+20/06/2026 19:45:25,GSK - Veteran,Rizqa Mai Sa’adah,rizqamaisaadah05@gmail.com,085752387190,KASIR
+20/06/2026 19:45:27,GSK - Martapura,Muhammad Rusdi,muhammadrusdysep96@gmail.com,081528541387,BM
+20/06/2026 19:46:59,GSK - Banjarbaru,AISYANIVA GALUH LIANT NIHKMA,aisyanivagln05@gmail.com,085820413220,KASIR
+20/06/2026 19:48:08,GSK - Kayutangi,Andryanoor,Aankyungsoo@gmail.com,082357767630,SPV
+20/06/2026 19:48:14,GSK - Banjarbaru,Najwa syabila,Najwasyabila4gmail.com,085654964982,KASIR
+20/06/2026 19:48:42,GSK - Martapura,Syapuani,syapuaniiwan1@gmail.com,087726999953,SPV
+20/06/2026 19:49:01,GSK - Veteran,Ahmad Supian,supianahmad04@gmail.com,082351389766,BM
+20/06/2026 19:50:20,GSK - Martapura,Siti Jamilah,sitijamilah2141@gmail.com,085703424114,KASIR
+20/06/2026 19:51:48,GSK - Sultan Adam,Ahmad rahmatullah,Ahmad.r.app78@gmail.com,081244472535,BM
+20/06/2026 20:02:20,GSK - Kayutangi,Muhammad Andi,Andigsk226@gmail.com,081352800789,BM
+20/06/2026 22:13:56,GSK - Banjarbaru,Riyanto ( yeahhh loyyyy ),fvck.the.haters@gmail.com,081255560787,SPV
+21/06/2026 15:18:46,GSK - Veteran,akhmad fauzi,imnotfaufau@gmail.com,083150523222,FL
+21/06/2026 15:20:00,GSK - Veteran,renaldi almadani,renaldialmadanii@gmail.com,085249403801,FL
+21/06/2026 15:27:44,GSK - Veteran,Noor Ahmadi (Dede),nrahmadi00@gmail.com,089523702617,FL
