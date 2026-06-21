@@ -137,9 +137,8 @@ class Pos extends Component
             $user->profile->save();
         }
 
-        // 3. Update di Accurate
-        $service = app(\App\Services\AccurateService::class);
-        $service->updateCustomer($user, $this->databaseSource);
+        // 3. Update di Accurate (Background Job)
+        \App\Jobs\SyncAccurateCustomerJob::dispatch($user, $this->databaseSource);
 
         // 4. Pilih customer ini untuk transaksi saat ini
         $this->selectedCustomerId = $user->id;
