@@ -5,6 +5,21 @@
             <p class="text-sm text-gray-500 mt-1">Kelola data harga dasar HP untuk fitur Tukar Tambah & Jual HP.</p>
         </div>
         <div class="flex items-center gap-3">
+            <button wire:click="exportCsv" wire:loading.attr="disabled"
+                class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Export (CSV)
+            </button>
+            <button wire:click="$set('showImportModal', true)"
+                class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Import (CSV)
+            </button>
+            
             <button wire:click="openSyncAccurateModal" wire:loading.attr="disabled"
                 class="flex items-center gap-2 bg-[#f59e0b] hover:bg-[#d97706] text-white px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all">
                 <svg wire:loading.remove wire:target="openSyncAccurateModal" class="w-4 h-4" fill="none"
@@ -48,7 +63,30 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 overflow-hidden mb-6">
+        <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <div class="relative w-full sm:w-80">
+                    <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari model, ram, storage, warna..."
+                        class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white transition-all shadow-sm">
+                </div>
+                <select wire:model.live="filterBrand" class="border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white text-gray-700 shadow-sm">
+                    <option value="">Semua Merek</option>
+                    @foreach($brands as $brand)
+                        <option value="{{ $brand->id }}">{{ $brand->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            
+            <div wire:loading wire:target="search, filterBrand" class="text-xs text-gray-500 flex items-center gap-2">
+                <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Memuat data...
+            </div>
+        </div>
+
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
@@ -56,6 +94,7 @@
                         class="bg-gray-50 border-b border-gray-100 text-xs text-gray-400 font-bold uppercase tracking-wider">
                         <th class="p-4">Merek & Model</th>
                         <th class="p-4">Kapasitas</th>
+                        <th class="p-4">Warna</th>
                         <th class="p-4">Harga Dasar (Mulus 100%)</th>
                         <th class="p-4">Kategori Tier</th>
                         <th class="p-4 text-center">Status</th>
@@ -81,6 +120,11 @@
                             <td class="p-4">
                                 <span class="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold">
                                     {{ $device->ram ? $device->ram . ' / ' : '' }}{{ $device->storage }}
+                                </span>
+                            </td>
+                            <td class="p-4">
+                                <span class="text-sm font-semibold text-gray-700">
+                                    {{ $device->color ?: '-' }}
                                 </span>
                             </td>
                             <td class="p-4">
@@ -132,7 +176,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="p-8 text-center text-gray-500">
+                            <td colspan="7" class="p-8 text-center text-gray-500">
                                 <div class="flex flex-col items-center justify-center">
                                     <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24"
                                         stroke="currentColor">
@@ -153,6 +197,12 @@
                 </tbody>
             </table>
         </div>
+        
+        @if($devices->hasPages())
+        <div class="p-4 border-t border-gray-100 bg-gray-50/30">
+            {{ $devices->links() }}
+        </div>
+        @endif
     </div>
 
     {{-- Edit Modal --}}
@@ -204,6 +254,15 @@
                                 <span class="text-xs text-rose-500 font-medium mt-1 block">{{ $message }}</span>
                             @enderror
                         </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Warna</label>
+                        <input type="text" wire:model="editColor" placeholder="Cth: Phantom Black"
+                            class="w-full text-[15px] bg-white/60 border border-gray-200/70 focus:bg-white focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/10 rounded-lg px-4 py-3 shadow-sm transition-all text-gray-800">
+                        @error('editColor')
+                            <span class="text-xs text-rose-500 font-medium mt-1 block">{{ $message }}</span>
+                        @enderror
                     </div>
 
                     <div>
@@ -311,6 +370,70 @@
                             </svg>
                             <span wire:loading.remove wire:target="processSyncAccurate">Mulai Sinkronisasi Massal</span>
                             <span wire:loading wire:target="processSyncAccurate">Menyinkronkan...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- Import CSV Modal --}}
+    @if($showImportModal)
+        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            {{-- Backdrop --}}
+            <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
+                wire:click="$set('showImportModal', false)"></div>
+
+            {{-- Modal Content --}}
+            <div class="relative bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900">Import CSV</h3>
+                        <p class="text-xs text-gray-500 mt-1">Mass update RAM, Storage, dan Base Price</p>
+                    </div>
+                    <button wire:click="$set('showImportModal', false)"
+                        class="text-gray-400 hover:text-gray-600 transition-colors p-2 bg-white rounded-full hover:bg-gray-100 border border-gray-200">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <form wire:submit.prevent="importCsv" class="p-6 space-y-5">
+                    <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-800 space-y-2">
+                        <p><strong>Cara Penggunaan:</strong></p>
+                        <ol class="list-decimal pl-5 space-y-1 text-xs">
+                            <li>Klik tombol <strong>Export (CSV)</strong> untuk mendownload template dan data saat ini.</li>
+                            <li>Buka file CSV tersebut di Excel / Spreadsheet.</li>
+                            <li>Edit kolom <code class="bg-white px-1 py-0.5 rounded border border-indigo-200">Model Name</code>, <code class="bg-white px-1 py-0.5 rounded border border-indigo-200">RAM</code>, <code class="bg-white px-1 py-0.5 rounded border border-indigo-200">Storage</code>, <code class="bg-white px-1 py-0.5 rounded border border-indigo-200">Color</code>, <code class="bg-white px-1 py-0.5 rounded border border-indigo-200">Base Price</code>, dan <code class="bg-white px-1 py-0.5 rounded border border-indigo-200">Is Active</code> (isi dengan <strong>1</strong> untuk Aktif, atau <strong>0</strong> untuk Nonaktif). <strong>Jangan ubah kolom ID.</strong></li>
+                            <li>Simpan kembali dalam format CSV, lalu upload di sini.</li>
+                        </ol>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1.5">File CSV</label>
+                        <input type="file" wire:model="csvFile" accept=".csv" required
+                            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-gray-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500">
+                        @error('csvFile') <span class="text-rose-500 text-xs mt-1">{{ $message }}</span> @enderror
+                        <div wire:loading wire:target="csvFile" class="text-xs text-indigo-600 mt-2 flex items-center gap-2">
+                            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Mengunggah file...
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex gap-3 border-t border-gray-100">
+                        <button type="button" wire:click="$set('showImportModal', false)"
+                            class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl text-[15px] font-bold transition-all">
+                            Batal
+                        </button>
+                        <button type="submit" wire:loading.attr="disabled"
+                            class="flex-[2] flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 rounded-xl text-[15px] font-bold hover:bg-indigo-700 shadow-sm transition-all">
+                            <svg wire:loading wire:target="importCsv" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span wire:loading.remove wire:target="importCsv">Mulai Import Data</span>
+                            <span wire:loading wire:target="importCsv">Memproses...</span>
                         </button>
                     </div>
                 </form>
