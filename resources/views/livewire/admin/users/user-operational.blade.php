@@ -158,7 +158,7 @@
                 </div>
 
                 <form wire:submit="saveRoles">
-                    <div class="p-6">
+                    <div class="p-6 max-h-[75vh] overflow-y-auto">
                         <div class="mb-5 p-4 bg-gray-50 rounded-2xl flex items-center gap-4 border border-gray-100">
                             <div
                                 class="w-10 h-10 rounded-full bg-linear-to-br from-gray-400 to-gray-500 text-white flex items-center justify-center font-bold text-sm shrink-0">

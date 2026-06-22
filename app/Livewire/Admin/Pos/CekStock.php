@@ -57,7 +57,10 @@ class CekStock extends Component
         // =========================================================================
 
         // 2. Cari di ProductAccurate sebagai sumber kebenaran tunggal (Single Source of Truth)
+        $activeBuId = Auth::user()->getActiveBusinessUnitId();
+
         $products = \App\Models\ProductAccurate::with('businessUnit')
+            ->where('business_unit_id', $activeBuId)
             ->where(function ($query) use ($term, $snSkus) {
                 $query->where('item_no', 'like', $term)
                     ->orWhere('name', 'like', $term);
