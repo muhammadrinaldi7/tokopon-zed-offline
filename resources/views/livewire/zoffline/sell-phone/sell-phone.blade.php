@@ -247,7 +247,7 @@
             </div>
         </div>
 
-                {{-- STEP 2: QC Kelayakan Fisik --}}
+        {{-- STEP 2: QC Kelayakan Fisik --}}
         <div x-show="step === 2" x-transition:enter="transition ease-out duration-300 delay-100"
             x-transition:enter-start="opacity-0 translate-x-4" x-transition:enter-end="opacity-100 translate-x-0"
             style="display: none;" class="space-y-8">
@@ -262,31 +262,38 @@
                 $maxQcStep = $categories->count() + 1;
             @endphp
 
-            <div x-data="{ qcStep: 0 }" class="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-neutral-100 relative">
-                
+            <div x-data="{ qcStep: 0 }"
+                class="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-neutral-100 relative">
+
                 {{-- Progress Bar QC --}}
                 <div class="mb-6 relative">
                     <div class="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                        <div class="h-full bg-violet-500 transition-all duration-300" :style="'width: ' + ((qcStep / {{ $maxQcStep }}) * 100) + '%'"></div>
+                        <div class="h-full bg-violet-500 transition-all duration-300"
+                            :style="'width: ' + ((qcStep / {{ $maxQcStep }}) * 100) + '%'"></div>
                     </div>
-                    <div class="mt-2 text-xs font-bold text-neutral-500 text-right">Tahap <span x-text="qcStep"></span> dari <span>{{ $maxQcStep }}</span></div>
+                    <div class="mt-2 text-xs font-bold text-neutral-500 text-right">Tahap <span
+                            x-text="qcStep"></span> dari <span>{{ $maxQcStep }}</span></div>
                 </div>
 
                 {{-- QC SUB-STEP 0: Foto Produk & IMEI --}}
                 <div x-show="qcStep === 0" x-transition.opacity class="space-y-6">
                     <div class="space-y-2">
-                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">IMEI Perangkat <span class="text-rose-500">*</span></label>
+                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">IMEI Perangkat
+                            <span class="text-rose-500">*</span></label>
                         <input type="text" wire:model.live.debounce.500ms="imei"
                             placeholder="Scan atau ketik IMEI..."
                             class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all font-bold text-neutral-700">
-                        @error('imei') <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
+                        @error('imei')
+                            <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span>
+                        @enderror
                     </div>
 
                     <div class="space-y-4" x-data="{ activeSlot: null }">
                         <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">
                             Ambil Foto HP Live (Maks. 5MB/Foto)
                         </h1>
-                        <p class="text-xs text-neutral-400 -mt-2 mb-4 ml-1">Semua foto harus diambil langsung dari kamera saat ini.</p>
+                        <p class="text-xs text-neutral-400 -mt-2 mb-4 ml-1">Semua foto harus diambil langsung dari
+                            kamera saat ini.</p>
 
                         @php
                             $slots = [
@@ -306,7 +313,8 @@
                                     $hasError = $errors->has($propertyName);
                                 @endphp
 
-                                <div x-data="{ localPreview: null }" class="relative aspect-square rounded-3xl overflow-hidden transition-all duration-300 group
+                                <div x-data="{ localPreview: null }"
+                                    class="relative aspect-square rounded-3xl overflow-hidden transition-all duration-300 group
                                  {{ $photoFile ? 'border border-neutral-100 shadow-sm' : 'border-2 border-dashed bg-neutral-50/50 hover:bg-neutral-50/100 cursor-pointer' }}
                                 {{ $hasError ? 'border-rose-300 bg-rose-50/20' : 'border-neutral-200 hover:border-neutral-300' }}">
 
@@ -315,45 +323,71 @@
                                             // Membaca file temporary secara lokal dan mengubahnya ke Base64
                                             $base64Image = '';
                                             if (file_exists($photoFile->getRealPath())) {
-                                                $base64Image = 'data:' . $photoFile->getMimeType() . ';base64,' . base64_encode(@file_get_contents($photoFile->getRealPath()));
+                                                $base64Image =
+                                                    'data:' .
+                                                    $photoFile->getMimeType() .
+                                                    ';base64,' .
+                                                    base64_encode(@file_get_contents($photoFile->getRealPath()));
                                             }
                                         @endphp
                                         <img src="{{ $base64Image }}"
                                             class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
-                                        <div class="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-xs py-2 px-3 text-center pointer-events-none z-10">
-                                            <span class="text-[11px] font-bold text-white tracking-wide block truncate">{{ $label }}</span>
+                                        <div
+                                            class="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-xs py-2 px-3 text-center pointer-events-none z-10">
+                                            <span
+                                                class="text-[11px] font-bold text-white tracking-wide block truncate">{{ $label }}</span>
                                         </div>
-                                        <button type="button" wire:click="$set('{{ $propertyName }}', null)" x-on:click="localPreview = null"
+                                        <button type="button" wire:click="$set('{{ $propertyName }}', null)"
+                                            x-on:click="localPreview = null"
                                             class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-10 flex items-center justify-center">
-                                            <svg class="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-16v1M4 7h16" /></svg>
+                                            <svg class="w-3.5 h-3.5 text-rose-500" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    stroke-width="2.5"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-16v1M4 7h16" />
+                                            </svg>
                                         </button>
                                     @else
                                         {{-- INSTANT LOCAL PREVIEW (WHILE COMPRESSING & UPLOADING) --}}
                                         <template x-if="localPreview">
                                             <div class="absolute inset-0 z-20">
-                                                <img :src="localPreview" class="w-full h-full object-cover opacity-60">
-                                                <div class="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px]">
-                                                    <svg class="animate-spin w-8 h-8 text-[#1c69d4]" fill="none" viewBox="0 0 24 24">
-                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                <img :src="localPreview"
+                                                    class="w-full h-full object-cover opacity-60">
+                                                <div
+                                                    class="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px]">
+                                                    <svg class="animate-spin w-8 h-8 text-[#1c69d4]" fill="none"
+                                                        viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12"
+                                                            r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                        </path>
                                                     </svg>
                                                 </div>
                                             </div>
                                         </template>
 
                                         {{-- CAMERA ONLY UPLOAD --}}
-                                        <label x-show="!localPreview" class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center select-none overflow-hidden cursor-pointer z-10">
-                                            <input type="file" accept="image/*" capture="environment" class="hidden" 
+                                        <label x-show="!localPreview"
+                                            class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center select-none overflow-hidden cursor-pointer z-10">
+                                            <input type="file" accept="image/*" capture="environment"
+                                                class="hidden"
                                                 @change="if($event.target.files.length > 0) { localPreview = URL.createObjectURL($event.target.files[0]); } customCompressHandler($event, 'photo_{{ $key }}')">
-                                            <div class="absolute inset-0 flex items-center justify-center z-0 group-hover:scale-110 transition-transform duration-300">
-                                                <img src="{{ asset('assets/png/' . $key . '.png') }}" alt="{{ $label }}" class="w-50 h-auto object-contain drop-shadow-sm {{ $hasError ? 'opacity-20' : 'opacity-30' }}" onerror="this.onerror=null; this.src='{{ asset('assets/png/default.png') }}';">
+                                            <div
+                                                class="absolute inset-0 flex items-center justify-center z-0 group-hover:scale-110 transition-transform duration-300">
+                                                <img src="{{ asset('assets/png/' . $key . '.png') }}"
+                                                    alt="{{ $label }}"
+                                                    class="w-50 h-auto object-contain drop-shadow-sm {{ $hasError ? 'opacity-20' : 'opacity-30' }}"
+                                                    onerror="this.onerror=null; this.src='{{ asset('assets/png/default.png') }}';">
                                             </div>
                                             <div class="absolute bottom-3 inset-x-0">
-                                                <span class="block text-[11px] font-bold tracking-wide {{ $hasError ? 'text-rose-500' : 'text-neutral-500 group-hover:text-neutral-700' }}">
+                                                <span
+                                                    class="block text-[11px] font-bold tracking-wide {{ $hasError ? 'text-rose-500' : 'text-neutral-500 group-hover:text-neutral-700' }}">
                                                     {{ $label }}
                                                 </span>
                                                 @error($propertyName)
-                                                    <span class="block text-[10px] text-rose-500 mt-0.5 leading-tight">{{ $message }}</span>
+                                                    <span
+                                                        class="block text-[10px] text-rose-500 mt-0.5 leading-tight">{{ $message }}</span>
                                                 @enderror
                                             </div>
                                         </label>
@@ -361,10 +395,12 @@
 
                                     <div wire:loading.flex wire:target="{{ $propertyName }}"
                                         class="absolute inset-0 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center gap-1 z-10">
-                                        <span class="animate-spin w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full"></span>
+                                        <span
+                                            class="animate-spin w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full"></span>
                                     </div>
                                     @error('photo_' . $key)
-                                        <div class="absolute inset-x-0 bottom-0 bg-rose-500 text-white p-2 text-center z-10 flex flex-col items-center justify-center h-12">
+                                        <div
+                                            class="absolute inset-x-0 bottom-0 bg-rose-500 text-white p-2 text-center z-10 flex flex-col items-center justify-center h-12">
                                             <span class="text-[9px] font-bold uppercase">{{ $message }}</span>
                                         </div>
                                     @enderror
@@ -375,42 +411,60 @@
                 </div>
 
                 {{-- QC SUB-STEPS (Categories) --}}
-                @foreach($categories as $index => $categoryName)
-                    <div x-show="qcStep === {{ $index + 1 }}" x-transition.opacity style="display: none;" class="space-y-6">
-                        <h4 class="text-lg font-black text-violet-700 uppercase tracking-wider border-b border-neutral-100 pb-2">
+                @foreach ($categories as $index => $categoryName)
+                    <div x-show="qcStep === {{ $index + 1 }}" x-transition.opacity style="display: none;"
+                        class="space-y-6">
+                        <h4
+                            class="text-lg font-black text-violet-700 uppercase tracking-wider border-b border-neutral-100 pb-2">
                             Pengecekan {{ $categoryName }}
                         </h4>
-                        
+
                         <div class="space-y-4">
-                            @foreach($qc_results as $i => $item)
-                                @if($item['category'] === $categoryName)
+                            @foreach ($qc_results as $i => $item)
+                                @if ($item['category'] === $categoryName)
                                     <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
                                         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                            <span class="text-sm font-bold text-neutral-700">{{ $item['name'] }}</span>
-                                            
-                                            @if($item['type'] === 'boolean')
+                                            <span
+                                                class="text-sm font-bold text-neutral-700">{{ $item['name'] }}</span>
+
+                                            @if ($item['type'] === 'boolean')
                                                 <div class="flex items-center gap-2">
                                                     <label class="flex items-center gap-1.5 cursor-pointer">
-                                                        <input type="radio" wire:model.live="qc_results.{{ $i }}.value" value="1" class="peer hidden">
-                                                        <div class="px-4 py-2 rounded-lg text-xs font-bold border transition-all
+                                                        <input type="radio"
+                                                            wire:model.live="qc_results.{{ $i }}.value"
+                                                            value="1" class="peer hidden">
+                                                        <div
+                                                            class="px-4 py-2 rounded-lg text-xs font-bold border transition-all
                                                             peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500
                                                             text-neutral-400 border-neutral-200 bg-white hover:bg-neutral-50 flex items-center gap-1">
-                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                                            <svg class="w-3.5 h-3.5" fill="none"
+                                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="3" d="M5 13l4 4L19 7"></path>
+                                                            </svg>
                                                             Berfungsi Normal
                                                         </div>
                                                     </label>
                                                     <label class="flex items-center gap-1.5 cursor-pointer">
-                                                        <input type="radio" wire:model.live="qc_results.{{ $i }}.value" value="0" class="peer hidden">
-                                                        <div class="px-4 py-2 rounded-lg text-xs font-bold border transition-all
+                                                        <input type="radio"
+                                                            wire:model.live="qc_results.{{ $i }}.value"
+                                                            value="0" class="peer hidden">
+                                                        <div
+                                                            class="px-4 py-2 rounded-lg text-xs font-bold border transition-all
                                                             peer-checked:bg-rose-500 peer-checked:text-white peer-checked:border-rose-500
                                                             text-neutral-400 border-neutral-200 bg-white hover:bg-neutral-50 flex items-center gap-1">
-                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                                            <svg class="w-3.5 h-3.5" fill="none"
+                                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="3" d="M6 18L18 6M6 6l12 12"></path>
+                                                            </svg>
                                                             Bermasalah
                                                         </div>
                                                     </label>
                                                 </div>
                                             @else
-                                                <input type="text" wire:model.lazy="qc_results.{{ $i }}.value"
+                                                <input type="text"
+                                                    wire:model.lazy="qc_results.{{ $i }}.value"
                                                     class="p-2 text-sm border border-gray-200 rounded-lg focus:ring-violet-500 focus:border-violet-500 bg-white"
                                                     placeholder="Isi data...">
                                             @endif
@@ -423,45 +477,72 @@
                 @endforeach
 
                 {{-- QC SUB-STEP N+1: VERDICT --}}
-                <div x-show="qcStep === {{ $maxQcStep }}" x-transition.opacity style="display: none;" class="space-y-6">
-                    <h4 class="text-lg font-black text-violet-700 uppercase tracking-wider border-b border-neutral-100 pb-2">Kesimpulan Sistem (Auto-Verdict)</h4>
-                    <p class="text-sm text-neutral-500">Berdasarkan data inspeksi yang Anda masukkan, sistem menentukan bahwa perangkat ini:</p>
-                    
+                <div x-show="qcStep === {{ $maxQcStep }}" x-transition.opacity style="display: none;"
+                    class="space-y-6">
+                    <h4
+                        class="text-lg font-black text-violet-700 uppercase tracking-wider border-b border-neutral-100 pb-2">
+                        Kesimpulan Sistem (Auto-Verdict)</h4>
+                    <p class="text-sm text-neutral-500">Berdasarkan data inspeksi yang Anda masukkan, sistem menentukan
+                        bahwa perangkat ini:</p>
+
                     <div class="mt-4">
                         {{-- Tampilan Dinamis Berdasarkan qc_verdict --}}
-                        <div x-show="$wire.qc_verdict === 'pass'" class="p-6 border-2 border-emerald-500 bg-emerald-50 rounded-2xl flex flex-col items-center justify-center text-center">
-                            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
-                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                        <div x-show="$wire.qc_verdict === 'pass'"
+                            class="p-6 border-2 border-emerald-500 bg-emerald-50 rounded-2xl flex flex-col items-center justify-center text-center">
+                            <div
+                                class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                                        d="M5 13l4 4L19 7"></path>
+                                </svg>
                             </div>
                             <h5 class="text-xl font-black text-emerald-700 mb-1">LAYAK BELI (PASS)</h5>
-                            <p class="text-sm text-emerald-600 font-medium">Seluruh komponen perangkat berfungsi 100% normal.</p>
+                            <p class="text-sm text-emerald-600 font-medium">Seluruh komponen perangkat berfungsi 100%
+                                normal.</p>
                         </div>
 
-                        <div x-show="$wire.qc_verdict === 'conditional'" class="p-6 border-2 border-amber-500 bg-amber-50 rounded-2xl flex flex-col items-center justify-center text-center">
-                            <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
-                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        <div x-show="$wire.qc_verdict === 'conditional'"
+                            class="p-6 border-2 border-amber-500 bg-amber-50 rounded-2xl flex flex-col items-center justify-center text-center">
+                            <div
+                                class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                                    </path>
+                                </svg>
                             </div>
                             <h5 class="text-xl font-black text-amber-700 mb-1">BERSYARAT (NEEDS SERVICE)</h5>
-                            <p class="text-sm text-amber-700/80 font-medium whitespace-pre-line" x-text="$wire.qc_notes"></p>
+                            <p class="text-sm text-amber-700/80 font-medium whitespace-pre-line"
+                                x-text="$wire.qc_notes"></p>
                         </div>
 
-                        <div x-show="$wire.qc_verdict === 'fail'" class="p-6 border-2 border-rose-500 bg-rose-50 rounded-2xl flex flex-col items-center justify-center text-center">
-                            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4">
-                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        <div x-show="$wire.qc_verdict === 'fail'"
+                            class="p-6 border-2 border-rose-500 bg-rose-50 rounded-2xl flex flex-col items-center justify-center text-center">
+                            <div
+                                class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                                        d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
                             </div>
                             <h5 class="text-xl font-black text-rose-700 mb-1">TIDAK LAYAK (FAIL)</h5>
-                            <p class="text-sm text-rose-700/80 font-medium whitespace-pre-line" x-text="$wire.qc_notes"></p>
+                            <p class="text-sm text-rose-700/80 font-medium whitespace-pre-line"
+                                x-text="$wire.qc_notes"></p>
                         </div>
 
                         {{-- Loading State saat hitung verdict --}}
-                        <div x-show="!$wire.qc_verdict" class="p-10 border-2 border-dashed border-neutral-200 bg-neutral-50 rounded-2xl flex flex-col items-center justify-center text-center">
-                            <span class="animate-spin w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full mb-4"></span>
-                            <p class="text-sm text-neutral-500 font-bold">Sistem sedang menganalisa data inspeksi...</p>
+                        <div x-show="!$wire.qc_verdict"
+                            class="p-10 border-2 border-dashed border-neutral-200 bg-neutral-50 rounded-2xl flex flex-col items-center justify-center text-center">
+                            <span
+                                class="animate-spin w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full mb-4"></span>
+                            <p class="text-sm text-neutral-500 font-bold">Sistem sedang menganalisa data inspeksi...
+                            </p>
                         </div>
                     </div>
 
                     <div class="space-y-2 mt-6 border-t border-neutral-100 pt-6">
-                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Tambahan Catatan Manual (Opsional)</label>
+                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Tambahan
+                            Catatan Manual (Opsional)</label>
                         <textarea wire:model.live.debounce.500ms="old_phone_additional_note" rows="3"
                             placeholder="Ketik catatan tambahan di luar analisa sistem jika ada..."
                             class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all text-sm font-medium text-neutral-700"></textarea>
@@ -471,63 +552,89 @@
                 {{-- Wizard Navigation Buttons --}}
                 @php
                     // Validasi foto dan imei untuk sub-step 0
-                    $isPhotoValid = !empty($photo_depan) && !empty($photo_belakang) && !empty($photo_kiri) && !empty($photo_kanan) && !empty($photo_kelengkapan);
+                    $isPhotoValid =
+                        !empty($photo_depan) &&
+                        !empty($photo_belakang) &&
+                        !empty($photo_kiri) &&
+                        !empty($photo_kanan) &&
+                        !empty($photo_kelengkapan);
                     $isStep0Valid = !empty($imei) && $isPhotoValid;
                 @endphp
-                <div class="flex flex-col md:flex-row justify-between items-center mt-8 pt-4 border-t border-neutral-100 gap-4">
+                <div
+                    class="flex flex-col md:flex-row justify-between items-center mt-8 pt-4 border-t border-neutral-100 gap-4">
                     <div class="w-full md:w-auto flex justify-start">
                         <button x-show="qcStep > 0" type="button" @click="qcStep--"
                             class="text-neutral-500 hover:text-neutral-800 font-bold px-4 py-3 transition-colors flex items-center gap-2 border md:border-none border-neutral-200 rounded-xl md:rounded-none w-full md:w-auto justify-center">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                             </svg>
                             Mundur
                         </button>
                         <button x-show="qcStep === 0" type="button" @click="step = 1"
                             class="text-neutral-500 hover:text-neutral-800 font-bold px-4 py-3 transition-colors flex items-center gap-2 border md:border-none border-neutral-200 rounded-xl md:rounded-none w-full md:w-auto justify-center">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                             </svg>
                             Kembali ke Specs
                         </button>
                     </div>
 
                     <div class="w-full md:w-auto flex justify-end">
-                        <button x-show="qcStep === 0" type="button" @click="qcStep++" {{ $isStep0Valid ? '' : 'disabled' }}
+                        <button x-show="qcStep === 0" type="button" @click="qcStep++"
+                            {{ $isStep0Valid ? '' : 'disabled' }}
                             class="px-6 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 w-full md:w-auto
                             {{ $isStep0Valid ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed' }}">
                             Mulai Ceklis
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                            </svg>
                         </button>
 
-                        <button x-show="qcStep > 0 && qcStep < {{ $maxQcStep }}" type="button" 
+                        <button x-show="qcStep > 0 && qcStep < {{ $maxQcStep }}" type="button"
                             x-data="{ isCalculating: false }"
                             @click="if (qcStep === {{ $maxQcStep - 1 }}) { isCalculating = true; $wire.calculateAutoVerdict().then(() => { qcStep++; isCalculating = false; }) } else { qcStep++ }"
                             :disabled="isCalculating"
                             class="px-6 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 w-full md:w-auto"
-                            :class="isCalculating ? 'bg-violet-400 text-white cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200'">
-                            
+                            :class="isCalculating ? 'bg-violet-400 text-white cursor-not-allowed' :
+                                'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200'">
+
                             <span x-show="!isCalculating" class="flex items-center gap-2">
                                 Lanjut
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                                </svg>
                             </span>
-                            
+
                             <span x-show="isCalculating" class="flex items-center gap-2" style="display: none;">
-                                <svg class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                <svg class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg"
+                                    fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                        stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                    </path>
                                 </svg>
                                 Memproses Kesimpulan...
                             </span>
                         </button>
 
-                        <button x-show="qcStep === {{ $maxQcStep }}" type="button" 
+                        <button x-show="qcStep === {{ $maxQcStep }}" type="button"
                             @click="$wire.qc_verdict === 'fail' ? $wire.submit() : step = 3"
                             :disabled="!$wire.qc_verdict"
                             class="px-6 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 w-full md:w-auto"
-                            :class="!$wire.qc_verdict ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed' : ($wire.qc_verdict === 'fail' ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-violet-600 hover:bg-violet-700 text-white')">
-                            <span x-text="$wire.qc_verdict === 'fail' ? 'Batalkan Transaksi' : 'Lanjut Kondisi Harga'"></span>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                            :class="!$wire.qc_verdict ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed' : ($wire
+                                .qc_verdict === 'fail' ? 'bg-rose-600 hover:bg-rose-700 text-white' :
+                                'bg-violet-600 hover:bg-violet-700 text-white')">
+                            <span
+                                x-text="$wire.qc_verdict === 'fail' ? 'Batalkan Transaksi' : 'Lanjut Kondisi Harga'"></span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                            </svg>
                         </button>
                     </div>
                 </div>
@@ -540,10 +647,12 @@
             x-transition:enter-start="opacity-0 translate-x-4" x-transition:enter-end="opacity-100 translate-x-0"
             style="display: none;" class="space-y-8">
 
-            <h3 class="text-lg md:text-xl uppercase font-black text-neutral-800 px-1">Inspeksi Minus / Penyesuaian Harga</h3>
+            <h3 class="text-lg md:text-xl uppercase font-black text-neutral-800 px-1">Inspeksi Minus / Penyesuaian
+                Harga</h3>
             <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl">
                 <p class="text-sm font-bold text-amber-900 mb-1">Potongan Harga Otomatis</p>
-                <p class="text-xs text-amber-700">Tandai cacat fisik atau fungsi yang mengurangi nilai jual. Data dari Ceklis QC sebelumnya bisa Anda gunakan sebagai patokan.</p>
+                <p class="text-xs text-amber-700">Tandai cacat fisik atau fungsi yang mengurangi nilai jual. Data dari
+                    Ceklis QC sebelumnya bisa Anda gunakan sebagai patokan.</p>
             </div>
 
             <div class="space-y-8 bg-white p-6 rounded-2xl shadow-sm border border-neutral-100">
@@ -594,7 +703,8 @@
                 @endif
 
                 <div class="space-y-3 pt-6 border-t border-neutral-100">
-                    <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">Catatan Tambahan Minus Harga</h1>
+                    <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">Catatan
+                        Tambahan Minus Harga</h1>
                     <textarea wire:model.live="old_phone_additional_note" rows="3"
                         placeholder="Jelaskan kondisi detail jika ada minus..."
                         class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all font-medium text-neutral-700"></textarea>
@@ -654,7 +764,7 @@
                     <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                 </h4>
                 {{-- Form Input Khusus Role FL --}}
-                @if (Auth::user() && Auth::user()->hasRole('fl'))
+                @if (Auth::user())
                     <div class="mb-8 space-y-6">
                         {{-- Tabs --}}
                         <div class="flex p-1 bg-neutral-100 rounded-2xl w-fit">
