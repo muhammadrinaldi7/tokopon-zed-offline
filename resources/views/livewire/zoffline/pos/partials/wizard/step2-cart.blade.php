@@ -66,8 +66,7 @@
                 </div>
 
                 <input type="text" wire:model.defer="scanned_sn" wire:keydown.enter="processScan"
-                    wire:key="input-scanned-sn"
-                    x-ref="barcodeScanner"
+                    wire:key="input-scanned-sn" x-ref="barcodeScanner"
                     class="block w-full pl-11 pr-16 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-center text-xl font-mono font-bold tracking-widest text-gray-800 placeholder-gray-300 focus:bg-white focus:border-blue-500 focus:ring-0 transition-all shadow-inner"
                     placeholder="SN / BARCODE" autofocus>
 
@@ -154,7 +153,7 @@
                                     </div>
                                     @if ($displayRam || $displayStorage || $displayColor)
                                         <div
-                                            class="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-500">
+                                            class="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-500 mb-2">
                                             @if ($displayRam || $displayStorage)
                                                 <span>{{ $displayRam ? $displayRam . ' / ' : '' }}{{ $displayStorage ?? '' }}</span>
                                             @endif
@@ -168,6 +167,26 @@
                                             @endif
                                         </div>
                                     @endif
+
+                                    {{-- Harga Satuan & Edit Harga --}}
+                                    <div class="flex items-end gap-4 mt-3">
+                                        <div>
+                                            <p
+                                                class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">
+                                                Harga Satuan</p>
+                                            <p class="font-bold text-neutral-800 text-sm leading-none">Rp
+                                                {{ number_format($item['price'], 0, ',', '.') }}</p>
+                                        </div>
+                                        <button wire:click="openEditPriceModal({{ $index }})"
+                                            class="w-8 h-8 flex items-center justify-center text-blue-500 bg-blue-50 hover:bg-blue-100 hover:text-blue-600 rounded-lg transition-colors tooltip shrink-0"
+                                            title="Edit Harga Transaksi">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {{-- MANUAL DISCOUNT PRESETS --}}
@@ -242,32 +261,41 @@
                                 @endif
                             </div>
 
-                            {{-- Kanan: Qty & Harga --}}
+                            {{-- Kanan: Qty & Subtotal --}}
                             <div class="flex flex-col gap-4 lg:w-48 shrink-0">
-                                <div class="flex flex-row lg:flex-col items-center lg:items-end justify-between gap-4">
-                                    {{-- Qty Control --}}
-                                    <div class="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm">
-                                        <button wire:click="decrementCartItem({{ $index }})"
-                                            class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-l-lg transition font-black text-lg">-</button>
-                                        <input type="number" wire:model.lazy="cart.{{ $index }}.qty"
-                                            class="w-12 h-9 text-center bg-transparent border-x border-gray-100 text-sm font-bold p-0 focus:ring-0"
-                                            min="1">
-                                        <button wire:click="incrementCartItem({{ $index }})"
-                                            class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-r-lg transition font-black text-lg">+</button>
+                                <div
+                                    class="flex flex-row lg:flex-col items-center lg:items-end justify-between h-full gap-4">
+
+                                    <div class="flex flex-col items-end gap-3 w-full">
+                                        {{-- Subtotal --}}
+                                        <div class="text-right w-full">
+                                            <p
+                                                class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-1 lg:mb-2">
+                                                Subtotal</p>
+                                            <p class="font-black text-gray-900 text-xl leading-none">Rp
+                                                {{ number_format(($item['price'] - ($item['discount_amount'] ?? 0)) * $item['qty'], 0, ',', '.') }}
+                                            </p>
+                                            @if (isset($item['discount_amount']) && $item['discount_amount'] > 0)
+                                                <p class="text-[10px] font-bold text-emerald-500 mt-1.5">(Termasuk
+                                                    Diskon Rp
+                                                    {{ number_format($item['discount_amount'] * $item['qty'], 0, ',', '.') }})
+                                                </p>
+                                            @endif
+                                        </div>
+
+                                        {{-- Qty Control --}}
+                                        <div
+                                            class="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm mt-2">
+                                            <button wire:click="decrementCartItem({{ $index }})"
+                                                class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-l-lg transition font-black text-lg">-</button>
+                                            <input type="number" wire:model.lazy="cart.{{ $index }}.qty"
+                                                class="w-12 h-9 text-center bg-transparent border-x border-gray-100 text-sm font-bold p-0 focus:ring-0"
+                                                min="1">
+                                            <button wire:click="incrementCartItem({{ $index }})"
+                                                class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-r-lg transition font-black text-lg">+</button>
+                                        </div>
                                     </div>
 
-                                    {{-- Total Harga Item --}}
-                                    <div class="text-right">
-                                        <p class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">
-                                            Subtotal</p>
-                                        <p class="font-black text-gray-900 text-lg">Rp
-                                            {{ number_format($item['price'] * $item['qty'] - ($item['discount_amount'] ?? 0), 0, ',', '.') }}
-                                        </p>
-                                        @if (isset($item['discount_amount']) && $item['discount_amount'] > 0)
-                                            <p class="text-[10px] font-bold text-emerald-500 mt-0.5">(Termasuk Diskon Rp
-                                                {{ number_format($item['discount_amount'], 0, ',', '.') }})</p>
-                                        @endif
-                                    </div>
                                 </div>
 
                                 {{-- Tombol Hapus (Selalu Tampil) --}}
@@ -276,8 +304,8 @@
                                     <button wire:click="removeFromCart({{ $index }})"
                                         class="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 hover:text-rose-600 rounded-lg transition-colors"
                                         title="Hapus Item">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                            stroke-width="2">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                         </svg>
@@ -311,16 +339,88 @@
         <button wire:click="nextStep" wire:loading.attr="disabled" wire:target="nextStep"
             class="px-8 py-3.5 bg-[#668DFF] hover:bg-[#4f7df8] text-white font-black rounded-xl shadow-[0_8px_15px_-3px_rgba(28,105,212,0.3)] hover:shadow-[0_12px_20px_-3px_rgba(28,105,212,0.4)] hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-75 disabled:cursor-wait">
             <span wire:loading.remove wire:target="nextStep">Lanjut</span>
-            <svg wire:loading.remove wire:target="nextStep" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+            <svg wire:loading.remove wire:target="nextStep" class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor" stroke-width="3">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
             <span wire:loading.inline-flex wire:target="nextStep" class="items-center gap-2">
-                <svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <svg class="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                        stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
                 </svg>
                 Memproses...
             </span>
         </button>
     </div>
+
+    {{-- Modal Edit Harga Satuan --}}
+    @if ($showEditPriceModal)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            x-data="{
+                rawAmount: @entangle('editPriceValue').defer,
+                formattedAmount: '',
+                init() {
+                    this.formattedAmount = this.formatNumber(this.rawAmount);
+                    $watch('rawAmount', value => {
+                        if (document.activeElement !== this.$refs.amountInput) {
+                            this.formattedAmount = this.formatNumber(value);
+                        }
+                    });
+                },
+                formatNumber(val) {
+                    if (!val) return '';
+                    let num = parseInt(String(val).replace(/\D/g, ''), 10);
+                    return isNaN(num) ? '' : num.toLocaleString('id-ID');
+                },
+                updateAmount(e) {
+                    let val = e.target.value;
+                    let num = parseInt(val.replace(/\D/g, ''), 10);
+                    if (isNaN(num)) num = 0;
+                    this.formattedAmount = this.formatNumber(num);
+                    this.rawAmount = num;
+                },
+                savePrice() {
+                    $wire.set('editPriceValue', this.rawAmount).then(() => {
+                        $wire.saveEditedPrice();
+                    });
+                }
+            }">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+                <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-800">Edit Harga Satuan</h3>
+                    <button wire:click="closeEditPriceModal"
+                        class="text-gray-400 hover:text-rose-500 font-bold">&times;</button>
+                </div>
+                <div class="p-6">
+                    <p class="text-sm text-gray-500 mb-4">
+                        Masukkan harga satuan baru untuk transaksi ini. Perubahan ini tidak mempengaruhi harga master
+                        produk di database.
+                    </p>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm font-semibold">Rp</span>
+                        </div>
+                        <input type="text" x-ref="amountInput" x-model="formattedAmount"
+                            @input="updateAmount($event)" @keydown.enter="savePrice"
+                            class="pl-10 block w-full rounded-xl border-gray-200 shadow-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] sm:text-lg font-bold py-3"
+                            placeholder="0">
+                    </div>
+                </div>
+                <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                    <button type="button" wire:click="closeEditPriceModal"
+                        class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+                        Batal
+                    </button>
+                    <button type="button" @click="savePrice"
+                        class="px-5 py-2.5 bg-[#1c69d4] hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm transition-colors">
+                        Simpan Harga
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

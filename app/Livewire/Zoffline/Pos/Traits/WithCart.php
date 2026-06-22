@@ -574,70 +574,79 @@ trait WithCart
                 return;
             }
 
-            // =================================================================
-            // PROSES VALIDASI SN LOKAL (Dual Engine)
-            // =================================================================
-            $localSnRecord = \Illuminate\Support\Facades\DB::table('product_serial_numbers')
-                ->where('serial_number', $value)
-                ->first();
-
-            if (!$localSnRecord) {
-                $this->dispatch('toast', title: 'SN Tidak Ditemukan', message: "Serial Number '{$value}' tidak terdaftar di sistem lokal.", type: 'error');
-                $this->new_sns[$index] = '';
-                return;
-            }
-
-            if ($localSnRecord->item_no !== $expectedSku) {
-                $this->dispatch('toast', title: 'SN Tidak Sesuai', message: "SN '{$value}' ada, TAPI milik produk/barang lain.", type: 'error');
-                $this->new_sns[$index] = '';
-                return;
-            }
-            // =================================================================
-
-            // =================================================================
-            // TAMBAHAN: CEK KESESUAIAN WAREHOUSE DI TABEL product_serial_numbers
-            // =================================================================
             $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
+            $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+            $activeBu = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
+            $buName = $activeBu ? $activeBu->code : 'second';
 
-            // Cari record SN di database lokal
-            $localSnRecord = \Illuminate\Support\Facades\DB::table('product_serial_numbers')
-                ->where('serial_number', $value) // sesuaikan kolom jika namanya 'sn'
-                ->first();
-
-            if (!$localSnRecord) {
-                $this->dispatch('toast', title: 'Error', message: "Serial Number '{$value}' tidak ditemukan di database lokal.", type: 'error');
+            // 1. Cek dulu ke Accurate Service
+            $accurateService = app(\App\Services\AccurateService::class);
+            $skuFromAccurate = $accurateService->findSkuBySerialNumber($value, $buName);
+            
+            if ($skuFromAccurate === 'error') {
+                $this->dispatch('toast', title: 'Warning', message: 'Koneksi ke Accurate bermasalah, mencoba pengecekan lokal.', type: 'warning');
+            } else if ($skuFromAccurate === null) {
+                $this->dispatch('toast', title: 'Gagal', message: "Barcode / SN '{$value}' tidak ditemukan di Accurate.", type: 'error');
                 $this->new_sns[$index] = '';
                 return;
             }
 
-            // Cek jika warehouse tidak cocok
-            if ($localSnRecord->warehouse_id != $warehouseId) {
-                $actualWarehouseName = \Illuminate\Support\Facades\DB::table('warehouses')
-                    ->where('id', $localSnRecord->warehouse_id)
-                    ->value('name'); // sesuaikan kolom nama gudang Anda
+            $isConfirmedSn = ($skuFromAccurate && $skuFromAccurate !== 'invalid_type' && $skuFromAccurate !== 'error');
 
-                $warehouseTarget = $actualWarehouseName ?? 'Gudang Lain';
+            if ($isConfirmedSn || $skuFromAccurate === 'error') {
+                $localSnRecordGlobal = \App\Models\ProductSerialNumber::with('productAccurate')
+                    ->where('serial_number', $value)
+                    ->first();
 
-                $this->dispatch(
-                    'toast',
-                    title: 'Error',
-                    message: "Serial Number '{$value}' ada di gudang {$warehouseTarget}. Silahkan lakukan pemindahan barang di accurate.",
-                    type: 'error'
-                );
+                if ($localSnRecordGlobal) {
+                    // Cek SKU
+                    if ($localSnRecordGlobal->item_no !== $expectedSku) {
+                        $this->dispatch('toast', title: 'SN Tidak Sesuai', message: "SN '{$value}' ada, TAPI milik produk/barang lain.", type: 'error');
+                        $this->new_sns[$index] = '';
+                        return;
+                    }
 
-                $this->new_sns[$index] = '';
-                return;
+                    // Cek Business Unit
+                    $productBuId = $localSnRecordGlobal->productAccurate->business_unit_id ?? null;
+                    if ($productBuId !== null && $productBuId != $buId) {
+                        $this->dispatch('toast', title: 'Gagal', message: "Serial Number '{$value}' terdaftar untuk Business Unit / Cabang lain.", type: 'error');
+                        $this->new_sns[$index] = '';
+                        return;
+                    }
+
+                    // Cek Gudang
+                    if ($localSnRecordGlobal->warehouse_id != $warehouseId) {
+                        $actualWarehouseName = \App\Models\Warehouse::where('id', $localSnRecordGlobal->warehouse_id)->value('name');
+                        $warehouseTarget = $actualWarehouseName ?? 'Gudang Lain';
+                        $this->dispatch('toast', title: 'Gagal', message: "Serial Number '{$value}' ada di gudang {$warehouseTarget}. Silahkan lakukan pemindahan barang di accurate.", type: 'error');
+                        $this->new_sns[$index] = '';
+                        return;
+                    }
+
+                    // Cek Status
+                    if ($localSnRecordGlobal->status === 'Unavailable') {
+                        $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$value}' sudah dalam status Draft atau Terjual.", type: 'warning');
+                        $this->new_sns[$index] = '';
+                        return;
+                    }
+
+                    // Lolos semua validasi, tambahkan SN ke array
+                    if (!isset($this->cart[$index]['serial_numbers'])) {
+                        $this->cart[$index]['serial_numbers'] = [];
+                    }
+                    $this->cart[$index]['serial_numbers'][] = $value;
+                    $this->new_sns[$index] = ''; 
+                    return;
+
+                } else if ($isConfirmedSn) {
+                    $this->dispatch('toast', title: 'Gagal', message: "Serial Number '{$value}' terdaftar di Accurate, namun belum tersinkronisasi di sistem lokal. Pastikan sudah di-receive atau di-transfer ke sistem.", type: 'error');
+                    $this->new_sns[$index] = '';
+                    return;
+                }
             }
-            // =================================================================
 
-            // 2. Pastikan array serial_numbers sudah ada
-            if (!isset($this->cart[$index]['serial_numbers'])) {
-                $this->cart[$index]['serial_numbers'] = [];
-            }
-
-            // 3. Tambahkan SN ke array
-            $this->cart[$index]['serial_numbers'][] = $value;
-            $this->new_sns[$index] = ''; // clear input
+            $this->dispatch('toast', title: 'Gagal', message: "Barcode / SN '{$value}' tidak ditemukan di sistem lokal atau tidak valid.", type: 'error');
+            $this->new_sns[$index] = '';
         }
     }
     // ─── Stock Modal Properties ────────────────────────────────
@@ -723,6 +732,37 @@ trait WithCart
                 $this->cart[$cartIndex]['discount_amount'] = (int) $amount;
             }
             $this->syncSinglePaymentAmount();
+        }
+    }
+
+    // ─── Edit Price Modal ──────────────────────────────────────
+    public $showEditPriceModal = false;
+    public $editPriceCartIndex = null;
+    public $editPriceValue = 0;
+
+    public function openEditPriceModal($index)
+    {
+        if (isset($this->cart[$index])) {
+            $this->editPriceCartIndex = $index;
+            $this->editPriceValue = $this->cart[$index]['price'] ?? 0;
+            $this->showEditPriceModal = true;
+        }
+    }
+
+    public function closeEditPriceModal()
+    {
+        $this->showEditPriceModal = false;
+        $this->editPriceCartIndex = null;
+        $this->editPriceValue = 0;
+    }
+
+    public function saveEditedPrice()
+    {
+        if ($this->editPriceCartIndex !== null && isset($this->cart[$this->editPriceCartIndex])) {
+            $this->cart[$this->editPriceCartIndex]['price'] = (int) $this->editPriceValue;
+            $this->syncSinglePaymentAmount();
+            $this->dispatch('toast', title: 'Berhasil', message: 'Harga satuan berhasil diubah.', type: 'success');
+            $this->closeEditPriceModal();
         }
     }
 }

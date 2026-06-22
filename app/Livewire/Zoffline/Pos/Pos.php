@@ -547,8 +547,8 @@ class Pos extends Component
     #[Computed]
     public function itemDiscountTotal()
     {
-        // Menghitung total diskon manual
-        return collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
+        // Menghitung total diskon manual per-unit dikali qty
+        return collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1));
     }
 
     #[Computed]

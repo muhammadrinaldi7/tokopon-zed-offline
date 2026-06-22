@@ -177,7 +177,7 @@ trait WithCheckoutAndReceipt
             }
 
             $subtotal = $this->subtotal();
-            $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
+            $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1));
             $promoDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['promo_discount'] ?? 0));
             $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
             $grandTotal = max(0, $subtotal - $totalDiscountAmount);
@@ -295,7 +295,7 @@ trait WithCheckoutAndReceipt
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => (int) ($item['discount_amount'] ?? 0),
+                    'discount_amount' => (int) ($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1),
                     'promo_discount_amount' => (int) ($item['promo_discount'] ?? 0),
                     'applied_promo_id' => $item['applied_promo_id'] ?? null,
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
@@ -443,7 +443,7 @@ trait WithCheckoutAndReceipt
             }
 
             $subtotal = $this->subtotal();
-            $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0));
+            $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1));
             $promoDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['promo_discount'] ?? 0));
             $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
 
@@ -577,7 +577,7 @@ trait WithCheckoutAndReceipt
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => (int) ($item['discount_amount'] ?? 0),
+                    'discount_amount' => (int) ($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1),
                     'promo_discount_amount' => (int) ($item['promo_discount'] ?? 0),
                     'applied_promo_id' => $item['applied_promo_id'] ?? null,
                     // 3. Simpan ke database. Jika ada 2 SN, jadinya: "SN001, SN002"
@@ -665,7 +665,7 @@ trait WithCheckoutAndReceipt
                             'warehouseName' => $accurateWarehouseName,
                             'unitPrice' => $item['price'],
                             'quantity' => $item['qty'],
-                            'itemCashDiscount' => (int)($item['discount_amount'] ?? 0) + (int)($item['promo_discount'] ?? 0),
+                            'itemCashDiscount' => ((int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1)) + (int)($item['promo_discount'] ?? 0),
                             'salesmanListNumber' => $detailSalesman,
                         ];
 
