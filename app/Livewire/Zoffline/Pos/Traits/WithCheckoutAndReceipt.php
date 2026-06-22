@@ -203,7 +203,7 @@ trait WithCheckoutAndReceipt
                                 'stock' => $warehouseStock->stock + (int)$oldItem->qty
                             ]);
                         }
-                        
+
                         // Kembalikan status SN lama menjadi Available
                         if (!empty($oldItem->serial_number)) {
                             $oldSns = explode(',', $oldItem->serial_number);
@@ -216,7 +216,7 @@ trait WithCheckoutAndReceipt
                     }
                     $order->items()->delete();
                     $order->promos()->detach();
-                    
+
                     $order->update([
                         'user_id' => $customerId,
                         'order_date' => $dateToUse->format('Y-m-d'),
@@ -266,6 +266,7 @@ trait WithCheckoutAndReceipt
                     'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
                     'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
                     'notes' => $this->notes,
+                    'branch_id' => Auth::user()->branch_id,
                 ]);
             }
 
@@ -469,7 +470,7 @@ trait WithCheckoutAndReceipt
                                 'stock' => $warehouseStock->stock + (int)$oldItem->qty
                             ]);
                         }
-                        
+
                         // Kembalikan status SN lama menjadi Available
                         if (!empty($oldItem->serial_number)) {
                             $oldSns = explode(',', $oldItem->serial_number);
@@ -543,6 +544,7 @@ trait WithCheckoutAndReceipt
                     'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
                     'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
                     'notes' => $this->notes,
+                    'branch_id' => Auth::user()->branch_id,
                 ]);
             }
 
@@ -1124,7 +1126,7 @@ trait WithCheckoutAndReceipt
         // Items List
         foreach ($this->completedOrder->items as $item) {
             $v = $item->variant;
-            
+
             if ($v instanceof \App\Models\ProductAccurate) {
                 $itemName = $v->name ?? '-';
                 $ram = '';
@@ -1136,7 +1138,7 @@ trait WithCheckoutAndReceipt
                 $storage = $v ? $v->storage ?? '' : '';
                 $color = $v ? $v->color ?? '' : '';
             }
-            
+
             // Bersihkan awalan nama
             $itemName = preg_replace('/^(?:DS\s*-\s*HP\s*|DS\s*-\s*|HP\s*-\s*|HP\s*)/i', '', trim($itemName));
 

@@ -64,6 +64,11 @@ class Order extends Model
         return $this->belongsTo(Employe::class, 'sales_id', 'id');
     }
 
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
     public function paymentMethod()
     {
         return $this->belongsTo(PaymentMethod::class);

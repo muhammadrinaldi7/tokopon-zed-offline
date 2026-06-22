@@ -70,7 +70,8 @@ class SellPhone extends Component
     public function mount()
     {
         // Cache brands sekali saja saat halaman pertama kali dimuat
-        $this->brands = \App\Models\Brand::whereIn('id',
+        $this->brands = \App\Models\Brand::whereIn(
+            'id',
             \App\Models\BuybackDevice::where('is_active', true)->select('brand_id')->distinct()
         )->orderBy('name')->get();
     }
@@ -525,6 +526,7 @@ class SellPhone extends Component
             'status'            => $this->qc_verdict === 'fail' ? 'CANCELLED' : 'PAYING',
             'handled_by'        => $currentUser->id,
             'business_unit_id'  => $currentUser->getActiveBusinessUnitId(),
+            'branch_id'         => Auth::user()->branch_id,
         ]);
 
         // Simpan Data QC Kelayakan (Device Inspection)
