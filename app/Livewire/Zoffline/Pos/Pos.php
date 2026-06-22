@@ -369,8 +369,16 @@ class Pos extends Component
         $this->syncSinglePaymentAmount();
     }
 
-    public function updated($property)
+    public function updated($property, $value = null)
     {
+        if (str_starts_with($property, 'cart.') && str_ends_with($property, '.qty')) {
+            $parts = explode('.', $property);
+            if (count($parts) === 3) {
+                $index = $parts[1];
+                $this->validateCartItemQty($index, $value);
+            }
+        }
+
         if (str_starts_with($property, 'cart.')) {
             $this->syncSinglePaymentAmount();
         }

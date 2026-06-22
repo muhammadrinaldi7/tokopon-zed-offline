@@ -71,9 +71,17 @@ trait WithCart
             $this->dispatch('focus-addon-sn-input');
         } else {
             // Langsung tambahkan ke keranjang (tanpa SN)
-            $stock = (int) $product->stock;
+            $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
+            $warehouseStock = \App\Models\WarehouseStock::where([
+                'variant_id' => $product->id,
+                'variant_type' => \App\Models\ProductAccurate::class,
+                'warehouse_id' => $warehouseId
+            ])->first();
+            
+            $stock = $warehouseStock ? (int) $warehouseStock->stock : 0;
+
             if ($stock <= 0) {
-                $this->dispatch('toast', title: 'Stok Kosong', message: "Stok untuk produk '{$product->name}' saat ini habis (0).", type: 'error');
+                $this->dispatch('toast', title: 'Stok Kosong', message: "Stok untuk produk '{$product->name}' di gudang Anda saat ini habis (0).", type: 'error');
                 return;
             }
             $this->addScannedAccurateToCart($product, null, $stock);
@@ -273,10 +281,17 @@ trait WithCart
                 return;
             }
 
-            $stock = (int) $productAccurate->stock;
+            // Ambil stock dari WarehouseStock (gudang aktif)
+            $warehouseStock = \App\Models\WarehouseStock::where([
+                'variant_id' => $productAccurate->id,
+                'variant_type' => \App\Models\ProductAccurate::class,
+                'warehouse_id' => $warehouseId
+            ])->first();
+
+            $stock = $warehouseStock ? (int) $warehouseStock->stock : 0;
 
             if ($stock <= 0) {
-                $this->dispatch('toast', title: 'Stok Kosong', message: "Stok untuk produk '{$productAccurate->name}' saat ini habis (0).", type: 'error');
+                $this->dispatch('toast', title: 'Stok Kosong', message: "Stok untuk produk '{$productAccurate->name}' di gudang Anda saat ini habis (0).", type: 'error');
                 $this->scanned_sn = '';
                 return;
             }
@@ -513,15 +528,56 @@ trait WithCart
         $this->syncSinglePaymentAmount();
     }
 
+    public function validateCartItemQty($index, $newQty)
+    {
+        if (!isset($this->cart[$index])) return;
+
+        $newQty = (int) $newQty;
+        if ($newQty < 1) {
+            $newQty = 1;
+        }
+
+        $variantType = $this->cart[$index]['variant_type'];
+        $variantId = $this->cart[$index]['variant_id'];
+        $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
+
+        $warehouseStock = \App\Models\WarehouseStock::where([
+            'variant_id' => $variantId,
+            'variant_type' => $variantType,
+            'warehouse_id' => $warehouseId
+        ])->first();
+
+        $maxStock = $warehouseStock ? (int) $warehouseStock->stock : 0;
+
+        // Hitung total qty dari item yang sama di baris lain
+        $otherRowsQty = 0;
+        foreach ($this->cart as $i => $item) {
+            if ($i != $index && $item['variant_id'] == $variantId && $item['variant_type'] == $variantType) {
+                $otherRowsQty += $item['qty'];
+            }
+        }
+
+        if (($newQty + $otherRowsQty) > $maxStock) {
+            $allowedQty = max(1, $maxStock - $otherRowsQty);
+            $this->dispatch('toast', title: 'Gagal', message: "Stok Tidak Cukup. Sisa stok di gudang Anda adalah {$allowedQty}.", type: 'error');
+            $newQty = $allowedQty;
+        }
+
+        $this->cart[$index]['qty'] = $newQty;
+
+        // Jika jumlah array SN melebihi qty yang baru,
+        // hapus elemen/slot paling terakhir agar sinkron.
+        if (isset($this->cart[$index]['serial_numbers'])) {
+            while (count($this->cart[$index]['serial_numbers']) > $this->cart[$index]['qty']) {
+                array_pop($this->cart[$index]['serial_numbers']);
+            }
+        }
+    }
+
     public function incrementCartItem($index)
     {
         if (isset($this->cart[$index])) {
-            // 1. Naikkan jumlah kuantitas barang
-            $this->cart[$index]['qty']++;
-
-            // JANGAN lakukan push string kosong ('') lagi di sini.
-            // Biarkan array serial_numbers tetap apa adanya sampai user melakukan scan.
-
+            $this->validateCartItemQty($index, $this->cart[$index]['qty'] + 1);
             $this->syncSinglePaymentAmount();
         }
     }
@@ -529,19 +585,7 @@ trait WithCart
     public function decrementCartItem($index)
     {
         if (isset($this->cart[$index]) && $this->cart[$index]['qty'] > 1) {
-            // 1. Turunkan jumlah kuantitas barang
-            $this->cart[$index]['qty']--;
-
-            // 2. Jika jumlah array SN melebihi qty yang baru,
-            // kita hapus elemen/slot paling terakhir agar sinkron.
-            if (isset($this->cart[$index]['serial_numbers'])) {
-                while (count($this->cart[$index]['serial_numbers']) > $this->cart[$index]['qty']) {
-                    array_pop($this->cart[$index]['serial_numbers']);
-                }
-
-                // Catatan: Sinkronisasi legacy di sini sudah dihapus!
-            }
-
+            $this->validateCartItemQty($index, $this->cart[$index]['qty'] - 1);
             $this->syncSinglePaymentAmount();
         }
     }
