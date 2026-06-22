@@ -38,8 +38,12 @@ class LaporanStok extends Component
 
     public function exportCsv()
     {
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+        $validWarehouseIds = Warehouse::where('business_unit_id', $buId)->pluck('id')->toArray();
+
         $query = ProductSerialNumber::with(['productAccurate', 'warehouse', 'vendor'])
             ->where('status', 'Available')
+            ->whereIn('warehouse_id', $validWarehouseIds)
             ->when($this->search, function ($query) {
                 $query->where(function($q) {
                     $q->where('serial_number', 'like', '%' . $this->search . '%')
@@ -109,8 +113,12 @@ class LaporanStok extends Component
 
     public function render()
     {
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+        $validWarehouseIds = Warehouse::where('business_unit_id', $buId)->pluck('id')->toArray();
+
         $query = ProductSerialNumber::with(['productAccurate', 'warehouse', 'vendor'])
             ->where('status', 'Available')
+            ->whereIn('warehouse_id', $validWarehouseIds)
             ->when($this->search, function ($query) {
                 $query->where(function($q) {
                     $q->where('serial_number', 'like', '%' . $this->search . '%')
@@ -126,7 +134,7 @@ class LaporanStok extends Component
             ->orderBy($this->sortField, $this->sortDirection);
 
         $stocks = $query->paginate(20);
-        $warehouses = Warehouse::orderBy('name')->get();
+        $warehouses = Warehouse::where('business_unit_id', $buId)->orderBy('name')->get();
 
         return view('livewire.admin.reporting.laporan-stok', [
             'stocks' => $stocks,
