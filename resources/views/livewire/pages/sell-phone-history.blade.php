@@ -88,9 +88,9 @@
                 <img src="{{ asset('assets/png/tradein.png') }}" class="w-70 h-auto" alt="">
                 <h3 class="font-bold text-gray-900 text-lg">Kamu belum menjual HP</h3>
                 <p class="text-gray-500 mt-1 text-xs md:text-sm">Yuk jual HP lamamu sekarang.</p>
-                <a href="{{ route('products.index') }}" wire:navigate
+                {{-- <a href="{{ route('products.index') }}" wire:navigate
                     class="inline-block mt-4 bg-[#4E44DB] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#3f36b8] transition">Mulai
-                    Ajukan</a>
+                    Ajukan</a> --}}
             </div>
         @endforelse
     </div>

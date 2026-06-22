@@ -115,6 +115,21 @@ new class extends Component {
                     </span>
                 </a>
             @endcan
+            @can('sell-phone-history')
+                {{-- Item: Jual HP --}}
+                <a href="{{ route('zoffline.sell-phone-history') }}" wire:navigate
+                    class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->is('zoffline/sell-phone-history') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
+                        Riwayat Pembelian
+                        <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-neutral-800 rotate-45"></div>
+                    </span>
+                </a>
+            @endcan
 
             @can('warranty-activation')
                 {{-- Item: QC Unboxing --}}

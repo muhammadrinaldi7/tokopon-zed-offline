@@ -13,10 +13,11 @@ class History extends Component
 {
     public function render()
     {
+        $branch = Auth::user()->branch->id;
         if (Auth::user()) {
             // Tampilkan history yang kolom 'handled_by'-nya adalah ID FL yang sedang login
-            $sells = SellPhone::with(['media', 'handledBy'])
-                ->where('handled_by', Auth::id())
+            $sells = SellPhone::with(['media', 'handledBy', 'branch'])
+                ->where('branch_id', Auth::user()->branch_id)
                 ->latest()
                 ->get();
         } else {

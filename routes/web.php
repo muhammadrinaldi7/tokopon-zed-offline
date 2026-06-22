@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Admin\Accurate\AccurateInvoiceExport;
 use App\Livewire\Admin\Employe\EmployeManage;
 use App\Livewire\Admin\Vendor\VendorManage;
 use App\Livewire\Admin\Pos\CekStock;
@@ -23,7 +24,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/riwayat-kasir', \App\Livewire\Admin\Pos\RiwayatKasir::class)->name('zoffline.riwayat-kasir')->middleware('can:view-riwayat-kasir');
     Route::get('/zoffline/trade-in', \App\Livewire\Zoffline\TradeIn\TradeIn::class)->name('zoffline.trade-in')->middleware('can:trade-in');
     Route::get('/zoffline/sell-phone', \App\Livewire\Zoffline\SellPhone\SellPhone::class)->name('zoffline.sell-phone')->middleware('can:sell-phone');
-    Route::get('/zoffline/sell-phone-history', \App\Livewire\Zoffline\SellPhone\History::class)->name('zoffline.sell-phone-history')->middleware('can:sell-phone');
+    Route::get('/zoffline/sell-phone-history', \App\Livewire\Zoffline\SellPhone\History::class)->name('zoffline.sell-phone-history')->middleware('can:sell-phone-history');
     Route::get('/zoffline/warranty-activation', \App\Livewire\Zoffline\Qc\WarrantyActivation::class)->name('zoffline.warranty-activation')->middleware('can:warranty-activation');
     Route::get('/zoffline/cek-stock', CekStock::class)->name('zoffline.cek-stock')->middleware('can:view-stock');
 });
@@ -49,7 +50,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/pos', \App\Livewire\Admin\Pos\PointOfSale::class)->name('pos')->middleware('can:view-pos');
     Route::livewire('/dashboard', 'pages::admin.dashboard')->name('dashboard')->middleware('can:view_dashboard');
-    Route::get('/purchase-invoice-export', \App\Livewire\Admin\Accurate\AccurateInvoiceExport::class)->name('purchase-invoice-export');
+    Route::get('/purchase-invoice-export', AccurateInvoiceExport::class)->name('purchase-invoice-export');
 
     // Administrator
     Route::livewire('/users', 'pages::admin.user-management')->name('users')->middleware('can:manage-users');

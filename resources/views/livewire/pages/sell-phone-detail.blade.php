@@ -1,4 +1,4 @@
-<div class="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
+<div x-data="{ showQcModal: false }" class="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
 
     {{-- ========================================== --}}
     {{-- 1. BANNER UTAMA (Desain Asli) --}}
@@ -7,7 +7,7 @@
         class="bg-[#4E44DB] rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 text-white shadow-md relative overflow-hidden">
         {{-- Tombol Back & Judul --}}
         <div class="flex items-center gap-4 z-10">
-            <a href="{{ route('sell-phone-history') }}" wire:navigate
+            <a href="{{ route('zoffline.sell-phone-history') }}" wire:navigate
                 class="bg-black/10 hover:bg-black/20 p-2.5 rounded-xl transition">
                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
@@ -15,6 +15,7 @@
             </a>
             <div class="flex items-center gap-3">
                 <h1 class="text-xl md:text-2xl font-bold tracking-wide">Detail Jual HP Bekas</h1>
+                <span class="text-xs bg-light-200 text-neutral-400 font-medium">SPL-{{ $sellPhone->id }}</span>
             </div>
         </div>
 
@@ -57,8 +58,19 @@
             <div>
                 <p class="text-xs font-bold text-indigo-500 uppercase tracking-widest">{{ $sellPhone->phone_brand }}</p>
                 <h3 class="text-2xl font-black text-neutral-900">{{ $sellPhone->phone_model }}</h3>
-                <p class="text-sm text-neutral-500 mt-1 font-medium">{{ $sellPhone->phone_ram }} RAM •
+                <p class="text-sm text-neutral-500 mt-1 font-medium">
+                    {{ $sellPhone->phone_ram ?? $sellPhone->phone_ram . 'RAM' }} •
                     {{ $sellPhone->phone_storage }} Storage</p>
+                @if ($sellPhone->inspections->isNotEmpty())
+                    <p class="text-sm text-neutral-500 mt-1 font-medium">
+                        IMEI: {{ $sellPhone->inspections->first()->imei }}
+                    </p>
+                    <button @click="showQcModal = true" type="button" 
+                        class="mt-3 text-xs font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5 border border-violet-100">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        Lihat Hasil QC ({{ $sellPhone->inspections->first()->passed_count }}/{{ $sellPhone->inspections->first()->total_items }} Lulus)
+                    </button>
+                @endif
             </div>
 
         </div>
@@ -156,16 +168,12 @@
         {{-- Info Readonly Resi / Bank Customer --}}
         @if (in_array($sellPhone->status, ['INSPECTING', 'PAYING', 'COMPLETED']))
             <div class="mt-6 text-center bg-white border border-neutral-200 rounded-2xl p-4">
-                @if (Auth::user()->hasRole('fl'))
-                    <p class="text-xs text-neutral-400 font-medium">Customer: <strong
-                            class="text-neutral-700">{{ $sellPhone->user->name }}</strong> • Rekening: <strong
-                            class="text-neutral-700">{{ $sellPhone->user->bankAccounts->first()->bank_name }}
-                            ({{ $sellPhone->user->bankAccounts->first()->account_number }})</strong></p>
-                @else
-                    <p class="text-xs text-neutral-400 font-medium">Nomor Resi Pengiriman: <strong
-                            class="font-mono text-neutral-700 text-sm">{{ $sellPhone->customer_shipping_receipt ?? '-' }}</strong>
-                    </p>
-                @endif
+
+                <p class="text-xs text-neutral-400 font-medium">Customer: <strong
+                        class="text-neutral-700">{{ $sellPhone->user->name }}</strong> • Rekening: <strong
+                        class="text-neutral-700">{{ $sellPhone->user->bankAccounts->first()->bank_name }}
+                        ({{ $sellPhone->user->bankAccounts->first()->account_number }})</strong></p>
+
             </div>
         @endif
     </div>
@@ -239,4 +247,75 @@
             <p class="text-sm text-neutral-400 italic">Tidak ada foto terlampir.</p>
         @endif
     </div>
+
+{{-- MODAL QC RESULTS --}}
+@if ($sellPhone->inspections->isNotEmpty())
+<div x-show="showQcModal" style="display: none;"
+    class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+    
+    {{-- Backdrop --}}
+    <div x-transition.opacity.duration.300ms class="absolute inset-0 bg-neutral-900/60 backdrop-blur-sm" @click="showQcModal = false"></div>
+
+    {{-- Modal Content --}}
+    <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 translate-y-8 scale-95"
+        x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+        x-transition:leave-end="opacity-0 translate-y-8 scale-95" @click.stop>
+
+        {{-- Header --}}
+        <div class="flex items-center justify-between p-6 border-b border-neutral-100 bg-neutral-50/50">
+            <div>
+                <h3 class="text-lg font-black text-neutral-800">Detail Inspeksi QC</h3>
+                <p class="text-xs text-neutral-500 font-medium mt-1">Status: <span class="uppercase font-bold {{ $sellPhone->inspections->first()->verdict === 'fail' ? 'text-rose-500' : 'text-emerald-500' }}">{{ $sellPhone->inspections->first()->verdict }}</span></p>
+            </div>
+            <button @click="showQcModal = false" type="button"
+                class="p-2 text-neutral-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                        d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        {{-- Body (Scrollable) --}}
+        <div class="p-6 overflow-y-auto">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                @foreach ($sellPhone->inspections->first()->checklist_results ?? [] as $item)
+                    @php
+                        $isOk = ($item['type'] ?? 'boolean') === 'boolean' ? !empty($item['value']) : true;
+                    @endphp
+                    <div class="flex items-center justify-between p-3 rounded-2xl border {{ $isOk ? 'border-emerald-100 bg-emerald-50/30' : 'border-rose-100 bg-rose-50/50' }}">
+                        <span class="text-sm font-bold {{ $isOk ? 'text-neutral-700' : 'text-rose-700' }}">{{ $item['name'] ?? '-' }}</span>
+                        @if (($item['type'] ?? 'boolean') === 'boolean')
+                            @if ($isOk)
+                                <span class="text-emerald-500 bg-white px-2 py-1 rounded-lg text-xs font-black shadow-sm border border-emerald-100">Lulus</span>
+                            @else
+                                <span class="text-rose-600 bg-white px-2 py-1 rounded-lg text-xs font-black shadow-sm border border-rose-100">Gagal</span>
+                            @endif
+                        @else
+                            <span class="text-neutral-600 font-bold text-sm bg-white px-2 py-1 rounded-lg shadow-sm border border-neutral-100">{{ $item['value'] ?? '-' }}</span>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+            
+            @if($sellPhone->inspections->first()->inspector_notes)
+            <div class="mt-6 bg-neutral-50 rounded-2xl p-4 border border-neutral-100">
+                <p class="text-xs font-black text-neutral-400 uppercase tracking-widest mb-2">Catatan Inspektor</p>
+                <p class="text-sm font-medium text-neutral-700">{{ $sellPhone->inspections->first()->inspector_notes }}</p>
+            </div>
+            @endif
+        </div>
+        
+        {{-- Footer --}}
+        <div class="p-5 border-t border-neutral-100 bg-neutral-50/50 text-right">
+            <button @click="showQcModal = false" type="button" class="px-6 py-2.5 bg-neutral-800 text-white font-bold rounded-xl shadow-sm hover:bg-neutral-900 transition-colors">Tutup</button>
+        </div>
+    </div>
+</div>
+@endif
+
 </div>

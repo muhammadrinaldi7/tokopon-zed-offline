@@ -57,6 +57,7 @@ class SellPhone extends Component
     public $available_models = [];
     public $available_storages = [];
     public $buyback_device = null;
+    public $brands = []; // Cache brands agar tidak query ulang di render()
 
     // QC Kelayakan (Step 2 Baru)
     public $imei = '';
@@ -65,6 +66,14 @@ class SellPhone extends Component
     public $qc_notes = '';
     public $qc_verdict = ''; // pass, conditional, fail
     public $qc_max_weight_threshold = 3;
+
+    public function mount()
+    {
+        // Cache brands sekali saja saat halaman pertama kali dimuat
+        $this->brands = \App\Models\Brand::whereIn('id',
+            \App\Models\BuybackDevice::where('is_active', true)->select('brand_id')->distinct()
+        )->orderBy('name')->get();
+    }
 
     #[Computed]
     public function customerResults()
@@ -121,7 +130,7 @@ class SellPhone extends Component
             $this->qc_template = \App\Models\QcTemplate::findForBrand($this->selected_brand_id);
             if ($this->qc_template) {
                 $this->qc_max_weight_threshold = $this->qc_template->max_weight_threshold ?? 3;
-                
+
                 foreach ($this->qc_template->items as $item) {
                     if ($item['name'] === 'Health Battery' && !$isApple) {
                         continue; // Skip Health Battery for non-Apple brands
@@ -146,12 +155,12 @@ class SellPhone extends Component
         $totalWeightDeduction = 0;
         $hasFatalFailure = false;
         $allPass = true;
-        
+
         $this->qc_notes = ''; // Reset notes
 
         foreach ($this->qc_results as $item) {
             $val = $item['value'];
-            
+
             if ($item['name'] === 'Health Battery') {
                 if ($val !== '' && is_numeric($val) && $val < 85) {
                     $allPass = false;
@@ -169,7 +178,7 @@ class SellPhone extends Component
                     $allPass = false;
                     $weight = $item['weight'] ?? 1;
                     $totalWeightDeduction += $weight;
-                    
+
                     if (!empty($item['is_fatal'])) {
                         $hasFatalFailure = true;
                         $this->qc_notes .= "- FATAL: " . $item['name'] . " rusak/bermasalah.\n";
@@ -319,15 +328,15 @@ class SellPhone extends Component
             // Jika kamu masih memakai BH atau RAM secara manual, tambahkan di sini. 
             // Tapi jika sudah include di selected_rules, ini sudah cukup.
         ];
-        // JIKA USER ADALAH FL, TAMBAHKAN VALIDASI REGISTRASI CUSTOMER OFFLINE
-        if (Auth::check() && User::findOrFail(Auth::user()->id)->hasRole('fl')) {
+        // Validasi data customer (selalu aktif karena FL sudah tidak dicek lagi)
+        if (Auth::check()) {
             if ($this->isNewCustomer) {
                 $rules['name']        = 'required|string|max:255';
                 $rules['mobilePhone'] = 'required|string|max:15';
                 $rules['email']       = 'required|email|unique:users,email';
-                $rules['nik']         = 'required|numeric|digits:16|unique:users,identity'; // Sesuaikan field NIK di table user Anda
+                $rules['nik']         = 'required|numeric|digits:16|unique:users,identity';
                 $rules['npwp']        = 'nullable|string|max:20';
-                $rules['foto_ktp']    = 'required|image|max:2048'; // Max 2MB
+                $rules['foto_ktp']    = 'required|image|max:5120'; // Max 5MB (auto-compressed oleh JS)
                 $rules['account_number'] = 'required|string|max:20';
                 $rules['account_name'] = 'required|string|max:20';
                 $rules['bank_name'] = 'required|string|max:20';
@@ -388,74 +397,49 @@ class SellPhone extends Component
             return redirect()->to('/login');
         }
 
-        $userIdToSave = Auth::id(); // Default user login (untuk user online)
+        $currentUser = Auth::user(); // Cache user sekali, hindari query berulang
+        $userIdToSave = $currentUser->id;
 
-        // LOGIKA DIVIDASI BERDASARKAN ROLE
-        if (User::findOrFail(Auth::user()->id)->hasRole('fl')) {
+        // Jalankan Validasi
+        $this->validate();
 
-            // 1. Jalankan Validasi (Otomatis memuat rules tambahan milik FL)
-            $this->validate();
-
-            if ($this->isNewCustomer) {
-                // 2. Buat User Baru untuk Customer Offline
-                $customer = User::create([
-                    'name'         => $this->name,
-                    // 'mobile_phone' => $this->mobilePhone, // Sesuaikan nama kolom table users Anda
-                    'email'        => $this->email,
-                    'identity'     => $this->nik,
-                    'npwp'         => $this->npwp,
-                    'password'     => \Illuminate\Support\Facades\Hash::make($this->nik), // Hash otomatis dari NIK
+        if ($this->isNewCustomer) {
+            // Buat User Baru untuk Customer
+            $customer = User::create([
+                'name'         => $this->name,
+                'email'        => $this->email,
+                'identity'     => $this->nik,
+                'npwp'         => $this->npwp,
+                'password'     => \Illuminate\Support\Facades\Hash::make($this->nik),
+            ]);
+            if ($customer) {
+                $customer->assignRole('user');
+                $customer->profile()->create([
+                    'user_id'      => $customer->id,
+                    'full_name'    => $this->name,
+                    'phone_number' => $this->mobilePhone,
                 ]);
-                if ($customer) {
-                    $customer->assignRole('user');
-                    $customer->profile()->create([
-                        'user_id'      => $customer->id,
-                        'full_name'    => $this->name,
-                        'phone_number' => $this->mobilePhone,
-                    ]);
 
-                    $customer->bankAccounts()->create([
-                        'account_number' => $this->account_number,
-                        'account_name'   => $this->account_name,
-                        'bank_name'      => $this->bank_name,
-                    ]);
-                }
-                event(new Registered($customer));
-                // 3. Upload Foto KTP Customer Baru menggunakan Spatie Media Library / Storage biasa
-                // Jika User model menggunakan Spatie Media Library:
-                if ($this->foto_ktp) {
-                    $customer->addMedia($this->foto_ktp->getRealPath())
-                        ->usingFileName($this->foto_ktp->getClientOriginalName())
-                        ->toMediaCollection('ktp_photo'); // Sesuaikan nama collection Anda
-                }
-
-                // Alihkan ID user yang akan disimpan di SellPhone ke ID customer baru ini
-                $userIdToSave = $customer->id;
-                $userForAccurate = $customer;
-            } else {
-                $customer = User::findOrFail($this->selectedCustomerId);
-                $userIdToSave = $customer->id;
-                $userForAccurate = $customer;
+                $customer->bankAccounts()->create([
+                    'account_number' => $this->account_number,
+                    'account_name'   => $this->account_name,
+                    'bank_name'      => $this->bank_name,
+                ]);
             }
+            event(new Registered($customer));
+
+            if ($this->foto_ktp) {
+                $customer->addMedia($this->foto_ktp->getRealPath())
+                    ->usingFileName($this->foto_ktp->getClientOriginalName())
+                    ->toMediaCollection('ktp_photo');
+            }
+
+            $userIdToSave = $customer->id;
+            $userForAccurate = $customer;
         } else {
-            // LOGIKA LAMA UNTUK USER ONLINE UMUM
-            $user = User::findOrFail(Auth::user()->id);
-
-            $isSellerReady = $user->profile && !empty($user->profile->full_name)
-                && !empty($user->profile->phone_number)
-                && !empty($user->identity)
-                && !empty($user->npwp)
-                && !empty($user->getFirstMediaUrl('ktp_photo'))
-                && $user->bankAccounts()->where('is_primary', true)->exists();
-
-            if (!$isSellerReady) {
-                $this->dispatch('show-toast', type: 'error', message: 'Silakan lengkapi Data Pribadi, KTP, NPWP, dan Rekening Bank di menu Profil.');
-                return $this->redirect(route('profile'), navigate: true);
-            }
-
-            // Jalankan Validasi standar
-            $this->validate();
-            $userForAccurate = $user;
+            $customer = User::findOrFail($this->selectedCustomerId);
+            $userIdToSave = $customer->id;
+            $userForAccurate = $customer;
         }
 
         // -------------------------------------------------------------
@@ -527,9 +511,9 @@ class SellPhone extends Component
             \Illuminate\Support\Facades\Log::error('Failed to sync vendor to Accurate: ' . $e->getMessage());
         }
 
-        // Simpan ke Database (Menggunakan $userIdToSave)
+        // Simpan ke Database
         $sellPhone = \App\Models\SellPhone::create([
-            'user_id'           => $userIdToSave, // Berubah dinamis (Bisa ID FL atau ID Customer baru)
+            'user_id'           => $userIdToSave,
             'buyback_device_id' => $device->id,
             'phone_brand'       => $device->brand->name,
             'phone_model'       => $device->model_name,
@@ -538,9 +522,9 @@ class SellPhone extends Component
             'imei'              => $this->imei,
             'minus_desc'        => $minusDesc,
             'appraised_value'   => $this->final_price,
-            'status'            => $this->qc_verdict === 'fail' ? 'CANCELLED' : (User::findOrFail(Auth::user()->id)->hasRole('fl') ? 'PAYING' : 'WAITING_FOR_DEVICE'),
-            'handled_by'        => User::findOrFail(Auth::user()->id)->hasRole('fl') ? Auth::id() : null,
-            'business_unit_id'  => User::findOrFail(Auth::user()->id)->getActiveBusinessUnitId(),
+            'status'            => $this->qc_verdict === 'fail' ? 'CANCELLED' : 'PAYING',
+            'handled_by'        => $currentUser->id,
+            'business_unit_id'  => $currentUser->getActiveBusinessUnitId(),
         ]);
 
         // Simpan Data QC Kelayakan (Device Inspection)
@@ -627,9 +611,6 @@ class SellPhone extends Component
     }
     public function render()
     {
-        $brands = \App\Models\Brand::whereIn('id', \App\Models\BuybackDevice::where('is_active', true)->select('brand_id')->distinct())->orderBy('name')->get();
-        return view('livewire.zoffline.sell-phone.sell-phone', [
-            'brands' => $brands,
-        ]);
+        return view('livewire.zoffline.sell-phone.sell-phone');
     }
 }

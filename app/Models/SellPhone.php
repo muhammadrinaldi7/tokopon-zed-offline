@@ -30,7 +30,8 @@ class SellPhone extends Model implements HasMedia
         'business_unit_id',
         'reject_reason',
         'payment_receipt_path',
-        'store_bank_no'
+        'store_bank_no',
+        'branch_id'
     ];
 
     public function buybackDevice()
@@ -41,6 +42,11 @@ class SellPhone extends Model implements HasMedia
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function productVariants()

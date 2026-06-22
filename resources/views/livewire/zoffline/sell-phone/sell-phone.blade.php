@@ -320,17 +320,10 @@
 
                                     @if ($photoFile)
                                         @php
-                                            // Membaca file temporary secara lokal dan mengubahnya ke Base64
-                                            $base64Image = '';
-                                            if (file_exists($photoFile->getRealPath())) {
-                                                $base64Image =
-                                                    'data:' .
-                                                    $photoFile->getMimeType() .
-                                                    ';base64,' .
-                                                    base64_encode(@file_get_contents($photoFile->getRealPath()));
-                                            }
+                                            // Gunakan temporaryUrl() bawaan Livewire — jauh lebih ringan dari Base64
+                                            $previewUrl = $photoFile->temporaryUrl();
                                         @endphp
-                                        <img src="{{ $base64Image }}"
+                                        <img src="{{ $previewUrl }}"
                                             class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
                                         <div
                                             class="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-xs py-2 px-3 text-center pointer-events-none z-10">
@@ -431,7 +424,7 @@
                                                 <div class="flex items-center gap-2">
                                                     <label class="flex items-center gap-1.5 cursor-pointer">
                                                         <input type="radio"
-                                                            wire:model.live="qc_results.{{ $i }}.value"
+                                                            wire:model="qc_results.{{ $i }}.value"
                                                             value="1" class="peer hidden">
                                                         <div
                                                             class="px-4 py-2 rounded-lg text-xs font-bold border transition-all
@@ -447,7 +440,7 @@
                                                     </label>
                                                     <label class="flex items-center gap-1.5 cursor-pointer">
                                                         <input type="radio"
-                                                            wire:model.live="qc_results.{{ $i }}.value"
+                                                            wire:model="qc_results.{{ $i }}.value"
                                                             value="0" class="peer hidden">
                                                         <div
                                                             class="px-4 py-2 rounded-lg text-xs font-bold border transition-all
@@ -543,7 +536,7 @@
                     <div class="space-y-2 mt-6 border-t border-neutral-100 pt-6">
                         <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Tambahan
                             Catatan Manual (Opsional)</label>
-                        <textarea wire:model.live.debounce.500ms="old_phone_additional_note" rows="3"
+                        <textarea wire:model.live.debounce.1000ms="old_phone_additional_note" rows="3"
                             placeholder="Ketik catatan tambahan di luar analisa sistem jika ada..."
                             class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all text-sm font-medium text-neutral-700"></textarea>
                     </div>
@@ -705,7 +698,7 @@
                 <div class="space-y-3 pt-6 border-t border-neutral-100">
                     <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">Catatan
                         Tambahan Minus Harga</h1>
-                    <textarea wire:model.live="old_phone_additional_note" rows="3"
+                    <textarea wire:model.lazy="old_phone_additional_note" rows="3"
                         placeholder="Jelaskan kondisi detail jika ada minus..."
                         class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all font-medium text-neutral-700"></textarea>
                 </div>
