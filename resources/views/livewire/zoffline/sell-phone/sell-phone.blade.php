@@ -961,7 +961,8 @@
                                                         @endif
                                                     </div>
                                                 </div>
-                                                <input id="foto_ktp" wire:model="foto_ktp" type="file"
+                                                <input id="foto_ktp"
+                                                    @change="customCompressHandler($event, 'foto_ktp')" type="file"
                                                     accept="image/*" required class="hidden" />
                                             </label>
                                         </div>

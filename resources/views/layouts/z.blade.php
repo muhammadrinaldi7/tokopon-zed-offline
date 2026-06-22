@@ -55,7 +55,7 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            const maxSize = 5 * 1024 * 1024; // 5 MB
+            const maxSize = 1 * 1024 * 1024; // 5 MB
 
             // PERBAIKAN DINAMIS: Mencari container Livewire terdekat secara otomatis dari DOM Element
             const livewireElement = event.target.closest('[wire\\:id]');
@@ -73,7 +73,7 @@
 
             // JIKA DI BAWAH 5MB (Langsung Upload Asli)
             if (file.size <= maxSize) {
-                console.log('%c[Info] Ukuran file aman (<= 5MB). Langsung mengunggah file asli...',
+                console.log('%c[Info] Ukuran file aman (<= 1MB). Langsung mengunggah file asli...',
                     'color: #65a30d; font-weight: bold;');
 
                 component.set(wirePropertyName, null);
