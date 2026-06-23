@@ -50,6 +50,7 @@ class CekStock extends Component
         // =========================================================================
         $snSkus = \Illuminate\Support\Facades\DB::table('product_serial_numbers')
             ->where('serial_number', 'like', $term)
+            ->where('status', '!=', 'Unavailable')
             ->pluck('item_no') // Mengambil SKU dari SN tanpa memandang milik gudang mana
             ->filter()
             ->unique()
