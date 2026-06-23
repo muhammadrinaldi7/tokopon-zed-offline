@@ -554,17 +554,17 @@
     </div>
 
     {{-- Footer Actions --}}
-    <div class="flex justify-between gap-3 pt-6 border-t border-gray-200 mt-2">
+    <div class="flex flex-col sm:flex-row justify-between gap-3 pt-4 sm:pt-6 border-t border-gray-200 mt-2">
         <button wire:click="prevStep"
-            class="px-6 py-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm transition-all flex items-center gap-2">
+            class="order-last sm:order-first w-full sm:w-auto px-6 py-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             Kembali
         </button>
-        <div x-data="{ showConfirmModal: false }" class="flex gap-3">
+        <div x-data="{ showConfirmModal: false }" class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <button type="button" wire:click="saveDraft" wire:loading.attr="disabled" wire:target="saveDraft"
-                class="px-6 py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[170px]">
+                class="w-full sm:w-auto px-6 py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[170px]">
                 <span wire:loading.remove wire:target="saveDraft" class="flex items-center gap-2">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
@@ -584,7 +584,7 @@
                 </span>
             </button>
             <button type="button" @click="showConfirmModal = true" @if (!$this->isPaymentsValid) disabled @endif
-                class="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
+                class="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
                 Proses Transaksi
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -618,19 +618,19 @@
 
                             {{-- Header --}}
                             <div
-                                class="px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-center sticky top-0 z-10">
+                                class="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-start sm:items-center sticky top-0 z-10">
                                 <div>
-                                    <div class="flex items-center gap-2">
-                                        <h3 class="text-xl font-black text-gray-800" id="modal-title">Konfirmasi
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 class="text-lg sm:text-xl font-black text-gray-800" id="modal-title">Konfirmasi
                                             Pesanan</h3>
                                         <span
-                                            class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs font-bold border border-blue-100">{{ $this->displayCustomerName }}</span>
+                                            class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] sm:text-xs font-bold border border-blue-100">{{ $this->displayCustomerName }}</span>
                                     </div>
-                                    <p class="text-sm text-gray-500 mt-1">Pastikan pesanan dan pembayaran sudah sesuai
+                                    <p class="text-xs sm:text-sm text-gray-500 mt-1">Pastikan pesanan dan pembayaran sudah sesuai
                                     </p>
                                 </div>
                                 <button type="button" @click="showConfirmModal = false"
-                                    class="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 focus:outline-none p-2 rounded-xl transition-all">
+                                    class="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 focus:outline-none p-2 rounded-xl transition-all shrink-0">
                                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                         stroke-width="2.5">
                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -641,17 +641,17 @@
 
                             {{-- Body --}}
                             <div
-                                class="px-6 py-6 space-y-6 max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+                                class="px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
 
                                 {{-- Daftar Item --}}
                                 <div>
                                     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Daftar
                                         Item</h4>
-                                    <div class="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                                    <div class="space-y-3 bg-gray-50/50 p-3 sm:p-4 rounded-xl border border-gray-100">
                                         @forelse($this->cart as $item)
                                             <div
-                                                class="flex justify-between items-start gap-4 pb-3 border-b border-gray-200/60 last:border-0 last:pb-0">
-                                                <div class="flex-1">
+                                                class="flex flex-col sm:flex-row justify-between items-start gap-2 sm:gap-4 pb-3 border-b border-gray-200/60 last:border-0 last:pb-0">
+                                                <div class="flex-1 w-full">
                                                     @php
                                                         $nameParts = explode(' - ', $item['name']);
 
@@ -736,16 +736,20 @@
                                                         </div>
                                                     @endif
                                                 </div>
-                                                <div class="text-right">
-                                                    <div class="font-black text-gray-800 text-sm">Rp
-                                                        {{ number_format($item['price'], 0, ',', '.') }}</div>
-                                                    <div class="text-xs font-bold text-gray-400 mt-0.5">
-                                                        {{ $item['qty'] }} x</div>
-                                                    @if (isset($item['discount_amount']) && $item['discount_amount'] > 0)
-                                                        <div class="text-xs text-rose-500 font-bold mt-1">- Rp
-                                                            {{ number_format($item['discount_amount'], 0, ',', '.') }}
-                                                        </div>
-                                                    @endif
+                                                <div class="w-full sm:w-auto mt-2 sm:mt-0 flex sm:block justify-between items-center sm:text-right">
+                                                    <div class="text-left sm:text-right">
+                                                        <div class="text-xs font-bold text-gray-400 sm:mt-0.5">
+                                                            {{ $item['qty'] }} x</div>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <div class="font-black text-gray-800 text-sm">Rp
+                                                            {{ number_format($item['price'], 0, ',', '.') }}</div>
+                                                        @if (isset($item['discount_amount']) && $item['discount_amount'] > 0)
+                                                            <div class="text-xs text-rose-500 font-bold mt-0.5 sm:mt-1">- Rp
+                                                                {{ number_format($item['discount_amount'], 0, ',', '.') }}
+                                                            </div>
+                                                        @endif
+                                                    </div>
                                                 </div>
                                             </div>
                                         @empty
@@ -759,7 +763,7 @@
                                 <div>
                                     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Metode
                                         Pembayaran</h4>
-                                    <div class="bg-white border border-gray-100 rounded-xl p-4 shadow-sm space-y-4">
+                                    <div class="bg-white border border-gray-100 rounded-xl p-3 sm:p-4 shadow-sm space-y-4">
                                         @if ($paymentMode === 'split')
                                             @foreach ($payments as $payment)
                                                 @php
@@ -771,11 +775,11 @@
                                                     );
                                                 @endphp
                                                 <div
-                                                    class="flex justify-between items-start text-sm border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+                                                    class="flex flex-col sm:flex-row sm:justify-between sm:items-start text-sm border-b border-gray-50 pb-2 last:border-0 last:pb-0 gap-1.5 sm:gap-2">
                                                     <div class="flex flex-col gap-1.5">
                                                         <div class="flex items-center gap-2">
                                                             <span
-                                                                class="w-2 h-2 rounded-full {{ $payment['category'] === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
+                                                                class="w-2 h-2 rounded-full shrink-0 {{ $payment['category'] === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
                                                             <span
                                                                 class="text-gray-700 font-bold">{{ $pmObj->name ?? $payment['category'] }}</span>
                                                         </div>
@@ -792,7 +796,7 @@
                                                             @endif
                                                         </div>
                                                     </div>
-                                                    <span class="font-black text-gray-800 pt-0.5">Rp
+                                                    <span class="font-black text-gray-800 pt-0.5 pl-4 sm:pl-0">Rp
                                                         {{ number_format($payment['amount'], 0, ',', '.') }}</span>
                                                 </div>
                                             @endforeach
@@ -809,11 +813,11 @@
                                                     ? $pmObj->name
                                                     : $payment['category'] ?? 'Belum dipilih';
                                             @endphp
-                                            <div class="flex justify-between items-start text-sm">
+                                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start text-sm gap-1.5 sm:gap-2">
                                                 <div class="flex flex-col gap-1.5">
                                                     <div class="flex items-center gap-2">
                                                         <span
-                                                            class="w-2 h-2 rounded-full {{ ($payment['category'] ?? '') === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
+                                                            class="w-2 h-2 rounded-full shrink-0 {{ ($payment['category'] ?? '') === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
                                                         <span
                                                             class="text-gray-700 font-bold">{{ $methodName }}</span>
                                                     </div>
@@ -830,7 +834,7 @@
                                                         @endif
                                                     </div>
                                                 </div>
-                                                <span class="font-black text-gray-800 pt-0.5">Rp
+                                                <span class="font-black text-gray-800 pt-0.5 pl-4 sm:pl-0">Rp
                                                     {{ number_format($payment['amount'] ?? 0, 0, ',', '.') }}</span>
                                             </div>
                                         @endif
@@ -841,7 +845,7 @@
                                 <div>
                                     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Rincian
                                         Tagihan</h4>
-                                    <div class="bg-[#1c69d4]/5 rounded-xl p-4 border border-[#1c69d4]/10 space-y-2">
+                                    <div class="bg-[#1c69d4]/5 rounded-xl p-3 sm:p-4 border border-[#1c69d4]/10 space-y-2">
                                         <div class="flex justify-between items-center text-sm">
                                             <span class="text-gray-600 font-medium">Subtotal</span>
                                             <span class="font-bold text-gray-800">Rp
@@ -869,7 +873,7 @@
                                         <div class="border-t border-[#1c69d4]/20 my-2 pt-2">
                                             <div class="flex justify-between items-center">
                                                 <span class="text-gray-800 font-black">Grand Total</span>
-                                                <span class="font-black text-2xl text-[#1c69d4]">Rp
+                                                <span class="font-black text-xl sm:text-2xl text-[#1c69d4]">Rp
                                                     {{ number_format(max(0, $this->subtotal - $this->totalDiscount), 0, ',', '.') }}</span>
                                             </div>
                                         </div>
@@ -879,13 +883,13 @@
 
                             {{-- Footer --}}
                             <div
-                                class="px-6 py-4 border-t border-gray-100 bg-white flex justify-end gap-3 rounded-b-2xl sticky bottom-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                                class="px-4 sm:px-6 py-4 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row justify-end gap-3 rounded-b-2xl sticky bottom-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                                 <button type="button" @click="showConfirmModal = false"
-                                    class="px-5 py-2.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-all">
+                                    class="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-all flex justify-center">
                                     Batal
                                 </button>
                                 <button type="button" wire:click="processPayment" @click="showConfirmModal = false"
-                                    class="px-6 py-2.5 bg-[#1c69d4] hover:bg-blue-700 text-white font-black rounded-xl shadow-md shadow-blue-500/30 transition-all flex items-center gap-2">
+                                    class="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-[#1c69d4] hover:bg-blue-700 text-white font-black rounded-xl shadow-md shadow-blue-500/30 transition-all flex items-center justify-center gap-2">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                         stroke-width="2.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
