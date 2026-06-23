@@ -291,8 +291,15 @@ trait WithPaymentAndPromo
 
         if ($warehouseName) {
             return $methods->filter(function ($method) use ($warehouseName) {
+                $methodNameLower = strtolower(trim($method->name));
+
+                // Pengecualian: Selalu tampilkan jika namanya mengandung 'tukar tambah'
+                if (str_contains($methodNameLower, 'tukar tambah')) {
+                    return true;
+                }
+
                 // Ekstrak nama lokasi dari payment method (contoh: "Tunai Banjarbaru" -> "banjarbaru")
-                $methodLocation = trim(str_replace('tunai', '', strtolower($method->name)));
+                $methodLocation = trim(str_replace('tunai', '', $methodNameLower));
                 
                 if (empty($methodLocation)) return false;
 
