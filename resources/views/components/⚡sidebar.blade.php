@@ -99,8 +99,8 @@ new class extends Component {
                 </a>
             @endcan --}}
 
+            {{-- Item: Jual HP --}}
             @can('sell-phone')
-                {{-- Item: Jual HP --}}
                 <a href="{{ route('zoffline.sell-phone') }}" wire:navigate
                     class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->is('zoffline/sell-phone') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-auto" viewBox="0 0 2048 2048">
@@ -116,7 +116,6 @@ new class extends Component {
                 </a>
             @endcan
             @can('sell-phone-history')
-                {{-- Item: Jual HP --}}
                 <a href="{{ route('zoffline.sell-phone-history') }}" wire:navigate
                     class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->is('zoffline/sell-phone-history') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -131,8 +130,8 @@ new class extends Component {
                 </a>
             @endcan
 
+            {{-- Item: QC Unboxing --}}
             @can('warranty-activation')
-                {{-- Item: QC Unboxing --}}
                 <a href="{{ route('zoffline.warranty-activation') }}" wire:navigate
                     class="group relative flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-500 shadow-sm {{ request()->routeIs('zoffline.warranty-activation') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-1 hover:scale-105' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-auto" viewBox="0 0 24 24">
@@ -148,8 +147,8 @@ new class extends Component {
                 </a>
             @endcan
 
+            {{-- Item: Cek Stok --}}
             @can('view-stock')
-                {{-- Item: Cek Stok --}}
                 <a href="{{ route('zoffline.cek-stock') }}" wire:navigate
                     class="group relative flex items-center justify-center w-12 h-12 rounded-xl shadow-sm  transition-all duration-500 {{ request()->routeIs('zoffline.cek-stock') ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:text-white hover:bg-neutral-800 hover:translate-x-2 hover:scale-110' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-auto" viewBox="0 0 15 15">
@@ -331,7 +330,6 @@ new class extends Component {
                 <span class="text-[10px] font-medium">Stock</span>
             </a>
         @endcan
-
         @can('view-pos')
             {{-- Buka Shift --}}
             <a href="{{ route('zoffline.pos.open-shift') }}" wire:navigate
@@ -393,6 +391,13 @@ new class extends Component {
                         Dashboard Admin
                     </a>
                 @endif
+                @can('sell-phone-history')
+                    {{-- Item: Jual HP --}}
+                    <a href="{{ route('zoffline.sell-phone-history') }}" wire:navigate
+                        class="block px-4 py-2 text-sm text-left text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors">
+                        Riwayat Pembelian
+                    </a>
+                @endcan
                 <a href="/profile" wire:navigate
                     class="block px-4 py-2 text-sm text-left text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors">
                     Profil & Pengaturan

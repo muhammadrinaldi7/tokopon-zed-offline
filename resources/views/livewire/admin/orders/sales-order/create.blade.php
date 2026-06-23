@@ -12,11 +12,20 @@
 
     <form wire:submit="save" class="space-y-6">
         {{-- Header Info --}}
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3">Informasi Pelanggan & SO</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                </div>
+                <div>
+                    <h3 class="font-bold text-gray-900 text-lg">Informasi Pesanan</h3>
+                    <p class="text-xs text-gray-500">Pilih pelanggan dan tentukan tanggal pembuatan SO</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="relative">
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 flex justify-between">
+                    <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 flex justify-between">
                         <span>Pelanggan *</span>
                         <div wire:loading wire:target="searchCustomer" class="text-[#1c69d4]">
                             <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -25,152 +34,164 @@
                             </svg>
                         </div>
                     </label>
-                    <input type="text" wire:model.live.debounce.300ms="searchCustomer" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50/50 hover:bg-gray-50 transition-colors" placeholder="Ketik nama / email pelanggan..." autocomplete="off">
+                    <input type="text" wire:model.live.debounce.300ms="searchCustomer" class="w-full px-4 py-3 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors font-medium placeholder-gray-400" placeholder="Ketik nama / email pelanggan..." autocomplete="off">
                     
                     @if(!empty($customerSearchResults))
-                        <div class="absolute z-10 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-100 max-h-60 overflow-y-auto">
+                        <div class="absolute z-20 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto">
                             @foreach($customerSearchResults as $res)
-                                <div wire:click="selectCustomer({{ $res['id'] }}, '{{ addslashes($res['name']) }}')" class="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors">
-                                    <div class="font-bold text-gray-800 text-sm">{{ $res['name'] }}</div>
-                                    <div class="text-xs text-gray-400">{{ $res['email'] }}</div>
+                                <div wire:click="selectCustomer({{ $res['id'] }}, '{{ addslashes($res['name']) }}')" class="px-5 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors">
+                                    <div class="font-bold text-gray-900 text-sm">{{ $res['name'] }}</div>
+                                    <div class="text-xs text-gray-500 mt-0.5">{{ $res['email'] }}</div>
                                 </div>
                             @endforeach
                         </div>
                     @endif
                     
                     <input type="hidden" wire:model="user_id" required>
-                    @error('user_id') <span class="text-xs text-red-500 mt-1">{{ $message }}</span> @enderror
+                    @error('user_id') <span class="text-xs text-red-500 mt-2 block">{{ $message }}</span> @enderror
                 </div>
 
-
                 <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tanggal SO *</label>
-                    <input type="date" wire:model="order_date" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50/50 hover:bg-gray-50 transition-colors" required>
-                    @error('order_date') <span class="text-xs text-red-500 mt-1">{{ $message }}</span> @enderror
+                    <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Tanggal SO *</label>
+                    <input type="date" wire:model="order_date" class="w-full px-4 py-3 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors font-medium" required>
+                    @error('order_date') <span class="text-xs text-red-500 mt-2 block">{{ $message }}</span> @enderror
                 </div>
             </div>
         </div>
 
         {{-- Line Items --}}
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
-            <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3">Daftar Barang</h3>
-            <table class="w-full text-left border-collapse min-w-[800px]">
-                <thead>
-                    <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                        <th class="p-3 font-bold rounded-tl-lg w-[45%]">Pilih Barang</th>
-                        <th class="p-3 font-bold w-[10%]">Kuantitas</th>
-                        <th class="p-3 font-bold w-[15%]">Harga Satuan</th>
-                        <th class="p-3 font-bold w-[15%]">Diskon (Rp)</th>
-                        <th class="p-3 font-bold w-[15%]">Total Harga</th>
-                        <th class="p-3 font-bold text-center rounded-tr-lg">Hapus</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                    @foreach($items as $index => $item)
-                        <tr class="group hover:bg-blue-50/30 transition-colors" wire:key="item-{{ $index }}">
-
-                            <td class="p-2 relative">
-                                <div class="relative">
-                                    <input type="text" wire:model.live.debounce.300ms="items.{{ $index }}.searchProduct" class="w-full px-3 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white pr-8" placeholder="Ketik nama produk / SKU..." autocomplete="off">
-                                    <div wire:loading wire:target="items.{{ $index }}.searchProduct" class="absolute right-3 top-3 text-[#1c69d4]">
-                                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                    </div>
-                                </div>
-                                
-                                @if(!empty($item['searchResults']))
-                                    <div class="absolute z-10 mt-1 left-2 right-2 w-64 md:w-full bg-white rounded-xl shadow-xl border border-gray-100 max-h-60 overflow-y-auto">
-                                        @foreach($item['searchResults'] as $res)
-                                            <div wire:click="selectProduct({{ $index }}, {{ $res['id'] }}, '{{ addslashes($res['name']) }}', {{ $res['price'] }})" class="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors">
-                                                <div class="font-bold text-gray-800 text-sm whitespace-normal">{{ $res['name'] }}</div>
-                                                <div class="text-xs text-[#1c69d4] font-medium mt-1">Rp {{ number_format($res['price'], 0, ',', '.') }}</div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                @endif
-                                
-                                <input type="hidden" wire:model="items.{{ $index }}.variant_id" required>
-                            </td>
-                            <td class="p-2">
-                                <input type="number" min="1" wire:model.live.debounce.500ms="items.{{ $index }}.qty" class="w-full px-3 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm text-center bg-white font-medium">
-                            </td>
-                            <td class="p-2">
-                                <input type="number" wire:model.live.debounce.500ms="items.{{ $index }}.unit_price" class="w-full px-3 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm text-right bg-white font-medium">
-                            </td>
-                            <td class="p-2">
-                                <input type="number" wire:model.live.debounce.500ms="items.{{ $index }}.discount" class="w-full px-3 py-2.5 rounded-xl border-gray-200 text-sm text-red-500 focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm text-right bg-white font-medium placeholder-red-300" placeholder="0">
-                            </td>
-                            <td class="p-2 text-right">
-                                <div class="font-bold text-gray-800 bg-gray-50 px-4 py-2.5 rounded-xl border border-gray-200 shadow-inner flex items-center justify-end h-full">
-                                    Rp {{ number_format($item['total'], 0, ',', '.') }}
-                                </div>
-                            </td>
-                            <td class="p-2 text-center">
-                                @if(count($items) > 1)
-                                    <button type="button" wire:click="removeItem({{ $index }})" class="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors" title="Hapus Baris">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-            
-            <div class="mt-4">
-                <button type="button" wire:click="addItem" class="px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold rounded-lg text-sm transition-colors flex items-center gap-2 border border-emerald-200 shadow-sm">
+        <div class="space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-gray-200/60">
+                <h3 class="font-bold text-gray-800 text-lg">Daftar Produk</h3>
+                <button type="button" wire:click="addItem" class="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold rounded-xl text-sm transition-colors flex items-center gap-2 border border-blue-100 shadow-sm">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                     </svg>
                     Tambah Baris
                 </button>
-                @error('items') <span class="text-xs text-red-500 mt-2 block">{{ $message }}</span> @enderror
             </div>
+            @error('items') <span class="text-xs text-red-500 block">{{ $message }}</span> @enderror
+
+            @foreach($items as $index => $item)
+            <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm relative group transition-all hover:border-blue-200" wire:key="item-{{ $index }}">
+                @if(count($items) > 1)
+                <button type="button" wire:click="removeItem({{ $index }})" class="absolute -top-3 -right-3 p-2 bg-white border border-gray-100 shadow-md text-red-500 hover:text-white hover:bg-red-500 rounded-full transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 z-10" title="Hapus Baris">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                @endif
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                    <!-- Produk Search -->
+                    <div class="lg:col-span-5 relative">
+                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Pilih Produk</label>
+                        <div class="relative">
+                            <input type="text" wire:model.live.debounce.300ms="items.{{ $index }}.searchProduct" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors placeholder-gray-400 font-medium" placeholder="Ketik nama produk / SKU..." autocomplete="off">
+                            <div wire:loading wire:target="items.{{ $index }}.searchProduct" class="absolute right-3 top-3 text-[#1c69d4]">
+                                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        @if(!empty($item['searchResults']))
+                            <div class="absolute z-30 mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto">
+                                @foreach($item['searchResults'] as $res)
+                                    <div wire:click="selectProduct({{ $index }}, {{ $res['id'] }}, '{{ addslashes($res['name']) }}', {{ $res['price'] }})" class="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors">
+                                        <div class="font-bold text-gray-800 text-sm leading-tight">{{ $res['name'] }}</div>
+                                        <div class="text-xs text-[#1c69d4] font-bold mt-1">Rp {{ number_format($res['price'], 0, ',', '.') }}</div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                        
+                        <input type="hidden" wire:model="items.{{ $index }}.variant_id" required>
+                    </div>
+
+                    <div class="grid grid-cols-3 lg:col-span-5 gap-3">
+                        <!-- Kuantitas -->
+                        <div class="col-span-1">
+                            <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Qty</label>
+                            <input type="number" min="1" wire:model.live.debounce.500ms="items.{{ $index }}.qty" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm text-center bg-gray-50 focus:bg-white transition-colors font-bold">
+                        </div>
+
+                        <!-- Harga -->
+                        <div class="col-span-1">
+                            <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 text-right">Harga</label>
+                            <input type="number" wire:model.live.debounce.500ms="items.{{ $index }}.unit_price" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm text-right bg-gray-50 focus:bg-white transition-colors font-bold">
+                        </div>
+
+                        <!-- Diskon -->
+                        <div class="col-span-1">
+                            <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 text-right">Diskon</label>
+                            <input type="number" wire:model.live.debounce.500ms="items.{{ $index }}.discount" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm text-red-500 focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm text-right bg-red-50 focus:bg-white transition-colors font-bold placeholder-red-300" placeholder="0">
+                        </div>
+                    </div>
+
+                    <!-- Total -->
+                    <div class="lg:col-span-2 flex flex-col justify-end h-full">
+                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 lg:text-right hidden lg:block">Total</label>
+                        <div class="font-black text-[#1c69d4] text-right mt-1 lg:mt-0 text-lg border-t border-gray-100 lg:border-0 pt-3 lg:pt-0">
+                            <span class="text-xs font-normal text-gray-400 lg:hidden mr-2 uppercase">Total:</span>Rp {{ number_format($item['total'], 0, ',', '.') }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endforeach
         </div>
 
         {{-- Footer Totals & Notes --}}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
-                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Catatan Pesanan</label>
-                <textarea wire:model="notes" rows="5" class="w-full flex-1 px-4 py-3 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50/50 hover:bg-gray-50 transition-colors resize-none" placeholder="Tuliskan catatan khusus untuk pesanan ini..."></textarea>
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 pt-4">
+            <div class="xl:col-span-7 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8 flex flex-col">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-900 text-lg">Catatan Pesanan</h3>
+                        <p class="text-xs text-gray-500">Informasi tambahan untuk Sales Order</p>
+                    </div>
+                </div>
+                <textarea wire:model="notes" rows="5" class="w-full flex-1 px-4 py-3 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors resize-none font-medium placeholder-gray-400" placeholder="Tuliskan catatan khusus untuk pesanan ini..."></textarea>
             </div>
             
-            <div class="bg-gray-800 rounded-2xl shadow-sm border border-gray-700 p-6 text-white">
-                <h3 class="font-bold text-gray-300 mb-4 border-b border-gray-600 pb-3 uppercase tracking-wider text-xs">Ringkasan Pesanan</h3>
-                <div class="space-y-3">
+            <div class="xl:col-span-5 bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-xl border border-gray-700 p-6 md:p-8 text-white relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-8 opacity-5">
+                    <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                </div>
+                
+                <h3 class="font-bold text-gray-300 mb-6 border-b border-gray-600/50 pb-4 uppercase tracking-wider text-[11px]">Ringkasan Pembayaran</h3>
+                <div class="space-y-4 relative z-10">
                     <div class="flex justify-between items-center text-gray-400">
-                        <span>Sub Total</span>
-                        <span class="font-medium text-white">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
+                        <span class="text-sm">Sub Total</span>
+                        <span class="font-bold text-white text-lg">Rp {{ number_format($subtotal, 0, ',', '.') }}</span>
                     </div>
                     <div class="flex justify-between items-center text-gray-400">
-                        <span>Total Diskon</span>
-                        <span class="font-medium text-red-400">- Rp {{ number_format($discount_amount, 0, ',', '.') }}</span>
+                        <span class="text-sm">Total Diskon</span>
+                        <span class="font-bold text-red-400 text-lg">- Rp {{ number_format($discount_amount, 0, ',', '.') }}</span>
                     </div>
-                    <div class="pt-3 border-t border-gray-600 flex justify-between items-center">
-                        <span class="font-bold text-lg">Total Akhir (Grand Total)</span>
-                        <span class="font-black text-2xl text-emerald-400">Rp {{ number_format($grand_total, 0, ',', '.') }}</span>
+                    
+                    <div class="pt-6 mt-4 border-t border-gray-600/50">
+                        <div class="text-gray-400 text-xs uppercase tracking-wider mb-1">Total Akhir (Grand Total)</div>
+                        <div class="font-black text-4xl text-emerald-400 tracking-tight">Rp {{ number_format($grand_total, 0, ',', '.') }}</div>
                     </div>
                 </div>
 
-                <div class="mt-6 flex justify-end gap-3">
-                    <button type="submit" wire:loading.attr="disabled" wire:target="save" class="w-full sm:w-auto px-6 py-3 bg-[#1c69d4] hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
+                <div class="mt-8 relative z-10">
+                    <button type="submit" wire:loading.attr="disabled" wire:target="save" class="w-full px-6 py-4 bg-[#1c69d4] hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-lg rounded-xl transition-all shadow-lg hover:shadow-blue-500/30 flex items-center justify-center gap-3">
                         <div wire:loading.remove wire:target="save">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                             </svg>
                         </div>
                         <div wire:loading wire:target="save">
-                            <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                         </div>
-                        <span wire:loading.remove wire:target="save">Simpan Sales Order</span>
-                        <span wire:loading wire:target="save">Menyimpan...</span>
+                        <span wire:loading.remove wire:target="save">Buat Sales Order</span>
+                        <span wire:loading wire:target="save">Memproses...</span>
                     </button>
                 </div>
             </div>

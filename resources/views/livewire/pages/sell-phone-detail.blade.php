@@ -170,10 +170,68 @@
             <div class="mt-6 text-center bg-white border border-neutral-200 rounded-2xl p-4">
 
                 <p class="text-xs text-neutral-400 font-medium">Customer: <strong
-                        class="text-neutral-700">{{ $sellPhone->user->name }}</strong> • Rekening: <strong
-                        class="text-neutral-700">{{ $sellPhone->user->bankAccounts->first()->bank_name }}
-                        ({{ $sellPhone->user->bankAccounts->first()->account_number }})</strong></p>
+                        class="text-neutral-700">{{ $sellPhone->user->name ?? '-' }}</strong> 
+                    @if($sellPhone->user && $sellPhone->user->bankAccounts->first())
+                        • Rekening: <strong class="text-neutral-700">{{ $sellPhone->user->bankAccounts->first()->bank_name }}
+                        ({{ $sellPhone->user->bankAccounts->first()->account_number }})</strong>
+                    @else
+                        • Rekening: <strong class="text-neutral-500 italic">Belum diisi</strong>
+                        <button type="button" @click="$wire.set('isEditBankOpen', true)" class="ml-2 px-3 py-1 bg-violet-100 text-violet-700 hover:bg-violet-200 text-[10px] font-bold uppercase rounded-lg transition-colors">
+                            Isi Rekening
+                        </button>
+                    @endif
+                </p>
 
+            </div>
+
+            {{-- Modal Isi Rekening Bank --}}
+            <div x-data="{ open: @entangle('isEditBankOpen') }" x-show="open" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/50 backdrop-blur-sm p-4"
+                x-transition:enter="ease-out duration-300"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-200"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0">
+                
+                <div class="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl text-left" @click.away="open = false"
+                    x-transition:enter="ease-out duration-300"
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100">
+                    
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-neutral-800">Lengkapi Rekening Bank</h3>
+                        <button @click="open = false" type="button" class="text-neutral-400 hover:text-neutral-600 transition-colors bg-neutral-100 hover:bg-neutral-200 p-2 rounded-full">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <label class="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-1.5">Nama Bank</label>
+                            <input type="text" wire:model="bank_name" class="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl text-sm focus:border-violet-500 focus:outline-none transition-colors" placeholder="Contoh: BCA / Mandiri / BNI">
+                            @error('bank_name') <span class="text-xs text-rose-500 mt-1 block font-bold">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-1.5">Nomor Rekening</label>
+                            <input type="number" wire:model="account_number" class="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl text-sm focus:border-violet-500 focus:outline-none transition-colors" placeholder="Contoh: 1234567890">
+                            @error('account_number') <span class="text-xs text-rose-500 mt-1 block font-bold">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-1.5">Nama Pemilik Rekening</label>
+                            <input type="text" wire:model="account_name" class="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl text-sm focus:border-violet-500 focus:outline-none transition-colors" placeholder="Sesuai buku tabungan">
+                            @error('account_name') <span class="text-xs text-rose-500 mt-1 block font-bold">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button type="button" @click="open = false" class="w-full py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl transition-colors">
+                            Batal
+                        </button>
+                        <button type="button" wire:click="saveBankInfo" class="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-violet-600/30">
+                            Simpan Data
+                        </button>
+                    </div>
+                </div>
             </div>
         @endif
     </div>

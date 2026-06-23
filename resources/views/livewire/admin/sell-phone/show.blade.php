@@ -325,27 +325,24 @@
                                     @error('storeBankNo') <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span> @enderror
                                 </div>
 
-                                <div>
+                                <div x-data="{ previewUrl: null }">
                                     <label class="block text-sm font-bold text-blue-900 mb-1">Upload Bukti Transfer <span class="text-rose-500">*</span></label>
-                                    <input type="file" wire:model.live="paymentReceipt" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200">
+                                    <input type="file" wire:model="paymentReceipt" accept="image/*" 
+                                        @change="
+                                            const file = $event.target.files[0];
+                                            if (file) {
+                                                previewUrl = URL.createObjectURL(file);
+                                            } else {
+                                                previewUrl = null;
+                                            }
+                                        "
+                                        class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200">
                                     <div wire:loading wire:target="paymentReceipt" class="text-xs text-blue-600 mt-1">Mengunggah...</div>
                                     @error('paymentReceipt') <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span> @enderror
                                     
-                                    @if ($paymentReceipt && !is_string($paymentReceipt))
-                                        @php
-                                            $previewUrl = null;
-                                            try {
-                                                $previewUrl = $paymentReceipt->temporaryUrl();
-                                            } catch (\Exception $e) {
-                                                $previewUrl = null;
-                                            }
-                                        @endphp
-                                        @if($previewUrl)
-                                            <div class="mt-2 rounded-lg overflow-hidden border border-blue-200 aspect-video relative">
-                                                <img src="{{ $previewUrl }}" class="w-full h-full object-cover">
-                                            </div>
-                                        @endif
-                                    @endif
+                                    <div x-show="previewUrl" x-cloak style="display: none;" class="mt-2 rounded-lg overflow-hidden border border-blue-200 aspect-video relative">
+                                        <img :src="previewUrl" class="w-full h-full object-cover">
+                                    </div>
                                 </div>
                             </div>
 

@@ -35,7 +35,9 @@
                 <path stroke-linecap="round" stroke-linejoin="round"
                     d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
-            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Dashboard</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Dashboard</span>
+            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Dashboard</span><span
+                class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                x-show="sidebarCollapsed" style="display:none;" x-cloak>Dashboard</span>
         </a>
 
         @can('access-cs-chat')
@@ -46,7 +48,9 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="flex-1 whitespace-nowrap transition-opacity">Chat CS</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Chat CS</span>
+                <span x-show="!sidebarCollapsed" class="flex-1 whitespace-nowrap transition-opacity">Chat CS</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Chat CS</span>
                 @if ($unreadCount > 0)
                     <span
                         class="ml-auto bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
@@ -56,16 +60,16 @@
             </a>
         @endcan
 
-        <a href="#"
-            class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->is('admin/services') ? $activeClass : $inactiveClass }}">
-            <svg class="w-5 h-5 {{ request()->is('admin/services') ? $activeIconClass : $inactiveIconClass }}"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Status Servis</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Status Servis</span>
-        </a>
+        <!--<a href="#"-->
+        <!--    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->is('admin/services') ? $activeClass : $inactiveClass }}">-->
+        <!--    <svg class="w-5 h-5 {{ request()->is('admin/services') ? $activeIconClass : $inactiveIconClass }}"-->
+        <!--        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">-->
+        <!--        <path stroke-linecap="round" stroke-linejoin="round"-->
+        <!--            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />-->
+        <!--        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />-->
+        <!--    </svg>-->
+        <!--    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Status Servis</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Status Servis</span>-->
+        <!--</a>-->
 
         @can('manage-promos')
             <a href="{{ route('admin.promos.index') }}" wire:navigate
@@ -75,8 +79,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Promo & Voucher</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Promo & Voucher</span>
-                <span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Promo & Voucher</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Promo & Voucher</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Promo & Voucher</span>
+                <span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Promo & Voucher</span>
             </a>
 
             <a href="{{ route('admin.manual-discount.index') }}" wire:navigate
@@ -86,8 +94,13 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Promo Internal Diskon</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Promo Internal Diskon</span>
-                <span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Promo Internal Diskon</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Promo Internal
+                    Diskon</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Promo Internal Diskon</span>
+                <span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Promo Internal Diskon</span>
             </a>
         @endcan
 
@@ -104,7 +117,9 @@
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
-                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kasir (POS)</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Kasir (POS)</span>
+                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kasir (POS)</span><span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                        x-show="sidebarCollapsed" style="display:none;" x-cloak>Kasir (POS)</span>
                 </a>
             @endcan
 
@@ -118,7 +133,9 @@
                             d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
                     </svg>
 
-                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Cek Stock</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Cek Stock</span>
+                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Cek Stock</span><span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                        x-show="sidebarCollapsed" style="display:none;" x-cloak>Cek Stock</span>
                 </a>
             @endcan
             @can('view-warehouse-stocks')
@@ -130,7 +147,9 @@
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
                     </svg>
-                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Cek Lokasi SN</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Cek Lokasi SN</span>
+                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Cek Lokasi SN</span><span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                        x-show="sidebarCollapsed" style="display:none;" x-cloak>Cek Lokasi SN</span>
                 </a>
             @endcan
         @endcanany
@@ -145,7 +164,10 @@
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
-                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Katalog Pusat</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Katalog Pusat</span>
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Katalog
+                            Pusat</span><span
+                            class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                            x-show="sidebarCollapsed" style="display:none;" x-cloak>Katalog Pusat</span>
                     </div>
                     <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openProducts }"
                         class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
@@ -212,8 +234,12 @@
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kelola Pesanan</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Kelola Pesanan</span>
-                <span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Kelola Pesanan</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kelola Pesanan</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Kelola Pesanan</span>
+                <span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Kelola Pesanan</span>
             </a>
 
             <a href="{{ route('admin.sales-orders.index') }}" wire:navigate
@@ -224,7 +250,9 @@
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pesanan & Tagihan
-                    (SO)</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Pesanan & Tagihan
+                    (SO)</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Pesanan & Tagihan
                     (SO)</span>
             </a>
         @endcan
@@ -240,7 +268,10 @@
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
-                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Reporting</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Reporting</span>
+                        <span x-show="!sidebarCollapsed"
+                            class="whitespace-nowrap transition-opacity">Reporting</span><span
+                            class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                            x-show="sidebarCollapsed" style="display:none;" x-cloak>Reporting</span>
                     </div>
                     <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openReporting }"
                         class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
@@ -292,15 +323,15 @@
         @endcan
 
         @can('manage-trade-in')
-            <a href="{{ route('admin.trade-ins.index') }}" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.trade-ins.*') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('admin.trade-ins.*') ? $activeIconClass : $inactiveIconClass }}"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Tukar Tambah</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Tukar Tambah</span>
-            </a>
+            <!--<a href="{{ route('admin.trade-ins.index') }}" wire:navigate-->
+            <!--    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.trade-ins.*') ? $activeClass : $inactiveClass }}">-->
+            <!--    <svg class="w-5 h-5 {{ request()->routeIs('admin.trade-ins.*') ? $activeIconClass : $inactiveIconClass }}"-->
+            <!--        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">-->
+            <!--        <path stroke-linecap="round" stroke-linejoin="round"-->
+            <!--            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />-->
+            <!--    </svg>-->
+            <!--    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Tukar Tambah</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Tukar Tambah</span>-->
+            <!--</a>-->
 
             <a href="{{ route('admin.sell-phones.index') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.sell-phones.*') ? $activeClass : $inactiveClass }}">
@@ -309,7 +340,9 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pembelian HP</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Pembelian HP</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pembelian HP</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Pembelian HP</span>
             </a>
         @endcan
 
@@ -323,7 +356,10 @@
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Master Harga</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Master Harga</span>
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Master
+                            Harga</span><span
+                            class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                            x-show="sidebarCollapsed" style="display:none;" x-cloak>Master Harga</span>
                     </div>
                     <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openBuyback }"
                         class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
@@ -355,7 +391,10 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                         </svg>
-                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">QC & Inspeksi</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>QC & Inspeksi</span>
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">QC &
+                            Inspeksi</span><span
+                            class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                            x-show="sidebarCollapsed" style="display:none;" x-cloak>QC & Inspeksi</span>
                     </div>
                     <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openQc }"
                         class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
@@ -378,10 +417,10 @@
                         </a>
                     @endcan
                     @can('manage-qc-inspections')
-                        <a href="{{ route('admin.qc.inbound') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.inbound') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Antrean Inbound
-                        </a>
+                        <!--<a href="{{ route('admin.qc.inbound') }}" wire:navigate-->
+                        <!--    class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.inbound') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">-->
+                        <!--    Antrean Inbound-->
+                        <!--</a>-->
                         <a href="{{ route('admin.qc.device-search') }}" wire:navigate
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.qc.device-search') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                             Pemeriksaan Perangkat
@@ -403,7 +442,9 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kelola Pengguna</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Kelola Pengguna</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kelola Pengguna</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Kelola Pengguna</span>
             </a>
             <a href={{ route('admin.user.operational') }} wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.user.operational') ? $activeClass : $inactiveClass }}">
@@ -412,7 +453,9 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">User Operational</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>User Operational</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">User Operational</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>User Operational</span>
             </a>
             <a href={{ route('admin.user.employes') }} wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.user.employes') ? $activeClass : $inactiveClass }}">
@@ -421,7 +464,9 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Karyawan</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Karyawan</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Karyawan</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Karyawan</span>
             </a>
 
             <a href={{ route('admin.user.vendors') }} wire:navigate
@@ -431,7 +476,9 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Vendor</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Vendor</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Vendor</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Vendor</span>
             </a>
 
             <a href="/admin/roles" wire:navigate
@@ -441,7 +488,10 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kelola Role & Akses</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Kelola Role & Akses</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kelola Role &
+                    Akses</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Kelola Role & Akses</span>
             </a>
         @endcan
 
@@ -457,7 +507,9 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Unit Usaha</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Unit Usaha</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Unit Usaha</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Unit Usaha</span>
             </a>
 
             <a href="{{ route('admin.settings.payment-methods') }}" wire:navigate
@@ -467,28 +519,30 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">List Bank</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>List Bank</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">List Bank</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>List Bank</span>
             </a>
 
-            <a href="{{ route('admin.settings.shipping') }}" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.shipping') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.shipping') ? $activeIconClass : $inactiveIconClass }}"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
-                </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan Pengiriman</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Pengaturan Pengiriman</span>
-            </a>
+            <!--<a href="{{ route('admin.settings.shipping') }}" wire:navigate-->
+            <!--    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.shipping') ? $activeClass : $inactiveClass }}">-->
+            <!--    <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.shipping') ? $activeIconClass : $inactiveIconClass }}"-->
+            <!--        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">-->
+            <!--        <path stroke-linecap="round" stroke-linejoin="round"-->
+            <!--            d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />-->
+            <!--    </svg>-->
+            <!--    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan Pengiriman</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Pengaturan Pengiriman</span>-->
+            <!--</a>-->
 
-            <a href="{{ route('admin.settings.catalog') }}" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.catalog') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.catalog') ? $activeIconClass : $inactiveIconClass }}"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan Katalog</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Pengaturan Katalog</span>
-            </a>
+            <!--<a href="{{ route('admin.settings.catalog') }}" wire:navigate-->
+            <!--    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.catalog') ? $activeClass : $inactiveClass }}">-->
+            <!--    <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.catalog') ? $activeIconClass : $inactiveIconClass }}"-->
+            <!--        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">-->
+            <!--        <path stroke-linecap="round" stroke-linejoin="round"-->
+            <!--            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />-->
+            <!--    </svg>-->
+            <!--    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan Katalog</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Pengaturan Katalog</span>-->
+            <!--</a>-->
 
             <a href="{{ route('admin.settings.warehouse') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.warehouse') ? $activeClass : $inactiveClass }}">
@@ -497,18 +551,21 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan Gudang</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Pengaturan Gudang</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan
+                    Gudang</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Pengaturan Gudang</span>
             </a>
 
-            <a href="{{ route('admin.settings.pos') }}" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.pos') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.pos') ? $activeIconClass : $inactiveIconClass }}"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan POS</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Pengaturan POS</span>
-            </a>
+            <!--<a href="{{ route('admin.settings.pos') }}" wire:navigate-->
+            <!--    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.pos') ? $activeClass : $inactiveClass }}">-->
+            <!--    <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.pos') ? $activeIconClass : $inactiveIconClass }}"-->
+            <!--        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">-->
+            <!--        <path stroke-linecap="round" stroke-linejoin="round"-->
+            <!--            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />-->
+            <!--    </svg>-->
+            <!--    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan POS</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Pengaturan POS</span>-->
+            <!--</a>-->
 
             <a href="{{ route('admin.adjustment.index') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.adjustment.index') ? $activeClass : $inactiveClass }}">
@@ -517,7 +574,9 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Penyesuaian Stok</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Penyesuaian Stok</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Penyesuaian Stok</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Penyesuaian Stok</span>
             </a>
         @endcan
     </nav>
@@ -532,9 +591,10 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Keluar</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Keluar</span>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Keluar</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Keluar</span>
             </button>
         </form>
     </div>
 </aside>
-

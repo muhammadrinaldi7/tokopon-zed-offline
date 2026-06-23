@@ -38,6 +38,7 @@ class Show extends Component
         $this->order = $order->load(['items.variant', 'user', 'businessUnit', 'payments.paymentMethod']);
         $this->dp_amount = $this->getRemainingBalance();
         $this->dp_date = Carbon::now()->format('Y-m-d');
+        // dd($this->order);
     }
 
     public function getRemainingBalance()
@@ -311,10 +312,17 @@ class Show extends Component
                 }
 
                 $variant = $item->variant;
-                $isNew = $item->product_variant_type === \App\Models\ProductVariant::class;
-                $itemName = $isNew ? ($variant->product->name ?? 'Unknown') : ($variant->secondProduct->name ?? 'Unknown');
+                if ($variant && get_class($variant) === \App\Models\ProductAccurate::class) {
+                    $itemName = $variant->name;
+                    $sku = $variant->item_no ?? null;
+                    $detailName = trim($itemName);
+                } else {
+                    $isNew = $item->product_variant_type === \App\Models\ProductVariant::class;
+                    $itemName = $isNew ? ($variant->product->name ?? 'Unknown') : ($variant->secondProduct->name ?? 'Unknown');
+                    $sku = $variant->sku ?? null;
+                    $detailName = trim($itemName . ' ' . ($variant->color ?? '') . ' ' . ($variant->storage ?? ''));
+                }
 
-                $sku = $variant->sku ?? null;
                 if (empty($sku)) {
                     throw new \Exception("Gagal: Produk '{$itemName}' belum memiliki SKU (Item No). Harap lengkapi SKU produk di database agar bisa dikirim ke Accurate.");
                 }
@@ -323,7 +331,7 @@ class Show extends Component
                     'itemNo' => $sku,
                     'unitPrice' => (float)$item->price_at_checkout,
                     'quantity' => (float)$item->qty,
-                    'detailName' => $itemName . ' ' . ($variant->color ?? '') . ' ' . ($variant->storage ?? ''),
+                    'detailName' => $detailName,
                     'itemCashDiscount' => (float)$item->discount_amount,
                 ];
 

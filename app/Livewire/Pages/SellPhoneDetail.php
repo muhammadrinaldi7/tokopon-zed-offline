@@ -18,6 +18,12 @@ class SellPhoneDetail extends Component
     public string $customerShippingReceipt = '';
     public $dataParamPurchaseInvoice = [];
 
+    // Form Bank Info
+    public $isEditBankOpen = false;
+    public $bank_name = '';
+    public $account_number = '';
+    public $account_name = '';
+
     public function mount(SellPhone $sellPhone)
     {
 
@@ -57,8 +63,26 @@ class SellPhoneDetail extends Component
             'customer_shipping_receipt' => $this->customerShippingReceipt,
             'status' => 'INSPECTING'
         ]);
-        $this->dispatch('show-toast', type: 'success', message: 'Resi Disimpan. Kami akan melacak kedatangan paket Anda.');
         return $this->redirect(route('sell-phone-history'));
+    }
+
+    public function saveBankInfo()
+    {
+        $this->validate([
+            'bank_name' => 'required|string|max:50',
+            'account_number' => 'required|string|max:50',
+            'account_name' => 'required|string|max:100',
+        ]);
+
+        $this->sellPhone->user->bankAccounts()->create([
+            'bank_name' => $this->bank_name,
+            'account_number' => $this->account_number,
+            'account_name' => $this->account_name,
+        ]);
+
+        $this->dispatch('toast', title: 'Berhasil', message: 'Informasi Rekening Bank berhasil disimpan.', type: 'success');
+        $this->isEditBankOpen = false;
+        $this->sellPhone->load('user.bankAccounts'); // Refresh data
     }
 
 

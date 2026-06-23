@@ -308,9 +308,19 @@
                         @foreach ($order->items as $item)
                             <tr>
                                 <td class="p-3 text-sm font-semibold text-gray-800">
-                                    {{ $item->variant->product->name ?? ($item->variant->secondProduct->name ?? 'Unknown') }}
-                                    <div class="text-xs font-normal text-gray-500">{{ $item->variant->storage ?? '' }}
-                                        {{ $item->variant->color ?? '' }}</div>
+                                    @if ($item->variant && get_class($item->variant) === \App\Models\ProductAccurate::class)
+                                        {{ $item->variant->name }}
+                                        <div class="text-xs font-normal text-gray-500">
+                                            {{ $item->variant->item_no ?? '' }}
+                                        </div>
+                                    @elseif($item->variant)
+                                        {{ $item->variant->product->name ?? ($item->variant->secondProduct->name ?? 'Unknown') }}
+                                        <div class="text-xs font-normal text-gray-500">
+                                            {{ $item->variant->storage ?? '' }}
+                                            {{ $item->variant->color ?? '' }}</div>
+                                    @else
+                                        Unknown Product
+                                    @endif
                                 </td>
                                 <td class="p-3 text-sm text-center">{{ $item->qty }}</td>
                                 <td class="p-3 text-sm text-right">Rp
@@ -489,166 +499,203 @@
 
     {{-- Invoice / Fulfillment Modal --}}
     @if ($showInvoiceModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 backdrop-blur-sm"
-            style="margin: 0 !important; padding: 1rem;">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden" x-data
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6"
+            style="margin: 0 !important;">
+            <div class="bg-white rounded-t-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-full" x-data
                 @click.outside="$wire.set('showInvoiceModal', false)">
-                <div class="bg-blue-600 px-6 py-4 flex justify-between items-center">
-                    <h2 class="text-white font-bold text-lg">Terbitkan Faktur & Input Serial Number</h2>
-                    <button wire:click="$set('showInvoiceModal', false)" class="text-white/70 hover:text-white">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                <div
+                    class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-white/50 backdrop-blur-md">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-gray-900 font-bold text-xl leading-tight">Terbitkan Faktur</h2>
+                            <p class="text-xs font-medium text-gray-500">Input Serial Number dan Pelunasan Akhir</p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="$set('showInvoiceModal', false)"
+                        class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
                                 d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
 
-                <form wire:submit.prevent="submitFaktur" class="p-6 space-y-5">
-                    <div class="bg-blue-50 border border-blue-200 text-blue-800 text-sm p-4 rounded-xl">
-                        Faktur Penjualan (Sales Invoice) akan dibuat di Accurate untuk memotong stok. Pastikan Anda
-                        memasukkan <strong>Serial Number</strong> (dipisah koma) sesuai jumlah kuantitas jika barang
-                        tersebut merupakan perangkat ber-SN.
-                    </div>
-
-                    <div class="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                        @foreach ($order->items as $item)
-                            @php
-                                $variant = $item->variant;
-                                $isNew = $item->product_variant_type === \App\Models\ProductVariant::class;
-                                $itemName = $isNew
-                                    ? $variant->product->name ?? 'Unknown'
-                                    : $variant->secondProduct->name ?? 'Unknown';
-                                $sku = $variant->sku ?? '';
-                            @endphp
-                            <div
-                                class="p-4 border {{ empty($sku) ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50' }} rounded-xl flex flex-col gap-3">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <div class="flex items-center gap-2 mb-1">
-                                            @if (empty($sku))
-                                                <span
-                                                    class="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded">NO
-                                                    SKU</span>
-                                            @else
-                                                <span
-                                                    class="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded">{{ $sku }}</span>
-                                            @endif
-                                            <span
-                                                class="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded">NO
-                                                SO TERKAIT{{ $order->accurate_so_number }}</span>
-                                        </div>
-                                        <p class="font-bold text-gray-800">{{ $itemName }}</p>
-                                        <p class="text-xs text-gray-500">{{ $variant->storage ?? '' }}
-                                            {{ $variant->color ?? '' }} • Harga: Rp
-                                            {{ number_format($item->price_at_checkout, 0, ',', '.') }}</p>
-                                    </div>
-                                    <div class="flex flex-col items-end">
-                                        <div
-                                            class="bg-white border border-gray-200 px-3 py-1 rounded-lg text-sm font-bold text-gray-700 shadow-sm mb-1">
-                                            Qty: {{ $item->qty }}
-                                        </div>
-                                        <div class="text-xs font-bold text-gray-800">
-                                            Total: Rp
-                                            {{ number_format($item->price_at_checkout * $item->qty, 0, ',', '.') }}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                @if (empty($sku))
-                                    <p class="text-xs text-red-600 italic">⚠️ Produk ini tidak memiliki SKU. Accurate
-                                        akan menolak transaksi ini. Harap tambahkan SKU di menu Produk.</p>
-                                @endif
-
-                                <div>
-                                    <label
-                                        class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
-                                        Serial Number / IMEI (Pisahkan dengan koma)
-                                    </label>
-                                    <input type="text" wire:model="invoice_sns.{{ $item->id }}"
-                                        class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                                        placeholder="Contoh: IMEI12345, IMEI67890">
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-
-                    @if ($this->getRemainingBalance() > 0)
-                        <div class="pt-6 border-t border-gray-200 mt-4">
-                            <h3 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                                Pelunasan Sisa Tagihan (Rp
-                                {{ number_format($this->getRemainingBalance(), 0, ',', '.') }})
-                            </h3>
-
-                            <div class="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label
-                                            class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Tanggal
-                                            Pelunasan *</label>
-                                        <input type="date" wire:model="invoice_date"
-                                            class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                                            required>
-                                    </div>
-                                    <div>
-                                        <label
-                                            class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Ke
-                                            Rekening Bank *</label>
-                                        <select wire:model.live="invoice_payment_method_id"
-                                            class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                                            required>
-                                            <option value="">-- Pilih Rekening --</option>
-                                            @foreach ($paymentMethods as $method)
-                                                <option value="{{ $method->id }}">{{ $method->name }}</option>
-                                            @endforeach
-                                        </select>
-                                        @error('invoice_payment_method_id')
-                                            <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
-                                        @enderror
-                                    </div>
-                                </div>
-
-                                @if ($this->selectedInvoicePaymentMethod && $this->selectedInvoicePaymentMethod->rates->count() > 0)
-                                    <div>
-                                        <label
-                                            class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Pilih
-                                            Tarif MDR *</label>
-                                        <select wire:model="invoice_payment_method_rate_id"
-                                            class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                                            required>
-                                            <option value="">-- Pilih Tarif MDR --</option>
-                                            @foreach ($this->selectedInvoicePaymentMethod->rates as $rate)
-                                                <option value="{{ $rate->id }}">{{ $rate->name }}
-                                                    ({{ (float) ($rate->percentage ?? $rate->mdr_percentage) }}%)
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @error('invoice_payment_method_rate_id')
-                                            <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
-                                        @enderror
-                                    </div>
-                                @endif
-
-                                <div>
-                                    <label
-                                        class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Catatan/Referensi</label>
-                                    <input type="text" wire:model="invoice_notes"
-                                        class="w-full p-2.5 rounded-lg border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                                        placeholder="Contoh: Lunas via Transfer BCA">
-                                </div>
+                <form wire:submit.prevent="submitFaktur" class="flex flex-col flex-1 overflow-hidden">
+                    <div class="p-6 space-y-5 overflow-y-auto flex-1">
+                        <div
+                            class="bg-blue-50/50 border border-blue-100 text-blue-800 text-sm p-4 rounded-xl flex gap-3 items-start">
+                            <svg class="w-5 h-5 shrink-0 mt-0.5 text-blue-600" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div>
+                                Faktur Penjualan (Sales Invoice) akan dibuat di Accurate untuk memotong stok. Pastikan
+                                Anda
+                                memasukkan <strong>Serial Number</strong> (dipisah koma) sesuai jumlah kuantitas jika
+                                barang
+                                tersebut merupakan perangkat ber-SN.
                             </div>
                         </div>
-                    @endif
 
-                    <div class="pt-4 border-t border-gray-100 flex justify-end gap-3">
+                        <div class="space-y-4">
+                            @foreach ($order->items as $item)
+                                @php
+                                    $variant = $item->variant;
+                                    if ($variant && get_class($variant) === \App\Models\ProductAccurate::class) {
+                                        $itemName = $variant->name;
+                                        $sku = $variant->item_no ?? '';
+                                        $subDesc = '';
+                                    } else {
+                                        $isNew = $item->product_variant_type === \App\Models\ProductVariant::class;
+                                        $itemName = $isNew
+                                            ? $variant->product->name ?? 'Unknown'
+                                            : $variant->secondProduct->name ?? 'Unknown';
+                                        $sku = $variant->sku ?? '';
+                                        $subDesc = trim(($variant->storage ?? '') . ' ' . ($variant->color ?? ''));
+                                    }
+                                @endphp
+                                <div
+                                    class="p-4 border {{ empty($sku) ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50/50' }} rounded-xl flex flex-col gap-3">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="flex items-center gap-2 mb-1">
+                                                @if (empty($sku))
+                                                    <span
+                                                        class="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded">NO
+                                                        SKU</span>
+                                                @else
+                                                    <span
+                                                        class="px-2 py-0.5 bg-blue-100/50 border border-blue-200 text-blue-700 text-[10px] font-bold rounded">{{ $sku }}</span>
+                                                @endif
+                                                @if ($order->accurate_so_number)
+                                                    <span
+                                                        class="px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-700 text-[10px] font-bold rounded">SO:
+                                                        {{ $order->accurate_so_number }}</span>
+                                                @endif
+                                            </div>
+                                            <p class="font-bold text-gray-800 text-sm mt-1.5">{{ $itemName }}</p>
+                                            <p class="text-xs text-gray-500">{{ $subDesc }} @if ($subDesc)
+                                                    •
+                                                @endif Harga: Rp
+                                                {{ number_format($item->price_at_checkout, 0, ',', '.') }}</p>
+                                        </div>
+                                        <div class="flex flex-col items-end">
+                                            <div
+                                                class="bg-white border border-gray-200 px-3 py-1 rounded-lg text-sm font-bold text-gray-700 shadow-sm mb-1">
+                                                Qty: {{ $item->qty }}
+                                            </div>
+                                            <div class="text-xs font-bold text-gray-800">
+                                                Total: Rp
+                                                {{ number_format($item->price_at_checkout * $item->qty, 0, ',', '.') }}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @if (empty($sku))
+                                        <p class="text-xs text-red-600 italic">⚠️ Produk ini tidak memiliki SKU.
+                                            Accurate
+                                            akan menolak transaksi ini. Harap tambahkan SKU di menu Produk.</p>
+                                    @endif
+
+                                    <div>
+                                        <label
+                                            class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                                            Serial Number / IMEI (Pisahkan dengan koma)
+                                        </label>
+                                        <input type="text" wire:model="invoice_sns.{{ $item->id }}"
+                                            class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                                            placeholder="Contoh: IMEI12345, IMEI67890">
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        @if ($this->getRemainingBalance() > 0)
+                            <div class="pt-6 border-t border-gray-200 mt-4">
+                                <h3 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    Pelunasan Sisa Tagihan (Rp
+                                    {{ number_format($this->getRemainingBalance(), 0, ',', '.') }})
+                                </h3>
+
+                                <div class="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label
+                                                class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Tanggal
+                                                Pelunasan *</label>
+                                            <input type="date" wire:model="invoice_date"
+                                                class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                                                required>
+                                        </div>
+                                        <div>
+                                            <label
+                                                class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Ke
+                                                Rekening Bank *</label>
+                                            <select wire:model.live="invoice_payment_method_id"
+                                                class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                                                required>
+                                                <option value="">-- Pilih Rekening --</option>
+                                                @foreach ($paymentMethods as $method)
+                                                    <option value="{{ $method->id }}">{{ $method->name }}</option>
+                                                @endforeach
+                                            </select>
+                                            @error('invoice_payment_method_id')
+                                                <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                                            @enderror
+                                        </div>
+                                    </div>
+
+                                    @if ($this->selectedInvoicePaymentMethod && $this->selectedInvoicePaymentMethod->rates->count() > 0)
+                                        <div>
+                                            <label
+                                                class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Pilih
+                                                Tarif MDR *</label>
+                                            <select wire:model="invoice_payment_method_rate_id"
+                                                class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                                                required>
+                                                <option value="">-- Pilih Tarif MDR --</option>
+                                                @foreach ($this->selectedInvoicePaymentMethod->rates as $rate)
+                                                    <option value="{{ $rate->id }}">{{ $rate->name }}
+                                                        ({{ (float) ($rate->percentage ?? $rate->mdr_percentage) }}%)
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @error('invoice_payment_method_rate_id')
+                                                <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                                            @enderror
+                                        </div>
+                                    @endif
+
+                                    <div>
+                                        <label
+                                            class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Catatan/Referensi</label>
+                                        <input type="text" wire:model="invoice_notes"
+                                            class="w-full p-2.5 rounded-lg border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                                            placeholder="Contoh: Lunas via Transfer BCA">
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+                    </div> <!-- Tutup div p-6 overflow-y-auto -->
+
+                    <div
+                        class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 shrink-0 rounded-b-2xl">
                         <button type="button" wire:click="$set('showInvoiceModal', false)"
-                            class="px-4 py-2 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition-colors">Batal</button>
+                            class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">Batal</button>
                         <button type="submit"
-                            class="px-5 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2"
+                            class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2"
                             wire:loading.attr="disabled">
                             <span wire:loading.remove wire:target="submitFaktur">Simpan & Terbitkan Faktur</span>
                             <span wire:loading wire:target="submitFaktur">Memproses...</span>
