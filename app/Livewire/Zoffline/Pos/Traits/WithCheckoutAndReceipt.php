@@ -452,6 +452,125 @@ trait WithCheckoutAndReceipt
 
             \Illuminate\Support\Facades\DB::beginTransaction();
 
+            if ($this->isPiutangSettlement) {
+                $order = Order::find($this->loadedDraftId);
+
+                if (!$order) {
+                    \Illuminate\Support\Facades\DB::rollBack();
+                    $this->dispatch('toast', title: 'Error', message: 'Faktur Piutang tidak ditemukan.', type: 'error');
+                    return;
+                }
+
+                $orderNumber = $order->order_number;
+
+                $order->update([
+                    'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
+                    'mdr_amount' => $mdrAmt,
+                    'payment_method_id' => $this->payments[0]['payment_method_id'] ?: null,
+                    'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
+                    'order_status' => 'COMPLETED',
+                    'notes' => $this->notes, // User might add notes during settlement
+                ]);
+
+                // Create OrderPayments (for each split payment row)
+                foreach ($this->payments as $payment) {
+                    $rowTotal = (float)$payment['amount'];
+
+                    OrderPayment::create([
+                        'order_id' => $order->id,
+                        'xendit_external_id' => 'ORD-PTG-' . date('YmdHis') . rand(1000, 9999),
+                        'amount' => $rowTotal,
+                        'status' => 'PAID',
+                        'payment_method_id' => $payment['payment_method_id'],
+                        'payment_method_rate_id' => $payment['payment_method_rate_id'] ?: null,
+                        'no_kontrak' => $payment['no_kontrak'] ?? null,
+                    ]);
+                }
+
+                \Illuminate\Support\Facades\DB::commit();
+
+                // Only do Accurate Sales Receipt, NO Sales Invoice needed because it's already there
+                try {
+                    $accurateService = app(AccurateService::class);
+                    $dbSource = $order->businessUnit->code ?? 'syihab';
+
+                    $handler = Auth::user();
+                    $branchName = $handler->branch->name ?? 'Banjarbaru';
+
+                    if (!$order->accurate_receipt_no && $order->accurate_invoice_no) {
+                        $srNumbers = [];
+                        foreach ($this->payments as $index => $payment) {
+                            $pm = \App\Models\PaymentMethod::findOrFail($payment['payment_method_id']);
+                            $rate = $payment['payment_method_rate_id'] ? \App\Models\PaymentMethodRate::find($payment['payment_method_rate_id']) : null;
+
+                            $pct = $this->getMdrPercentage($payment);
+                            $rowMdr = $pct > 0 ? round((float)$payment['amount'] * $pct / 100, 0) : 0;
+                            $rowBaseAmount = (float)$payment['amount'];
+                            $netReceiptAmount = $rowBaseAmount - $rowMdr;
+
+                            $detailDiscounts = [];
+                            if ($rowMdr > 0 && $rate && $rate->accurate_account_no) {
+                                $detailDiscounts[] = [
+                                    'accountNo' => $rate->accurate_account_no,
+                                    'amount' => (float) $rowMdr,
+                                    'departmentName' => $branchName,
+                                    'discountNotes' => 'MDR ' . ($rate->name ?? ' ')
+                                ];
+                            }
+
+                            $detailInvoiceItem = [
+                                'invoiceNo' => $order->accurate_invoice_no,
+                                'paymentAmount' => $rowBaseAmount,
+                            ];
+
+                            if (!empty($detailDiscounts)) {
+                                $detailInvoiceItem['detailDiscount'] = $detailDiscounts;
+                            }
+
+                            $srData = [
+                                'customerNo' => $order->user->getAccurateCustomerNo($dbSource),
+                                'branchName' => $branchName,
+                                'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
+                                'receiptAmount' => (float) $netReceiptAmount,
+                                'chequeAmount' => (float) $netReceiptAmount,
+                                'transDate'    => now()->format('d/m/Y'),
+                                'detailInvoice' => [
+                                    $detailInvoiceItem
+                                ],
+                                'description' => 'Pelunasan Piutang POS'
+                            ];
+
+                            $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+                            if (isset($srResult['r']['number'])) {
+                                $srNumbers[] = $srResult['r']['number'];
+                                \App\Models\OrderAccurateDoc::create([
+                                    'order_id' => $order->id,
+                                    'doc_type' => 'SALES_RECEIPT',
+                                    'doc_number' => $srResult['r']['number'],
+                                    'accurate_id' => $srResult['r']['id'] ?? null,
+                                    'amount' => (float) $netReceiptAmount,
+                                    'status' => 'SUCCESS',
+                                ]);
+                            }
+                        }
+
+                        if (!empty($srNumbers)) {
+                            $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('POS Accurate Integration Error (Pelunasan Piutang): ' . $e->getMessage());
+                }
+
+                $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
+                $this->showCheckoutModal = false;
+                $this->showReceiptModal = true;
+
+                $this->resetCheckout();
+                $this->dispatch('toast', title: 'Transaksi Berhasil', message: 'Pelunasan Piutang ' . $orderNumber . ' berhasil diproses.', type: 'success');
+                return;
+            }
+
             $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
 
             $order = null;
@@ -803,8 +922,344 @@ trait WithCheckoutAndReceipt
         }
     }
 
+    public function processPiutang()
+    {
+        $handler = Auth::user();
+        if (!$handler || !$handler->branch || !$handler->warehouse) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Akun Anda belum terhubung dengan Cabang (Branch) atau Gudang. Harap hubungi Admin.', type: 'error');
+            return;
+        }
+
+        try {
+            $customerId = $this->selectedCustomerId;
+
+            // Jika customer baru, buat user terlebih dahulu
+            if ($this->isNewCustomer && !$customerId) {
+
+                // 1. Cek jika input HANYA berisi angka 0
+                if (preg_match('/^0+$/', (string) $this->customerPhone)) {
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP tidak boleh hanya berisi angka 0.', type: 'error');
+                    return; // Hentikan proses di sini
+                }
+
+                // Tentukan email yang akan digunakan
+                $emailToValidate = $this->customerEmail ?: ($this->customerPhone . rand(1000, 9999) . '@zpos.com');
+
+                // 2. Terapkan Validasi menggunakan Validator Facade
+                $validator = \Illuminate\Support\Facades\Validator::make(
+                    [
+                        'customerName'  => $this->customerName,
+                        'customerPhone' => $this->customerPhone,
+                        'customerEmail' => $emailToValidate,
+                    ],
+                    [
+                        'customerName'  => 'required|string|max:255',
+                        'customerPhone' => 'required|string|max:20|unique:user_profiles,phone_number',
+                        'customerEmail' => 'nullable|email|unique:users,email',
+                    ],
+                    [
+                        'customerName.required'  => 'Nama customer wajib diisi.',
+                        'customerPhone.required' => 'Nomor HP customer wajib diisi.',
+                        'customerPhone.unique'   => 'Nomor HP ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                        'customerEmail.email'    => 'Format email tidak valid.',
+                        'customerEmail.unique'   => 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                    ]
+                );
+
+                if ($validator->fails()) {
+                    $errors = $validator->errors();
+                    $failedRules = $validator->failed();
+                    $firstErrorMessage = $errors->first();
+
+                    if (isset($failedRules['customerPhone']['Unique'])) {
+                        $existingProfile = \Illuminate\Support\Facades\DB::table('user_profiles')
+                            ->where('phone_number', $this->customerPhone)
+                            ->first();
+
+                        if ($existingProfile) {
+                            $namaCustomer = $existingProfile->full_name ?? 'Customer Lain';
+                            $firstErrorMessage = "Nomor HP sudah terdaftar atas nama: {$namaCustomer}. Silakan pilih customer dari daftar pencarian.";
+                        }
+                    }
+
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
+                    return;
+                }
+
+                // 3. Jika validasi aman, barulah proses ke database
+                $newUser = User::create([
+                    'name'     => $this->customerName,
+                    'email'    => $emailToValidate,
+                    'password' => bcrypt('tokopun' . rand(1000, 9999)),
+                ]);
+                $newUser->assignRole('user');
+
+                if ($this->customerPhone) {
+                    $newUser->profile()->create([
+                        'full_name'    => $this->customerName,
+                        'phone_number' => $this->customerPhone,
+                    ]);
+                }
+
+                $customerId = $newUser->id;
+            }
+
+            if (!$customerId) {
+                $this->dispatch('toast', title: 'Error', message: 'Customer belum dipilih.', type: 'error');
+                return;
+            }
+
+            $subtotal = $this->subtotal();
+            $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1));
+            $promoDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['promo_discount'] ?? 0));
+            $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
+
+            $mdrAmt = 0;
+            $grandTotal = max(0, $subtotal - $totalDiscountAmount);
+
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
+            $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
+
+            $order = null;
+            if ($this->loadedDraftId) {
+                $order = Order::find($this->loadedDraftId);
+                if ($order) {
+                    foreach ($order->items as $oldItem) {
+                        $warehouseStock = \App\Models\WarehouseStock::where([
+                            'warehouse_id' => Auth::user()->warehouse_id,
+                            'variant_id' => $oldItem->product_variant_id,
+                            'variant_type' => $oldItem->product_variant_type,
+                        ])->first();
+                        if ($warehouseStock) {
+                            $warehouseStock->update([
+                                'stock' => $warehouseStock->stock + (int)$oldItem->qty
+                            ]);
+                        }
+
+                        if (!empty($oldItem->serial_number)) {
+                            $oldSns = explode(',', $oldItem->serial_number);
+                            $cleanOldSns = array_values(array_filter(array_map('trim', $oldSns)));
+                            if (!empty($cleanOldSns)) {
+                                \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanOldSns)
+                                    ->update(['status' => 'Available']);
+                            }
+                        }
+                    }
+                    $order->items()->delete();
+                    $order->promos()->detach();
+                    $order->payments()->delete();
+
+                    $order->update([
+                        'user_id' => $customerId,
+                        'order_date' => $dateToUse->format('Y-m-d'),
+                        'total_amount' => $subtotal,
+                        'shipping_cost' => 0,
+                        'discount_amount' => $totalDiscountAmount,
+                        'mdr_percentage' => 0,
+                        'mdr_amount' => 0,
+                        'grand_total' => $grandTotal,
+                        'order_status' => 'PIUTANG',
+                        'order_channel' => 'POS',
+                        'handled_by' => Auth::id(),
+                        'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
+                        'payment_method_id' => null,
+                        'payment_method_rate_id' => null,
+                        'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
+                        'notes' => $this->notes,
+                    ]);
+                    $orderNumber = $order->order_number;
+                }
+            }
+
+            if (!$order) {
+                $buCode = \Illuminate\Support\Facades\Auth::user()->businessUnit->code ?? 'syihab';
+                $completedPrefix = ($buCode === 'second') ? 'POS-GSK-' : 'POS-SYB-';
+
+                $orderNumber = $completedPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
+                    Order::whereDate('order_date', $dateToUse->format('Y-m-d'))
+                        ->where('order_channel', 'POS')
+                        ->count() + 1,
+                    4,
+                    '0',
+                    STR_PAD_LEFT
+                );
+
+                $order = Order::create([
+                    'business_unit_id' => Auth::user()->getActiveBusinessUnitId() ?? 1,
+                    'user_id' => $customerId,
+                    'order_number' => $orderNumber,
+                    'order_date' => $dateToUse->format('Y-m-d'),
+                    'total_amount' => $subtotal,
+                    'shipping_cost' => 0,
+                    'discount_amount' => $totalDiscountAmount,
+                    'mdr_percentage' => 0,
+                    'mdr_amount' => 0,
+                    'grand_total' => $grandTotal,
+                    'order_status' => 'PIUTANG',
+                    'order_channel' => 'POS',
+                    'handled_by' => Auth::id(),
+                    'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
+                    'payment_method_id' => null,
+                    'payment_method_rate_id' => null,
+                    'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
+                    'notes' => $this->notes,
+                    'branch_id' => Auth::user()->branch_id,
+                ]);
+            }
+
+            if (!empty($this->selectedPromos)) {
+                $service = app(\App\Services\PromoCalculatorService::class);
+                $service->recordPromosToOrder($order, $this->cart, $this->selectedPromos);
+            }
+
+            foreach ($this->cart as $item) {
+                $rawSns = $item['serial_numbers'] ?? [];
+                $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
+
+                if (!empty($cleanSns)) {
+                    \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanSns)
+                        ->update(['status' => 'Unavailable']);
+                }
+
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_variant_id' => $item['variant_id'],
+                    'product_variant_type' => $item['variant_type'],
+                    'product_name' => $item['name'] ?? 'Unknown Product',
+                    'qty' => $item['qty'],
+                    'price_at_checkout' => $item['price'],
+                    'subtotal' => $item['price'] * $item['qty'],
+                    'discount_amount' => (int) ($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1),
+                    'promo_discount_amount' => (int) ($item['promo_discount'] ?? 0),
+                    'applied_promo_id' => $item['applied_promo_id'] ?? null,
+                    'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
+                ]);
+
+                $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
+                    [
+                        'warehouse_id' => Auth::user()->warehouse_id,
+                        'variant_id' => $item['variant_id'],
+                        'variant_type' => $item['variant_type'],
+                    ],
+                    [
+                        'stock' => 0
+                    ]
+                );
+                $warehouseStock->update([
+                    'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
+                ]);
+            }
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            try {
+                $accurateService = app(AccurateService::class);
+                $customerUser = User::find($customerId);
+                $handler = Auth::user();
+                $branchName = $handler->branch->name ?? 'Banjarbaru';
+                $warehouseName = $handler->warehouse->name ?? 'Head Office';
+
+                $dbSource = $this->cart[0]['database_source'] ?? 'syihab';
+
+                $accurateBranchName = $branchName;
+                $accurateWarehouseName = $warehouseName;
+
+                $accurateService->syncCustomer($customerUser, $dbSource);
+                $customerUser->refresh();
+
+                if (!$order->accurate_invoice_no) {
+                    $detailItems = [];
+                    foreach ($this->cart as $item) {
+
+                        $rawSns = $item['serial_numbers'] ?? [];
+                        $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
+
+                        $detailSN = [];
+                        if (!empty($cleanSns)) {
+                            foreach ($cleanSns as $sn) {
+                                $detailSN[] = ['serialNumberNo' => $sn, 'quantity' => 1];
+                            }
+                        }
+
+                        $detailSalesman = [];
+                        foreach ($this->selectedSales as $sales) {
+                            if (!empty($sales['employee_no'])) {
+                                $detailSalesman[] = (string) $sales['employee_no'];
+                            }
+                        }
+
+                        $itemData = [
+                            'itemNo' => $item['sku'] ?: 'ITEM-UNKNOWN',
+                            'warehouseName' => $accurateWarehouseName,
+                            'unitPrice' => $item['price'],
+                            'quantity' => $item['qty'],
+                            'itemCashDiscount' => ((int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1)) + (int)($item['promo_discount'] ?? 0),
+                            'salesmanListNumber' => $detailSalesman,
+                        ];
+
+                        $condition = $item['condition'] ?? '';
+                        if (in_array($condition, ['Inter', 'Resmi'])) {
+                            $city = trim(str_replace(['GSK -', 'GSK '], '', $accurateWarehouseName));
+                            $departmentPrefix = ($condition === 'Inter') ? 'Distri' : 'Retail';
+                            $itemData['departmentName'] = $departmentPrefix . ' ' . $city;
+                        }
+
+                        if (!empty($detailSN)) {
+                            $itemData['detailSerialNumber'] = $detailSN;
+                        }
+
+                        $detailItems[] = $itemData;
+                    }
+
+                    $siData = [
+                        'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
+                        'branchName' => $accurateBranchName,
+                        'detailItem' => $detailItems,
+                        'inclusiveTax' => true,
+                        'transDate'    => $this->order_date
+                            ? Carbon::parse($this->order_date)->format('d/m/Y')
+                            : now()->format('d/m/Y'),
+                        'taxable' => true,
+                        'useTax1' => true,
+                        'description' => $this->notes
+                    ];
+
+                    $siResult = $accurateService->postSalesInvoice($siData, $dbSource);
+                    if (isset($siResult['r']['number'])) {
+                        $order->update(['accurate_invoice_no' => $siResult['r']['number']]);
+                        \App\Models\OrderAccurateDoc::create([
+                            'order_id' => $order->id,
+                            'doc_type' => 'SALES_INVOICE',
+                            'doc_number' => $siResult['r']['number'],
+                            'accurate_id' => $siResult['r']['id'] ?? null,
+                            'amount' => $grandTotal,
+                            'status' => 'SUCCESS',
+                        ]);
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::error('POS Accurate Integration Error (Piutang): ' . $e->getMessage());
+            }
+
+            $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
+            $this->showCheckoutModal = false;
+            $this->showPiutangModal = false; // Add this too
+            $this->showReceiptModal = true;
+
+            $this->resetCheckout();
+            $this->dispatch('toast', title: 'Transaksi Piutang Berhasil', message: 'Order ' . $orderNumber . ' berhasil diproses.', type: 'success');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            Log::error('POS Payment Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
+        }
+    }
+
     public function resetCheckout()
     {
+        $this->isPiutangSettlement = false;
+        $this->loadedDraftId = null;
         $this->cart = [];
         $this->selectedSales = [];
         $this->discount_amount = 0;

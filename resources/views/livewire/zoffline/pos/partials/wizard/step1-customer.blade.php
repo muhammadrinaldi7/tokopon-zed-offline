@@ -41,8 +41,16 @@
                     </svg>
                 </a>
             @endif
+            <button wire:click="openPiutang"
+                class="p-4 bg-violet-100 text-violet-700 hover:bg-violet-200 rounded-full flex items-center gap-2 transition-all shadow-sm"
+                title="Lunas Piutang">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+            </button>
             <button wire:click="openDraft"
-                class="p-4 bg-amber-200 text-amber-700 hover:bg-amber-300 rounded-full  flex items-center gap-2 transition-all shadow-sm">
+                class="p-4 bg-amber-200 text-amber-700 hover:bg-amber-300 rounded-full flex items-center gap-2 transition-all shadow-sm"
+                title="Draft">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-auto" viewBox="0 0 24 24">
                     <path d="M0 0h24v24H0z" fill="none" />
                     <path fill="currentColor" d="M13 12H7v-2h6zm4-4H7V6h10z" />
@@ -52,6 +60,22 @@
             </button>
         </div>
     </div>
+
+    @if ($isPiutangSettlement)
+        <div class="mb-6 bg-violet-600 text-white rounded-xl p-4 shadow-lg border border-violet-500 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-white/20 p-2 rounded-lg">
+                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg leading-tight">Mode Pelunasan Piutang</h3>
+                    <p class="text-sm text-violet-100">Menyelesaikan tagihan Piutang. Data Customer dan Item tidak dapat diubah.</p>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <div class="bg-white rounded-3xl shadow-sm p-8 md:p-10">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -375,6 +399,61 @@
                             Tidak, Gunakan Data Lama
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal Piutang List --}}
+    @if ($showPiutangModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-violet-50/50">
+                    <div>
+                        <h3 class="text-xl font-black text-gray-800">Daftar Tagihan Piutang</h3>
+                        <p class="text-sm text-gray-500 mt-1">Pilih faktur untuk dilunasi</p>
+                    </div>
+                    <button wire:click="$set('showPiutangModal', false)"
+                        class="text-gray-400 hover:text-gray-600 focus:outline-none p-2 rounded-xl hover:bg-white transition-colors">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto">
+                    @if (count($piutangOrders) > 0)
+                        <div class="space-y-4">
+                            @foreach ($piutangOrders as $order)
+                                <div class="p-4 border border-gray-100 rounded-2xl hover:border-violet-200 hover:bg-violet-50/30 transition-all group flex justify-between items-center">
+                                    <div>
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="font-bold text-gray-800 group-hover:text-violet-700">{{ $order->order_number }}</span>
+                                            <span class="px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-bold uppercase tracking-wider">PIUTANG</span>
+                                        </div>
+                                        <div class="text-sm text-gray-500">
+                                            {{ $order->user->name ?? 'Tanpa Nama' }} &bull; {{ \Carbon\Carbon::parse($order->order_date)->format('d M Y') }}
+                                        </div>
+                                    </div>
+                                    <div class="text-right flex flex-col items-end gap-2">
+                                        <div class="font-black text-lg text-gray-900 group-hover:text-violet-700">Rp {{ number_format($order->grand_total, 0, ',', '.') }}</div>
+                                        <button wire:click="loadPiutang({{ $order->id }})" class="px-4 py-1.5 bg-violet-100 text-violet-700 font-bold rounded-lg hover:bg-violet-200 transition-colors text-sm shadow-sm">
+                                            Load Piutang
+                                        </button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="text-center py-10">
+                            <div class="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
+                                <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-lg font-bold text-gray-800 mb-1">Tidak ada tagihan Piutang</h3>
+                            <p class="text-gray-500 text-sm">Semua transaksi piutang telah dilunasi.</p>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

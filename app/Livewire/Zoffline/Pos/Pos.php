@@ -52,9 +52,13 @@ class Pos extends Component
 
     // ─── Wizard State ──────────────────────────────────────────
     public $currentStep = 1; // 1: Customer, 2: Cart, 3: Upsell, 4: Payment
+    public $isPiutangSettlement = false;
 
     public function nextStep()
     {
+        if ($this->isPiutangSettlement) {
+            return; // Cannot move from step 4
+        }
         if ($this->currentStep == 1) {
             // Validasi Step 1: Customer dan Sales
             if (!$this->selectedCustomerId) {
@@ -107,6 +111,9 @@ class Pos extends Component
 
     public function prevStep()
     {
+        if ($this->isPiutangSettlement) {
+            return; // Cannot move back from step 4
+        }
         if ($this->currentStep > 1) {
             $this->currentStep--;
         }
@@ -114,6 +121,9 @@ class Pos extends Component
 
     public function goToStep($step)
     {
+        if ($this->isPiutangSettlement && $step != 4) {
+            return; // Cannot move to other steps
+        }
         $this->currentStep = $step;
     }
 
@@ -195,6 +205,93 @@ class Pos extends Component
             ->get();
 
         $this->showDraftModal = true;
+    }
+
+    // ─── Piutang Settlement ──────────────────────────────
+    public $showPiutangModal = false;
+    public $piutangOrders = [];
+
+    public function openPiutang()
+    {
+        $this->piutangOrders = Order::with(['user'])
+            ->where('order_channel', 'POS')
+            ->where('order_status', 'PIUTANG')
+            ->latest()
+            ->take(20)
+            ->get();
+
+        $this->showPiutangModal = true;
+    }
+
+    public function loadPiutang($orderId)
+    {
+        $order = Order::with(['items.variant', 'user.profile', 'promos'])->find($orderId);
+        if (!$order) {
+            $this->dispatch('toast', title: 'Error', message: 'Faktur Piutang tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        // Restore customer
+        $this->selectedCustomerId = $order->user_id;
+        $this->isNewCustomer = false;
+        if ($order->user) {
+            $this->customerName = $order->user->name;
+            $this->customerPhone = $order->user->profile->phone_number ?? '';
+            $this->customerEmail = $order->user->email ?? '';
+        }
+
+        // Restore sales (jika ada)
+        if ($order->sales_id) {
+            $sales = \App\Models\Employe::find($order->sales_id);
+            if ($sales) {
+                $this->selectedSales = [[
+                    'id' => $sales->id,
+                    'name' => $sales->name,
+                    'employee_no' => $sales->employee_no
+                ]];
+            }
+        }
+
+        // Restore manual discount
+        $this->discount_amount = (int) $order->discount_amount;
+        $this->notes = $order->notes;
+
+        $this->order_date = $order->order_date;
+        // Restore promos
+        $this->selectedPromos = $order->promos->pluck('id')->toArray();
+
+        // Restore cart
+        $this->cart = [];
+        foreach ($order->items as $item) {
+            $snArray = array_values(array_filter(array_map('trim', explode(',', $item->serial_number))));
+
+            $variant = $item->variant;
+
+            $this->cart[] = [
+                'variant_id' => $item->product_variant_id,
+                'variant_type' => $item->product_variant_type,
+                'name' => $variant->name ?? 'Unknown',
+                'sku' => $variant->item_no ?? ($variant->sku ?? ''),
+                'ram' => '-',
+                'storage' => '-',
+                'color' => '-',
+                'price' => (int) $item->price_at_checkout,
+                'qty' => $item->qty,
+                'discount_amount' => (int) ($item->discount_amount / max(1, $item->qty)),
+                'promo_discount' => (int) $item->promo_discount_amount,
+                'applied_promo_id' => $item->applied_promo_id,
+                'serial_numbers' => $snArray,
+                'has_sn' => (bool) ($variant->has_sn ?? true),
+                'database_source' => $variant->database_source ?? 'syihab',
+            ];
+        }
+
+        $this->loadedDraftId = $order->id;
+        $this->isPiutangSettlement = true;
+        $this->syncSinglePaymentAmount();
+        $this->showPiutangModal = false;
+        $this->dispatch('toast', title: 'Berhasil', message: 'Faktur Piutang berhasil dimuat.', type: 'success');
+        $this->goToStep(4);
     }
 
     public function loadDraft($orderId)

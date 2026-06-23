@@ -57,8 +57,13 @@ class RiwayatPenjualan extends Component
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
+        $paymentMethods = \App\Models\PaymentMethod::where('business_unit_id', $user->getActiveBusinessUnitId())
+            ->where('is_active', true)
+            ->get();
+
         return view('livewire.zoffline.pos.riwayat-penjualan', [
-            'orders' => $orders
+            'orders' => $orders,
+            'paymentMethods' => $paymentMethods
         ]);
     }
 
