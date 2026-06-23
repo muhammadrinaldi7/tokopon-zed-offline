@@ -32,6 +32,7 @@ class SellPhone extends Component
     public $isNewCustomer = true;
     public $searchCustomer = '';
     public $selectedCustomerId = null;
+    public $needsBankInfo = false;
 
     // END KEPERLUAN DATA USER DI FL
 
@@ -43,6 +44,7 @@ class SellPhone extends Component
     public $device_rules = [];
     public $selected_rules = [];
     public $final_price = 0;
+    public $is_price_adjusted = false;
 
     // Fallback notes
     public $old_phone_additional_note;
@@ -95,7 +97,16 @@ class SellPhone extends Component
     public function selectCustomer($id)
     {
         $this->selectedCustomerId = $id;
-        $this->searchCustomer = '';
+        $customer = User::with('bankAccounts')->find($id);
+
+        $this->searchCustomer = $customer->name;
+
+        if ($customer->bankAccounts->isEmpty()) {
+            $this->needsBankInfo = true;
+            $this->dispatch('toast', title: 'Perhatian!', message: 'Pelanggan ini belum memiliki informasi rekening bank. Silakan lengkapi data bank di bawah.', type: 'warning');
+        } else {
+            $this->needsBankInfo = false;
+        }
     }
 
     public function clearSelectedCustomer()
@@ -266,8 +277,15 @@ class SellPhone extends Component
         $this->calculatePrice();
     }
 
+    public function resetCalculation()
+    {
+        $this->is_price_adjusted = false;
+        $this->calculatePrice();
+    }
+
     public function calculatePrice()
     {
+        if ($this->is_price_adjusted) return;
         if (!$this->buyback_device) return;
 
         $price = $this->buyback_device->base_price;
@@ -343,6 +361,11 @@ class SellPhone extends Component
                 $rules['bank_name'] = 'required|string|max:20';
             } else {
                 $rules['selectedCustomerId'] = 'required|exists:users,id';
+                if ($this->needsBankInfo) {
+                    $rules['account_number'] = 'required|string|max:20';
+                    $rules['account_name']   = 'required|string|max:20';
+                    $rules['bank_name']      = 'required|string|max:20';
+                }
             }
         }
         return $rules;
@@ -441,6 +464,15 @@ class SellPhone extends Component
             $customer = User::findOrFail($this->selectedCustomerId);
             $userIdToSave = $customer->id;
             $userForAccurate = $customer;
+
+            if ($this->needsBankInfo) {
+                $customer->bankAccounts()->create([
+                    'account_number' => $this->account_number,
+                    'account_name'   => $this->account_name,
+                    'bank_name'      => $this->bank_name,
+                ]);
+                $this->needsBankInfo = false;
+            }
         }
 
         // -------------------------------------------------------------
@@ -450,7 +482,7 @@ class SellPhone extends Component
         $device = \App\Models\BuybackDevice::with('brand')->find($this->buyback_device_id);
 
         if (!$device) {
-            $this->dispatch('show-toast', type: 'error', message: 'Data perangkat tidak valid.');
+            $this->dispatch('toast', title: 'Gagal', message: 'Data perangkat tidak valid.', type: 'error');
             return;
         }
 
@@ -523,6 +555,7 @@ class SellPhone extends Component
             'imei'              => $this->imei,
             'minus_desc'        => $minusDesc,
             'appraised_value'   => $this->final_price,
+            'is_price_adjusted' => $this->is_price_adjusted,
             'status'            => $this->qc_verdict === 'fail' ? 'CANCELLED' : 'PAYING',
             'handled_by'        => $currentUser->id,
             'business_unit_id'  => $currentUser->getActiveBusinessUnitId(),
@@ -560,7 +593,9 @@ class SellPhone extends Component
             if ($this->$propertyName) {
                 $photo = $this->$propertyName;
 
-                $sellPhone->addMedia($photo->getRealPath())
+                // Menggunakan addMediaFromString untuk membaca file secara aman melalui Flysystem Livewire
+                // sehingga terhindar dari error 'Unable to retrieve file_size'
+                $sellPhone->addMediaFromString($photo->get())
                     ->usingFileName($photo->getClientOriginalName())
                     // Menyimpan info posisi foto ke dalam custom property Spatie
                     ->withCustomProperties([
@@ -571,7 +606,7 @@ class SellPhone extends Component
             }
         }
 
-        $this->dispatch('show-toast', type: 'success', message: 'Transaksi berhasil diproses!');
+        $this->dispatch('toast', title: 'Transaksi berhasil diproses!', message: 'Data berhasil disimpan.', type: 'success');
 
         // Reset semua form input termasuk input data user FL
         $this->reset([

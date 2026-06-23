@@ -20,8 +20,6 @@ class History extends Component
                 ->where('branch_id', Auth::user()->branch_id)
                 ->latest()
                 ->get();
-        } else {
-            return abort(403);
         }
         return view('livewire.zoffline.sell-phone.history', compact('sells'));
     }

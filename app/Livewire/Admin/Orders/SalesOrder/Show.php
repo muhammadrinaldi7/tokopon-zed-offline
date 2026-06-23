@@ -174,6 +174,8 @@ class Show extends Component
                     'dpAmount'   => (float)$this->dp_amount,
                     'soNumber'   => $this->order->accurate_so_number,
                     'transDate'  => Carbon::parse($this->dp_date)->format('d/m/Y'),
+                    'inclusiveTax' => false,
+                    'isTaxable' => false,
                     'description' => 'Uang Muka (DP) SO: ' . $this->order->accurate_so_number . '. ' . $this->dp_notes,
                 ];
 
@@ -273,7 +275,7 @@ class Show extends Component
         if ($remBal > 0) {
             $rules['invoice_payment_method_id'] = 'required';
             $rules['invoice_date'] = 'required|date';
-            
+
             if ($this->selectedInvoicePaymentMethod && $this->selectedInvoicePaymentMethod->rates->count() > 0) {
                 $rules['invoice_payment_method_rate_id'] = 'required';
             }

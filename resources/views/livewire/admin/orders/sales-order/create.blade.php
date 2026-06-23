@@ -41,25 +41,8 @@
                     <input type="hidden" wire:model="user_id" required>
                     @error('user_id') <span class="text-xs text-red-500 mt-1">{{ $message }}</span> @enderror
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Unit Usaha *</label>
-                    <select wire:model.live="business_unit_id" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50/50 hover:bg-gray-50 transition-colors" required>
-                        <option value="">-- Pilih Unit Usaha --</option>
-                        @foreach($businessUnits as $bu)
-                            <option value="{{ $bu->id }}">{{ $bu->name }}</option>
-                        @endforeach
-                    </select>
-                    @error('business_unit_id') <span class="text-xs text-red-500 mt-1">{{ $message }}</span> @enderror
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Gudang / Cabang</label>
-                    <select wire:model="warehouse_id" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50/50 hover:bg-gray-50 transition-colors">
-                        <option value="">-- Pilih Gudang --</option>
-                        @foreach($warehouses as $wh)
-                            <option value="{{ $wh->id }}">{{ $wh->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+
+
                 <div>
                     <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tanggal SO *</label>
                     <input type="date" wire:model="order_date" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50/50 hover:bg-gray-50 transition-colors" required>
@@ -74,8 +57,7 @@
             <table class="w-full text-left border-collapse min-w-[800px]">
                 <thead>
                     <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                        <th class="p-3 font-bold rounded-tl-lg w-[15%]">Tipe Barang</th>
-                        <th class="p-3 font-bold w-[30%]">Pilih Barang</th>
+                        <th class="p-3 font-bold rounded-tl-lg w-[45%]">Pilih Barang</th>
                         <th class="p-3 font-bold w-[10%]">Kuantitas</th>
                         <th class="p-3 font-bold w-[15%]">Harga Satuan</th>
                         <th class="p-3 font-bold w-[15%]">Diskon (Rp)</th>
@@ -86,16 +68,7 @@
                 <tbody class="divide-y divide-gray-100">
                     @foreach($items as $index => $item)
                         <tr class="group hover:bg-blue-50/30 transition-colors" wire:key="item-{{ $index }}">
-                            <td class="p-2">
-                                <select wire:model.live="items.{{ $index }}.type" class="w-full px-3 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50">
-                                    @if(!$isGsk)
-                                        <option value="new">Barang Baru</option>
-                                    @endif
-                                    @if($isGsk)
-                                        <option value="second">Barang Bekas</option>
-                                    @endif
-                                </select>
-                            </td>
+
                             <td class="p-2 relative">
                                 <div class="relative">
                                     <input type="text" wire:model.live.debounce.300ms="items.{{ $index }}.searchProduct" class="w-full px-3 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white pr-8" placeholder="Ketik nama produk / SKU..." autocomplete="off">

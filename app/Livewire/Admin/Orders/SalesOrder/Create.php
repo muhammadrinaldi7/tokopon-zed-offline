@@ -22,7 +22,7 @@ class Create extends Component
     public $user_id;
     public $searchCustomer = '';
     public $customerSearchResults = [];
-    
+
     public $business_unit_id;
     public $warehouse_id;
     public $order_date;
@@ -39,25 +39,15 @@ class Create extends Component
     public function mount()
     {
         $this->order_date = Carbon::now()->format('Y-m-d');
+        $this->business_unit_id = Auth::user()->getActiveBusinessUnitId();
+        $this->warehouse_id = Auth::user()->warehouse_id;
         // Initial empty row
         $this->addItem();
-    }
-
-    public function getAvailableType()
-    {
-        if ($this->business_unit_id) {
-            $bu = BusinessUnit::find($this->business_unit_id);
-            if ($bu && $bu->code === 'second') {
-                return 'second';
-            }
-        }
-        return 'new'; // default
     }
 
     public function addItem()
     {
         $this->items[] = [
-            'type' => $this->getAvailableType(),
             'searchProduct' => '',
             'searchResults' => [],
             'variant_id' => '',
@@ -88,54 +78,31 @@ class Create extends Component
             if ($field === 'searchProduct') {
                 $term = $value;
                 if (strlen($term) >= 2) {
-                    $type = $this->items[$index]['type'];
-                    if ($type === 'new') {
-                        $this->items[$index]['searchResults'] = ProductVariant::with('product')
-                            ->whereHas('product', function($q) use ($term) {
-                                $q->where('name', 'like', '%' . $term . '%');
-                            })
-                            ->orWhere('sku', 'like', '%' . $term . '%')
-                            ->take(10)
-                            ->get()
-                            ->map(function($v) {
-                                return [
-                                    'id' => $v->id,
-                                    'name' => ($v->product->name ?? 'Unknown') . ' ' . $v->storage . ' ' . $v->color,
-                                    'price' => $v->price
-                                ];
-                            })->toArray();
-                    } else {
-                        $this->items[$index]['searchResults'] = SecondProductVariant::with('secondProduct')
-                            ->whereHas('secondProduct', function($q) use ($term) {
-                                $q->where('name', 'like', '%' . $term . '%');
-                            })
-                            ->orWhere('sku', 'like', '%' . $term . '%')
-                            ->take(10)
-                            ->get()
-                            ->map(function($v) {
-                                return [
-                                    'id' => $v->id,
-                                    'name' => ($v->secondProduct->name ?? 'Unknown') . ' ' . $v->storage . ' ' . $v->color,
-                                    'price' => $v->price
-                                ];
-                            })->toArray();
-                    }
+                    $this->items[$index]['searchResults'] = \App\Models\ProductAccurate::where(function ($q) use ($term) {
+                        $q->where('name', 'like', '%' . $term . '%')
+                            ->orWhere('item_no', 'like', '%' . $term . '%');
+                    })
+                        ->where('business_unit_id', $this->business_unit_id)
+                        ->take(10)
+                        ->get()
+                        ->map(function ($v) {
+                            return [
+                                'id' => $v->id,
+                                'name' => $v->name,
+                                'price' => $v->base_price
+                            ];
+                        })->toArray();
                 } else {
                     $this->items[$index]['searchResults'] = [];
                 }
             }
 
-            if ($field === 'variant_id' || $field === 'type') {
+            if ($field === 'variant_id') {
                 // Fetch price based on variant
                 $item = $this->items[$index];
                 if (!empty($item['variant_id'])) {
-                    if ($item['type'] === 'new') {
-                        $variant = ProductVariant::find($item['variant_id']);
-                        $this->items[$index]['unit_price'] = $variant ? $variant->price : 0;
-                    } else {
-                        $variant = SecondProductVariant::find($item['variant_id']);
-                        $this->items[$index]['unit_price'] = $variant ? $variant->price : 0;
-                    }
+                    $variant = \App\Models\ProductAccurate::find($item['variant_id']);
+                    $this->items[$index]['unit_price'] = $variant ? $variant->base_price : 0;
                 } else {
                     $this->items[$index]['unit_price'] = 0;
                 }
@@ -155,13 +122,13 @@ class Create extends Component
     {
         if (strlen($value) >= 3) {
             $this->customerSearchResults = User::role('user')
-                ->where(function($q) use ($value) {
+                ->where(function ($q) use ($value) {
                     $q->where('name', 'like', '%' . $value . '%')
-                      ->orWhere('email', 'like', '%' . $value . '%');
+                        ->orWhere('email', 'like', '%' . $value . '%');
                 })
                 ->take(10)
                 ->get()
-                ->map(function($u) {
+                ->map(function ($u) {
                     return [
                         'id' => $u->id,
                         'name' => $u->name,
@@ -187,23 +154,19 @@ class Create extends Component
         $this->items[$index]['searchProduct'] = $name;
         $this->items[$index]['unit_price'] = $price;
         $this->items[$index]['searchResults'] = [];
-        
+
         $this->updatedItems(null, $index . '.qty'); // Recalculate
     }
 
     public function updatedBusinessUnitId($value)
     {
-        $type = $this->getAvailableType();
         foreach ($this->items as $index => $item) {
-            if ($item['type'] !== $type) {
-                $this->items[$index]['type'] = $type;
-                $this->items[$index]['searchResults'] = [];
-                $this->items[$index]['searchProduct'] = '';
-                $this->items[$index]['variant_id'] = '';
-                $this->items[$index]['product_name'] = '';
-                $this->items[$index]['unit_price'] = 0;
-                $this->items[$index]['total'] = 0;
-            }
+            $this->items[$index]['searchResults'] = [];
+            $this->items[$index]['searchProduct'] = '';
+            $this->items[$index]['variant_id'] = '';
+            $this->items[$index]['product_name'] = '';
+            $this->items[$index]['unit_price'] = 0;
+            $this->items[$index]['total'] = 0;
         }
         $this->calculateTotals();
     }
@@ -272,6 +235,7 @@ class Create extends Component
             $order = Order::create([
                 'user_id' => $this->user_id,
                 'business_unit_id' => $this->business_unit_id,
+                'branch_id' => $handler->branch_id,
                 'order_channel' => 'SO',
                 'order_number' => 'SO-' . time() . rand(10, 99),
                 'order_date' => $this->order_date,
@@ -289,11 +253,10 @@ class Create extends Component
 
             // Create Items
             foreach ($this->items as $item) {
-                $variantClass = $item['type'] === 'new' ? ProductVariant::class : SecondProductVariant::class;
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
-                    'product_variant_type' => $variantClass,
+                    'product_variant_type' => \App\Models\ProductAccurate::class,
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['unit_price'],
                     'discount_amount' => $item['discount'],
@@ -323,14 +286,15 @@ class Create extends Component
 
                 $detailItems = [];
                 foreach ($this->items as $item) {
-                    $variant = $item['type'] === 'new' ? ProductVariant::find($item['variant_id']) : SecondProductVariant::find($item['variant_id']);
-                    $itemName = $item['type'] === 'new' ? ($variant->product->name ?? 'Unknown') : ($variant->secondProduct->name ?? 'Unknown');
+                    $variant = \App\Models\ProductAccurate::find($item['variant_id']);
+                    $itemName = $variant->name ?? 'Unknown';
 
                     $detailItems[] = [
-                        'itemNo' => $variant->sku ?? 'ITEM-UNKNOWN',
+                        'itemNo' => $variant->item_no ?? 'ITEM-UNKNOWN',
                         'unitPrice' => (float)$item['unit_price'],
                         'quantity' => (float)$item['qty'],
-                        'detailName' => $itemName . ' ' . ($variant->color ?? '') . ' ' . ($variant->storage ?? ''),
+                        'detailName' => $itemName,
+                        'useTax1'   => false,
                         'itemCashDiscount' => (float)$item['discount'],
                     ];
                 }
@@ -340,14 +304,14 @@ class Create extends Component
                     'branchName' => $accurateBranchName,
                     'transDate' => Carbon::parse($this->order_date)->format('d/m/Y'),
                     'detailItem' => $detailItems,
-                    'inclusiveTax' => true,
-                    'taxable' => true,
+                    'inclusiveTax' => false,
+                    'taxable' => false,
                     'description' => $this->notes
                 ];
 
                 $soResult = $accurateService->postSalesOrder($soData, $dbSource);
                 Log::info('Response API Accurate SO: ', is_array($soResult) ? $soResult : []);
-                
+
                 if (isset($soResult['r']['number'])) {
                     $order->update(['accurate_so_number' => $soResult['r']['number']]);
                     \App\Models\OrderAccurateDoc::create([

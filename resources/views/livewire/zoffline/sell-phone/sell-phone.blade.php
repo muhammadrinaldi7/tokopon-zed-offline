@@ -318,79 +318,67 @@
                                  {{ $photoFile ? 'border border-neutral-100 shadow-sm' : 'border-2 border-dashed bg-neutral-50/50 hover:bg-neutral-50/100 cursor-pointer' }}
                                 {{ $hasError ? 'border-rose-300 bg-rose-50/20' : 'border-neutral-200 hover:border-neutral-300' }}">
 
-                                    @if ($photoFile)
-                                        @php
-                                            // Gunakan temporaryUrl() bawaan Livewire — jauh lebih ringan dari Base64
-                                            $previewUrl = $photoFile->temporaryUrl();
-                                        @endphp
-                                        <img src="{{ $previewUrl }}"
-                                            class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
-                                        <div
-                                            class="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-xs py-2 px-3 text-center pointer-events-none z-10">
-                                            <span
-                                                class="text-[11px] font-bold text-white tracking-wide block truncate">{{ $label }}</span>
-                                        </div>
-                                        <button type="button" wire:click="$set('{{ $propertyName }}', null)"
-                                            x-on:click="localPreview = null"
-                                            class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-10 flex items-center justify-center">
-                                            <svg class="w-3.5 h-3.5 text-rose-500" fill="none"
-                                                stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    stroke-width="2.5"
-                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-16v1M4 7h16" />
-                                            </svg>
-                                        </button>
-                                    @else
-                                        {{-- INSTANT LOCAL PREVIEW (WHILE COMPRESSING & UPLOADING) --}}
-                                        <template x-if="localPreview">
-                                            <div class="absolute inset-0 z-20">
-                                                <img :src="localPreview"
-                                                    class="w-full h-full object-cover opacity-60">
-                                                <div
-                                                    class="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px]">
-                                                    <svg class="animate-spin w-8 h-8 text-[#1c69d4]" fill="none"
-                                                        viewBox="0 0 24 24">
-                                                        <circle class="opacity-25" cx="12" cy="12"
-                                                            r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                        <path class="opacity-75" fill="currentColor"
-                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                                        </path>
-                                                    </svg>
-                                                </div>
-                                            </div>
-                                        </template>
+                                    {{-- PREVIEW MURNI DARI BROWSER (ALPINE JS) --}}
+                                    <template x-if="localPreview">
+                                        <div class="absolute inset-0 z-20">
+                                            <img :src="localPreview"
+                                                class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
 
-                                        {{-- CAMERA ONLY UPLOAD --}}
-                                        <label x-show="!localPreview"
-                                            class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center select-none overflow-hidden cursor-pointer z-10">
-                                            <input type="file" accept="image/*" capture="environment"
-                                                class="hidden"
-                                                @change="if($event.target.files.length > 0) { localPreview = URL.createObjectURL($event.target.files[0]); } customCompressHandler($event, 'photo_{{ $key }}')">
+                                            {{-- Label Bawah --}}
                                             <div
-                                                class="absolute inset-0 flex items-center justify-center z-0 group-hover:scale-110 transition-transform duration-300">
-                                                <img src="{{ asset('assets/png/' . $key . '.png') }}"
-                                                    alt="{{ $label }}"
-                                                    class="w-50 h-auto object-contain drop-shadow-sm {{ $hasError ? 'opacity-20' : 'opacity-30' }}"
-                                                    onerror="this.onerror=null; this.src='{{ asset('assets/png/default.png') }}';">
-                                            </div>
-                                            <div class="absolute bottom-3 inset-x-0">
+                                                class="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-xs py-2 px-3 text-center pointer-events-none z-30">
                                                 <span
-                                                    class="block text-[11px] font-bold tracking-wide {{ $hasError ? 'text-rose-500' : 'text-neutral-500 group-hover:text-neutral-700' }}">
-                                                    {{ $label }}
-                                                </span>
-                                                @error($propertyName)
-                                                    <span
-                                                        class="block text-[10px] text-rose-500 mt-0.5 leading-tight">{{ $message }}</span>
-                                                @enderror
+                                                    class="text-[11px] font-bold text-white tracking-wide block truncate">{{ $label }}</span>
                                             </div>
-                                        </label>
-                                    @endif
 
-                                    <div wire:loading.flex wire:target="{{ $propertyName }}"
-                                        class="absolute inset-0 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center gap-1 z-10">
-                                        <span
-                                            class="animate-spin w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full"></span>
-                                    </div>
+                                            {{-- Tombol Hapus --}}
+                                            <button type="button"
+                                                @click="localPreview = null; $wire.set('{{ $propertyName }}', null)"
+                                                class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-40 flex items-center justify-center">
+                                                <svg class="w-3.5 h-3.5 text-rose-500" fill="none"
+                                                    stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2.5"
+                                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-16v1M4 7h16" />
+                                                </svg>
+                                            </button>
+
+                                            {{-- Loading Overlay (Saat proses upload ke Livewire berlangsung) --}}
+                                            <div wire:loading.flex wire:target="{{ $propertyName }}"
+                                                class="absolute inset-0 bg-white/60 backdrop-blur-[2px] flex items-center justify-center z-30">
+                                                <svg class="animate-spin w-8 h-8 text-violet-600" fill="none"
+                                                    viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                    </path>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    {{-- TOMBOL UPLOAD KAMERA --}}
+                                    <label x-show="!localPreview"
+                                        class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center select-none overflow-hidden cursor-pointer z-10">
+                                        <input type="file" accept="image/*" capture="environment" class="hidden"
+                                            @change="if($event.target.files.length > 0) { localPreview = URL.createObjectURL($event.target.files[0]); } customCompressHandler($event, '{{ $propertyName }}')">
+                                        <div
+                                            class="absolute inset-0 flex items-center justify-center z-0 group-hover:scale-110 transition-transform duration-300">
+                                            <img src="{{ asset('assets/png/' . $key . '.png') }}"
+                                                alt="{{ $label }}"
+                                                class="w-50 h-auto object-contain drop-shadow-sm {{ $hasError ? 'opacity-20' : 'opacity-30' }}"
+                                                onerror="this.onerror=null; this.src='{{ asset('assets/png/default.png') }}';">
+                                        </div>
+                                        <div class="absolute bottom-3 inset-x-0">
+                                            <span
+                                                class="block text-[11px] font-bold tracking-wide {{ $hasError ? 'text-rose-500' : 'text-neutral-500 group-hover:text-neutral-700' }}">
+                                                {{ $label }}
+                                            </span>
+                                        </div>
+                                    </label>
+
+
                                     @error('photo_' . $key)
                                         <div
                                             class="absolute inset-x-0 bottom-0 bg-rose-500 text-white p-2 text-center z-10 flex flex-col items-center justify-center h-12">
@@ -965,6 +953,23 @@
                                     </div>
                                 </div>
                             </div>
+                        @endif
+
+                        @if ($isNewCustomer || $needsBankInfo)
+                            @if (!$isNewCustomer && $needsBankInfo)
+                                <div
+                                    class="p-4 bg-amber-50 border border-amber-200 text-amber-700 rounded-2xl mb-4 text-xs font-bold flex items-start gap-3">
+                                    <svg class="w-5 h-5 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div>
+                                        Pelanggan ini belum memiliki data Rekening Bank. Anda wajib melengkapinya untuk
+                                        melanjutkan proses pembayaran.
+                                    </div>
+                                </div>
+                            @endif
 
                             <div class="mb-8 p-6 bg-neutral-50 rounded-3xl border border-neutral-100 space-y-4">
                                 <p class="text-xs font-black text-neutral-400 uppercase tracking-widest mb-2">
@@ -1047,10 +1052,106 @@
                         <div class="text-xs">
                             <p class="font-black text-emerald-900">Estimasi Harga Jual Anda</p>
                             <p class="text-emerald-700 font-medium">Berdasarkan kondisi yang Anda cantumkan.</p>
+                            @if ($is_price_adjusted)
+                                <div class="mt-1 flex flex-wrap items-center gap-2">
+                                    <span
+                                        class="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded border border-amber-200">
+                                        Harga Disesuaikan Manual
+                                    </span>
+                                    <button type="button" wire:click="resetCalculation"
+                                        class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 underline">
+                                        Reset ke Otomatis
+                                    </button>
+                                </div>
+                            @endif
                         </div>
-                        <div class="text-right">
-                            <p class="text-2xl md:text-3xl font-black text-emerald-600">Rp
-                                {{ number_format($final_price, 0, ',', '.') }}</p>
+                        <div class="text-right" x-data="{ 
+                            modalOpen: false, 
+                            price: @entangle('final_price'),
+                            formattedPrice: '',
+                            init() {
+                                this.formattedPrice = this.formatNumber(this.price);
+                                $watch('price', value => {
+                                    if(document.activeElement !== this.$refs.priceInput) {
+                                        this.formattedPrice = this.formatNumber(value);
+                                    }
+                                });
+                            },
+                            formatNumber(value) {
+                                if (!value) return '';
+                                let str = value.toString().replace(/\D/g, '');
+                                return new Intl.NumberFormat('id-ID').format(str);
+                            },
+                            updatePrice(value) {
+                                let cleanValue = value.replace(/\D/g, '');
+                                this.price = cleanValue ? parseInt(cleanValue) : 0;
+                                this.formattedPrice = this.formatNumber(cleanValue);
+                            }
+                        }">
+                            {{-- TAMPILAN NORMAL --}}
+                            <div class="flex items-center justify-end gap-3">
+                                <p class="text-2xl md:text-3xl font-black text-emerald-600">
+                                    Rp <span x-text="new Intl.NumberFormat('id-ID').format(price || 0)"></span>
+                                </p>
+                                <button type="button" @click="modalOpen = true"
+                                    class="p-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-xl transition-colors"
+                                    title="Sesuaikan Harga">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
+                                        </path>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            {{-- TAMPILAN EDIT MODAL --}}
+                            <div x-show="modalOpen" x-cloak
+                                class="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/50 backdrop-blur-sm p-4"
+                                x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
+                                x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200"
+                                x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+
+                                <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl text-left"
+                                    @click.away="modalOpen = false" x-transition:enter="ease-out duration-300"
+                                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100">
+
+                                    <div class="flex justify-between items-center mb-6">
+                                        <h3 class="text-lg font-bold text-neutral-800">Sesuaikan Harga Manual</h3>
+                                        <button @click="modalOpen = false" type="button"
+                                            class="text-neutral-400 hover:text-neutral-600 transition-colors bg-neutral-100 hover:bg-neutral-200 p-2 rounded-full">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+
+                                    <div class="relative w-full mb-8">
+                                        <label class="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2">Harga Kesepakatan Akhir</label>
+                                        <div class="relative">
+                                            <span
+                                                class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-emerald-600 text-lg">Rp</span>
+                                            <input type="text" x-ref="priceInput" :value="formattedPrice" @input="updatePrice($event.target.value)" 
+                                                class="w-full pl-12 pr-4 py-4 border-2 border-emerald-200 rounded-xl font-bold text-emerald-800 focus:outline-none focus:border-emerald-500 bg-white text-xl shadow-inner transition-colors"
+                                                @keydown.enter="modalOpen = false; $wire.set('is_price_adjusted', true)">
+                                        </div>
+                                    </div>
+
+                                    <div class="flex gap-3">
+                                        <button type="button" @click="modalOpen = false"
+                                            class="w-full py-3.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl transition-colors">
+                                            Batal
+                                        </button>
+                                        <button type="button"
+                                            @click="modalOpen = false; $wire.set('is_price_adjusted', true)"
+                                            class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-emerald-600/30">
+                                            Simpan Harga
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
