@@ -71,6 +71,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/accurate-sync-sn', \App\Livewire\Admin\Accurate\SerialNumberSync::class)->name('accurate-sync-sn')->middleware('can:manage-accurate-products');
     Route::get('/warehouse-stocks', \App\Livewire\Admin\Warehouse\StockManagement::class)->name('warehouse-stocks')->middleware('can:view-warehouse-stocks');
     Route::get('/check-serial-number', \App\Livewire\Admin\Warehouse\CheckSerialNumber::class)->name('check-serial-number')->middleware('can:view-warehouse-stocks');
+    Route::get('/check-serial-number/{sn}/history', \App\Livewire\Admin\Warehouse\SerialNumberHistory::class)->name('warehouse.sn-history')->middleware('can:view-warehouse-stocks');
 
     // Pesanan
     Route::get('/orders', \App\Livewire\Admin\Orders\OrderManagement::class)->name('orders.management')->middleware('can:manage-orders');

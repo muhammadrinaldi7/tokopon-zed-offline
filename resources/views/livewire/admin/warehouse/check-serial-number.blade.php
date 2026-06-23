@@ -105,10 +105,17 @@
                                     </div>
                                 </div>
                                 
-                                <div class="md:col-span-2">
+                                <div class="md:col-span-2 flex items-center justify-between mt-2 pt-4 border-t border-gray-100">
                                     <p class="text-xs text-gray-400">
-                                        Data terakhir ditarik dari Accurate pada: {{ $result->updated_at->format('d M Y H:i:s') }}
+                                        Update terakhir: {{ $result->updated_at->format('d M Y H:i') }}
                                     </p>
+                                    
+                                    <a href="{{ route('admin.warehouse.sn-history', ['sn' => urlencode($result->serial_number)]) }}" wire:navigate class="px-5 py-2.5 bg-neutral-800 hover:bg-black text-white font-bold rounded-xl text-sm transition-colors flex items-center gap-2 shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Lihat Riwayat Perjalanan
+                                    </a>
                                 </div>
                             </div>
                         </div>
