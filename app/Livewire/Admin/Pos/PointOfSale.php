@@ -191,15 +191,11 @@ class PointOfSale extends Component
                 'total_amount' => $subtotal,
                 'shipping_cost' => 0,
                 'discount_amount' => $totalDiscountAmount, // Total semua diskon
-                'mdr_percentage' => ($subtotal - $totalDiscountAmount) > 0 ? round(($mdrAmt / ($subtotal - $totalDiscountAmount)) * 100, 2) : 0,
-                'mdr_amount' => $mdrAmt,
                 'grand_total' => $grandTotal,
                 'order_status' => 'COMPLETED',
                 'order_channel' => 'POS',
                 'handled_by' => Auth::id(),
                 'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
-                'payment_method_id' => $this->payments[0]['payment_method_id'] ?: null,
-                'payment_method_rate_id' => $this->payments[0]['payment_method_rate_id'] ?: null,
                 'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
                 'notes' => $this->notes,
             ]);

@@ -140,7 +140,7 @@
                                             <td class="p-3">
                                                 <span
                                                     class="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md uppercase">
-                                                    {{ $order->paymentMethod->name ?? 'Cash' }}
+                                                    {{ $order->payments->first()->paymentMethod->name ?? 'Cash' }}
                                                 </span>
                                             </td>
                                             <td class="p-3 text-right font-bold text-gray-900">

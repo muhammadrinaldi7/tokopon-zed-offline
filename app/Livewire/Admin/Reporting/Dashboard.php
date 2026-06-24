@@ -99,13 +99,22 @@ class Dashboard extends Component
             });
 
         // --- 1. KPI OVERVIEW ---
+        $orderIds = (clone $query)->pluck('id');
         $totalGross = (clone $query)->sum('total_amount');
         $totalDiscount = (clone $query)->sum('discount_amount');
-        $totalMdr = (clone $query)->sum('mdr_amount');
+        
+        $totalMdr = \App\Models\OrderPayment::whereIn('order_id', $orderIds)
+            ->with(['paymentMethod', 'paymentMethodRate'])
+            ->get()
+            ->sum(function($payment) {
+                $rate = $payment->paymentMethodRate;
+                $pct = $rate ? $rate->mdr_percentage : ($payment->paymentMethod->mdr_percentage ?? 0);
+                return round($payment->amount * $pct / 100);
+            });
+
         $totalNet = (clone $query)->sum('grand_total') - $totalMdr;
         $totalTransactions = (clone $query)->count();
 
-        $orderIds = (clone $query)->pluck('id');
         $totalQty = OrderItem::whereIn('order_id', $orderIds)->sum('qty');
 
         // --- 2. MTD (Month To Date) SECTION ---
@@ -142,15 +151,33 @@ class Dashboard extends Component
                 }
             });
 
-        $mtdNetSales = (clone $mtdQuery)->sum('grand_total') - (clone $mtdQuery)->sum('mdr_amount');
-        $lastMtdNetSales = (clone $lastMtdQuery)->sum('grand_total') - (clone $lastMtdQuery)->sum('mdr_amount');
+        $mtdOrderIds = (clone $mtdQuery)->pluck('id');
+        $lastMtdOrderIds = (clone $lastMtdQuery)->pluck('id');
+
+        $mtdMdr = \App\Models\OrderPayment::whereIn('order_id', $mtdOrderIds)
+            ->with(['paymentMethod', 'paymentMethodRate'])
+            ->get()
+            ->sum(function($payment) {
+                $rate = $payment->paymentMethodRate;
+                $pct = $rate ? $rate->mdr_percentage : ($payment->paymentMethod->mdr_percentage ?? 0);
+                return round($payment->amount * $pct / 100);
+            });
+
+        $lastMtdMdr = \App\Models\OrderPayment::whereIn('order_id', $lastMtdOrderIds)
+            ->with(['paymentMethod', 'paymentMethodRate'])
+            ->get()
+            ->sum(function($payment) {
+                $rate = $payment->paymentMethodRate;
+                $pct = $rate ? $rate->mdr_percentage : ($payment->paymentMethod->mdr_percentage ?? 0);
+                return round($payment->amount * $pct / 100);
+            });
+
+        $mtdNetSales = (clone $mtdQuery)->sum('grand_total') - $mtdMdr;
+        $lastMtdNetSales = (clone $lastMtdQuery)->sum('grand_total') - $lastMtdMdr;
         
         $mtdTransactions = (clone $mtdQuery)->count();
         $lastMtdTransactions = (clone $lastMtdQuery)->count();
 
-        $mtdOrderIds = (clone $mtdQuery)->pluck('id');
-        $lastMtdOrderIds = (clone $lastMtdQuery)->pluck('id');
-        
         $mtdQty = OrderItem::whereIn('order_id', $mtdOrderIds)->sum('qty');
         $lastMtdQty = OrderItem::whereIn('order_id', $lastMtdOrderIds)->sum('qty');
 
@@ -172,7 +199,7 @@ class Dashboard extends Component
         ];
 
         // Fetch all orders for chart processing
-        $orders = (clone $query)->with(['paymentMethod', 'salesBy'])->get();
+        $orders = (clone $query)->with(['salesBy'])->get();
 
         // --- 3. TREND DATA (Line/Area Chart) ---
         $daysDiff = $start->diffInDays($end);
@@ -240,11 +267,12 @@ class Dashboard extends Component
         ];
 
         // --- 5. PAYMENT METHOD PROPORTION (Donut Chart) ---
-        $pmData = $orders->groupBy('payment_method_id')->map(function($group) {
+        $orderPaymentsForChart = \App\Models\OrderPayment::with('paymentMethod')->whereIn('order_id', $orderIds)->get();
+        $pmData = $orderPaymentsForChart->groupBy('payment_method_id')->map(function($group) {
             $pm = $group->first()->paymentMethod;
             return [
                 'name' => $pm ? $pm->name : 'Unknown',
-                'total' => $group->sum('grand_total')
+                'total' => $group->sum('amount')
             ];
         })->sortByDesc('total')->values();
 

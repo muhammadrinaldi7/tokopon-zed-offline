@@ -11,10 +11,18 @@ class Order extends Model
     // Konversi kolom JSON menjadi array otomatis di Laravel
     protected $casts = [
         'shipping_address_snapshot' => 'array',
-        'mdr_percentage' => 'decimal:2',
-        'mdr_amount' => 'decimal:2',
         'order_date' => 'date',
     ];
+
+    // Accessor untuk menggantikan kolom legacy mdr_amount
+    public function getMdrAmountAttribute()
+    {
+        return $this->payments->sum(function($payment) {
+            $rate = $payment->paymentMethodRate;
+            $pct = $rate ? $rate->mdr_percentage : ($payment->paymentMethod->mdr_percentage ?? 0);
+            return round($payment->amount * $pct / 100);
+        });
+    }
 
     // ─── Relationships ─────────────────────────────────────────
 
@@ -69,15 +77,6 @@ class Order extends Model
         return $this->belongsTo(Branch::class);
     }
 
-    public function paymentMethod()
-    {
-        return $this->belongsTo(PaymentMethod::class);
-    }
-
-    public function paymentMethodRate()
-    {
-        return $this->belongsTo(PaymentMethodRate::class);
-    }
 
     // ─── Scopes ────────────────────────────────────────────────
 

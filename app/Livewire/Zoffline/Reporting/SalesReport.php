@@ -87,7 +87,7 @@ class SalesReport extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        return Order::with(['user', 'salesBy', 'paymentMethod', 'items.variant', 'promos'])
+        return Order::with(['user', 'salesBy', 'payments.paymentMethod', 'payments.paymentMethodRate', 'items.variant', 'promos'])
             ->whereBetween('orders.created_at', [$start, $end])
             ->where('orders.order_status', 'COMPLETED')
             ->when($this->search, function ($query) {
@@ -114,7 +114,7 @@ class SalesReport extends Component
     public function exportCsv()
     {
         // Eager load relasi payments untuk performa saat generate CSV
-        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'paymentMethodRate', 'promos'])->get();
+        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'promos'])->get();
         $csvFileName = 'laporan_penjualan_detail_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
         $separator = $this->csvSeparator;
         return response()->streamDownload(function () use ($orders, $separator) {
@@ -131,10 +131,7 @@ class SalesReport extends Component
                         $allPaymentMethodNames[$methodName] = true;
                     }
                 } else {
-                    $methodName = $order->paymentMethod ? $order->paymentMethod->name : 'Unknown Payment';
-                    if ($methodName !== 'Unknown Payment') {
-                        $allPaymentMethodNames[$methodName] = true;
-                    }
+                    $allPaymentMethodNames['Unknown Payment'] = true;
                 }
 
                 foreach ($order->promos as $promo) {
@@ -194,10 +191,7 @@ class SalesReport extends Component
                         $orderPayments[$pmName] += $payment->amount;
                     }
                 } else {
-                    $pmName = $order->paymentMethod ? $order->paymentMethod->name : 'Unknown Payment';
-                    if ($pmName !== 'Unknown Payment') {
-                        $orderPayments[$pmName] = $order->grand_total; // Fallback transaksi lama
-                    }
+                    $orderPayments['Unknown Payment'] = $order->grand_total; // Fallback transaksi lama
                 }
 
                 // Rekap Total Promo untuk Order ini
@@ -343,8 +337,8 @@ class SalesReport extends Component
                         $rowData[] = $promoVal;
                     }
 
-                    $mdrPct = $order->paymentMethodRate->mdr_percentage ?? 0;
-                    $mdrAmount = ($order->grand_total * $mdrPct) / 100;
+                    $mdrPct = 0;
+                    $mdrAmount = 0;
                     $rowData[] = $mdrAmount;
                     $rowData[] = $order->grand_total; // TOTAL TRANSAKSI
                     $rowData[] = $order->grand_total - $mdrAmount; // NET SALES
@@ -359,7 +353,7 @@ class SalesReport extends Component
     public function exportCsvOpsi2()
     {
         // Eager load relasi payments untuk performa saat generate CSV
-        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'paymentMethodRate', 'promos'])->get();
+        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'promos'])->get();
         $csvFileName = 'laporan_penjualan_multi_row_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
         $separator = $this->csvSeparator;
         return response()->streamDownload(function () use ($orders, $separator) {
@@ -437,9 +431,9 @@ class SalesReport extends Component
                             '-', // METODE BAYAR / PROMO
                             '0', // NOMINAL
                             $order->total_amount, // GROSS
-                            ($order->grand_total * ($order->paymentMethodRate->mdr_percentage ?? 0)) / 100,
+                            0,
                             $order->grand_total,
-                            $order->grand_total - (($order->grand_total * ($order->paymentMethodRate->mdr_percentage ?? 0)) / 100)
+                            $order->grand_total
                         ]);
                         fputcsv($file, $row, $separator);
                     }
@@ -459,9 +453,9 @@ class SalesReport extends Component
                         '-',
                         '0',
                         $order->total_amount,
-                        ($order->grand_total * ($order->paymentMethodRate->mdr_percentage ?? 0)) / 100,
+                        0,
                         $order->grand_total,
-                        $order->grand_total - (($order->grand_total * ($order->paymentMethodRate->mdr_percentage ?? 0)) / 100)
+                        $order->grand_total
                     ]);
                     fputcsv($file, $row, $separator);
                 }
@@ -495,29 +489,26 @@ class SalesReport extends Component
                         fputcsv($file, $row, $separator);
                     }
                 } else {
-                    $methodName = $order->paymentMethod ? $order->paymentMethod->name : 'Unknown Payment';
-                    if ($methodName !== 'Unknown Payment') {
-                        $row = array_merge($baseRow, [
-                            'PEMBAYARAN',
-                            '-',
-                            '-',
-                            '-',
-                            '-',
-                            '-',
-                            '-',
-                            '0',
-                            '0',
-                            '0',
-                            '0',
-                            $methodName,
-                            $order->grand_total,
-                            '0',
-                            '0',
-                            '0',
-                            '0'
-                        ]);
-                        fputcsv($file, $row, $separator);
-                    }
+                    $row = array_merge($baseRow, [
+                        'PEMBAYARAN',
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '-',
+                        '0',
+                        '0',
+                        '0',
+                        '0',
+                        'Unknown Payment',
+                        $order->grand_total,
+                        '0',
+                        '0',
+                        '0',
+                        '0'
+                    ]);
+                    fputcsv($file, $row, $separator);
                 }
 
                 // 3. Tulis Baris Promo
@@ -551,7 +542,7 @@ class SalesReport extends Component
     public function exportCsvOpsi3()
     {
         // Eager load relasi payments untuk performa saat generate CSV
-        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'paymentMethodRate', 'promos.skus', 'promos.bundleSkus'])->get();
+        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'promos.skus', 'promos.bundleSkus'])->get();
         $csvFileName = 'laporan_penjualan_kolom_statis_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
         $separator = $this->csvSeparator;
         return response()->streamDownload(function () use ($orders, $separator) {
@@ -630,21 +621,14 @@ class SalesReport extends Component
                         $orderPayments[$key]['mdr_amount'] += $mdrAmt;
                     }
                 } else {
-                    $pmName = $order->paymentMethod ? $order->paymentMethod->name : 'Unknown Payment';
-                    if ($pmName !== 'Unknown Payment') {
-                        $pmrPct = $order->paymentMethodRate ? $order->paymentMethodRate->mdr_percentage : 0;
-                        $pmrName = $order->paymentMethodRate ? $order->paymentMethodRate->name : '-';
-                        $mdrAmt = round(($order->grand_total * $pmrPct) / 100);
-
-                        $key = $pmName . '|' . $pmrPct . '|' . $pmrName;
-                        $orderPayments[$key] = [
-                            'name' => $pmName,
-                            'amount' => $order->grand_total,
-                            'mdr_pct' => $pmrPct,
-                            'mdr_amount' => $mdrAmt,
-                            'mdr_name' => $pmrName
-                        ];
-                    }
+                    $key = 'Unknown Payment|0|-';
+                    $orderPayments[$key] = [
+                        'name' => 'Unknown Payment',
+                        'amount' => $order->grand_total,
+                        'mdr_pct' => 0,
+                        'mdr_amount' => 0,
+                        'mdr_name' => '-'
+                    ];
                 }
                 $orderPayments = array_values($orderPayments);
 
@@ -887,8 +871,9 @@ class SalesReport extends Component
 
         $totalGross = $this->ordersQuery->sum('total_amount');
         $netQuery = clone $this->ordersQuery;
-        $totalNet = $netQuery->leftJoin('payment_method_rates', 'orders.payment_method_rate_id', '=', 'payment_method_rates.id')
-            ->sum(\Illuminate\Support\Facades\DB::raw('orders.grand_total - ((orders.grand_total * COALESCE(payment_method_rates.mdr_percentage, 0)) / 100)'));
+        $totalNet = $netQuery->get()->sum(function($order) {
+            return $order->grand_total - $order->mdr_amount;
+        });
 
         return view('livewire.zoffline.reporting.sales-report', [
             'orders' => $orders,

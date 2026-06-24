@@ -76,7 +76,7 @@ class StaffReport extends Component
             ->when($this->businessUnitFilter, function ($query) {
                 $query->where('business_unit_id', $this->businessUnitFilter);
             })
-            ->with(['salesBy'])
+            ->with(['salesBy', 'payments.paymentMethod', 'payments.paymentMethodRate'])
             ->get();
 
         $grouped = $orders->groupBy('sales_id');

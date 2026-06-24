@@ -174,7 +174,7 @@
                                 </span>
                             </td>
                             <td class="px-5 py-3 text-xs font-medium text-gray-700">
-                                {{ $order->paymentMethod ? $order->paymentMethod->name : '-' }}
+                                {{ $order->payments->first()->paymentMethod->name ?? '-' }}
                             </td>
                             <td class="px-5 py-3 text-right">
                                 <p class="text-xs font-bold text-gray-800">Rp
