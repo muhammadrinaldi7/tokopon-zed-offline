@@ -58,6 +58,7 @@
     @endif
     @include('livewire.zoffline.pos.modal.draft-penjualan')
     @include('livewire.zoffline.pos.modal.receipt-struk')
+    @include('livewire.zoffline.pos.modal.manual-discount')
     <div id="scanner-modal" class="hidden fixed inset-0 z-50 bg-black/60 items-center justify-center backdrop-blur-sm">
         <div class="bg-white p-4 rounded-lg w-11/12 max-w-md shadow-xl">
 
