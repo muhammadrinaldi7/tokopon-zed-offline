@@ -33,7 +33,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/check-serial-number/{sn}/history', \App\Livewire\Zoffline\Warehouse\SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
     // Reporting
     Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
-        Route::get('/', Dashboard::class)->name('index');
         Route::get('/sales', \App\Livewire\Zoffline\Reporting\SalesReport::class)->name('sales');
         Route::get('/promo', \App\Livewire\Zoffline\Reporting\PromoReport::class)->name('promo');
         Route::get('/products', \App\Livewire\Zoffline\Reporting\ProductReport::class)->name('products');
@@ -64,7 +63,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/pos', \App\Livewire\Admin\Pos\PointOfSale::class)->name('pos')->middleware('can:view-pos');
     Route::livewire('/dashboard', 'pages::admin.dashboard')->name('dashboard')->middleware('can:view_dashboard');
-    Route::get('/purchase-invoice-export', AccurateInvoiceExport::class)->name('purchase-invoice-export');
+    Route::get('/purchase-invoice-export', AccurateInvoiceExport::class)->name('purchase.invoice.export');
 
     // Administrator
     Route::livewire('/users', 'pages::admin.user-management')->name('users')->middleware('can:manage-users');
@@ -98,7 +97,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/{order}', \App\Livewire\Admin\Orders\SalesOrder\Show::class)->name('show');
     });
 
-
+    // Reporting
+    Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
+        Route::get('/', Dashboard::class)->name('index');
+    });
 
     // Settings
     Route::get('/settings/business-units', \App\Livewire\Admin\Settings\BusinessUnitIndex::class)->name('settings.business-units')->middleware('can:manage-settings');

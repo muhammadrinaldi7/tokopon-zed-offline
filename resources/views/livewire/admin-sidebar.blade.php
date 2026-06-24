@@ -288,7 +288,7 @@
                             Dashboard
                         </a>
                     @endcan
-                    @can('reporting-sales')
+                    {{-- @can('reporting-sales')
                         <a href="{{ route('admin.reporting.sales') }}" wire:navigate
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.sales') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                             Laporan Penjualan
@@ -317,7 +317,7 @@
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.staff') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                             Analisa Sales
                         </a>
-                    @endcan
+                    @endcan --}}
                 </div>
             </div>
         @endcan
@@ -510,6 +510,22 @@
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Unit Usaha</span><span
                     class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                     x-show="sidebarCollapsed" style="display:none;" x-cloak>Unit Usaha</span>
+            </a>
+
+            <a href="{{ route('admin.purchase.invoice.export') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.purchase.invoice.export') ? $activeClass : $inactiveClass }}">
+
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.purchase.invoice.export') ? $activeIconClass : $inactiveIconClass }}"
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor" class="size-6">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3" />
+                </svg>
+
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Import Purchase
+                    Invoice</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Import Purchase Invoice</span>
             </a>
 
             <a href="{{ route('admin.settings.payment-methods') }}" wire:navigate

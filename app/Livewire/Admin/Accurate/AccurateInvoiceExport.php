@@ -35,24 +35,38 @@ class AccurateInvoiceExport extends Component
             'serial_numbers'
         ];
 
-        // Contoh: HP ada 2 unit, maka IMEI digabung pakai titik koma
-        $exampleRow = [
+        // Contoh: Format 1 baris = 1 kuantitas = 1 Serial Number
+        $exampleRow1 = [
             'INV-MIG-001',
             '25/06/2026',
             'GSK_VENDOR_40146',
             'GSK - Banjarbaru',
             'Migrasi dari Erzap',
             '100021',
-            '2',
+            '1',
             '5000000',
             'GSK - Banjarbaru',
-            '351234567890123;351234567890124'
+            '351234567890123'
         ];
 
-        return response()->streamDownload(function () use ($columns, $exampleRow) {
+        $exampleRow2 = [
+            'INV-MIG-001',
+            '25/06/2026',
+            'GSK_VENDOR_40146',
+            'GSK - Banjarbaru',
+            'Migrasi dari Erzap',
+            '100021',
+            '1',
+            '5000000',
+            'GSK - Banjarbaru',
+            '351234567890124'
+        ];
+
+        return response()->streamDownload(function () use ($columns, $exampleRow1, $exampleRow2) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
-            fputcsv($file, $exampleRow);
+            fputcsv($file, $exampleRow1);
+            fputcsv($file, $exampleRow2);
             fclose($file);
         }, $fileName, ['Content-Type' => 'text/csv']);
     }
@@ -180,15 +194,6 @@ class AccurateInvoiceExport extends Component
                 fputcsv($file, array_pad($headerRow, $maxColumns, ''));
 
                 foreach ($inv->items as $item) {
-                    $itemRow = array_fill(0, count($row2_item), '');
-                    $itemRow[0] = 'ITEM';
-                    $itemRow[1] = $item->item_code;
-                    $itemRow[3] = $item->quantity;
-                    $itemRow[4] = $item->unit;
-                    $itemRow[5] = round($item->unit_price, 0);
-                    $itemRow[9] = $item->warehouse_name ?? '';
-
-                    // Masukkan data SN ke indeks ke-16
                     if (!empty(trim($item->serial_numbers))) {
                         // Bersihkan jika ada spasi atau titik koma berlebih di ujung teks
                         $cleanSn = trim($item->serial_numbers, " \t\n\r\0\x0B;");
@@ -203,10 +208,31 @@ class AccurateInvoiceExport extends Component
                             return; // Hentikan proses download
                         }
 
-                        // Kembalikan teks yang sudah bersih ke properti item
-                        $item->serial_numbers = $cleanSn;
+                        // Buat 1 baris per Serial Number dengan Kuantitas = 1
+                        foreach ($snArray as $sn) {
+                            $itemRow = array_fill(0, count($row2_item), '');
+                            $itemRow[0] = 'ITEM';
+                            $itemRow[1] = $item->item_code;
+                            $itemRow[3] = 1; // Kuantitas dipecah jadi 1
+                            $itemRow[4] = $item->unit;
+                            $itemRow[5] = round($item->unit_price, 0);
+                            $itemRow[9] = $item->warehouse_name ?? '';
+                            $itemRow[16] = trim($sn); // Masukkan Serial Number
+
+                            fputcsv($file, array_pad($itemRow, $maxColumns, ''));
+                        }
+                    } else {
+                        // Jika tidak ada Serial Number, export utuh seperti biasa
+                        $itemRow = array_fill(0, count($row2_item), '');
+                        $itemRow[0] = 'ITEM';
+                        $itemRow[1] = $item->item_code;
+                        $itemRow[3] = $item->quantity;
+                        $itemRow[4] = $item->unit;
+                        $itemRow[5] = round($item->unit_price, 0);
+                        $itemRow[9] = $item->warehouse_name ?? '';
+
+                        fputcsv($file, array_pad($itemRow, $maxColumns, ''));
                     }
-                    fputcsv($file, array_pad($itemRow, $maxColumns, ''));
                 }
 
                 $inv->update(['is_exported' => true]);
@@ -272,6 +298,8 @@ class AccurateInvoiceExport extends Component
                 'vendorNo'   => $invoice->vendor_id,
                 'branchName' => $invoice->branch_name,
                 'detailItem' => $detailItemArray,
+                'taxable' => false,
+                'inclusiveTax' => false,
             ];
 
             try {
