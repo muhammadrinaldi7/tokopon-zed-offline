@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Admin\Reporting;
+namespace App\Livewire\Zoffline\Reporting;
 
 use App\Models\Order;
 use Carbon\Carbon;
@@ -215,6 +215,6 @@ class PromoReport extends Component
             ->merge(\App\Models\ProductAccurate::whereNotNull('brandName')->distinct()->pluck('brandName'))
             ->unique()->sort()->values();
 
-        return view('livewire.admin.reporting.promo-report', compact('orders', 'availableBrands'))->layout('layouts.z');
+        return view('livewire.zoffline.reporting.promo-report', compact('orders', 'availableBrands'))->layout('layouts.z');
     }
 }

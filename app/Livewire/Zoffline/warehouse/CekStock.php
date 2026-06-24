@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Admin\Pos;
+namespace App\Livewire\Zoffline\warehouse;
 
 use App\Utils\Format;
 use Illuminate\Support\Facades\Auth;
@@ -180,6 +180,6 @@ class CekStock extends Component
 
     public function render()
     {
-        return view('livewire.admin.pos.cek-stock');
+        return view('livewire.zoffline.warehouse.cek-stock');
     }
 }

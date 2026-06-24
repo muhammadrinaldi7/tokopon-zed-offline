@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Admin\Reporting;
+namespace App\Livewire\Zoffline\Reporting;
 
 use App\Models\Order;
 use Carbon\Carbon;
@@ -890,7 +890,7 @@ class SalesReport extends Component
         $totalNet = $netQuery->leftJoin('payment_method_rates', 'orders.payment_method_rate_id', '=', 'payment_method_rates.id')
             ->sum(\Illuminate\Support\Facades\DB::raw('orders.grand_total - ((orders.grand_total * COALESCE(payment_method_rates.mdr_percentage, 0)) / 100)'));
 
-        return view('livewire.admin.reporting.sales-report', [
+        return view('livewire.zoffline.reporting.sales-report', [
             'orders' => $orders,
             'availableBranches' => $availableBranches,
             'summary' => [

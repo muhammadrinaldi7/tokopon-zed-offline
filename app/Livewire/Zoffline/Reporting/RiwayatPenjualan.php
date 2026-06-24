@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Zoffline\Pos;
+namespace App\Livewire\Zoffline\Reporting;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -61,7 +61,7 @@ class RiwayatPenjualan extends Component
             ->where('is_active', true)
             ->get();
 
-        return view('livewire.zoffline.pos.riwayat-penjualan', [
+        return view('livewire.zoffline.reporting.riwayat-penjualan', [
             'orders' => $orders,
             'paymentMethods' => $paymentMethods
         ]);
@@ -87,7 +87,7 @@ class RiwayatPenjualan extends Component
             $this->generateEscposContent($printer);
             $printer->feed(1);
             $printer->cut();
-            
+
             $data = $connector->getData();
             $base64 = base64_encode($data);
 
@@ -104,7 +104,7 @@ class RiwayatPenjualan extends Component
     private function generateEscposContent($printer)
     {
         $maxColumns = 40;
-        $separator = str_repeat("-", $maxColumns) . "\n"; 
+        $separator = str_repeat("-", $maxColumns) . "\n";
 
         $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
         $printer->selectPrintMode(
@@ -143,7 +143,7 @@ class RiwayatPenjualan extends Component
                 $storage = $v ? $v->storage ?? '' : '';
                 $color = $v ? $v->color ?? '' : '';
             }
-            
+
             // Bersihkan awalan nama
             $itemName = preg_replace('/^(?:DS\s*-\s*HP\s*|DS\s*-\s*|HP\s*-\s*|HP\s*)/i', '', trim($itemName));
 

@@ -19,7 +19,7 @@ class Home extends Component
 
     public function navigateToCekLokasiSN()
     {
-        return $this->redirectRoute('check-serial-number', navigate: true);
+        return $this->redirectRoute('zoffline.check-serial-number', navigate: true);
     }
 
     public function navigateToShift()

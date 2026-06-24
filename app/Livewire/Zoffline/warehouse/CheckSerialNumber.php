@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Admin\Warehouse;
+namespace App\Livewire\Zoffline\Warehouse;
 
 use App\Models\ProductSerialNumber;
 use Livewire\Component;
@@ -15,7 +15,7 @@ class CheckSerialNumber extends Component
     #[Layout('layouts.z')]
     public function render()
     {
-        return view('livewire.admin.warehouse.check-serial-number');
+        return view('livewire.zoffline.warehouse.check-serial-number');
     }
 
     public function search()

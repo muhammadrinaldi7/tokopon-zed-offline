@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Admin\Reporting;
+namespace App\Livewire\Zoffline\Reporting;
 
 use App\Models\Branch;
 use App\Models\Order;
@@ -260,7 +260,7 @@ class ProductReport extends Component
 
     public function render()
     {
-        return view('livewire.admin.reporting.product-report', [
+        return view('livewire.zoffline.reporting.product-report', [
             'products' => $this->products
         ])->layout('layouts.z');
     }

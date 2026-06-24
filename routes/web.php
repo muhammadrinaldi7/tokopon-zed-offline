@@ -3,13 +3,14 @@
 use App\Livewire\Admin\Accurate\AccurateInvoiceExport;
 use App\Livewire\Admin\Employe\EmployeManage;
 use App\Livewire\Admin\Vendor\VendorManage;
-use App\Livewire\Admin\Pos\CekStock;
+// use App\Livewire\Admin\Pos\CekStock;
 use App\Livewire\Admin\Reporting\Dashboard;
 use App\Livewire\Admin\Users\UserOperational;
 use App\Livewire\Pages\SellPhone;
 use App\Livewire\Pages\SellPhoneHistory;
 use App\Livewire\Pages\TradeIn;
 use App\Livewire\Pages\UserProfile;
+use App\Livewire\Zoffline\warehouse\CekStock;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -20,7 +21,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/pos', \App\Livewire\Zoffline\Pos\Pos::class)->name('zoffline.pos')->middleware('can:view-pos');
     Route::get('/zoffline/pos/open-shift', \App\Livewire\Zoffline\Pos\OpenShift::class)->name('zoffline.pos.open-shift')->middleware('can:view-pos');
     Route::get('/zoffline/pos/closing-kasir', \App\Livewire\Zoffline\Pos\ClosingKasir::class)->name('zoffline.pos.closing-kasir')->middleware('can:view-pos');
-    Route::get('/zoffline/pos/riwayat', \App\Livewire\Zoffline\Pos\RiwayatPenjualan::class)->name('zoffline.pos.riwayat')->middleware('can:view-pos');
+    Route::get('/zoffline/riwayat', \App\Livewire\Zoffline\Reporting\RiwayatPenjualan::class)->name('zoffline.pos.riwayat')->middleware('can:view-pos');
     Route::get('/zoffline/riwayat-kasir', \App\Livewire\Admin\Pos\RiwayatKasir::class)->name('zoffline.riwayat-kasir')->middleware('can:view-riwayat-kasir');
     Route::get('/zoffline/trade-in', \App\Livewire\Zoffline\TradeIn\TradeIn::class)->name('zoffline.trade-in')->middleware('can:trade-in');
     Route::get('/zoffline/sell-phone', \App\Livewire\Zoffline\SellPhone\SellPhone::class)->name('zoffline.sell-phone')->middleware('can:sell-phone');
@@ -28,7 +29,17 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/warranty-activation', \App\Livewire\Zoffline\Qc\WarrantyActivation::class)->name('zoffline.warranty-activation')->middleware('can:warranty-activation');
     Route::get('/zoffline/cek-stock', CekStock::class)->name('zoffline.cek-stock')->middleware('can:view-stock');
     Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view_dashboard');
-    Route::get('/check-serial-number', \App\Livewire\Admin\Warehouse\CheckSerialNumber::class)->name('check-serial-number')->middleware('can:view-warehouse-stocks');
+    Route::get('/zoffline/check-serial-number', \App\Livewire\Zoffline\Warehouse\CheckSerialNumber::class)->name('zoffline.check-serial-number')->middleware('can:view-warehouse-stocks');
+    // Reporting
+    Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
+        Route::get('/', Dashboard::class)->name('index');
+        Route::get('/sales', \App\Livewire\Zoffline\Reporting\SalesReport::class)->name('sales');
+        Route::get('/promo', \App\Livewire\Zoffline\Reporting\PromoReport::class)->name('promo');
+        Route::get('/products', \App\Livewire\Zoffline\Reporting\ProductReport::class)->name('products');
+        Route::get('/stock', \App\Livewire\Zoffline\Reporting\StockReport::class)->name('stock');
+        Route::get('/laporan-stok', \App\Livewire\Zoffline\Reporting\LaporanStok::class)->name('laporan-stok');
+        Route::get('/staff', \App\Livewire\Zoffline\Reporting\StaffReport::class)->name('staff');
+    });
 });
 
 // ─── Trade In & Sell Phone Client Pages (accessible by authenticated users, e.g. FL or customer) ───
@@ -86,16 +97,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/{order}', \App\Livewire\Admin\Orders\SalesOrder\Show::class)->name('show');
     });
 
-    // Reporting
-    Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
-        Route::get('/', Dashboard::class)->name('index');
-        Route::get('/sales', \App\Livewire\Admin\Reporting\SalesReport::class)->name('sales');
-        Route::get('/promo', \App\Livewire\Admin\Reporting\PromoReport::class)->name('promo');
-        Route::get('/products', \App\Livewire\Admin\Reporting\ProductReport::class)->name('products');
-        Route::get('/stock', \App\Livewire\Admin\Reporting\StockReport::class)->name('stock');
-        Route::get('/laporan-stok', \App\Livewire\Admin\Reporting\LaporanStok::class)->name('laporan-stok');
-        Route::get('/staff', \App\Livewire\Admin\Reporting\StaffReport::class)->name('staff');
-    });
+
 
     // Settings
     Route::get('/settings/business-units', \App\Livewire\Admin\Settings\BusinessUnitIndex::class)->name('settings.business-units')->middleware('can:manage-settings');

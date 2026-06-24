@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Admin\Reporting;
+namespace App\Livewire\Zoffline\Reporting;
 
 use App\Models\Order;
 use Carbon\Carbon;
@@ -128,7 +128,7 @@ class StaffReport extends Component
 
     public function render()
     {
-        return view('livewire.admin.reporting.staff-report', [
+        return view('livewire.zoffline.reporting.staff-report', [
             'staffPerformance' => $this->staffPerformance
         ])->layout('layouts.z');
     }

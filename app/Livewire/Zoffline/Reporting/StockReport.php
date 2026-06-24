@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Admin\Reporting;
+namespace App\Livewire\Zoffline\Reporting;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -236,7 +236,7 @@ class StockReport extends Component
             ['path' => LengthAwarePaginator::resolveCurrentPath()]
         );
 
-        return view('livewire.admin.reporting.stock-report', [
+        return view('livewire.zoffline.reporting.stock-report', [
             'stocks' => $paginatedData,
             'summary' => [
                 'total_items' => $allData->sum('stock'),

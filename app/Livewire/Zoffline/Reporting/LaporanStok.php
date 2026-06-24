@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Admin\Reporting;
+namespace App\Livewire\Zoffline\Reporting;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -136,7 +136,7 @@ class LaporanStok extends Component
         $stocks = $query->paginate(20);
         $warehouses = Warehouse::where('business_unit_id', $buId)->orderBy('name')->get();
 
-        return view('livewire.admin.reporting.laporan-stok', [
+        return view('livewire.zoffline.reporting.laporan-stok', [
             'stocks' => $stocks,
             'warehouses' => $warehouses
         ])->layout('layouts.z');
