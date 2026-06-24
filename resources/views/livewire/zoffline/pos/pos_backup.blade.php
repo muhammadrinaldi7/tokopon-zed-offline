@@ -1038,6 +1038,7 @@
 
     @include('livewire.zoffline.pos.modal.draft-penjualan')
     @include('livewire.zoffline.pos.modal.receipt-struk')
+    @include('livewire.zoffline.pos.modal.manual-discount')
     @include('livewire.zoffline.pos.modal.stok-gudang')
 
     {{-- <div id="scanner-modal"

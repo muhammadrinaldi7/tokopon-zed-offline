@@ -199,18 +199,20 @@
                                 @endphp
 
                                 @if ($validPresets->count() > 0)
-                                    <div class="pt-2">
-                                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
-                                            Internal Cashback</p>
-                                        <div class="flex flex-wrap gap-2">
-                                            @foreach ($validPresets as $preset)
-                                                <button
-                                                    wire:click="toggleManualDiscount({{ $index }}, {{ $preset->amount }})"
-                                                    class="px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors {{ isset($item['discount_amount']) && $item['discount_amount'] == $preset->amount ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50' }}">
-                                                    {{ number_format($preset->amount, 0, ',', '.') }}
-                                                </button>
-                                            @endforeach
-                                        </div>
+                                    <div class="pt-3 flex items-end gap-3">
+                                        @if(isset($item['discount_amount']) && $item['discount_amount'] > 0)
+                                            <div>
+                                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Cashback</p>
+                                                <p class="text-sm font-bold text-indigo-600">Rp {{ number_format($item['discount_amount'], 0, ',', '.') }}</p>
+                                            </div>
+                                        @endif
+                                        <button wire:click="openManualDiscountModal({{ $index }})"
+                                            class="h-8 px-3 flex items-center justify-center text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg transition-colors text-xs font-bold shrink-0">
+                                            <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            {{ isset($item['discount_amount']) && $item['discount_amount'] > 0 ? 'Ubah' : 'Cashback' }}
+                                        </button>
                                     </div>
                                 @endif
                             </div>

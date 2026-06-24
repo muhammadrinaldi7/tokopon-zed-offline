@@ -77,7 +77,7 @@ trait WithCart
                 'variant_type' => \App\Models\ProductAccurate::class,
                 'warehouse_id' => $warehouseId
             ])->first();
-            
+
             $stock = $warehouseStock ? (int) $warehouseStock->stock : 0;
 
             if ($stock <= 0) {
@@ -626,7 +626,7 @@ trait WithCart
             // 1. Cek dulu ke Accurate Service
             $accurateService = app(\App\Services\AccurateService::class);
             $skuFromAccurate = $accurateService->findSkuBySerialNumber($value, $buName);
-            
+
             if ($skuFromAccurate === 'error') {
                 $this->dispatch('toast', title: 'Warning', message: 'Koneksi ke Accurate bermasalah, mencoba pengecekan lokal.', type: 'warning');
             } else if ($skuFromAccurate === null) {
@@ -679,9 +679,8 @@ trait WithCart
                         $this->cart[$index]['serial_numbers'] = [];
                     }
                     $this->cart[$index]['serial_numbers'][] = $value;
-                    $this->new_sns[$index] = ''; 
+                    $this->new_sns[$index] = '';
                     return;
-
                 } else if ($isConfirmedSn) {
                     $this->dispatch('toast', title: 'Gagal', message: "Serial Number '{$value}' terdaftar di Accurate, namun belum tersinkronisasi di sistem lokal. Pastikan sudah di-receive atau di-transfer ke sistem.", type: 'error');
                     $this->new_sns[$index] = '';
@@ -765,6 +764,21 @@ trait WithCart
         return \App\Models\ManualDiscountPreset::where('is_active', true)->get();
     }
 
+    public $showManualDiscountModal = false;
+    public $manualDiscountCartIndex = null;
+
+    public function openManualDiscountModal($index)
+    {
+        $this->manualDiscountCartIndex = $index;
+        $this->showManualDiscountModal = true;
+    }
+
+    public function closeManualDiscountModal()
+    {
+        $this->showManualDiscountModal = false;
+        $this->manualDiscountCartIndex = null;
+    }
+
     public function toggleManualDiscount($cartIndex, $amount)
     {
         if (isset($this->cart[$cartIndex])) {
@@ -777,6 +791,7 @@ trait WithCart
             }
             $this->syncSinglePaymentAmount();
         }
+        $this->closeManualDiscountModal();
     }
 
     // ─── Edit Price Modal ──────────────────────────────────────
@@ -803,7 +818,22 @@ trait WithCart
     public function saveEditedPrice()
     {
         if ($this->editPriceCartIndex !== null && isset($this->cart[$this->editPriceCartIndex])) {
-            $this->cart[$this->editPriceCartIndex]['price'] = (int) $this->editPriceValue;
+            $item = $this->cart[$this->editPriceCartIndex];
+
+            // Dapatkan model aslinya untuk mengecek harga minimum
+            $variantClass = $item['variant_type'];
+            $variant = $variantClass::find($item['variant_id']);
+            $basePrice = $variant ? (int) ($variant->base_price ?? $variant->price ?? 0) : 0;
+
+            $newPrice = (int) $this->editPriceValue;
+
+            if ($newPrice < $basePrice) {
+                $this->dispatch('toast', title: 'Gagal', message: 'Harga tidak boleh kurang dari harga dasar (Rp ' . number_format($basePrice, 0, ',', '.') . ').', type: 'error');
+                $this->closeEditPriceModal();
+                return;
+            }
+
+            $this->cart[$this->editPriceCartIndex]['price'] = $newPrice;
             $this->syncSinglePaymentAmount();
             $this->dispatch('toast', title: 'Berhasil', message: 'Harga satuan berhasil diubah.', type: 'success');
             $this->closeEditPriceModal();
