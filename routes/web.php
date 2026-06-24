@@ -13,6 +13,7 @@ use App\Livewire\Pages\UserProfile;
 use App\Livewire\Zoffline\Warehouse\CekStock;
 use App\Livewire\Zoffline\Warehouse\CheckSerialNumber;
 use App\Livewire\Zoffline\Warehouse\SerialNumberHistory;
+use App\Livewire\Zoffline\Warranty\WarrantyClaim;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +30,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/sell-phone', \App\Livewire\Zoffline\SellPhone\SellPhone::class)->name('zoffline.sell-phone')->middleware('can:sell-phone');
     Route::get('/zoffline/sell-phone-history', \App\Livewire\Zoffline\SellPhone\History::class)->name('zoffline.sell-phone-history')->middleware('can:sell-phone-history');
     Route::get('/zoffline/warranty-activation', \App\Livewire\Zoffline\Qc\WarrantyActivation::class)->name('zoffline.warranty-activation')->middleware('can:warranty-activation');
+    Route::get('/zoffline/warranty-claim', WarrantyClaim::class)->name('zoffline.warranty-claim')->middleware('can:warranty-activation');
     Route::get('/zoffline/cek-stock', CekStock::class)->name('zoffline.cek-stock')->middleware('can:view-stock');
     Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view-reporting');
     Route::get('/zoffline/check-serial-number', CheckSerialNumber::class)->name('zoffline.check-serial-number')->middleware('can:view-warehouse-stocks');
@@ -140,6 +142,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::prefix('warranty')->name('warranty.')->group(function () {
         Route::get('/policies', \App\Livewire\Admin\Warranty\PolicyManagement::class)->name('policies');
+        Route::get('/claims', \App\Livewire\Admin\Warranty\ClaimManagement::class)->name('claims');
     });
 
     // Inbound PO

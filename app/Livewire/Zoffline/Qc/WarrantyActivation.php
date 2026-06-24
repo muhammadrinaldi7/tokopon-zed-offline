@@ -5,6 +5,10 @@ namespace App\Livewire\Zoffline\Qc;
 use App\Models\DeviceInspection;
 use App\Models\OrderItem;
 use App\Models\QcTemplate;
+use App\Models\Warranty;
+use App\Models\WarrantyPolicy;
+use App\Models\Brand;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
@@ -32,6 +36,9 @@ class WarrantyActivation extends Component
     public $qc_notes = '';
     public $template;
     public $isSaved = false;
+    
+    // Warranty Result State
+    public $generatedWarranties = [];
 
     public function searchItem()
     {
@@ -46,6 +53,7 @@ class WarrantyActivation extends Component
         $this->foundItem = null;
         $this->isInspecting = false;
         $this->isSaved = false;
+        $this->generatedWarranties = [];
 
         $activeUnitId = Auth::user()->getActiveBusinessUnitId();
 
@@ -172,10 +180,103 @@ class WarrantyActivation extends Component
                 ->toMediaCollection('qc_photos');
         }
 
+        $this->generateWarranties($inspection);
+
         $this->isSaved = true;
         $this->isInspecting = false;
         
         $this->dispatch('toast', title: 'Berhasil', message: 'Aktivasi Garansi berhasil disimpan!', type: 'success');
+    }
+
+    private function generateWarranties(DeviceInspection $inspection)
+    {
+        $order = $this->foundItem->order;
+        $variant = $this->foundItem->variant;
+        $variantClass = get_class($variant);
+
+        // 1. Determine Brand
+        $brand = null;
+        if ($variantClass === \App\Models\ProductAccurate::class) {
+            $brand = Brand::where('name', $variant->brandName)->first();
+        } elseif ($variantClass === \App\Models\SecondProductVariant::class) {
+            $brand = $variant->device->brand ?? null;
+        } elseif ($variantClass === \App\Models\ProductVariant::class) {
+            $brand = $variant->product->brand ?? null;
+        }
+
+        // 2. Find Default Store Warranty Policy
+        $defaultPolicy = null;
+        if ($brand) {
+            $defaultPolicy = WarrantyPolicy::where('type', 'store_default')
+                ->where('is_active', true)
+                ->where('brand_id', $brand->id)
+                ->first();
+        }
+        
+        // Fallback to global store default if no brand specific policy
+        if (!$defaultPolicy) {
+            $defaultPolicy = WarrantyPolicy::where('type', 'store_default')
+                ->where('is_active', true)
+                ->whereNull('brand_id')
+                ->first();
+        }
+
+        $now = Carbon::now();
+        $this->generatedWarranties = [];
+
+        // Create Default Warranty
+        if ($defaultPolicy) {
+            $warranty = Warranty::create([
+                'warranty_policy_id' => $defaultPolicy->id,
+                'order_item_id' => $this->foundItem->id,
+                'serial_number' => $this->foundItem->serial_number,
+                'customer_user_id' => $order->user_id,
+                'activated_at' => $now,
+                'expires_at' => $now->copy()->addDays($defaultPolicy->duration_days),
+                'status' => 'active',
+                'claims_used' => 0,
+                'device_inspection_id' => $inspection->id,
+                'source' => 'activation',
+            ]);
+            $this->generatedWarranties[] = $warranty;
+        }
+
+        // 3. Find Insurance Items in the same Order
+        $orderItems = OrderItem::with('variant')->where('order_id', $order->id)->get();
+        $insurancePolicies = WarrantyPolicy::where('type', 'insurance')->where('is_active', true)->get();
+
+        foreach ($orderItems as $item) {
+            $itemVariant = $item->variant;
+            if (!$itemVariant) continue;
+
+            $itemVariantClass = get_class($itemVariant);
+            $categoryName = '';
+
+            if ($itemVariantClass === \App\Models\ProductAccurate::class) {
+                $categoryName = $itemVariant->categoryName;
+            }
+
+            // Check if this item's category matches any active insurance policy
+            foreach ($insurancePolicies as $insPolicy) {
+                if (!empty($insPolicy->item_category) && strcasecmp(trim($categoryName), trim($insPolicy->item_category)) === 0) {
+                    // Create Insurance Warranty
+                    $warranty = Warranty::create([
+                        'warranty_policy_id' => $insPolicy->id,
+                        'order_item_id' => $this->foundItem->id, // Attach to the device being activated
+                        'serial_number' => $this->foundItem->serial_number,
+                        'customer_user_id' => $order->user_id,
+                        'activated_at' => $now,
+                        'expires_at' => $now->copy()->addDays($insPolicy->duration_days),
+                        'status' => 'active',
+                        'claims_used' => 0,
+                        'device_inspection_id' => $inspection->id,
+                        'source' => 'purchase',
+                    ]);
+                    $this->generatedWarranties[] = $warranty;
+                    break; // Move to next order item
+                }
+            }
+        }
     }
 
     public function goBack()

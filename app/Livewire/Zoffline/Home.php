@@ -38,10 +38,7 @@ class Home extends Component
 
     public function navigateToKlaimGaransi()
     {
-        $this->dispatch('alert', [
-            'type' => 'info',
-            'message' => 'Fitur Klaim Garansi akan segera hadir!'
-        ]);
+        return $this->redirectRoute('zoffline.warranty-claim', navigate: true);
     }
 
     public function navigateToAddOnGaransi()

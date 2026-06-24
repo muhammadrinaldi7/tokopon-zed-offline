@@ -16,8 +16,23 @@ class StockManagement extends Component
     use WithPagination;
 
     public $search = '';
-    public $activeTab = 'syihab'; // 'syihab' atau 'second'
+    public $activeTab;
     public $isLoading = false;
+
+    public function mount()
+    {
+        $businessUnits = \App\Models\BusinessUnit::where('is_active', true)->get();
+        if ($businessUnits->isNotEmpty()) {
+            $this->activeTab = $businessUnits->first()->code;
+        } else {
+            $this->activeTab = 'syihab'; // fallback
+        }
+    }
+
+    public function getBusinessUnitsProperty()
+    {
+        return \App\Models\BusinessUnit::where('is_active', true)->get();
+    }
 
     public function updatingSearch()
     {
@@ -39,8 +54,9 @@ class StockManagement extends Component
             $service = app(AccurateService::class);
             $syncedCount = 0;
 
-            // 1. Ambil daftar Gudang lokal sesuai Business Unit (1 = Syihab, 2 = Second)
-            $buId = $this->activeTab === 'second' ? 2 : 1;
+            // 1. Ambil daftar Gudang lokal sesuai Business Unit
+            $bu = \App\Models\BusinessUnit::where('code', $this->activeTab)->first();
+            $buId = $bu ? $bu->id : null;
             $warehouses = Warehouse::where('business_unit_id', $buId)->get();
             $products = ProductAccurate::where('database_source', $dbSource)->get();
 
@@ -164,7 +180,8 @@ class StockManagement extends Component
     #[Layout('layouts.admin')]
     public function render()
     {
-        $buId = $this->activeTab === 'second' ? 2 : 1;
+        $bu = \App\Models\BusinessUnit::where('code', $this->activeTab)->first();
+        $buId = $bu ? $bu->id : null;
         $warehouses = Warehouse::where('business_unit_id', $buId)->orderBy('name')->get();
 
         $query = ProductAccurate::with(['warehouseStocks'])

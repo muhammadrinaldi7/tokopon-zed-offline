@@ -381,6 +381,40 @@
             </div>
         @endcan
 
+        @can('manage-orders')
+            <div x-data="{ openWarranty: {{ request()->routeIs('admin.warranty.*') ? 'true' : 'false' }} }">
+                <button @click="openWarranty = !openWarranty" type="button"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.warranty.*') ? $activeClass : $inactiveClass }}">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 {{ request()->routeIs('admin.warranty.*') ? $activeIconClass : $inactiveIconClass }}"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Garansi & Klaim</span><span
+                            class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                            x-show="sidebarCollapsed" style="display:none;" x-cloak>Garansi & Klaim</span>
+                    </div>
+                    <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openWarranty }"
+                        class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                <div x-show="openWarranty && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
+                    <a href="{{ route('admin.warranty.policies') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.warranty.policies') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Kebijakan Garansi
+                    </a>
+                    <a href="{{ route('admin.warranty.claims') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.warranty.claims') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Klaim Garansi Masuk
+                    </a>
+                </div>
+            </div>
+        @endcan
+
         @canany(['manage-inbound', 'manage-qc-templates', 'manage-qc-inspections'])
             <div x-data="{ openQc: {{ request()->routeIs('admin.qc.*', 'admin.inbound.*') ? 'true' : 'false' }} }">
                 <button @click="openQc = !openQc" type="button"

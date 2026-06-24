@@ -74,9 +74,6 @@ class CekStock extends Component
         $results = [];
 
         foreach ($products as $p) {
-            // Tentukan is_second berdasarkan Business Unit (Asumsi BU ID 2 atau nama 'Second')
-            $is_second = $p->businessUnit && (stripos($p->businessUnit->name, 'Second') !== false || $p->business_unit_id == 2);
-
             $results[] = [
                 'id' => $p->id,
                 'type' => 'accurate',
@@ -87,7 +84,7 @@ class CekStock extends Component
                 'sku' => $p->item_no,
                 'price' => Format::rupiah($p->base_price ?? 0),
                 'allStock' => $p->stock ?? 0,
-                'is_second' => $is_second,
+                'business_unit_name' => $p->businessUnit->name ?? 'Unknown BU',
             ];
         }
 
@@ -103,12 +100,13 @@ class CekStock extends Component
         $accurate = \App\Models\ProductAccurate::with([
             'productVariants.warehouseStocks.warehouse',
             'secondProductVariants.warehouseStocks.warehouse',
+            'warehouseStocks.warehouse',
             'businessUnit'
         ])->find($id);
 
         if ($accurate) {
-            $is_second = $accurate->businessUnit && (stripos($accurate->businessUnit->name, 'Second') !== false || $accurate->business_unit_id == 2);
-            $this->selectedProduct = ($accurate->name ?? 'Unknown') . " [" . ($is_second ? 'Second' : 'Baru') . "]";
+            $buName = $accurate->businessUnit->name ?? 'Unknown BU';
+            $this->selectedProduct = ($accurate->name ?? 'Unknown') . " [" . $buName . "]";
 
             // =========================================================================
             // AMBIL DAN KELOMPOKKAN SN BERDASARKAN WAREHOUSE_ID
@@ -123,6 +121,13 @@ class CekStock extends Component
             // GABUNGKAN STOCK DARI VARIANT LAMA JIKA ADA
             // =========================================================================
             $allStocks = collect();
+            
+            // 1. Ambil stok langsung dari ProductAccurate
+            foreach ($accurate->warehouseStocks as $ws) {
+                $allStocks->push($ws);
+            }
+
+            // 2. Ambil dari variant lama (jika masih ada)
             foreach ($accurate->productVariants as $pv) {
                 foreach ($pv->warehouseStocks as $ws) {
                     $allStocks->push($ws);
@@ -135,7 +140,7 @@ class CekStock extends Component
             }
 
             $groupedStocks = $allStocks->groupBy('warehouse_id');
-            $warehouses = \App\Models\Warehouse::all();
+            $warehouses = \App\Models\Warehouse::where('business_unit_id', $accurate->business_unit_id)->get();
 
             $this->stockData = [];
 

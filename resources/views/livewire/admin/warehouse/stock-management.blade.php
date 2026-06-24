@@ -25,15 +25,13 @@
 
     <!-- Tabs and Filters -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-200 pb-1">
-        <div class="flex gap-2">
-            <button wire:click="$set('activeTab', 'syihab')"
-                class="px-4 py-2 text-sm font-medium border-b-2 transition-all {{ $activeTab === 'syihab' ? 'border-[#1c69d4] text-[#1c69d4] font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
-                Unit Usaha Syihab
-            </button>
-            <button wire:click="$set('activeTab', 'second')"
-                class="px-4 py-2 text-sm font-medium border-b-2 transition-all {{ $activeTab === 'second' ? 'border-[#1c69d4] text-[#1c69d4] font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
-                Unit Usaha GSK
-            </button>
+        <div class="flex gap-2 overflow-x-auto whitespace-nowrap">
+            @foreach($this->businessUnits as $bu)
+                <button wire:click="$set('activeTab', '{{ $bu->code }}')"
+                    class="px-4 py-2 text-sm font-medium border-b-2 transition-all {{ $activeTab === $bu->code ? 'border-[#1c69d4] text-[#1c69d4] font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+                    Unit Usaha {{ $bu->name }}
+                </button>
+            @endforeach
         </div>
 
         <div class="w-full md:w-80">

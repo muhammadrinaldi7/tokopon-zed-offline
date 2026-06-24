@@ -45,13 +45,9 @@
                                 <div>
                                     <h4 class="font-bold text-gray-900 group-hover:text-blue-700 transition">
                                         {{ $result['name'] }}
-                                        @if ($result['is_second'])
-                                            <span
-                                                class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">GSK</span>
-                                        @else
-                                            <span
-                                                class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800">SYIHAB</span>
-                                        @endif
+                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 uppercase">
+                                            {{ $result['business_unit_name'] ?? 'Unknown' }}
+                                        </span>
                                     </h4>
                                     <p class="text-xs text-gray-500 mt-1">
                                         {{ !empty($result['ram']) ? $result['ram'] . ' / ' . $result['storage'] : $result['storage'] }}

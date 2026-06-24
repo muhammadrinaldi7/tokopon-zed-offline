@@ -80,23 +80,118 @@
                 </div>
             </div>
         @elseif ($isSaved)
-            <div class="bg-emerald-50 border-2 border-dashed border-emerald-200 rounded-2xl p-8 text-center mt-8">
-                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div class="mb-6 flex flex-col items-center justify-center text-center">
+                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4 shadow-inner">
                     <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
                     </svg>
                 </div>
-                <h3 class="text-xl font-black text-gray-900">Aktivasi Garansi Selesai</h3>
-                <p class="text-gray-500 mt-2 max-w-sm mx-auto">
-                    Data inspeksi fisik dan kelengkapan perangkat telah tersimpan secara permanen pada sistem.
+                <h3 class="text-2xl font-black text-gray-900 tracking-tight">Aktivasi Garansi Berhasil</h3>
+                <p class="text-gray-500 mt-2 max-w-md mx-auto text-sm">
+                    Inspeksi QC Unboxing selesai dan garansi telah diaktifkan untuk perangkat ini.
                 </p>
-                <div class="mt-8">
-                    <button wire:click="goBack" class="px-6 py-3 bg-white border border-emerald-200 text-emerald-700 font-bold rounded-xl hover:bg-emerald-100 transition-colors shadow-sm">
-                        Kembali ke Menu Utama
-                    </button>
-                </div>
             </div>
-        @else
+
+            @if(count($generatedWarranties) > 0)
+                <div class="space-y-6">
+                    @foreach($generatedWarranties as $warranty)
+                        <div class="bg-white rounded-3xl p-6 md:p-8 shadow-xl shadow-blue-900/5 border border-gray-100 relative overflow-hidden">
+                            <!-- Background Decoration -->
+                            <div class="absolute -right-16 -top-16 w-64 h-64 bg-gradient-to-br {{ $warranty->policy->type === 'insurance' ? 'from-purple-500/10 to-pink-500/10' : 'from-blue-500/10 to-cyan-500/10' }} rounded-full blur-3xl pointer-events-none"></div>
+                            
+                            <div class="relative z-10 flex flex-col md:flex-row gap-6 md:items-center justify-between border-b border-gray-100 pb-6 mb-6">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm {{ $warranty->policy->type === 'insurance' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600' }}">
+                                        @if($warranty->policy->type === 'insurance')
+                                            <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                            </svg>
+                                        @else
+                                            <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                            </svg>
+                                        @endif
+                                    </div>
+                                    <div>
+                                        <h4 class="text-lg font-black text-gray-900">{{ $warranty->policy->name }}</h4>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider {{ $warranty->policy->type === 'insurance' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700' }}">
+                                                {{ $warranty->policy->type === 'insurance' ? 'Asuransi Tambahan' : 'Garansi Resmi Toko' }}
+                                            </span>
+                                            <span class="text-xs font-medium text-gray-500">
+                                                Maks {{ $warranty->policy->max_claims }}x Klaim
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-left md:text-right">
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Status Garansi</p>
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold shadow-sm">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        Aktif s/d {{ $warranty->expires_at->format('d M Y') }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+                                <div>
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Detail Perangkat</p>
+                                    <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-3">
+                                        <div class="flex justify-between items-center border-b border-gray-200/60 pb-3">
+                                            <span class="text-sm font-medium text-gray-500">Model</span>
+                                            <span class="text-sm font-bold text-gray-900">{{ $foundItem->product_name }}</span>
+                                        </div>
+                                        <div class="flex justify-between items-center border-b border-gray-200/60 pb-3">
+                                            <span class="text-sm font-medium text-gray-500">Serial Number</span>
+                                            <span class="text-sm font-mono font-bold text-gray-900">{{ $warranty->serial_number }}</span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm font-medium text-gray-500">Pelanggan</span>
+                                            <span class="text-sm font-bold text-blue-600">{{ $foundItem->order->user->name ?? 'Tamu' }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Cakupan Kerusakan (Coverage)</p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        @foreach($warranty->policy->coverage as $cov)
+                                            <div class="flex items-start gap-2.5 p-2 rounded-lg {{ $cov['covered'] ? 'bg-emerald-50/50' : 'bg-rose-50/50' }}">
+                                                @if($cov['covered'])
+                                                    <svg class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                                                @else
+                                                    <svg class="w-4 h-4 text-rose-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                @endif
+                                                <span class="text-xs font-semibold {{ $cov['covered'] ? 'text-gray-800' : 'text-gray-500 line-through' }}">
+                                                    {{ $cov['name'] }}
+                                                </span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
+                    <svg class="w-12 h-12 text-amber-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <p class="font-bold text-amber-800">Tidak ada Garansi Aktif</p>
+                    <p class="text-sm text-amber-700 mt-1">Sistem tidak menemukan kebijakan garansi default untuk produk ini maupun pembelian asuransi tambahan.</p>
+                </div>
+            @endif
+
+            <div class="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
+                <button type="button" class="px-8 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-sm flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                    Cetak Kartu Garansi
+                </button>
+                <button wire:click="goBack" class="px-8 py-3 bg-[#1c69d4] hover:bg-[#3f36b8] text-white font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
+                    Selesai & Kembali
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                </button>
+            </div>
             {{-- State 3: Execution (Wizard Mode) --}}
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div class="mb-6 pb-4 border-b border-gray-100 flex justify-between items-end">
