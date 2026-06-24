@@ -137,7 +137,7 @@
                                             Update terakhir: {{ $result->updated_at->format('d M Y H:i') }}
                                         </p>
 
-                                        <a href="{{ route('admin.warehouse.sn-history', ['sn' => urlencode($result->serial_number)]) }}"
+                                        <a href="{{ route('zoffline.warehouse.sn-history', ['sn' => urlencode($result->serial_number)]) }}"
                                             wire:navigate
                                             class="px-5 py-2.5 bg-neutral-800 hover:bg-black text-white font-bold rounded-xl text-sm transition-colors flex items-center gap-2 shadow-sm">
                                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"

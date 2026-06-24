@@ -30,6 +30,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/cek-stock', CekStock::class)->name('zoffline.cek-stock')->middleware('can:view-stock');
     Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view_dashboard');
     Route::get('/zoffline/check-serial-number', \App\Livewire\Zoffline\Warehouse\CheckSerialNumber::class)->name('zoffline.check-serial-number')->middleware('can:view-warehouse-stocks');
+    Route::get('/zoffline/check-serial-number/{sn}/history', \App\Livewire\Zoffline\Warehouse\SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
     // Reporting
     Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
         Route::get('/', Dashboard::class)->name('index');
@@ -84,7 +85,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/accurate-sync-sn', \App\Livewire\Admin\Accurate\SerialNumberSync::class)->name('accurate-sync-sn')->middleware('can:manage-accurate-products');
     Route::get('/warehouse-stocks', \App\Livewire\Admin\Warehouse\StockManagement::class)->name('warehouse-stocks')->middleware('can:view-warehouse-stocks');
 
-    Route::get('/check-serial-number/{sn}/history', \App\Livewire\Admin\Warehouse\SerialNumberHistory::class)->name('warehouse.sn-history')->middleware('can:view-warehouse-stocks');
+
 
     // Pesanan
     Route::get('/orders', \App\Livewire\Admin\Orders\OrderManagement::class)->name('orders.management')->middleware('can:manage-orders');

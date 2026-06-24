@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Admin\Warehouse;
+namespace App\Livewire\Zoffline\Warehouse;
 
 use App\Models\ProductSerialNumber;
 use App\Models\OrderItem;
@@ -8,13 +8,14 @@ use App\Models\MigrationInvoiceItem;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 
+#[Layout('layouts.z', ['title' => 'Riwayat Serial Number'])]
 class SerialNumberHistory extends Component
 {
     public $sn = '';
     public $productSn = null;
     public $history = [];
 
-    #[Layout('layouts.admin')]
+
     public function mount($sn)
     {
         $this->sn = urldecode($sn);
@@ -116,6 +117,6 @@ class SerialNumberHistory extends Component
 
     public function render()
     {
-        return view('livewire.admin.warehouse.serial-number-history');
+        return view('livewire.zoffline.warehouse.serial-number-history');
     }
 }
