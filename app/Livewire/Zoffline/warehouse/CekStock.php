@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Zoffline\warehouse;
+namespace App\Livewire\Zoffline\Warehouse;
 
 use App\Utils\Format;
 use Illuminate\Support\Facades\Auth;
