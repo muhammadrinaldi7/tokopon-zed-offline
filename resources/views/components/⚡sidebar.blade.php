@@ -25,8 +25,8 @@ new class extends Component {
     {{-- ==========================================
          1. DESKTOP NAVBAR (Hanya tampil di layar besar / lg) 
          ========================================== --}}
-    <nav class="hidden lg:block fixed top-0 inset-x-0 z-50 w-full h-20 px-6 pointer-events-none">
-        <div class="max-w-7xl mx-auto w-full h-full flex flex-row items-center justify-between pointer-events-auto">
+    <aside class="hidden lg:flex fixed top-0 left-0 bottom-0 z-50 w-24 bg-transparent pointer-events-none">
+        <div class="w-full h-full flex flex-col items-center justify-between py-6 pointer-events-auto">
 
             {{-- Kiri: Home --}}
             <div>
@@ -39,9 +39,9 @@ new class extends Component {
                             d="M9 20h3m3 0h-3m0 0v-3m0 0h7a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2z" />
                     </svg>
                     <span
-                        class="absolute top-full mt-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50">
                         Home
-                        <div class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-neutral-800 rotate-45"></div>
+                        <div class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-neutral-800 rotate-45"></div>
                     </span>
                 </a>
             </div>
@@ -56,12 +56,12 @@ new class extends Component {
                 </button>
 
                 <div x-show="open" x-transition:enter="transition ease-out duration-200"
-                    x-transition:enter-start="opacity-0 translate-y-2 lg:translate-y-2 lg:translate-x-0"
-                    x-transition:enter-end="opacity-100 translate-y-0 lg:translate-x-0"
+                    x-transition:enter-start="opacity-0 -translate-x-2 lg:-translate-x-2 lg:translate-y-0"
+                    x-transition:enter-end="opacity-100 translate-x-0 lg:translate-y-0"
                     x-transition:leave="transition ease-in duration-150"
-                    x-transition:leave-start="opacity-100 translate-y-0 lg:translate-x-0"
-                    x-transition:leave-end="opacity-0 translate-y-2 lg:translate-y-2 lg:translate-x-0"
-                    class="absolute top-full right-0 mt-4 w-48 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 py-2"
+                    x-transition:leave-start="opacity-100 translate-x-0 lg:translate-y-0"
+                    x-transition:leave-end="opacity-0 -translate-x-2 lg:-translate-x-2 lg:translate-y-0"
+                    class="absolute left-full bottom-0 ml-4 w-48 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 py-2"
                     style="display: none;">
 
                     @auth
@@ -97,7 +97,7 @@ new class extends Component {
                     </button>
                 </div>
             </div>
-    </nav>
+    </aside>
 
     {{-- ==========================================
          2. MOBILE & TABLET BOTTOM BAR (Sembunyi di lg) 

@@ -38,7 +38,7 @@
 <body class="min-h-screen bg-neutral-100 antialiased flex flex-col font-paperlogy">
 
     <livewire:sidebar />
-    <main class="flex-1 pb-24 lg:pb-0 lg:pt-15">
+    <main class="flex-1 pb-24 lg:pb-0 lg:pl-20 lg:pt-0">
         {{ $slot }}
     </main>
 
