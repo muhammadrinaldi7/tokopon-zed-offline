@@ -892,7 +892,7 @@
                                         <label for="npwp"
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">NPWP
                                             (Opsional)</label>
-                                        <input type="text" id="npwp" wire:model="npwp"
+                                        <input type="text" id="npwp" wire:model="npwp" maxlength="16"
                                             class="w-full px-4 py-3 text-sm bg-white border @error('npwp') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
                                             placeholder="Masukkan nomor NPWP">
                                         @error('npwp')
@@ -1065,14 +1065,14 @@
                                 </div>
                             @endif
                         </div>
-                        <div class="text-right" x-data="{ 
-                            modalOpen: false, 
+                        <div class="text-right" x-data="{
+                            modalOpen: false,
                             price: @entangle('final_price'),
                             formattedPrice: '',
                             init() {
                                 this.formattedPrice = this.formatNumber(this.price);
                                 $watch('price', value => {
-                                    if(document.activeElement !== this.$refs.priceInput) {
+                                    if (document.activeElement !== this.$refs.priceInput) {
                                         this.formattedPrice = this.formatNumber(value);
                                     }
                                 });
@@ -1129,11 +1129,14 @@
                                     </div>
 
                                     <div class="relative w-full mb-8">
-                                        <label class="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2">Harga Kesepakatan Akhir</label>
+                                        <label
+                                            class="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2">Harga
+                                            Kesepakatan Akhir</label>
                                         <div class="relative">
                                             <span
                                                 class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-emerald-600 text-lg">Rp</span>
-                                            <input type="text" x-ref="priceInput" :value="formattedPrice" @input="updatePrice($event.target.value)" 
+                                            <input type="text" x-ref="priceInput" :value="formattedPrice"
+                                                @input="updatePrice($event.target.value)"
                                                 class="w-full pl-12 pr-4 py-4 border-2 border-emerald-200 rounded-xl font-bold text-emerald-800 focus:outline-none focus:border-emerald-500 bg-white text-xl shadow-inner transition-colors"
                                                 @keydown.enter="modalOpen = false; $wire.set('is_price_adjusted', true)">
                                         </div>

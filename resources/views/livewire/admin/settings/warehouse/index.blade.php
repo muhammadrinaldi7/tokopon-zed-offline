@@ -7,8 +7,8 @@
 
     {{-- Tabs --}}
     <div class="flex gap-4 border-b border-gray-200 mb-6 px-2">
-        @foreach($businessUnits as $bu)
-            <button wire:click="$set('activeTab', {{ $bu->id }})" 
+        @foreach ($businessUnits as $bu)
+            <button wire:click="$set('activeTab', {{ $bu->id }})"
                 class="px-4 py-3 font-bold text-sm transition-colors border-b-2 {{ $activeTab == $bu->id ? 'border-[#1c69d4] text-[#1c69d4]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
                 {{ $bu->name }}
             </button>
@@ -39,10 +39,12 @@
                                 <div class="flex items-center gap-2">
                                     <span class="font-bold text-gray-900">{{ $item->name }}</span>
                                     <div class="flex gap-1">
-                                        @if($item->businessUnit)
-                                            <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded">{{ $item->businessUnit->name }}</span>
+                                        @if ($item->businessUnit)
+                                            <span
+                                                class="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded">{{ $item->businessUnit->name }}</span>
                                         @else
-                                            <span class="bg-gray-100 text-gray-800 text-[10px] font-bold px-1.5 py-0.5 rounded">Unassigned</span>
+                                            <span
+                                                class="bg-gray-100 text-gray-800 text-[10px] font-bold px-1.5 py-0.5 rounded">Unassigned</span>
                                         @endif
                                     </div>
                                 </div>
@@ -95,10 +97,12 @@
                                 <div class="flex items-center gap-2">
                                     <span class="font-bold text-gray-900">{{ $item->name }}</span>
                                     <div class="flex gap-1">
-                                        @if($item->businessUnit)
-                                            <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded">{{ $item->businessUnit->name }}</span>
+                                        @if ($item->businessUnit)
+                                            <span
+                                                class="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded">{{ $item->businessUnit->name }}</span>
                                         @else
-                                            <span class="bg-gray-100 text-gray-800 text-[10px] font-bold px-1.5 py-0.5 rounded">Unassigned</span>
+                                            <span
+                                                class="bg-gray-100 text-gray-800 text-[10px] font-bold px-1.5 py-0.5 rounded">Unassigned</span>
                                         @endif
                                     </div>
                                 </div>
@@ -129,4 +133,3 @@
         </div>
     </div>
 </div>
-

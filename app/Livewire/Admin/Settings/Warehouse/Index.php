@@ -33,29 +33,23 @@ class Index extends Component
     {
         try {
             $service = new AccurateService();
-            $syihabBranch = $service->getBranchList('syihab');
-            $secondBranch = $service->getBranchList('second');
-            $syihabUnitId = \App\Models\BusinessUnit::where('code', 'syihab')->value('id');
-            $secondUnitId = \App\Models\BusinessUnit::where('code', 'second')->value('id');
+            $businessUnits = \App\Models\BusinessUnit::where('is_active', true)->get();
 
-            // Map Syihab branches
-            foreach ($syihabBranch['d'] as $item) {
-                Branch::updateOrCreate(
-                    ['name' => $item['name'], 'business_unit_id' => $syihabUnitId],
-                    ['branch_id' => $item['id']]
-                );
-            }
+            foreach ($businessUnits as $bu) {
+                $branchResponse = $service->getBranchList($bu->code);
 
-            // Map Second branches
-            foreach ($secondBranch['d'] as $item) {
-                Branch::updateOrCreate(
-                    ['name' => $item['name'], 'business_unit_id' => $secondUnitId],
-                    ['branch_id' => $item['id']]
-                );
+                if (isset($branchResponse['d']) && is_array($branchResponse['d'])) {
+                    foreach ($branchResponse['d'] as $item) {
+                        Branch::updateOrCreate(
+                            ['name' => $item['name'], 'business_unit_id' => $bu->id],
+                            ['branch_id' => $item['id']]
+                        );
+                    }
+                }
             }
 
             $this->loadAll();
-            $this->dispatch('toast', ["type" => "success", 'title' => 'Berhasil', "message" => "Data Branch berhasil disinkronkan dari kedua database"]);
+            $this->dispatch('toast', ["type" => "success", 'title' => 'Berhasil', "message" => "Data Branch berhasil disinkronkan dari seluruh database"]);
         } catch (\Exception $e) {
             $this->dispatch('toast', ["type" => "error", 'title' => 'Gagal', "message" => $e->getMessage()]);
         }
@@ -65,29 +59,23 @@ class Index extends Component
     {
         try {
             $service = new AccurateService();
-            $syihabWarehouse = $service->getWarehouseList('syihab');
-            $secondWarehouse = $service->getWarehouseList('second');
-            $syihabUnitId = \App\Models\BusinessUnit::where('code', 'syihab')->value('id');
-            $secondUnitId = \App\Models\BusinessUnit::where('code', 'second')->value('id');
+            $businessUnits = \App\Models\BusinessUnit::where('is_active', true)->get();
 
-            // Map Syihab warehouses
-            foreach ($syihabWarehouse['d'] as $item) {
-                Warehouse::updateOrCreate(
-                    ['name' => $item['name'], 'business_unit_id' => $syihabUnitId],
-                    ['warehouse_id' => $item['id']]
-                );
-            }
+            foreach ($businessUnits as $bu) {
+                $warehouseResponse = $service->getWarehouseList($bu->code);
 
-            // Map Second warehouses
-            foreach ($secondWarehouse['d'] as $item) {
-                Warehouse::updateOrCreate(
-                    ['name' => $item['name'], 'business_unit_id' => $secondUnitId],
-                    ['warehouse_id' => $item['id']]
-                );
+                if (isset($warehouseResponse['d']) && is_array($warehouseResponse['d'])) {
+                    foreach ($warehouseResponse['d'] as $item) {
+                        Warehouse::updateOrCreate(
+                            ['name' => $item['name'], 'business_unit_id' => $bu->id],
+                            ['warehouse_id' => $item['id']]
+                        );
+                    }
+                }
             }
 
             $this->loadAll();
-            $this->dispatch('toast', ["type" => "success", 'title' => 'Berhasil', "message" => "Data Warehouse berhasil disinkronkan dari kedua database"]);
+            $this->dispatch('toast', ["type" => "success", 'title' => 'Berhasil', "message" => "Data Warehouse berhasil disinkronkan dari seluruh database"]);
         } catch (\Exception $e) {
             $this->dispatch('toast', ["type" => "error", 'title' => 'Gagal', "message" => $e->getMessage()]);
         }

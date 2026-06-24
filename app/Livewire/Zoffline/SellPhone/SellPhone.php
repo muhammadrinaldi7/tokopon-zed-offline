@@ -371,7 +371,7 @@ class SellPhone extends Component
                 $rules['mobilePhone'] = 'required|string|max:15';
                 $rules['email']       = 'required|email|unique:users,email';
                 $rules['nik']         = 'required|numeric|digits:16|unique:users,identity';
-                $rules['npwp']        = 'nullable|string|max:20';
+                $rules['npwp']        = 'nullable|string|max:16';
                 $rules['foto_ktp']    = 'required|image|max:5120'; // Max 5MB (auto-compressed oleh JS)
                 $rules['account_number'] = 'required|string|max:20';
                 $rules['account_name'] = 'required|string|max:20';
