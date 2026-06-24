@@ -1,65 +1,73 @@
 <div class="p-6 bg-[#f7f7f7] min-h-screen">
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <div class="flex flex-col  items-start  mb-6 gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-800 tracking-tight">Laporan Penjualan</h1>
             <p class="text-sm text-gray-500 mt-1">Rekapitulasi transaksi mendetail</p>
         </div>
 
-        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div class="flex items-center bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 w-full">
+            <div
+                class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center justify-between">
                 <span class="text-xs text-gray-500 mr-2 font-medium">Separator:</span>
-                <select wire:model="csvSeparator" class="text-sm border-none bg-transparent focus:ring-0 text-gray-700 p-0 font-medium cursor-pointer">
+                <select wire:model="csvSeparator"
+                    class="text-sm border-none bg-transparent focus:ring-0 text-gray-700 p-0 font-medium cursor-pointer w-full text-right truncate">
                     <option value=";">Semicolon (;)</option>
                     <option value=",">Comma (,)</option>
                 </select>
             </div>
 
-            {{-- <button wire:click="exportCsv" wire:loading.attr="disabled"
-                class="flex items-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
-                <svg wire:loading.remove wire:target="exportCsv" class="w-4 h-4" fill="none" stroke="currentColor"
-                    viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                </svg>
-                <svg wire:loading wire:target="exportCsv" class="animate-spin w-4 h-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                        stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                    </path>
-                </svg>
-                <span wire:loading.remove wire:target="exportCsv">Export CSV (Kolom)</span>
-                <span wire:loading wire:target="exportCsv">Memproses...</span>
-            </button> --}}
+            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
+                <select wire:model.live="businessUnitFilter"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 cursor-pointer w-full truncate">
+                    <option value="">Semua Unit Usaha</option>
+                    @foreach (\App\Models\BusinessUnit::where('is_active', true)->get() as $bu)
+                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                    @endforeach
+                </select>
+            </div>
 
-            {{-- <button wire:click="exportCsvOpsi2" wire:loading.attr="disabled"
-                class="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
-                <svg wire:loading.remove wire:target="exportCsvOpsi2" class="w-4 h-4" fill="none" stroke="currentColor"
-                    viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                </svg>
-                <svg wire:loading wire:target="exportCsvOpsi2" class="animate-spin w-4 h-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                        stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                    </path>
-                </svg>
-                <span wire:loading.remove wire:target="exportCsvOpsi2">Export CSV (Multi-Row)</span>
-                <span wire:loading wire:target="exportCsvOpsi2">Memproses...</span>
-            </button> --}}
+            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
+                <select wire:model.live="branchFilter"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 cursor-pointer w-full truncate">
+                    <option value="">Semua Cabang</option>
+                    @foreach ($availableBranches as $branch)
+                        <option value="{{ $branch }}">{{ $branch }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
+                <select wire:model.live="dateRange"
+                    class="border-none text-sm font-bold text-blue-600 focus:ring-0 bg-transparent p-0 cursor-pointer w-full truncate">
+                    <option value="today">Hari Ini</option>
+                    <option value="yesterday">Kemarin</option>
+                    <option value="this_week">Minggu Ini</option>
+                    <option value="this_month">Bulan Ini</option>
+                    <option value="last_month">Bulan Lalu</option>
+                    <option value="this_year">Tahun Ini</option>
+                    <option value="custom">Kustom</option>
+                </select>
+            </div>
+
+            @if ($dateRange === 'custom')
+                <div
+                    class=" flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm">
+                    <input type="date" wire:model.live="startDate"
+                        class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700 w-full text-center">
+                    <span class="text-gray-400 text-sm font-bold">-</span>
+                    <input type="date" wire:model.live="endDate"
+                        class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700 w-full text-center">
+                </div>
+            @endif
 
             <button wire:click="exportCsvOpsi3" wire:loading.attr="disabled"
-                class="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
-                <svg wire:loading.remove wire:target="exportCsvOpsi3" class="w-4 h-4" fill="none" stroke="currentColor"
-                    viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                class=" flex items-center justify-center gap-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors w-full h-full min-h-[42px]">
+                <svg wire:loading.remove wire:target="exportCsvOpsi3" class="w-4 h-4 shrink-0" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                 </svg>
-                <svg wire:loading wire:target="exportCsvOpsi3" class="animate-spin w-4 h-4 text-white"
+                <svg wire:loading wire:target="exportCsvOpsi3" class="animate-spin w-4 h-4 text-white shrink-0"
                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                         stroke-width="4"></circle>
@@ -70,49 +78,6 @@
                 <span wire:loading.remove wire:target="exportCsvOpsi3">Export CSV</span>
                 <span wire:loading wire:target="exportCsvOpsi3">Memproses...</span>
             </button>
-
-            <div class="flex flex-wrap items-center gap-2">
-                <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
-                    <select wire:model.live="businessUnitFilter"
-                        class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 pr-6 rounded-lg cursor-pointer">
-                        <option value="">Semua Unit Usaha</option>
-                        @foreach(\App\Models\BusinessUnit::where('is_active', true)->get() as $bu)
-                            <option value="{{ $bu->id }}">{{ $bu->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
-                    <select wire:model.live="branchFilter"
-                        class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 pr-6 rounded-lg cursor-pointer">
-                        <option value="">Semua Cabang</option>
-                        @foreach($availableBranches as $branch)
-                            <option value="{{ $branch }}">{{ $branch }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
-                    <select wire:model.live="dateRange"
-                        class="border-none text-sm font-bold text-blue-600 focus:ring-0 bg-transparent p-0 pr-6 rounded-lg cursor-pointer">
-                        <option value="today">Hari Ini</option>
-                        <option value="yesterday">Kemarin</option>
-                        <option value="this_week">Minggu Ini</option>
-                        <option value="this_month">Bulan Ini</option>
-                        <option value="last_month">Bulan Lalu</option>
-                        <option value="this_year">Tahun Ini</option>
-                        <option value="custom">Kustom</option>
-                    </select>
-                </div>
-
-                @if($dateRange === 'custom')
-                    <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
-                        <input type="date" wire:model.live="startDate" class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700">
-                        <span class="text-gray-400 text-sm font-bold">-</span>
-                        <input type="date" wire:model.live="endDate" class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700">
-                    </div>
-                @endif
-            </div>
         </div>
     </div>
 
@@ -181,7 +146,10 @@
                                     @foreach ($order->items as $item)
                                         @php
                                             $variant = $item->variant;
-                                            $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
+                                            $name =
+                                                $variant?->name ??
+                                                ($variant?->product?->name ??
+                                                    ($item->product_name ?? 'Unknown Product'));
                                         @endphp
                                         <div class="truncate w-40 sm:w-48" title="{{ $name }}">
                                             {{ $name }} ({{ $item->qty }}x)</div>
