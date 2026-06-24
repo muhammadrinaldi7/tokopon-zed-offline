@@ -11,6 +11,8 @@ use App\Livewire\Pages\SellPhoneHistory;
 use App\Livewire\Pages\TradeIn;
 use App\Livewire\Pages\UserProfile;
 use App\Livewire\Zoffline\warehouse\CekStock;
+use App\Livewire\Zoffline\Warehouse\CheckSerialNumber;
+use App\Livewire\Zoffline\Warehouse\SerialNumberHistory;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -28,9 +30,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/sell-phone-history', \App\Livewire\Zoffline\SellPhone\History::class)->name('zoffline.sell-phone-history')->middleware('can:sell-phone-history');
     Route::get('/zoffline/warranty-activation', \App\Livewire\Zoffline\Qc\WarrantyActivation::class)->name('zoffline.warranty-activation')->middleware('can:warranty-activation');
     Route::get('/zoffline/cek-stock', CekStock::class)->name('zoffline.cek-stock')->middleware('can:view-stock');
-    Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view_dashboard');
-    Route::get('/zoffline/check-serial-number', \App\Livewire\Zoffline\Warehouse\CheckSerialNumber::class)->name('zoffline.check-serial-number')->middleware('can:view-warehouse-stocks');
-    Route::get('/zoffline/check-serial-number/{sn}/history', \App\Livewire\Zoffline\Warehouse\SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
+    Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view-reporting');
+    Route::get('/zoffline/check-serial-number', CheckSerialNumber::class)->name('zoffline.check-serial-number')->middleware('can:view-warehouse-stocks');
+    Route::get('/zoffline/check-serial-number/{sn}/history', SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
     // Reporting
     Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
         Route::get('/sales', \App\Livewire\Zoffline\Reporting\SalesReport::class)->name('sales');

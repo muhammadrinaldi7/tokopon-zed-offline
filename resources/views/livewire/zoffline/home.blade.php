@@ -247,7 +247,7 @@
                 </div>
             </div>
         @endcan
-        @can('view_dashboard')
+        @can('view-reporting')
             <div x-data="{ openReportModal: false }" class="md:nth-[3n+1]:col-span-2 w-full">
                 {{-- Card 5: Report (sebelumnya Dashboard) --}}
                 <div @click="openReportModal = true"
