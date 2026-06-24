@@ -136,6 +136,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/tiers', App\Livewire\Admin\Buyback\TierIndex::class)->name('tiers');
     });
 
+    Route::prefix('warranty')->name('warranty.')->group(function () {
+        Route::get('/policies', \App\Livewire\Admin\Warranty\PolicyManagement::class)->name('policies');
+    });
+
     // Inbound PO
     Route::middleware('can:manage-inbound')->group(function () {
         Route::get('/inbound', \App\Livewire\Admin\Inbound\Index::class)->name('inbound.index');

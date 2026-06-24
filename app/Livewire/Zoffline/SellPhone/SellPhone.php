@@ -257,6 +257,11 @@ class SellPhone extends Component
         }
     }
 
+    public function updatedImei()
+    {
+        $this->validateOnly('imei');
+    }
+
     public function updatedBuybackDeviceId()
     {
         if ($this->buyback_device_id) {
@@ -333,7 +338,19 @@ class SellPhone extends Component
     {
         $rules = [
             'buyback_device_id'         => 'required|exists:buyback_devices,id',
-            'imei'                      => 'required|string|max:255',
+            'imei' => [
+                'required',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) {
+                    $exists = \App\Models\ProductSerialNumber::where('serial_number', $value)
+                        ->where('status', 'Available')
+                        ->exists();
+                    if ($exists) {
+                        $fail('IMEI ini masih berstatus "Available" di stok kita. Tidak bisa membeli perangkat ini.');
+                    }
+                },
+            ],
             'selected_rules'            => 'required|array|min:1',
             // Aturan Baru: Semua slot wajib berupa gambar dan maksimal 5MB (5120 KB)
             'photo_depan'               => 'required|image|max:5120',

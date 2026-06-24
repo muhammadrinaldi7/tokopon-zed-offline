@@ -17,8 +17,23 @@ class ProductAccurateManagement extends Component
     use WithPagination, GeneratesProductVariant;
 
     public $search = '';
-    public $activeTab = 'syihab'; // 'syihab' or 'second'
+    public $activeTab;
     public $isLoading = false;
+
+    public function mount()
+    {
+        $businessUnits = \App\Models\BusinessUnit::where('is_active', true)->get();
+        if ($businessUnits->isNotEmpty()) {
+            $this->activeTab = $businessUnits->first()->code;
+        } else {
+            $this->activeTab = 'syihab'; // fallback
+        }
+    }
+
+    public function getBusinessUnitsProperty()
+    {
+        return \App\Models\BusinessUnit::where('is_active', true)->get();
+    }
 
     public $isSyncing = false;
     public $syncCurrentPage = 1;

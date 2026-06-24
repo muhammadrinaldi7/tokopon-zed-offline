@@ -22,6 +22,11 @@ class Brand extends Model implements HasMedia
         return $this->belongsTo(BusinessUnit::class);
     }
 
+    public function warrantyPolicies()
+    {
+        return $this->hasMany(WarrantyPolicy::class);
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('logo')

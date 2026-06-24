@@ -36,4 +36,9 @@ class OrderItem extends Model
     {
         return $this->morphMany(DeviceInspection::class, 'inspectable');
     }
+
+    public function warranties()
+    {
+        return $this->hasMany(Warranty::class);
+    }
 }

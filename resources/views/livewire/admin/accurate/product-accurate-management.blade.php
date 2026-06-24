@@ -56,15 +56,13 @@
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
         <div class="flex flex-col sm:flex-row items-center justify-between border-b border-gray-100">
             {{-- Tabs --}}
-            <div class="flex w-full sm:w-auto">
-                <button wire:click="$set('activeTab', 'syihab')"
-                    class="flex-1 sm:flex-none px-6 py-4 text-sm font-semibold transition-colors border-b-2 {{ $activeTab === 'syihab' ? 'border-[#1c69d4] text-[#1c69d4]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50' }}">
-                    Produk Baru (Syihab)
-                </button>
-                <button wire:click="$set('activeTab', 'second')"
-                    class="flex-1 sm:flex-none px-6 py-4 text-sm font-semibold transition-colors border-b-2 {{ $activeTab === 'second' ? 'border-[#1c69d4] text-[#1c69d4]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50' }}">
-                    Produk Bekas (Second)
-                </button>
+            <div class="flex w-full sm:w-auto overflow-x-auto whitespace-nowrap">
+                @foreach($this->businessUnits as $bu)
+                    <button wire:click="$set('activeTab', '{{ $bu->code }}')"
+                        class="flex-1 sm:flex-none px-6 py-4 text-sm font-semibold transition-colors border-b-2 {{ $activeTab === $bu->code ? 'border-[#1c69d4] text-[#1c69d4]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50' }}">
+                        {{ $bu->name }}
+                    </button>
+                @endforeach
             </div>
 
             {{-- Search Bar --}}
@@ -173,7 +171,7 @@
                                 </svg>
                                 <p class="text-gray-500 font-medium">Belum ada data dari Accurate</p>
                                 <p class="text-sm text-gray-400 mt-1">Klik tombol Sinkronisasi untuk menarik data dari
-                                    database {{ $activeTab === 'syihab' ? 'Baru' : 'Bekas' }}.</p>
+                                    database {{ $this->businessUnits->firstWhere('code', $activeTab)->name ?? 'Terpilih' }}.</p>
                             </td>
                         </tr>
                     @endforelse
