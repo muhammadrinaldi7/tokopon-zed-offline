@@ -10,7 +10,7 @@ use App\Livewire\Pages\SellPhone;
 use App\Livewire\Pages\SellPhoneHistory;
 use App\Livewire\Pages\TradeIn;
 use App\Livewire\Pages\UserProfile;
-use App\Livewire\Zoffline\warehouse\CekStock;
+use App\Livewire\Zoffline\Warehouse\CekStock;
 use App\Livewire\Zoffline\Warehouse\CheckSerialNumber;
 use App\Livewire\Zoffline\Warehouse\SerialNumberHistory;
 use Illuminate\Support\Facades\Auth;
