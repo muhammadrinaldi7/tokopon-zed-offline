@@ -27,6 +27,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/sell-phone-history', \App\Livewire\Zoffline\SellPhone\History::class)->name('zoffline.sell-phone-history')->middleware('can:sell-phone-history');
     Route::get('/zoffline/warranty-activation', \App\Livewire\Zoffline\Qc\WarrantyActivation::class)->name('zoffline.warranty-activation')->middleware('can:warranty-activation');
     Route::get('/zoffline/cek-stock', CekStock::class)->name('zoffline.cek-stock')->middleware('can:view-stock');
+    Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view_dashboard');
+    Route::get('/check-serial-number', \App\Livewire\Admin\Warehouse\CheckSerialNumber::class)->name('check-serial-number')->middleware('can:view-warehouse-stocks');
 });
 
 // ─── Trade In & Sell Phone Client Pages (accessible by authenticated users, e.g. FL or customer) ───
@@ -70,7 +72,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/accurate-customers', \App\Livewire\Admin\Accurate\CustomerAccurateManagement::class)->name('accurate-customers')->middleware('can:manage-accurate-customers');
     Route::get('/accurate-sync-sn', \App\Livewire\Admin\Accurate\SerialNumberSync::class)->name('accurate-sync-sn')->middleware('can:manage-accurate-products');
     Route::get('/warehouse-stocks', \App\Livewire\Admin\Warehouse\StockManagement::class)->name('warehouse-stocks')->middleware('can:view-warehouse-stocks');
-    Route::get('/check-serial-number', \App\Livewire\Admin\Warehouse\CheckSerialNumber::class)->name('check-serial-number')->middleware('can:view-warehouse-stocks');
+
     Route::get('/check-serial-number/{sn}/history', \App\Livewire\Admin\Warehouse\SerialNumberHistory::class)->name('warehouse.sn-history')->middleware('can:view-warehouse-stocks');
 
     // Pesanan

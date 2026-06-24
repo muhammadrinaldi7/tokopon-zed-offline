@@ -26,9 +26,17 @@ class StaffReport extends Component
         }
     }
 
-    public function updatedStartDate() { $this->dateRange = 'custom'; }
-    public function updatedEndDate() { $this->dateRange = 'custom'; }
-    public function updatedBusinessUnitFilter() { /* Trigger render */ }
+    public function updatedStartDate()
+    {
+        $this->dateRange = 'custom';
+    }
+    public function updatedEndDate()
+    {
+        $this->dateRange = 'custom';
+    }
+    public function updatedBusinessUnitFilter()
+    { /* Trigger render */
+    }
 
     private function setDateRange()
     {
@@ -77,7 +85,7 @@ class StaffReport extends Component
             $sales = $group->first()->salesBy;
             $totalGross = $group->sum('total_amount');
             $totalMdr = $group->sum('mdr_amount');
-            
+
             return [
                 'name' => $sales ? $sales->name : 'Walk-in / No Sales',
                 'transactions' => $group->count(),
@@ -95,11 +103,14 @@ class StaffReport extends Component
         $staffData = $this->staffPerformance;
         $csvFileName = 'kinerja_sales_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
 
-        return response()->streamDownload(function() use($staffData) {
+        return response()->streamDownload(function () use ($staffData) {
             $file = fopen('php://output', 'w');
             fputcsv($file, [
-                'NAMA SALES/KARYAWAN', 'TOTAL TRANSAKSI', 'GROSS REVENUE (Rp)', 
-                'NET REVENUE (Rp)', 'RATA-RATA TRANSAKSI (Rp)'
+                'NAMA SALES/KARYAWAN',
+                'TOTAL TRANSAKSI',
+                'GROSS REVENUE (Rp)',
+                'NET REVENUE (Rp)',
+                'RATA-RATA TRANSAKSI (Rp)'
             ]);
 
             foreach ($staffData as $staff) {
@@ -119,6 +130,6 @@ class StaffReport extends Component
     {
         return view('livewire.admin.reporting.staff-report', [
             'staffPerformance' => $this->staffPerformance
-        ])->layout('layouts.admin');
+        ])->layout('layouts.z');
     }
 }

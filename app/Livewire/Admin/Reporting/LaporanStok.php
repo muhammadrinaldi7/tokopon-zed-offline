@@ -45,12 +45,12 @@ class LaporanStok extends Component
             ->where('status', 'Available')
             ->whereIn('warehouse_id', $validWarehouseIds)
             ->when($this->search, function ($query) {
-                $query->where(function($q) {
+                $query->where(function ($q) {
                     $q->where('serial_number', 'like', '%' . $this->search . '%')
-                      ->orWhere('item_no', 'like', '%' . $this->search . '%')
-                      ->orWhereHas('productAccurate', function($q) {
-                          $q->where('name', 'like', '%' . $this->search . '%');
-                      });
+                        ->orWhere('item_no', 'like', '%' . $this->search . '%')
+                        ->orWhereHas('productAccurate', function ($q) {
+                            $q->where('name', 'like', '%' . $this->search . '%');
+                        });
                 });
             })
             ->when($this->warehouseId, function ($query) {
@@ -120,12 +120,12 @@ class LaporanStok extends Component
             ->where('status', 'Available')
             ->whereIn('warehouse_id', $validWarehouseIds)
             ->when($this->search, function ($query) {
-                $query->where(function($q) {
+                $query->where(function ($q) {
                     $q->where('serial_number', 'like', '%' . $this->search . '%')
-                      ->orWhere('item_no', 'like', '%' . $this->search . '%')
-                      ->orWhereHas('productAccurate', function($q) {
-                          $q->where('name', 'like', '%' . $this->search . '%');
-                      });
+                        ->orWhere('item_no', 'like', '%' . $this->search . '%')
+                        ->orWhereHas('productAccurate', function ($q) {
+                            $q->where('name', 'like', '%' . $this->search . '%');
+                        });
                 });
             })
             ->when($this->warehouseId, function ($query) {
@@ -139,6 +139,6 @@ class LaporanStok extends Component
         return view('livewire.admin.reporting.laporan-stok', [
             'stocks' => $stocks,
             'warehouses' => $warehouses
-        ])->layout('layouts.admin');
+        ])->layout('layouts.z');
     }
 }

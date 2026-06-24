@@ -262,6 +262,6 @@ class ProductReport extends Component
     {
         return view('livewire.admin.reporting.product-report', [
             'products' => $this->products
-        ])->layout('layouts.admin');
+        ])->layout('layouts.z');
     }
 }

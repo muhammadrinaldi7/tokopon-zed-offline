@@ -138,7 +138,7 @@
                         x-show="sidebarCollapsed" style="display:none;" x-cloak>Cek Stock</span>
                 </a>
             @endcan
-            @can('view-warehouse-stocks')
+            {{-- @can('view-warehouse-stocks')
                 <a href="{{ route('admin.check-serial-number') }}" wire:navigate
                     class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.check-serial-number') ? $activeClass : $inactiveClass }}">
                     <svg class="w-5 h-5 {{ request()->routeIs('admin.check-serial-number') ? $activeIconClass : $inactiveIconClass }}"
@@ -151,7 +151,7 @@
                         class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                         x-show="sidebarCollapsed" style="display:none;" x-cloak>Cek Lokasi SN</span>
                 </a>
-            @endcan
+            @endcan --}}
         @endcanany
 
         @can('view-catalog-menu')

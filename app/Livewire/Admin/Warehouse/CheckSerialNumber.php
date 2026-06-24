@@ -12,7 +12,7 @@ class CheckSerialNumber extends Component
     public $result = null;
     public $hasSearched = false;
 
-    #[Layout('layouts.admin')]
+    #[Layout('layouts.z')]
     public function render()
     {
         return view('livewire.admin.warehouse.check-serial-number');
@@ -28,11 +28,11 @@ class CheckSerialNumber extends Component
         ]);
 
         $this->hasSearched = true;
-        
+
         $this->result = ProductSerialNumber::with('warehouse')
             ->where('serial_number', trim($this->keyword))
             ->first();
-            
+
         // Reset the input so scanner can scan the next one easily
         $this->keyword = '';
     }

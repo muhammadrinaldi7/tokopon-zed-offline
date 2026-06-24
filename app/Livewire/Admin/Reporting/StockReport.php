@@ -243,6 +243,6 @@ class StockReport extends Component
                 'total_cost' => $allData->sum(fn($item) => $item['base_cost'] * $item['stock']),
                 'total_potential_revenue' => $allData->sum(fn($item) => $item['base_price'] * $item['stock']),
             ]
-        ])->layout('layouts.admin');
+        ])->layout('layouts.z');
     }
 }

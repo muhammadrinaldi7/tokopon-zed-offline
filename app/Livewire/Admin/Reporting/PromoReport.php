@@ -100,17 +100,17 @@ class PromoReport extends Component
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('order_number', 'like', '%' . $this->search . '%')
-                      ->orWhere('accurate_invoice_no', 'like', '%' . $this->search . '%');
+                        ->orWhere('accurate_invoice_no', 'like', '%' . $this->search . '%');
                 });
             })
             ->when($this->brandFilter, function ($query) {
                 // Filter order yang punya item dengan brand ini
                 $query->whereHas('items', function ($q) {
-                    $q->where(function($qItem) {
+                    $q->where(function ($qItem) {
                         $qItem->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($q2) {
                             $q2->where('brandName', $this->brandFilter);
                         })->orWhereHasMorph('variant', [\App\Models\ProductVariant::class], function ($q2) {
-                            $q2->whereHas('product.brand', function($q3) {
+                            $q2->whereHas('product.brand', function ($q3) {
                                 $q3->where('name', $this->brandFilter);
                             });
                         });
@@ -130,7 +130,7 @@ class PromoReport extends Component
 
         return response()->streamDownload(function () use ($orders) {
             $file = fopen('php://output', 'w');
-            
+
             // Header
             fputcsv($file, [
                 'TANGGAL',
@@ -150,7 +150,10 @@ class PromoReport extends Component
                 $invNo = $order->accurate_invoice_no ?? '-';
 
                 $baseRow = [
-                    $orderDate, $orderNo, $invNo, $branch
+                    $orderDate,
+                    $orderNo,
+                    $invNo,
+                    $branch
                 ];
 
                 $totalOrderItemsSubtotal = $order->items->sum('subtotal');
@@ -206,12 +209,12 @@ class PromoReport extends Component
     public function render()
     {
         $orders = $this->ordersQuery->paginate(20);
-        
+
         // Ambil list brand yang unik dari order-order yang ada (untuk filter)
         $availableBrands = \App\Models\Brand::orderBy('name')->pluck('name')
             ->merge(\App\Models\ProductAccurate::whereNotNull('brandName')->distinct()->pluck('brandName'))
             ->unique()->sort()->values();
 
-        return view('livewire.admin.reporting.promo-report', compact('orders', 'availableBrands'))->layout('layouts.admin');
+        return view('livewire.admin.reporting.promo-report', compact('orders', 'availableBrands'))->layout('layouts.z');
     }
 }

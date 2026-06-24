@@ -14,7 +14,12 @@ class Home extends Component
     }
     public function navigateToCekStock()
     {
-        return $this->redirectRoute('zoffline.cekstock', navigate: true);
+        return $this->redirectRoute('zoffline.cek-stock', navigate: true);
+    }
+
+    public function navigateToCekLokasiSN()
+    {
+        return $this->redirectRoute('check-serial-number', navigate: true);
     }
 
     public function navigateToShift()
@@ -30,13 +35,39 @@ class Home extends Component
     {
         return $this->redirectRoute('zoffline.warranty-activation', navigate: true);
     }
+
+    public function navigateToKlaimGaransi()
+    {
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Fitur Klaim Garansi akan segera hadir!'
+        ]);
+    }
+
+    public function navigateToAddOnGaransi()
+    {
+        $this->dispatch('alert', [
+            'type' => 'info',
+            'message' => 'Fitur Add On Garansi akan segera hadir!'
+        ]);
+    }
     public function navigateToClosingKasir()
     {
         return $this->redirectRoute('zoffline.pos.closing-kasir', navigate: true);
     }
-    public function navigateToDashboard()
+    public function navigateToRiwayatPenjualan()
     {
-        return $this->redirectRoute('admin.dashboard', navigate: true);
+        return $this->redirectRoute('zoffline.pos.riwayat', navigate: true);
+    }
+
+    public function navigateToRiwayatPembelian()
+    {
+        return $this->redirectRoute('zoffline.sell-phone-history', navigate: true);
+    }
+
+    public function navigateToTarikDataLaporan()
+    {
+        return $this->redirectRoute('zoffline.reporting', navigate: true);
     }
 
     public function navigateToZPos()
