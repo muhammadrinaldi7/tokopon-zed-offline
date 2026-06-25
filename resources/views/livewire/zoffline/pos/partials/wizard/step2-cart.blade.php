@@ -200,16 +200,21 @@
 
                                 @if ($validPresets->count() > 0)
                                     <div class="pt-3 flex items-end gap-3">
-                                        @if(isset($item['discount_amount']) && $item['discount_amount'] > 0)
+                                        @if (isset($item['discount_amount']) && $item['discount_amount'] > 0)
                                             <div>
-                                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Cashback</p>
-                                                <p class="text-sm font-bold text-indigo-600">Rp {{ number_format($item['discount_amount'], 0, ',', '.') }}</p>
+                                                <p
+                                                    class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
+                                                    Cashback</p>
+                                                <p class="text-sm font-bold text-indigo-600">Rp
+                                                    {{ number_format($item['discount_amount'], 0, ',', '.') }}</p>
                                             </div>
                                         @endif
                                         <button wire:click="openManualDiscountModal({{ $index }})"
                                             class="h-8 px-3 flex items-center justify-center text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg transition-colors text-xs font-bold shrink-0">
-                                            <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                            <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M12 4v16m8-8H4" />
                                             </svg>
                                             {{ isset($item['discount_amount']) && $item['discount_amount'] > 0 ? 'Ubah' : 'Cashback' }}
                                         </button>
@@ -323,7 +328,7 @@
 
             {{-- Footer / Total --}}
             <div
-                class="p-6 bg-gradient-to-r from-gray-50 to-[#1c69d4]/5 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+                class="p-6 bg-linear-to-r from-gray-50 to-[#1c69d4]/5 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
                 <span class="font-bold text-gray-500 uppercase tracking-widest text-sm">Total Tagihan Sementara</span>
                 <span class="font-black text-3xl text-[#1c69d4]">Rp
                     {{ number_format($this->subtotal - $this->itemDiscountTotal, 0, ',', '.') }}</span>
@@ -361,7 +366,7 @@
 
     {{-- Modal Edit Harga Satuan --}}
     @if ($showEditPriceModal)
-        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+        <div class="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
             x-data="{
                 rawAmount: @entangle('editPriceValue').defer,
                 formattedAmount: '',
