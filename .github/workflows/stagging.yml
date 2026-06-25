@@ -132,7 +132,7 @@ jobs:
           script: |
             # Pindah ke direktori web root di VPS Anda
             # Jika VPS menggunakan CloudPanel, path-nya biasanya: /home/nama_user/htdocs/nama_domain
-            cd /path/ke/folder/laravel/di/vps
+            cd /home/zedgroup-pos/htdocs/pos.zedgroup.tech
 
             # Tarik kode terbaru dari branch stagging_prod
             git pull origin stagging_prod
