@@ -4,6 +4,7 @@ namespace App\Livewire\Zoffline\Reporting;
 
 use App\Models\Order;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -16,7 +17,6 @@ class SalesReport extends Component
     public $endDate;
     public $search = '';
     public $branchFilter = '';
-    public $businessUnitFilter = '';
     public $csvSeparator = ';';
 
     public function mount()
@@ -47,10 +47,6 @@ class SalesReport extends Component
         $this->resetPage();
     }
     public function updatedBranchFilter()
-    {
-        $this->resetPage();
-    }
-    public function updatedBusinessUnitFilter()
     {
         $this->resetPage();
     }
@@ -105,9 +101,7 @@ class SalesReport extends Component
             ->when($this->branchFilter, function ($query) {
                 $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
             })
-            ->when($this->businessUnitFilter, function ($query) {
-                $query->where('orders.business_unit_id', $this->businessUnitFilter);
-            })
+            ->where('orders.business_unit_id', Auth::user()->getActiveBusinessUnitId())
             ->latest('orders.created_at');
     }
 
@@ -867,7 +861,9 @@ class SalesReport extends Component
     public function render()
     {
         $orders = $this->ordersQuery->paginate(20);
-        $availableBranches = \App\Models\Branch::orderBy('name')->pluck('name');
+        $availableBranches = \App\Models\Branch::where('business_unit_id', Auth::user()->getActiveBusinessUnitId())
+            ->orderBy('name')
+            ->pluck('name');
 
         $totalGross = $this->ordersQuery->sum('total_amount');
         $netQuery = clone $this->ordersQuery;

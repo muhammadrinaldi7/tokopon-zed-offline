@@ -16,15 +16,6 @@
                 </select>
             </div>
 
-            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
-                <select wire:model.live="businessUnitFilter"
-                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 cursor-pointer w-full truncate">
-                    <option value="">Semua Unit Usaha</option>
-                    @foreach (\App\Models\BusinessUnit::where('is_active', true)->get() as $bu)
-                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
-                    @endforeach
-                </select>
-            </div>
 
             <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
                 <select wire:model.live="branchFilter"
@@ -51,7 +42,7 @@
 
             @if ($dateRange === 'custom')
                 <div
-                    class=" flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm">
+                    class="md:col-span-2 lg:col-span-2 flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm">
                     <input type="date" wire:model.live="startDate"
                         class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700 w-full text-center">
                     <span class="text-gray-400 text-sm font-bold">-</span>
@@ -61,7 +52,7 @@
             @endif
 
             <button wire:click="exportCsvOpsi3" wire:loading.attr="disabled"
-                class=" flex items-center justify-center gap-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors w-full h-full min-h-[42px]">
+                class=" flex items-center justify-center gap-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors w-full h-full min-h-10.5">
                 <svg wire:loading.remove wire:target="exportCsvOpsi3" class="w-4 h-4 shrink-0" fill="none"
                     stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
