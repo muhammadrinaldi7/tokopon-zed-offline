@@ -306,10 +306,10 @@
                                                 placeholder="Contoh: Kerusakan LCD, Kena Air, dll" required>
                                         </div>
                                         <div class="w-40 relative">
-                                            <select wire:model="coverageItems.{{ $index }}.covered"
+                                            <select wire:model.live="coverageItems.{{ $index }}.covered"
                                                 class="w-full px-4 py-2 rounded-lg border-gray-200 text-sm bg-white shadow-sm font-bold {{ $item['covered'] ? 'text-emerald-600 focus:ring-emerald-500 focus:border-emerald-500' : 'text-rose-600 focus:ring-rose-500 focus:border-rose-500' }}">
-                                                <option value="1">✓ Tercover</option>
-                                                <option value="0">✕ Tidak Tercover</option>
+                                                <option value="1" class="text-emerald-600 font-bold bg-white">✓ Tercover</option>
+                                                <option value="0" class="text-rose-600 font-bold bg-white">✕ Tidak Tercover</option>
                                             </select>
                                         </div>
                                         <button type="button" wire:click="removeCoverageItem({{ $index }})"

@@ -37,7 +37,7 @@ class PolicyManagement extends Component
 
     public function addCoverageItem()
     {
-        $this->coverageItems[] = ['name' => '', 'covered' => true];
+        $this->coverageItems[] = ['name' => '', 'covered' => '1'];
     }
 
     public function removeCoverageItem($index)
@@ -61,10 +61,10 @@ class PolicyManagement extends Component
         $this->isEdit = false;
         
         $this->coverageItems = [
-            ['name' => 'LCD Rusak', 'covered' => true],
-            ['name' => 'Baterai Drop', 'covered' => true],
-            ['name' => 'Water Damage', 'covered' => false],
-            ['name' => 'Kerusakan Fisik', 'covered' => false],
+            ['name' => 'LCD Rusak', 'covered' => '1'],
+            ['name' => 'Baterai Drop', 'covered' => '1'],
+            ['name' => 'Water Damage', 'covered' => '0'],
+            ['name' => 'Kerusakan Fisik', 'covered' => '0'],
         ];
 
         $this->showModal = true;

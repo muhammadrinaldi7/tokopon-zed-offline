@@ -20,13 +20,17 @@ class WarrantyClaim extends Component
     {
         $this->foundWarranties = collect();
     }
-    
+
     // Form fields
     public $issue_description = '';
     public $customer_name = '';
     public $customer_phone = '';
-    
+
     public $isSubmitted = false;
+
+    // QC History
+    public $showQcModal = false;
+    public $qcInspection = null;
 
     public function searchWarranties()
     {
@@ -43,7 +47,7 @@ class WarrantyClaim extends Component
 
         $this->selectedWarrantyId = null;
         $this->isSubmitted = false;
-        
+
         if ($this->foundWarranties->count() === 0) {
             $this->addError('searchQuery', 'Tidak ada garansi ditemukan untuk Serial Number ini.');
         }
@@ -52,13 +56,33 @@ class WarrantyClaim extends Component
     public function selectWarranty($id)
     {
         $this->selectedWarrantyId = $id;
-        
-        // Auto-fill customer info if available
-        $warranty = $this->foundWarranties->firstWhere('id', $id);
+
+        // Re-query to ensure relations are loaded (Livewire hydration might drop them)
+        $warranty = Warranty::with('orderItem.order.user.profile')->find($id);
         if ($warranty && $warranty->orderItem && $warranty->orderItem->order && $warranty->orderItem->order->user) {
             $user = $warranty->orderItem->order->user;
             $this->customer_name = $user->name;
-            $this->customer_phone = $user->phone_number;
+            $this->customer_phone = $user->profile->phone_number ?? '';
+        }
+    }
+
+    public function openQcHistory()
+    {
+        if (!$this->selectedWarrantyId) return;
+
+        $warranty = $this->foundWarranties->firstWhere('id', $this->selectedWarrantyId);
+        // The Warranty model has a device_inspection_id attribute
+        if ($warranty && $warranty->device_inspection_id) {
+            $this->qcInspection = \App\Models\DeviceInspection::with(['qcTemplate', 'inspector'])
+                ->find($warranty->device_inspection_id);
+
+            if ($this->qcInspection) {
+                $this->showQcModal = true;
+            } else {
+                $this->dispatch('toast', title: 'Info', message: 'Data QC Unboxing tidak ditemukan untuk perangkat ini.', type: 'info');
+            }
+        } else {
+            $this->dispatch('toast', title: 'Info', message: 'Perangkat ini belum pernah melewati proses QC Unboxing.', type: 'info');
         }
     }
 

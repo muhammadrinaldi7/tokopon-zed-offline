@@ -102,7 +102,13 @@
 
                     @if($selectedWarrantyId)
                         <div class="border-t border-gray-100 pt-8 animate-fade-in-up">
-                            <h3 class="text-lg font-bold text-gray-900 mb-6">Informasi Pelanggan & Kerusakan</h3>
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
+                                <h3 class="text-lg font-bold text-gray-900">Informasi Pelanggan & Kerusakan</h3>
+                                <button type="button" wire:click="openQcHistory" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-bold rounded-xl transition-colors">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                                    Cek Riwayat QC
+                                </button>
+                            </div>
                             <form wire:submit="submitClaim">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                     <div class="form-control">
@@ -153,4 +159,114 @@
             </div>
         @endif
     </div>
+
+    <!-- Modal QC History -->
+    @if($showQcModal && $qcInspection)
+        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" wire:click="$set('showQcModal', false)"></div>
+
+            <!-- Modal Content -->
+            <div class="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
+                <!-- Modal Header -->
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-gray-50">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-xl text-gray-900">Riwayat QC Unboxing</h3>
+                            <p class="text-xs text-gray-500 mt-0.5">Dilakukan pada: {{ $qcInspection->created_at->format('d M Y H:i') }}</p>
+                        </div>
+                    </div>
+                    <button wire:click="$set('showQcModal', false)" class="text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-100 rounded-full p-2 transition-colors shadow-sm">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div class="p-6 overflow-y-auto flex-1 space-y-6">
+                    <!-- Inspector Info -->
+                    <div class="flex justify-between items-center bg-indigo-50/50 p-4 rounded-xl border border-indigo-100/50">
+                        <div>
+                            <p class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">Diinspeksi Oleh</p>
+                            <p class="font-bold text-indigo-900">{{ $qcInspection->inspector->name ?? 'Staff' }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">Status Final QC</p>
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-md text-xs font-bold">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Lulus / Passed
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Photos -->
+                    @php
+                        $mediaItems = $qcInspection->getMedia('qc_photos');
+                    @endphp
+                    @if($mediaItems->count() > 0)
+                        <div>
+                            <h4 class="text-sm font-bold text-gray-900 mb-3">Foto Kondisi Awal (Unboxing)</h4>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                                @foreach($mediaItems as $media)
+                                    <a href="{{ $media->getUrl() }}" target="_blank" class="aspect-square rounded-xl overflow-hidden border border-gray-100 shadow-sm bg-gray-50 group relative block">
+                                        <img src="{{ $media->getUrl() }}" alt="QC Photo" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110">
+                                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                                            <svg class="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
+                                        </div>
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- Checklist -->
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-900 mb-3">Hasil Checklist QC Fungsional</h4>
+                        @php
+                            // Decode JSON from DB
+                            $results = is_array($qcInspection->checklist_results) ? $qcInspection->checklist_results : json_decode($qcInspection->checklist_results, true);
+                            $grouped = collect($results)->groupBy('category');
+                        @endphp
+                        
+                        <div class="space-y-4">
+                            @foreach($grouped as $category => $items)
+                                <div class="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+                                    <div class="bg-gray-100/50 px-4 py-2 border-b border-gray-100">
+                                        <h5 class="text-xs font-bold text-gray-600 uppercase">{{ $category }}</h5>
+                                    </div>
+                                    <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        @foreach($items as $item)
+                                            <div class="flex items-center justify-between bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm">
+                                                <span class="text-sm font-medium text-gray-700">{{ $item['name'] }}</span>
+                                                @if($item['type'] === 'boolean')
+                                                    @if($item['value'])
+                                                        <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                                    @else
+                                                        <svg class="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    @endif
+                                                @else
+                                                    <span class="text-sm font-bold text-gray-900">{{ $item['value'] }}</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    @if($qcInspection->inspector_notes)
+                        <div>
+                            <h4 class="text-sm font-bold text-gray-900 mb-2">Catatan Tambahan</h4>
+                            <div class="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                                <p class="text-sm text-amber-800">{{ $qcInspection->inspector_notes }}</p>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
