@@ -149,17 +149,16 @@ jobs:
       - name: Build assets
         run: npm run build
 
-      # 5. Upload via FTP ke VPS CloudPanel
-      - name: Upload to VPS via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+# 5. Upload via SFTP ke VPS CloudPanel
+      - name: Upload to VPS via SFTP
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
-          server: ${{ secrets.VPS_FTP_SERVER }}
-          username: ${{ secrets.VPS_FTP_USERNAME }}
-          password: ${{ secrets.VPS_FTP_PASSWORD }}
-          local-dir: ./
-          # Path FTP biasanya langsung mengarah ke folder user. 
-          # Sesuaikan dengan struktur direktori saat Anda login FTP
-          server-dir: /htdocs/pos.zedgroup.tech/
+          server: ${{ secrets.VPS_HOST }} # Gunakan IP VPS Anda
+          username: ${{ secrets.VPS_USERNAME }} # Gunakan Site User dari CloudPanel (bukan FTP user)
+          ssh_private_key: ${{ secrets.VPS_SSH_KEY }} # Gunakan Private Key yang sudah Anda buat sebelumnya
+          local_path: './*'
+          remote_path: '/htdocs/pos.zedgroup.tech/' # Sesuaikan dengan path root website Anda
+          args: '-o ConnectTimeout=5'
           exclude: |
             node_modules/*
             node_modules
