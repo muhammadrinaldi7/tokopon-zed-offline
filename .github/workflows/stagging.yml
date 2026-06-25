@@ -67,7 +67,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 22 # Sesuaikan dengan versi Node.js yang Anda gunakan
+          node-version: 22
 
       # 3.6 Cache NPM dependencies
       - name: Cache NPM dependencies
@@ -85,7 +85,7 @@ jobs:
       - name: Build assets
         run: npm run build
 
-      # 4. Upload Laravel Core (Kecuali `public/`) ke root hosting
+      # 4. Upload Laravel Core ke root hosting via FTP
       - name: Upload Laravel Core to Hosting Root
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
@@ -115,3 +115,38 @@ jobs:
             package.json
             package-lock.json
             webpack.mix.js
+
+  # --- JOB BARU: DEPLOY KE VPS ---
+  deploy_vps:
+    needs: deploy # Ini adalah kunci agar job ini menunggu job 'deploy' FTP selesai
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Execute Deployment Scripts on VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            # Pindah ke direktori web root di VPS Anda
+            # Jika VPS menggunakan CloudPanel, path-nya biasanya: /home/nama_user/htdocs/nama_domain
+            cd /path/ke/folder/laravel/di/vps
+
+            # Tarik kode terbaru dari branch stagging_prod
+            git pull origin stagging_prod
+
+            # Install dependencies PHP
+            composer install --no-interaction --no-dev --optimize-autoloader
+
+            # Install dependencies Node & Build aset (Tailwind/Vite dll)
+            npm install
+            npm run build
+
+            # Eksekusi optimasi Laravel dan migrasi database
+            php artisan migrate --force
+            php artisan optimize:clear
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
