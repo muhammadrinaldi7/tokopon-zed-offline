@@ -17,6 +17,7 @@ class PaymentMethod extends Model
         'account_number',
         'account_owner',
         'accurate_bank_no',
+        'accurate_customer_no',
         'mdr_percentage',
         'is_active',
     ];

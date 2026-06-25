@@ -236,8 +236,8 @@ trait WithCheckoutAndReceipt
 
             if (!$order) {
                 // Buat Order Number baru jika belum ada
-                $buCode = \Illuminate\Support\Facades\Auth::user()->businessUnit->code ?? 'syihab';
-                $draftPrefix = ($buCode === 'second') ? 'POS-DRF-GSK-' : 'POS-DRF-SYB-';
+                $businessUnit = \Illuminate\Support\Facades\Auth::user()->businessUnit;
+                $draftPrefix = $businessUnit->draft_prefix ?? 'POS-DRF-';
 
                 $orderNumber = $draftPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
                     Order::whereDate('order_date', $dateToUse->format('Y-m-d'))
@@ -497,6 +497,12 @@ trait WithCheckoutAndReceipt
                         $srNumbers = [];
                         foreach ($this->payments as $index => $payment) {
                             $pm = \App\Models\PaymentMethod::findOrFail($payment['payment_method_id']);
+
+                            // SKIP jika ini adalah payment finance (punya accurate_customer_no)
+                            if (!empty($pm->accurate_customer_no)) {
+                                continue;
+                            }
+
                             $rate = $payment['payment_method_rate_id'] ? \App\Models\PaymentMethodRate::find($payment['payment_method_rate_id']) : null;
 
                             $pct = $this->getMdrPercentage($payment);
@@ -623,8 +629,8 @@ trait WithCheckoutAndReceipt
                 $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
 
                 // 2. Generate order number berdasarkan order_date
-                $buCode = \Illuminate\Support\Facades\Auth::user()->businessUnit->code ?? 'syihab';
-                $completedPrefix = ($buCode === 'second') ? 'POS-GSK-' : 'POS-SYB-';
+                $businessUnit = \Illuminate\Support\Facades\Auth::user()->businessUnit;
+                $completedPrefix = $businessUnit->order_prefix ?? 'POS-';
 
                 $orderNumber = $completedPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
                     Order::whereDate('order_date', $dateToUse->format('Y-m-d')) // <- Menggunakan order_date
@@ -744,6 +750,20 @@ trait WithCheckoutAndReceipt
                 $accurateService->syncCustomer($customerUser, $dbSource);
                 $customerUser->refresh();
 
+                // Tentukan Customer No untuk Invoice (Cek apakah ada payment finance)
+                $financePayment = null;
+                foreach ($this->payments as $payment) {
+                    $pm = \App\Models\PaymentMethod::find($payment['payment_method_id']);
+                    if ($pm && !empty($pm->accurate_customer_no)) {
+                        $financePayment = $pm;
+                        break;
+                    }
+                }
+
+                $invoiceCustomerNo = $financePayment
+                    ? $financePayment->accurate_customer_no
+                    : $customerUser->getAccurateCustomerNo($dbSource);
+
                 // Sales Invoice
                 if (!$order->accurate_invoice_no) {
                     $detailItems = [];
@@ -794,19 +814,27 @@ trait WithCheckoutAndReceipt
                         $detailItems[] = $itemData;
                     }
 
+                    $buConfig = \App\Models\BusinessUnit::where('code', $dbSource)->first();
+                    $isTaxable = $buConfig ? (bool) $buConfig->is_taxable : false;
+
                     $siData = [
-                        'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
+                        'customerNo' => $invoiceCustomerNo,
                         'branchName' => $accurateBranchName,
                         'detailItem' => $detailItems,
                         // 'cashDiscount' => $manualDiscountAmount,
-                        'inclusiveTax' => true,
                         'transDate'    => $this->order_date
                             ? Carbon::parse($this->order_date)->format('d/m/Y')
                             : now()->format('d/m/Y'),
-                        'taxable' => true,
-                        'useTax1' => true,
+                        'inclusiveTax' => $isTaxable,
+                        'taxable' => $isTaxable,
+                        'useTax1' => $isTaxable,
                         'description' => $this->notes
                     ];
+
+                    $mdrExpenses = $order->getMdrExpenseDetails();
+                    if (!empty($mdrExpenses)) {
+                        $siData['detailExpense'] = $mdrExpenses;
+                    }
 
                     $siResult = $accurateService->postSalesInvoice($siData, $dbSource);
                     if (isset($siResult['r']['number'])) {
@@ -829,36 +857,25 @@ trait WithCheckoutAndReceipt
 
                     foreach ($this->payments as $index => $payment) {
                         $pm = \App\Models\PaymentMethod::findOrFail($payment['payment_method_id']);
+
+                        // SKIP jika ini adalah payment finance (punya accurate_customer_no)
+                        if (!empty($pm->accurate_customer_no)) {
+                            continue;
+                        }
+
                         $rate = $payment['payment_method_rate_id'] ? \App\Models\PaymentMethodRate::find($payment['payment_method_rate_id']) : null;
 
                         $pct = $this->getMdrPercentage($payment);
                         $rowMdr = $pct > 0 ? round((float)$payment['amount'] * $pct / 100, 0) : 0;
-                        $rowBaseAmount = (float)$payment['amount'];
-                        $netReceiptAmount = $rowBaseAmount - $rowMdr;
-
-                        $detailDiscounts = [];
-
-                        // 1. Masukkan MDR sebagai potongan SR
-                        if ($rowMdr > 0 && $rate && $rate->accurate_account_no) {
-                            $detailDiscounts[] = [
-                                'accountNo' => $rate->accurate_account_no,
-                                'amount' => (float) $rowMdr,
-                                'departmentName' => $accurateBranchName,
-                                'discountNotes' => 'MDR ' . ($rate->name ?? ' ')
-                            ];
-                        }
+                        $netReceiptAmount = (float)$payment['amount'] - $rowMdr;
 
                         $detailInvoiceItem = [
                             'invoiceNo' => $order->accurate_invoice_no,
-                            'paymentAmount' => $rowBaseAmount, // Bayar sisa tagihan invoice = Cash
+                            'paymentAmount' => $netReceiptAmount, // Bayar sisa tagihan invoice net
                         ];
 
-                        if (!empty($detailDiscounts)) {
-                            $detailInvoiceItem['detailDiscount'] = $detailDiscounts;
-                        }
-
                         $srData = [
-                            'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
+                            'customerNo' => $invoiceCustomerNo,
                             'branchName' => $accurateBranchName,
                             'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
                             'receiptAmount' => (float) $netReceiptAmount, // Net cash ke bank
@@ -1061,8 +1078,8 @@ trait WithCheckoutAndReceipt
             }
 
             if (!$order) {
-                $buCode = \Illuminate\Support\Facades\Auth::user()->businessUnit->code ?? 'syihab';
-                $completedPrefix = ($buCode === 'second') ? 'POS-GSK-' : 'POS-SYB-';
+                $businessUnit = \Illuminate\Support\Facades\Auth::user()->businessUnit;
+                $completedPrefix = $businessUnit->order_prefix ?? 'POS-';
 
                 $orderNumber = $completedPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
                     Order::whereDate('order_date', $dateToUse->format('Y-m-d'))
@@ -1200,16 +1217,19 @@ trait WithCheckoutAndReceipt
                         $detailItems[] = $itemData;
                     }
 
+                    $buConfig = \App\Models\BusinessUnit::where('code', $dbSource)->first();
+                    $isTaxable = $buConfig ? (bool) $buConfig->is_taxable : false;
+
                     $siData = [
                         'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
                         'branchName' => $accurateBranchName,
                         'detailItem' => $detailItems,
-                        'inclusiveTax' => true,
+                        'inclusiveTax' => $isTaxable,
                         'transDate'    => $this->order_date
                             ? Carbon::parse($this->order_date)->format('d/m/Y')
                             : now()->format('d/m/Y'),
-                        'taxable' => true,
-                        'useTax1' => true,
+                        'taxable' => $isTaxable,
+                        'useTax1' => $isTaxable,
                         'description' => $this->notes
                     ];
 
@@ -1546,7 +1566,7 @@ trait WithCheckoutAndReceipt
                 \Mike42\Escpos\Printer::MODE_DOUBLE_WIDTH |
                 \Mike42\Escpos\Printer::MODE_DOUBLE_HEIGHT
         );
-        $storeTitle = optional($this->completedOrder->businessUnit)->code === 'second' ? 'GSK STORE' : 'SYIHAB STORE';
+        $storeTitle = optional($this->completedOrder->businessUnit)->store_title ?? 'Z-POS STORE';
         $printer->text($storeTitle . "\n");
 
         // PERBAIKAN 2: Kembalikan ke MODE_FONT_B standar (jangan dikosongkan)
@@ -1608,8 +1628,8 @@ trait WithCheckoutAndReceipt
         $printer->text($separator);
 
         // Total Section
-        $isGsk = optional($this->completedOrder->businessUnit)->code === 'second';
-        if ($isGsk) {
+        $showDiscount = optional($this->completedOrder->businessUnit)->receipt_show_discount;
+        if ($showDiscount) {
             $printer->text($this->formatLine("Subtotal", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), $maxColumns) . "\n");
             if ($this->completedOrder->discount_amount > 0) {
                 $printer->text($this->formatLine("Diskon", "-Rp " . number_format($this->completedOrder->discount_amount, 0, ',', '.'), $maxColumns) . "\n");

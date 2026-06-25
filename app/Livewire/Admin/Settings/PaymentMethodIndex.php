@@ -20,6 +20,7 @@ class PaymentMethodIndex extends Component
     public $account_number;
     public $account_owner;
     public $accurate_bank_no;
+    public $accurate_customer_no;
     public $mdr_percentage = 0;
     public $is_active = true;
     public $category = 'NON-TUNAI';
@@ -48,6 +49,7 @@ class PaymentMethodIndex extends Component
         'account_number' => 'nullable|string|max:255',
         'account_owner' => 'nullable|string|max:255',
         'accurate_bank_no' => 'required|string|max:255',
+        'accurate_customer_no' => 'nullable|string|max:255',
         'mdr_percentage' => 'required|numeric|min:0|max:100',
         'is_active' => 'boolean',
         'category' => 'required|in:TUNAI,NON-TUNAI',
@@ -99,6 +101,7 @@ class PaymentMethodIndex extends Component
         $this->account_number = $method->account_number;
         $this->account_owner = $method->account_owner;
         $this->accurate_bank_no = $method->accurate_bank_no;
+        $this->accurate_customer_no = $method->accurate_customer_no;
         $this->mdr_percentage = $method->mdr_percentage;
         $this->is_active = $method->is_active;
         $this->category = $method->category ?? 'NON-TUNAI';
@@ -118,6 +121,7 @@ class PaymentMethodIndex extends Component
             'account_number' => $this->account_number,
             'account_owner' => $this->account_owner,
             'accurate_bank_no' => $this->accurate_bank_no,
+            'accurate_customer_no' => $this->accurate_customer_no,
             'mdr_percentage' => $this->mdr_percentage,
             'is_active' => $this->is_active,
             'category' => $this->category,
@@ -163,6 +167,7 @@ class PaymentMethodIndex extends Component
         $this->account_number = '';
         $this->account_owner = '';
         $this->accurate_bank_no = '';
+        $this->accurate_customer_no = '';
         $this->mdr_percentage = 0;
         $this->is_active = true;
         $this->category = 'NON-TUNAI';

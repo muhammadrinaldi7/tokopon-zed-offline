@@ -48,6 +48,9 @@
                                 class="px-3 py-1 rounded-full text-xs font-bold {{ $unit->is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600' }}">
                                 {{ $unit->is_active ? 'Aktif' : 'Non-Aktif' }}
                             </button>
+                            @if($unit->is_taxable)
+                                <span class="ml-2 px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">Taxable</span>
+                            @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button wire:click="edit({{ $unit->id }})"
@@ -97,6 +100,39 @@
                                     <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
                                 @enderror
                                 <p class="text-[10px] text-gray-500 mt-1">Gunakan huruf kecil tanpa spasi.</p>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Customer Prefix (Accurate)</label>
+                                <input type="text" wire:model="customer_prefix" placeholder="Contoh: SYB_"
+                                    class="w-full border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
+                                @error('customer_prefix')
+                                    <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
+                                @enderror
+                                <p class="text-[10px] text-gray-500 mt-1">Digunakan sebagai awalan Nomor Pelanggan (Customer No) di Accurate.</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Order Prefix (Faktur)</label>
+                                <input type="text" wire:model="order_prefix" placeholder="Contoh: POS-SYB-"
+                                    class="w-full border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
+                                @error('order_prefix')
+                                    <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
+                                @enderror
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Draft Prefix</label>
+                                <input type="text" wire:model="draft_prefix" placeholder="Contoh: POS-DRF-SYB-"
+                                    class="w-full border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
+                                @error('draft_prefix')
+                                    <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
+                                @enderror
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Nama Toko (Judul Setruk)</label>
+                                <input type="text" wire:model="store_title" placeholder="Contoh: SYIHAB STORE"
+                                    class="w-full border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
+                                @error('store_title')
+                                    <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
+                                @enderror
                             </div>
                         </div>
 
@@ -148,7 +184,18 @@
                             </div>
                         </div>
 
-                        <div class="pt-4 border-t border-gray-200">
+                        <div class="pt-4 border-t border-gray-200 space-y-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" wire:model="is_taxable"
+                                    class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                <span class="ml-2 text-sm text-gray-600">Gunakan Pajak (Taxable)</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" wire:model="receipt_show_discount"
+                                    class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                <span class="ml-2 text-sm text-gray-600">Tampilkan Diskon di Setruk</span>
+                            </label>
+
                             <label class="flex items-center">
                                 <input type="checkbox" wire:model="is_active"
                                     class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">

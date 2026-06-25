@@ -17,11 +17,32 @@ class Order extends Model
     // Accessor untuk menggantikan kolom legacy mdr_amount
     public function getMdrAmountAttribute()
     {
-        return $this->payments->sum(function($payment) {
+        return $this->payments->sum(function ($payment) {
             $rate = $payment->paymentMethodRate;
             $pct = $rate ? $rate->mdr_percentage : ($payment->paymentMethod->mdr_percentage ?? 0);
             return round($payment->amount * $pct / 100);
         });
+    }
+
+    public function getMdrExpenseDetails()
+    {
+        $expenses = [];
+
+        foreach ($this->payments as $payment) {
+            $rate = $payment->paymentMethodRate;
+            $pct = $rate ? $rate->mdr_percentage : ($payment->paymentMethod->mdr_percentage ?? 0);
+            $rowMdr = $pct > 0 ? round($payment->amount * $pct / 100) : 0;
+
+            if ($rowMdr > 0 && $rate && $rate->accurate_account_no) {
+                $expenses[] = [
+                    'accountNo' => $rate->accurate_account_no,
+                    'expenseAmount' => -abs((float)$rowMdr),
+                    'expenseNotes' => 'MDR ' . ($rate->name ?? ' ')
+                ];
+            }
+        }
+
+        return $expenses;
     }
 
     // ─── Relationships ─────────────────────────────────────────

@@ -505,13 +505,13 @@ class AccurateService
 
         $address = $user->addresses()->where('is_primary', true)->first();
 
-        // Generate prefix dynamically for any new business unit, preserving legacy ones
-        $prefix = strtoupper(trim($databaseSource)) . '_';
-        if (trim(strtolower($databaseSource)) === 'second') $prefix = 'GSK_';
-        if (trim(strtolower($databaseSource)) === 'syihab') $prefix = 'SYB_';
+        // Ambil prefix dinamis dari database, default ke KODE unit jika kosong
+        $prefix = $businessUnit->customer_prefix
+            ? strtoupper($businessUnit->customer_prefix)
+            : strtoupper(trim($businessUnit->code)) . '_';
 
         $customerData = [
-            'name' => $prefix . 'CUSTOMER_' . ($user->profile ? $user->profile->full_name : $user->name),
+            'name' => $user->profile ? $user->profile->full_name : $user->name,
             'customerNo' => $prefix . 'CUSTOMER_' . str_pad($user->id, 5, '0', STR_PAD_LEFT),
             'currencyCode' => 'IDR',
             'mobilePhone' => $user->profile ? $user->profile->phone_number : null,
@@ -577,14 +577,14 @@ class AccurateService
 
         list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
 
-        // Generate prefix dynamically for any new business unit, preserving legacy ones
-        $prefix = strtoupper(trim($databaseSource)) . '_';
-        if (trim(strtolower($databaseSource)) === 'second') $prefix = 'GSK_';
-        if (trim(strtolower($databaseSource)) === 'syihab') $prefix = 'SYB_';
+        // Ambil prefix dinamis dari database, default ke KODE unit jika kosong
+        $prefix = $businessUnit->customer_prefix
+            ? strtoupper($businessUnit->customer_prefix)
+            : strtoupper(trim($businessUnit->code)) . '_';
 
         $customerData = [
             'id' => $existingPivot->accurate_customer_id, // Sertakan ID untuk UPDATE
-            'name' => $prefix . 'CUSTOMER_' . ($user->profile ? $user->profile->full_name : $user->name),
+            'name' => $user->profile ? $user->profile->full_name : $user->name,
             'mobilePhone' => $user->profile ? $user->profile->phone_number : null,
         ];
 

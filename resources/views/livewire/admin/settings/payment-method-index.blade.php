@@ -60,13 +60,21 @@
                             <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-bold {{ $method->category === 'TUNAI' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200' }} border">
                                 {{ $method->category }}
                             </span>
-                            <div class="mt-1">
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            <div class="mt-1 flex flex-col gap-1">
+                                <span class="inline-flex w-max items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                                     <svg class="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                     </svg>
-                                    GL: {{ $method->accurate_bank_no }}
+                                    Bank GL: {{ $method->accurate_bank_no }}
                                 </span>
+                                @if($method->accurate_customer_no)
+                                <span class="inline-flex w-max items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                    <svg class="w-3 h-3 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    Customer No: {{ $method->accurate_customer_no }}
+                                </span>
+                                @endif
                             </div>
                         </td>
 
@@ -214,27 +222,41 @@
                         @enderror
                     </div> --}}
 
-                    <div class="p-4 bg-amber-50 rounded-lg border border-amber-100">
-                        <label class="block text-sm font-bold text-amber-900 mb-1">Accurate Bank No <span
-                                class="text-rose-500">*</span></label>
-                        <p class="text-xs text-amber-700 mb-3">Pilih Akun Bank (CASH_BANK) dari buku besar Accurate.
-                        </p>
-                        <select wire:model="accurate_bank_no"
-                            class="w-full p-2 border-amber-200 rounded-lg focus:ring-amber-500 focus:border-amber-500 text-sm font-mono bg-white">
-                            <option value="">-- Pilih Akun GL Accurate --</option>
-                            @php
-                                $selectedUnit = collect($businessUnits)->firstWhere('id', $business_unit_id);
-                                $unitCode = $selectedUnit ? $selectedUnit->code : null;
-                                $filteredGlAccounts = collect($accurateGlAccounts)->where('database_source', $unitCode);
-                            @endphp
-                            @foreach ($filteredGlAccounts as $gl)
-                                <option value="{{ $gl->account_no }}">{{ $gl->account_no }} - {{ $gl->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('accurate_bank_no')
-                            <span class="text-xs text-rose-500 mt-1">{{ $message }}</span>
-                        @enderror
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="p-4 bg-amber-50 rounded-lg border border-amber-100">
+                            <label class="block text-sm font-bold text-amber-900 mb-1">Accurate Bank No <span
+                                    class="text-rose-500">*</span></label>
+                            <p class="text-xs text-amber-700 mb-3">Pilih Akun Bank (CASH_BANK) dari buku besar Accurate.
+                            </p>
+                            <select wire:model="accurate_bank_no"
+                                class="w-full p-2 border-amber-200 rounded-lg focus:ring-amber-500 focus:border-amber-500 text-sm font-mono bg-white">
+                                <option value="">-- Pilih Akun GL Accurate --</option>
+                                @php
+                                    $selectedUnit = collect($businessUnits)->firstWhere('id', $business_unit_id);
+                                    $unitCode = $selectedUnit ? $selectedUnit->code : null;
+                                    $filteredGlAccounts = collect($accurateGlAccounts)->where('database_source', $unitCode);
+                                @endphp
+                                @foreach ($filteredGlAccounts as $gl)
+                                    <option value="{{ $gl->account_no }}">{{ $gl->account_no }} - {{ $gl->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('accurate_bank_no')
+                                <span class="text-xs text-rose-500 mt-1">{{ $message }}</span>
+                            @enderror
+                        </div>
+
+                        <div class="p-4 bg-purple-50 rounded-lg border border-purple-100">
+                            <label class="block text-sm font-bold text-purple-900 mb-1">Accurate Customer No (Opsional)</label>
+                            <p class="text-xs text-purple-700 mb-3">Isi untuk payment Finance (HCI, Kredivo, dll) agar tagihan tercatat sebagai piutang.
+                            </p>
+                            <input type="text" wire:model="accurate_customer_no"
+                                class="w-full p-2 border-purple-200 rounded-lg focus:ring-purple-500 focus:border-purple-500 text-sm font-mono bg-white"
+                                placeholder="Contoh: HCI">
+                            @error('accurate_customer_no')
+                                <span class="text-xs text-rose-500 mt-1">{{ $message }}</span>
+                            @enderror
+                        </div>
                     </div>
 
                     <div class="flex items-center gap-2 mt-2">
