@@ -117,36 +117,64 @@ jobs:
             webpack.mix.js
 
   # --- JOB BARU: DEPLOY KE VPS ---
+  # --- JOB BARU: DEPLOY KE VPS VIA FTP ---
   deploy_vps:
-    needs: deploy # Ini adalah kunci agar job ini menunggu job 'deploy' FTP selesai
+    needs: deploy # Menunggu deploy staging web hosting selesai
     runs-on: ubuntu-latest
 
     steps:
-      - name: Execute Deployment Scripts on VPS via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      # 1. Checkout Repo
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Setup PHP
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            # Pindah ke direktori web root di VPS Anda
-            # Jika VPS menggunakan CloudPanel, path-nya biasanya: /home/nama_user/htdocs/nama_domain
-            cd /home/zedgroup-pos/htdocs/pos.zedgroup.tech
+          php-version: 8.3
 
-            # Tarik kode terbaru dari branch stagging_prod
-            git pull origin stagging_prod
+      # 3. Install Laravel Dependencies (Wajib dijalankan di Github Actions)
+      - name: Install Composer Dependencies
+        run: composer install --no-dev --optimize-autoloader
 
-            # Install dependencies PHP
-            composer install --no-interaction --no-dev --optimize-autoloader
+      # 4. Setup Node.js & Build Assets
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
 
-            # Install dependencies Node & Build aset (Tailwind/Vite dll)
-            npm install
-            npm run build
+      - name: Install Node dependencies
+        run: npm install
 
-            # Eksekusi optimasi Laravel dan migrasi database
-            php artisan migrate --force
-            php artisan optimize:clear
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
+      - name: Build assets
+        run: npm run build
+
+      # 5. Upload via FTP ke VPS CloudPanel
+      - name: Upload to VPS via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.VPS_FTP_SERVER }}
+          username: ${{ secrets.VPS_FTP_USERNAME }}
+          password: ${{ secrets.VPS_FTP_PASSWORD }}
+          local-dir: ./
+          # Path FTP biasanya langsung mengarah ke folder user. 
+          # Sesuaikan dengan struktur direktori saat Anda login FTP
+          server-dir: /htdocs/pos.zedgroup.tech/
+          exclude: |
+            node_modules/*
+            node_modules
+            node_modules/**
+            .git*
+            .git/*
+            .git/**
+            .github/**
+            .github/*
+            .github/
+            test/*
+            test
+            test/**
+            README.md
+            vite.config.js
+            package.json
+            package-lock.json
+            webpack.mix.js
