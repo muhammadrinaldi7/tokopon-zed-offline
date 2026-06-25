@@ -4,6 +4,7 @@ use App\Livewire\Admin\Employe\EmployeManage;
 use App\Livewire\Admin\Vendor\VendorManage;
 use App\Livewire\Admin\Pos\CekStock;
 use App\Livewire\Admin\Reporting\Dashboard;
+use App\Livewire\Admin\Reporting\InvoiceReport;
 use App\Livewire\Admin\Users\UserOperational;
 use App\Livewire\Pages\SellPhone;
 use App\Livewire\Pages\SellPhoneHistory;
@@ -79,6 +80,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::get('/stock', \App\Livewire\Admin\Reporting\StockReport::class)->name('stock');
         Route::get('/laporan-stok', \App\Livewire\Admin\Reporting\LaporanStok::class)->name('laporan-stok');
         Route::get('/staff', \App\Livewire\Admin\Reporting\StaffReport::class)->name('staff');
+        Route::get('/laporan-pembayaran', InvoiceReport::class)->name('pembayaran');
     });
 
     // Settings
