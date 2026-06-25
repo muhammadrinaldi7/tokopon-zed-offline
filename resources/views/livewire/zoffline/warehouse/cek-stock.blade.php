@@ -45,7 +45,8 @@
                                 <div>
                                     <h4 class="font-bold text-gray-900 group-hover:text-blue-700 transition">
                                         {{ $result['name'] }}
-                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 uppercase">
+                                        <span
+                                            class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 uppercase">
                                             {{ $result['business_unit_name'] ?? 'Unknown' }}
                                         </span>
                                     </h4>
@@ -246,10 +247,17 @@
                             $sn = is_array($snData) ? $snData['serial_number'] : $snData;
                             $hpp = is_array($snData) ? $snData['hpp'] : 0;
                             $vendor = is_array($snData) ? $snData['vendor_name'] : 'Tidak ada';
+                            $receiptDate =
+                                is_array($snData) && isset($snData['receipt_date']) ? $snData['receipt_date'] : null;
+                            $age = $receiptDate
+                                ? (int) \Carbon\Carbon::parse($receiptDate)
+                                        ->startOfDay()
+                                        ->diffInDays(now()->startOfDay()) . ' Hari'
+                                : '-';
                         @endphp
                         <div
                             class="flex items-center justify-between p-3 bg-gray-50 border border-gray-200/60 rounded-xl font-mono text-sm text-gray-700 hover:bg-blue-50/40 hover:border-blue-200 transition group">
-                            <div class="flex flex-col gap-1">
+                            <div class="flex flex-col gap-1 flex-1 min-w-0">
                                 <div class="flex items-center gap-2">
                                     <span
                                         class="text-xs text-gray-400 font-sans font-medium">{{ $index + 1 }}.</span>
@@ -266,14 +274,30 @@
                                                 </svg>
                                                 <span class="truncate">{{ $vendor }}</span>
                                             </span>
-                                            <span class="flex items-center gap-1.5" title="HPP">
-                                                <svg class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" fill="none"
-                                                    viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                {{ \App\Utils\Format::rupiah($hpp) }}
-                                            </span>
+
+                                            <div class="flex items-center justify-between w-full pr-4">
+                                                <span class="flex items-center gap-1.5" title="HPP">
+                                                    <svg class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" fill="none"
+                                                        viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    {{ \App\Utils\Format::rupiah($hpp) }}
+                                                </span>
+
+                                                @if ($receiptDate)
+                                                    <span class="flex items-center gap-1.5" title="Umur Stok (Hari)">
+                                                        <svg class="w-3.5 h-3.5 text-orange-500 flex-shrink-0"
+                                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2"
+                                                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        {{ $age }}
+                                                    </span>
+                                                @endif
+                                            </div>
                                         </div>
                                     @endcan
                                 @endif

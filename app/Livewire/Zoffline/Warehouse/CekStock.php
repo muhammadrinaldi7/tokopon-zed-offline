@@ -161,6 +161,7 @@ class CekStock extends Component
                                 'serial_number' => $sn->serial_number,
                                 'hpp' => $sn->hpp ?? 0,
                                 'vendor_name' => $sn->vendor ? $sn->vendor->vendor_name : 'Tidak ada',
+                                'receipt_date' => $sn->receipt_date ?? null,
                             ];
                         })->toArray(),
                     ];
