@@ -177,7 +177,7 @@
                {{-- Receipt Preview --}}
                <div id="receipt-content" class="p-5 font-mono text-xs leading-relaxed overflow-y-auto h-125">
                    <div class="text-center mb-3">
-                       <p class="font-bold text-sm">{{ optional($completedOrder->businessUnit)->code === 'second' ? 'GSK STORE' : 'SYIHAB STORE' }}</p>
+                       <p class="font-bold text-sm">{{ optional($completedOrder->businessUnit)->store_title ?? 'Z-POS STORE' }}</p>
                        <p class="text-[10px] text-gray-500">
                            {{ $completedOrder->shipping_address_snapshot['store'] ?? 'Toko' }}</p>
                        <p class="text-[10px] text-gray-400">{{ $completedOrder->created_at->format('d/m/Y H:i') }}
@@ -232,16 +232,15 @@
                    @endforeach
                    <div class="border-t border-dashed border-gray-300 my-2"></div>
                    <div class="flex justify-between">
-                       <span>Subtotal</span><span>{{ number_format($completedOrder->total_amount, 0, ',', '.') }}</span>
+                       <span>Subtotal</span><span>Rp {{ number_format($completedOrder->total_amount, 0, ',', '.') }}</span>
                    </div>
                    @if ($completedOrder->discount_amount > 0)
                        <div class="flex justify-between text-rose-600">
-                           <span>Diskon</span><span>-{{ number_format($completedOrder->discount_amount, 0, ',', '.') }}</span>
+                           <span>Diskon</span><span>-Rp {{ number_format($completedOrder->discount_amount, 0, ',', '.') }}</span>
                        </div>
                    @endif
                    <div class="border-t border-dashed border-gray-300 my-1"></div>
-                   <div class="flex justify-between font-bold text-sm"><span>TOTAL</span><span>Rp
-                           {{ number_format($completedOrder->grand_total, 0, ',', '.') }}</span></div>
+                   <div class="flex justify-between font-bold text-sm"><span>TOTAL</span><span>Rp {{ number_format($completedOrder->grand_total, 0, ',', '.') }}</span></div>
                    <div class="border-t border-dashed border-gray-300 my-2"></div>
                    <div class="space-y-0.5 mb-2">
                        @foreach ($completedOrder->payments as $payment)

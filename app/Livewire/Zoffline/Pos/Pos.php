@@ -130,6 +130,7 @@ class Pos extends Component
     // ─── Modals ────────────────────────────────────────────────
     public $showCheckoutModal = false;
     public $showReceiptModal = false;
+
     public $completedOrder = null;
     public $showConfirmUpdateCustomerModal = false;
     public $existingCustomerToUpdate = null;
@@ -197,9 +198,14 @@ class Pos extends Component
 
     public function openDraft()
     {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $userBranchId = $user->branch_id ?? null;
+
         $this->draftOrders = Order::with(['user'])
             ->where('order_channel', 'POS')
             ->where('order_status', 'DRAFT')
+            ->where('business_unit_id', $user->getActiveBusinessUnitId())
+            ->where('branch_id', $userBranchId)
             ->latest()
             ->take(20)
             ->get();
@@ -213,9 +219,14 @@ class Pos extends Component
 
     public function openPiutang()
     {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $userBranchId = $user->branch_id ?? null;
+
         $this->piutangOrders = Order::with(['user'])
             ->where('order_channel', 'POS')
             ->where('order_status', 'PIUTANG')
+            ->where('business_unit_id', $user->getActiveBusinessUnitId())
+            ->where('branch_id', $userBranchId)
             ->latest()
             ->take(20)
             ->get();
