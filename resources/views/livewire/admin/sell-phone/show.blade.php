@@ -1,7 +1,9 @@
-<div class="relative min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 p-4 sm:p-8">
+<div class="relative min-h-screen bg-gradient-to-br p-4 sm:p-8">
     {{-- Decorative Background Elements --}}
-    <div class="absolute top-0 left-0 w-full h-96 bg-gradient-to-br from-blue-600/5 to-purple-600/5 blur-3xl pointer-events-none -z-10"></div>
-    
+    <div
+        class="absolute top-0 left-0 w-full h-96 bg-gradient-to-br from-blue-600/5 to-purple-600/5 blur-3xl pointer-events-none -z-10">
+    </div>
+
     <div class="flex items-center justify-between mb-8">
         <div>
             <a href="{{ route('admin.sell-phones.index') }}" wire:navigate
@@ -11,7 +13,9 @@
                 </svg>
                 Kembali
             </a>
-            <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-700 tracking-tight mt-1">Detail Penjualan HP #SPL-{{ $sellPhone->id }}</h1>
+            <h1
+                class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-700 tracking-tight mt-1">
+                Detail Penjualan HP #SPL-{{ $sellPhone->id }}</h1>
         </div>
         <div>
             @php
@@ -52,14 +56,20 @@
                     <div class="col-span-2 mt-2 flex flex-wrap gap-6">
                         <div>
                             <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Nomor IMEI</p>
-                            <p class="font-mono text-gray-900 bg-gray-100 px-3 py-1.5 rounded-lg inline-block font-bold">
+                            <p
+                                class="font-mono text-gray-900 bg-gray-100 px-3 py-1.5 rounded-lg inline-block font-bold">
                                 {{ $sellPhone->imei ?? 'Belum ada IMEI' }}
                             </p>
                         </div>
                         <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Ditangani Oleh (Frontliner)</p>
-                            <p class="font-medium text-gray-900 bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1.5 rounded-lg inline-flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Ditangani Oleh
+                                (Frontliner)</p>
+                            <p
+                                class="font-medium text-gray-900 bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1.5 rounded-lg inline-flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
                                 {{ optional($sellPhone->handledBy)->name ?? 'Sistem / Pelanggan' }}
                             </p>
                         </div>
@@ -67,23 +77,33 @@
                     <div class="col-span-2 mt-2" x-data="{ showQcModal: false }">
                         <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Deskripsi Kondisi
                             (Catatan Pelanggan)</p>
-                        <div class="p-3 bg-gray-50 rounded-lg text-sm text-gray-700 whitespace-pre-wrap font-medium">
+                        <div class="p-2 bg-gray-50 rounded-lg text-sm text-gray-700 font-medium">
                             {{ $sellPhone->minus_desc ?: 'Tidak ada catatan.' }}
                         </div>
 
                         @if ($sellPhone->status !== 'PENDING' && $sellPhone->status !== 'WAITING_FOR_DEVICE')
-                            <button @click="showQcModal = true" class="mt-3 px-4 py-2 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg text-sm font-bold hover:bg-indigo-100 transition">
+                            <button @click="showQcModal = true"
+                                class="mt-3 px-4 py-2 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg text-sm font-bold hover:bg-indigo-100 transition">
                                 Lihat Detail Inspeksi QC
                             </button>
-                            
+
                             {{-- Modal QC --}}
                             <template x-teleport="body">
-                                <div x-show="showQcModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" style="display: none;">
-                                    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col" @click.away="showQcModal = false">
-                                        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                                <div x-show="showQcModal"
+                                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                                    style="display: none;">
+                                    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col"
+                                        @click.away="showQcModal = false">
+                                        <div
+                                            class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                                             <h3 class="font-bold text-lg text-gray-900">Hasil Inspeksi QC Fisik</h3>
-                                            <button @click="showQcModal = false" class="text-gray-400 hover:text-gray-600">
-                                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            <button @click="showQcModal = false"
+                                                class="text-gray-400 hover:text-gray-600">
+                                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
                                             </button>
                                         </div>
                                         <div class="p-6 overflow-y-auto space-y-4">
@@ -91,25 +111,44 @@
                                                 $qcRecords = $sellPhone->inspections()->latest()->get();
                                             @endphp
                                             @forelse($qcRecords as $record)
-                                                <div class="p-4 border rounded-lg {{ $record->verdict === 'pass' ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50' }}">
+                                                <div
+                                                    class="p-4 border rounded-lg {{ $record->verdict === 'pass' ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50' }}">
                                                     <div class="flex justify-between items-center mb-2">
-                                                        <span class="font-bold {{ $record->verdict === 'pass' ? 'text-emerald-700' : 'text-rose-700' }}">
+                                                        <span
+                                                            class="font-bold {{ $record->verdict === 'pass' ? 'text-emerald-700' : 'text-rose-700' }}">
                                                             {{ strtoupper($record->verdict) }}
                                                         </span>
-                                                        <span class="text-xs text-gray-500">{{ $record->created_at->format('d M Y H:i') }}</span>
+                                                        <span
+                                                            class="text-xs text-gray-500">{{ $record->created_at->format('d M Y H:i') }}</span>
                                                     </div>
-                                                    
-                                                    @if($record->checklist_results)
+
+                                                    @if ($record->checklist_results)
                                                         <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
-                                                            @foreach($record->checklist_results as $item)
-                                                                <div class="flex justify-between items-center p-2 rounded {{ ($item['type'] ?? '') === 'boolean' ? ($item['value'] ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100') : 'bg-gray-50 text-gray-700 border border-gray-200' }}">
-                                                                    <span class="font-medium truncate pr-2">{{ $item['name'] ?? '-' }}</span>
+                                                            @foreach ($record->checklist_results as $item)
+                                                                <div
+                                                                    class="flex justify-between items-center p-2 rounded {{ ($item['type'] ?? '') === 'boolean' ? ($item['value'] ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100') : 'bg-gray-50 text-gray-700 border border-gray-200' }}">
+                                                                    <span
+                                                                        class="font-medium truncate pr-2">{{ $item['name'] ?? '-' }}</span>
                                                                     <span class="font-bold flex-shrink-0">
-                                                                        @if(($item['type'] ?? '') === 'boolean')
-                                                                            @if($item['value'])
-                                                                                <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                                        @if (($item['type'] ?? '') === 'boolean')
+                                                                            @if ($item['value'])
+                                                                                <svg class="w-4 h-4 text-emerald-500"
+                                                                                    fill="none" viewBox="0 0 24 24"
+                                                                                    stroke="currentColor">
+                                                                                    <path stroke-linecap="round"
+                                                                                        stroke-linejoin="round"
+                                                                                        stroke-width="2"
+                                                                                        d="M5 13l4 4L19 7" />
+                                                                                </svg>
                                                                             @else
-                                                                                <svg class="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                                                <svg class="w-4 h-4 text-rose-500"
+                                                                                    fill="none" viewBox="0 0 24 24"
+                                                                                    stroke="currentColor">
+                                                                                    <path stroke-linecap="round"
+                                                                                        stroke-linejoin="round"
+                                                                                        stroke-width="2"
+                                                                                        d="M6 18L18 6M6 6l12 12" />
+                                                                                </svg>
                                                                             @endif
                                                                         @else
                                                                             {{ $item['value'] ?? '-' }}
@@ -120,17 +159,25 @@
                                                         </div>
                                                     @endif
 
-                                                    <div class="mt-4 pt-3 border-t {{ $record->verdict === 'pass' ? 'border-emerald-200' : 'border-rose-200' }}">
-                                                        <p class="text-sm font-medium text-gray-800"><span class="text-xs text-gray-500 block mb-1">Catatan Inspektur:</span>{{ $record->inspector_notes ?: 'Tidak ada catatan khusus.' }}</p>
-                                                        <p class="text-xs text-gray-500 mt-2">Diperiksa oleh: <span class="font-bold text-gray-700">{{ $record->inspector->name ?? 'Sistem' }}</span></p>
+                                                    <div
+                                                        class="mt-4 pt-3 border-t {{ $record->verdict === 'pass' ? 'border-emerald-200' : 'border-rose-200' }}">
+                                                        <p class="text-sm font-medium text-gray-800"><span
+                                                                class="text-xs text-gray-500 block mb-1">Catatan
+                                                                Inspektur:</span>{{ $record->inspector_notes ?: 'Tidak ada catatan khusus.' }}
+                                                        </p>
+                                                        <p class="text-xs text-gray-500 mt-2">Diperiksa oleh: <span
+                                                                class="font-bold text-gray-700">{{ $record->inspector->name ?? 'Sistem' }}</span>
+                                                        </p>
                                                     </div>
                                                 </div>
                                             @empty
-                                                <p class="text-gray-500 text-sm text-center italic">Belum ada data inspeksi.</p>
+                                                <p class="text-gray-500 text-sm text-center italic">Belum ada data
+                                                    inspeksi.</p>
                                             @endforelse
                                         </div>
                                         <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end">
-                                            <button @click="showQcModal = false" class="px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-50">Tutup</button>
+                                            <button @click="showQcModal = false"
+                                                class="px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-50">Tutup</button>
                                         </div>
                                     </div>
                                 </div>
@@ -205,27 +252,36 @@
                 </h3>
 
                 @if ($sellPhone->appraised_value)
-                    <div class="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-lg text-center" x-data="{ editingPrice: false }">
+                    <div class="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-lg text-center"
+                        x-data="{ editingPrice: false }">
                         <p class="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">Nilai Disepakati /
                             Penawaran</p>
-                        
+
                         <div x-show="!editingPrice">
                             <p class="text-2xl font-black text-emerald-700">Rp
                                 {{ number_format($sellPhone->appraised_value, 0, ',', '.') }}</p>
-                            
-                            @if($sellPhone->status === 'PAYING')
-                                <button type="button" @click="editingPrice = true" class="mt-2 text-xs font-bold text-emerald-600 underline hover:text-emerald-800 focus:outline-none">Ubah Harga</button>
+
+                            @if ($sellPhone->status === 'PAYING')
+                                {{-- <button type="button" @click="editingPrice = true"
+                                    class="mt-2 text-xs font-bold text-emerald-600 underline hover:text-emerald-800 focus:outline-none">Ubah
+                                    Harga</button> --}}
                             @else
                                 <p class="text-xs text-emerald-600 mt-2">Dihitung otomatis dari Base Price & Rules.</p>
                             @endif
                         </div>
 
-                        <div x-show="editingPrice" style="display: none;" class="mt-3 text-left bg-white p-4 rounded-xl border border-emerald-200 shadow-sm">
-                            <label class="block text-xs font-bold text-emerald-900 mb-2">Nominal Harga Baru (Rp)</label>
-                            <input type="number" wire:model="appraisedValue" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm bg-white font-mono mb-3 outline-none transition-all">
+                        <div x-show="editingPrice" style="display: none;"
+                            class="mt-3 text-left bg-white p-4 rounded-xl border border-emerald-200 shadow-sm">
+                            <label class="block text-xs font-bold text-emerald-900 mb-2">Nominal Harga Baru
+                                (Rp)</label>
+                            <input type="number" wire:model="appraisedValue"
+                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm bg-white font-mono mb-3 outline-none transition-all">
                             <div class="flex gap-2">
-                                <button type="button" wire:click="updatePrice" @click="editingPrice = false" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-sm transition-colors">Simpan</button>
-                                <button type="button" @click="editingPrice = false; $wire.set('appraisedValue', {{ $sellPhone->appraised_value }})" class="flex-1 bg-white border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">Batal</button>
+                                <button type="button" wire:click="updatePrice" @click="editingPrice = false"
+                                    class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-sm transition-colors">Simpan</button>
+                                <button type="button"
+                                    @click="editingPrice = false; $wire.set('appraisedValue', {{ $sellPhone->appraised_value }})"
+                                    class="flex-1 bg-white border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">Batal</button>
                             </div>
                         </div>
                     </div>
@@ -249,7 +305,8 @@
                                     </svg>
                                     Menunggu Inspeksi QC
                                 </p>
-                                <p class="text-xs mt-1.5 opacity-90">Silakan selesaikan form inspeksi fisik perangkat di
+                                <p class="text-xs mt-1.5 opacity-90">Silakan selesaikan form inspeksi fisik perangkat
+                                    di
                                     bagian bawah halaman ini terlebih dahulu.</p>
                             </div>
                         @elseif (!$isRevising)
@@ -314,20 +371,27 @@
                         <div class="space-y-4">
                             <div class="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-4">
                                 <div>
-                                    <label class="block text-sm font-bold text-blue-900 mb-1">Rekening Bank Toko (Asal Transfer) <span class="text-rose-500">*</span></label>
-                                    <p class="text-[10px] text-blue-700 leading-tight mb-2">Pilih kas/bank Accurate untuk melakukan pembayaran / pelunasan pembelian ini.</p>
-                                    <select wire:model.live="storeBankNo" class="w-full p-2 border-blue-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm bg-white font-mono">
+                                    <label class="block text-sm font-bold text-blue-900 mb-1">Rekening Bank Toko (Asal
+                                        Transfer) <span class="text-rose-500">*</span></label>
+                                    <p class="text-[10px] text-blue-700 leading-tight mb-2">Pilih kas/bank Accurate
+                                        untuk melakukan pembayaran / pelunasan pembelian ini.</p>
+                                    <select wire:model.live="storeBankNo"
+                                        class="w-full p-2 border-blue-200 rounded-lg focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm bg-white font-mono">
                                         <option value="">-- Pilih Akun GL Accurate --</option>
-                                        @foreach($accurateGlAccounts as $gl)
-                                            <option value="{{ $gl['account_no'] }}">{{ $gl['account_no'] }} - {{ $gl['name'] }}</option>
+                                        @foreach ($accurateGlAccounts as $gl)
+                                            <option value="{{ $gl['account_no'] }}">{{ $gl['account_no'] }} -
+                                                {{ $gl['name'] }}</option>
                                         @endforeach
                                     </select>
-                                    @error('storeBankNo') <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span> @enderror
+                                    @error('storeBankNo')
+                                        <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span>
+                                    @enderror
                                 </div>
 
                                 <div x-data="{ previewUrl: null }">
-                                    <label class="block text-sm font-bold text-blue-900 mb-1">Upload Bukti Transfer <span class="text-rose-500">*</span></label>
-                                    <input type="file" wire:model="paymentReceipt" accept="image/*" 
+                                    <label class="block text-sm font-bold text-blue-900 mb-1">Upload Bukti Transfer
+                                        <span class="text-rose-500">*</span></label>
+                                    <input type="file" wire:model="paymentReceipt" accept="image/*"
                                         @change="
                                             const file = $event.target.files[0];
                                             if (file) {
@@ -337,22 +401,33 @@
                                             }
                                         "
                                         class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200">
-                                    <div wire:loading wire:target="paymentReceipt" class="text-xs text-blue-600 mt-1">Mengunggah...</div>
-                                    @error('paymentReceipt') <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span> @enderror
-                                    
-                                    <div x-show="previewUrl" x-cloak style="display: none;" class="mt-2 rounded-lg overflow-hidden border border-blue-200 aspect-video relative">
+                                    <div wire:loading wire:target="paymentReceipt" class="text-xs text-blue-600 mt-1">
+                                        Mengunggah...</div>
+                                    @error('paymentReceipt')
+                                        <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span>
+                                    @enderror
+
+                                    <div x-show="previewUrl" x-cloak style="display: none;"
+                                        class="mt-2 rounded-lg overflow-hidden border border-blue-200 aspect-video relative">
                                         <img :src="previewUrl" class="w-full h-full object-cover">
                                     </div>
                                 </div>
                             </div>
 
-                            <button type="button" wire:click="markAsPaid"
-                                wire:loading.attr="disabled"
-                                @if(!$paymentReceipt || !$storeBankNo) disabled @endif
+                            <button type="button" wire:click="markAsPaid" wire:loading.attr="disabled"
+                                @if (!$paymentReceipt || !$storeBankNo) disabled @endif
                                 wire:confirm="Anda akan menandai ini Lunas dan akan dibuatkan Purchase Payment otomatis ke Accurate. Lanjutkan?"
                                 class="w-full bg-emerald-500 text-white py-3 rounded-lg font-bold hover:bg-emerald-600 transition flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed">
-                                <svg wire:loading wire:target="markAsPaid" class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                Tandai Selesai / Lunas (Hit Accurate)
+                                <svg wire:loading wire:target="markAsPaid"
+                                    class="animate-spin -ml-1 mr-2 h-5 w-5 text-white"
+                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                        stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                    </path>
+                                </svg>
+                                Tandai Lunas (Hit Accurate)
                             </button>
 
                             <button type="button" wire:click="$set('isRejecting', true)"
@@ -360,7 +435,6 @@
                                 Batalkan Transaksi
                             </button>
                         </div>
-
                     @else
                         <div class="space-y-3">
                             <button type="button" wire:click="markAsPaid"
@@ -380,7 +454,8 @@
 
             {{-- Info Inventaris --}}
             @if ($sellPhone->status === 'COMPLETED')
-                <div class="bg-emerald-50 rounded-lg border border-emerald-100 p-6 text-center animate-in zoom-in duration-300">
+                <div
+                    class="bg-emerald-50 rounded-lg border border-emerald-100 p-6 text-center animate-in zoom-in duration-300">
                     <div
                         class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -389,35 +464,50 @@
                         </svg>
                     </div>
                     <h3 class="font-bold text-emerald-900">Purchase Invoice & Payment Berhasil!</h3>
-                    <p class="text-sm text-emerald-700 mt-1">Stok perangkat ini telah berhasil dicatat di server Accurate, dan Pelunasan Pembelian sudah dikirim. Unit akan muncul di POS setelah Sinkronisasi Master Data berjalan.</p>
-                    
-                    @if($sellPhone->payment_receipt_path)
+                    <p class="text-sm text-emerald-700 mt-1">Stok perangkat ini telah berhasil dicatat di server
+                        Accurate, dan Pelunasan Pembelian sudah dikirim. Unit akan muncul di POS setelah Sinkronisasi
+                        Master Data berjalan.</p>
+
+                    @if ($sellPhone->payment_receipt_path)
                         <div class="mt-4 border-t border-emerald-200 pt-4">
-                            <p class="text-xs font-bold text-emerald-800 uppercase tracking-widest mb-2">Bukti Transfer Pelunasan</p>
-                            <a href="{{ asset('storage/' . $sellPhone->payment_receipt_path) }}" target="_blank" class="inline-block rounded-lg overflow-hidden border border-emerald-200 aspect-video w-48 mx-auto hover:opacity-80 transition cursor-zoom-in mb-3">
-                                <img src="{{ asset('storage/' . $sellPhone->payment_receipt_path) }}" class="w-full h-full object-cover">
+                            <p class="text-xs font-bold text-emerald-800 uppercase tracking-widest mb-2">Bukti Transfer
+                                Pelunasan</p>
+                            <a href="{{ asset('storage/' . $sellPhone->payment_receipt_path) }}" target="_blank"
+                                class="inline-block rounded-lg overflow-hidden border border-emerald-200 aspect-video w-48 mx-auto hover:opacity-80 transition cursor-zoom-in mb-3">
+                                <img src="{{ asset('storage/' . $sellPhone->payment_receipt_path) }}"
+                                    class="w-full h-full object-cover">
                             </a>
                         </div>
                     @else
                         <div class="mt-4 border-t border-emerald-200 pt-4">
-                            <p class="text-xs font-bold text-rose-600 uppercase tracking-widest mb-2">Bukti Transfer Belum Ada</p>
+                            <p class="text-xs font-bold text-rose-600 uppercase tracking-widest mb-2">Bukti Transfer
+                                Belum Ada</p>
                         </div>
                     @endif
-                    
-                    @if(!$isReuploading)
-                        <button type="button" wire:click="$set('isReuploading', true)" class="text-xs font-bold text-emerald-700 underline hover:text-emerald-800">
+
+                    @if (!$isReuploading)
+                        <button type="button" wire:click="$set('isReuploading', true)"
+                            class="text-xs font-bold text-emerald-700 underline hover:text-emerald-800">
                             {{ $sellPhone->payment_receipt_path ? 'Upload Ulang Bukti Transfer' : 'Upload Bukti Transfer Sekarang' }}
                         </button>
                     @else
                         <div class="mt-4 text-left bg-white p-4 rounded-xl border border-emerald-200">
-                            <label class="block text-sm font-bold text-emerald-900 mb-1">Pilih Bukti Transfer Baru</label>
-                            <input type="file" wire:model="paymentReceipt" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-100 file:text-emerald-700 hover:file:bg-emerald-200 mb-2">
-                            <div wire:loading wire:target="paymentReceipt" class="text-xs text-emerald-600 mt-1 mb-2">Mengunggah file...</div>
-                            @error('paymentReceipt') <span class="text-xs text-rose-500 mt-1 mb-2 block">{{ $message }}</span> @enderror
-                            
+                            <label class="block text-sm font-bold text-emerald-900 mb-1">Pilih Bukti Transfer
+                                Baru</label>
+                            <input type="file" wire:model="paymentReceipt" accept="image/*"
+                                class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-100 file:text-emerald-700 hover:file:bg-emerald-200 mb-2">
+                            <div wire:loading wire:target="paymentReceipt" class="text-xs text-emerald-600 mt-1 mb-2">
+                                Mengunggah file...</div>
+                            @error('paymentReceipt')
+                                <span class="text-xs text-rose-500 mt-1 mb-2 block">{{ $message }}</span>
+                            @enderror
+
                             <div class="flex gap-2 mt-2">
-                                <button type="button" wire:click="$set('isReuploading', false)" class="flex-1 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-bold hover:bg-gray-200 transition">Batal</button>
-                                <button type="button" wire:click="reuploadReceipt" class="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition">Simpan File</button>
+                                <button type="button" wire:click="$set('isReuploading', false)"
+                                    class="flex-1 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-bold hover:bg-gray-200 transition">Batal</button>
+                                <button type="button" wire:click="reuploadReceipt"
+                                    class="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-bold hover:bg-emerald-600 transition">Simpan
+                                    File</button>
                             </div>
                         </div>
                     @endif
@@ -439,23 +529,80 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 animate-in zoom-in duration-200">
                 <h3 class="font-bold text-xl text-rose-600 mb-2">Batalkan Transaksi / Tolak</h3>
-                <p class="text-sm text-gray-600 mb-4">Silakan masukkan alasan penolakan. Alasan ini akan tercatat dalam sistem dan dapat dilihat oleh pelanggan.</p>
-                
+                <p class="text-sm text-gray-600 mb-4">Silakan masukkan alasan penolakan. Alasan ini akan tercatat dalam
+                    sistem dan dapat dilihat oleh pelanggan.</p>
+
                 <form wire:submit="reject">
                     <div class="mb-4">
                         <label class="block text-sm font-bold text-gray-700 mb-1">Alasan Penolakan</label>
-                        <textarea wire:model="rejectReason" rows="3" class="w-full border-gray-200 rounded-lg focus:ring-rose-500 focus:border-rose-500 bg-gray-50" placeholder="Misal: Layar pecah parah, icloud terkunci, dll..."></textarea>
-                        @error('rejectReason') <span class="text-xs text-rose-500 mt-1">{{ $message }}</span> @enderror
+                        <textarea wire:model="rejectReason" rows="3"
+                            class="w-full border-gray-200 rounded-lg focus:ring-rose-500 focus:border-rose-500 bg-gray-50"
+                            placeholder="Misal: Layar pecah parah, icloud terkunci, dll..."></textarea>
+                        @error('rejectReason')
+                            <span class="text-xs text-rose-500 mt-1">{{ $message }}</span>
+                        @enderror
                     </div>
-                    
+
                     <div class="flex justify-end gap-2">
-                        <button type="button" wire:click="$set('isRejecting', false)" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200 transition">Kembali</button>
-                        <button type="submit" class="px-4 py-2 bg-rose-600 text-white rounded-lg font-bold hover:bg-rose-700 transition flex items-center gap-2">
-                            <svg wire:loading wire:target="reject" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <button type="button" wire:click="$set('isRejecting', false)"
+                            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200 transition">Kembali</button>
+                        <button type="submit"
+                            class="px-4 py-2 bg-rose-600 text-white rounded-lg font-bold hover:bg-rose-700 transition flex items-center gap-2">
+                            <svg wire:loading wire:target="reject" class="animate-spin h-4 w-4"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10"
+                                    stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
                             Konfirmasi Tolak
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    @endif
+
+    @if ($showQcWarningModal)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 animate-in zoom-in duration-200">
+                <div class="flex items-center gap-3 mb-4">
+                    <div
+                        class="w-12 h-12 rounded-full flex items-center justify-center shrink-0 {{ $latestQcVerdict === 'fail' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600' }}">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-xl text-gray-900">Peringatan: QC Tidak Pass!</h3>
+                        <p class="text-sm text-gray-500 font-medium uppercase mt-0.5">
+                            Status Terakhir: <span
+                                class="font-black {{ $latestQcVerdict === 'fail' ? 'text-rose-600' : 'text-amber-600' }}">{{ $latestQcVerdict }}</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+                    <p class="text-sm text-gray-700 leading-relaxed">
+                        Perangkat ini <b>tidak sepenuhnya lolos inspeksi fisik</b>. <br><br>
+                        Memproses perangkat ini berarti Anda <b>mengabaikan hasil QC</b> dan tetap akan membelinya.
+                        Pastikan Anda telah mendapatkan persetujuan manajer cabang sebelum melanjutkan.
+                    </p>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button type="button" wire:click="$set('showQcWarningModal', false)"
+                        class="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition">
+                        Batal & Kembali
+                    </button>
+                    <button type="button" wire:click="$set('forceProcessQc', true); markAsPaid()"
+                        class="px-5 py-2.5 {{ $latestQcVerdict === 'fail' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-amber-500 hover:bg-amber-600' }} text-white rounded-lg font-bold transition flex items-center gap-2 shadow-sm">
+                        Ya, Tetap Lanjutkan
+                    </button>
+                </div>
             </div>
         </div>
     @endif

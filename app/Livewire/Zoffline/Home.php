@@ -48,9 +48,20 @@ class Home extends Component
             'message' => 'Fitur Add On Garansi akan segera hadir!'
         ]);
     }
+
+
     public function navigateToClosingKasir()
     {
         return $this->redirectRoute('zoffline.pos.closing-kasir', navigate: true);
+    }
+
+    public function navigateToClaimManagement()
+    {
+        return $this->redirectRoute('admin.warranty.claims', navigate: true);
+    }
+    public function navigateToSellManagement()
+    {
+        return $this->redirectRoute('admin.sell-phones.index', navigate: true);
     }
     public function navigateToRiwayatPenjualan()
     {

@@ -48,6 +48,10 @@ class Show extends Component
     public $isRejecting = false;
     public $rejectReason = '';
 
+    public $showQcWarningModal = false;
+    public $forceProcessQc = false;
+    public $latestQcVerdict = '';
+
     public function mount(SellPhone $sellPhone)
     {
         $this->sellPhone = $sellPhone->load(['user.bankAccounts', 'buybackDevice.tier', 'businessUnit']);
@@ -68,6 +72,7 @@ class Show extends Component
     public function handleQcSaved($verdict)
     {
         $this->qcPassed = ($verdict === 'pass');
+        $this->latestQcVerdict = $verdict;
     }
 
     #[Computed]
@@ -123,11 +128,20 @@ class Show extends Component
 
     public function markAsPaid()
     {
-        if (!$this->qcPassed) {
-            $this->dispatch('toast', ['type' => 'error', 'title' => 'Gagal', 'message' => 'Lakukan Inspeksi QC terlebih dahulu dan pastikan statusnya LAYAK BELI (PASS).']);
-            return;
+        if (!$this->qcPassed && !$this->forceProcessQc) {
+            $latestInspection = $this->sellPhone->inspections()->latest()->first();
+            if ($latestInspection && in_array($latestInspection->verdict, ['conditional', 'fail'])) {
+                $this->latestQcVerdict = $latestInspection->verdict;
+                $this->showQcWarningModal = true;
+                return;
+            } else {
+                $this->dispatch('toast', ['type' => 'error', 'title' => 'Gagal', 'message' => 'Lakukan Inspeksi QC terlebih dahulu dan pastikan statusnya LAYAK BELI (PASS).']);
+                return;
+            }
         }
 
+        $this->showQcWarningModal = false; // Hide if open
+        
         $billNumber = 'TPD-' . date('dmY') . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT);
 
         if ($this->sellPhone->status === 'COMPLETED' || $this->sellPhone->status === 'CANCELLED') return;
@@ -317,7 +331,7 @@ class Show extends Component
     // convertToProduct telah dihapus karena manajemen inventaris kini terpusat pada Accurate
     // dan ditarik melalui fitur Sinkronisasi Master Data ProductAccurate
 
-    #[Layout('layouts.admin')]
+    #[Layout('layouts.z')]
     public function render()
     {
         return view('livewire.admin.sell-phone.show');

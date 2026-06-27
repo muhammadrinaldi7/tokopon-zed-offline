@@ -133,79 +133,269 @@
     @if ($selectedClaim)
         <div class="fixed inset-0 z-[110] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"></div>
-            <div class="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-amber-50">
-                <div>
-                    <h3 class="font-bold text-xl text-amber-900">Form Retur & Ganti Unit (Accurate)</h3>
-                    <p class="text-xs text-amber-700 mt-0.5">Sistem akan memotong stok secara otomatis</p>
-                </div>
-                <button wire:click="closeReplacementForm"
-                    class="text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-100 rounded-full p-2 transition-colors shadow-sm">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            
-            <div class="p-6 overflow-y-auto flex-1">
-                <!-- Info Barang (Read Only) -->
-                <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 shadow-sm">
-                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">Data Retur (Otomatis)</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-[11px] text-gray-500 mb-0.5">Nama Produk</p>
-                            <p class="font-bold text-gray-800 text-sm line-clamp-1">{{ $selectedClaim->warranty->orderItem->product_name ?? ($selectedClaim->warranty->orderItem->variant->name ?? 'Unknown Product') }}</p>
-                        </div>
-                        <div>
-                            <p class="text-[11px] text-gray-500 mb-0.5">Pelanggan</p>
-                            <p class="font-bold text-gray-800 text-sm">{{ $selectedClaim->customer->name ?? '-' }}</p>
-                        </div>
-                        <div>
-                            <p class="text-[11px] text-gray-500 mb-0.5">No Faktur Awal</p>
-                            <p class="font-bold text-gray-800 text-sm">{{ $selectedClaim->warranty->orderItem->order->accurate_invoice_no ?? ($selectedClaim->warranty->orderItem->order->order_number ?? '-') }}</p>
-                        </div>
-                        <div>
-                            <p class="text-[11px] text-gray-500 mb-0.5">IMEI / SN (Barang Rusak)</p>
-                            <p class="font-bold font-mono text-gray-900 text-sm">{{ $selectedClaim->serial_number }}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Form Input -->
-                <div class="space-y-4">
+            <div
+                class="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
+                <div
+                    class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-amber-50">
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-1">IMEI / Serial Number Baru <span class="text-amber-500">*</span></label>
-                        <input type="text" wire:model="replacement_imei"
-                            class="w-full bg-white border border-gray-300 rounded-xl p-3 text-sm focus:ring-amber-500 focus:border-amber-500 font-mono shadow-sm"
-                            placeholder="Scan atau ketik IMEI unit pengganti...">
-                        @error('replacement_imei')
-                            <div class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs font-medium">
-                                {{ $message }}
-                            </div>
-                        @enderror
+                        <h3 class="font-bold text-xl text-amber-900">Form Retur & Ganti Unit (Accurate)</h3>
+                        <p class="text-xs text-amber-700 mt-0.5">Sistem akan memotong stok secara otomatis</p>
                     </div>
-                    
-                    <div class="bg-blue-50 border border-blue-100 p-3 rounded-lg flex items-start gap-2">
-                        <svg class="w-5 h-5 text-blue-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        <p class="text-xs text-blue-800 leading-relaxed">
-                            Pastikan IMEI baru telah disiapkan. Sistem akan menembak API <b>Sales Return</b> untuk menarik IMEI lama, lalu menembak <b>Sales Invoice</b> untuk mengeluarkan IMEI baru ke Accurate secara *realtime*.
-                        </p>
-                    </div>
+                    <button wire:click="closeReplacementForm"
+                        class="text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-100 rounded-full p-2 transition-colors shadow-sm">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                 </div>
 
-                <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100">
-                    <button type="button" wire:click="closeReplacementForm"
-                        class="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">Batal</button>
-                    <button type="button" wire:click="approveReplacement"
-                        class="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2"
-                        wire:loading.attr="disabled" wire:target="approveReplacement">
-                        <span wire:loading.remove wire:target="approveReplacement">Eksekusi Retur Accurate</span>
-                        <span wire:loading wire:target="approveReplacement">Memproses API...</span>
-                    </button>
+                <div class="p-6 overflow-y-auto flex-1">
+                    <!-- Info Barang (Read Only) -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 shadow-sm">
+                        <h4
+                            class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">
+                            Data Retur (Otomatis)</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-[11px] text-gray-500 mb-0.5">Nama Produk</p>
+                                <p class="font-bold text-gray-800 text-sm line-clamp-1">
+                                    {{ $selectedClaim->warranty->orderItem->product_name ?? ($selectedClaim->warranty->orderItem->variant->name ?? 'Unknown Product') }}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] text-gray-500 mb-0.5">Pelanggan</p>
+                                <p class="font-bold text-gray-800 text-sm">
+                                    {{ $selectedClaim->customer->name ?? '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] text-gray-500 mb-0.5">No Faktur Awal</p>
+                                <p class="font-bold text-gray-800 text-sm">
+                                    {{ $selectedClaim->warranty->orderItem->order->accurate_invoice_no ?? ($selectedClaim->warranty->orderItem->order->order_number ?? '-') }}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] text-gray-500 mb-0.5">IMEI / SN (Barang Rusak)</p>
+                                <p class="font-bold font-mono text-gray-900 text-sm">
+                                    {{ $selectedClaim->serial_number }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Input -->
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">IMEI / Serial Number Baru
+                                <span class="text-amber-500">*</span></label>
+                            <input type="text" wire:model="replacement_imei"
+                                class="w-full bg-white border border-gray-300 rounded-xl p-3 text-sm focus:ring-amber-500 focus:border-amber-500 font-mono shadow-sm"
+                                placeholder="Scan atau ketik IMEI unit pengganti...">
+                            @error('replacement_imei')
+                                <div
+                                    class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs font-medium">
+                                    {{ $message }}
+                                </div>
+                            @enderror
+                        </div>
+
+                        <div class="bg-blue-50 border border-blue-100 p-3 rounded-lg flex items-start gap-2">
+                            <svg class="w-5 h-5 text-blue-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p class="text-xs text-blue-800 leading-relaxed">
+                                Pastikan IMEI baru telah disiapkan. Sistem akan menembak API <b>Sales Return</b>
+                                untuk menarik IMEI lama, lalu menembak <b>Sales Invoice</b> untuk mengeluarkan IMEI
+                                baru ke Accurate secara *realtime*.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100">
+                        <button type="button" wire:click="closeReplacementForm"
+                            class="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">Batal</button>
+                        <button type="button" wire:click="approveReplacement"
+                            class="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2"
+                            wire:loading.attr="disabled" wire:target="approveReplacement">
+                            <span wire:loading.remove wire:target="approveReplacement">Eksekusi Retur
+                                Accurate</span>
+                            <span wire:loading wire:target="approveReplacement">Memproses API...</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+    @endif
+@endif
+
+<!-- Modal Form Service (Perbaikan Biasa) -->
+@if ($showServiceForm && $selectedClaimId)
+    @php
+        $selectedClaim = $claims->firstWhere('id', $selectedClaimId);
+    @endphp
+    @if ($selectedClaim)
+        <div class="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-gray-900/60 min-h-screen backdrop-blur-sm transition-opacity"></div>
+            <div
+                class="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
+                <div
+                    class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-blue-50">
+                    <div>
+                        <h3 class="font-bold text-xl text-blue-900">Form Persetujuan Servis (Perbaikan)</h3>
+                        <p class="text-xs text-blue-700 mt-0.5">Kirim perangkat ini ke Service Center internal /
+                            mitra</p>
+                    </div>
+                    <button wire:click="closeServiceForm"
+                        class="text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-100 rounded-full p-2 transition-colors shadow-sm">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="p-6 overflow-y-auto flex-1">
+                    <!-- Info Barang (Read Only) -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 shadow-sm">
+                        <h4
+                            class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">
+                            Informasi Perangkat</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-[11px] text-gray-500 mb-0.5">Nama Produk</p>
+                                <p class="font-bold text-gray-800 text-sm line-clamp-1">
+                                    {{ $selectedClaim->warranty->orderItem->product_name ?? ($selectedClaim->warranty->orderItem->variant->name ?? 'Unknown Product') }}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] text-gray-500 mb-0.5">Pelanggan</p>
+                                <p class="font-bold text-gray-800 text-sm">
+                                    {{ $selectedClaim->customer->name ?? '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] text-gray-500 mb-0.5">IMEI / SN (Barang Rusak)</p>
+                                <p class="font-bold font-mono text-gray-900 text-sm">
+                                    {{ $selectedClaim->serial_number }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Input -->
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Catatan Persetujuan Servis
+                                (Opsional)</label>
+                            <textarea wire:model="resolution_notes" rows="3"
+                                class="w-full bg-white border border-gray-300 rounded-xl p-3 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                                placeholder="Tulis instruksi khusus untuk teknisi atau catatan ke pelanggan..."></textarea>
+                            @error('resolution_notes')
+                                <div
+                                    class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs font-medium">
+                                    {{ $message }}
+                                </div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100">
+                        <button type="button" wire:click="closeServiceForm"
+                            class="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">Batal</button>
+                        <button type="button" wire:click="approveService"
+                            class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2"
+                            wire:loading.attr="disabled" wire:target="approveService">
+                            <span wire:loading.remove wire:target="approveService">Setujui & Proses Servis</span>
+                            <span wire:loading wire:target="approveService">Memproses...</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+@endif
+
+<!-- Modal Form Tolak Klaim -->
+@if ($showRejectForm && $selectedClaimId)
+    @php
+        $selectedClaim = $claims->firstWhere('id', $selectedClaimId);
+    @endphp
+    @if ($selectedClaim)
+        <div class="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"></div>
+            <div
+                class="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
+                <div
+                    class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-rose-50">
+                    <div>
+                        <h3 class="font-bold text-xl text-rose-900">Form Penolakan Klaim Garansi</h3>
+                        <p class="text-xs text-rose-700 mt-0.5">Berikan alasan mengapa klaim ini ditolak (misal:
+                            Human Error)</p>
+                    </div>
+                    <button wire:click="closeRejectForm"
+                        class="text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-100 rounded-full p-2 transition-colors shadow-sm">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="p-6 overflow-y-auto flex-1">
+                    <!-- Info Barang (Read Only) -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 shadow-sm">
+                        <h4
+                            class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">
+                            Informasi Perangkat</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-[11px] text-gray-500 mb-0.5">Nama Produk</p>
+                                <p class="font-bold text-gray-800 text-sm line-clamp-1">
+                                    {{ $selectedClaim->warranty->orderItem->product_name ?? ($selectedClaim->warranty->orderItem->variant->name ?? 'Unknown Product') }}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] text-gray-500 mb-0.5">Pelanggan</p>
+                                <p class="font-bold text-gray-800 text-sm">
+                                    {{ $selectedClaim->customer->name ?? '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] text-gray-500 mb-0.5">IMEI / SN (Barang Rusak)</p>
+                                <p class="font-bold font-mono text-gray-900 text-sm">
+                                    {{ $selectedClaim->serial_number }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Input -->
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Catatan Penolakan <span
+                                    class="text-rose-500">*</span></label>
+                            <textarea wire:model="resolution_notes" rows="3" required
+                                class="w-full bg-white border border-gray-300 rounded-xl p-3 text-sm focus:ring-rose-500 focus:border-rose-500 shadow-sm"
+                                placeholder="Tulis alasan jelas kenapa klaim garansi ditolak (misal: Layar retak karena jatuh)..."></textarea>
+                            @error('resolution_notes')
+                                <div
+                                    class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs font-medium">
+                                    {{ $message }}
+                                </div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100">
+                        <button type="button" wire:click="closeRejectForm"
+                            class="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">Batal</button>
+                        <button type="button" wire:click="rejectClaim"
+                            class="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2"
+                            wire:loading.attr="disabled" wire:target="rejectClaim">
+                            <span wire:loading.remove wire:target="rejectClaim">Konfirmasi Penolakan</span>
+                            <span wire:loading wire:target="rejectClaim">Memproses...</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     @endif
 @endif
 
@@ -397,25 +587,12 @@
                                 Tindakan Keputusan & Integrasi Accurate</h4>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <!-- Catatan -->
-                                <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-1.5">Catatan
-                                        Resolusi</label>
-                                    <textarea wire:model="resolution_notes" rows="3"
-                                        class="w-full rounded-lg border-gray-200 px-4 py-2.5 focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm text-gray-800 bg-gray-50 shadow-sm"
-                                        placeholder="Tulis alasan persetujuan atau penolakan..."></textarea>
-                                    @error('resolution_notes')
-                                        <span
-                                            class="text-rose-500 text-xs mt-1 font-medium">{{ $message }}</span>
-                                    @enderror
-                                </div>
-
-                                <!-- Tidak ada proses inline lagi, dipindah ke Modal -->
+                                <!-- Catatan Resolusi sekarang dipindah ke Modal masing-masing (Servis / Tolak) -->
                             </div>
 
                             <div class="flex flex-wrap gap-2 mt-6 pt-4 border-t border-gray-100">
                                 @if ($selectedClaim->status === 'pending')
-                                    <button wire:click="updateStatus('approved')"
+                                    <button wire:click="openServiceForm"
                                         class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm transition-colors shadow-sm">
                                         Setujui Klaim Biasa (Servis)
                                     </button>
@@ -423,7 +600,7 @@
                                         class="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-sm transition-colors shadow-sm">
                                         Setujui & Ganti Unit (Accurate)
                                     </button>
-                                    <button wire:click="updateStatus('rejected')"
+                                    <button wire:click="openRejectForm"
                                         class="px-6 py-2.5 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold rounded-lg text-sm transition-colors">
                                         Tolak Klaim (Reject)
                                     </button>

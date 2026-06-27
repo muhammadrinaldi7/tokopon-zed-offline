@@ -27,6 +27,8 @@ class ClaimManagement extends Component
 
     public $viewingQcDetails = null; // 'original' or 'claim'
     public $showReplacementForm = false;
+    public $showServiceForm = false;
+    public $showRejectForm = false;
 
     protected $listeners = ['refreshClaims' => '$refresh'];
 
@@ -158,6 +160,38 @@ class ClaimManagement extends Component
         $this->showReplacementForm = false;
         $this->replacement_imei = '';
         $this->resetValidation('replacement_imei');
+    }
+
+    public function openServiceForm()
+    {
+        $this->showServiceForm = true;
+    }
+
+    public function closeServiceForm()
+    {
+        $this->showServiceForm = false;
+    }
+
+    public function approveService()
+    {
+        $this->updateStatus('approved');
+        $this->closeServiceForm();
+    }
+
+    public function openRejectForm()
+    {
+        $this->showRejectForm = true;
+    }
+
+    public function closeRejectForm()
+    {
+        $this->showRejectForm = false;
+    }
+
+    public function rejectClaim()
+    {
+        $this->updateStatus('rejected');
+        $this->closeRejectForm();
     }
 
     public function render()

@@ -127,7 +127,7 @@
                                 <span class="block text-xs sm:text-sm text-center leading-tight">Klaim Garansi</span>
                             </button>
 
-                            <button wire:click="navigateToAddOnGaransi" @click="openGaransiModal = false"
+                            <button wire:click="navigateToClaimManagement" @click="openGaransiModal = false"
                                 class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
                                 <div
                                     class="w-12 h-12 rounded-xl bg-purple-100/50 flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
@@ -326,6 +326,19 @@
                                     </svg>
                                 </div>
                                 <span class="block text-xs sm:text-sm text-center leading-tight">Tarik Laporan</span>
+                            </button>
+
+                            <button wire:click="navigateToSellManagement" @click="openReportModal = false"
+                                class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
+                                <div
+                                    class="w-12 h-12 rounded-xl bg-[#FFD9B7]/30 flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                </div>
+                                <span class="block text-xs sm:text-sm text-center leading-tight">Manajemen Pembelian</span>
                             </button>
                         </div>
 
