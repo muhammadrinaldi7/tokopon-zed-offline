@@ -65,8 +65,8 @@ class Form extends Component
             $this->brand_id = $promo->brand_id;
             $this->accurate_account_no = $promo->accurate_account_no;
             $this->discount_type = $promo->discount_type;
-            $this->discount_value = $promo->discount_value;
-            $this->max_discount = $promo->max_discount;
+            $this->discount_value = $promo->discount_value !== null ? (int) $promo->discount_value : null;
+            $this->max_discount = $promo->max_discount !== null ? (int) $promo->max_discount : null;
             $this->start_date = $promo->start_date ? $promo->start_date->format('Y-m-d') : null;
             $this->end_date = $promo->end_date ? $promo->end_date->format('Y-m-d') : null;
             $this->is_active = $promo->is_active;
@@ -77,14 +77,14 @@ class Form extends Component
             $this->selected_branches = $promo->branches->pluck('id')->toArray();
             $this->selected_payment_methods = $promo->paymentMethods->pluck('id')->toArray();
 
-            $this->min_transaction_amount = $promo->min_transaction_amount;
+            $this->min_transaction_amount = $promo->min_transaction_amount !== null ? (int) $promo->min_transaction_amount : null;
             $this->min_qty = $promo->min_qty;
             $this->apply_to_all_items = $promo->apply_to_all_items;
             $this->is_bundle = $promo->is_bundle;
             $this->bundle_max_qty = $promo->bundle_max_qty;
             $this->bundle_discount_type = $promo->bundle_discount_type ?: 'fixed';
-            $this->bundle_discount_value = $promo->bundle_discount_value;
-            $this->bundle_max_discount = $promo->bundle_max_discount;
+            $this->bundle_discount_value = $promo->bundle_discount_value !== null ? (int) $promo->bundle_discount_value : null;
+            $this->bundle_max_discount = $promo->bundle_max_discount !== null ? (int) $promo->bundle_max_discount : null;
 
             // Load SKUs (Produk Utama)
             $this->selected_skus = $promo->skus->map(function ($promo_sku) {
@@ -96,9 +96,6 @@ class Form extends Component
                 return [
                     'sku' => $bundleSku->sku,
                     'name' => $this->resolveSkuName($bundleSku->sku),
-                    'discount_type' => $bundleSku->discount_type ?: 'fixed',
-                    'discount_value' => $bundleSku->discount_value,
-                    'max_discount' => $bundleSku->max_discount,
                 ];
             })->toArray();
         }
@@ -125,7 +122,7 @@ class Form extends Component
         $terms = array_filter(explode(' ', $query));
 
         $productsQuery = \App\Models\ProductAccurate::query();
-        
+
         if (\Illuminate\Support\Facades\Auth::check() && \Illuminate\Support\Facades\Auth::user()->business_unit_id) {
             $productsQuery->where('business_unit_id', \Illuminate\Support\Facades\Auth::user()->business_unit_id);
         }
@@ -197,9 +194,6 @@ class Form extends Component
             $this->selected_bundle_skus[] = [
                 'sku' => $sku,
                 'name' => $name,
-                'discount_type' => 'fixed',
-                'discount_value' => null,
-                'max_discount' => null,
             ];
         }
         $this->search_bundle_sku = '';
@@ -252,22 +246,21 @@ class Form extends Component
             return;
         }
 
-        // Validasi: promo bundle harus punya Bundle SKU dan Diskon per item
+        // Validasi: promo bundle harus punya Bundle SKU dan Diskon Global
         if ($this->is_bundle) {
             if (count($this->selected_bundle_skus) === 0) {
                 $this->dispatch('toast', title: 'Error', message: 'Promo bundling harus memiliki minimal 1 produk pendamping (bundle).', type: 'error');
                 return;
             }
-            foreach ($this->selected_bundle_skus as $bs) {
-                if (empty($bs['discount_value']) || $bs['discount_value'] <= 0) {
-                    $this->dispatch('toast', title: 'Error', message: 'Ada item pendamping yang belum diisi nilai diskonnya.', type: 'error');
-                    return;
-                }
+            if (empty($this->bundle_discount_value) || $this->bundle_discount_value <= 0) {
+                $this->dispatch('toast', title: 'Error', message: 'Silakan isi Nilai Diskon untuk bundling.', type: 'error');
+                return;
             }
         }
 
         $data = [
             'name' => $this->name,
+            'business_unit_id' => $this->promo?->business_unit_id ?? \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId(),
             'description' => $this->description,
             'code' => $this->code,
             'category' => $this->category,
@@ -285,7 +278,6 @@ class Form extends Component
             'min_transaction_amount' => $this->min_transaction_amount ?: null,
             'min_qty' => $this->min_qty ?: null,
             'apply_to_all_items' => $this->apply_to_all_items,
-
             'is_bundle' => $this->is_bundle,
             'bundle_discount_type' => $this->is_bundle ? $this->bundle_discount_type : null,
             'bundle_discount_value' => $this->is_bundle ? $this->bundle_discount_value : null,
@@ -317,9 +309,9 @@ class Form extends Component
             $bundleSkusToInsert = array_map(function ($item) {
                 return [
                     'sku' => $item['sku'],
-                    'discount_type' => $item['discount_type'] ?? 'fixed',
-                    'discount_value' => $item['discount_value'] ?? 0,
-                    'max_discount' => ($item['discount_type'] === 'percentage') ? ($item['max_discount'] ?: null) : null,
+                    'discount_type' => null,
+                    'discount_value' => null,
+                    'max_discount' => null,
                 ];
             }, $this->selected_bundle_skus);
             $promo->bundleSkus()->createMany($bundleSkusToInsert);
@@ -343,7 +335,10 @@ class Form extends Component
         return view('livewire.admin.promo.form', [
             'brands' => Brand::orderBy('name')->get(),
             'branches' => $branchesQuery->orderBy('name')->get(),
-            'paymentMethods' => \App\Models\PaymentMethod::orderBy('name')->get(),
+            'paymentMethods' => \App\Models\PaymentMethod::where(function ($q) {
+                $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+                $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+            })->orderBy('name')->get(),
         ]);
     }
 }

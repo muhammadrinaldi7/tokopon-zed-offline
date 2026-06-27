@@ -52,6 +52,9 @@ class RiwayatPenjualan extends Component
                         ->orWhereHas('user', function ($uq) {
                             $uq->where('name', 'like', '%' . $this->search . '%')
                                 ->orWhere('identity', 'like', '%' . $this->search . '%');
+                        })
+                        ->orWhereHas('items', function ($iq) {
+                            $iq->where('serial_number', 'like', '%' . $this->search . '%');
                         });
                 });
             })

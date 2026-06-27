@@ -20,7 +20,7 @@
                     </div>
                     <input wire:model.live.debounce.300ms="search" type="text"
                         class="block w-full pl-10 pr-3 py-2 border border-neutral-200 rounded-xl leading-5 bg-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out shadow-sm"
-                        placeholder="Cari nomor struk atau pelanggan...">
+                        placeholder="Cari nomor struk, SN, atau pelanggan...">
                 </div>
             </div>
 

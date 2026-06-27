@@ -410,6 +410,80 @@
                             @enderror
                         </div>
 
+                        {{-- Global Bundle Discount Settings --}}
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                            <div class="col-span-1 md:col-span-2">
+                                <h4 class="font-bold text-amber-900 mb-1">Konfigurasi Diskon Bundling</h4>
+                                <p class="text-xs text-amber-700">Diskon ini akan berlaku sama untuk semua produk pendamping yang ada di daftar bawah.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-amber-900 mb-2">Tipe Diskon</label>
+                                <select wire:model.live="bundle_discount_type"
+                                    class="w-full border border-amber-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white">
+                                    <option value="fixed">Nominal (Rp)</option>
+                                    <option value="percentage">Persen (%)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-amber-900 mb-2">Nilai Diskon</label>
+                                @if ($bundle_discount_type === 'fixed')
+                                    <div class="relative" wire:key="bundle-discount-fixed" x-data="{
+                                        rawVal: @entangle('bundle_discount_value'),
+                                        get maskedVal() {
+                                            if (!this.rawVal) return '';
+                                            return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                        },
+                                        set maskedVal(val) {
+                                            this.rawVal = val.replace(/\D/g, '');
+                                        }
+                                    }">
+                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
+                                        <input type="text" x-model="maskedVal"
+                                            @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
+                                            class="w-full pl-11 pr-4 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                            placeholder="0">
+                                    </div>
+                                @else
+                                    <div class="relative" wire:key="bundle-discount-percentage">
+                                        <input type="number" wire:model="bundle_discount_value"
+                                            class="w-full pl-4 pr-10 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                            min="0" max="100" placeholder="0">
+                                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">%</span>
+                                    </div>
+                                @endif
+                                @error('bundle_discount_value')
+                                    <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            @if ($bundle_discount_type === 'percentage')
+                                <div class="col-span-1 md:col-span-2">
+                                    <label class="block text-sm font-bold text-amber-900 mb-2">Maks. Potongan (Opsional)</label>
+                                    <div class="relative max-w-md" wire:key="bundle-max-discount-container" x-data="{
+                                        rawMax: @entangle('bundle_max_discount'),
+                                        get maskedMax() {
+                                            if (!this.rawMax) return '';
+                                            return this.rawMax.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                        },
+                                        set maskedMax(val) {
+                                            this.rawMax = val.replace(/\D/g, '');
+                                        }
+                                    }">
+                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
+                                        <input type="text" x-model="maskedMax"
+                                            @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
+                                            class="w-full pl-11 pr-4 py-2 border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                            placeholder="Tanpa batas">
+                                    </div>
+                                    @error('bundle_max_discount')
+                                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            @endif
+                        </div>
+
                         {{-- Bundle Reward Products --}}
                         <div>
                             <label class="block text-sm font-bold text-amber-900 mb-2">
@@ -447,36 +521,6 @@
                                             <div class="text-xs text-amber-600 font-mono">{{ $item['sku'] }}</div>
                                         </div>
 
-                                        <div class="w-full md:w-32">
-                                            <label class="block text-xs font-bold text-amber-900 mb-1">Tipe
-                                                Diskon</label>
-                                            <select
-                                                wire:model.live="selected_bundle_skus.{{ $index }}.discount_type"
-                                                class="w-full text-sm border-amber-300 rounded-lg px-2 py-1.5 focus:ring-amber-500 focus:border-amber-500">
-                                                <option value="fixed">Nominal (Rp)</option>
-                                                <option value="percentage">Persen (%)</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="w-full md:w-40">
-                                            <label class="block text-xs font-bold text-amber-900 mb-1">Nilai
-                                                Diskon</label>
-                                            <input type="number"
-                                                wire:model="selected_bundle_skus.{{ $index }}.discount_value"
-                                                class="w-full text-sm border-amber-300 rounded-lg px-2 py-1.5 focus:ring-amber-500 focus:border-amber-500"
-                                                placeholder="0">
-                                        </div>
-
-                                        @if (($item['discount_type'] ?? 'fixed') === 'percentage')
-                                            <div class="w-full md:w-40">
-                                                <label class="block text-xs font-bold text-amber-900 mb-1">Maks.
-                                                    Potongan</label>
-                                                <input type="number"
-                                                    wire:model="selected_bundle_skus.{{ $index }}.max_discount"
-                                                    class="w-full text-sm border-amber-300 rounded-lg px-2 py-1.5 focus:ring-amber-500 focus:border-amber-500"
-                                                    placeholder="Tanpa batas">
-                                            </div>
-                                        @endif
 
                                         <button type="button" wire:click="removeBundleSku('{{ $item['sku'] }}')"
                                             class="mt-4 md:mt-0 text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors border border-transparent hover:border-red-200">

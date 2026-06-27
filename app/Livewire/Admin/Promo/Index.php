@@ -40,7 +40,13 @@ class Index extends Component
 
     public function render()
     {
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+
         $promos = Promo::with('brand')
+            ->where(function ($q) use ($buId) {
+                $q->where('business_unit_id', $buId)
+                  ->orWhereNull('business_unit_id');
+            })
             ->when($this->search, function ($query) {
                 $query->where('name', 'like', '%' . $this->search . '%')
                       ->orWhere('code', 'like', '%' . $this->search . '%');

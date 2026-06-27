@@ -103,6 +103,14 @@ class Pos extends Component
                 }
             }
         }
+        
+        if ($this->currentStep == 2 || $this->currentStep == 3) {
+            // Validasi Harga 0
+            if ($this->hasZeroPriceItem) {
+                $this->dispatch('toast', title: 'Harga Tidak Valid', message: 'Terdapat item dengan harga Rp 0. Silakan atur harga terlebih dahulu.', type: 'warning');
+                return;
+            }
+        }
 
         if ($this->currentStep < 4) {
             $this->currentStep++;
@@ -617,6 +625,12 @@ class Pos extends Component
     }
 
     #[Computed]
+    public function hasZeroPriceItem()
+    {
+        return collect($this->cart)->contains(fn($item) => (float)($item['price'] ?? 0) <= 0);
+    }
+
+    #[Computed]
     public function mdrAmount()
     {
         $totalMdr = 0;
@@ -640,8 +654,9 @@ class Pos extends Component
     {
         $service = app(\App\Services\PromoCalculatorService::class);
         $userBranchId = \Illuminate\Support\Facades\Auth::user()->branch_id;
+        $businessUnitId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
 
-        $eligiblePromos = $service->getEligiblePromos($this->cart, $userBranchId);
+        $eligiblePromos = $service->getEligiblePromos($this->cart, $userBranchId, $businessUnitId);
 
         // Check if previously selected promos are still eligible
         $eligibleIds = $eligiblePromos->pluck('id')->toArray();

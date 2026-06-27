@@ -120,6 +120,13 @@ class PromoReport extends Component
             ->when($this->businessUnitFilter, function ($query) {
                 $query->where('business_unit_id', $this->businessUnitFilter);
             })
+            ->when(!$this->businessUnitFilter, function ($query) {
+                $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+                $query->where(function ($q) use ($buId) {
+                    $q->where('business_unit_id', $buId)
+                      ->orWhereNull('business_unit_id');
+                });
+            })
             ->latest();
     }
 

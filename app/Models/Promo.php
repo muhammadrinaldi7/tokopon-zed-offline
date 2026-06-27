@@ -30,6 +30,11 @@ class Promo extends Model
         return $this->belongsTo(Brand::class);
     }
 
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
+    }
+
     public function branches()
     {
         return $this->belongsToMany(Branch::class, 'promo_branches');

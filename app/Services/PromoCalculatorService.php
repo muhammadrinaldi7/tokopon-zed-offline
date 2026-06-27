@@ -10,10 +10,16 @@ class PromoCalculatorService
     /**
      * Get eligible promos for a cart and branch
      */
-    public function getEligiblePromos(array $cart, int $branchId)
+    public function getEligiblePromos(array $cart, int $branchId, ?int $businessUnitId = null)
     {
         $promos = Promo::with(['skus', 'bundleSkus.variant.product', 'branches'])
             ->where('is_active', true)
+            ->where(function ($q) use ($businessUnitId) {
+                $q->whereNull('business_unit_id');
+                if ($businessUnitId) {
+                    $q->orWhere('business_unit_id', $businessUnitId);
+                }
+            })
             ->where(function ($q) {
                 $q->whereNull('start_date')->orWhere('start_date', '<=', now());
             })
@@ -113,8 +119,9 @@ class PromoCalculatorService
             $eligibleMain = $this->calculateEligibleCart($promo, $cart, false);
             if ($eligibleMain['qty'] > 0) {
                 $multiplier = 1;
-                if ($promo->is_multiply && $promo->min_qty > 0) {
-                    $multiplier = floor($eligibleMain['qty'] / $promo->min_qty);
+                if ($promo->is_multiply) {
+                    $divisor = $promo->min_qty > 0 ? $promo->min_qty : 1;
+                    $multiplier = floor($eligibleMain['qty'] / $divisor);
                 }
 
                 $mainDiscountValue = $promo->discount_type === 'fixed' 
@@ -141,8 +148,9 @@ class PromoCalculatorService
             // 3. Kalkulasi Diskon Bundling
             if ($promo->is_bundle) {
                 $multiplier = 1;
-                if ($promo->is_multiply && $promo->min_qty > 0) {
-                    $multiplier = floor($eligibleMain['qty'] / $promo->min_qty);
+                if ($promo->is_multiply) {
+                    $divisor = $promo->min_qty > 0 ? $promo->min_qty : 1;
+                    $multiplier = floor($eligibleMain['qty'] / $divisor);
                 }
 
                 $eligibleBundle = $this->calculateEligibleCart($promo, $cart, true, $multiplier);

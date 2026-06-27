@@ -354,6 +354,9 @@ trait WithCart
             $this->dispatch('toast', title: 'Sukses', message: "Berhasil menambahkan {$productAccurate->name} ke keranjang.", type: 'success');
         }
 
+        if (!empty($this->selectedPromos)) {
+            $this->applyPromosToCart();
+        }
         $this->syncSinglePaymentAmount();
     }
 
@@ -525,6 +528,10 @@ trait WithCart
     {
         unset($this->cart[$index]);
         $this->cart = array_values($this->cart); // re-index
+        
+        if (!empty($this->selectedPromos)) {
+            $this->applyPromosToCart();
+        }
         $this->syncSinglePaymentAmount();
     }
 
@@ -571,6 +578,10 @@ trait WithCart
             while (count($this->cart[$index]['serial_numbers']) > $this->cart[$index]['qty']) {
                 array_pop($this->cart[$index]['serial_numbers']);
             }
+        }
+        
+        if (!empty($this->selectedPromos)) {
+            $this->applyPromosToCart();
         }
     }
 

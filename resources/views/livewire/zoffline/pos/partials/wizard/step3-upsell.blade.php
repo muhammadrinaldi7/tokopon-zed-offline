@@ -190,7 +190,8 @@
             Kembali
         </button>
         <button wire:click="nextStep" wire:loading.attr="disabled" wire:target="nextStep"
-            class="px-8 py-3.5 bg-[#668DFF] hover:bg-[#4f7df8] text-white font-black rounded-xl shadow-[0_8px_15px_-3px_rgba(28,105,212,0.3)] hover:shadow-[0_12px_20px_-3px_rgba(28,105,212,0.4)] hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-75 disabled:cursor-wait">
+            @if($this->hasZeroPriceItem) disabled @endif
+            class="px-8 py-3.5 text-white font-black rounded-xl shadow-[0_8px_15px_-3px_rgba(28,105,212,0.3)] hover:shadow-[0_12px_20px_-3px_rgba(28,105,212,0.4)] hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-75 disabled:cursor-wait {{ $this->hasZeroPriceItem ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed shadow-none hover:shadow-none hover:-translate-y-0' : 'bg-[#668DFF] hover:bg-[#4f7df8]' }}">
             <span wire:loading.remove wire:target="nextStep">Lanjut</span>
             <svg wire:loading.remove wire:target="nextStep" class="w-5 h-5" fill="none" viewBox="0 0 24 24"
                 stroke="currentColor" stroke-width="3">
