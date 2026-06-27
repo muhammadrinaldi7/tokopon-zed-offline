@@ -676,6 +676,45 @@ class Pos extends Component
     }
 
     #[Computed]
+    public function potentialPromos()
+    {
+        $cartSkus = array_column($this->cart, 'sku');
+        if (empty($cartSkus)) return collect();
+
+        $userBranchId = \Illuminate\Support\Facades\Auth::user()->branch_id;
+        $businessUnitId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+
+        return \App\Models\Promo::with(['skus', 'bundleSkus'])
+            ->where('is_active', true)
+            ->where('is_bundle', true)
+            ->where(function ($q) use ($businessUnitId) {
+                $q->whereNull('business_unit_id');
+                if ($businessUnitId) {
+                    $q->orWhere('business_unit_id', $businessUnitId);
+                }
+            })
+            ->where(function ($q) {
+                $q->whereNull('start_date')->orWhere('start_date', '<=', now());
+            })
+            ->where(function ($q) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+            })
+            ->where(function ($q) {
+                $q->whereNull('quota')->orWhereColumn('quota', '>', 'used_quota');
+            })
+            ->where(function ($q) use ($userBranchId) {
+                $q->whereDoesntHave('branches')
+                  ->orWhereHas('branches', function ($bq) use ($userBranchId) {
+                      $bq->where('branches.id', $userBranchId);
+                  });
+            })
+            ->whereHas('bundleSkus', function ($q) use ($cartSkus) {
+                $q->whereIn('sku', $cartSkus);
+            })
+            ->get();
+    }
+
+    #[Computed]
     public function itemDiscountTotal()
     {
         // Menghitung total diskon manual per-unit dikali qty
