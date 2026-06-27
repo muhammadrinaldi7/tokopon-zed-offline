@@ -339,7 +339,7 @@
                                     class="font-bold text-gray-800 group-hover:text-[#1c69d4]">{{ $sales->name }}</span>
                                 <span
                                     class="text-sm font-medium text-gray-500 mt-1">{{ $sales->employee_no ?? 'N/A' }}
-                                    &bull; {{ $sales->branch->name }}</span>
+                                    &bull; {{ $sales->branch->name ?? 'Semua Cabang' }}</span>
                             </button>
                         @empty
                             <p class="p-6 text-gray-500 text-center font-medium">Data sales tidak ditemukan</p>

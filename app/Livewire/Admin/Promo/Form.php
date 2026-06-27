@@ -70,7 +70,7 @@ class Form extends Component
             $this->start_date = $promo->start_date ? $promo->start_date->format('Y-m-d') : null;
             $this->end_date = $promo->end_date ? $promo->end_date->format('Y-m-d') : null;
             $this->is_active = $promo->is_active;
-            
+
             $this->is_multiply = $promo->is_multiply;
             $this->is_combinable = $promo->is_combinable;
             $this->quota = $promo->quota;
@@ -94,7 +94,7 @@ class Form extends Component
             // Load Bundle SKUs (Produk Pendamping)
             $this->selected_bundle_skus = $promo->bundleSkus->map(function ($bundleSku) {
                 return [
-                    'sku' => $bundleSku->sku, 
+                    'sku' => $bundleSku->sku,
                     'name' => $this->resolveSkuName($bundleSku->sku),
                     'discount_type' => $bundleSku->discount_type ?: 'fixed',
                     'discount_value' => $bundleSku->discount_value,
@@ -109,12 +109,11 @@ class Form extends Component
      */
     private function resolveSkuName(string $sku): string
     {
-        $pv = \App\Models\ProductVariant::where('sku', $sku)->first();
-        if ($pv) {
-            return '[HP] ' . $pv->product->name . ' ' . $pv->color . ' ' . $pv->storage;
+        $product = \App\Models\ProductAccurate::where('item_no', $sku)->first();
+        if ($product) {
+            return $product->name;
         }
-        $sv = \App\Models\SecondProductVariant::where('sku', $sku)->first();
-        return $sv ? ('[2ND] ' . $sv->secondProduct->name . ' ' . $sv->color . ' ' . $sv->storage) : $sku;
+        return $sku;
     }
 
     /**
@@ -125,45 +124,25 @@ class Form extends Component
         $results = [];
         $terms = array_filter(explode(' ', $query));
 
-        $variantsQuery = \App\Models\ProductVariant::with('product');
+        $productsQuery = \App\Models\ProductAccurate::query();
+        
+        if (\Illuminate\Support\Facades\Auth::check() && \Illuminate\Support\Facades\Auth::user()->business_unit_id) {
+            $productsQuery->where('business_unit_id', \Illuminate\Support\Facades\Auth::user()->business_unit_id);
+        }
+
         foreach ($terms as $term) {
-            $variantsQuery->where(function ($q) use ($term) {
-                $q->where('sku', 'like', "%{$term}%")
-                    ->orWhere('color', 'like', "%{$term}%")
-                    ->orWhere('ram', 'like', "%{$term}%")
-                    ->orWhere('storage', 'like', "%{$term}%")
-                    ->orWhereHas('product', function ($pq) use ($term) {
-                        $pq->where('name', 'like', "%{$term}%");
-                    });
+            $productsQuery->where(function ($q) use ($term) {
+                $q->where('item_no', 'like', "%{$term}%")
+                    ->orWhere('name', 'like', "%{$term}%");
             });
         }
-        $variants = $variantsQuery->take(10)->get();
 
-        foreach ($variants as $v) {
+        $products = $productsQuery->take(20)->get();
+
+        foreach ($products as $p) {
             $results[] = [
-                'sku' => $v->sku,
-                'name' => '[HP] ' . $v->product->name . ' ' . $v->color . ' ' . ($v->ram ? $v->ram . ' / ' : '') . $v->storage
-            ];
-        }
-
-        $secondVariantsQuery = \App\Models\SecondProductVariant::with('secondProduct');
-        foreach ($terms as $term) {
-            $secondVariantsQuery->where(function ($q) use ($term) {
-                $q->where('sku', 'like', "%{$term}%")
-                    ->orWhere('color', 'like', "%{$term}%")
-                    ->orWhere('ram', 'like', "%{$term}%")
-                    ->orWhere('storage', 'like', "%{$term}%")
-                    ->orWhereHas('secondProduct', function ($pq) use ($term) {
-                        $pq->where('name', 'like', "%{$term}%");
-                    });
-            });
-        }
-        $secondVariants = $secondVariantsQuery->take(10)->get();
-
-        foreach ($secondVariants as $v) {
-            $results[] = [
-                'sku' => $v->sku,
-                'name' => '[2ND] ' . $v->secondProduct->name . ' ' . $v->color . ' ' . ($v->ram ? $v->ram . ' / ' : '') . $v->storage
+                'sku' => $p->item_no,
+                'name' => $p->name
             ];
         }
 
@@ -216,7 +195,7 @@ class Form extends Component
     {
         if (!collect($this->selected_bundle_skus)->contains('sku', $sku)) {
             $this->selected_bundle_skus[] = [
-                'sku' => $sku, 
+                'sku' => $sku,
                 'name' => $name,
                 'discount_type' => 'fixed',
                 'discount_value' => null,
@@ -279,8 +258,8 @@ class Form extends Component
                 $this->dispatch('toast', title: 'Error', message: 'Promo bundling harus memiliki minimal 1 produk pendamping (bundle).', type: 'error');
                 return;
             }
-            foreach($this->selected_bundle_skus as $bs) {
-                if(empty($bs['discount_value']) || $bs['discount_value'] <= 0) {
+            foreach ($this->selected_bundle_skus as $bs) {
+                if (empty($bs['discount_value']) || $bs['discount_value'] <= 0) {
                     $this->dispatch('toast', title: 'Error', message: 'Ada item pendamping yang belum diisi nilai diskonnya.', type: 'error');
                     return;
                 }
@@ -356,9 +335,14 @@ class Form extends Component
 
     public function render()
     {
+        $branchesQuery = \App\Models\Branch::query();
+        if (\Illuminate\Support\Facades\Auth::check() && \Illuminate\Support\Facades\Auth::user()->business_unit_id) {
+            $branchesQuery->where('business_unit_id', \Illuminate\Support\Facades\Auth::user()->business_unit_id);
+        }
+
         return view('livewire.admin.promo.form', [
             'brands' => Brand::orderBy('name')->get(),
-            'branches' => \App\Models\Branch::orderBy('name')->get(),
+            'branches' => $branchesQuery->orderBy('name')->get(),
             'paymentMethods' => \App\Models\PaymentMethod::orderBy('name')->get(),
         ]);
     }

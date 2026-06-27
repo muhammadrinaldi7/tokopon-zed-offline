@@ -39,12 +39,13 @@ class RiwayatPenjualan extends Component
     public function render()
     {
         $user = Auth::user();
-        $userWarehouseName = $user->warehouse->name ?? null;
+        $userBranchId = $user->branch_id ?? null;
 
         $orders = Order::with(['user', 'items', 'payments', 'salesBy'])
             ->where('order_channel', 'POS')
+            ->where('order_status', '!=', 'DRAFT')
             ->where('business_unit_id', $user->getActiveBusinessUnitId())
-            ->where('shipping_address_snapshot->store', $userWarehouseName)
+            ->where('branch_id', $userBranchId)
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('order_number', 'like', '%' . $this->search . '%')
@@ -112,7 +113,7 @@ class RiwayatPenjualan extends Component
                 \Mike42\Escpos\Printer::MODE_DOUBLE_WIDTH |
                 \Mike42\Escpos\Printer::MODE_DOUBLE_HEIGHT
         );
-        $storeTitle = optional($this->completedOrder->businessUnit)->code === 'second' ? 'GSK STORE' : 'SYIHAB STORE';
+        $storeTitle = optional($this->completedOrder->businessUnit)->store_title ?? 'Z-POS STORE';
         $printer->text($storeTitle . "\n");
         $printer->selectPrintMode(\Mike42\Escpos\Printer::MODE_FONT_B);
 
@@ -170,8 +171,8 @@ class RiwayatPenjualan extends Component
         $printer->text($separator);
 
         // Total Section
-        $isGsk = optional($this->completedOrder->businessUnit)->code === 'second';
-        if ($isGsk) {
+        $showDiscount = optional($this->completedOrder->businessUnit)->receipt_show_discount;
+        if ($showDiscount) {
             $printer->text($this->formatLine("Subtotal", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), $maxColumns) . "\n");
             if ($this->completedOrder->discount_amount > 0) {
                 $printer->text($this->formatLine("Diskon", "-Rp " . number_format($this->completedOrder->discount_amount, 0, ',', '.'), $maxColumns) . "\n");
