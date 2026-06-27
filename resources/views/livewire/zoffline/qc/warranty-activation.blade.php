@@ -163,34 +163,45 @@
                                         $hasError = $errors->has($propertyName);
                                     @endphp
 
-                                    <div
+                                    <div x-data="{ previewUrl: null }"
                                         class="relative aspect-square rounded-3xl overflow-hidden transition-all duration-300 group
-                                     {{ $photoFile ? 'border border-neutral-100 shadow-sm' : 'border-2 border-dashed bg-neutral-50/50 hover:bg-neutral-50/100 cursor-pointer' }}
-                                    {{ $hasError ? 'border-rose-300 bg-rose-50/20' : 'border-neutral-200 hover:border-neutral-300' }}">
+                                        {{ $hasError ? 'border-rose-300 bg-rose-50/20' : 'border-neutral-200 hover:border-neutral-300' }}"
+                                        :class="previewUrl ? 'border border-neutral-100 shadow-sm' : 'border-2 border-dashed bg-neutral-50/50 hover:bg-neutral-50/100 cursor-pointer'">
 
-                                        @if ($photoFile)
-                                            <img src="{{ $photoFile->temporaryUrl() }}"
-                                                class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
-                                            <div
-                                                class="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-xs py-2 px-3 text-center pointer-events-none z-10">
-                                                <span
-                                                    class="text-[11px] font-bold text-white tracking-wide block truncate">{{ $label }}</span>
+                                        <template x-if="previewUrl">
+                                            <div class="w-full h-full relative">
+                                                <img :src="previewUrl"
+                                                    class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                                                <div
+                                                    class="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-xs py-2 px-3 text-center pointer-events-none z-10">
+                                                    <span
+                                                        class="text-[11px] font-bold text-white tracking-wide block truncate">{{ $label }}</span>
+                                                </div>
+                                                <button type="button" @click="previewUrl = null; $wire.set('{{ $propertyName }}', null)"
+                                                    class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-10 flex items-center justify-center">
+                                                    <svg class="w-3.5 h-3.5 text-rose-500" fill="none"
+                                                        stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2.5"
+                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-16v1M4 7h16" />
+                                                    </svg>
+                                                </button>
                                             </div>
-                                            <button type="button" wire:click="$set('{{ $propertyName }}', null)"
-                                                class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-10 flex items-center justify-center">
-                                                <svg class="w-3.5 h-3.5 text-rose-500" fill="none"
-                                                    stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2.5"
-                                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-16v1M4 7h16" />
-                                                </svg>
-                                            </button>
-                                        @else
-                                            {{-- CAMERA ONLY UPLOAD --}}
+                                        </template>
+
+                                        <template x-if="!previewUrl">
                                             <label
                                                 class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center select-none overflow-hidden cursor-pointer z-10">
                                                 <input type="file" accept="image/*" capture="environment"
-                                                    wire:model="{{ $propertyName }}" class="hidden">
+                                                    wire:model="{{ $propertyName }}" class="hidden"
+                                                    @change="
+                                                        const file = $event.target.files[0];
+                                                        if (file) {
+                                                            previewUrl = URL.createObjectURL(file);
+                                                        } else {
+                                                            previewUrl = null;
+                                                        }
+                                                    ">
                                                 <div
                                                     class="absolute inset-0 flex items-center justify-center z-0 group-hover:scale-110 transition-transform duration-300">
                                                     <img src="{{ asset('assets/png/' . $key . '.png') }}"
@@ -217,10 +228,10 @@
                                                     </div>
                                                 </div>
                                             </label>
-                                        @endif
+                                        </template>
 
                                         <div wire:loading.flex wire:target="{{ $propertyName }}"
-                                            class="absolute inset-0 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center gap-1 z-10">
+                                            class="absolute inset-0 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center gap-1 z-10" style="display: none;">
                                             <span
                                                 class="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></span>
                                         </div>
