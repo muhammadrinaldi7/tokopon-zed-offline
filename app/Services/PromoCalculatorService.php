@@ -102,6 +102,7 @@ class PromoCalculatorService
         foreach ($cart as $key => $item) {
             $cart[$key]['promo_discount'] = 0;
             $cart[$key]['applied_promo_id'] = null;
+            $cart[$key]['promo_discounts'] = [];
         }
 
         if (empty($selectedPromoIds)) return true;
@@ -141,6 +142,7 @@ class PromoCalculatorService
                         $itemDiscount = round($mainDiscountValue * $proportion);
                         $cart[$key]['promo_discount'] += $itemDiscount;
                         $cart[$key]['applied_promo_id'] = $promo->id;
+                        $cart[$key]['promo_discounts'][$promo->id] = ($cart[$key]['promo_discounts'][$promo->id] ?? 0) + $itemDiscount;
                     }
                 }
             }
@@ -183,6 +185,7 @@ class PromoCalculatorService
 
                             $cart[$key]['promo_discount'] += $itemDiscount;
                             $cart[$key]['applied_promo_id'] = $promo->id;
+                            $cart[$key]['promo_discounts'][$promo->id] = ($cart[$key]['promo_discounts'][$promo->id] ?? 0) + $itemDiscount;
                             
                             $totalQtyApplied += $qtyToDiscount;
                         }
@@ -205,9 +208,8 @@ class PromoCalculatorService
         // Hitung total discount per promo dari cart yang SUDAH dikalkulasi
         $promoTotals = [];
         foreach ($cart as $item) {
-            $pid = $item['applied_promo_id'] ?? null;
-            if ($pid) {
-                $promoTotals[$pid] = ($promoTotals[$pid] ?? 0) + (float)($item['promo_discount'] ?? 0);
+            foreach ($item['promo_discounts'] ?? [] as $pid => $disc) {
+                $promoTotals[$pid] = ($promoTotals[$pid] ?? 0) + $disc;
             }
         }
 

@@ -27,6 +27,23 @@ class OrderItem extends Model
         return $this->belongsTo(Promo::class, 'applied_promo_id');
     }
 
+    public function promos()
+    {
+        return $this->belongsToMany(Promo::class, 'order_item_promos')->withPivot('discount_amount', 'serial_number', 'vendor_name');
+    }
+
+    public function getVendorNameAttribute()
+    {
+        if (!$this->variant) return 'Vendor tidak ditemukan';
+        
+        // Coba ambil dari ProductAccurate
+        if (isset($this->variant->vendor_name)) {
+            return $this->variant->vendor_name;
+        }
+
+        return 'Vendor tidak ditemukan';
+    }
+
     public function getTotalDiscountAttribute()
     {
         return (int)$this->discount_amount + (int)$this->promo_discount_amount;

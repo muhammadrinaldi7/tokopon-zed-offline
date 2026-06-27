@@ -287,7 +287,7 @@ trait WithCheckoutAndReceipt
                         ->update(['status' => 'Unavailable']);
                 }
 
-                OrderItem::create([
+                $orderItem = OrderItem::create([
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
                     'product_variant_type' => $item['variant_type'],
@@ -300,6 +300,38 @@ trait WithCheckoutAndReceipt
                     'applied_promo_id' => $item['applied_promo_id'] ?? null,
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
+
+                // Attach ke order_item_promos pivot
+                $vendorNameFallback = clone $orderItem;
+                $vendorNameFallback = $vendorNameFallback->vendor_name;
+
+                foreach ($item['promo_discounts'] ?? [] as $promoId => $discAmount) {
+                    if ($discAmount > 0) {
+                        if (!empty($cleanSns)) {
+                            // Jika ada SN, bagi diskon sebanyak jumlah SN
+                            $discountPerSn = round($discAmount / max(1, count($cleanSns)));
+
+                            foreach ($cleanSns as $sn) {
+                                // Cari nama vendor asli dari tabel ProductSerialNumber
+                                $snModel = \App\Models\ProductSerialNumber::with('vendor')->where('serial_number', $sn)->first();
+                                $actualVendorName = $snModel?->vendor?->vendor_name ?? $vendorNameFallback;
+
+                                $orderItem->promos()->attach($promoId, [
+                                    'discount_amount' => $discountPerSn,
+                                    'serial_number' => $sn,
+                                    'vendor_name' => $actualVendorName,
+                                ]);
+                            }
+                        } else {
+                            // Jika tidak ada SN, simpan 1 row seperti biasa
+                            $orderItem->promos()->attach($promoId, [
+                                'discount_amount' => $discAmount,
+                                'serial_number' => '',
+                                'vendor_name' => $vendorNameFallback,
+                            ]);
+                        }
+                    }
+                }
 
                 // Reduce stock locally
                 $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
@@ -682,7 +714,7 @@ trait WithCheckoutAndReceipt
                         ->update(['status' => 'Unavailable']);
                 }
 
-                OrderItem::create([
+                $orderItem = OrderItem::create([
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
                     'product_variant_type' => $item['variant_type'],
@@ -696,6 +728,38 @@ trait WithCheckoutAndReceipt
                     // 3. Simpan ke database. Jika ada 2 SN, jadinya: "SN001, SN002"
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
+
+                // Attach ke order_item_promos pivot
+                $vendorNameFallback = clone $orderItem;
+                $vendorNameFallback = $vendorNameFallback->vendor_name;
+
+                foreach ($item['promo_discounts'] ?? [] as $promoId => $discAmount) {
+                    if ($discAmount > 0) {
+                        if (!empty($cleanSns)) {
+                            // Jika ada SN, bagi diskon sebanyak jumlah SN
+                            $discountPerSn = round($discAmount / max(1, count($cleanSns)));
+
+                            foreach ($cleanSns as $sn) {
+                                // Cari nama vendor asli dari tabel ProductSerialNumber
+                                $snModel = \App\Models\ProductSerialNumber::with('vendor')->where('serial_number', $sn)->first();
+                                $actualVendorName = $snModel?->vendor?->vendor_name ?? $vendorNameFallback;
+
+                                $orderItem->promos()->attach($promoId, [
+                                    'discount_amount' => $discountPerSn,
+                                    'serial_number' => $sn,
+                                    'vendor_name' => $actualVendorName,
+                                ]);
+                            }
+                        } else {
+                            // Jika tidak ada SN, simpan 1 row seperti biasa
+                            $orderItem->promos()->attach($promoId, [
+                                'discount_amount' => $discAmount,
+                                'serial_number' => '',
+                                'vendor_name' => $vendorNameFallback,
+                            ]);
+                        }
+                    }
+                }
 
                 // Reduce stock locally
                 $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
@@ -1127,7 +1191,7 @@ trait WithCheckoutAndReceipt
                         ->update(['status' => 'Unavailable']);
                 }
 
-                OrderItem::create([
+                $orderItem = OrderItem::create([
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
                     'product_variant_type' => $item['variant_type'],
@@ -1140,6 +1204,38 @@ trait WithCheckoutAndReceipt
                     'applied_promo_id' => $item['applied_promo_id'] ?? null,
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);
+
+                // Attach ke order_item_promos pivot
+                $vendorNameFallback = clone $orderItem;
+                $vendorNameFallback = $vendorNameFallback->vendor_name;
+
+                foreach ($item['promo_discounts'] ?? [] as $promoId => $discAmount) {
+                    if ($discAmount > 0) {
+                        if (!empty($cleanSns)) {
+                            // Jika ada SN, bagi diskon sebanyak jumlah SN
+                            $discountPerSn = round($discAmount / max(1, count($cleanSns)));
+
+                            foreach ($cleanSns as $sn) {
+                                // Cari nama vendor asli dari tabel ProductSerialNumber
+                                $snModel = \App\Models\ProductSerialNumber::with('vendor')->where('serial_number', $sn)->first();
+                                $actualVendorName = $snModel?->vendor?->vendor_name ?? $vendorNameFallback;
+
+                                $orderItem->promos()->attach($promoId, [
+                                    'discount_amount' => $discountPerSn,
+                                    'serial_number' => $sn,
+                                    'vendor_name' => $actualVendorName,
+                                ]);
+                            }
+                        } else {
+                            // Jika tidak ada SN, simpan 1 row seperti biasa
+                            $orderItem->promos()->attach($promoId, [
+                                'discount_amount' => $discAmount,
+                                'serial_number' => '',
+                                'vendor_name' => $vendorNameFallback,
+                            ]);
+                        }
+                    }
+                }
 
                 $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
                     [

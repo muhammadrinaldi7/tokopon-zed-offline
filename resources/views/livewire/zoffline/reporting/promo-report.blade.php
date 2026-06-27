@@ -141,11 +141,16 @@
                             </td>
                             <td class="px-6 py-4">
                                 <div class="flex flex-col gap-1">
-                                    @foreach ($order->promos as $promo)
-                                        <div class="text-sm font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded">
-                                            {{ $promo->name }} (Total Rp
-                                            {{ number_format($promo->pivot->discount_applied, 0, ',', '.') }})
-                                        </div>
+                                    @foreach ($order->items as $item)
+                                        @foreach ($item->promos as $promo)
+                                            <div class="text-sm font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                                                @if(!empty($promo->pivot->serial_number))
+                                                    <span class="font-bold text-xs text-purple-800">[SN: {{ $promo->pivot->serial_number }}]</span> 
+                                                @endif
+                                                {{ $promo->name }} 
+                                                - Rp {{ number_format($promo->pivot->discount_amount, 0, ',', '.') }}
+                                            </div>
+                                        @endforeach
                                     @endforeach
                                 </div>
                             </td>

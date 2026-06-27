@@ -91,7 +91,7 @@ class PromoReport extends Component
 
     public function getOrdersQueryProperty()
     {
-        return Order::with(['items.variant', 'promos'])
+        return Order::with(['items.variant', 'items.promos', 'promos'])
             ->whereBetween('created_at', [
                 Carbon::parse($this->startDate)->startOfDay(),
                 Carbon::parse($this->endDate)->endOfDay(),
@@ -144,8 +144,10 @@ class PromoReport extends Component
                 'NO. ORDER',
                 'NO. INVOICE',
                 'CABANG',
-                'NAMA PRODUK',
                 'MERK PRODUK',
+                'NAMA VENDOR',
+                'NAMA PRODUK',
+                'SN',
                 'NAMA PROMO',
                 'NILAI KLAIM PROMO (Rp)'
             ]);
@@ -163,46 +165,35 @@ class PromoReport extends Component
                     $branch
                 ];
 
-                $totalOrderItemsSubtotal = $order->items->sum('subtotal');
-                if ($totalOrderItemsSubtotal == 0) $totalOrderItemsSubtotal = 1;
-
-                // Loop setiap promo yang dipakai di order ini
-                foreach ($order->promos as $promo) {
-                    $promoName = $promo->name;
-                    $promoDiscount = $promo->pivot->discount_applied ?? 0;
-
-                    $allocatedPromoTotal = 0;
-                    $itemCount = $order->items->count();
-                    $currentIndex = 0;
-
-                    foreach ($order->items as $item) {
-                        $currentIndex++;
-                        $isLastItem = ($currentIndex === $itemCount);
-                        $weight = $item->subtotal / $totalOrderItemsSubtotal;
-
-                        $variant = $item->variant;
-                        $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
-                        $merk = $variant?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
+                // Loop setiap item di order ini
+                foreach ($order->items as $item) {
+                    $variant = $item->variant;
+                    $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
+                    $merk = $variant?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
+                    
+                    // Loop setiap promo di item ini (dari order_item_promos pivot)
+                    foreach ($item->promos as $promo) {
+                        $promoName = $promo->name;
+                        $discountAmount = $promo->pivot->discount_amount;
+                        $sn = $promo->pivot->serial_number ?? '-';
+                        
+                        // Vendor name fallback
+                        $vendorName = $promo->pivot->vendor_name ?? $merk;
 
                         // Filter by brand jika ada
                         if ($this->brandFilter && $merk !== $this->brandFilter) {
                             continue;
                         }
 
-                        if ($isLastItem) {
-                            $allocated = $promoDiscount - $allocatedPromoTotal;
-                        } else {
-                            $allocated = round($promoDiscount * $weight);
-                            $allocatedPromoTotal += $allocated;
-                        }
-
-                        // Hanya catat jika ada alokasi potongannya
-                        if ($allocated > 0 || $itemCount == 1) {
+                        // Catat ke CSV
+                        if ($discountAmount > 0) {
                             $row = array_merge($baseRow, [
-                                $name,
                                 $merk,
+                                $vendorName,
+                                $name,
+                                $sn,
                                 $promoName,
-                                $allocated
+                                $discountAmount
                             ]);
                             fputcsv($file, $row);
                         }
