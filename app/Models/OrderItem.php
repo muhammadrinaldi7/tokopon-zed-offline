@@ -17,6 +17,10 @@ class OrderItem extends Model
         return $this->morphTo(__FUNCTION__, 'product_variant_type', 'product_variant_id');
     }
 
+    public function serialNumber()
+    {
+        return $this->hasOne(ProductSerialNumber::class, 'serial_number', 'serial_number');
+    }
     public function review()
     {
         return $this->hasOne(ProductReview::class);
