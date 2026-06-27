@@ -26,6 +26,7 @@ class ClaimManagement extends Component
     public $claimInspection = null;
 
     public $viewingQcDetails = null; // 'original' or 'claim'
+    public $showReplacementForm = false;
 
     protected $listeners = ['refreshClaims' => '$refresh'];
 
@@ -145,6 +146,18 @@ class ClaimManagement extends Component
 
         $this->closeModal();
         $this->dispatch('toast', title: 'Retur Sukses', message: 'Unit berhasil diganti dan disinkronisasi ke Accurate.', type: 'success');
+    }
+
+    public function openReplacementForm()
+    {
+        $this->showReplacementForm = true;
+    }
+
+    public function closeReplacementForm()
+    {
+        $this->showReplacementForm = false;
+        $this->replacement_imei = '';
+        $this->resetValidation('replacement_imei');
     }
 
     public function render()

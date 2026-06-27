@@ -94,7 +94,7 @@
                                                 @if ($isExpired)
                                                     <span
                                                         class="inline-block px-2 py-1 bg-rose-100 text-rose-700 text-[10px] font-bold rounded-md">Habis
-                                                        Masa Garansi / Void</span>
+                                                        Masa Garansi</span>
                                                 @else
                                                     <span
                                                         class="inline-block px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-md">Aktif</span>
@@ -103,27 +103,30 @@
                                         </div>
 
                                         <h4 class="font-bold text-gray-900 mb-1 line-clamp-1">
-                                            {{ $warranty->policy->name ?? 'Garansi' }}</h4>
+                                            {{ $warranty->policy->name ?? 'Garansi' }}
+                                            <span class="text-xs text-gray-500">( {{ $warranty->policy->duration_days }}
+                                                Hari)</span>
+                                        </h4>
                                         <div class="space-y-1.5 mt-3 text-xs text-gray-500">
                                             <div class="flex justify-between">
                                                 <span>Berakhir:</span>
                                                 <span
                                                     class="font-bold {{ $isExpired ? 'text-rose-600' : 'text-gray-700' }}">{{ $warranty->expires_at->format('d M Y') }}</span>
                                             </div>
-                                            <div class="flex justify-between">
+                                            {{-- <div class="flex justify-between">
                                                 <span>Telah Diklaim:</span>
                                                 <span
                                                     class="font-bold text-gray-700">{{ $warranty->claims_used }}x</span>
-                                            </div>
+                                            </div> --}}
                                         </div>
 
                                         <!-- Custom Radio Button Indicator -->
-                                        <div
+                                        {{-- <div
                                             class="absolute top-5 right-5 w-5 h-5 rounded-full border-2 border-gray-300 peer-checked:border-blue-500 flex items-center justify-center transition-colors {{ $isDisabled ? 'hidden' : '' }}">
                                             <div
                                                 class="w-2.5 h-2.5 rounded-full bg-blue-500 opacity-0 peer-checked:opacity-100 transition-opacity">
                                             </div>
-                                        </div>
+                                        </div> --}}
                                     </div>
                                 </label>
                             @endforeach
@@ -160,9 +163,9 @@
                                     class="mb-6 {{ $isSelectedExpired ? 'bg-rose-50 border-rose-100' : 'bg-blue-50 border-blue-100' }} rounded-lg p-4 border">
                                     @if ($isSelectedExpired)
                                         <p class="text-sm font-bold text-rose-800 mb-1">Peringatan: Garansi ini sudah
-                                            Habis / Void.</p>
-                                        <p class="text-xs text-rose-600">Perbaikan akan diproses sebagai **Titip Servis
-                                            Berbayar** (Service Center).</p>
+                                            Habis.</p>
+                                        <p class="text-xs text-rose-600">Perbaikan akan diproses sebagai Servis
+                                            Berbayar (Service Center).</p>
                                     @else
                                         <p class="text-sm font-bold text-blue-800 mb-1">Cakupan Garansi:
                                             {{ $selectedWarranty->type === 'full_cover' ? 'Full Cover (Termasuk Human Error)' : 'Ganti Unit (Hanya Cacat Pabrik)' }}
@@ -189,7 +192,8 @@
                                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                         </path>
                                     </svg>
-                                    Mulai QC Penerimaan Klaim
+                                    {{ $isSelectedExpired ? 'Lanjutkan QC dan Service' : 'Mulai QC Penerimaan Klaim' }}
+
                                 </button>
                             </div>
                         </div>
@@ -484,7 +488,7 @@
                                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                             </path>
                                         </svg>
-                                        {{ $isSelectedExpired ? 'Terbitkan Tiket Servis Berbayar' : 'Simpan QC & Ajukan Klaim' }}
+                                        {{ $isSelectedExpired ? 'Lanjutkan Isi Form Service' : 'Simpan QC & Ajukan Klaim' }}
                                     </button>
                                 </div>
                             </form>
@@ -562,6 +566,32 @@
                 </div>
                 <div class="p-6 overflow-y-auto flex-1">
                     <form wire:submit="submitServiceCenter">
+                        @php
+                            $svcWarranty = $foundWarranties ? $foundWarranties->firstWhere('id', $selectedWarrantyId) : null;
+                        @endphp
+                        
+                        @if($svcWarranty)
+                            <div class="bg-white border border-gray-200 shadow-sm rounded-xl p-4 mb-5">
+                                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">Informasi Perangkat</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <p class="text-[11px] text-gray-500 mb-0.5">Nama Produk</p>
+                                        <p class="font-bold text-gray-800 text-sm line-clamp-1">{{ $svcWarranty->orderItem->product_name ?? ($svcWarranty->orderItem->variant->name ?? 'Unknown Product') }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[11px] text-gray-500 mb-0.5">IMEI / Serial Number</p>
+                                        <p class="font-bold font-mono text-gray-900 text-sm">{{ $svcWarranty->serial_number }}</p>
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <p class="text-[11px] text-gray-500 mb-0.5">No Faktur / Transaksi Pelanggan</p>
+                                        <p class="font-bold text-gray-800 text-sm">
+                                            {{ $svcWarranty->orderItem->order->accurate_invoice_no ?? ($svcWarranty->orderItem->order->order_number ?? '-') }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
                         <div class="space-y-4">
                             <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-1">Cek Fisik Saat Diterima <span

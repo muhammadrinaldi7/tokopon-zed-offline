@@ -41,7 +41,7 @@ class WarrantyCalculatorService
 
         foreach ($addonPolicies as $addonPolicy) {
             if (!empty($addonPolicy->addon_trigger_keywords) && $addonPolicy->addon_trigger_keywords !== '[]') {
-                if ($this->hasInsuranceProduct($order, $addonPolicy->addon_trigger_keywords)) {
+                if ($this->hasInsuranceQuota($order, $addonPolicy)) {
                     $policiesToApply->push($addonPolicy);
                 }
             }
@@ -104,12 +104,15 @@ class WarrantyCalculatorService
     }
 
     /**
-     * Cek apakah order memiliki item asuransi yang ID Accurate-nya tercantum dalam policy
+     * Cek apakah order memiliki sisa kuota untuk item asuransi ini (Berdasarkan Qty beli vs Qty terpakai)
      */
-    private function hasInsuranceProduct(Order $order, $insuranceProductIds)
+    private function hasInsuranceQuota(Order $order, WarrantyPolicy $addonPolicy)
     {
+        $insuranceProductIds = $addonPolicy->addon_trigger_keywords;
         $insuranceProductIds = is_array($insuranceProductIds) ? $insuranceProductIds : (json_decode($insuranceProductIds, true) ?? []);
         if (empty($insuranceProductIds)) return false;
+
+        $totalPurchasedQty = 0;
 
         foreach ($order->items as $oItem) {
             $accurateId = null;
@@ -125,13 +128,24 @@ class WarrantyCalculatorService
                 }
             }
 
-            // Jika cocok dengan salah satu ID yang didaftarkan di Policy
+            // Jika item ini adalah asuransi yang terdaftar di Policy, tambahkan kuantitasnya
             if ($accurateId && in_array((string)$accurateId, array_map('strval', $insuranceProductIds))) {
-                return true;
+                $totalPurchasedQty += (int)$oItem->quantity;
             }
         }
 
-        return false;
+        // Jika tidak ada asuransi ini yang dibeli di nota, return false
+        if ($totalPurchasedQty <= 0) return false;
+
+        // Hitung berapa kali asuransi (policy) ini sudah diaktifkan untuk Order ini
+        $usedQty = \App\Models\Warranty::where('warranty_policy_id', $addonPolicy->id)
+            ->whereHas('orderItem', function ($q) use ($order) {
+                $q->where('order_id', $order->id);
+            })
+            ->count();
+
+        // Asuransi diberikan JIKA kuantitas yang dibeli LEBIH BESAR dari yang sudah terpakai
+        return $totalPurchasedQty > $usedQty;
     }
 
     /**

@@ -131,13 +131,15 @@
                                 class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
                                 <div
                                     class="w-12 h-12 rounded-xl bg-purple-100/50 flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                            d="M12 4v16m8-8H4" />
+
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
                                     </svg>
+
                                 </div>
-                                <span class="block text-xs sm:text-sm text-center leading-tight">Add On Garansi</span>
+                                <span class="block text-xs sm:text-sm text-center leading-tight">Klaim Manajemen</span>
                             </button>
                         </div>
 
