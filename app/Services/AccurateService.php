@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Employe;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -665,6 +666,37 @@ class AccurateService
         } else {
             Log::info('API Accurate Sales Invoice Error: ' . $response->body());
             throw new \Exception('API Accurate Sales Invoice Error: ' . $response->body());
+        }
+    }
+
+    public function postSalesReturn($salesReturnData, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-return/save.do', $salesReturnData);
+
+        Log::info('API Accurate Sales Return Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Sales Return Error: ' . $response->body());
+            throw new \Exception('API Accurate Sales Return Error: ' . $response->body());
         }
     }
 
@@ -1514,5 +1546,97 @@ class AccurateService
 
         Log::error("Accurate API Get Purchase Order Detail Failed ({$databaseSource}): " . $response->body());
         return null;
+    }
+
+    /**
+     * Proses penggantian unit garansi (Retur).
+     * Memanggil API Accurate untuk Sales Return (menarik stok rusak) 
+     * dan Sales Invoice (mengeluarkan stok baru).
+     */
+    public function processWarrantyReplacement(\App\Models\WarrantyClaim $claim, $newImei)
+    {
+        $businessUnitCode = $claim->warranty->policy->businessUnit->code ?? 'syihab';
+
+        // 1. Ambil Data Referensi dari Database
+        // Ambil No Pelanggan yang TEPAT sesuai dengan Business Unit tempat garansi ini diterbitkan
+        $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
+        $customerName = $claim->customer->name ?? 'Pelanggan Garansi';
+
+        // Simulasi mendapatkan nomor invoice lama dan item lama dari order system
+        $order = $claim->warranty->orderItem->order ?? null;
+        $originalInvoiceNo = $order->accurate_invoice_no ?? $order->order_number ?? 'INV-UNKNOWN';
+
+        // Ambil Item No (SKU) dari relasi Variant
+        $variant = $claim->warranty->orderItem->variant ?? null;
+        $originalItemNo = 'UNKNOWN-SKU';
+
+        if ($variant) {
+            // Jika variant langsung dari ProductAccurate
+            if (isset($variant->item_no)) {
+                $originalItemNo = $variant->item_no;
+            }
+            // Jika dari SecondProductVariant atau ProductVariant (punya relasi ke productAccurate)
+            elseif ($variant->productAccurate) {
+                $originalItemNo = $variant->productAccurate->item_no;
+            }
+        }
+
+        // Ambil Nama Cabang berdasarkan User yang login
+        $branchName = Auth::user()->branch->name ?? 'Cabang Utama';
+
+        // Gudang Retur idealnya diambil dari settingan Business Unit,
+        // Contoh: $claim->warranty->policy->businessUnit->settings['return_warehouse'] ?? 'GSK - Return'
+        $warehouseReturnName = 'GSK - Return';
+        $warehouseMainName = Auth::user()->warehouse->name ?? 'Gudang Utama';
+
+        // --- PROSES 1: SALES RETURN (MENARIK IMEI LAMA) ---
+        Log::info("Mempersiapkan Sales Return ke Accurate untuk IMEI Lama: " . $claim->serial_number);
+
+        // Payload standar retur industri
+        $returnPayload = [
+            'customerNo' => $customerNo,
+            'invoiceNumber' => $originalInvoiceNo, // <--- Relasi ke faktur lama
+            'returnDate' => now()->format('d/m/Y'),
+            'branchName' => $branchName,
+            'description' => "Retur Klaim Garansi Ganti Unit. Referensi Faktur: {$originalInvoiceNo}. SN Rusak: {$claim->serial_number}",
+            'detailItem' => [
+                [
+                    'itemNo' => $originalItemNo,
+                    'quantity' => 1,
+                    'warehouseName' => $warehouseReturnName,
+                    'detailSerialNumber' => [
+                        ['serialNumberNo' => $claim->serial_number, 'quantity' => 1]
+                    ]
+                ]
+            ]
+        ];
+
+        $this->postSalesReturn($returnPayload, $businessUnitCode);
+
+        // --- PROSES 2: SALES INVOICE (MENGELUARKAN IMEI BARU) ---
+        Log::info("Mempersiapkan Sales Invoice ke Accurate untuk IMEI Baru: " . $newImei);
+
+        // Payload standar pengeluaran barang pengganti
+        $invoicePayload = [
+            'customerNo' => $customerNo,
+            'transDate' => now()->format('d/m/Y'),
+            'branchName' => $branchName,
+            'description' => "Penggantian Unit Klaim Garansi untuk Faktur: {$originalInvoiceNo}. SN Pengganti: {$newImei}",
+            'detailItem' => [
+                [
+                    'itemNo' => $originalItemNo,
+                    'quantity' => 1,
+                    'unitPrice' => 0, // Harga 0 karena ini garansi
+                    'warehouseName' => $warehouseMainName,
+                    'detailSerialNumber' => [
+                        ['serialNumberNo' => $newImei, 'quantity' => 1]
+                    ]
+                ]
+            ]
+        ];
+
+        $this->postSalesInvoice($invoicePayload, $businessUnitCode);
+
+        return true;
     }
 }

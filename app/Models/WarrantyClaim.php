@@ -40,5 +40,25 @@ class WarrantyClaim extends Model
     {
         return $this->belongsTo(DeviceInspection::class);
     }
+
+    public function claimsHistory()
+    {
+        return $this->hasMany(WarrantyClaimHistory::class, 'claim_id');
+    }
+
+    public function receivingInspection()
+    {
+        return $this->belongsTo(DeviceInspection::class, 'receiving_inspection_id');
+    }
+
+    public function replacement()
+    {
+        return $this->hasOne(WarrantyReplacement::class);
+    }
+
+    public function serviceCenterTicket()
+    {
+        return $this->hasOne(ServiceCenterTicket::class);
+    }
 }
 

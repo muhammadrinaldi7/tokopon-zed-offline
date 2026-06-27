@@ -40,5 +40,10 @@ class Warranty extends Model
     {
         return $this->hasMany(WarrantyClaim::class);
     }
+
+    public function replacements()
+    {
+        return $this->hasManyThrough(WarrantyReplacement::class, WarrantyClaim::class);
+    }
 }
 

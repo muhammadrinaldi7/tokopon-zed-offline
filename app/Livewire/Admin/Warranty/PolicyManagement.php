@@ -8,7 +8,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
 
-#[Layout('layouts.admin', ['title' => 'Warranty Policies'])]
+#[Layout('layouts.admin', ['title' => 'Policy Engine Garansi'])]
 class PolicyManagement extends Component
 {
     use WithPagination;
@@ -20,31 +20,15 @@ class PolicyManagement extends Component
     public $editId = null;
 
     public $name;
-    public $brand_id;
-    public $type = 'store_default';
-    public $duration_days = 365;
-    public $max_claims = 1;
-    public $item_category;
+    public $type = 'store_normal'; // store_normal, store_discount, addon_warranty
+    public $coverage_type = 'ganti_unit'; // ganti_unit, full_cover
+    public $coverage_scope = []; // array of 'factory_defect', 'human_error'
+    public $duration_days = 90;
+    public $brand_rule = 'all_brands'; // all_brands, include, exclude
+    public $brand_list = [];
+    public $addon_product_list = [];
+    public $searchProduct = '';
     public $is_active = true;
-
-    // Untuk coverage list dinamis
-    public $coverageItems = [
-        ['name' => 'LCD Rusak', 'covered' => true],
-        ['name' => 'Baterai Drop', 'covered' => true],
-        ['name' => 'Water Damage', 'covered' => false],
-        ['name' => 'Kerusakan Fisik', 'covered' => false],
-    ];
-
-    public function addCoverageItem()
-    {
-        $this->coverageItems[] = ['name' => '', 'covered' => '1'];
-    }
-
-    public function removeCoverageItem($index)
-    {
-        unset($this->coverageItems[$index]);
-        $this->coverageItems = array_values($this->coverageItems);
-    }
 
     public function updatingSearch()
     {
@@ -54,19 +38,19 @@ class PolicyManagement extends Component
     public function openCreateModal()
     {
         $this->resetValidation();
-        $this->reset(['name', 'brand_id', 'type', 'item_category', 'editId']);
-        $this->duration_days = 365;
-        $this->max_claims = 1;
-        $this->is_active = true;
         $this->isEdit = false;
+        $this->editId = null;
+        $this->name = '';
+        $this->type = 'store_normal';
+        $this->coverage_type = 'ganti_unit';
+        $this->coverage_scope = ['factory_defect'];
+        $this->duration_days = 90;
+        $this->brand_rule = 'all_brands';
+        $this->brand_list = [];
+        $this->addon_product_list = [];
+        $this->searchProduct = '';
+        $this->is_active = true;
         
-        $this->coverageItems = [
-            ['name' => 'LCD Rusak', 'covered' => '1'],
-            ['name' => 'Baterai Drop', 'covered' => '1'],
-            ['name' => 'Water Damage', 'covered' => '0'],
-            ['name' => 'Kerusakan Fisik', 'covered' => '0'],
-        ];
-
         $this->showModal = true;
     }
 
@@ -75,18 +59,20 @@ class PolicyManagement extends Component
         $policy = WarrantyPolicy::findOrFail($id);
         $this->editId = $policy->id;
         $this->name = $policy->name;
-        $this->brand_id = $policy->brand_id;
         $this->type = $policy->type;
+        $this->coverage_type = $policy->coverage_type;
+        $this->coverage_scope = is_array($policy->coverage_scope) ? $policy->coverage_scope : [];
         $this->duration_days = $policy->duration_days;
-        $this->max_claims = $policy->max_claims;
-        $this->item_category = $policy->item_category;
-        $this->is_active = $policy->is_active;
-
-        if ($policy->coverage && is_array($policy->coverage)) {
-            $this->coverageItems = $policy->coverage;
-        } else {
-            $this->coverageItems = [];
+        $this->brand_rule = $policy->brand_rule;
+        
+        $this->brand_list = $policy->brand_list;
+        if (is_string($this->brand_list)) {
+            $this->brand_list = json_decode($this->brand_list, true) ?? [];
         }
+
+        $this->addon_product_list = $policy->addon_trigger_keywords ?? [];
+        $this->searchProduct = '';
+        $this->is_active = $policy->is_active;
 
         $this->isEdit = true;
         $this->showModal = true;
@@ -96,29 +82,32 @@ class PolicyManagement extends Component
     {
         $this->validate([
             'name' => 'required|string|max:255',
-            'type' => 'required|in:store_default,insurance',
+            'type' => 'required|in:store_normal,store_discount,addon_warranty',
+            'coverage_type' => 'required|in:ganti_unit,full_cover',
+            'coverage_scope' => 'array',
             'duration_days' => 'required|integer|min:1',
-            'max_claims' => 'required|integer|min:1',
-            'coverageItems.*.name' => 'required|string|max:255',
+            'brand_rule' => 'required|in:all_brands,include,exclude',
         ]);
 
         $data = [
             'name' => $this->name,
-            'brand_id' => $this->brand_id ?: null,
             'type' => $this->type,
+            'coverage_type' => $this->coverage_type,
+            'coverage_scope' => $this->coverage_scope,
             'duration_days' => $this->duration_days,
-            'max_claims' => $this->max_claims,
-            'item_category' => $this->item_category,
+            'brand_rule' => $this->type !== 'addon_warranty' ? $this->brand_rule : 'all_brands',
+            'brand_list' => ($this->type !== 'addon_warranty' && $this->brand_rule !== 'all_brands') ? array_map('intval', $this->brand_list) : [],
+            'addon_trigger_keywords' => $this->type === 'addon_warranty' ? array_map('intval', $this->addon_product_list) : null,
+            'business_unit_id' => \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId(),
             'is_active' => $this->is_active,
-            'coverage' => array_values($this->coverageItems),
         ];
 
         if ($this->isEdit) {
             WarrantyPolicy::find($this->editId)->update($data);
-            $this->dispatch('toast', title: 'Berhasil', message: 'Kebijakan garansi diupdate.', type: 'success');
+            $this->dispatch('toast', title: 'Berhasil', message: 'Policy berhasil diupdate.', type: 'success');
         } else {
             WarrantyPolicy::create($data);
-            $this->dispatch('toast', title: 'Berhasil', message: 'Kebijakan garansi ditambahkan.', type: 'success');
+            $this->dispatch('toast', title: 'Berhasil', message: 'Policy ditambahkan.', type: 'success');
         }
 
         $this->showModal = false;
@@ -128,24 +117,37 @@ class PolicyManagement extends Component
     {
         $policy = WarrantyPolicy::findOrFail($id);
         $policy->update(['is_active' => !$policy->is_active]);
-        $this->dispatch('toast', title: 'Berhasil', message: 'Status garansi diubah.', type: 'success');
+        $this->dispatch('toast', title: 'Berhasil', message: 'Status policy diubah.', type: 'success');
     }
 
     public function delete($id)
     {
         WarrantyPolicy::findOrFail($id)->delete();
-        $this->dispatch('toast', title: 'Berhasil', message: 'Kebijakan garansi dihapus.', type: 'success');
+        $this->dispatch('toast', title: 'Berhasil', message: 'Policy dihapus.', type: 'success');
     }
 
     public function render()
     {
-        $policies = WarrantyPolicy::with('brand')
+        $activeUnitId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+        
+        $policies = WarrantyPolicy::where('business_unit_id', $activeUnitId)
             ->where('name', 'like', '%' . $this->search . '%')
             ->orderBy('id', 'desc')
-            ->paginate(10);
+            ->paginate(15);
             
-        $brands = Brand::orderBy('name', 'asc')->get();
+        $brands = \App\Models\Brand::where('is_active', true)->orderBy('name')->get();
 
-        return view('livewire.admin.warranty.policy-management', compact('policies', 'brands'));
+        $searchedProducts = collect();
+        if ($this->type === 'addon_warranty' && strlen($this->searchProduct) > 2) {
+            $searchedProducts = \App\Models\ProductAccurate::where('name', 'like', '%' . $this->searchProduct . '%')
+                ->limit(20)
+                ->get();
+        }
+
+        return view('livewire.admin.warranty.policy-management', [
+            'policies' => $policies,
+            'brands' => $brands,
+            'searchedProducts' => $searchedProducts,
+        ]);
     }
 }

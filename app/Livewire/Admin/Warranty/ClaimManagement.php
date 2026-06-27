@@ -7,6 +7,8 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use App\Models\DeviceInspection;
+use App\Services\AccurateService;
 
 class ClaimManagement extends Component
 {
@@ -18,6 +20,12 @@ class ClaimManagement extends Component
     public $showModal = false;
     public $selectedClaimId = null;
     public $resolution_notes = '';
+    public $replacement_imei = '';
+
+    public $originalInspection = null;
+    public $claimInspection = null;
+
+    public $viewingQcDetails = null; // 'original' or 'claim'
 
     protected $listeners = ['refreshClaims' => '$refresh'];
 
@@ -35,7 +43,16 @@ class ClaimManagement extends Component
     {
         $this->selectedClaimId = $id;
         $this->resolution_notes = '';
+        $this->replacement_imei = '';
         $this->resetValidation();
+        $this->viewingQcDetails = null;
+        
+        $claim = WarrantyClaim::with('warranty')->find($id);
+        if ($claim) {
+            $this->originalInspection = $claim->warranty->device_inspection_id ? DeviceInspection::with(['media', 'qcTemplate'])->find($claim->warranty->device_inspection_id) : null;
+            $this->claimInspection = $claim->receiving_inspection_id ? DeviceInspection::with(['media', 'qcTemplate'])->find($claim->receiving_inspection_id) : null;
+        }
+
         $this->showModal = true;
     }
 
@@ -44,6 +61,20 @@ class ClaimManagement extends Component
         $this->showModal = false;
         $this->selectedClaimId = null;
         $this->resolution_notes = '';
+        $this->replacement_imei = '';
+        $this->originalInspection = null;
+        $this->claimInspection = null;
+        $this->viewingQcDetails = null;
+    }
+
+    public function viewQcDetails($type)
+    {
+        $this->viewingQcDetails = $type;
+    }
+
+    public function closeQcDetails()
+    {
+        $this->viewingQcDetails = null;
     }
 
     public function updateStatus($status)
@@ -65,16 +96,55 @@ class ClaimManagement extends Component
 
         if ($status === 'completed') {
             $claim->resolved_at = Carbon::now();
-            $claim->resolution = 'repaired'; // default resolution, could be dynamic
-
-            // Increment claims used on the warranty
+            $claim->resolution = 'repaired'; 
             $claim->warranty->increment('claims_used');
         }
 
         $claim->save();
 
         $this->closeModal();
-        $this->dispatch('toast', title: 'Berhasil', message: 'Status klaim berhasil diperbarui menjadi ' . strtoupper($status), type: 'success');
+        $this->dispatch('toast', title: 'Berhasil', message: 'Status klaim diperbarui menjadi ' . strtoupper($status), type: 'success');
+    }
+
+    public function approveReplacement()
+    {
+        $this->validate([
+            'replacement_imei' => 'required|string|min:3'
+        ]);
+
+        $claim = WarrantyClaim::with(['warranty.orderItem.order'])->findOrFail($this->selectedClaimId);
+        
+        // 1. Integrasi API Accurate
+        try {
+            $accurateService = app(AccurateService::class);
+            $accurateService->processWarrantyReplacement($claim, $this->replacement_imei);
+        } catch (\Exception $e) {
+            $this->addError('replacement_imei', 'Gagal memproses Accurate: ' . $e->getMessage());
+            return;
+        }
+
+        // 2. Update Database Lokal
+        $claim->status = 'completed'; // Langsung selesai jika ganti unit
+        $claim->resolved_at = Carbon::now();
+        $claim->resolution = 'replaced';
+        $claim->resolution_notes = 'Ganti Unit ke IMEI: ' . $this->replacement_imei . ' | ' . $this->resolution_notes;
+        $claim->approved_by = Auth::id();
+        $claim->save();
+
+        // Nonaktifkan Garansi Lama
+        $oldWarranty = $claim->warranty;
+        $oldWarranty->status = 'replaced';
+        $oldWarranty->save();
+
+        // Buat Garansi Baru untuk IMEI Baru (Meneruskan masa aktif yang lama)
+        $newWarranty = $oldWarranty->replicate();
+        $newWarranty->serial_number = $this->replacement_imei;
+        $newWarranty->status = 'active';
+        $newWarranty->device_inspection_id = null; // Butuh QC baru nanti
+        $newWarranty->save();
+
+        $this->closeModal();
+        $this->dispatch('toast', title: 'Retur Sukses', message: 'Unit berhasil diganti dan disinkronisasi ke Accurate.', type: 'success');
     }
 
     public function render()
