@@ -24,6 +24,7 @@ class Show extends Component
     public $payment_method_rate_id;
     public $dp_date;
     public $dp_notes;
+    public $dp_contract_number;
 
     // Invoice Form
     public $showInvoiceModal = false;
@@ -32,6 +33,7 @@ class Show extends Component
     public $invoice_payment_method_rate_id;
     public $invoice_date;
     public $invoice_notes;
+    public $invoice_contract_number;
 
     public function mount(Order $order)
     {
@@ -103,6 +105,7 @@ class Show extends Component
                 'paid_at' => \Carbon\Carbon::parse($this->dp_date),
                 'payment_payload' => [
                     'notes' => $this->dp_notes,
+                    'contract_number' => $this->dp_contract_number,
                 ],
             ]);
 
@@ -177,8 +180,12 @@ class Show extends Component
                     'transDate'  => Carbon::parse($this->dp_date)->format('d/m/Y'),
                     'inclusiveTax' => false,
                     'isTaxable' => false,
-                    'description' => 'Uang Muka (DP) SO: ' . $this->order->accurate_so_number . '. ' . $this->dp_notes,
+                    'description' => 'Uang Muka (DP) SO: ' . $this->order->accurate_so_number . ($this->dp_contract_number ? '. No Kontrak: ' . $this->dp_contract_number : '') . '. ' . $this->dp_notes,
                 ];
+
+                if ($this->dp_contract_number) {
+                    $dpInvData['poNumber'] = $this->dp_contract_number;
+                }
 
                 Log::info('Accurate DP Invoice Payload: ' . json_encode($dpInvData));
                 $dpInvResult = $accurateService->postDownPaymentInvoice($dpInvData, $dbSource);
@@ -206,7 +213,7 @@ class Show extends Component
                     'transDate' => Carbon::parse($this->dp_date)->format('d/m/Y'),
                     'receiptAmount' => (float)$netReceiptAmount,
                     'chequeAmount' => (float)$netReceiptAmount,
-                    'description' => 'Penerimaan DP SO: ' . $this->order->accurate_so_number . '. ' . $this->dp_notes,
+                    'description' => 'Penerimaan DP SO: ' . $this->order->accurate_so_number . ($this->dp_contract_number ? '. No Kontrak: ' . $this->dp_contract_number : '') . '. ' . $this->dp_notes,
                     'detailInvoice' => [
                         [
                             'invoiceNo' => $dpInvoiceNo,
@@ -257,19 +264,25 @@ class Show extends Component
     {
         $this->invoice_sns = [];
         foreach ($this->order->items as $item) {
-            $this->invoice_sns[$item->id] = $item->serial_number ?? '';
+            $existing = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
+            $sns = [];
+            for ($i = 0; $i < $item->qty; $i++) {
+                $sns[] = $existing[$i] ?? '';
+            }
+            $this->invoice_sns[$item->id] = $sns;
         }
         $this->invoice_payment_method_id = null;
         $this->invoice_payment_method_rate_id = null;
         $this->invoice_date = \Carbon\Carbon::now()->format('Y-m-d');
         $this->invoice_notes = '';
+        $this->invoice_contract_number = '';
         $this->showInvoiceModal = true;
     }
 
     public function submitFaktur()
     {
         $rules = [
-            'invoice_sns.*' => 'nullable|string'
+            'invoice_sns.*.*' => 'nullable|string'
         ];
 
         $remBal = $this->getRemainingBalance();
@@ -306,7 +319,13 @@ class Show extends Component
             $detailItems = [];
             foreach ($this->order->items as $item) {
                 // Update local serial numbers first
-                $snInput = $this->invoice_sns[$item->id] ?? '';
+                $snArray = $this->invoice_sns[$item->id] ?? [];
+                if (is_array($snArray)) {
+                    $snInput = implode(', ', array_filter(array_map('trim', $snArray)));
+                } else {
+                    $snInput = trim($snArray);
+                }
+
                 if ($snInput !== ($item->serial_number ?? '')) {
                     $item->update(['serial_number' => $snInput]);
                 }
@@ -355,8 +374,12 @@ class Show extends Component
                 'detailItem' => $detailItems,
                 'inclusiveTax' => true,
                 'taxable' => true,
-                'description' => 'Pelunasan SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number)
+                'description' => 'Pelunasan SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number) . ($this->invoice_contract_number ? '. No Kontrak: ' . $this->invoice_contract_number : '')
             ];
+
+            if ($this->invoice_contract_number) {
+                $siData['poNumber'] = $this->invoice_contract_number;
+            }
 
             if ($this->order->accurate_so_number) {
                 foreach ($siData['detailItem'] as &$i) {
@@ -441,6 +464,7 @@ class Show extends Component
                         'paid_at' => \Carbon\Carbon::parse($this->invoice_date),
                         'payment_payload' => [
                             'notes' => $this->invoice_notes,
+                            'contract_number' => $this->invoice_contract_number,
                         ],
                     ]);
 
@@ -451,7 +475,7 @@ class Show extends Component
                         'transDate' => \Carbon\Carbon::parse($this->invoice_date)->format('d/m/Y'),
                         'receiptAmount' => (float)$netReceiptAmount,
                         'chequeAmount' => (float)$netReceiptAmount,
-                        'description' => 'Pelunasan Faktur SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number) . '. ' . $this->invoice_notes,
+                        'description' => 'Pelunasan Faktur SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number) . ($this->invoice_contract_number ? '. No Kontrak: ' . $this->invoice_contract_number : '') . '. ' . $this->invoice_notes,
                         'detailInvoice' => [
                             [
                                 'invoiceNo' => $siResult['r']['number'],
@@ -504,6 +528,6 @@ class Show extends Component
             'paymentMethods' => PaymentMethod::where('is_active', true)
                 ->where('business_unit_id', $this->order->business_unit_id)
                 ->get()
-        ])->layout('layouts.admin');
+        ])->layout('layouts.z');
     }
 }

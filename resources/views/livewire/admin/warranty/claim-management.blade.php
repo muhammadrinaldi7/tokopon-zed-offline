@@ -128,7 +128,7 @@
 <!-- Modal Form Replacement Accurate -->
 @if ($showReplacementForm && $selectedClaimId)
     @php
-        $selectedClaim = $claims->firstWhere('id', $selectedClaimId);
+        $selectedClaim = $selectedClaimObj;
     @endphp
     @if ($selectedClaim)
         <div class="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -184,6 +184,137 @@
 
                     <!-- Form Input -->
                     <div class="space-y-4">
+                        <!-- Tipe Ganti Unit -->
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Pilih Jenis Penggantian <span class="text-amber-500">*</span></label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label class="cursor-pointer">
+                                    <input type="radio" wire:model.live="replacement_type" value="same" class="peer sr-only">
+                                    <div class="p-3 rounded-xl border-2 transition-all peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-800 border-gray-200 text-gray-500 hover:bg-gray-50 flex items-center gap-2">
+                                        <div class="w-4 h-4 rounded-full border-2 border-current flex items-center justify-center shrink-0">
+                                            <div class="w-2 h-2 rounded-full bg-current opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+                                        </div>
+                                        <span class="text-sm font-bold">Ganti Unit Sama (1:1)</span>
+                                    </div>
+                                </label>
+                                <label class="cursor-pointer">
+                                    <input type="radio" wire:model.live="replacement_type" value="different" class="peer sr-only">
+                                    <div class="p-3 rounded-xl border-2 transition-all peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-800 border-gray-200 text-gray-500 hover:bg-gray-50 flex items-center gap-2">
+                                        <div class="w-4 h-4 rounded-full border-2 border-current flex items-center justify-center shrink-0">
+                                            <div class="w-2 h-2 rounded-full bg-current opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+                                        </div>
+                                        <span class="text-sm font-bold">Unit Beda (Upgrade/Downgrade)</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Pilih Produk Pengganti (Jika Beda) -->
+                        @if($replacement_type === 'different')
+                        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
+                            @if(!$replacement_item_no)
+                            <div class="relative">
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Cari Produk Pengganti <span class="text-amber-500">*</span></label>
+                                <div class="absolute inset-y-0 left-0 pl-3 pt-6 flex items-center pointer-events-none">
+                                    <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </div>
+                                <input type="text" wire:model.live.debounce.300ms="search_product_query"
+                                    placeholder="Ketik nama produk pengganti..."
+                                    class="w-full bg-white border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-amber-500 focus:border-amber-500 transition-colors">
+                                
+                                @if(count($product_results) > 0)
+                                <div class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                    @foreach($product_results as $prod)
+                                    <button type="button" wire:click="selectReplacementProduct('{{ $prod['item_no'] }}', '{{ $prod['name'] }}', {{ $prod['base_price'] ?? 0 }})"
+                                        class="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-gray-100 last:border-0 flex justify-between items-center">
+                                        <div>
+                                            <div class="font-bold text-gray-800 text-sm line-clamp-1">{{ $prod['name'] }}</div>
+                                            <div class="text-xs text-gray-500 mt-0.5">SKU: {{ $prod['item_no'] }}</div>
+                                        </div>
+                                        <div class="text-amber-600 font-bold text-sm">
+                                            Rp {{ number_format($prod['base_price'] ?? 0, 0, ',', '.') }}
+                                        </div>
+                                    </button>
+                                    @endforeach
+                                </div>
+                                @elseif(strlen($search_product_query) > 2)
+                                <div class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4 text-center text-sm text-gray-500">
+                                    Produk tidak ditemukan.
+                                </div>
+                                @endif
+                            </div>
+                            @error('replacement_item_no')
+                                <div class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs font-medium">
+                                    Anda wajib memilih produk pengganti.
+                                </div>
+                            @enderror
+                            @else
+                            <!-- Produk Terpilih -->
+                            <div class="bg-white border-2 border-amber-200 rounded-xl p-4 shadow-sm relative">
+                                <button type="button" wire:click="cancelReplacementProduct" class="absolute top-2 right-2 text-gray-400 hover:text-rose-500 p-1 bg-gray-50 rounded-lg transition-colors">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                                <p class="text-[11px] text-gray-500 uppercase font-bold tracking-wider mb-1">Produk Pengganti Terpilih</p>
+                                <p class="font-bold text-gray-900 text-sm pr-6">{{ $replacement_product_name }}</p>
+                                
+                                @php
+                                    $oldPrice = (float)($original_price ?? 0);
+                                    $newPrice = (float)($replacement_price ?? 0);
+                                    $diff = $newPrice - $oldPrice;
+                                @endphp
+                                
+                                <div class="mt-3 flex gap-4 text-sm bg-amber-50 p-3 rounded-lg border border-amber-100 items-end">
+                                    <div class="flex-1">
+                                        <p class="text-[10px] uppercase font-bold text-amber-700 mb-1">Harga Lama (Nilai Retur Faktur)</p>
+                                        <div class="relative">
+                                            <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                                                <span class="text-sm text-amber-700 font-bold">Rp</span>
+                                            </div>
+                                            <input type="number" wire:model.live.debounce.300ms="original_price" class="w-full bg-white border border-amber-200 rounded-lg pl-8 pr-2 py-2 text-sm font-bold text-amber-900 focus:ring-amber-500 focus:border-amber-500 shadow-sm" title="Ubah jika nilai faktur Accurate berbeda (misal karena diskon/MDR)">
+                                        </div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-[10px] uppercase font-bold text-amber-700 mb-1">Harga Baru</p>
+                                        <div class="bg-white border border-amber-100 rounded-lg px-3 py-2">
+                                            <p class="font-bold text-amber-900 text-sm">Rp {{ number_format($newPrice, 0, ',', '.') }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="border-l-2 border-amber-200 pl-4 flex-1">
+                                        <p class="text-[10px] uppercase font-bold text-amber-700 mb-1">Selisih</p>
+                                        @if($diff > 0)
+                                            <p class="font-black text-rose-600 text-sm">+ Rp {{ number_format($diff, 0, ',', '.') }} <span class="text-[10px] font-normal block leading-tight">Pelanggan Kurang Bayar</span></p>
+                                        @elseif($diff < 0)
+                                            <p class="font-black text-emerald-600 text-sm">- Rp {{ number_format(abs($diff), 0, ',', '.') }} <span class="text-[10px] font-normal block leading-tight">Refund ke Pelanggan</span></p>
+                                        @else
+                                            <p class="font-black text-amber-900 text-sm">Rp 0</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Pilih Bank untuk Refund/Pembayaran -->
+                            <div class="mt-4">
+                                <label class="block text-sm font-bold text-gray-700 mb-1">
+                                    Pilih Bank / Kas Pembayaran <span class="text-amber-500">*</span>
+                                </label>
+                                <select wire:model="bank_no" class="w-full bg-white border-gray-300 rounded-xl p-3 text-sm focus:ring-amber-500 focus:border-amber-500 shadow-sm">
+                                    <option value="">-- Pilih Akun Bank/Kas Accurate --</option>
+                                    @foreach($banks as $bank)
+                                        <option value="{{ $bank->account_no }}">{{ $bank->name }} ({{ $bank->account_no }})</option>
+                                    @endforeach
+                                </select>
+                                @error('bank_no')
+                                    <div class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs font-medium">
+                                        Anda wajib memilih bank untuk proses pelunasan/refund.
+                                    </div>
+                                @enderror
+                            </div>
+                            @endif
+                        </div>
+                        @endif
+
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1">IMEI / Serial Number Baru
                                 <span class="text-amber-500">*</span></label>
@@ -204,11 +335,14 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <p class="text-xs text-blue-800 leading-relaxed">
-                                Pastikan IMEI baru telah disiapkan. Sistem akan menembak API <b>Sales Return</b>
-                                untuk menarik IMEI lama, lalu menembak <b>Sales Invoice</b> untuk mengeluarkan IMEI
-                                baru ke Accurate secara *realtime*.
-                            </p>
+                            <div class="text-xs text-blue-800 leading-relaxed">
+                                <p class="mb-1">Pastikan IMEI baru telah disiapkan. Sistem akan menembak secara *realtime*:</p>
+                                <ul class="list-disc pl-4 space-y-0.5">
+                                    <li><b>Sales Return</b> (menarik IMEI lama)</li>
+                                    <li><b>Sales Invoice</b> (mengeluarkan IMEI baru)</li>
+                                    <li><b>Sales Receipt</b> (menyelesaikan piutang/refund otomatis)</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
 
@@ -232,7 +366,7 @@
 <!-- Modal Form Service (Perbaikan Biasa) -->
 @if ($showServiceForm && $selectedClaimId)
     @php
-        $selectedClaim = $claims->firstWhere('id', $selectedClaimId);
+        $selectedClaim = $selectedClaimObj;
     @endphp
     @if ($selectedClaim)
         <div class="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -317,7 +451,7 @@
 <!-- Modal Form Tolak Klaim -->
 @if ($showRejectForm && $selectedClaimId)
     @php
-        $selectedClaim = $claims->firstWhere('id', $selectedClaimId);
+        $selectedClaim = $selectedClaimObj;
     @endphp
     @if ($selectedClaim)
         <div class="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -419,7 +553,7 @@
             </div>
 
             @php
-                $selectedClaim = $claims->firstWhere('id', $selectedClaimId);
+                $selectedClaim = $selectedClaimObj;
             @endphp
 
             @if ($selectedClaim)
@@ -619,6 +753,13 @@
                                         Selesai (Completed)
                                     </button>
                                 @endif
+
+                                @if ($selectedClaim->status === 'waiting_refund')
+                                    <button wire:click="openRefundForm"
+                                        class="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg text-sm transition-colors shadow-sm">
+                                        Proses Refund Tunai
+                                    </button>
+                                @endif
                             </div>
                         </div>
                     @else
@@ -713,4 +854,66 @@
         </div>
     </div>
 @endif
+
+    <!-- Modal Proses Refund -->
+    @if ($showRefundForm && $selectedClaimId)
+        @php
+            $selectedClaim = $selectedClaimObj;
+        @endphp
+        @if ($selectedClaim)
+            <div class="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"></div>
+                <div class="relative bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
+                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-yellow-50">
+                        <div>
+                            <h3 class="font-bold text-xl text-yellow-900">Proses Refund Tunai</h3>
+                            <p class="text-xs text-yellow-700 mt-0.5">Cairkan sisa saldo ke Kas/Bank</p>
+                        </div>
+                        <button wire:click="closeRefundForm"
+                            class="text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-100 rounded-full p-2 transition-colors shadow-sm">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="p-6 overflow-y-auto flex-1">
+                        <div class="bg-gray-50 rounded-xl p-4 mb-5 text-center border border-gray-200 shadow-inner">
+                            <p class="text-sm text-gray-500 mb-1">Nominal Refund (Kelebihan Bayar)</p>
+                            <p class="text-3xl font-black text-rose-600">Rp {{ number_format($selectedClaim->refund_amount ?? 0, 0, ',', '.') }}</p>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2" for="bank_no">
+                                    Sumber Kas/Bank (Uang Keluar) <span class="text-rose-500">*</span>
+                                </label>
+                                <select id="bank_no" wire:model="bank_no"
+                                    class="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 block p-3 transition-colors">
+                                    <option value="">-- Pilih Akun Bank / Kas (Sesuai Accurate) --</option>
+                                    @foreach (\App\Models\AccurateGlAccount::where('account_type', 'CASH_BANK')->get() as $account)
+                                        <option value="{{ $account->account_no }}">{{ $account->account_no }} - {{ $account->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('bank_no')
+                                    <p class="mt-1.5 text-xs text-rose-500 font-medium">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
+                        <button wire:click="closeRefundForm" type="button"
+                            class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors shadow-sm">
+                            Batal
+                        </button>
+                        <button wire:click="processRefundCash({{ $selectedClaimId }})" type="button"
+                            class="px-5 py-2.5 text-sm font-bold text-white bg-yellow-600 hover:bg-yellow-700 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2">
+                            Cairkan Uang Sekarang
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
+    @endif
 </div>

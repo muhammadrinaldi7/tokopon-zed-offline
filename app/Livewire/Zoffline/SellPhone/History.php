@@ -11,6 +11,21 @@ use Livewire\Attributes\Layout;
 #[Layout('layouts.z', ['title' => 'History Sell Phone'])]
 class History extends Component
 {
+    public $showReceiptModal = false;
+    public $selectedSell = null;
+
+    public function showReceipt(SellPhone $sellPhone)
+    {
+        $this->selectedSell = $sellPhone->load(['handledBy', 'user.profile', 'user.bankAccounts', 'businessUnit']);
+        $this->showReceiptModal = true;
+    }
+
+    public function closeReceipt()
+    {
+        $this->showReceiptModal = false;
+        $this->selectedSell = null;
+    }
+
     public function render()
     {
         $branch = Auth::user()->branch->id;

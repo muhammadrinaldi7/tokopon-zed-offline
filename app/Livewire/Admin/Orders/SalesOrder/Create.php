@@ -357,6 +357,6 @@ class Create extends Component
             'businessUnits' => BusinessUnit::all(),
             'warehouses' => $warehouses,
             'isGsk' => $isGsk,
-        ])->layout('layouts.admin');
+        ])->layout('layouts.z');
     }
 }

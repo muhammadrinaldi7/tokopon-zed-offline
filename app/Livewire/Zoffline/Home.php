@@ -82,6 +82,16 @@ class Home extends Component
     {
         return $this->redirectRoute('zoffline.pos', navigate: true);
     }
+    
+    public function navigateToSalesOrderCreate()
+    {
+        return $this->redirectRoute('admin.sales-orders.create', navigate: true);
+    }
+    
+    public function navigateToSalesOrderIndex()
+    {
+        return $this->redirectRoute('admin.sales-orders.index', navigate: true);
+    }
     public function render()
     {
         return view('livewire.zoffline.home');

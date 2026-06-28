@@ -79,11 +79,68 @@ new class extends Component {
                             Dashboard Admin
                         </a>
                     @endcan
-
+                    {{-- 
                     <a href="/profile" wire:navigate
                         class="block px-4 py-2 text-sm text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors">
                         Profil & Pengaturan
-                    </a>
+                    </a> --}}
+
+                    {{-- <div x-data="{ openSoModal: false }" class="">
+                        <div @click="openSoModal = true" class="transition-all duration-200 ease-out">
+                            <p
+                                class="block px-4 py-2 text-sm text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors ">
+                                Pre-Order(SO)</p>
+                        </div>
+                        <div x-show="openSoModal" style="display: none;"
+                            class="fixed inset-0 z-100 flex items-center justify-center px-4">
+
+                            <div class="absolute inset-0 bg-black/20" @click="openSoModal = false"></div>
+
+                            <div
+                                class="relative w-full max-w-md bg-white/70 backdrop-blur-2xl border border-white/60 shadow-2xl rounded-[2.5rem] p-6 text-center transform">
+
+                                <div class="w-12 h-1.5 bg-gray-400/40 rounded-full mx-auto mb-6"></div>
+
+                                <h3 class="text-xl font-bold text-gray-800 mb-2">Menu Pre-Order (SO)</h3>
+                                <p class="text-sm text-gray-600 mb-8">Pilih tindakan untuk Sales Order</p>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    <button wire:click="navigateToSalesOrderCreate" @click="openSoModal = false"
+                                        class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-3 group">
+                                        <div
+                                            class="w-12 h-12 rounded-xl bg-emerald-100/50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                                viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                                    d="M12 4v16m8-8H4" />
+                                            </svg>
+                                        </div>
+                                        <span class="block text-sm text-center leading-tight">Buat Pesanan <br> (SO)
+                                            Baru</span>
+                                    </button>
+
+                                    <button wire:click="navigateToSalesOrderIndex" @click="openSoModal = false"
+                                        class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-3 group">
+                                        <div
+                                            class="w-12 h-12 rounded-xl bg-blue-100/50 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                                viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                            </svg>
+                                        </div>
+                                        <span class="block text-sm text-center leading-tight">Daftar SO <br> &
+                                            Pelunasan</span>
+                                    </button>
+                                </div>
+
+                                <button @click="openSoModal = false"
+                                    class="mt-8 w-full py-3 text-red-500 font-semibold hover:bg-red-50/50 rounded-xl transition-colors">
+                                    Batal
+                                </button>
+                            </div>
+                        </div>
+                    </div> --}}
                     <a href="{{ route('zoffline.sell-phone-history') }}" wire:navigate
                         class="block px-4 py-2 text-sm text-gray-600 hover:text-[#4E44DB] hover:bg-blue-50 transition-colors">
                         History Sell Phone

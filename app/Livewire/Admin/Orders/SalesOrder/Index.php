@@ -27,6 +27,6 @@ class Index extends Component
 
         return view('livewire.admin.orders.sales-order.index', [
             'orders' => $orders
-        ])->layout('layouts.admin');
+        ])->layout('layouts.z');
     }
 }

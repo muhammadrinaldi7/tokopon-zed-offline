@@ -31,7 +31,7 @@
     </div>
     <div class="space-y-4">
         @forelse($sells as $item)
-            <a href="{{ route('sell-phone.show', $item) }}" wire:navigate
+            <div
                 class="block bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md hover:border-gray-200 transition">
                 <div class="flex flex-col md:flex-row justify-between md:items-center gap-4">
                     <div class="flex items-center gap-4">
@@ -87,7 +87,26 @@
                         @endif
                     </div>
                 </div>
-            </a>
+
+                <div class="mt-4 pt-4 border-t border-gray-100 flex justify-end gap-2">
+                    @if(in_array($item->status, ['PAYING', 'COMPLETED']))
+                        <button type="button" wire:click="showReceipt({{ $item->id }})"
+                            class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                            Cetak Struk Jaminan
+                        </button>
+                    @endif
+                    <a href="{{ route('sell-phone.show', $item) }}" wire:navigate
+                        class="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold hover:bg-emerald-100 transition flex items-center gap-1">
+                        Lihat Detail
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
         @empty
             <div
                 class="bg-white rounded-2xl p-10 shadow-sm border border-gray-100 text-center flex flex-col items-center justify-center">
@@ -101,4 +120,100 @@
         @endforelse
     </div>
 
+    {{-- Receipt Modal --}}
+    @if ($showReceiptModal && $selectedSell)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden relative">
+                <div class="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-black text-gray-900">Struk Tanda Terima</h3>
+                    <div class="flex items-center gap-4">
+                        <button onclick="window.print()"
+                            class="group relative text-blue-500 hover:text-blue-700 font-bold text-sm flex items-center gap-1">
+                            <svg class="w-6 h-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                        </button>
+                        <button wire:click="closeReceipt" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="receipt-content" class="p-5 font-mono text-xs leading-relaxed overflow-y-auto max-h-[70vh]">
+                    <div class="text-center mb-3">
+                        <p class="font-bold text-sm">{{ optional($selectedSell->businessUnit)->store_title ?? 'Z-POS STORE' }}</p>
+                        <p class="text-[10px] text-gray-500">{{ optional($selectedSell->businessUnit)->address ?? 'Toko' }}</p>
+                        <p class="text-[10px] text-gray-400">{{ $selectedSell->created_at->format('d/m/Y H:i') }}</p>
+                    </div>
+                    
+                    <div class="border-t border-dashed border-gray-300 my-2"></div>
+                    
+                    <p class="text-[10px] text-gray-500">No Transaksi : SPL-{{ $selectedSell->id }}</p>
+                    <p class="text-[10px] text-gray-500">Frontliner   : {{ optional($selectedSell->handledBy)->name ?? '-' }}</p>
+                    <p class="text-[10px] text-gray-500">Pelanggan    : {{ optional($selectedSell->user)->name ?? '-' }}</p>
+                    <p class="text-[10px] text-gray-500">No. HP       : {{ optional(optional($selectedSell->user)->profile)->phone_number ?? '-' }}</p>
+                    
+                    <div class="border-t border-dashed border-gray-300 my-2"></div>
+                    
+                    <div class="text-center font-bold mb-2">DATA PERANGKAT</div>
+                    
+                    <p class="text-[10px] text-gray-500">Merek/Model: {{ $selectedSell->phone_brand }} {{ $selectedSell->phone_model }}</p>
+                    <p class="text-[10px] text-gray-500">Kapasitas  : {{ $selectedSell->phone_ram ?? '-' }} / {{ $selectedSell->phone_storage ?? '-' }}</p>
+                    <p class="text-[10px] text-gray-500">IMEI/SN    : {{ $selectedSell->imei ?? '-' }}</p>
+                    
+                    <div class="border-t border-dashed border-gray-300 my-2"></div>
+                    
+                    <div class="flex justify-between font-bold text-xs">
+                        <span>NILAI KESEPAKATAN</span>
+                        <span>Rp {{ number_format($selectedSell->appraised_value, 0, ',', '.') }}</span>
+                    </div>
+                    <div class="flex justify-between text-[10px] mt-1">
+                        <span>STATUS TRANSAKSI</span>
+                        <span class="uppercase font-bold text-emerald-600">{{ str_replace('_', ' ', $selectedSell->status) }}</span>
+                    </div>
+                    
+                    <div class="border-t border-dashed border-gray-300 my-3"></div>
+                    
+                    <div class="text-center text-[9px] space-y-1 text-gray-500">
+                        <p class="font-bold text-[10px] text-gray-700 mb-1">** JAMINAN PENYERAHAN UNIT **</p>
+                        <p>Struk ini adalah bukti sah penyerahan perangkat ke toko.</p>
+                        <p>Pembayaran akan ditransfer ke rekening:</p>
+                        @if ($selectedSell->user && $selectedSell->user->bankAccounts->first())
+                            <p class="font-bold text-gray-700 mt-1">{{ $selectedSell->user->bankAccounts->first()->bank_name }} - {{ $selectedSell->user->bankAccounts->first()->account_number }}</p>
+                            <p class="font-bold text-gray-700">A/N: {{ $selectedSell->user->bankAccounts->first()->account_name }}</p>
+                        @else
+                            <p class="font-bold text-gray-700 mt-1">Rekening Belum Diinput</p>
+                        @endif
+                        <p class="mt-2">Simpan struk ini sampai dana berhasil masuk.</p>
+                        <p class="mt-1">Terima kasih telah menjual HP Anda di {{ optional($selectedSell->businessUnit)->store_title ?? 'Z-POS STORE' }}.</p>
+                    </div>
+                    
+                    <div class="border-t border-dashed border-gray-300 my-3"></div>
+                    <div class="text-center text-[10px] text-gray-400">*** TANDA TERIMA ***</div>
+                </div>
+
+                <style>
+                    @media print {
+                        body * {
+                            visibility: hidden;
+                        }
+                        #receipt-content, #receipt-content * {
+                            visibility: visible;
+                        }
+                        #receipt-content {
+                            position: absolute;
+                            left: 0;
+                            top: 0;
+                            width: 80mm;
+                            padding: 0;
+                            margin: 0;
+                            color: black;
+                        }
+                    }
+                </style>
+            </div>
+        </div>
+    @endif
 </div>

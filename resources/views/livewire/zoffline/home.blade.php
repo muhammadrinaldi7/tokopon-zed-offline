@@ -33,6 +33,73 @@
             </div>
         @endcan
 
+        {{-- Card: Sales Order (Pre-Order) --}}
+        @can('view-sales-order')
+            <div x-data="{ openSoModal: false }" class="md:nth-[3n+1]:col-span-2 w-full">
+                <div @click="openSoModal = true"
+                    class="w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+
+                    <div class="rounded-full w-20 h-20 bg-[#D1FAE5] flex items-center justify-center text-emerald-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-auto" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl ">Pre-Order <br> (SO)</h1>
+                        <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Pesan barang indent & catatan DP</p>
+                    </div>
+                </div>
+                <div x-show="openSoModal" style="display: none;"
+                    class="fixed inset-0 z-100 flex items-center justify-center px-4">
+
+                    <div class="absolute inset-0 bg-black/20" @click="openSoModal = false"></div>
+
+                    <div
+                        class="relative w-full max-w-md bg-white/70 backdrop-blur-2xl border border-white/60 shadow-2xl rounded-[2.5rem] p-6 text-center transform">
+
+                        <div class="w-12 h-1.5 bg-gray-400/40 rounded-full mx-auto mb-6"></div>
+
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">Menu Pre-Order (SO)</h3>
+                        <p class="text-sm text-gray-600 mb-8">Pilih tindakan untuk Sales Order</p>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <button wire:click="navigateToSalesOrderCreate" @click="openSoModal = false"
+                                class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-3 group">
+                                <div
+                                    class="w-12 h-12 rounded-xl bg-emerald-100/50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </div>
+                                <span class="block text-sm text-center leading-tight">Buat Pesanan <br> (SO) Baru</span>
+                            </button>
+
+                            <button wire:click="navigateToSalesOrderIndex" @click="openSoModal = false"
+                                class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-3 group">
+                                <div
+                                    class="w-12 h-12 rounded-xl bg-blue-100/50 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                </div>
+                                <span class="block text-sm text-center leading-tight">Daftar SO <br> & Pelunasan</span>
+                            </button>
+                        </div>
+
+                        <button @click="openSoModal = false"
+                            class="mt-8 w-full py-3 text-red-500 font-semibold hover:bg-red-50/50 rounded-xl transition-colors">
+                            Batal
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endcan
         @can('sell-phone')
             {{-- Card 3: Sell Phone (Jual HP) --}}
             <div wire:click="navigateToSellPhone" {{-- Ubah justify-end menjadi justify-between di sini --}}

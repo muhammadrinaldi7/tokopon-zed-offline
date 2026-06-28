@@ -1553,7 +1553,7 @@ class AccurateService
      * Memanggil API Accurate untuk Sales Return (menarik stok rusak) 
      * dan Sales Invoice (mengeluarkan stok baru).
      */
-    public function processWarrantyReplacement(\App\Models\WarrantyClaim $claim, $newImei)
+    public function processWarrantyReplacement(\App\Models\WarrantyClaim $claim, $newImei, $newItemNo = null, $newPrice = 0, $priceDifference = 0, $replacementType = 'same', $bankNo = null, $originalPriceFromUI = null)
     {
         $businessUnitCode = $claim->warranty->policy->businessUnit->code ?? 'syihab';
 
@@ -1575,11 +1575,20 @@ class AccurateService
             if (isset($variant->item_no)) {
                 $originalItemNo = $variant->item_no;
             }
-            // Jika dari SecondProductVariant atau ProductVariant (punya relasi ke productAccurate)
-            elseif ($variant->productAccurate) {
-                $originalItemNo = $variant->productAccurate->item_no;
+            // Jika dari SecondProductVariant atau ProductVariant (punya relasi ke accurateData)
+            elseif ($variant->accurateData) {
+                $originalItemNo = $variant->accurateData->item_no;
+            }
+            // Fallback: coba panggil accurateData() sebagai method
+            elseif (method_exists($variant, 'accurateData') && $variant->accurateData()->first()) {
+                $originalItemNo = $variant->accurateData()->first()->item_no;
             }
         }
+        
+        $targetItemNo = $newItemNo ?? $originalItemNo;
+        $originalPrice = $originalPriceFromUI ?? ($claim->warranty->orderItem->price_at_checkout ?? 0);
+        $targetPrice = $newPrice > 0 ? $newPrice : $originalPrice;
+        $chequeAmount = $priceDifference;
 
         // Ambil Nama Cabang berdasarkan User yang login
         $branchName = Auth::user()->branch->name ?? 'Cabang Utama';
@@ -1592,17 +1601,21 @@ class AccurateService
         // --- PROSES 1: SALES RETURN (MENARIK IMEI LAMA) ---
         Log::info("Mempersiapkan Sales Return ke Accurate untuk IMEI Lama: " . $claim->serial_number);
 
-        // Payload standar retur industri
+        // Payload standar retur industri (Terhubung ke faktur lama agar memotong piutang/jadi overpayment)
         $returnPayload = [
             'customerNo' => $customerNo,
-            'invoiceNumber' => $originalInvoiceNo, // <--- Relasi ke faktur lama
+            'invoiceNumber' => $originalInvoiceNo, // <--- Relasi ke faktur lama dihidupkan kembali
             'returnDate' => now()->format('d/m/Y'),
             'branchName' => $branchName,
+            'taxable' => false, // Nonaktifkan pajak agar nilai retur pas
+            'inclusiveTax' => false,
             'description' => "Retur Klaim Garansi Ganti Unit. Referensi Faktur: {$originalInvoiceNo}. SN Rusak: {$claim->serial_number}",
             'detailItem' => [
                 [
                     'itemNo' => $originalItemNo,
                     'quantity' => 1,
+                    'unitPrice' => $originalPrice, // WAJIB ADA agar menjadi deposit walau invoice tak ketemu
+                    'itemDiscount' => 0, // Hindari diskon bawaan
                     'warehouseName' => $warehouseReturnName,
                     'detailSerialNumber' => [
                         ['serialNumberNo' => $claim->serial_number, 'quantity' => 1]
@@ -1611,6 +1624,7 @@ class AccurateService
             ]
         ];
 
+        Log::info("Payload Sales Return:", $returnPayload);
         $this->postSalesReturn($returnPayload, $businessUnitCode);
 
         // --- PROSES 2: SALES INVOICE (MENGELUARKAN IMEI BARU) ---
@@ -1621,12 +1635,15 @@ class AccurateService
             'customerNo' => $customerNo,
             'transDate' => now()->format('d/m/Y'),
             'branchName' => $branchName,
+            'taxable' => false, // Nonaktifkan pajak agar piutang pas
+            'inclusiveTax' => false,
             'description' => "Penggantian Unit Klaim Garansi untuk Faktur: {$originalInvoiceNo}. SN Pengganti: {$newImei}",
             'detailItem' => [
                 [
-                    'itemNo' => $originalItemNo,
+                    'itemNo' => $targetItemNo,
                     'quantity' => 1,
-                    'unitPrice' => 0, // Harga 0 karena ini garansi
+                    'unitPrice' => $targetPrice, // Harga menggunakan harga asli/baru
+                    'itemDiscount' => 0, // Hindari diskon bawaan
                     'warehouseName' => $warehouseMainName,
                     'detailSerialNumber' => [
                         ['serialNumberNo' => $newImei, 'quantity' => 1]
@@ -1635,7 +1652,105 @@ class AccurateService
             ]
         ];
 
-        $this->postSalesInvoice($invoicePayload, $businessUnitCode);
+        Log::info("Payload Sales Invoice:", $invoicePayload);
+        $invoiceResponse = $this->postSalesInvoice($invoicePayload, $businessUnitCode);
+        $newInvoiceNo = $invoiceResponse['r']['number'] ?? null;
+        
+        if (!$newInvoiceNo) {
+            Log::warning("Gagal mendapatkan nomor invoice baru dari respon Accurate, otomatisasi pelunasan dilewati.");
+            return true;
+        }
+
+        // --- PROSES 3: SALES RECEIPT (SETTLEMENT / REFUND) ---
+        Log::info("Mempersiapkan Sales Receipt untuk pelunasan Invoice Baru: {$newInvoiceNo} menggunakan overpayment Invoice Lama: {$originalInvoiceNo}");
+        
+        $finalBankNo = $bankNo ?: '110101'; // Gunakan parameter bank, jika kosong fallback ke Kas default
+
+        // Logika Offsetting Piutang (Kelebihan bayar vs Tagihan baru)
+        if ($chequeAmount < 0) {
+            // Downgrade: Kita hanya menarik saldo dari faktur lama SEBESAR harga faktur baru
+            // Sisa overpayment akan tetap tertinggal di faktur lama
+            $oldInvoiceDeduction = -$targetPrice;
+            $actualCheque = 0;
+            $descSuffix = " (Sisa overpayment Rp " . number_format(abs($chequeAmount), 0, ',', '.') . " tertinggal di faktur lama)";
+        } else {
+            // Upgrade atau 1:1: Kita menarik SELURUH saldo faktur lama (originalPrice)
+            $oldInvoiceDeduction = -$originalPrice;
+            $actualCheque = $chequeAmount; // >0 jika upgrade, 0 jika 1:1
+            $descSuffix = "";
+        }
+
+        $receiptPayload = [
+            'customerNo' => $customerNo,
+            'bankNo' => $finalBankNo, 
+            'transDate' => now()->format('d/m/Y'),
+            'branchName' => $branchName,
+            'chequeAmount' => $actualCheque, 
+            'useCredit' => false, // Kita tidak pakai deposit terpisah, kita pakai sistem offset invoice
+            'description' => "Pelunasan Ganti Unit. Faktur Baru: {$newInvoiceNo}. Potong Faktur Lama: {$originalInvoiceNo}{$descSuffix}",
+            'detailInvoice' => [
+                [
+                    'invoiceNo' => $originalInvoiceNo,
+                    'paymentAmount' => $oldInvoiceDeduction // Tarik saldo minus dari faktur lama
+                ],
+                [
+                    'invoiceNo' => $newInvoiceNo,
+                    'paymentAmount' => $targetPrice // Bayar faktur baru
+                ]
+            ]
+        ];
+
+        Log::info("Payload Sales Receipt (Offsetting):", $receiptPayload);
+
+        try {
+            $this->postSalesReceipt($receiptPayload, $businessUnitCode);
+        } catch (\Exception $e) {
+            Log::error("Sales Receipt Gagal: " . $e->getMessage());
+            throw $e;
+        }
+
+        return true;
+    }
+
+    /**
+     * Memproses pencairan refund (uang keluar) untuk kasus Downgrade.
+     * Menggunakan Sales Receipt dengan nilai chequeAmount minus.
+     */
+    public function processDowngradeRefund(\App\Models\WarrantyClaim $claim, $bankNo, $refundAmount)
+    {
+        $businessUnitCode = $claim->warranty->policy->businessUnit->code ?? 'syihab';
+        
+        $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
+        $order = $claim->warranty->orderItem->order ?? null;
+        $originalInvoiceNo = $order->accurate_invoice_no ?? $order->order_number ?? 'INV-UNKNOWN';
+        
+        $branchName = 'GSK - Banjarbaru'; // Harusnya dari BusinessUnit, tapi sementara hardcode sesuai current logic
+        
+        // Payload Penerimaan Penjualan (Uang Keluar)
+        $receiptPayload = [
+            'customerNo' => $customerNo,
+            'bankNo' => $bankNo, 
+            'transDate' => now()->format('d/m/Y'),
+            'branchName' => $branchName,
+            'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
+            'useCredit' => false,
+            'description' => "Pencairan Tunai / Refund Sisa Kelebihan Bayar atas Downgrade Klaim Garansi untuk Faktur Lama: {$originalInvoiceNo}",
+            'detailInvoice' => [
+                [
+                    'invoiceNo' => $originalInvoiceNo,
+                    'paymentAmount' => -$refundAmount // Tarik dari sisa saldo faktur
+                ]
+            ]
+        ];
+
+        Log::info("Payload Pencairan Refund (Uang Keluar):", $receiptPayload);
+
+        try {
+            $this->postSalesReceipt($receiptPayload, $businessUnitCode);
+        } catch (\Exception $e) {
+            Log::error("Pencairan Refund Gagal: " . $e->getMessage());
+            throw $e;
+        }
 
         return true;
     }
