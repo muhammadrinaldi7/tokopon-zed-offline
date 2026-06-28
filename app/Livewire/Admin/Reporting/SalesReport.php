@@ -745,6 +745,24 @@ class SalesReport extends Component
                         // Penjualan Bersih = (Qty * Harga / 1.11) - diskon item - diskon promo
                         $penjualanBersih = round(($item->subtotal / 1.11) - ($item->discount_amount ?? 0) - $itemPromosTotal);
 
+                        // Resolve Vendor Names for multiple SNs
+                        $vendorNames = '-';
+                        if ($item->serial_number) {
+                            $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                            if (count($sns) > 1) {
+                                $vendors = \App\Models\ProductSerialNumber::with('vendor')
+                                    ->whereIn('serial_number', $sns)
+                                    ->get()
+                                    ->map(fn($sn) => $sn->vendor?->vendor_name ?? '-')
+                                    ->filter(fn($name) => $name !== '-')
+                                    ->unique()
+                                    ->implode(', ');
+                                $vendorNames = $vendors ?: '-';
+                            } else {
+                                $vendorNames = $item->serialNumber?->vendor?->vendor_name ?? '-';
+                            }
+                        }
+
                         $rowData = [
                             $order->created_at->format('Y-m-d H:i'),
                             $order->order_number,
@@ -761,7 +779,7 @@ class SalesReport extends Component
                             $variant?->color ?? '-',
                             ($variant?->ram ? $variant->ram . ' ' : '') . ($variant?->storage ? $variant->storage : '') ?? '-',
                             $item->serial_number ?? '-',
-                            $item->serialNumber?->vendor?->vendor_name ?? '-',
+                            $vendorNames,
                             str_replace(["\n", "\r", "\t"], ' ', $order->notes ?? ''),
                             $item->qty,
                             $item->price_at_checkout,
