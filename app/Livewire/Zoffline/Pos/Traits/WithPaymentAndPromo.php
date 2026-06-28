@@ -19,7 +19,6 @@ trait WithPaymentAndPromo
             'amount' => 0,
         ]
     ];
-    public $discount_amount = 0;
     public $notes = '';
     public $selectedPromos = []; // Menyimpan ID promo yang dipilih
 

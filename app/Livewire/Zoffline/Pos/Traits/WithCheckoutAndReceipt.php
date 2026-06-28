@@ -111,11 +111,19 @@ trait WithCheckoutAndReceipt
 
         try {
             $customerId = $this->resolveCustomerId();
-            if (!$customerId) return;
-
             if (!$customerId) {
                 $this->dispatch('toast', title: 'Error', message: 'Customer belum dipilih.', type: 'error');
                 return;
+            }
+
+            if (!empty($this->selectedPromos)) {
+                $handler = Auth::user();
+                $service = app(\App\Services\PromoCalculatorService::class);
+                $promoValid = $service->validatePromosBeforeCheckout($this->selectedPromos, $handler->branch_id ?? 0, $handler->getActiveBusinessUnitId());
+                if ($promoValid !== true) {
+                    $this->dispatch('toast', title: 'Promo Gagal', message: $promoValid, type: 'error');
+                    return;
+                }
             }
 
             $subtotal = $this->subtotal();
@@ -148,6 +156,7 @@ trait WithCheckoutAndReceipt
                         'sales_id' => count($this->selectedSales) > 0 ? $this->selectedSales[0]['id'] : null,
                         'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
                         'notes' => $this->notes,
+                        'branch_id' => Auth::user()->branch_id,
                     ]);
                 }
             }
@@ -221,6 +230,13 @@ trait WithCheckoutAndReceipt
 
             // Validasi Promo vs Metode Pembayaran
             if (!empty($this->selectedPromos)) {
+                $service = app(\App\Services\PromoCalculatorService::class);
+                $promoValid = $service->validatePromosBeforeCheckout($this->selectedPromos, $handler->branch_id ?? 0, $handler->getActiveBusinessUnitId());
+                if ($promoValid !== true) {
+                    $this->dispatch('toast', title: 'Promo Gagal', message: $promoValid, type: 'error');
+                    return;
+                }
+
                 $promos = \App\Models\Promo::with('paymentMethods')->whereIn('id', $this->selectedPromos)->get();
                 $usedPaymentMethodIds = collect($this->payments)->pluck('payment_method_id')->filter()->unique()->toArray();
 
@@ -642,6 +658,7 @@ trait WithCheckoutAndReceipt
                 }
             } catch (\Exception $e) {
                 Log::error('POS Accurate Integration Error: ' . $e->getMessage());
+                $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate gagal.', type: 'warning');
                 // Sengaja tidak me-rethrow exception agar transaksi POS lokal tetap dianggap berhasil
             }
 
@@ -870,7 +887,6 @@ trait WithCheckoutAndReceipt
         $this->loadedDraftId = null;
         $this->cart = [];
         $this->selectedSales = [];
-        $this->discount_amount = 0;
         $this->notes = '';
         $this->selectedCustomerId = null;
         $this->isNewCustomer = false;
@@ -902,10 +918,11 @@ trait WithCheckoutAndReceipt
     public function newTransaction()
     {
         $this->cart = [];
-        $this->discount_amount = 0;
         $this->notes = '';
         $this->payments = [
             [
+                'category' => '',
+                'bank_name' => '',
                 'payment_method_id' => '',
                 'payment_method_rate_id' => '',
                 'no_kontrak' => '',

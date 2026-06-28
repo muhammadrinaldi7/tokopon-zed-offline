@@ -195,6 +195,30 @@ class PromoCalculatorService
     }
 
     /**
+     * Re-validate promos right before checkout to prevent race conditions
+     * Returns true if all promos are still valid, or string error message otherwise.
+     */
+    public function validatePromosBeforeCheckout(array $selectedPromoIds, int $branchId, ?int $businessUnitId = null)
+    {
+        if (empty($selectedPromoIds)) return true;
+
+        $promos = Promo::whereIn('id', $selectedPromoIds)->get();
+
+        foreach ($promos as $promo) {
+            if (!$promo->is_active) return "Promo {$promo->name} sudah tidak aktif.";
+            if ($promo->start_date && $promo->start_date > now()) return "Promo {$promo->name} belum dimulai.";
+            if ($promo->end_date && $promo->end_date < now()) return "Promo {$promo->name} sudah berakhir.";
+            if ($promo->quota !== null && $promo->used_quota >= $promo->quota) return "Kuota promo {$promo->name} sudah habis.";
+            
+            if ($promo->business_unit_id !== null && $businessUnitId !== null && $promo->business_unit_id !== $businessUnitId) {
+                return "Promo {$promo->name} tidak berlaku di unit bisnis ini.";
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Record promos to order pivot table and increment used quota
      * Assumes applyPromosToCart was already called and cart has promo_discount
      */

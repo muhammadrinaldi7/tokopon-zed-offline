@@ -273,7 +273,6 @@ class Pos extends Component
         }
 
         // Restore manual discount
-        $this->discount_amount = (int) $order->discount_amount;
         $this->notes = $order->notes;
 
         $this->order_date = $order->order_date;
@@ -314,6 +313,9 @@ class Pos extends Component
 
         $this->loadedDraftId = $order->id;
         $this->isPiutangSettlement = true;
+        $this->paymentMode = null;
+        $this->paymentWizardStep = 1;
+        $this->activePaymentIndex = 0;
         $this->syncSinglePaymentAmount();
         $this->showPiutangModal = false;
         $this->dispatch('toast', title: 'Berhasil', message: 'Faktur Piutang berhasil dimuat.', type: 'success');
@@ -350,7 +352,6 @@ class Pos extends Component
         }
 
         // Restore manual discount
-        $this->discount_amount = (int) $order->discount_amount;
         $this->notes = $order->notes;
 
         $this->order_date = $order->order_date;
@@ -392,6 +393,9 @@ class Pos extends Component
 
         // Set the loaded draft ID so we can update it later
         $this->loadedDraftId = $order->id;
+        $this->paymentMode = null;
+        $this->paymentWizardStep = 1;
+        $this->activePaymentIndex = 0;
         $this->syncSinglePaymentAmount();
         $this->showDraftModal = false;
         $this->dispatch('toast', title: 'Berhasil', message: 'Draft berhasil dimuat.', type: 'success');
@@ -450,7 +454,7 @@ class Pos extends Component
     // Method untuk cetak ulang (reprint) dari riwayat
     public function reprintOrder($orderId)
     {
-        $this->completedOrder = Order::with(['items', 'user', 'paymentMethod', 'handledBy', 'salesBy'])->find($orderId);
+        $this->completedOrder = Order::with(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'salesBy'])->find($orderId);
         // dd($this->completedOrder);
         if ($this->completedOrder) {
             $this->showHistoryModal = false; // tutup modal history
@@ -494,10 +498,7 @@ class Pos extends Component
         $this->syncSinglePaymentAmount();
     }
 
-    public function updatedDiscountAmount()
-    {
-        $this->syncSinglePaymentAmount();
-    }
+
 
     public function updated($property, $value = null)
     {
