@@ -101,7 +101,6 @@ class PromoCalculatorService
         // 1. Reset all promo discounts in cart
         foreach ($cart as $key => $item) {
             $cart[$key]['promo_discount'] = 0;
-            $cart[$key]['applied_promo_id'] = null;
             $cart[$key]['promo_discounts'] = [];
         }
 
@@ -141,7 +140,6 @@ class PromoCalculatorService
                         $proportion = $eligibleMain['amount'] > 0 ? ($itemAmount / $eligibleMain['amount']) : 0;
                         $itemDiscount = round($mainDiscountValue * $proportion);
                         $cart[$key]['promo_discount'] += $itemDiscount;
-                        $cart[$key]['applied_promo_id'] = $promo->id;
                         $cart[$key]['promo_discounts'][$promo->id] = ($cart[$key]['promo_discounts'][$promo->id] ?? 0) + $itemDiscount;
                     }
                 }
@@ -184,7 +182,6 @@ class PromoCalculatorService
                             }
 
                             $cart[$key]['promo_discount'] += $itemDiscount;
-                            $cart[$key]['applied_promo_id'] = $promo->id;
                             $cart[$key]['promo_discounts'][$promo->id] = ($cart[$key]['promo_discounts'][$promo->id] ?? 0) + $itemDiscount;
                             
                             $totalQtyApplied += $qtyToDiscount;

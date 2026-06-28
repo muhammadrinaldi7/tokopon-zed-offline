@@ -110,66 +110,8 @@ trait WithCheckoutAndReceipt
         }
 
         try {
-            $customerId = $this->selectedCustomerId;
-
-            // Jika customer baru, buat user terlebih dahulu
-            if ($this->isNewCustomer && !$customerId) {
-                if (preg_match('/^0+$/', (string) $this->customerPhone)) {
-                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP tidak boleh hanya berisi angka 0.', type: 'error');
-                    return;
-                }
-
-                $emailToValidate = $this->customerEmail ?: ($this->customerPhone . rand(1000, 9999) . '@zpos.com');
-
-                $validator = \Illuminate\Support\Facades\Validator::make(
-                    [
-                        'customerName'  => $this->customerName,
-                        'customerPhone' => $this->customerPhone,
-                        'customerEmail' => $emailToValidate,
-                    ],
-                    [
-                        'customerName'  => 'required|string|max:255',
-                        'customerPhone' => 'required|string|max:20|unique:user_profiles,phone_number',
-                        'customerEmail' => 'nullable|email|unique:users,email',
-                    ]
-                );
-
-                if ($validator->fails()) {
-                    $errors = $validator->errors();
-                    $failedRules = $validator->failed();
-                    $firstErrorMessage = $errors->first();
-
-                    if (isset($failedRules['customerPhone']['Unique'])) {
-                        $existingProfile = \Illuminate\Support\Facades\DB::table('user_profiles')
-                            ->where('phone_number', $this->customerPhone)
-                            ->first();
-
-                        if ($existingProfile) {
-                            $namaCustomer = $existingProfile->full_name ?? 'Customer Lain';
-                            $firstErrorMessage = "Nomor HP sudah terdaftar atas nama: {$namaCustomer}. Silakan pilih customer dari daftar pencarian.";
-                        }
-                    }
-
-                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
-                    return;
-                }
-
-                $newUser = User::create([
-                    'name'     => $this->customerName,
-                    'email'    => $emailToValidate,
-                    'password' => bcrypt('tokopun' . rand(1000, 9999)),
-                ]);
-                $newUser->assignRole('user');
-
-                if ($this->customerPhone) {
-                    $newUser->profile()->create([
-                        'full_name'    => $this->customerName,
-                        'phone_number' => $this->customerPhone,
-                    ]);
-                }
-
-                $customerId = $newUser->id;
-            }
+            $customerId = $this->resolveCustomerId();
+            if (!$customerId) return;
 
             if (!$customerId) {
                 $this->dispatch('toast', title: 'Error', message: 'Customer belum dipilih.', type: 'error');
@@ -191,31 +133,7 @@ trait WithCheckoutAndReceipt
             if ($this->loadedDraftId) {
                 $order = Order::find($this->loadedDraftId);
                 if ($order) {
-                    // Kembalikan stock dari item draft lama dulu sebelum diisi yang baru
-                    foreach ($order->items as $oldItem) {
-                        $warehouseStock = \App\Models\WarehouseStock::where([
-                            'warehouse_id' => Auth::user()->warehouse_id,
-                            'variant_id' => $oldItem->product_variant_id,
-                            'variant_type' => $oldItem->product_variant_type,
-                        ])->first();
-                        if ($warehouseStock) {
-                            $warehouseStock->update([
-                                'stock' => $warehouseStock->stock + (int)$oldItem->qty
-                            ]);
-                        }
-
-                        // Kembalikan status SN lama menjadi Available
-                        if (!empty($oldItem->serial_number)) {
-                            $oldSns = explode(',', $oldItem->serial_number);
-                            $cleanOldSns = array_values(array_filter(array_map('trim', $oldSns)));
-                            if (!empty($cleanOldSns)) {
-                                \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanOldSns)
-                                    ->update(['status' => 'Available']);
-                            }
-                        }
-                    }
-                    $order->items()->delete();
-                    $order->promos()->detach();
+                    $this->restoreStockFromOldItems($order);
 
                     $order->update([
                         'user_id' => $customerId,
@@ -276,78 +194,7 @@ trait WithCheckoutAndReceipt
                 $service->recordPromosToOrder($order, $this->cart, $this->selectedPromos);
             }
 
-            // Create Order Items + reduce stock (Kunci Stock Opsi B)
-            foreach ($this->cart as $item) {
-                $rawSns = $item['serial_numbers'] ?? [];
-                $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
-
-                // Update status SN menjadi Unavailable
-                if (!empty($cleanSns)) {
-                    \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanSns)
-                        ->update(['status' => 'Unavailable']);
-                }
-
-                $orderItem = OrderItem::create([
-                    'order_id' => $order->id,
-                    'product_variant_id' => $item['variant_id'],
-                    'product_variant_type' => $item['variant_type'],
-                    'product_name' => $item['name'] ?? 'Unknown Product',
-                    'qty' => $item['qty'],
-                    'price_at_checkout' => $item['price'],
-                    'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => (int) ($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1),
-                    'promo_discount_amount' => (int) ($item['promo_discount'] ?? 0),
-                    'applied_promo_id' => $item['applied_promo_id'] ?? null,
-                    'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
-                ]);
-
-                // Attach ke order_item_promos pivot
-                $vendorNameFallback = clone $orderItem;
-                $vendorNameFallback = $vendorNameFallback->vendor_name;
-
-                foreach ($item['promo_discounts'] ?? [] as $promoId => $discAmount) {
-                    if ($discAmount > 0) {
-                        if (!empty($cleanSns)) {
-                            // Jika ada SN, bagi diskon sebanyak jumlah SN
-                            $discountPerSn = round($discAmount / max(1, count($cleanSns)));
-
-                            foreach ($cleanSns as $sn) {
-                                // Cari nama vendor asli dari tabel ProductSerialNumber
-                                $snModel = \App\Models\ProductSerialNumber::with('vendor')->where('serial_number', $sn)->first();
-                                $actualVendorName = $snModel?->vendor?->vendor_name ?? $vendorNameFallback;
-
-                                $orderItem->promos()->attach($promoId, [
-                                    'discount_amount' => $discountPerSn,
-                                    'serial_number' => $sn,
-                                    'vendor_name' => $actualVendorName,
-                                ]);
-                            }
-                        } else {
-                            // Jika tidak ada SN, simpan 1 row seperti biasa
-                            $orderItem->promos()->attach($promoId, [
-                                'discount_amount' => $discAmount,
-                                'serial_number' => '',
-                                'vendor_name' => $vendorNameFallback,
-                            ]);
-                        }
-                    }
-                }
-
-                // Reduce stock locally
-                $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
-                    [
-                        'warehouse_id' => Auth::user()->warehouse_id,
-                        'variant_id' => $item['variant_id'],
-                        'variant_type' => $item['variant_type'],
-                    ],
-                    [
-                        'stock' => 0
-                    ]
-                );
-                $warehouseStock->update([
-                    'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
-                ]);
-            }
+            $this->createOrderItemsFromCart($order);
 
             \Illuminate\Support\Facades\DB::commit();
 
@@ -369,87 +216,8 @@ trait WithCheckoutAndReceipt
         }
 
         try {
-            $customerId = $this->selectedCustomerId;
-
-            // Jika customer baru, buat user terlebih dahulu
-            if ($this->isNewCustomer && !$customerId) {
-
-                // 1. Cek jika input HANYA berisi angka 0
-                if (preg_match('/^0+$/', (string) $this->customerPhone)) {
-                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP tidak boleh hanya berisi angka 0.', type: 'error');
-                    return; // Hentikan proses di sini
-                }
-
-                // Tentukan email yang akan digunakan
-                $emailToValidate = $this->customerEmail ?: ($this->customerPhone . rand(1000, 9999) . '@zpos.com');
-
-                // 2. Terapkan Validasi menggunakan Validator Facade
-                $validator = \Illuminate\Support\Facades\Validator::make(
-                    [
-                        'customerName'  => $this->customerName,
-                        'customerPhone' => $this->customerPhone,
-                        'customerEmail' => $emailToValidate,
-                    ],
-                    [
-                        'customerName'  => 'required|string|max:255',
-                        // Tambahkan rule unique langsung di sini
-                        'customerPhone' => 'required|string|max:20|unique:user_profiles,phone_number',
-                        'customerEmail' => 'nullable|email|unique:users,email',
-                    ],
-                    [
-                        'customerName.required'  => 'Nama customer wajib diisi.',
-                        'customerPhone.required' => 'Nomor HP customer wajib diisi.',
-                        'customerPhone.unique'   => 'Nomor HP ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
-                        'customerEmail.email'    => 'Format email tidak valid.',
-                        'customerEmail.unique'   => 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
-                    ]
-                );
-
-                // JIKA VALIDASI GAGAL
-                if ($validator->fails()) {
-                    $errors = $validator->errors();
-                    $failedRules = $validator->failed();
-                    $firstErrorMessage = $errors->first();
-
-                    // Cek spesifik jika validasi gagal karena nomor HP sudah terdaftar (Rule 'Unique')
-                    if (isset($failedRules['customerPhone']['Unique'])) {
-                        // Lakukan query ke database untuk mengambil nama dari user_profiles
-                        $existingProfile = \Illuminate\Support\Facades\DB::table('user_profiles')
-                            ->where('phone_number', $this->customerPhone)
-                            ->first();
-
-                        if ($existingProfile) {
-                            $namaCustomer = $existingProfile->full_name ?? 'Customer Lain';
-                            $firstErrorMessage = "Nomor HP sudah terdaftar atas nama: {$namaCustomer}. Silakan pilih customer dari daftar pencarian.";
-                        }
-                    }
-
-                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
-                    return; // Hentikan proses pembayaran di sini
-                }
-
-                // 3. Jika validasi aman, barulah proses ke database
-                $newUser = User::create([
-                    'name'     => $this->customerName,
-                    'email'    => $emailToValidate,
-                    'password' => bcrypt('tokopun' . rand(1000, 9999)),
-                ]);
-                $newUser->assignRole('user');
-
-                if ($this->customerPhone) {
-                    $newUser->profile()->create([
-                        'full_name'    => $this->customerName,
-                        'phone_number' => $this->customerPhone,
-                    ]);
-                }
-
-                $customerId = $newUser->id;
-            }
-
-            if (!$customerId) {
-                $this->dispatch('toast', title: 'Error', message: 'Customer belum dipilih.', type: 'error');
-                return;
-            }
+            $customerId = $this->resolveCustomerId();
+            if (!$customerId) return;
 
             // Validasi Promo vs Metode Pembayaran
             if (!empty($this->selectedPromos)) {
@@ -611,31 +379,7 @@ trait WithCheckoutAndReceipt
             if ($this->loadedDraftId) {
                 $order = Order::find($this->loadedDraftId);
                 if ($order) {
-                    // Kembalikan stock dari item draft yang lama
-                    foreach ($order->items as $oldItem) {
-                        $warehouseStock = \App\Models\WarehouseStock::where([
-                            'warehouse_id' => Auth::user()->warehouse_id,
-                            'variant_id' => $oldItem->product_variant_id,
-                            'variant_type' => $oldItem->product_variant_type,
-                        ])->first();
-                        if ($warehouseStock) {
-                            $warehouseStock->update([
-                                'stock' => $warehouseStock->stock + (int)$oldItem->qty
-                            ]);
-                        }
-
-                        // Kembalikan status SN lama menjadi Available
-                        if (!empty($oldItem->serial_number)) {
-                            $oldSns = explode(',', $oldItem->serial_number);
-                            $cleanOldSns = array_values(array_filter(array_map('trim', $oldSns)));
-                            if (!empty($cleanOldSns)) {
-                                \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanOldSns)
-                                    ->update(['status' => 'Available']);
-                            }
-                        }
-                    }
-                    $order->items()->delete();
-                    $order->promos()->detach();
+                    $this->restoreStockFromOldItems($order);
                     $order->payments()->delete(); // in case there are payments attached to draft
 
                     $order->update([
@@ -700,82 +444,7 @@ trait WithCheckoutAndReceipt
             }
 
 
-            // Create Order Items + reduce stock
-            foreach ($this->cart as $item) {
-                // 1. Murni hanya mengambil dari array 'serial_numbers'
-                $rawSns = $item['serial_numbers'] ?? [];
-
-                // 2. Bersihkan spasi berlebih dan buang array yang kosong
-                $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
-
-                // Update status SN menjadi Unavailable
-                if (!empty($cleanSns)) {
-                    \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanSns)
-                        ->update(['status' => 'Unavailable']);
-                }
-
-                $orderItem = OrderItem::create([
-                    'order_id' => $order->id,
-                    'product_variant_id' => $item['variant_id'],
-                    'product_variant_type' => $item['variant_type'],
-                    'product_name' => $item['name'] ?? 'Unknown Product',
-                    'qty' => $item['qty'],
-                    'price_at_checkout' => $item['price'],
-                    'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => (int) ($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1),
-                    'promo_discount_amount' => (int) ($item['promo_discount'] ?? 0),
-                    'applied_promo_id' => $item['applied_promo_id'] ?? null,
-                    // 3. Simpan ke database. Jika ada 2 SN, jadinya: "SN001, SN002"
-                    'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
-                ]);
-
-                // Attach ke order_item_promos pivot
-                $vendorNameFallback = clone $orderItem;
-                $vendorNameFallback = $vendorNameFallback->vendor_name;
-
-                foreach ($item['promo_discounts'] ?? [] as $promoId => $discAmount) {
-                    if ($discAmount > 0) {
-                        if (!empty($cleanSns)) {
-                            // Jika ada SN, bagi diskon sebanyak jumlah SN
-                            $discountPerSn = round($discAmount / max(1, count($cleanSns)));
-
-                            foreach ($cleanSns as $sn) {
-                                // Cari nama vendor asli dari tabel ProductSerialNumber
-                                $snModel = \App\Models\ProductSerialNumber::with('vendor')->where('serial_number', $sn)->first();
-                                $actualVendorName = $snModel?->vendor?->vendor_name ?? $vendorNameFallback;
-
-                                $orderItem->promos()->attach($promoId, [
-                                    'discount_amount' => $discountPerSn,
-                                    'serial_number' => $sn,
-                                    'vendor_name' => $actualVendorName,
-                                ]);
-                            }
-                        } else {
-                            // Jika tidak ada SN, simpan 1 row seperti biasa
-                            $orderItem->promos()->attach($promoId, [
-                                'discount_amount' => $discAmount,
-                                'serial_number' => '',
-                                'vendor_name' => $vendorNameFallback,
-                            ]);
-                        }
-                    }
-                }
-
-                // Reduce stock locally
-                $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
-                    [
-                        'warehouse_id' => Auth::user()->warehouse_id,
-                        'variant_id' => $item['variant_id'],
-                        'variant_type' => $item['variant_type'],
-                    ],
-                    [
-                        'stock' => 0
-                    ]
-                );
-                $warehouseStock->update([
-                    'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
-                ]);
-            }
+            $this->createOrderItemsFromCart($order);
 
             // Create OrderPayments (for each split payment row)
             foreach ($this->payments as $payment) {
@@ -1000,83 +669,8 @@ trait WithCheckoutAndReceipt
         }
 
         try {
-            $customerId = $this->selectedCustomerId;
-
-            // Jika customer baru, buat user terlebih dahulu
-            if ($this->isNewCustomer && !$customerId) {
-
-                // 1. Cek jika input HANYA berisi angka 0
-                if (preg_match('/^0+$/', (string) $this->customerPhone)) {
-                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP tidak boleh hanya berisi angka 0.', type: 'error');
-                    return; // Hentikan proses di sini
-                }
-
-                // Tentukan email yang akan digunakan
-                $emailToValidate = $this->customerEmail ?: ($this->customerPhone . rand(1000, 9999) . '@zpos.com');
-
-                // 2. Terapkan Validasi menggunakan Validator Facade
-                $validator = \Illuminate\Support\Facades\Validator::make(
-                    [
-                        'customerName'  => $this->customerName,
-                        'customerPhone' => $this->customerPhone,
-                        'customerEmail' => $emailToValidate,
-                    ],
-                    [
-                        'customerName'  => 'required|string|max:255',
-                        'customerPhone' => 'required|string|max:20|unique:user_profiles,phone_number',
-                        'customerEmail' => 'nullable|email|unique:users,email',
-                    ],
-                    [
-                        'customerName.required'  => 'Nama customer wajib diisi.',
-                        'customerPhone.required' => 'Nomor HP customer wajib diisi.',
-                        'customerPhone.unique'   => 'Nomor HP ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
-                        'customerEmail.email'    => 'Format email tidak valid.',
-                        'customerEmail.unique'   => 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
-                    ]
-                );
-
-                if ($validator->fails()) {
-                    $errors = $validator->errors();
-                    $failedRules = $validator->failed();
-                    $firstErrorMessage = $errors->first();
-
-                    if (isset($failedRules['customerPhone']['Unique'])) {
-                        $existingProfile = \Illuminate\Support\Facades\DB::table('user_profiles')
-                            ->where('phone_number', $this->customerPhone)
-                            ->first();
-
-                        if ($existingProfile) {
-                            $namaCustomer = $existingProfile->full_name ?? 'Customer Lain';
-                            $firstErrorMessage = "Nomor HP sudah terdaftar atas nama: {$namaCustomer}. Silakan pilih customer dari daftar pencarian.";
-                        }
-                    }
-
-                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
-                    return;
-                }
-
-                // 3. Jika validasi aman, barulah proses ke database
-                $newUser = User::create([
-                    'name'     => $this->customerName,
-                    'email'    => $emailToValidate,
-                    'password' => bcrypt('tokopun' . rand(1000, 9999)),
-                ]);
-                $newUser->assignRole('user');
-
-                if ($this->customerPhone) {
-                    $newUser->profile()->create([
-                        'full_name'    => $this->customerName,
-                        'phone_number' => $this->customerPhone,
-                    ]);
-                }
-
-                $customerId = $newUser->id;
-            }
-
-            if (!$customerId) {
-                $this->dispatch('toast', title: 'Error', message: 'Customer belum dipilih.', type: 'error');
-                return;
-            }
+            $customerId = $this->resolveCustomerId();
+            if (!$customerId) return;
 
             $subtotal = $this->subtotal();
             $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1));
@@ -1094,29 +688,7 @@ trait WithCheckoutAndReceipt
             if ($this->loadedDraftId) {
                 $order = Order::find($this->loadedDraftId);
                 if ($order) {
-                    foreach ($order->items as $oldItem) {
-                        $warehouseStock = \App\Models\WarehouseStock::where([
-                            'warehouse_id' => Auth::user()->warehouse_id,
-                            'variant_id' => $oldItem->product_variant_id,
-                            'variant_type' => $oldItem->product_variant_type,
-                        ])->first();
-                        if ($warehouseStock) {
-                            $warehouseStock->update([
-                                'stock' => $warehouseStock->stock + (int)$oldItem->qty
-                            ]);
-                        }
-
-                        if (!empty($oldItem->serial_number)) {
-                            $oldSns = explode(',', $oldItem->serial_number);
-                            $cleanOldSns = array_values(array_filter(array_map('trim', $oldSns)));
-                            if (!empty($cleanOldSns)) {
-                                \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanOldSns)
-                                    ->update(['status' => 'Available']);
-                            }
-                        }
-                    }
-                    $order->items()->delete();
-                    $order->promos()->detach();
+                    $this->restoreStockFromOldItems($order);
                     $order->payments()->delete();
 
                     $order->update([
@@ -1182,75 +754,7 @@ trait WithCheckoutAndReceipt
                 $service->recordPromosToOrder($order, $this->cart, $this->selectedPromos);
             }
 
-            foreach ($this->cart as $item) {
-                $rawSns = $item['serial_numbers'] ?? [];
-                $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
-
-                if (!empty($cleanSns)) {
-                    \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanSns)
-                        ->update(['status' => 'Unavailable']);
-                }
-
-                $orderItem = OrderItem::create([
-                    'order_id' => $order->id,
-                    'product_variant_id' => $item['variant_id'],
-                    'product_variant_type' => $item['variant_type'],
-                    'product_name' => $item['name'] ?? 'Unknown Product',
-                    'qty' => $item['qty'],
-                    'price_at_checkout' => $item['price'],
-                    'subtotal' => $item['price'] * $item['qty'],
-                    'discount_amount' => (int) ($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1),
-                    'promo_discount_amount' => (int) ($item['promo_discount'] ?? 0),
-                    'applied_promo_id' => $item['applied_promo_id'] ?? null,
-                    'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
-                ]);
-
-                // Attach ke order_item_promos pivot
-                $vendorNameFallback = clone $orderItem;
-                $vendorNameFallback = $vendorNameFallback->vendor_name;
-
-                foreach ($item['promo_discounts'] ?? [] as $promoId => $discAmount) {
-                    if ($discAmount > 0) {
-                        if (!empty($cleanSns)) {
-                            // Jika ada SN, bagi diskon sebanyak jumlah SN
-                            $discountPerSn = round($discAmount / max(1, count($cleanSns)));
-
-                            foreach ($cleanSns as $sn) {
-                                // Cari nama vendor asli dari tabel ProductSerialNumber
-                                $snModel = \App\Models\ProductSerialNumber::with('vendor')->where('serial_number', $sn)->first();
-                                $actualVendorName = $snModel?->vendor?->vendor_name ?? $vendorNameFallback;
-
-                                $orderItem->promos()->attach($promoId, [
-                                    'discount_amount' => $discountPerSn,
-                                    'serial_number' => $sn,
-                                    'vendor_name' => $actualVendorName,
-                                ]);
-                            }
-                        } else {
-                            // Jika tidak ada SN, simpan 1 row seperti biasa
-                            $orderItem->promos()->attach($promoId, [
-                                'discount_amount' => $discAmount,
-                                'serial_number' => '',
-                                'vendor_name' => $vendorNameFallback,
-                            ]);
-                        }
-                    }
-                }
-
-                $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
-                    [
-                        'warehouse_id' => Auth::user()->warehouse_id,
-                        'variant_id' => $item['variant_id'],
-                        'variant_type' => $item['variant_type'],
-                    ],
-                    [
-                        'stock' => 0
-                    ]
-                );
-                $warehouseStock->update([
-                    'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
-                ]);
-            }
+            $this->createOrderItemsFromCart($order);
 
             \Illuminate\Support\Facades\DB::commit();
 
@@ -1816,5 +1320,195 @@ trait WithCheckoutAndReceipt
     public function render()
     {
         return view('livewire.zoffline.pos.pos');
+    }
+
+    /**
+     * Resolve customer ID — find existing or create new.
+     * @return int|null Customer ID, or null if validation fails (toast dispatched)
+     */
+    private function resolveCustomerId(): ?int
+    {
+        if ($this->selectedCustomerId) {
+            return $this->selectedCustomerId;
+        }
+
+        if ($this->isNewCustomer) {
+            if (preg_match('/^0+$/', (string) $this->customerPhone)) {
+                $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP tidak boleh hanya berisi angka 0.', type: 'error');
+                return null;
+            }
+
+            $emailToValidate = $this->customerEmail ?: ($this->customerPhone . rand(1000, 9999) . '@zpos.com');
+
+            $validator = \Illuminate\Support\Facades\Validator::make(
+                [
+                    'customerName'  => $this->customerName,
+                    'customerPhone' => $this->customerPhone,
+                    'customerEmail' => $emailToValidate,
+                ],
+                [
+                    'customerName'  => 'required|string|max:255',
+                    'customerPhone' => 'required|string|max:20|unique:user_profiles,phone_number',
+                    'customerEmail' => 'nullable|email|unique:users,email',
+                ],
+                [
+                    'customerName.required'  => 'Nama customer wajib diisi.',
+                    'customerPhone.required' => 'Nomor HP customer wajib diisi.',
+                    'customerPhone.unique'   => 'Nomor HP ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                    'customerEmail.email'    => 'Format email tidak valid.',
+                    'customerEmail.unique'   => 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                ]
+            );
+
+            if ($validator->fails()) {
+                $errors = $validator->errors();
+                $failedRules = $validator->failed();
+                $firstErrorMessage = $errors->first();
+
+                if (isset($failedRules['customerPhone']['Unique'])) {
+                    $existingProfile = \Illuminate\Support\Facades\DB::table('user_profiles')
+                        ->where('phone_number', $this->customerPhone)
+                        ->first();
+
+                    if ($existingProfile) {
+                        $namaCustomer = $existingProfile->full_name ?? 'Customer Lain';
+                        $firstErrorMessage = "Nomor HP sudah terdaftar atas nama: {$namaCustomer}. Silakan pilih customer dari daftar pencarian.";
+                    }
+                }
+
+                $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
+                return null;
+            }
+
+            $newUser = User::create([
+                'name'     => $this->customerName,
+                'email'    => $emailToValidate,
+                'password' => bcrypt('tokopun' . rand(1000, 9999)),
+            ]);
+            $newUser->assignRole('user');
+
+            if ($this->customerPhone) {
+                $newUser->profile()->create([
+                    'full_name'    => $this->customerName,
+                    'phone_number' => $this->customerPhone,
+                ]);
+            }
+
+            return $newUser->id;
+        }
+
+        return null;
+    }
+
+    /**
+     * Restore stock and SN from old draft items.
+     */
+    private function restoreStockFromOldItems(Order $order): void
+    {
+        foreach ($order->items as $oldItem) {
+            $warehouseStock = \App\Models\WarehouseStock::where([
+                'warehouse_id' => Auth::user()->warehouse_id,
+                'variant_id' => $oldItem->product_variant_id,
+                'variant_type' => $oldItem->product_variant_type,
+            ])->first();
+
+            if ($warehouseStock) {
+                $warehouseStock->update([
+                    'stock' => $warehouseStock->stock + (int)$oldItem->qty
+                ]);
+            }
+
+            if (!empty($oldItem->serial_number)) {
+                $oldSns = array_values(array_filter(array_map('trim', explode(',', $oldItem->serial_number))));
+                if (!empty($oldSns)) {
+                    \App\Models\ProductSerialNumber::whereIn('serial_number', $oldSns)
+                        ->update(['status' => 'Available']);
+                }
+            }
+        }
+        $order->items()->delete();
+        $order->promos()->detach();
+    }
+
+    /**
+     * Create order items from cart, reduce stock, update SN status, and attach promos.
+     */
+    private function createOrderItemsFromCart(Order $order): void
+    {
+        foreach ($this->cart as $item) {
+            $rawSns = $item['serial_numbers'] ?? [];
+            $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
+
+            if (!empty($cleanSns)) {
+                \App\Models\ProductSerialNumber::whereIn('serial_number', $cleanSns)
+                    ->update(['status' => 'Unavailable']);
+            }
+
+            $orderItem = OrderItem::create([
+                'order_id' => $order->id,
+                'product_variant_id' => $item['variant_id'],
+                'product_variant_type' => $item['variant_type'],
+                'product_name' => $item['name'] ?? 'Unknown Product',
+                'qty' => $item['qty'],
+                'price_at_checkout' => $item['price'],
+                'subtotal' => $item['price'] * $item['qty'],
+                'discount_amount' => (int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1),
+                'promo_discount_amount' => (int)($item['promo_discount'] ?? 0),
+                'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
+            ]);
+
+            $this->attachPromoBreakdownToItem($orderItem, $item, $cleanSns);
+            $this->reduceWarehouseStock($item);
+        }
+    }
+
+    /**
+     * Attach promo discount breakdown per SN to order_item_promos pivot.
+     */
+    private function attachPromoBreakdownToItem(OrderItem $orderItem, array $item, array $cleanSns): void
+    {
+        $vendorNameFallback = (clone $orderItem)->vendor_name;
+
+        foreach ($item['promo_discounts'] ?? [] as $promoId => $discAmount) {
+            if ($discAmount <= 0) continue;
+
+            if (!empty($cleanSns)) {
+                $discountPerSn = round($discAmount / max(1, count($cleanSns)));
+                foreach ($cleanSns as $sn) {
+                    $snModel = \App\Models\ProductSerialNumber::with('vendor')->where('serial_number', $sn)->first();
+                    $actualVendorName = $snModel?->vendor?->vendor_name ?? $vendorNameFallback;
+
+                    $orderItem->promos()->attach($promoId, [
+                        'discount_amount' => $discountPerSn,
+                        'serial_number' => $sn,
+                        'vendor_name' => $actualVendorName,
+                    ]);
+                }
+            } else {
+                $orderItem->promos()->attach($promoId, [
+                    'discount_amount' => $discAmount,
+                    'serial_number' => '',
+                    'vendor_name' => $vendorNameFallback,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Reduce warehouse stock for a cart item.
+     */
+    private function reduceWarehouseStock(array $item): void
+    {
+        $warehouseStock = \App\Models\WarehouseStock::firstOrCreate(
+            [
+                'warehouse_id' => Auth::user()->warehouse_id,
+                'variant_id' => $item['variant_id'],
+                'variant_type' => $item['variant_type'],
+            ],
+            ['stock' => 0]
+        );
+        $warehouseStock->update([
+            'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
+        ]);
     }
 }

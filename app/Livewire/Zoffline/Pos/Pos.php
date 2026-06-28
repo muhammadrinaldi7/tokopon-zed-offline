@@ -103,7 +103,7 @@ class Pos extends Component
                 }
             }
         }
-        
+
         if ($this->currentStep == 2 || $this->currentStep == 3) {
             // Validasi Harga 0
             if ($this->hasZeroPriceItem) {
@@ -244,7 +244,8 @@ class Pos extends Component
 
     public function loadPiutang($orderId)
     {
-        $order = Order::with(['items.variant', 'user.profile', 'promos'])->find($orderId);
+        $order = Order::with(['items.variant', 'items.promos', 'user.profile', 'promos'])->find($orderId);
+
         if (!$order) {
             $this->dispatch('toast', title: 'Error', message: 'Faktur Piutang tidak ditemukan.', type: 'error');
             return;
@@ -286,6 +287,11 @@ class Pos extends Component
 
             $variant = $item->variant;
 
+            $promoDiscounts = [];
+            foreach ($item->promos as $promo) {
+                $promoDiscounts[$promo->id] = ($promoDiscounts[$promo->id] ?? 0) + $promo->pivot->discount_amount;
+            }
+
             $this->cart[] = [
                 'variant_id' => $item->product_variant_id,
                 'variant_type' => $item->product_variant_type,
@@ -302,6 +308,7 @@ class Pos extends Component
                 'serial_numbers' => $snArray,
                 'has_sn' => (bool) ($variant->has_sn ?? true),
                 'database_source' => $variant->database_source ?? 'syihab',
+                'promo_discounts' => $promoDiscounts,
             ];
         }
 
@@ -315,7 +322,7 @@ class Pos extends Component
 
     public function loadDraft($orderId)
     {
-        $order = Order::with(['items.variant', 'user.profile', 'promos'])->find($orderId);
+        $order = Order::with(['items.variant', 'items.promos', 'user.profile', 'promos'])->find($orderId);
         if (!$order) {
             $this->dispatch('toast', title: 'Error', message: 'Draft tidak ditemukan.', type: 'error');
             return;
@@ -347,6 +354,7 @@ class Pos extends Component
         $this->notes = $order->notes;
 
         $this->order_date = $order->order_date;
+
         // Restore promos
         $this->selectedPromos = $order->promos->pluck('id')->toArray();
 
@@ -356,6 +364,11 @@ class Pos extends Component
             $snArray = array_values(array_filter(array_map('trim', explode(',', $item->serial_number))));
 
             $variant = $item->variant; // Instance dari ProductAccurate
+
+            $promoDiscounts = [];
+            foreach ($item->promos as $promo) {
+                $promoDiscounts[$promo->id] = ($promoDiscounts[$promo->id] ?? 0) + $promo->pivot->discount_amount;
+            }
 
             $this->cart[] = [
                 'variant_id' => $item->product_variant_id,
@@ -367,12 +380,13 @@ class Pos extends Component
                 'color' => '-',
                 'price' => (int) $item->price_at_checkout,
                 'qty' => $item->qty,
-                'discount_amount' => (int) $item->discount_amount,
+                'discount_amount' => (int) ($item->discount_amount / max(1, $item->qty)),
                 'promo_discount' => (int) $item->promo_discount_amount,
                 'applied_promo_id' => $item->applied_promo_id,
                 'serial_numbers' => $snArray,
                 'has_sn' => (bool) ($variant->has_sn ?? true),
                 'database_source' => $variant->database_source ?? 'syihab',
+                'promo_discounts' => $promoDiscounts,
             ];
         }
 
@@ -661,6 +675,12 @@ class Pos extends Component
         // Check if previously selected promos are still eligible
         $eligibleIds = $eligiblePromos->pluck('id')->toArray();
         $needsUpdate = false;
+        
+        // Pastikan format awalnya adalah array
+        if (!is_array($this->selectedPromos)) {
+            $this->selectedPromos = $this->selectedPromos ? [$this->selectedPromos] : [];
+        }
+
         foreach ($this->selectedPromos as $id) {
             if (!in_array($id, $eligibleIds)) {
                 $this->selectedPromos = array_diff($this->selectedPromos, [$id]);
@@ -669,6 +689,11 @@ class Pos extends Component
         }
 
         if ($needsUpdate) {
+            // SANGAT PENTING: array_diff merusak urutan index (menjadi assosiatif).
+            // Kita harus mengembalikannya menjadi array berurutan (sequential)
+            // agar Livewire (JavaScript) membacanya sebagai Array [] bukan Object {},
+            // karena Object akan membuat checkbox multi-select nge-bug (uncheck all).
+            $this->selectedPromos = array_values($this->selectedPromos);
             $this->applyPromosToCart();
         }
 
@@ -704,9 +729,9 @@ class Pos extends Component
             })
             ->where(function ($q) use ($userBranchId) {
                 $q->whereDoesntHave('branches')
-                  ->orWhereHas('branches', function ($bq) use ($userBranchId) {
-                      $bq->where('branches.id', $userBranchId);
-                  });
+                    ->orWhereHas('branches', function ($bq) use ($userBranchId) {
+                        $bq->where('branches.id', $userBranchId);
+                    });
             })
             ->whereHas('bundleSkus', function ($q) use ($cartSkus) {
                 $q->whereIn('sku', $cartSkus);
@@ -738,6 +763,11 @@ class Pos extends Component
 
     public function applyPromosToCart()
     {
+        // Pastikan variabel selalu berupa array untuk mencegah TypeError dari Livewire binding
+        if (!is_array($this->selectedPromos)) {
+            $this->selectedPromos = $this->selectedPromos ? [$this->selectedPromos] : [];
+        }
+
         $service = app(\App\Services\PromoCalculatorService::class);
         $success = $service->applyPromosToCart($this->cart, $this->selectedPromos);
 
