@@ -17,6 +17,11 @@ class ProductAccurate extends Model
         'business_unit_id' => 'integer',
     ];
 
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'product_id', 'id');
+    }
+
     public function productVariants()
     {
         return $this->hasMany(ProductVariant::class, 'product_accurate_id', 'id');

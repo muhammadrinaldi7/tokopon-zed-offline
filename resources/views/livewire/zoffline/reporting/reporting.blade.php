@@ -88,5 +88,18 @@
                 <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Kinerja penjualan per Staff/Sales</p>
             </div>
         </div>
+
+        <div wire:click="navigateToIncomeStatement"
+            class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+            <div class="rounded-full w-16 h-16 bg-indigo-50 flex items-center justify-center text-indigo-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Report Laba rugi</h2>
+                <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Ringkasan laba kotor</p>
+            </div>
+        </div>
     </div>
 </div>

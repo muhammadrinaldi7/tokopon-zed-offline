@@ -43,6 +43,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/stock', \App\Livewire\Zoffline\Reporting\StockReport::class)->name('stock');
         Route::get('/laporan-stok', \App\Livewire\Zoffline\Reporting\LaporanStok::class)->name('laporan-stok');
         Route::get('/staff', \App\Livewire\Zoffline\Reporting\StaffReport::class)->name('staff');
+        Route::get('/laba-rugi', \App\Livewire\Zoffline\Reporting\IncomeStatement::class)->name('income-statement');
     });
 });
 

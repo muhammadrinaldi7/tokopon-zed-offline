@@ -38,6 +38,11 @@ class Reporting extends Component
         return $this->redirectRoute('reporting.staff', navigate: true);
     }
 
+    public function navigateToIncomeStatement()
+    {
+        return $this->redirectRoute('reporting.income-statement', navigate: true);
+    }
+
     public function render()
     {
         return view('livewire.zoffline.reporting.reporting');
