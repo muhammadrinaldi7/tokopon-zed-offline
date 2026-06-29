@@ -72,17 +72,23 @@ trait WithCart
         } else {
             // Langsung tambahkan ke keranjang (tanpa SN)
             $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
-            $warehouseStock = \App\Models\WarehouseStock::where([
-                'variant_id' => $product->id,
-                'variant_type' => \App\Models\ProductAccurate::class,
-                'warehouse_id' => $warehouseId
-            ])->first();
+            $isNonInventory = in_array(strtoupper($product->itemType ?? ''), ['SERVICE', 'NON_INVENTORY']);
 
-            $stock = $warehouseStock ? (int) $warehouseStock->stock : 0;
+            if ($isNonInventory) {
+                $stock = 9999;
+            } else {
+                $warehouseStock = \App\Models\WarehouseStock::where([
+                    'variant_id' => $product->id,
+                    'variant_type' => \App\Models\ProductAccurate::class,
+                    'warehouse_id' => $warehouseId
+                ])->first();
 
-            if ($stock <= 0) {
-                $this->dispatch('toast', title: 'Stok Kosong', message: "Stok untuk produk '{$product->name}' di gudang Anda saat ini habis (0).", type: 'error');
-                return;
+                $stock = $warehouseStock ? (int) $warehouseStock->stock : 0;
+
+                if ($stock <= 0) {
+                    $this->dispatch('toast', title: 'Stok Kosong', message: "Stok untuk produk '{$product->name}' di gudang Anda saat ini habis (0).", type: 'error');
+                    return;
+                }
             }
             $this->addScannedAccurateToCart($product, null, $stock);
         }
@@ -281,19 +287,25 @@ trait WithCart
                 return;
             }
 
-            // Ambil stock dari WarehouseStock (gudang aktif)
-            $warehouseStock = \App\Models\WarehouseStock::where([
-                'variant_id' => $productAccurate->id,
-                'variant_type' => \App\Models\ProductAccurate::class,
-                'warehouse_id' => $warehouseId
-            ])->first();
+            $isNonInventory = in_array(strtoupper($productAccurate->itemType ?? ''), ['SERVICE', 'NON_INVENTORY']);
 
-            $stock = $warehouseStock ? (int) $warehouseStock->stock : 0;
+            if ($isNonInventory) {
+                $stock = 9999;
+            } else {
+                // Ambil stock dari WarehouseStock (gudang aktif)
+                $warehouseStock = \App\Models\WarehouseStock::where([
+                    'variant_id' => $productAccurate->id,
+                    'variant_type' => \App\Models\ProductAccurate::class,
+                    'warehouse_id' => $warehouseId
+                ])->first();
 
-            if ($stock <= 0) {
-                $this->dispatch('toast', title: 'Stok Kosong', message: "Stok untuk produk '{$productAccurate->name}' di gudang Anda saat ini habis (0).", type: 'error');
-                $this->scanned_sn = '';
-                return;
+                $stock = $warehouseStock ? (int) $warehouseStock->stock : 0;
+
+                if ($stock <= 0) {
+                    $this->dispatch('toast', title: 'Stok Kosong', message: "Stok untuk produk '{$productAccurate->name}' di gudang Anda saat ini habis (0).", type: 'error');
+                    $this->scanned_sn = '';
+                    return;
+                }
             }
 
             $this->addScannedAccurateToCart($productAccurate, null, $stock);

@@ -95,6 +95,7 @@ class ProductAccurateManagement extends Component
                     'brandName' => $item['itemBrand']['name'] ?? null,
                     'id_category_accurate' => $item['itemCategory']['id'] ?? null,
                     'categoryName' => $item['itemCategory']['name'] ?? null,
+                    'itemType' => $item['itemType'] ?? null,
                     'raw_data'        => json_encode($item),
                     'created_at'      => now(),
                     'updated_at'      => now(),
@@ -104,7 +105,7 @@ class ProductAccurateManagement extends Component
                 ProductAccurate::upsert(
                     $importData,
                     ['accurate_id', 'database_source'],
-                    ['item_no', 'name', 'base_price', 'stock', 'has_sn', 'business_unit_id', 'id_brand_accurate', 'brandName', 'id_category_accurate', 'categoryName', 'raw_data', 'base_cost', 'updated_at']
+                    ['item_no', 'name', 'base_price', 'stock', 'has_sn', 'business_unit_id', 'id_brand_accurate', 'itemType', 'brandName', 'id_category_accurate', 'categoryName', 'raw_data', 'base_cost', 'updated_at']
                 );
 
                 // Sync harga ke ProductVariant / SecondProductVariant lokal
