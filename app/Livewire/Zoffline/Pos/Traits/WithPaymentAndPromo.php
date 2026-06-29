@@ -21,6 +21,7 @@ trait WithPaymentAndPromo
     ];
     public $notes = '';
     public $selectedPromos = []; // Menyimpan ID promo yang dipilih
+    public $searchPromo = ''; // Menyimpan keyword pencarian promo
 
     public $paymentMode = null; // 'tunai', 'non-tunai', 'split'
     public $paymentWizardStep = 1; // 1: Mode, 2: Method, 3: MDR & Nominal, 'split_dashboard'

@@ -53,7 +53,7 @@
         {{-- ADD-ON SECTION --}}
         <div class="bg-white rounded-3xl lg:col-span-2 shadow-sm border border-gray-100 p-6 flex flex-col h-120">
             <h3 class="font-black text-gray-800 text-lg mb-2 shrink-0">Add Ons</h3>
-            <p class="text-xs text-gray-500 mb-6 shrink-0">Tawarkan produk pelengkap ke pelanggan.</p>
+            <p class="text-xs text-gray-500 mb-2 shrink-0">Tawarkan produk pelengkap ke pelanggan.</p>
 
             <div class="relative mb-6 shrink-0">
                 <span class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -68,7 +68,7 @@
                     placeholder="Cari aksesoris atau produk lain...">
             </div>
 
-            <div class="flex-1 overflow-y-auto pr-2 no-scrollbar">
+            <div class="flex-1 overflow-y-auto  no-scrollbar">
                 <div class="grid grid-cols-2 md:grid-cols-3  gap-3">
                     @forelse($this->addonsResults as $product)
                         @php
@@ -89,7 +89,7 @@
                                 </div>
                             @endif
 
-                            <div class="w-7 h-7 rounded-xl overflow-hidden bg-gray-100 shrink-0 border border-gray-200">
+                            {{-- <div class="w-7 h-7 rounded-xl overflow-hidden bg-gray-100 shrink-0 border border-gray-200">
                                 <div class="w-full h-full flex items-center justify-center text-neutral-800">
                                     @php $productNameLower = strtolower($product->name); @endphp
                                     @if (str_contains($productNameLower, 'care'))
@@ -114,7 +114,7 @@
                                         </svg>
                                     @endif
                                 </div>
-                            </div>
+                            </div> --}}
                             <div class="flex-1 min-w-0">
                                 <h4 class="font-semibold text-xs text-gray-800 truncate group-hover:text-[#1c69d4]">
                                     {{ $product->name }}</h4>
@@ -125,7 +125,10 @@
                                     $applicablePromo = null;
                                     // Case 1: Check active promos (Promo is already eligible, see if this product is a bundle item)
                                     foreach ($this->activePromos as $promo) {
-                                        if ($promo->is_bundle && $promo->bundleSkus->contains('sku', $product->item_no)) {
+                                        if (
+                                            $promo->is_bundle &&
+                                            $promo->bundleSkus->contains('sku', $product->item_no)
+                                        ) {
                                             $applicablePromo = $promo;
                                             break;
                                         }
@@ -166,35 +169,59 @@
                                         }
 
                                         // Ensure the current add-on name is included based on the matched Case
-                                        if ($applicablePromo->is_bundle && $applicablePromo->bundleSkus->contains('sku', $product->item_no)) {
+                                        if (
+                                            $applicablePromo->is_bundle &&
+                                            $applicablePromo->bundleSkus->contains('sku', $product->item_no)
+                                        ) {
                                             $bundleItemNames[] = $product->name;
-                                        } else if (!$applicablePromo->apply_to_all_items && $applicablePromo->skus->contains('sku', $product->item_no)) {
+                                        } elseif (
+                                            !$applicablePromo->apply_to_all_items &&
+                                            $applicablePromo->skus->contains('sku', $product->item_no)
+                                        ) {
                                             $mainItemNames[] = $product->name;
                                         }
                                     }
 
-                                    $mainItemNamesStr = empty($mainItemNames) ? 'Item Utama' : implode(', ', array_unique($mainItemNames));
-                                    $bundleItemNamesStr = empty($bundleItemNames) ? 'Item Add-On' : implode(', ', array_unique($bundleItemNames));
+                                    $mainItemNamesStr = empty($mainItemNames)
+                                        ? 'Item Utama'
+                                        : implode(', ', array_unique($mainItemNames));
+                                    $bundleItemNamesStr = empty($bundleItemNames)
+                                        ? 'Item Add-On'
+                                        : implode(', ', array_unique($bundleItemNames));
                                 @endphp
                                 @if ($applicablePromo)
                                     <div class="mt-1.5 flex items-center gap-1.5">
-                                        <div class="inline-flex items-center gap-1 bg-green-50 text-green-700 text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-green-200" title="Ada promo terkait dengan produk ini">
-                                            <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path></svg>
-                                            Promo: {{ Str::limit($applicablePromo->name, 15) }}
+                                        <div class="inline-flex items-center gap-1 bg-green-50 text-green-700 text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-green-200 max-w-30"
+                                            title="Ada promo terkait dengan produk ini">
+                                            <svg class="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7">
+                                                </path>
+                                            </svg>
+                                            <span class="truncate">{{ Str::limit($applicablePromo->name, 15) }}</span>
                                         </div>
-                                        <button type="button" @click.stop="$dispatch('open-promo-info', {
+                                        <button type="button"
+                                            @click.stop="$dispatch('open-promo-info', {
                                             name: '{{ addslashes($applicablePromo->name) }}',
                                             mainItemName: '{{ addslashes($mainItemNamesStr) }}',
                                             bundleItemName: '{{ addslashes($bundleItemNamesStr) }}',
                                             discountType: '{{ $applicablePromo->discount_type }}',
-                                            discountValue: {{ (float)($applicablePromo->discount_value ?? 0) }},
-                                            maxDiscount: {{ (float)($applicablePromo->max_discount ?? 0) }},
+                                            discountValue: {{ (float) ($applicablePromo->discount_value ?? 0) }},
+                                            maxDiscount: {{ (float) ($applicablePromo->max_discount ?? 0) }},
                                             isBundle: {{ $applicablePromo->is_bundle ? 'true' : 'false' }},
                                             bundleDiscountType: '{{ $applicablePromo->bundle_discount_type }}',
-                                            bundleDiscountValue: {{ (float)($applicablePromo->bundle_discount_value ?? 0) }},
-                                            bundleMaxDiscount: {{ (float)($applicablePromo->bundle_max_discount ?? 0) }}
-                                        })" class="p-0.5 text-gray-400 hover:text-[#1c69d4] bg-white border border-gray-200 rounded-full shadow-sm hover:bg-blue-50 transition-colors" title="Lihat detail promo">
-                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                            bundleDiscountValue: {{ (float) ($applicablePromo->bundle_discount_value ?? 0) }},
+                                            bundleMaxDiscount: {{ (float) ($applicablePromo->bundle_max_discount ?? 0) }}
+                                        })"
+                                            class="absolute bottom-2 right-2 p-0.5 text-gray-400 hover:text-[#1c69d4] bg-white border border-gray-200 rounded-full shadow-sm hover:bg-blue-50 transition-colors"
+                                            title="Lihat detail promo">
+                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                                                </path>
+                                            </svg>
                                         </button>
                                     </div>
                                 @endif
@@ -217,9 +244,21 @@
         <div
             class="bg-white rounded-3xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] border border-gray-100 p-6 flex flex-col h-120">
             <h3 class="font-black text-gray-800 text-lg mb-2 shrink-0">Promo Tersedia</h3>
-            <p class="text-xs text-gray-500 mb-6 shrink-0">Pilih promo yang berlaku untuk keranjang Anda saat ini.</p>
+            <p class="text-xs text-gray-500 mb-2 shrink-0">Pilih promo yang berlaku untuk keranjang Anda saat ini.</p>
 
-            <div class="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            <div class="relative shrink-0 mb-4">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-4">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </span>
+                <input wire:model.live.debounce.300ms="searchPromo" type="text"
+                    class="w-full bg-gray-50/50 border border-gray-200 rounded-xl pl-12 pr-4 py-3 text-sm font-medium focus:border-[#1c69d4] focus:bg-white focus:ring-2 focus:ring-[#1c69d4]/20 shadow-sm transition-all"
+                    placeholder="Cari promo...">
+            </div>
+
+            <div class="space-y-3 flex-1 overflow-y-auto  no-scrollbar">
                 @forelse ($this->activePromos as $promo)
                     @php
                         $mainItemNames = [];
@@ -245,37 +284,26 @@
                             }
                         }
 
-                        $mainItemNamesStr = empty($mainItemNames) ? 'Item Utama' : implode(', ', array_unique($mainItemNames));
-                        $bundleItemNamesStr = empty($bundleItemNames) ? 'Item Bundling' : implode(', ', array_unique($bundleItemNames));
+                        $mainItemNamesStr = empty($mainItemNames)
+                            ? 'Item Utama'
+                            : implode(', ', array_unique($mainItemNames));
+                        $bundleItemNamesStr = empty($bundleItemNames)
+                            ? 'Item Bundling'
+                            : implode(', ', array_unique($bundleItemNames));
                     @endphp
                     <label wire:key="promo-{{ $promo->id }}"
-                        class="flex items-start gap-4 p-3 rounded-xl  {{ in_array($promo->id, $selectedPromos) ? 'border-[#1c69d4] border-2 bg-blue-50/50' : 'border-gray-100 border hover:border-blue-200 hover:bg-gray-50' }} cursor-pointer shadow-sm transition-all">
+                        class="relative flex items-start gap-4 p-3 rounded-xl  {{ in_array($promo->id, $selectedPromos) ? 'border-[#1c69d4] border-2 bg-blue-50/50' : 'border-gray-100 border hover:border-blue-200 hover:bg-gray-50' }} cursor-pointer shadow-sm transition-all">
                         <div class="mt-1">
                             <input type="checkbox" wire:model.live="selectedPromos" value="{{ $promo->id }}"
                                 class="w-5 h-5 text-[#1c69d4] border-gray-300 rounded focus:ring-[#1c69d4]">
                         </div>
-                        <div class="flex-1">
-                            <div class="flex items-center gap-1.5">
-                                <h4 class="font-semibold text-gray-800 text-xs">{{ $promo->name }}</h4>
-                                <button type="button" @click.prevent="$dispatch('open-promo-info', {
-                                    name: '{{ addslashes($promo->name) }}',
-                                    mainItemName: '{{ addslashes($mainItemNamesStr) }}',
-                                    bundleItemName: '{{ addslashes($bundleItemNamesStr) }}',
-                                    discountType: '{{ $promo->discount_type }}',
-                                    discountValue: {{ (float)($promo->discount_value ?? 0) }},
-                                    maxDiscount: {{ (float)($promo->max_discount ?? 0) }},
-                                    isBundle: {{ $promo->is_bundle ? 'true' : 'false' }},
-                                    bundleDiscountType: '{{ $promo->bundle_discount_type }}',
-                                    bundleDiscountValue: {{ (float)($promo->bundle_discount_value ?? 0) }},
-                                    bundleMaxDiscount: {{ (float)($promo->bundle_max_discount ?? 0) }}
-                                })" class="p-0.5 text-gray-400 hover:text-[#1c69d4] bg-white border border-gray-200 rounded-full shadow-sm hover:bg-blue-50 transition-colors" title="Lihat detail promo">
-                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                </button>
-                            </div>
+                        <div class="flex-1 pr-6 min-w-0">
+                            <h4 class="font-semibold text-gray-800 text-xs truncate" title="{{ $promo->name }}">
+                                {{ $promo->name }}</h4>
                             <p class="text-[10px] text-gray-500 mt-1 line-clamp-2">
                                 {{ $promo->description ?? 'Nikmati potongan harga spesial.' }}</p>
                         </div>
-                        <div class="text-right shrink-0">
+                        <div class="text-right shrink-0 pr-6">
                             @if ($promo->discount_type === 'fixed')
                                 <span class="block text-sm font-semibold text-rose-500">-Rp
                                     {{ number_format($promo->discount_value, 0, ',', '.') }}</span>
@@ -285,6 +313,26 @@
                             @endif
                             <span class="text-[10px] text-xs font-semibold text-gray-400 uppercase">Potongan</span>
                         </div>
+                        <button type="button"
+                            @click.prevent="$dispatch('open-promo-info', {
+                            name: '{{ addslashes($promo->name) }}',
+                            mainItemName: '{{ addslashes($mainItemNamesStr) }}',
+                            bundleItemName: '{{ addslashes($bundleItemNamesStr) }}',
+                            discountType: '{{ $promo->discount_type }}',
+                            discountValue: {{ (float) ($promo->discount_value ?? 0) }},
+                            maxDiscount: {{ (float) ($promo->max_discount ?? 0) }},
+                            isBundle: {{ $promo->is_bundle ? 'true' : 'false' }},
+                            bundleDiscountType: '{{ $promo->bundle_discount_type }}',
+                            bundleDiscountValue: {{ (float) ($promo->bundle_discount_value ?? 0) }},
+                            bundleMaxDiscount: {{ (float) ($promo->bundle_max_discount ?? 0) }}
+                        })"
+                            class="absolute top-2 right-2 p-0.5 text-gray-400 hover:text-[#1c69d4] bg-white border border-gray-200 rounded-full shadow-sm hover:bg-blue-50 transition-colors"
+                            title="Lihat detail promo">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </button>
                     </label>
                 @empty
                     <div class="text-center py-8">
@@ -311,8 +359,8 @@
             Kembali
         </button>
         <button wire:click="nextStep" wire:loading.attr="disabled" wire:target="nextStep"
-            @if($this->hasZeroPriceItem) disabled @endif
-            class="px-8 py-3.5 text-white font-black rounded-xl shadow-[0_8px_15px_-3px_rgba(28,105,212,0.3)] hover:shadow-[0_12px_20px_-3px_rgba(28,105,212,0.4)] hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-75 disabled:cursor-wait {{ $this->hasZeroPriceItem ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed shadow-none hover:shadow-none hover:-translate-y-0' : 'bg-[#668DFF] hover:bg-[#4f7df8]' }}">
+            @if ($this->hasZeroPriceItem) disabled @endif
+            class="px-8 py-3.5 text-white font-black rounded-xl shadow-[0_8px_15px_-3px_rgba(28,105,212,0.3)] hover:shadow-[0_12px_20px_-3px_rgba(28,105,212,0.4)] hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-75 disabled:cursor-wait {{ $this->hasZeroPriceItem ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed shadow-none hover:shadow-none hover:translate-y-0' : 'bg-[#668DFF] hover:bg-[#4f7df8]' }}">
             <span wire:loading.remove wire:target="nextStep">Lanjut</span>
             <svg wire:loading.remove wire:target="nextStep" class="w-5 h-5" fill="none" viewBox="0 0 24 24"
                 stroke="currentColor" stroke-width="3">
@@ -335,7 +383,7 @@
     {{-- Modal Scan SN Khusus Addon --}}
     @if ($addonScanModalOpen)
         <div
-            class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-all">
+            class="fixed inset-0 z-100 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-all">
             <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full mx-4"
                 @click.away="$wire.closeAddonModal()">
                 <div class="text-center">
@@ -376,40 +424,64 @@
             this.promoData = data;
             this.openPromoInfo = true;
         }
-    }" @open-promo-info.window="showInfo($event.detail)" x-show="openPromoInfo" class="fixed inset-0 z-[110] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4" x-cloak style="display: none;">
-        <div @click.away="openPromoInfo = false" class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative">
+    }" @open-promo-info.window="showInfo($event.detail)" x-show="openPromoInfo"
+        class="fixed inset-0 z-110 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4" x-cloak
+        style="display: none;">
+        <div @click.away="openPromoInfo = false"
+            class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative">
             <div class="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
                 <div class="flex items-center gap-2">
-                    <svg class="w-5 h-5 text-[#1c69d4]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <svg class="w-5 h-5 text-[#1c69d4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
                     <h3 class="font-bold text-gray-800 text-sm" x-text="promoData?.name"></h3>
                 </div>
                 <button @click="openPromoInfo = false" class="text-gray-400 hover:text-rose-500 transition-colors">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                 </button>
             </div>
             <div class="p-5 space-y-4">
                 {{-- Potongan Utama --}}
                 <div class="bg-blue-50/50 rounded-xl p-3 border border-blue-100">
-                    <span class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider" x-text="'Potongan: ' + (promoData?.mainItemName || 'Item Utama')"></span>
+                    <span class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider"
+                        x-text="'Potongan: ' + (promoData?.mainItemName || 'Item Utama')"></span>
                     <div class="text-gray-800 mt-1 flex items-baseline gap-1">
-                        <span class="font-black text-lg text-rose-500" x-show="promoData?.discountType === 'fixed'" x-text="'-Rp ' + formatCurrency(promoData?.discountValue)"></span>
-                        <span class="font-black text-lg text-rose-500" x-show="promoData?.discountType === 'percentage'" x-text="'-' + promoData?.discountValue + '%'"></span>
+                        <span class="font-black text-lg text-rose-500" x-show="promoData?.discountType === 'fixed'"
+                            x-text="'-Rp ' + formatCurrency(promoData?.discountValue)"></span>
+                        <span class="font-black text-lg text-rose-500"
+                            x-show="promoData?.discountType === 'percentage'"
+                            x-text="'-' + promoData?.discountValue + '%'"></span>
                     </div>
-                    <p class="text-xs text-gray-500 font-semibold mt-0.5" x-show="promoData?.discountType === 'percentage' && promoData?.maxDiscount > 0" x-text="'Maksimal Potongan: Rp ' + formatCurrency(promoData?.maxDiscount)"></p>
+                    <p class="text-xs text-gray-500 font-semibold mt-0.5"
+                        x-show="promoData?.discountType === 'percentage' && promoData?.maxDiscount > 0"
+                        x-text="'Maksimal Potongan: Rp ' + formatCurrency(promoData?.maxDiscount)"></p>
                 </div>
-                
+
                 {{-- Potongan Bundling --}}
                 <div class="bg-green-50/50 rounded-xl p-3 border border-green-100" x-show="promoData?.isBundle">
-                    <span class="text-[10px] font-bold text-green-600 uppercase tracking-wider" x-text="'Potongan Bundling: ' + (promoData?.bundleItemName || 'Item Add-On')"></span>
+                    <span class="text-[10px] font-bold text-green-600 uppercase tracking-wider"
+                        x-text="'Potongan Bundling: ' + (promoData?.bundleItemName || 'Item Add-On')"></span>
                     <div class="text-gray-800 mt-1 flex items-baseline gap-1">
-                        <span class="font-black text-lg text-rose-500" x-show="promoData?.bundleDiscountType === 'fixed'" x-text="'-Rp ' + formatCurrency(promoData?.bundleDiscountValue)"></span>
-                        <span class="font-black text-lg text-rose-500" x-show="promoData?.bundleDiscountType === 'percentage'" x-text="'-' + promoData?.bundleDiscountValue + '%'"></span>
+                        <span class="font-black text-lg text-rose-500"
+                            x-show="promoData?.bundleDiscountType === 'fixed'"
+                            x-text="'-Rp ' + formatCurrency(promoData?.bundleDiscountValue)"></span>
+                        <span class="font-black text-lg text-rose-500"
+                            x-show="promoData?.bundleDiscountType === 'percentage'"
+                            x-text="'-' + promoData?.bundleDiscountValue + '%'"></span>
                     </div>
-                    <p class="text-xs text-gray-500 font-semibold mt-0.5" x-show="promoData?.bundleDiscountType === 'percentage' && promoData?.bundleMaxDiscount > 0" x-text="'Maksimal Potongan: Rp ' + formatCurrency(promoData?.bundleMaxDiscount)"></p>
+                    <p class="text-xs text-gray-500 font-semibold mt-0.5"
+                        x-show="promoData?.bundleDiscountType === 'percentage' && promoData?.bundleMaxDiscount > 0"
+                        x-text="'Maksimal Potongan: Rp ' + formatCurrency(promoData?.bundleMaxDiscount)"></p>
                 </div>
             </div>
             <div class="p-4 border-t border-gray-100">
-                <button @click="openPromoInfo = false" class="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors">Tutup Info</button>
+                <button @click="openPromoInfo = false"
+                    class="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors">Tutup
+                    Info</button>
             </div>
         </div>
     </div>

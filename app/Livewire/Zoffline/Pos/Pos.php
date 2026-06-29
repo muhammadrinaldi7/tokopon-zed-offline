@@ -683,6 +683,13 @@ class Pos extends Component
 
         $eligiblePromos = $service->getEligiblePromos($this->cart, $userBranchId, $businessUnitId);
 
+        if (!empty($this->searchPromo)) {
+            $searchTerm = strtolower($this->searchPromo);
+            $eligiblePromos = $eligiblePromos->filter(function ($promo) use ($searchTerm) {
+                return str_contains(strtolower($promo->name), $searchTerm);
+            });
+        }
+
         // Check if previously selected promos are still eligible
         $eligibleIds = $eligiblePromos->pluck('id')->toArray();
         $needsUpdate = false;
