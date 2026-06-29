@@ -145,9 +145,16 @@ class Pos extends Component
 
     public function confirmUpdateCustomer()
     {
-        // 1. Update nama di tabel users
+        // 1. Update nama dan email di tabel users
         $user = $this->existingCustomerToUpdate;
         $user->name = $this->customerName;
+        
+        if (!empty($this->customerEmail)) {
+            $user->email = $this->customerEmail;
+        } else {
+            $this->customerEmail = $user->email ?? '';
+        }
+        
         $user->save();
 
         // 2. Update nama di user_profiles jika ada fieldnya, misal full_name
@@ -184,6 +191,9 @@ class Pos extends Component
 
         $this->selectedCustomerId = $user->id;
         $this->searchCustomer = $user->name;
+        $this->customerName = $user->name;
+        $this->customerPhone = $user->profile->phone_number ?? '';
+        $this->customerEmail = $user->email ?? '';
         $this->isNewCustomer = false;
 
         $this->showConfirmUpdateCustomerModal = false;
