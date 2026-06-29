@@ -1713,6 +1713,66 @@ class AccurateService
         return true;
     }
 
+
+    /**
+     * Delete Sales Receipt in Accurate
+     * 
+     * @param int|string $id
+     * @param string $databaseSource
+     * @return array|bool
+     * @throws \Exception
+     */
+    public function deleteSalesReceipt($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $response = Http::withHeaders($config['headers'])
+            ->post($config['host'] . '/sales-receipt/delete.do', ['id' => $id]);
+
+        Log::info("API Accurate Delete Sales Receipt ({$databaseSource}) ID: {$id} Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete SR: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete SR Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
+     * Delete Sales Invoice in Accurate
+     * 
+     * @param int|string $id
+     * @param string $databaseSource
+     * @return array|bool
+     * @throws \Exception
+     */
+    public function deleteSalesInvoice($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $response = Http::withHeaders($config['headers'])
+            ->post($config['host'] . '/sales-invoice/delete.do', ['id' => $id]);
+
+        Log::info("API Accurate Delete Sales Invoice ({$databaseSource}) ID: {$id} Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete SI: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete SI Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
     /**
      * Memproses pencairan refund (uang keluar) untuk kasus Downgrade.
      * Menggunakan Sales Receipt dengan nilai chequeAmount minus.
