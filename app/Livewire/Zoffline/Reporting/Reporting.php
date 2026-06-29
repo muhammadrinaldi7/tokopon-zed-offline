@@ -43,6 +43,11 @@ class Reporting extends Component
         return $this->redirectRoute('reporting.income-statement', navigate: true);
     }
 
+    public function navigateToClosingKasir()
+    {
+        return $this->redirectRoute('reporting.closing-kasir', navigate: true);
+    }
+
     public function render()
     {
         return view('livewire.zoffline.reporting.reporting');

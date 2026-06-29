@@ -58,6 +58,7 @@ class AccurateImportController extends Controller
                         'name' => $item['name'] ?? null,
                         'base_price' => $item['unitPrice'] ?? 0, // Disesuaikan dengan field harga Accurate
                         'stock' => $item['quantity'] ?? 0, // Disesuaikan dengan field stok Accurate
+                        'itemType' => $item['itemType'] ?? null,
                         'raw_data' => $item,
                     ]
                 );

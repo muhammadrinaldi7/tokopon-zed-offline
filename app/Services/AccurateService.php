@@ -347,7 +347,7 @@ class AccurateService
         $param = [
             "sp.page"     => $page,
             "sp.pageSize" => $pageSize,
-            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory,manageSN",
+            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory,manageSN,itemType",
         ];
 
         $response = Http::withHeaders([
@@ -587,6 +587,7 @@ class AccurateService
             'id' => $existingPivot->accurate_customer_id, // Sertakan ID untuk UPDATE
             'name' => $user->profile ? $user->profile->full_name : $user->name,
             'mobilePhone' => $user->profile ? $user->profile->phone_number : null,
+            'email' => $user->email,
         ];
 
         $timestamp = now()->toIso8601String();

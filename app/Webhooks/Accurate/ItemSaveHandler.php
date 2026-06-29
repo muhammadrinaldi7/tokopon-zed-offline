@@ -79,6 +79,7 @@ class ItemSaveHandler implements WebhookHandlerInterface
                     'brandName' => $brandName,
                     'id_category_accurate' => $idCategory,
                     'categoryName' => $categoryName,
+                    'itemType' => $accurateItem['itemType'] ?? null,
                     'raw_data' => json_encode($accurateItem),
                 ]
             );

@@ -85,7 +85,7 @@
     <div class="bg-white rounded-3xl shadow-sm p-8 md:p-10">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             {{-- Customer Name/Search Input --}}
-            <div class="relative md:col-span-1">
+            <div class="relative md:col-span-1" x-data="{ showDropdown: false }" @click.outside="showDropdown = false">
                 <label class="block text-xs lg:text-sm  text-gray-700 mb-3 font-semibold uppercase tracking-widest">1.
                     Cari Nama /
                     No
@@ -119,7 +119,7 @@
                         </div>
                     @else
                         {{-- Input Field --}}
-                        <input type="text" wire:model.live.debounce.300ms="searchCustomer"
+                        <input type="text" wire:model.live.debounce.300ms="searchCustomer" @focus="showDropdown = true"
                             class="w-full bg-transparent pl-14 pr-12 py-3 text-lg font-normal text-gray-700 placeholder-gray-400 outline-none"
                             placeholder="Ketik nama pelanggan di sini...">
                     @endif
@@ -140,7 +140,7 @@
                 </div>
 
                 @if (strlen($searchCustomer) >= 2 && !$selectedCustomerId)
-                    <div
+                    <div x-show="showDropdown" x-transition
                         class="absolute top-full left-0 w-full mt-3 bg-white border border-gray-100 rounded-2xl shadow-2xl max-h-80 overflow-y-auto z-50">
                         @forelse($this->customerResults as $user)
                             <button wire:click="selectCustomer({{ $user->id }})"
