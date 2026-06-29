@@ -489,7 +489,7 @@ trait WithCheckoutAndReceipt
                 $branchName = $handler->branch->name ?? 'Banjarbaru';
                 $warehouseName = $handler->warehouse->name ?? 'Head Office';
 
-                $dbSource = $this->cart[0]['database_source'] ?? 'syihab';
+                $dbSource = Auth::user()->getActiveBusinessUnit()?->code ?? 'syihab';
 
                 // Gunakan nama Cabang & Gudang asli untuk dikirim ke Accurate
                 $accurateBranchName = $branchName;
@@ -782,7 +782,7 @@ trait WithCheckoutAndReceipt
                 $branchName = $handler->branch->name ?? 'Banjarbaru';
                 $warehouseName = $handler->warehouse->name ?? 'Head Office';
 
-                $dbSource = $this->cart[0]['database_source'] ?? 'syihab';
+                $dbSource = Auth::user()->getActiveBusinessUnit()?->code ?? 'syihab';
 
                 $accurateBranchName = $branchName;
                 $accurateWarehouseName = $warehouseName;
@@ -1444,6 +1444,13 @@ trait WithCheckoutAndReceipt
             }
         }
         $order->items()->delete();
+        
+        // Kembalikan kuota promo sebelum detach
+        $promoIds = $order->promos()->pluck('promos.id')->toArray();
+        if (!empty($promoIds)) {
+            \App\Models\Promo::whereIn('id', $promoIds)->decrement('used_quota');
+        }
+        
         $order->promos()->detach();
     }
 

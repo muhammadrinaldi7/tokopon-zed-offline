@@ -109,9 +109,10 @@ class PromoCalculatorService
         $promos = Promo::with(['skus', 'bundleSkus'])->whereIn('id', $selectedPromoIds)->get();
 
         // Check combinable
-        $hasNonCombinable = $promos->where('is_combinable', false)->count() > 0;
-        if ($hasNonCombinable && count($selectedPromoIds) > 1) {
-            return false; // Indicates conflict
+        $nonCombinablePromos = $promos->where('is_combinable', false);
+        if ($nonCombinablePromos->count() > 0 && count($selectedPromoIds) > 1) {
+            $names = $nonCombinablePromos->pluck('name')->implode(', ');
+            return "Promo berikut tidak dapat digabungkan dengan promo lain: {$names}."; // Indicates conflict
         }
 
         foreach ($promos as $promo) {
@@ -241,7 +242,14 @@ class PromoCalculatorService
             }
         }
 
-        // Increment quota
-        Promo::whereIn('id', $selectedPromoIds)->increment('used_quota');
+        // Increment quota with lock
+        $promos = Promo::whereIn('id', $selectedPromoIds)->lockForUpdate()->get();
+        foreach ($promos as $promo) {
+            if ($promo->quota !== null && $promo->used_quota >= $promo->quota) {
+                throw new \Exception("Kuota promo {$promo->name} sudah habis. Silakan batalkan pilihan promo tersebut.");
+            }
+            $promo->used_quota += 1;
+            $promo->save();
+        }
     }
 }

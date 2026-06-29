@@ -445,6 +445,13 @@ class Pos extends Component
         }
 
         $order->items()->delete();
+        
+        // Kembalikan kuota promo sebelum detach
+        $promoIds = $order->promos()->pluck('promos.id')->toArray();
+        if (!empty($promoIds)) {
+            \App\Models\Promo::whereIn('id', $promoIds)->decrement('used_quota');
+        }
+        
         $order->promos()->detach();
         $order->delete();
 
@@ -485,15 +492,14 @@ class Pos extends Component
     public function mount()
     {
         $unit = \Illuminate\Support\Facades\Auth::user()->businessUnit?->code ?? 'all';
+        $this->databaseSource = $unit !== 'all' ? $unit : 'syihab';
+        
         if ($unit === 'second') {
             $this->productType = 'second';
-            $this->databaseSource = 'second';
-        } elseif ($unit === 'syihab') {
-            $this->productType = 'new';
-            $this->databaseSource = 'syihab';
-        } else {
+        } elseif ($unit === 'all') {
             $this->productType = 'all';
-            $this->databaseSource = 'syihab'; // Default for all
+        } else {
+            $this->productType = 'new';
         }
     }
 
@@ -789,8 +795,9 @@ class Pos extends Component
         $service = app(\App\Services\PromoCalculatorService::class);
         $success = $service->applyPromosToCart($this->cart, $this->selectedPromos);
 
-        if (!$success) {
-            $this->dispatch('toast', title: 'Gagal', message: 'Ada promo yang tidak dapat digabungkan dengan promo lain.', type: 'error');
+        if ($success !== true) {
+            $errorMessage = is_string($success) ? $success : 'Ada promo yang tidak dapat digabungkan dengan promo lain.';
+            $this->dispatch('toast', title: 'Gagal', message: $errorMessage, type: 'error');
             // Revert ke 1 promo saja (yg pertama)
             if (count($this->selectedPromos) > 0) {
                 $this->selectedPromos = [$this->selectedPromos[0]];

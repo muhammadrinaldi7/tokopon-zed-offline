@@ -354,8 +354,10 @@
 
                     @if (strtolower($methodObj->bank_name ?? '') === 'finance')
                         <div class="space-y-3">
-                            <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Nomor Kontrak (Opsional)</label>
-                            <input type="text" wire:model.live.debounce.500ms="payments.{{ $activePaymentIndex }}.no_kontrak"
+                            <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Nomor Kontrak
+                                (Opsional)</label>
+                            <input type="text"
+                                wire:model.live.debounce.500ms="payments.{{ $activePaymentIndex }}.no_kontrak"
                                 class="w-full bg-white border-2 border-gray-300 rounded-2xl px-5 py-4 text-xl font-bold text-gray-800 focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/20 transition-all"
                                 placeholder="Masukkan Nomor Kontrak">
                         </div>
@@ -566,8 +568,10 @@
             <button type="button" wire:click="saveDraft" wire:loading.attr="disabled" wire:target="saveDraft"
                 class="w-full sm:w-auto px-6 py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[170px]">
                 <span wire:loading.remove wire:target="saveDraft" class="flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                     </svg>
                     Simpan Draft
                 </span>
@@ -583,10 +587,12 @@
                     Menyimpan...
                 </span>
             </button>
-            <button type="button" @click="showPiutangModal = true"
-                class="w-full sm:w-auto px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[170px]">
-                Piutang
-            </button>
+            @can('piutang-penjualan')
+                <button type="button" @click="showPiutangModal = true"
+                    class="w-full sm:w-auto px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[170px]">
+                    Piutang
+                </button>
+            @endcan
             <button type="button" @click="showConfirmModal = true" @if (!$this->isPaymentsValid) disabled @endif
                 class="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
                 Proses Transaksi
@@ -625,12 +631,14 @@
                                 class="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-start sm:items-center sticky top-0 z-10">
                                 <div>
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <h3 class="text-lg sm:text-xl font-black text-gray-800" id="modal-title">Konfirmasi
+                                        <h3 class="text-lg sm:text-xl font-black text-gray-800" id="modal-title">
+                                            Konfirmasi
                                             Pesanan</h3>
                                         <span
                                             class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] sm:text-xs font-bold border border-blue-100">{{ $this->displayCustomerName }}</span>
                                     </div>
-                                    <p class="text-xs sm:text-sm text-gray-500 mt-1">Pastikan pesanan dan pembayaran sudah sesuai
+                                    <p class="text-xs sm:text-sm text-gray-500 mt-1">Pastikan pesanan dan pembayaran
+                                        sudah sesuai
                                     </p>
                                 </div>
                                 <button type="button" @click="showConfirmModal = false"
@@ -740,7 +748,8 @@
                                                         </div>
                                                     @endif
                                                 </div>
-                                                <div class="w-full sm:w-auto mt-2 sm:mt-0 flex sm:block justify-between items-center sm:text-right">
+                                                <div
+                                                    class="w-full sm:w-auto mt-2 sm:mt-0 flex sm:block justify-between items-center sm:text-right">
                                                     <div class="text-left sm:text-right">
                                                         <div class="text-xs font-bold text-gray-400 sm:mt-0.5">
                                                             {{ $item['qty'] }} x</div>
@@ -749,7 +758,9 @@
                                                         <div class="font-black text-gray-800 text-sm">Rp
                                                             {{ number_format($item['price'], 0, ',', '.') }}</div>
                                                         @if (isset($item['discount_amount']) && $item['discount_amount'] > 0)
-                                                            <div class="text-xs text-rose-500 font-bold mt-0.5 sm:mt-1">- Rp
+                                                            <div
+                                                                class="text-xs text-rose-500 font-bold mt-0.5 sm:mt-1">
+                                                                - Rp
                                                                 {{ number_format($item['discount_amount'], 0, ',', '.') }}
                                                             </div>
                                                         @endif
@@ -767,7 +778,8 @@
                                 <div>
                                     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Metode
                                         Pembayaran</h4>
-                                    <div class="bg-white border border-gray-100 rounded-xl p-3 sm:p-4 shadow-sm space-y-4">
+                                    <div
+                                        class="bg-white border border-gray-100 rounded-xl p-3 sm:p-4 shadow-sm space-y-4">
                                         @if ($paymentMode === 'split')
                                             @foreach ($payments as $payment)
                                                 @php
@@ -817,7 +829,8 @@
                                                     ? $pmObj->name
                                                     : $payment['category'] ?? 'Belum dipilih';
                                             @endphp
-                                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start text-sm gap-1.5 sm:gap-2">
+                                            <div
+                                                class="flex flex-col sm:flex-row sm:justify-between sm:items-start text-sm gap-1.5 sm:gap-2">
                                                 <div class="flex flex-col gap-1.5">
                                                     <div class="flex items-center gap-2">
                                                         <span
@@ -849,7 +862,8 @@
                                 <div>
                                     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Rincian
                                         Tagihan</h4>
-                                    <div class="bg-[#1c69d4]/5 rounded-xl p-3 sm:p-4 border border-[#1c69d4]/10 space-y-2">
+                                    <div
+                                        class="bg-[#1c69d4]/5 rounded-xl p-3 sm:p-4 border border-[#1c69d4]/10 space-y-2">
                                         <div class="flex justify-between items-center text-sm">
                                             <span class="text-gray-600 font-medium">Subtotal</span>
                                             <span class="font-bold text-gray-800">Rp
@@ -935,11 +949,13 @@
                                 class="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-start sm:items-center sticky top-0 z-10">
                                 <div>
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <h3 class="text-lg sm:text-xl font-black text-gray-800" id="modal-title">Konfirmasi Piutang</h3>
+                                        <h3 class="text-lg sm:text-xl font-black text-gray-800" id="modal-title">
+                                            Konfirmasi Piutang</h3>
                                         <span
                                             class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] sm:text-xs font-bold border border-blue-100">{{ $this->displayCustomerName }}</span>
                                     </div>
-                                    <p class="text-xs sm:text-sm text-gray-500 mt-1">Transaksi ini akan dicatat sebagai piutang (belum lunas)
+                                    <p class="text-xs sm:text-sm text-gray-500 mt-1">Transaksi ini akan dicatat sebagai
+                                        piutang (belum lunas)
                                     </p>
                                 </div>
                                 <button type="button" @click="showPiutangModal = false"
@@ -955,14 +971,18 @@
                             {{-- Body --}}
                             <div
                                 class="px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
-                                
-                                <div class="bg-violet-50 border border-violet-100 text-violet-700 p-4 rounded-xl flex gap-3 text-sm">
-                                    <svg class="w-6 h-6 shrink-0 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+
+                                <div
+                                    class="bg-violet-50 border border-violet-100 text-violet-700 p-4 rounded-xl flex gap-3 text-sm">
+                                    <svg class="w-6 h-6 shrink-0 text-violet-500" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                     <div>
                                         <p class="font-bold mb-1">Perhatian!</p>
-                                        <p>Order ini akan langsung diproses dan faktur akan dibuat di Accurate, namun <b>tanpa pelunasan</b> (Piutang). Pastikan data customer sudah benar.</p>
+                                        <p>Order ini akan langsung diproses dan faktur akan dibuat di Accurate, namun
+                                            <b>tanpa pelunasan</b> (Piutang). Pastikan data customer sudah benar.</p>
                                     </div>
                                 </div>
 
@@ -970,7 +990,8 @@
                                 <div>
                                     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Rincian
                                         Tagihan</h4>
-                                    <div class="bg-violet-600/5 rounded-xl p-3 sm:p-4 border border-violet-600/10 space-y-2">
+                                    <div
+                                        class="bg-violet-600/5 rounded-xl p-3 sm:p-4 border border-violet-600/10 space-y-2">
                                         <div class="flex justify-between items-center text-sm">
                                             <span class="text-gray-600 font-medium">Subtotal</span>
                                             <span class="font-bold text-gray-800">Rp
