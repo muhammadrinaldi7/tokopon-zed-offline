@@ -83,7 +83,18 @@
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    @if ($order->order_status === 'DELETED')
+                                    @php $pendingCancel = $order->approvalRequests->where('status', 'PENDING')->first(); @endphp
+                                    @if ($pendingCancel)
+                                        <span
+                                            class="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold rounded border border-amber-200 uppercase">
+                                            ⏳ Batal Pending
+                                        </span>
+                                    @elseif ($order->order_status === 'CANCELLED')
+                                        <span
+                                            class="px-2 py-0.5 bg-red-50 text-red-700 text-[10px] font-bold rounded border border-red-200 uppercase">
+                                            🚫 Dibatalkan
+                                        </span>
+                                    @elseif ($order->order_status === 'DELETED')
                                         <span
                                             class="px-2 py-0.5 bg-red-50 text-red-700 text-[10px] font-bold rounded border border-red-200 uppercase">
                                             🗑️ Dosa
@@ -123,6 +134,13 @@
                                                 </svg>
                                                 Struk
                                             </button>
+                                            
+                                            @if(!$pendingCancel && $order->order_status !== 'CANCELLED')
+                                                <button wire:click="requestCancellation({{ $order->id }})"
+                                                    class="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-[10px] font-bold transition-all border border-red-100 uppercase mt-1">
+                                                    Batalkan
+                                                </button>
+                                            @endif
                                         </div>
                                     @endif
                                 </td>
@@ -157,4 +175,34 @@
 
     @include('livewire.zoffline.pos.modal.receipt-struk')
 
+    {{-- MODAL AJUKAN PEMBATALAN --}}
+    @if($showCancelModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/50 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden" @click.outside="$wire.closeCancelModal()">
+                <div class="p-6">
+                    <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
+                        <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-center text-neutral-900 mb-2">Ajukan Pembatalan Transaksi</h3>
+                    <p class="text-sm text-center text-neutral-500 mb-6">Penghapusan faktur di Accurate memerlukan persetujuan. Silakan isi alasan pembatalan.</p>
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-neutral-700 uppercase mb-2">Alasan Pembatalan</label>
+                        <textarea wire:model="cancelReason" rows="3" class="w-full px-4 py-3 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all resize-none text-sm" placeholder="Contoh: Salah input nominal, customer retur, dsb..."></textarea>
+                        @error('cancelReason') <span class="text-xs text-red-500 font-medium mt-1">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+                <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex gap-3">
+                    <button wire:click="closeCancelModal" class="flex-1 px-4 py-2.5 text-sm font-bold text-neutral-600 bg-white border border-neutral-200 rounded-xl hover:bg-neutral-50 transition-all">
+                        Tutup
+                    </button>
+                    <button wire:click="submitCancellation" class="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-all shadow-sm shadow-red-600/20">
+                        Kirim Pengajuan
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

@@ -1584,7 +1584,7 @@ class AccurateService
                 $originalItemNo = $variant->accurateData()->first()->item_no;
             }
         }
-        
+
         $targetItemNo = $newItemNo ?? $originalItemNo;
         $originalPrice = $originalPriceFromUI ?? ($claim->warranty->orderItem->price_at_checkout ?? 0);
         $targetPrice = $newPrice > 0 ? $newPrice : $originalPrice;
@@ -1655,7 +1655,7 @@ class AccurateService
         Log::info("Payload Sales Invoice:", $invoicePayload);
         $invoiceResponse = $this->postSalesInvoice($invoicePayload, $businessUnitCode);
         $newInvoiceNo = $invoiceResponse['r']['number'] ?? null;
-        
+
         if (!$newInvoiceNo) {
             Log::warning("Gagal mendapatkan nomor invoice baru dari respon Accurate, otomatisasi pelunasan dilewati.");
             return true;
@@ -1663,7 +1663,7 @@ class AccurateService
 
         // --- PROSES 3: SALES RECEIPT (SETTLEMENT / REFUND) ---
         Log::info("Mempersiapkan Sales Receipt untuk pelunasan Invoice Baru: {$newInvoiceNo} menggunakan overpayment Invoice Lama: {$originalInvoiceNo}");
-        
+
         $finalBankNo = $bankNo ?: '110101'; // Gunakan parameter bank, jika kosong fallback ke Kas default
 
         // Logika Offsetting Piutang (Kelebihan bayar vs Tagihan baru)
@@ -1682,10 +1682,10 @@ class AccurateService
 
         $receiptPayload = [
             'customerNo' => $customerNo,
-            'bankNo' => $finalBankNo, 
+            'bankNo' => $finalBankNo,
             'transDate' => now()->format('d/m/Y'),
             'branchName' => $branchName,
-            'chequeAmount' => $actualCheque, 
+            'chequeAmount' => $actualCheque,
             'useCredit' => false, // Kita tidak pakai deposit terpisah, kita pakai sistem offset invoice
             'description' => "Pelunasan Ganti Unit. Faktur Baru: {$newInvoiceNo}. Potong Faktur Lama: {$originalInvoiceNo}{$descSuffix}",
             'detailInvoice' => [
@@ -1719,17 +1719,17 @@ class AccurateService
     public function processDowngradeRefund(\App\Models\WarrantyClaim $claim, $bankNo, $refundAmount)
     {
         $businessUnitCode = $claim->warranty->policy->businessUnit->code ?? 'syihab';
-        
+
         $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
         $order = $claim->warranty->orderItem->order ?? null;
         $originalInvoiceNo = $order->accurate_invoice_no ?? $order->order_number ?? 'INV-UNKNOWN';
-        
+
         $branchName = 'GSK - Banjarbaru'; // Harusnya dari BusinessUnit, tapi sementara hardcode sesuai current logic
-        
+
         // Payload Penerimaan Penjualan (Uang Keluar)
         $receiptPayload = [
             'customerNo' => $customerNo,
-            'bankNo' => $bankNo, 
+            'bankNo' => $bankNo,
             'transDate' => now()->format('d/m/Y'),
             'branchName' => $branchName,
             'chequeAmount' => -$refundAmount, // Minus = Uang Keluar

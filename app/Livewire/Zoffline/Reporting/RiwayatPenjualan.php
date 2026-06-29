@@ -17,6 +17,11 @@ class RiwayatPenjualan extends Component
     public $showReceiptModal = false;
     public $completedOrder = null;
 
+    // Cancellation properties
+    public $showCancelModal = false;
+    public $cancelOrderId = null;
+    public $cancelReason = '';
+
     public function reprintOrder($orderId)
     {
         $this->completedOrder = Order::with(['items.variant', 'user', 'payments.paymentMethod', 'handledBy', 'salesBy'])->find($orderId);
@@ -41,7 +46,9 @@ class RiwayatPenjualan extends Component
         $user = Auth::user();
         $userBranchId = $user->branch_id ?? null;
 
-        $orders = Order::with(['user', 'items', 'payments', 'salesBy'])
+        $orders = Order::with(['user', 'items', 'payments', 'salesBy', 'approvalRequests' => function($q) {
+            $q->where('request_type', 'cancellation');
+        }])
             ->where('order_channel', 'POS')
             ->where('order_status', '!=', 'DRAFT')
             ->where('business_unit_id', $user->getActiveBusinessUnitId())
@@ -345,5 +352,61 @@ class RiwayatPenjualan extends Component
             \Illuminate\Support\Facades\Log::error('Qontak HMAC Integration Crash: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
         }
+    }
+
+    // Cancellation Methods
+    public function requestCancellation($orderId)
+    {
+        $this->cancelOrderId = $orderId;
+        $this->cancelReason = '';
+        $this->showCancelModal = true;
+    }
+
+    public function closeCancelModal()
+    {
+        $this->showCancelModal = false;
+        $this->cancelOrderId = null;
+    }
+
+    public function submitCancellation()
+    {
+        $this->validate([
+            'cancelReason' => 'required|min:5'
+        ], [
+            'cancelReason.required' => 'Alasan pembatalan wajib diisi.',
+            'cancelReason.min' => 'Alasan pembatalan minimal 5 karakter.'
+        ]);
+
+        $order = Order::find($this->cancelOrderId);
+        if (!$order) {
+            $this->dispatch('toast', title: 'Error', message: 'Transaksi tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        // Check if there is already a pending request
+        $existing = $order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'cancellation')->first();
+        if ($existing) {
+            $this->dispatch('toast', title: 'Info', message: 'Transaksi ini sudah dalam proses pengajuan pembatalan.', type: 'info');
+            $this->closeCancelModal();
+            return;
+        }
+
+        // Fetch required level from ApprovalRule
+        $requiredLevel = \App\Models\ApprovalRule::where('module', 'cancellation')->max('level');
+        if (!$requiredLevel) {
+            $requiredLevel = 1; // Default fallback if no rules defined
+        }
+
+        $order->approvalRequests()->create([
+            'request_type' => 'cancellation',
+            'requested_by' => Auth::id(),
+            'reason' => $this->cancelReason,
+            'status' => 'PENDING',
+            'required_level' => $requiredLevel,
+            'current_level' => 0
+        ]);
+
+        $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan pembatalan berhasil dikirim ke Admin/Pusat.', type: 'success');
+        $this->closeCancelModal();
     }
 }

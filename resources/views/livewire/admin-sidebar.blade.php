@@ -391,7 +391,8 @@
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                         </svg>
-                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Garansi & Klaim</span><span
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Garansi &
+                            Klaim</span><span
                             class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                             x-show="sidebarCollapsed" style="display:none;" x-cloak>Garansi & Klaim</span>
                     </div>
@@ -527,6 +528,19 @@
                     class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                     x-show="sidebarCollapsed" style="display:none;" x-cloak>Kelola Role & Akses</span>
             </a>
+
+            <a href="{{ route('admin.approvals.index') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.approvals.*') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.approvals.*') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Persetujuan Transaksi</span>
+                <span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Persetujuan Transaksi</span>
+            </a>
         @endcan
 
         @can('manage-settings')
@@ -563,6 +577,19 @@
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Unit Usaha</span><span
                     class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                     x-show="sidebarCollapsed" style="display:none;" x-cloak>Unit Usaha</span>
+            </a>
+
+            <a href="{{ route('admin.settings.approval-rules') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.approval-rules') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.approval-rules') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Aturan Persetujuan</span>
+                <span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Aturan Persetujuan</span>
             </a>
 
             <a href="{{ route('admin.purchase.invoice.export') }}" wire:navigate

@@ -35,6 +35,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view-reporting');
     Route::get('/zoffline/check-serial-number', CheckSerialNumber::class)->name('zoffline.check-serial-number')->middleware('can:view-warehouse-stocks');
     Route::get('/zoffline/check-serial-number/{sn}/history', SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
+    
+    // Zoffline Approvals & Settings
+    Route::get('/zoffline/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('zoffline.approvals.index');
+    Route::get('/zoffline/approval-rules', \App\Livewire\Admin\Settings\ApprovalRule\Index::class)->name('zoffline.approval-rules.index')->middleware('can:manage-settings');
+
     // Reporting
     Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
         Route::get('/sales', \App\Livewire\Zoffline\Reporting\SalesReport::class)->name('sales');
@@ -114,8 +119,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/settings/catalog', \App\Livewire\Admin\Settings\CatalogSettings::class)->name('settings.catalog')->middleware('can:manage-settings');
     Route::get('/settings/warehouse', \App\Livewire\Admin\Settings\Warehouse\Index::class)->name('settings.warehouse')->middleware('can:manage-settings');
     Route::livewire('/settings/pos', 'pages::admin.settings.pos-settings')->name('settings.pos')->middleware('can:manage-settings');
-
+    Route::get('/settings/approval-rules', \App\Livewire\Admin\Settings\ApprovalRule\Index::class)->name('settings.approval-rules')->middleware('can:manage-settings');
     Route::get('/inventory/stock-adjustment', \App\Livewire\Admin\Inventory\StockAdjustment\Index::class)->name('adjustment.index')->middleware('can:manage-settings');
+
+    // Approvals
+    Route::get('/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('approvals.index');
 
     Route::prefix('promos')->name('promos.')->middleware('can:manage-promos')->group(function () {
         Route::get('/', App\Livewire\Admin\Promo\Index::class)->name('index');

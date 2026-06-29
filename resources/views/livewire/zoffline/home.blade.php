@@ -417,5 +417,77 @@
                 </div>
             </div>
         @endcan
+        <!-- Additional Cards for System Administration -->
+        @can('manage-settings')
+            <div class="md:col-span-2 w-full">
+                <div x-data="{ openApprovalModal: false }" class="w-full">
+                    <div @click="openApprovalModal = true"
+                        class="w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+                        <div class="rounded-full w-20 h-20 bg-rose-50 flex items-center justify-center text-rose-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-auto" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-2xl">Sistem <br> Persetujuan</h1>
+                            <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Kelola persetujuan diskon & pembatalan
+                            </p>
+                        </div>
+                    </div>
+
+                    <div x-show="openApprovalModal" style="display: none;"
+                        class="fixed inset-0 z-100 flex items-center justify-center px-4">
+                        <div class="absolute inset-0 bg-black/20" @click="openApprovalModal = false"></div>
+                        <div
+                            class="relative w-full max-w-md bg-white/70 backdrop-blur-2xl border border-white/60 shadow-2xl rounded-[2.5rem] p-6 text-center transform">
+                            <div class="w-12 h-1.5 bg-gray-400/40 rounded-full mx-auto mb-6"></div>
+                            <h3 class="text-xl font-bold text-gray-800 mb-2">Sistem Persetujuan</h3>
+                            <p class="text-sm text-gray-600 mb-8">Pilih menu manajemen persetujuan</p>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <button wire:click="navigateToApprovals" @click="openApprovalModal = false"
+                                    class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-3 group">
+                                    <div
+                                        class="w-12 h-12 rounded-xl bg-emerald-100/50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                        </svg>
+                                    </div>
+                                    <span class="block text-sm text-center leading-tight">Daftar Pengajuan</span>
+                                </button>
+
+                                <button wire:click="navigateToApprovalRules" @click="openApprovalModal = false"
+                                    class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-3 group">
+                                    <div
+                                        class="w-12 h-12 rounded-xl bg-purple-100/50 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                    </div>
+                                    <span class="block text-sm text-center leading-tight">Pengaturan Aturan</span>
+                                </button>
+                            </div>
+                            <button @click="openApprovalModal = false"
+                                class="mt-8 w-full py-3 text-red-500 font-semibold hover:bg-red-50/50 rounded-xl transition-colors">
+                                Batal
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endcan
     </div>
+
+
+    {{-- <div class="grid grid-cols-1 md:grid-cols-4 max-w-7xl gap-6 w-full mt-6">
+        
+    </div> --}}
 </div>

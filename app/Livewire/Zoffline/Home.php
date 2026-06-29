@@ -92,6 +92,16 @@ class Home extends Component
     {
         return $this->redirectRoute('admin.sales-orders.index', navigate: true);
     }
+
+    public function navigateToApprovals()
+    {
+        return $this->redirectRoute('zoffline.approvals.index', navigate: true);
+    }
+
+    public function navigateToApprovalRules()
+    {
+        return $this->redirectRoute('zoffline.approval-rules.index', navigate: true);
+    }
     public function render()
     {
         return view('livewire.zoffline.home');

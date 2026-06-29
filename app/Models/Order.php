@@ -62,6 +62,11 @@ class Order extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function approvalRequests()
+    {
+        return $this->morphMany(ApprovalRequest::class, 'approvable');
+    }
+
     public function items()
     {
         return $this->hasMany(OrderItem::class);
