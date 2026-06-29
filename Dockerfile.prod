@@ -1,0 +1,57 @@
+# ==========================================
+# STAGE 1: Mengompilasi Asset Javascript (Vite/Mix)
+# ==========================================
+FROM node:25-alpine AS asset-builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# ==========================================
+# STAGE 2: Mengunduh Dependency PHP via Composer
+# ==========================================
+FROM composer:latest AS vendor-builder
+WORKDIR /app
+RUN apk add --no-cache icu-dev \
+    && docker-php-ext-install intl exif
+
+COPY composer*.json ./
+# Run composer install dengan optimasi production
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --no-plugins \
+    --no-scripts \
+    --prefer-dist
+
+# ==========================================
+# STAGE 3: Final Production Image (PHP Only)
+# ==========================================
+FROM php:8.4-fpm-alpine
+WORKDIR /var/www/html
+
+# Install extension PHP minimal untuk production
+RUN apk add --no-cache libpng-dev libxml2-dev zip unzip \
+    && docker-php-ext-install pdo_mysql bcmath gd
+
+# Salin source code utama Laravel
+COPY . .
+
+# Salin vendor PHP hasil dari STAGE 2
+COPY --from=vendor-builder /app/vendor ./vendor
+
+# Salin hasil compile CSS/JS dari STAGE 1
+COPY --from=asset-builder /app/public/build ./public/build
+
+# Atur kepemilikan file ke user www-data demi keamanan ketat Linux
+RUN chown -R www-data:www-data /var/www/html
+
+# Salin dan berikan izin eksekusi untuk entrypoint script
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+EXPOSE 9000
+
+# Set entrypoint untuk menjalankan optimasi saat container dinyalakan
+ENTRYPOINT ["entrypoint.sh"]

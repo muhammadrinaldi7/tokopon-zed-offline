@@ -1,0 +1,56 @@
+services:
+  # 1. Service Aplikasi Laravel (PHP-FPM)
+  app:
+    image: nidzaredwan/laravel-app:latest
+    container_name: laravel_app_prod
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - laravel_storage:/var/www/html/storage
+      # Tambahkan baris ini untuk nge-share folder public ke volume global
+      - laravel_public_assets:/var/www/html/public
+    networks:
+      - production_network
+    depends_on:
+      - mysql
+
+  # 2. Service Nginx Web Server
+  webserver:
+    image: nginx:alpine
+    container_name: laravel_nginx_prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/production.conf:/etc/nginx/conf.d/default.conf
+      # Tambahkan baris ini agar Nginx bisa membaca file CSS/JS dari volume global
+      - laravel_public_assets:/var/www/html/public
+    networks:
+      - production_network
+    depends_on:
+      - app
+      - mysql
+
+  # 3. Service Database MySQL 8.0
+  mysql:
+    image: mysql:8.0
+    container_name: laravel_mysql_prod
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - mysql_production_data:/var/lib/mysql
+    networks:
+      - production_network
+
+networks:
+  production_network:
+    driver: bridge
+
+volumes:
+  mysql_production_data:
+  laravel_storage:
+  # Tambahkan volume baru khusus penampung asset statis
+  laravel_public_assets:
