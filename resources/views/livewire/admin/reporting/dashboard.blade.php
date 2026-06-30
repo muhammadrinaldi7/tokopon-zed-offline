@@ -156,7 +156,8 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {{-- Top Products --}}
         <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
-            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top {{ $topPerformerLimit }} Produk</h3>
+            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top
+                {{ $topPerformerLimit }} Produk</h3>
             <div class="space-y-4">
                 @forelse($topProducts as $index => $tp)
                     <div class="flex items-center justify-between">
@@ -183,7 +184,8 @@
 
         {{-- Top Sales --}}
         <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
-            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top {{ $topPerformerLimit }} Kasir/Sales
+            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top
+                {{ $topPerformerLimit }} Kasir/Sales
             </h3>
             <div class="space-y-4">
                 @forelse($topSales as $index => $ts)
@@ -211,7 +213,8 @@
 
         {{-- Top Brands --}}
         <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
-            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top {{ $topPerformerLimit }} Brand</h3>
+            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top
+                {{ $topPerformerLimit }} Brand</h3>
             <div class="space-y-4">
                 @forelse($topBrands as $index => $tb)
                     <div class="flex items-center justify-between">
@@ -313,7 +316,8 @@
         <div class="overflow-x-auto overflow-y-auto" style="max-height: 400px;">
             <table class="w-full text-left border-collapse relative">
                 <thead class="sticky top-0 z-10 shadow-sm">
-                    <tr class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    <tr
+                        class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
                         <th class="px-6 py-4 bg-gray-50">Nama Sales</th>
                         <th class="px-6 py-4 bg-gray-50 text-right">Cashback Amount</th>
                         <th class="px-6 py-4 bg-gray-50 text-right">Cashback Quantity</th>
@@ -324,7 +328,8 @@
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-sm">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-sm">
                                         {{ substr($cbData['name'], 0, 1) }}
                                     </div>
                                     <span class="text-sm font-bold text-gray-800">{{ $cbData['name'] }}</span>
@@ -332,14 +337,18 @@
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex flex-col items-end">
-                                    <span class="text-sm font-bold text-gray-800">Rp {{ number_format($cbData['cashback_amount'], 0, ',', '.') }}</span>
-                                    <span class="text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-600 mt-1">{{ $cbData['amount_pct'] }}%</span>
+                                    <span class="text-sm font-bold text-gray-800">Rp
+                                        {{ number_format($cbData['cashback_amount'], 0, ',', '.') }}</span>
+                                    <span
+                                        class="text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-600 mt-1">{{ $cbData['amount_pct'] }}%</span>
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex flex-col items-end">
-                                    <span class="text-sm font-bold text-gray-800">{{ $cbData['cashback_qty'] }} Pcs</span>
-                                    <span class="text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-600 mt-1">{{ $cbData['qty_pct'] }}%</span>
+                                    <span class="text-sm font-bold text-gray-800">{{ $cbData['cashback_qty'] }}
+                                        Pcs</span>
+                                    <span
+                                        class="text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-600 mt-1">{{ $cbData['qty_pct'] }}%</span>
                                 </div>
                             </td>
                         </tr>
@@ -347,6 +356,115 @@
                         <tr>
                             <td colspan="3" class="px-6 py-8 text-center text-sm text-gray-500">
                                 Belum ada data cashback pada rentang waktu ini.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {{-- SECTION 2.7: PERFORMA LEASING --}}
+    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center border-t pt-8 mt-8">
+        <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z">
+            </path>
+        </svg>
+        Performa Leasing
+    </h2>
+    <div
+        class="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden mb-8">
+        <div class="overflow-x-auto overflow-y-auto" style="max-height: 400px;">
+            <table class="w-full text-left border-collapse relative">
+                <thead class="sticky top-0 z-10 shadow-sm">
+                    <tr
+                        class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-4 bg-gray-50">Nama Leasing</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right">Total Quantity</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right">Total Amount</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    @forelse($leasingPerforma as $leasing)
+                        <tr class="hover:bg-blue-50/30 transition duration-150 ease-in-out">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                                        <span
+                                            class="text-blue-600 font-bold text-xs uppercase">{{ substr($leasing['name'], 0, 2) }}</span>
+                                    </div>
+                                    <span class="text-sm font-bold text-gray-800">{{ $leasing['name'] }}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <span
+                                    class="text-sm font-bold text-gray-800">{{ number_format($leasing['total_qty'], 0, ',', '.') }}</span>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <span class="text-sm font-bold text-gray-800">Rp
+                                    {{ number_format($leasing['total_amount'], 0, ',', '.') }}</span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="3" class="px-6 py-8 text-center text-sm text-gray-500">
+                                Belum ada data transaksi leasing pada rentang waktu ini.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {{-- SECTION 2.8: DAFTAR TRANSAKSI PIUTANG --}}
+    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center border-t pt-8 mt-8">
+        <svg class="w-5 h-5 mr-2 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+            </path>
+        </svg>
+        Laporan Transaksi Piutang (Outstanding)
+    </h2>
+    <div
+        class="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden mb-8">
+        <div class="overflow-x-auto overflow-y-auto" style="max-height: 400px;">
+            <table class="w-full text-left border-collapse relative">
+                <thead class="sticky top-0 z-10 shadow-sm">
+                    <tr class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-4 bg-gray-50">Nama Pelanggan / No Order</th>
+                        <th class="px-6 py-4 bg-gray-50 text-center">Metode (Jenis Piutang)</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right">Total Struk</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right">Sisa Tagihan / Utang</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    @forelse($piutangTransactions as $piutang)
+                        <tr class="hover:bg-yellow-50/30 transition duration-150 ease-in-out">
+                            <td class="px-6 py-4">
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-bold text-gray-800">{{ $piutang['customer_name'] }}</span>
+                                    <span class="text-xs text-gray-500 mt-1">{{ $piutang['order_number'] }} &bull; {{ \Carbon\Carbon::parse($piutang['date'])->format('d M Y H:i') }}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded bg-gray-100 text-gray-800 text-xs font-bold border {{ $piutang['payment_method'] === 'Piutang Toko' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-blue-200 bg-blue-50 text-blue-700' }}">
+                                    {{ $piutang['payment_method'] }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <span class="text-sm font-bold text-gray-800">Rp {{ number_format($piutang['grand_total'], 0, ',', '.') }}</span>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <span class="text-sm font-bold text-red-600">Rp {{ number_format($piutang['unpaid_amount'], 0, ',', '.') }}</span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="3" class="px-6 py-8 text-center text-sm text-gray-500">
+                                Tidak ada transaksi piutang (Outstanding) pada rentang waktu ini.
                             </td>
                         </tr>
                     @endforelse

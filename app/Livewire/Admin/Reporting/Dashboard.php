@@ -447,6 +447,109 @@ class Dashboard extends Component
             return $data;
         })->sortByDesc('cashback_amount')->values()->toArray();
 
+        // --- 9. PERFORMA LEASING ---
+        $leasingPerformaRaw = $orders->flatMap(function ($order) {
+            $leasingPayments = $order->payments->filter(function ($payment) {
+                $bankName = strtolower($payment->paymentMethod->bank_name ?? '');
+                return str_contains($bankName, 'finance') || $bankName === 'finance';
+            });
+            
+            return $leasingPayments->map(function ($payment) use ($order) {
+                return [
+                    'leasing_name' => $payment->paymentMethod->name ?? 'Unknown',
+                    'amount' => $payment->amount,
+                    'qty' => $order->items->sum('qty'),
+                ];
+            });
+        });
+
+        $leasingPerforma = $leasingPerformaRaw->groupBy('leasing_name')->map(function ($group, $name) {
+            return [
+                'name' => $name,
+                'total_amount' => $group->sum('amount'),
+                'total_qty' => $group->sum('qty'),
+            ];
+        })->sortByDesc('total_amount')->values()->toArray();
+
+        // --- 10. TRANSAKSI PIUTANG ---
+        // 1. Pure Piutang (order_status = 'PIUTANG')
+        $purePiutangOrders = Order::with(['user'])
+            ->whereBetween('created_at', [$start, $end])
+            ->where('order_status', 'PIUTANG')
+            ->when($this->branchFilter, function ($q) {
+                $q->where('shipping_address_snapshot->store', $this->branchFilter);
+            })
+            ->when($this->businessUnitFilter, function ($q) {
+                $q->where('business_unit_id', $this->businessUnitFilter);
+            }, function ($q) {
+                $user = \Illuminate\Support\Facades\Auth::user();
+                if (!$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
+                    $q->where('business_unit_id', $user->business_unit_id);
+                }
+            })
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'customer_name' => $order->user ? $order->user->name : 'Pelanggan Umum',
+                    'payment_method' => 'Piutang Toko',
+                    'unpaid_amount' => $order->grand_total,
+                    'grand_total' => $order->grand_total,
+                    'date' => $order->created_at,
+                ];
+            });
+
+        // 2. Finance Piutang (order_status = 'COMPLETED' and has PENDING payment)
+        $financePiutangOrders = Order::with(['user', 'payments.paymentMethod', 'payments.paymentMethodRate'])
+            ->whereBetween('created_at', [$start, $end])
+            ->where('order_status', 'COMPLETED')
+            ->whereHas('payments', function ($q) {
+                $q->where('status', 'PENDING');
+            })
+            ->when($this->branchFilter, function ($q) {
+                $q->where('shipping_address_snapshot->store', $this->branchFilter);
+            })
+            ->when($this->businessUnitFilter, function ($q) {
+                $q->where('business_unit_id', $this->businessUnitFilter);
+            }, function ($q) {
+                $user = \Illuminate\Support\Facades\Auth::user();
+                if (!$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
+                    $q->where('business_unit_id', $user->business_unit_id);
+                }
+            })
+            ->get()
+            ->flatMap(function ($order) {
+                // Find pending payments for this order
+                $pendingPayments = $order->payments->where('status', 'PENDING');
+                
+                return $pendingPayments->map(function ($payment) use ($order) {
+                    $pm = $payment->paymentMethod;
+                    $rate = $payment->paymentMethodRate;
+                    
+                    // Hitung MDR
+                    $pct = $rate ? ($rate->mdr_percentage ?? 0) : ($pm->mdr_percentage ?? 0);
+                    $rowMdr = $pct > 0 ? round((float)$payment->amount * (float)$pct / 100, 0) : 0;
+                    $expectedNetAmount = (float)$payment->amount - $rowMdr;
+
+                    return [
+                        'order_id' => $order->id,
+                        'order_number' => $order->order_number,
+                        'customer_name' => $order->user ? $order->user->name : 'Pelanggan Umum',
+                        'payment_method' => $pm->name ?? 'Finance',
+                        'unpaid_amount' => $expectedNetAmount, // Sudah dipotong MDR
+                        'grand_total' => $order->grand_total,
+                        'date' => $order->created_at,
+                    ];
+                });
+            });
+
+        // Gabungkan, urutkan berdasarkan yang terbaru
+        $piutangTransactions = $purePiutangOrders->concat($financePiutangOrders)
+            ->sortByDesc('date')
+            ->values()
+            ->toArray();
+
         return view('livewire.admin.reporting.dashboard', [
             'totalGross' => $totalGross,
             'totalDiscount' => $totalDiscount,
@@ -462,7 +565,9 @@ class Dashboard extends Component
             'topProducts' => $topProducts,
             'availableBranches' => $availableBranches,
             'cashierData' => $cashierData,
-            'cashbackPerSales' => $cashbackPerSales
+            'cashbackPerSales' => $cashbackPerSales,
+            'leasingPerforma' => $leasingPerforma,
+            'piutangTransactions' => $piutangTransactions
         ])->layout('layouts.admin');
     }
 }
