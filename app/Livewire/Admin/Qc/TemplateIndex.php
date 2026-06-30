@@ -147,6 +147,18 @@ class TemplateIndex extends Component
         $this->items = array_values($this->items);
     }
 
+    public function reorderItems($fromIndex, $toIndex)
+    {
+        if (!isset($this->items[$fromIndex]) || !isset($this->items[$toIndex])) {
+            return;
+        }
+
+        $item = $this->items[$fromIndex];
+        array_splice($this->items, $fromIndex, 1);
+        array_splice($this->items, $toIndex, 0, [$item]);
+        $this->items = array_values($this->items);
+    }
+
     /**
      * Load default 22-item checklist
      */

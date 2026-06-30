@@ -592,6 +592,7 @@
                     x-show="sidebarCollapsed" style="display:none;" x-cloak>Aturan Persetujuan</span>
             </a>
 
+
             <a href="{{ route('admin.purchase.invoice.export') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.purchase.invoice.export') ? $activeClass : $inactiveClass }}">
 

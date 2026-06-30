@@ -317,57 +317,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout Repo
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: 🚚 Mengambil kode terbaru dari GitHub
+        uses: actions/checkout@v4
 
-      # 2. Setup PHP
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      # (Opsional) Tambahkan proses build di sini jika diperlukan
+      # Contoh: npm install && npm run build
+
+      - name: 📂 Mentransfer file ke CloudPanel (via SCP)
+        uses: appleboy/scp-action@v0.1.7
         with:
-          php-version: 8.3
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          # Path sumber (semua file di repository)
+          source: "./"
+          # Path tujuan di CloudPanel (SESUAIKAN DENGAN NAMA DOMAINMU!)
+          target: "/home/${{ secrets.SERVER_USERNAME }}/htdocs/domain-kamu.com/"
+          # Mencegah folder root tambahan ikut ter-copy
+          strip_components: 1
 
-      # 3. Install Laravel Dependencies (Wajib dijalankan di Github Actions)
-      - name: Install Composer Dependencies
-        run: composer install --no-dev --optimize-autoloader
-
-      # 4. Setup Node.js & Build Assets
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: ⚙️ Menjalankan perintah post-deploy di server
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          node-version: 22
-
-      - name: Install Node dependencies
-        run: npm install
-
-      - name: Build assets
-        run: npm run build
-
-# 5. Upload via SFTP ke VPS CloudPanel
-      - name: Upload to VPS via SFTP
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
-        with:
-          server: ${{ secrets.VPS_HOST_ED }} # Gunakan IP VPS Anda
-          username: ${{ secrets.VPS_USERNAME_ED }} # Gunakan Site User dari CloudPanel (bukan FTP user)
-          ssh_private_key: ${{ secrets.VPS_SSH_KEY_ED }} # Gunakan Private Key yang sudah Anda buat sebelumnya
-          local_path: './*'
-          remote_path: '/htdocs/pos.zedgroup.tech/' # Sesuaikan dengan path root website Anda
-          args: '-o ConnectTimeout=5'
-          exclude: |
-            node_modules/*
-            node_modules
-            node_modules/**
-            .git*
-            .git/*
-            .git/**
-            .github/**
-            .github/*
-            .github/
-            test/*
-            test
-            test/**
-            README.md
-            vite.config.js
-            package.json
-            package-lock.json
-            webpack.mix.js
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          # Jalankan perintah tambahan (misal restart layanan atau clear cache)
+          script: |
+            cd /home/${{ secrets.SERVER_USERNAME }}/htdocs/pos.zedgroup.tech/
+            echo "Deployment berhasil! Menyesuaikan permission..."
+            # Jika ini project PHP/Laravel, kamu bisa tambah: composer install, php artisan optimize, dll.

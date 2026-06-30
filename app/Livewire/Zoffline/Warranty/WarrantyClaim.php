@@ -135,16 +135,43 @@ class WarrantyClaim extends Component
     private function loadTemplate()
     {
         $this->qc_results = [];
-        $this->template = QcTemplate::first();
+        $brandId = null;
+        $variant = $this->warranty->orderItem->variant ?? null;
+        
+        // Cek brand_name dari ProductAccurate
+        if ($variant) {
+            $brandName = null;
+            if ($variant instanceof \App\Models\ProductAccurate) {
+                $brandName = $variant->brandName;
+            } elseif (method_exists($variant, 'accurateData') && $variant->accurateData) {
+                $brandName = $variant->accurateData->brandName;
+            }
+
+            if ($brandName) {
+                $brand = \App\Models\Brand::where('name', 'like', '%' . $brandName . '%')->first();
+                $brandId = $brand->id ?? null;
+            }
+        }
+        
+        // Fallback
+        if (!$brandId && isset($variant->product->brand_id)) {
+            $brandId = $variant->product->brand_id;
+        }
+
+        $this->template = \App\Models\QcTemplate::findForBrand($brandId);
 
         if ($this->template) {
-            foreach ($this->template->items as $item) {
-                $category = $this->getCategoryForQc($item['name']);
+            $items = $this->template->items;
+            if (!is_array($items)) {
+                $items = json_decode($items, true) ?? [];
+            }
+
+            foreach ($items as $item) {
                 $this->qc_results[] = [
-                    'name' => $item['name'],
-                    'type' => $item['type'],
-                    'value' => $item['type'] === 'boolean' ? 1 : '', // Default to 1 (Pass)
-                    'category' => $category
+                    'name' => $item['name'] ?? 'Unknown',
+                    'type' => $item['type'] ?? 'boolean',
+                    'value' => ($item['type'] ?? 'boolean') === 'boolean' ? 1 : '', // Default to 1 (Pass)
+                    'category' => $this->getCategoryForQc($item['name'] ?? '')
                 ];
             }
         }

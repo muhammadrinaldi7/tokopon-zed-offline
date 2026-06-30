@@ -126,6 +126,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Approvals
     Route::get('/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('approvals.index');
 
+
     Route::prefix('promos')->name('promos.')->middleware('can:manage-promos')->group(function () {
         Route::get('/', App\Livewire\Admin\Promo\Index::class)->name('index');
         Route::get('/create', App\Livewire\Admin\Promo\Form::class)->name('create');

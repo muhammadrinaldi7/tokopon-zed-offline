@@ -231,10 +231,27 @@
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-2">
+                        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-2"
+                            x-data="{
+                                dragIndex: null,
+                                dropIndex: null,
+                                reorder() {
+                                    if (this.dragIndex !== null && this.dropIndex !== null && this.dragIndex !== this.dropIndex) {
+                                        @this.reorderItems(this.dragIndex, this.dropIndex);
+                                    }
+                                    this.dragIndex = null;
+                                    this.dropIndex = null;
+                                }
+                            }">
                             @foreach ($items as $index => $item)
-                                <div class="flex items-center gap-3 bg-gray-50/50 p-2 rounded-lg border border-gray-100 group flex-wrap md:flex-nowrap">
-                                    <div class="flex flex-col items-center justify-center w-8 text-gray-400 cursor-move hover:text-gray-600 transition-colors shrink-0">
+                                <div class="flex items-center gap-3 bg-gray-50/50 p-2 rounded-lg border border-gray-100 group flex-wrap md:flex-nowrap transition-all duration-200"
+                                     draggable="true"
+                                     @dragstart="dragIndex = {{ $index }}; $event.dataTransfer.effectAllowed = 'move';"
+                                     @dragover.prevent="dropIndex = {{ $index }}; $event.dataTransfer.dropEffect = 'move';"
+                                     @drop="reorder()"
+                                     @dragend="dragIndex = null; dropIndex = null;"
+                                     :class="{ 'opacity-40 scale-[0.98]': dragIndex === {{ $index }}, 'border-t-2 border-t-[#1c69d4] bg-blue-50/50 shadow-md transform -translate-y-1': dropIndex === {{ $index }} && dragIndex !== {{ $index }} }">
+                                    <div class="flex flex-col items-center justify-center w-8 text-gray-400 cursor-grab active:cursor-grabbing hover:text-[#1c69d4] transition-colors shrink-0">
                                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" /></svg>
                                         <span class="text-[10px] font-black leading-none mt-0.5">{{ $index + 1 }}</span>
                                     </div>

@@ -91,18 +91,43 @@ class WarrantyActivation extends Component
     {
         $this->qc_results = [];
         
-        // Find template. Usually we find by Brand, but for Unboxing maybe we can just load a default or guess.
-        // Assuming there is at least one active template in the system.
-        $this->template = QcTemplate::first();
+        $brandId = null;
+        $variant = $this->foundItem->variant ?? null;
+        
+        // Cek brand_name dari ProductAccurate
+        if ($variant) {
+            $brandName = null;
+            if ($variant instanceof \App\Models\ProductAccurate) {
+                $brandName = $variant->brandName;
+            } elseif (method_exists($variant, 'accurateData') && $variant->accurateData) {
+                $brandName = $variant->accurateData->brandName;
+            }
+
+            if ($brandName) {
+                $brand = \App\Models\Brand::where('name', 'like', '%' . $brandName . '%')->first();
+                $brandId = $brand->id ?? null;
+            }
+        }
+        
+        // Fallback: coba product->brand_id jika belum dapat
+        if (!$brandId && isset($variant->product->brand_id)) {
+            $brandId = $variant->product->brand_id;
+        }
+
+        $this->template = QcTemplate::findForBrand($brandId);
 
         if ($this->template) {
-            foreach ($this->template->items as $item) {
-                $category = $this->getCategoryForQc($item['name']);
+            $items = $this->template->items;
+            if (!is_array($items)) {
+                $items = json_decode($items, true) ?? [];
+            }
+
+            foreach ($items as $item) {
                 $this->qc_results[] = [
-                    'name' => $item['name'],
-                    'type' => $item['type'],
-                    'value' => $item['type'] === 'boolean' ? 1 : '', // Default to 1 (Pass) for unboxing
-                    'category' => $category
+                    'name' => $item['name'] ?? 'Unknown',
+                    'type' => $item['type'] ?? 'boolean',
+                    'value' => ($item['type'] ?? 'boolean') === 'boolean' ? 1 : '',
+                    'category' => $this->getCategoryForQc($item['name'] ?? '')
                 ];
             }
         }

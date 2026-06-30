@@ -84,8 +84,34 @@ class InspectionForm extends Component
         $model = $this->getInspectableModel();
         $brandId = null;
 
-        if ($model && method_exists($model, 'buybackDevice')) {
-            $brandId = $model->buybackDevice?->brand_id;
+        if ($model) {
+            if (method_exists($model, 'buybackDevice')) {
+                $brandId = $model->buybackDevice?->brand_id;
+            } elseif (method_exists($model, 'accurateData') && $model->accurateData) {
+                // Untuk SecondProductVariant / ProductVariant
+                $brandName = $model->accurateData->brandName;
+                if ($brandName) {
+                    $brand = \App\Models\Brand::where('name', 'like', '%' . $brandName . '%')->first();
+                    $brandId = $brand->id ?? null;
+                }
+            } elseif ($model instanceof \App\Models\OrderItem) {
+                $variant = $model->variant;
+                if ($variant) {
+                    $brandName = null;
+                    if ($variant instanceof \App\Models\ProductAccurate) {
+                        $brandName = $variant->brandName;
+                    } elseif (method_exists($variant, 'accurateData') && $variant->accurateData) {
+                        $brandName = $variant->accurateData->brandName;
+                    }
+                    if ($brandName) {
+                        $brand = \App\Models\Brand::where('name', 'like', '%' . $brandName . '%')->first();
+                        $brandId = $brand->id ?? null;
+                    }
+                    if (!$brandId && isset($variant->product->brand_id)) {
+                        $brandId = $variant->product->brand_id;
+                    }
+                }
+            }
         }
 
         $this->template = QcTemplate::findForBrand($brandId);
