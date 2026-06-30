@@ -217,6 +217,58 @@
         </div>
     </div>
 
+    {{-- SECTION 2.5: TRANSAKSI KASIR --}}
+    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center border-t pt-8 mt-8">
+        <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+        Laporan Transaksi Kasir
+    </h2>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden mb-8">
+        <div class="overflow-x-auto overflow-y-auto" style="max-height: 400px;">
+            <table class="w-full text-left border-collapse relative">
+                <thead class="sticky top-0 z-10 shadow-sm">
+                    <tr class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-4 bg-gray-50">Nama Kasir</th>
+                        <th class="px-6 py-4 bg-gray-50 text-center">Qty</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right">Amount (Struk)</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right">Cashback</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right">Promo</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right text-blue-600">Tunai</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right text-purple-600">Non-Tunai</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @forelse($cashierData as $cData)
+                        <tr class="hover:bg-gray-50/50 transition-colors">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+                                        {{ substr($cData['name'], 0, 1) }}
+                                    </div>
+                                    <span class="text-sm font-bold text-gray-800">{{ $cData['name'] }}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600 text-center font-medium">{{ $cData['qty'] }}</td>
+                            <td class="px-6 py-4 text-sm font-bold text-gray-800 text-right">Rp {{ number_format($cData['amount'], 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm font-medium text-red-500 text-right">Rp {{ number_format($cData['cashback'], 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm font-medium text-green-500 text-right">Rp {{ number_format($cData['promo'], 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm font-bold text-blue-600 text-right">Rp {{ number_format($cData['tunai'], 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm font-bold text-purple-600 text-right">Rp {{ number_format($cData['non_tunai'], 0, ',', '.') }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">
+                                Belum ada data transaksi kasir pada rentang waktu ini.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     {{-- SECTION 3: ANALYTICS CHARTS --}}
     <div class="grid grid-cols-1 gap-6 mb-8">
         {{-- Trend Chart --}}
@@ -238,6 +290,7 @@
             </div>
         </div>
     </div>
+
 
     {{-- SECTION 4: MONTH-TO-DATE (MTD) ANALYTICS --}}
     <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center border-t pt-8">

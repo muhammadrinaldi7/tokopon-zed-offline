@@ -199,7 +199,7 @@ class Dashboard extends Component
         ];
 
         // Fetch all orders for chart processing
-        $orders = (clone $query)->with(['salesBy'])->get();
+        $orders = (clone $query)->with(['salesBy', 'handledBy', 'items', 'payments.paymentMethod'])->get();
 
         // --- 3. TREND DATA (Line/Area Chart) ---
         $daysDiff = $start->diffInDays($end);
@@ -329,6 +329,47 @@ class Dashboard extends Component
             'paymentMethod' => $paymentMethodData
         ]);
 
+        // --- 7. TRANSAKSI KASIR ---
+        $cashierData = $orders->groupBy('handled_by')->map(function($group) {
+            $cashier = $group->first()->handledBy;
+            
+            $qty = 0;
+            $amount = 0;
+            $cashback = 0;
+            $promo = 0;
+            $tunai = 0;
+            $nonTunai = 0;
+
+            foreach ($group as $order) {
+                $amount += $order->grand_total;
+                
+                foreach ($order->items as $item) {
+                    $qty += $item->qty;
+                    $cashback += $item->discount_amount;
+                    $promo += $item->promo_discount_amount;
+                }
+
+                foreach ($order->payments as $payment) {
+                    $bankName = strtolower($payment->paymentMethod->bank_name ?? '');
+                    if (str_contains($bankName, 'finance') || $bankName === 'finance') {
+                        $nonTunai += $payment->amount;
+                    } else {
+                        $tunai += $payment->amount;
+                    }
+                }
+            }
+
+            return [
+                'name' => $cashier ? $cashier->name : 'Unknown',
+                'qty' => $qty,
+                'amount' => $amount,
+                'cashback' => $cashback,
+                'promo' => $promo,
+                'tunai' => $tunai,
+                'non_tunai' => $nonTunai,
+            ];
+        })->sortByDesc('amount')->values()->toArray();
+
         return view('livewire.admin.reporting.dashboard', [
             'totalGross' => $totalGross,
             'totalDiscount' => $totalDiscount,
@@ -342,7 +383,8 @@ class Dashboard extends Component
             'topBranches' => $topBranches,
             'topSales' => $topSales,
             'topProducts' => $topProducts,
-            'availableBranches' => $availableBranches
+            'availableBranches' => $availableBranches,
+            'cashierData' => $cashierData
         ])->layout('layouts.admin');
     }
 }
