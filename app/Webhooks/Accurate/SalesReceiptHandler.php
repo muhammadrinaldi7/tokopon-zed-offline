@@ -21,6 +21,7 @@ class SalesReceiptHandler implements WebhookHandlerInterface
         }
 
         $dbSource = $log->database_source ?? 'syihab';
+        $businessUnit = \App\Models\BusinessUnit::where('code', $dbSource)->first();
         $accurateService = app(AccurateService::class);
 
         foreach ($payload['data'] as $dataItem) {
@@ -61,10 +62,17 @@ class SalesReceiptHandler implements WebhookHandlerInterface
 
                     Log::info("Processing Webhook Sales Receipt for Invoice: {$invoiceNo}, Amount: {$paymentAmount}");
 
-                    // Find local order with this accurate_invoice_no
-                    $order = Order::where('accurate_invoice_no', $invoiceNo)
-                        ->orWhere('accurate_invoice_no', 'LIKE', '%' . $invoiceNo . '%')
-                        ->first();
+                    // Find local order with this accurate_invoice_no scoped by Business Unit
+                    $query = Order::where(function ($q) use ($invoiceNo) {
+                        $q->where('accurate_invoice_no', $invoiceNo)
+                          ->orWhere('accurate_invoice_no', 'LIKE', '%' . $invoiceNo . '%');
+                    });
+
+                    if ($businessUnit) {
+                        $query->where('business_unit_id', $businessUnit->id);
+                    }
+
+                    $order = $query->first();
 
                     if (!$order) {
                         Log::warning("Order not found for accurate_invoice_no: {$invoiceNo}");
