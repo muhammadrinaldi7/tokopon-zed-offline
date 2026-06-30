@@ -39,7 +39,7 @@ trait WithPaymentAndPromo
                     'payment_method_id' => '',
                     'payment_method_rate_id' => '',
                     'no_kontrak' => '',
-                    'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount()),
+                    'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0)),
                 ]
             ];
             $this->activePaymentIndex = 0;
@@ -52,7 +52,7 @@ trait WithPaymentAndPromo
                     'payment_method_id' => '',
                     'payment_method_rate_id' => '',
                     'no_kontrak' => '',
-                    'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount()),
+                    'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0)),
                 ]
             ];
             $this->activePaymentIndex = 0;
@@ -65,7 +65,7 @@ trait WithPaymentAndPromo
 
     public function addSplitPayment($category) // 'TUNAI' or 'NON-TUNAI'
     {
-        $remaining = max(0, ($this->subtotal() - (int)$this->totalDiscount()) - $this->paymentsTotalBase());
+        $remaining = max(0, ($this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0)) - $this->paymentsTotalBase());
         $this->payments[] = [
             'category' => $category,
             'bank_name' => '',
@@ -185,7 +185,7 @@ trait WithPaymentAndPromo
     public function isPaymentsValid()
     {
         $totalPaid = 0;
-        $grandTotal = max(0, $this->subtotal() - (int)$this->totalDiscount());
+        $grandTotal = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0));
 
         foreach ($this->payments as $p) {
             // Jika kategori kosong, invalid
@@ -243,7 +243,7 @@ trait WithPaymentAndPromo
                 $totalOther += (int)$p['amount'];
             }
         }
-        $target = max(0, $this->subtotal() - (int)$this->totalDiscount());
+        $target = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0));
         $this->payments[$index]['amount'] = max(0, $target - $totalOther);
     }
 
@@ -254,7 +254,7 @@ trait WithPaymentAndPromo
         }
 
         if (count($this->payments) === 1) {
-            $this->payments[0]['amount'] = max(0, $this->subtotal() - (int)$this->totalDiscount());
+            $this->payments[0]['amount'] = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0));
         }
     }
 

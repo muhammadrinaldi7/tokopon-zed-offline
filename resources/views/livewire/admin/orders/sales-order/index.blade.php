@@ -60,20 +60,29 @@
                             <td class="p-4 font-bold text-gray-800">Rp
                                 {{ number_format($order->grand_total, 0, ',', '.') }}</td>
                             <td class="p-4 text-center">
-                                @if ($order->order_status === 'pending')
-                                    <span
-                                        class="px-2.5 py-1 bg-amber-50 text-amber-600 text-[10px] font-bold uppercase rounded-md border border-amber-200">Pending</span>
-                                @elseif($order->order_status === 'down_payment')
-                                    <span
-                                        class="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold uppercase rounded-md border border-blue-200">DP
-                                        Dibayar</span>
-                                @elseif($order->order_status === 'completed')
-                                    <span
-                                        class="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase rounded-md border border-emerald-200">Selesai</span>
-                                @else
-                                    <span
-                                        class="px-2.5 py-1 bg-gray-50 text-gray-600 text-[10px] font-bold uppercase rounded-md border border-gray-200">{{ $order->order_status }}</span>
-                                @endif
+                                <div class="flex flex-col items-center gap-1.5">
+                                    @if ($order->order_status === 'pending')
+                                        <span
+                                            class="px-2.5 py-1 bg-amber-50 text-amber-600 text-[10px] font-bold uppercase rounded-md border border-amber-200">Pending</span>
+                                    @elseif($order->order_status === 'down_payment')
+                                        <span
+                                            class="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold uppercase rounded-md border border-blue-200">DP
+                                            Dibayar</span>
+                                    @elseif($order->order_status === 'completed')
+                                        <span
+                                            class="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase rounded-md border border-emerald-200">Selesai</span>
+                                    @else
+                                        <span
+                                            class="px-2.5 py-1 bg-gray-50 text-gray-600 text-[10px] font-bold uppercase rounded-md border border-gray-200">{{ $order->order_status }}</span>
+                                    @endif
+
+                                    @if($order->accurateDocs->where('doc_type', 'DELIVERY_ORDER')->isNotEmpty())
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 text-orange-600 text-[9px] font-bold uppercase rounded border border-orange-200">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                            DO TERCETAK
+                                        </span>
+                                    @endif
+                                </div>
                             </td>
                             <td class="p-4 text-right">
                                 <a href="{{ route('admin.sales-orders.show', $order) }}" wire:navigate

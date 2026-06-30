@@ -51,6 +51,13 @@
                     </svg>
                 </button>
             @endcan
+            <button wire:click="openSoList"
+                class="p-4 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-full flex items-center gap-2 transition-all shadow-sm"
+                title="Faktur Pesanan (SO)">
+                <svg class="w-5 h-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </button>
             <button wire:click="openDraft"
                 class="p-4 bg-amber-200 text-amber-700 hover:bg-amber-300 rounded-full flex items-center gap-2 transition-all shadow-sm"
                 title="Draft">
@@ -471,6 +478,71 @@
                             </div>
                             <h3 class="text-lg font-bold text-gray-800 mb-1">Tidak ada tagihan Piutang</h3>
                             <p class="text-gray-500 text-sm">Semua transaksi piutang telah dilunasi.</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal SO List --}}
+    @if ($showSoModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-blue-50/50">
+                    <div>
+                        <h3 class="text-xl font-black text-gray-800">Daftar Pesanan (SO)</h3>
+                        <p class="text-sm text-gray-500 mt-1">Pilih pesanan SO untuk dilunasi / input IMEI</p>
+                    </div>
+                    <button wire:click="$set('showSoModal', false)"
+                        class="text-gray-400 hover:text-gray-600 focus:outline-none p-2 rounded-xl hover:bg-white transition-colors">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto">
+                    @if (count($soOrders) > 0)
+                        <div class="space-y-4">
+                            @foreach ($soOrders as $order)
+                                <div
+                                    class="p-4 border border-gray-100 rounded-2xl hover:border-blue-200 hover:bg-blue-50/30 transition-all group flex justify-between items-center">
+                                    <div>
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span
+                                                class="font-bold text-gray-800 group-hover:text-blue-700">{{ $order->order_number }}</span>
+                                            <span
+                                                class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider">{{ $order->order_status }}</span>
+                                        </div>
+                                        <div class="text-sm text-gray-500">
+                                            {{ $order->user->name ?? 'Tanpa Nama' }} &bull;
+                                            {{ \Carbon\Carbon::parse($order->order_date)->format('d M Y') }}
+                                        </div>
+                                    </div>
+                                    <div class="text-right flex flex-col items-end gap-2">
+                                        <div class="font-black text-lg text-gray-900 group-hover:text-blue-700">Rp
+                                            {{ number_format($order->grand_total, 0, ',', '.') }}</div>
+                                        <button wire:click="loadSoOrder({{ $order->id }})"
+                                            class="px-4 py-1.5 bg-blue-100 text-blue-700 font-bold rounded-lg hover:bg-blue-200 transition-colors text-sm shadow-sm">
+                                            Proses Faktur
+                                        </button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="text-center py-10">
+                            <div
+                                class="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
+                                <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-lg font-bold text-gray-800 mb-1">Tidak ada pesanan SO</h3>
+                            <p class="text-gray-500 text-sm">Belum ada Sales Order yang siap diproses pelunasannya.</p>
                         </div>
                     @endif
                 </div>

@@ -76,26 +76,28 @@
                         </div>
                     </button>
 
-                    <button wire:click="setPaymentMode('split')"
-                        class="w-full min-h-62.5 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out border-2 {{ $paymentMode === 'split' ? 'border-[#1c69d4] shadow-md ring-4 ring-[#1c69d4]/10' : 'border-transparent' }}">
+                    @if (!isset($hideSplit) || !$hideSplit)
+                        <button wire:click="setPaymentMode('split')"
+                            class="w-full min-h-62.5 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out border-2 {{ $paymentMode === 'split' ? 'border-[#1c69d4] shadow-md ring-4 ring-[#1c69d4]/10' : 'border-transparent' }}">
 
-                        <div
-                            class="bg-slate-200 text-neutral-800 rounded-full w-20 h-20 flex items-center justify-center transition-all duration-300">
-                            <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                            </svg>
-                        </div>
+                            <div
+                                class="bg-slate-200 text-neutral-800 rounded-full w-20 h-20 flex items-center justify-center transition-all duration-300">
+                                <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                            </div>
 
-                        <div class="text-left mt-6">
-                            <h1
-                                class="text-2xl font-black {{ $paymentMode === 'split' ? 'text-[#1c69d4]' : 'text-neutral-800' }}">
-                                SPLIT</h1>
-                            <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Bayar dengan lebih dari satu metode
-                            </p>
-                        </div>
-                    </button>
+                            <div class="text-left mt-6">
+                                <h1
+                                    class="text-2xl font-black {{ $paymentMode === 'split' ? 'text-[#1c69d4]' : 'text-neutral-800' }}">
+                                    SPLIT</h1>
+                                <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Bayar dengan lebih dari satu metode
+                                </p>
+                            </div>
+                        </button>
+                    @endif
                 </div>
             @elseif($paymentWizardStep == 1.5)
                 {{-- STEP 1.5: PILIH GRUP BANK (HANYA NON-TUNAI) --}}
@@ -250,7 +252,8 @@
                         },
                     
                         updateAmount(e) {
-                            if (!this.isSplit) return;
+                            let allowEdit = {{ isset($allowEditAmount) && $allowEditAmount ? 'true' : 'false' }};
+                            if (!this.isSplit && !allowEdit) return;
                     
                             let val = e.target.value;
                             let num = parseInt(val.replace(/\D/g, ''), 10);
@@ -377,9 +380,9 @@
                             <span
                                 class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-black text-2xl">Rp</span>
                             <input type="text" x-ref="amountInput" x-model="formattedAmount"
-                                @input="updateAmount($event)" x-bind:readonly="!isSplit"
-                                :class="!isSplit ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'text-gray-800'"
-                                class="w-full bg-white border-2 border-gray-300 rounded-2xl pl-16 pr-5 py-5 text-4xl font-black focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/20 transition-all text-right"
+                                @input="updateAmount($event)" x-bind:readonly="!isSplit && {{ isset($allowEditAmount) && $allowEditAmount ? 'false' : 'true' }}"
+                                :class="(!isSplit && {{ isset($allowEditAmount) && $allowEditAmount ? 'false' : 'true' }}) ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'text-gray-800 bg-white'"
+                                class="w-full border-2 border-gray-300 rounded-2xl pl-16 pr-5 py-5 text-4xl font-black focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/20 transition-all text-right"
                                 placeholder="0">
                         </div>
                     </div>
@@ -492,7 +495,7 @@
 
                     @php
                         $totalPaid = collect($payments)->sum('amount');
-                        $target = max(0, $this->subtotal() - (int) $this->totalDiscount());
+                        $target = max(0, $this->subtotal() - (int) $this->totalDiscount() - ($isSoFulfillment ? ($soPaidAmount ?? 0) : 0));
                         $kurang = $target - $totalPaid;
                     @endphp
 
@@ -555,6 +558,7 @@
 
     </div>
 
+    @if(!isset($hideFooter) || !$hideFooter)
     {{-- Footer Actions --}}
     <div class="flex flex-col sm:flex-row justify-between gap-3 pt-4 sm:pt-6 border-t border-gray-200 mt-2">
         <button wire:click="prevStep"
@@ -888,11 +892,18 @@
                                             <span class="font-bold text-rose-500">- Rp
                                                 {{ number_format($this->totalDiscount, 0, ',', '.') }}</span>
                                         </div>
+                                        @if ($isSoFulfillment && ($soPaidAmount ?? 0) > 0)
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-600 font-medium">Down Payment (DP) SO</span>
+                                                <span class="font-bold text-emerald-500">- Rp
+                                                    {{ number_format($soPaidAmount, 0, ',', '.') }}</span>
+                                            </div>
+                                        @endif
                                         <div class="border-t border-[#1c69d4]/20 my-2 pt-2">
                                             <div class="flex justify-between items-center">
                                                 <span class="text-gray-800 font-black">Grand Total</span>
                                                 <span class="font-black text-xl sm:text-2xl text-[#1c69d4]">Rp
-                                                    {{ number_format(max(0, $this->subtotal - $this->totalDiscount), 0, ',', '.') }}</span>
+                                                    {{ number_format(max(0, $this->subtotal - $this->totalDiscount - ($isSoFulfillment ? ($soPaidAmount ?? 0) : 0)), 0, ',', '.') }}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1016,11 +1027,18 @@
                                             <span class="font-bold text-rose-500">- Rp
                                                 {{ number_format($this->totalDiscount, 0, ',', '.') }}</span>
                                         </div>
+                                        @if ($isSoFulfillment && ($soPaidAmount ?? 0) > 0)
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-600 font-medium">Down Payment (DP) SO</span>
+                                                <span class="font-bold text-emerald-500">- Rp
+                                                    {{ number_format($soPaidAmount, 0, ',', '.') }}</span>
+                                            </div>
+                                        @endif
                                         <div class="border-t border-violet-600/20 my-2 pt-2">
                                             <div class="flex justify-between items-center">
                                                 <span class="text-gray-800 font-black">Total Piutang</span>
                                                 <span class="font-black text-xl sm:text-2xl text-violet-600">Rp
-                                                    {{ number_format(max(0, $this->subtotal - $this->totalDiscount), 0, ',', '.') }}</span>
+                                                    {{ number_format(max(0, $this->subtotal - $this->totalDiscount - ($isSoFulfillment ? ($soPaidAmount ?? 0) : 0)), 0, ',', '.') }}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1049,3 +1067,4 @@
             </template>
         </div>
     </div>
+    @endif

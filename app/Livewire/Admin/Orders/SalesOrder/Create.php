@@ -23,6 +23,12 @@ class Create extends Component
     public $searchCustomer = '';
     public $customerSearchResults = [];
 
+    // New Customer
+    public $showNewCustomerModal = false;
+    public $new_customer_name = '';
+    public $new_customer_phone = '';
+    public $new_customer_email = '';
+
     public $business_unit_id;
     public $warehouse_id;
     public $order_date;
@@ -36,6 +42,9 @@ class Create extends Component
     public $discount_amount = 0;
     public $grand_total = 0;
 
+    // Wizard
+    public int $wizardStep = 1;
+
     public function mount()
     {
         $this->order_date = Carbon::now()->format('Y-m-d');
@@ -43,6 +52,41 @@ class Create extends Component
         $this->warehouse_id = Auth::user()->warehouse_id;
         // Initial empty row
         $this->addItem();
+    }
+
+    public function nextStep()
+    {
+        if ($this->wizardStep == 1) {
+            $this->validate([
+                'user_id' => 'required',
+                'order_date' => 'required|date',
+            ], [
+                'user_id.required' => 'Silakan pilih pelanggan terlebih dahulu.',
+            ]);
+        } elseif ($this->wizardStep == 2) {
+            if (empty($this->items)) {
+                $this->addError('items', 'Minimal pilih 1 produk.');
+                return;
+            }
+            $this->validate([
+                'items.*.variant_id' => 'required',
+                'items.*.qty' => 'required|numeric|min:1',
+            ], [
+                'items.*.variant_id.required' => 'Ada baris produk yang belum dipilih.',
+                'items.*.qty.min' => 'Kuantitas minimal 1.',
+            ]);
+        }
+
+        if ($this->wizardStep < 3) {
+            $this->wizardStep++;
+        }
+    }
+
+    public function prevStep()
+    {
+        if ($this->wizardStep > 1) {
+            $this->wizardStep--;
+        }
     }
 
     public function addItem()
@@ -56,6 +100,7 @@ class Create extends Component
             'discount' => 0,
             'total' => 0,
             'product_name' => '',
+            'serial_number' => '', // Tambahan untuk Kunci IMEI di SO
         ];
         $this->calculateTotals();
     }
@@ -147,6 +192,82 @@ class Create extends Component
         $this->customerSearchResults = [];
     }
 
+    public function createNewCustomer()
+    {
+        $this->validate([
+            'new_customer_name' => 'required|string|min:3',
+            'new_customer_phone' => 'required|string|min:9',
+        ], [
+            'new_customer_name.required' => 'Nama wajib diisi',
+            'new_customer_phone.required' => 'No HP wajib diisi',
+        ]);
+
+        $email = $this->new_customer_email;
+        if (empty($email)) {
+            // Gunakan rand agar email generated selalu unik (mirip dengan logic di POS)
+            $email = preg_replace('/[^0-9]/', '', $this->new_customer_phone) . rand(1000, 9999) . '@zpos.com';
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Check if phone or email already exists
+            $existingUser = User::where('email', $email)->orWhereHas('profile', function ($q) {
+                $q->where('phone_number', preg_replace('/[^0-9]/', '', $this->new_customer_phone));
+            })->first();
+
+            if ($existingUser) {
+                $this->dispatch('toast', title: 'Gagal', message: 'Email atau No HP sudah terdaftar di pelanggan lain.', type: 'error');
+                return;
+            }
+
+            $user = User::create([
+                'name' => $this->new_customer_name,
+                'email' => $email,
+                'password' => bcrypt('password123'), // Default password
+            ]);
+
+            $user->assignRole('user');
+
+            \App\Models\UserProfile::create([
+                'user_id' => $user->id,
+                'full_name' => $this->new_customer_name,
+                'phone_number' => preg_replace('/[^0-9]/', '', $this->new_customer_phone),
+            ]);
+
+            DB::commit();
+
+            // Sinkronisasi otomatis ke Accurate setelah berhasil simpan di lokal DB
+            try {
+                if ($this->business_unit_id) {
+                    $accurateService = app(\App\Services\AccurateService::class);
+                    $businessUnit = \App\Models\BusinessUnit::find($this->business_unit_id);
+                    $dbSource = $businessUnit ? $businessUnit->code : 'syihab';
+                    
+                    $accurateService->syncCustomer($user, $dbSource);
+                    $user->refresh();
+                }
+            } catch (\Exception $e) {
+                Log::error('Accurate Sync Customer Error (saat buat baru di SO): ' . $e->getMessage());
+                // Tetap lanjut meskipun gagal sync (bisa disync nanti saat simpan SO)
+            }
+
+            $this->selectCustomer($user->id, $user->name);
+            $this->showNewCustomerModal = false;
+
+            // Reset fields
+            $this->new_customer_name = '';
+            $this->new_customer_phone = '';
+            $this->new_customer_email = '';
+
+            $this->dispatch('toast', title: 'Berhasil', message: 'Pelanggan baru berhasil ditambahkan.', type: 'success');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Gagal membuat pelanggan baru di SO: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Terjadi kesalahan sistem saat membuat pelanggan.', type: 'error');
+        }
+    }
+
     public function selectProduct($index, $id, $name, $price)
     {
         $this->items[$index]['variant_id'] = $id;
@@ -225,6 +346,18 @@ class Create extends Component
             'grand_total' => $this->grand_total,
         ]);
 
+        $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
+        $businessUnit = BusinessUnit::find($this->business_unit_id);
+        $completePrefix = 'SO-' . $businessUnit->prefix . '-';
+        $orderNumber = $completePrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
+            Order::whereDate('order_date', $dateToUse->format('Y-m-d')) // <- Menggunakan order_date
+                ->where('order_channel', 'SO')
+                ->count() + 1,
+            4,
+            '0',
+            STR_PAD_LEFT
+        );
+
         try {
             DB::beginTransaction();
 
@@ -237,7 +370,7 @@ class Create extends Component
                 'business_unit_id' => $this->business_unit_id,
                 'branch_id' => $handler->branch_id,
                 'order_channel' => 'SO',
-                'order_number' => 'SO-' . time() . rand(10, 99),
+                'order_number' => $orderNumber,
                 'order_date' => $this->order_date,
                 'total_amount' => $this->subtotal,
                 'discount_amount' => $this->discount_amount,
@@ -261,6 +394,7 @@ class Create extends Component
                     'price_at_checkout' => $item['unit_price'],
                     'discount_amount' => $item['discount'],
                     'subtotal' => $item['total'],
+                    'serial_number' => $item['serial_number'] ?? null, // Simpan IMEI
                 ]);
             }
 
@@ -289,7 +423,7 @@ class Create extends Component
                     $variant = \App\Models\ProductAccurate::find($item['variant_id']);
                     $itemName = $variant->name ?? 'Unknown';
 
-                    $detailItems[] = [
+                    $detailData = [
                         'itemNo' => $variant->item_no ?? 'ITEM-UNKNOWN',
                         'unitPrice' => (float)$item['unit_price'],
                         'quantity' => (float)$item['qty'],
@@ -297,6 +431,20 @@ class Create extends Component
                         'useTax1'   => false,
                         'itemCashDiscount' => (float)$item['discount'],
                     ];
+
+                    // Jika user mengisi SN / IMEI, kirim ke Accurate untuk mencadangkan SN
+                    if (!empty($item['serial_number'])) {
+                        $sns = array_filter(array_map('trim', explode(',', $item['serial_number'])));
+                        if (count($sns) > 0) {
+                            $detailSNs = [];
+                            foreach ($sns as $sn) {
+                                $detailSNs[] = ['serialNumberNo' => $sn, 'quantity' => 1];
+                            }
+                            $detailData['detailSerialNumber'] = $detailSNs;
+                        }
+                    }
+
+                    $detailItems[] = $detailData;
                 }
 
                 $soData = [
@@ -323,6 +471,72 @@ class Create extends Component
                         'status' => 'SUCCESS',
                     ]);
                     Log::info('Berhasil Sync SO ke Accurate dengan Nomor: ' . $soResult['r']['number']);
+
+                    // CEK APAKAH ADA ITEM YANG PUNYA SN (JIKA YA, BUAT DELIVERY ORDER)
+                    $hasSN = false;
+                    foreach ($this->items as $item) {
+                        if (!empty($item['serial_number'])) {
+                            $hasSN = true;
+                            break;
+                        }
+                    }
+
+                    if ($hasSN) {
+                        Log::info('IMEI dideteksi pada SO, memulai pembuatan Delivery Order otomatis...');
+
+                        // Menentukan Gudang (Warehouse) untuk DO
+                        $handler = Auth::user();
+                        $warehouseName = $handler->warehouse->name ?? 'Gudang Utama';
+
+                        $doDetailItems = [];
+                        foreach ($this->items as $item) {
+                            $variant = \App\Models\ProductAccurate::find($item['variant_id']);
+
+                            $detailData = [
+                                'itemNo' => $variant->item_no ?? 'ITEM-UNKNOWN',
+                                'quantity' => (float)$item['qty'],
+                                'warehouseName' => $warehouseName,
+                            ];
+
+                            if (!empty($item['serial_number'])) {
+                                $sns = array_filter(array_map('trim', explode(',', $item['serial_number'])));
+                                if (count($sns) > 0) {
+                                    $detailSNs = [];
+                                    foreach ($sns as $sn) {
+                                        $detailSNs[] = ['serialNumberNo' => $sn, 'quantity' => 1];
+                                    }
+                                    $detailData['detailSerialNumber'] = $detailSNs;
+                                }
+                            }
+
+                            $doDetailItems[] = $detailData;
+                        }
+
+                        $doData = [
+                            'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
+                            'branchName' => $accurateBranchName,
+                            'transDate' => Carbon::parse($this->order_date)->format('d/m/Y'),
+                            'salesOrderNumber' => $soResult['r']['number'],
+                            'description' => 'DO Otomatis dari SO (Kunci IMEI). ' . $this->notes,
+                            'detailItem' => $doDetailItems
+                        ];
+
+                        Log::info('Payload Delivery Order: ' . json_encode($doData));
+                        $doResult = $accurateService->postDeliveryOrder($doData, $dbSource);
+                        Log::info('Response API Accurate DO: ', is_array($doResult) ? $doResult : []);
+
+                        if (isset($doResult['r']['number'])) {
+                            \App\Models\OrderAccurateDoc::create([
+                                'order_id' => $order->id,
+                                'doc_type' => 'DELIVERY_ORDER',
+                                'doc_number' => $doResult['r']['number'],
+                                'accurate_id' => $doResult['r']['id'] ?? null,
+                                'amount' => $this->grand_total,
+                                'status' => 'SUCCESS',
+                            ]);
+                            Log::info('Berhasil membuat Delivery Order dengan Nomor: ' . $doResult['r']['number']);
+                        }
+                    }
                 }
             } catch (\Exception $e) {
                 Log::error('Accurate SO Sync Error: ' . $e->getMessage());

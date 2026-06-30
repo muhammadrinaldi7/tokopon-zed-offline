@@ -12,13 +12,16 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use App\Livewire\Zoffline\Pos\Traits\WithPaymentAndPromo;
 
 class Show extends Component
 {
+    use WithPaymentAndPromo;
     public Order $order;
 
     // DP Form
     public $showDpModal = false;
+    public $displayCustomerName = '';
     public $dp_amount;
     public $payment_method_id;
     public $payment_method_rate_id;
@@ -38,6 +41,7 @@ class Show extends Component
     public function mount(Order $order)
     {
         $this->order = $order->load(['items.variant', 'user', 'businessUnit', 'payments.paymentMethod']);
+        $this->displayCustomerName = $this->order->user->name ?? 'Pelanggan Umum';
         $this->dp_amount = $this->getRemainingBalance();
         $this->dp_date = Carbon::now()->format('Y-m-d');
         // dd($this->order);
@@ -49,57 +53,134 @@ class Show extends Component
         return max(0, $this->order->grand_total - $paid);
     }
 
-    public function updatedPaymentMethodId($val)
+    #[Computed]
+    public function subtotal()
     {
-        $this->payment_method_rate_id = null;
+        return $this->getRemainingBalance();
     }
 
     #[Computed]
-    public function getSelectedPaymentMethodProperty()
+    public function totalDiscount()
     {
-        if (!$this->payment_method_id) return null;
-        return \App\Models\PaymentMethod::with(['rates' => function ($q) {
-            $q->where('is_active', true);
-        }])->find($this->payment_method_id);
-    }
-
-    public function updatedInvoicePaymentMethodId($val)
-    {
-        $this->invoice_payment_method_rate_id = null;
+        return 0; // Diskon sudah masuk ke grand_total
     }
 
     #[Computed]
-    public function getSelectedInvoicePaymentMethodProperty()
+    public function itemDiscountTotal()
     {
-        if (!$this->invoice_payment_method_id) return null;
-        return \App\Models\PaymentMethod::with(['rates' => function ($q) {
-            $q->where('is_active', true);
-        }])->find($this->invoice_payment_method_id);
+        return 0;
     }
 
-    public function saveDp()
+    #[Computed]
+    public function promoDiscountTotal()
     {
-        $rules = [
-            'dp_amount' => 'required|numeric|min:1|max:' . $this->getRemainingBalance(),
-            'payment_method_id' => 'required',
-            'dp_date' => 'required|date',
-        ];
+        return 0;
+    }
 
-        $pm = $this->selectedPaymentMethod;
-        if ($pm && $pm->rates->count() > 0) {
-            $rules['payment_method_rate_id'] = 'required';
+    #[Computed]
+    public function cart()
+    {
+        $cart = [];
+        foreach ($this->order->items as $item) {
+            $name = 'Unknown Product';
+            $storage = '-';
+            $color = '-';
+            $ram = '-';
+
+            if ($item->variant && get_class($item->variant) === \App\Models\ProductAccurate::class) {
+                $name = $item->variant->name;
+            } elseif ($item->variant) {
+                $name = $item->variant->product->name ?? ($item->variant->secondProduct->name ?? 'Unknown');
+                $storage = $item->variant->storage ?? '-';
+                $color = $item->variant->color ?? '-';
+                $ram = $item->variant->ram ?? '-';
+            }
+
+            $cart[] = [
+                'name' => $name,
+                'qty' => $item->qty,
+                'price' => $item->price_at_checkout,
+                'discount_amount' => $item->discount_amount,
+                'subtotal' => $item->subtotal,
+                'ram' => $ram,
+                'storage' => $storage,
+                'color' => $color,
+                'serial_numbers' => [],
+            ];
+        }
+        return $cart;
+    }
+
+
+    #[Computed]
+    public function isPaymentsValid()
+    {
+        $totalPaid = 0;
+
+        foreach ($this->payments as $p) {
+            // Jika kategori kosong, invalid
+            if (empty($p['category'])) {
+                return false;
+            }
+
+            // Jika ada baris yang belum dipilih payment method-nya
+            if (empty($p['payment_method_id'])) {
+                return false;
+            }
+
+            // Jika Non-Tunai, harus punya rate
+            if ($p['category'] === 'NON-TUNAI' && empty($p['payment_method_rate_id'])) {
+                $pm = \App\Models\PaymentMethod::find($p['payment_method_id']);
+                if ($pm && $pm->rates()->where('is_active', true)->count() > 0 && empty($p['payment_method_rate_id'])) {
+                    return false;
+                }
+            }
+
+            $totalPaid += (float)$p['amount'];
         }
 
-        $this->validate($rules);
+        // Jika tidak ada pembayaran yang diisi
+        if ($totalPaid <= 0) {
+            return false;
+        }
+
+        // Untuk pelunasan invoice (showInvoiceModal), harus sama persis
+        if ($this->showInvoiceModal) {
+            $grandTotal = max(0, $this->subtotal() - (int)$this->totalDiscount());
+            return abs($grandTotal - $totalPaid) < 0.01;
+        }
+
+        // Untuk DP (showDpModal), boleh parsial asal tidak melebihi sisa tagihan
+        return $totalPaid <= $this->getRemainingBalance();
+    }
+
+    public function openDpModal()
+    {
+        $this->showDpModal = true;
+        $this->dp_date = \Carbon\Carbon::now()->format('Y-m-d');
+        $this->dp_notes = '';
+        $this->dp_contract_number = '';
+
+        // $this->setPaymentMode('tunai');
+        $this->payments[0]['amount'] = $this->getRemainingBalance();
+    }
+    public function saveDp()
+    {
+        if (!$this->isPaymentsValid()) {
+            $this->dispatch('toast', title: 'Validasi Gagal', message: 'Harap periksa kembali isian pembayaran Anda.', type: 'warning');
+            return;
+        }
+
+        $paymentData = $this->payments[0];
 
         try {
             DB::beginTransaction();
 
             $payment = OrderPayment::create([
                 'order_id' => $this->order->id,
-                'payment_method_id' => $this->payment_method_id,
-                'payment_method_rate_id' => $this->payment_method_rate_id ?: null,
-                'amount' => $this->dp_amount,
+                'payment_method_id' => $paymentData['payment_method_id'],
+                'payment_method_rate_id' => $paymentData['payment_method_rate_id'] ?: null,
+                'amount' => $paymentData['amount'],
                 'status' => 'PAID',
                 'xendit_external_id' => 'DP-MANUAL-' . date('YmdHis') . rand(1000, 9999),
                 'paid_at' => \Carbon\Carbon::parse($this->dp_date),
@@ -141,21 +222,22 @@ class Show extends Component
                 }
 
                 // Hitung MDR
+                $pmId = $paymentData['payment_method_id'];
+                $pm = \App\Models\PaymentMethod::find($pmId);
                 $rate = null;
-                if ($this->payment_method_rate_id) {
-                    $rate = \App\Models\PaymentMethodRate::find($this->payment_method_rate_id);
-                } elseif ($pm->rates()->where('is_active', true)->exists()) {
+                if ($paymentData['payment_method_rate_id']) {
+                    $rate = \App\Models\PaymentMethodRate::find($paymentData['payment_method_rate_id']);
+                } elseif ($pm && $pm->rates()->where('is_active', true)->exists()) {
                     $rate = $pm->rates()->where('is_active', true)->first();
                 }
 
                 $pct = $rate ? (float) $rate->percentage : 0;
-                // fallback to mdr_percentage column if percentage not found
                 if ($rate && !isset($rate->percentage) && isset($rate->mdr_percentage)) {
                     $pct = (float) $rate->mdr_percentage;
                 }
 
-                $rowMdr = $pct > 0 ? round((float)$this->dp_amount * $pct / 100, 0) : 0;
-                $netReceiptAmount = (float)$this->dp_amount - $rowMdr;
+                $rowMdr = $pct > 0 ? round((float)$paymentData['amount'] * $pct / 100, 0) : 0;
+                $netReceiptAmount = (float)$paymentData['amount'] - $rowMdr;
 
                 $detailDiscounts = [];
                 if ($rowMdr > 0 && $rate && $rate->accurate_account_no) {
@@ -175,7 +257,7 @@ class Show extends Component
                 $dpInvData = [
                     'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
                     'branchName' => $accurateBranchName,
-                    'dpAmount'   => (float)$this->dp_amount,
+                    'dpAmount'   => (float)$paymentData['amount'],
                     'soNumber'   => $this->order->accurate_so_number,
                     'transDate'  => Carbon::parse($this->dp_date)->format('d/m/Y'),
                     'inclusiveTax' => false,
@@ -201,7 +283,7 @@ class Show extends Component
                     'doc_type' => 'DP_INVOICE',
                     'doc_number' => $dpInvoiceNo,
                     'accurate_id' => $dpInvResult['r']['id'] ?? null,
-                    'amount' => (float) $this->dp_amount,
+                    'amount' => (float) $paymentData['amount'],
                     'status' => 'SUCCESS',
                 ]);
 
@@ -217,7 +299,7 @@ class Show extends Component
                     'detailInvoice' => [
                         [
                             'invoiceNo' => $dpInvoiceNo,
-                            'paymentAmount' => (float)$this->dp_amount,
+                            'paymentAmount' => (float)$paymentData['amount'],
                         ]
                     ]
                 ];
@@ -271,11 +353,13 @@ class Show extends Component
             }
             $this->invoice_sns[$item->id] = $sns;
         }
-        $this->invoice_payment_method_id = null;
-        $this->invoice_payment_method_rate_id = null;
         $this->invoice_date = \Carbon\Carbon::now()->format('Y-m-d');
         $this->invoice_notes = '';
         $this->invoice_contract_number = '';
+
+        // $this->setPaymentMode('tunai');
+        $this->payments[0]['amount'] = $this->getRemainingBalance();
+
         $this->showInvoiceModal = true;
     }
 
@@ -285,17 +369,15 @@ class Show extends Component
             'invoice_sns.*.*' => 'nullable|string'
         ];
 
+        $this->validate($rules);
+
         $remBal = $this->getRemainingBalance();
         if ($remBal > 0) {
-            $rules['invoice_payment_method_id'] = 'required';
-            $rules['invoice_date'] = 'required|date';
-
-            if ($this->selectedInvoicePaymentMethod && $this->selectedInvoicePaymentMethod->rates->count() > 0) {
-                $rules['invoice_payment_method_rate_id'] = 'required';
+            if (!$this->isPaymentsValid()) {
+                $this->dispatch('toast', title: 'Validasi Gagal', message: 'Harap periksa kembali isian pembayaran pelunasan Anda.', type: 'warning');
+                return;
             }
         }
-
-        $this->validate($rules);
 
         try {
             DB::beginTransaction();
@@ -381,7 +463,16 @@ class Show extends Component
                 $siData['poNumber'] = $this->invoice_contract_number;
             }
 
-            if ($this->order->accurate_so_number) {
+            $doDoc = $this->order->accurateDocs()
+                ->where('doc_type', 'DELIVERY_ORDER')
+                ->where('status', 'SUCCESS')
+                ->first();
+
+            if ($doDoc) {
+                foreach ($siData['detailItem'] as &$i) {
+                    $i['deliveryOrderNumber'] = $doDoc->doc_number;
+                }
+            } elseif ($this->order->accurate_so_number) {
                 foreach ($siData['detailItem'] as &$i) {
                     $i['salesOrderNumber'] = $this->order->accurate_so_number;
                 }
@@ -437,76 +528,83 @@ class Show extends Component
 
                 // Settlement if balance > 0
                 if ($remBal > 0) {
-                    $feeAmount = 0;
-                    $netReceiptAmount = $remBal;
-                    $rate = null;
-                    $pm = $this->selectedInvoicePaymentMethod;
+                    foreach ($this->payments as $paymentData) {
+                        $feeAmount = 0;
+                        $netReceiptAmount = (float)$paymentData['amount'];
+                        $rate = null;
 
-                    if ($pm && $pm->rates->count() > 0 && $this->invoice_payment_method_rate_id) {
-                        $rate = $pm->rates->where('id', $this->invoice_payment_method_rate_id)->first();
+                        $pmId = $paymentData['payment_method_id'];
+                        $pm = \App\Models\PaymentMethod::find($pmId);
+
+                        if ($pm && $paymentData['payment_method_rate_id']) {
+                            $rate = \App\Models\PaymentMethodRate::find($paymentData['payment_method_rate_id']);
+                        } elseif ($pm && $pm->rates()->where('is_active', true)->exists()) {
+                            $rate = $pm->rates()->where('is_active', true)->first();
+                        }
+
                         if ($rate) {
                             $feePercentage = $rate->percentage ?? $rate->mdr_percentage;
-                            $feeAmount = ($remBal * $feePercentage) / 100;
-                            $netReceiptAmount = $remBal - $feeAmount;
+                            $feeAmount = ((float)$paymentData['amount'] * $feePercentage) / 100;
+                            $netReceiptAmount = (float)$paymentData['amount'] - $feeAmount;
                         }
-                    }
 
-                    \App\Models\OrderPayment::create([
-                        'order_id' => $this->order->id,
-                        'payment_method_id' => $this->invoice_payment_method_id,
-                        'payment_method_rate_id' => $this->invoice_payment_method_rate_id ?: null,
-                        'amount' => $remBal,
-                        'fee_amount' => $feeAmount,
-                        'payment_date' => $this->invoice_date,
-                        'notes' => $this->invoice_notes,
-                        'status' => 'PAID',
-                        'xendit_external_id' => 'PELUNASAN-' . date('YmdHis') . rand(1000, 9999),
-                        'paid_at' => \Carbon\Carbon::parse($this->invoice_date),
-                        'payment_payload' => [
+                        \App\Models\OrderPayment::create([
+                            'order_id' => $this->order->id,
+                            'payment_method_id' => $paymentData['payment_method_id'],
+                            'payment_method_rate_id' => $paymentData['payment_method_rate_id'] ?: null,
+                            'amount' => $paymentData['amount'],
+                            'fee_amount' => $feeAmount,
+                            'payment_date' => $this->invoice_date,
                             'notes' => $this->invoice_notes,
-                            'contract_number' => $this->invoice_contract_number,
-                        ],
-                    ]);
+                            'status' => 'PAID',
+                            'xendit_external_id' => 'PELUNASAN-' . date('YmdHis') . rand(1000, 9999),
+                            'paid_at' => \Carbon\Carbon::parse($this->invoice_date),
+                            'payment_payload' => [
+                                'notes' => $this->invoice_notes,
+                                'contract_number' => $this->invoice_contract_number,
+                            ],
+                        ]);
 
-                    $srData = [
-                        'customerNo' => $this->order->user->getAccurateCustomerNo($dbSource),
-                        'branchName' => $accurateBranchName,
-                        'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
-                        'transDate' => \Carbon\Carbon::parse($this->invoice_date)->format('d/m/Y'),
-                        'receiptAmount' => (float)$netReceiptAmount,
-                        'chequeAmount' => (float)$netReceiptAmount,
-                        'description' => 'Pelunasan Faktur SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number) . ($this->invoice_contract_number ? '. No Kontrak: ' . $this->invoice_contract_number : '') . '. ' . $this->invoice_notes,
-                        'detailInvoice' => [
-                            [
-                                'invoiceNo' => $siResult['r']['number'],
-                                'paymentAmount' => (float)$remBal,
-                            ]
-                        ]
-                    ];
-
-                    if ($feeAmount > 0) {
-                        $srData['detailInvoice'][0]['detailDiscount'] = [
-                            [
-                                'accountNo' => $rate->accurate_account_no ?? '7100.04',
-                                'amount' => (float)$feeAmount,
-                                'departmentName' => $accurateBranchName,
-                                'discountNotes' => 'Potongan MDR ' . ($rate->name ?? 'Payment Gateway'),
+                        $srData = [
+                            'customerNo' => $this->order->user->getAccurateCustomerNo($dbSource),
+                            'branchName' => $accurateBranchName,
+                            'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
+                            'transDate' => \Carbon\Carbon::parse($this->invoice_date)->format('d/m/Y'),
+                            'receiptAmount' => (float)$netReceiptAmount,
+                            'chequeAmount' => (float)$netReceiptAmount,
+                            'description' => 'Pelunasan Faktur SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number) . ($this->invoice_contract_number ? '. No Kontrak: ' . $this->invoice_contract_number : '') . '. ' . $this->invoice_notes,
+                            'detailInvoice' => [
+                                [
+                                    'invoiceNo' => $siResult['r']['number'],
+                                    'paymentAmount' => (float)$paymentData['amount'],
+                                ]
                             ]
                         ];
-                    }
 
-                    Log::info('Accurate SR Invoice Settlement Payload: ' . json_encode($srData));
-                    $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+                        if ($feeAmount > 0) {
+                            $srData['detailInvoice'][0]['detailDiscount'] = [
+                                [
+                                    'accountNo' => $rate->accurate_account_no ?? '7100.04',
+                                    'amount' => (float)$feeAmount,
+                                    'departmentName' => $accurateBranchName,
+                                    'discountNotes' => 'Potongan MDR ' . ($rate->name ?? 'Payment Gateway'),
+                                ]
+                            ];
+                        }
 
-                    if (isset($srResult['r']['number'])) {
-                        \App\Models\OrderAccurateDoc::create([
-                            'order_id' => $this->order->id,
-                            'doc_type' => 'SALES_RECEIPT',
-                            'doc_number' => $srResult['r']['number'],
-                            'accurate_id' => $srResult['r']['id'] ?? null,
-                            'amount' => $remBal,
-                            'status' => 'SUCCESS',
-                        ]);
+                        Log::info('Accurate SR Invoice Settlement Payload: ' . json_encode($srData));
+                        $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+
+                        if (isset($srResult['r']['number'])) {
+                            \App\Models\OrderAccurateDoc::create([
+                                'order_id' => $this->order->id,
+                                'doc_type' => 'SALES_RECEIPT',
+                                'doc_number' => $srResult['r']['number'],
+                                'accurate_id' => $srResult['r']['id'] ?? null,
+                                'amount' => $paymentData['amount'],
+                                'status' => 'SUCCESS',
+                            ]);
+                        }
                     }
                 }
             }

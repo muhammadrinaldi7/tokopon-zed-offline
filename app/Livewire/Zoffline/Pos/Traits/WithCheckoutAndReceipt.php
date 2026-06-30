@@ -268,6 +268,10 @@ trait WithCheckoutAndReceipt
 
             \Illuminate\Support\Facades\DB::beginTransaction();
 
+            if ($this->isSoFulfillment) {
+                return $this->processSoFulfillment($grandTotal);
+            }
+
             if ($this->isPiutangSettlement) {
                 $order = Order::find($this->loadedDraftId);
 
@@ -1534,5 +1538,261 @@ trait WithCheckoutAndReceipt
         $warehouseStock->update([
             'stock' => max(0, $warehouseStock->stock - (int)$item['qty'])
         ]);
+    }
+
+    public function processSoFulfillment($grandTotal)
+    {
+        try {
+            $order = Order::with(['items.variant', 'user', 'accurateDocs', 'businessUnit'])->find($this->loadedSoOrderId);
+            if (!$order) {
+                \Illuminate\Support\Facades\DB::rollBack();
+                $this->dispatch('toast', title: 'Error', message: 'Pesanan SO tidak ditemukan.', type: 'error');
+                return;
+            }
+
+            $accurateService = app(AccurateService::class);
+            $dbSource = $order->businessUnit->code ?? 'syihab';
+            $handler = Auth::user();
+            $warehouseName = $handler->warehouse->name ?? 'Gudang Utama';
+            $branchName = $handler->branch->name ?? 'Banjarbaru';
+
+            $accurateBranchName = $branchName;
+            if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
+                $accurateBranchName = 'GSK ' . $accurateBranchName;
+            }
+
+            // 1. Update SN in Local DB and collect for Accurate
+            $doDetailItems = [];
+            $siDetailItems = [];
+            $hasSN = false;
+
+            foreach ($this->cart as $cartItem) {
+                $orderItem = \App\Models\OrderItem::find($cartItem['item_id'] ?? 0);
+                if ($orderItem) {
+                    $snInput = implode(',', array_filter(array_map('trim', $cartItem['serial_numbers'] ?? [])));
+                    if ($snInput !== ($orderItem->serial_number ?? '')) {
+                        $orderItem->update(['serial_number' => $snInput]);
+                    }
+                    if (!empty($snInput)) {
+                        $hasSN = true;
+                    }
+                }
+
+                $detailSNs = [];
+                if (!empty($cartItem['serial_numbers'])) {
+                    foreach ($cartItem['serial_numbers'] as $sn) {
+                        if (trim($sn)) {
+                            $detailSNs[] = ['serialNumberNo' => trim($sn), 'quantity' => 1];
+                        }
+                    }
+                }
+
+                $sku = $cartItem['sku'] ?: 'ITEM-UNKNOWN';
+
+                // For DO
+                $doItem = [
+                    'itemNo' => $sku,
+                    'quantity' => (float)$cartItem['qty'],
+                    'warehouseName' => $warehouseName,
+                ];
+                if (!empty($detailSNs)) {
+                    $doItem['detailSerialNumber'] = $detailSNs;
+                }
+                $doDetailItems[] = $doItem;
+
+                // For SI
+                $siItem = [
+                    'itemNo' => $sku,
+                    'unitPrice' => (float)$cartItem['price'],
+                    'quantity' => (float)$cartItem['qty'],
+                    'detailName' => $cartItem['name'],
+                    'itemCashDiscount' => ((float)($cartItem['discount_amount'] ?? 0) * (float)$cartItem['qty']) + (float)($cartItem['promo_discount'] ?? 0),
+                ];
+                if (!empty($detailSNs)) {
+                    $siItem['detailSerialNumber'] = $detailSNs;
+                }
+                $siDetailItems[] = $siItem;
+            }
+
+            // 2. Check if DO exists, if not and has SN -> Create DO
+            $doDoc = $order->accurateDocs()->where('doc_type', 'DELIVERY_ORDER')->where('status', 'SUCCESS')->first();
+            
+            if (!$doDoc && $hasSN) {
+                $doData = [
+                    'customerNo' => $order->user->getAccurateCustomerNo($dbSource),
+                    'branchName' => $accurateBranchName,
+                    'transDate' => now()->format('d/m/Y'),
+                    'salesOrderNumber' => $order->accurate_so_number,
+                    'description' => 'DO Otomatis dari Pelunasan POS',
+                    'detailItem' => $doDetailItems
+                ];
+
+                $doResult = $accurateService->postDeliveryOrder($doData, $dbSource);
+                if (isset($doResult['r']['number'])) {
+                    $doDoc = \App\Models\OrderAccurateDoc::create([
+                        'order_id' => $order->id,
+                        'doc_type' => 'DELIVERY_ORDER',
+                        'doc_number' => $doResult['r']['number'],
+                        'accurate_id' => $doResult['r']['id'] ?? null,
+                        'amount' => $order->grand_total,
+                        'status' => 'SUCCESS',
+                    ]);
+                }
+            }
+
+            // 3. Create SI (Sales Invoice)
+            if (!$order->accurate_invoice_no) {
+                if ($doDoc) {
+                    foreach ($siDetailItems as &$i) {
+                        $i['deliveryOrderNumber'] = $doDoc->doc_number;
+                    }
+                } elseif ($order->accurate_so_number) {
+                    foreach ($siDetailItems as &$i) {
+                        $i['salesOrderNumber'] = $order->accurate_so_number;
+                    }
+                }
+
+                $siData = [
+                    'customerNo' => $order->user->getAccurateCustomerNo($dbSource),
+                    'branchName' => $accurateBranchName,
+                    'transDate' => now()->format('d/m/Y'),
+                    'detailItem' => $siDetailItems,
+                    'inclusiveTax' => true,
+                    'taxable' => true,
+                    'description' => 'Pelunasan SO via POS'
+                ];
+
+                // DP
+                $dpInvoices = $order->accurateDocs()
+                    ->where('doc_type', 'DP_INVOICE')
+                    ->where('status', 'SUCCESS')
+                    ->get();
+                $validDpInvoices = [];
+                foreach ($dpInvoices as $dpInv) {
+                    $hasReceipt = $order->accurateDocs()
+                        ->where('doc_type', 'DP_RECEIPT')
+                        ->where('status', 'SUCCESS')
+                        ->where('created_at', '>=', $dpInv->created_at)
+                        ->exists();
+                    if ($hasReceipt) {
+                        $validDpInvoices[] = [
+                            'invoiceNumber' => $dpInv->doc_number,
+                            'paymentAmount' => (float) $dpInv->amount,
+                        ];
+                    }
+                }
+                if (count($validDpInvoices) > 0) {
+                    $siData['detailDownPayment'] = $validDpInvoices;
+                }
+
+                $mdrExpenses = [];
+                foreach ($this->payments as $payment) {
+                    $rate = $payment['payment_method_rate_id'] ? \App\Models\PaymentMethodRate::find($payment['payment_method_rate_id']) : null;
+                    $pct = $this->getMdrPercentage($payment);
+                    $rowMdr = $pct > 0 ? round((float)$payment['amount'] * $pct / 100, 0) : 0;
+
+                    if ($rowMdr > 0 && $rate && $rate->accurate_account_no) {
+                        $mdrExpenses[] = [
+                            'accountNo' => $rate->accurate_account_no,
+                            'expenseAmount' => -abs((float)$rowMdr),
+                            'expenseNotes' => 'MDR ' . ($rate->name ?? ' ')
+                        ];
+                    }
+                }
+                
+                if (!empty($mdrExpenses)) {
+                    $siData['detailExpense'] = $mdrExpenses;
+                }
+
+                $siResult = $accurateService->postSalesInvoice($siData, $dbSource);
+                if (isset($siResult['r']['number'])) {
+                    $order->update(['accurate_invoice_no' => $siResult['r']['number']]);
+                    \App\Models\OrderAccurateDoc::create([
+                        'order_id' => $order->id,
+                        'doc_type' => 'SALES_INVOICE',
+                        'doc_number' => $siResult['r']['number'],
+                        'accurate_id' => $siResult['r']['id'] ?? null,
+                        'amount' => $order->grand_total,
+                        'status' => 'SUCCESS',
+                    ]);
+                }
+            }
+
+            // 4. Create SR (Sales Receipt) and save local OrderPayments
+            if ($order->accurate_invoice_no) {
+                $srNumbers = [];
+                foreach ($this->payments as $payment) {
+                    $rowTotal = (float)$payment['amount'];
+
+                    OrderPayment::create([
+                        'order_id' => $order->id,
+                        'xendit_external_id' => 'ORD-SO-POS-' . date('YmdHis') . rand(1000, 9999),
+                        'amount' => $rowTotal,
+                        'status' => 'PAID',
+                        'payment_method_id' => $payment['payment_method_id'],
+                        'payment_method_rate_id' => $payment['payment_method_rate_id'] ?: null,
+                        'no_kontrak' => $payment['no_kontrak'] ?? null,
+                    ]);
+
+                    $pm = \App\Models\PaymentMethod::findOrFail($payment['payment_method_id']);
+                    if (!empty($pm->accurate_customer_no)) {
+                        continue; // Finance
+                    }
+
+                    $rate = $payment['payment_method_rate_id'] ? \App\Models\PaymentMethodRate::find($payment['payment_method_rate_id']) : null;
+                    $pct = $this->getMdrPercentage($payment);
+                    $rowMdr = $pct > 0 ? round((float)$payment['amount'] * $pct / 100, 0) : 0;
+                    $rowBaseAmount = (float)$payment['amount'];
+                    $netReceiptAmount = $rowBaseAmount - $rowMdr;
+
+                    $detailInvoiceItem = [
+                        'invoiceNo' => $order->accurate_invoice_no,
+                        'paymentAmount' => $netReceiptAmount,
+                    ];
+
+                    $srData = [
+                        'customerNo' => $order->user->getAccurateCustomerNo($dbSource),
+                        'branchName' => $branchName,
+                        'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
+                        'receiptAmount' => (float) $netReceiptAmount,
+                        'chequeAmount' => (float) $netReceiptAmount,
+                        'transDate' => now()->format('d/m/Y'),
+                        'detailInvoice' => [$detailInvoiceItem],
+                        'description' => 'Pelunasan SO via POS'
+                    ];
+
+                    $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+                    if (isset($srResult['r']['number'])) {
+                        $srNumbers[] = $srResult['r']['number'];
+                        \App\Models\OrderAccurateDoc::create([
+                            'order_id' => $order->id,
+                            'doc_type' => 'SALES_RECEIPT',
+                            'doc_number' => $srResult['r']['number'],
+                            'accurate_id' => $srResult['r']['id'] ?? null,
+                            'amount' => (float) $netReceiptAmount,
+                            'status' => 'SUCCESS',
+                        ]);
+                    }
+                }
+                if (!empty($srNumbers)) {
+                    $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
+                }
+            }
+
+            $order->update(['order_status' => 'completed']);
+            \Illuminate\Support\Facades\DB::commit();
+
+            $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
+            $this->showCheckoutModal = false;
+            $this->showReceiptModal = true;
+
+            $this->resetCheckout();
+            $this->dispatch('toast', title: 'Transaksi Berhasil', message: 'Pelunasan SO ' . $order->order_number . ' berhasil diproses.', type: 'success');
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            Log::error('POS SO Fulfillment Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Error', message: 'Gagal memproses pelunasan SO: ' . $e->getMessage(), type: 'error');
+        }
     }
 }

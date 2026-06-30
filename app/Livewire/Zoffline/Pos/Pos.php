@@ -209,6 +209,121 @@ class Pos extends Component
         }
     }
 
+    // ─── SO Fulfillment Properties ──────────────────────────
+    public $showSoModal = false;
+    public $soOrders = [];
+    public $isSoFulfillment = false;
+    public $loadedSoOrderId = null;
+    public $soPaidAmount = 0;
+
+    public function openSoList()
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $this->soOrders = Order::with(['user', 'accurateDocs'])
+            ->where('order_channel', 'SO')
+            ->whereIn('order_status', ['pending', 'down_payment'])
+            ->where('business_unit_id', $user->getActiveBusinessUnitId())
+            ->latest()
+            ->take(20)
+            ->get();
+
+        $this->showSoModal = true;
+    }
+
+    public function loadSoOrder($orderId)
+    {
+        $order = Order::with(['items.variant', 'items.promos', 'user.profile', 'promos', 'accurateDocs'])->find($orderId);
+        if (!$order) {
+            $this->dispatch('toast', title: 'Error', message: 'Pesanan SO tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        // Restore customer
+        $this->selectedCustomerId = $order->user_id;
+        $this->isNewCustomer = false;
+        if ($order->user) {
+            $this->customerName = $order->user->name;
+            $this->customerPhone = $order->user->profile->phone_number ?? '';
+            $this->customerEmail = $order->user->email ?? '';
+        }
+
+        // Restore sales (handled_by or current user)
+        $salesUser = $order->handledBy ?? \Illuminate\Support\Facades\Auth::user();
+        if ($salesUser) {
+            $employe = \App\Models\Employe::where('user_id', $salesUser->id)->first();
+            if ($employe) {
+                $this->selectedSales = [[
+                    'id' => $employe->id,
+                    'name' => $employe->name,
+                    'employee_no' => $employe->employee_no
+                ]];
+            }
+        }
+
+        $this->notes = $order->notes;
+        $this->order_date = $order->order_date;
+        $this->selectedPromos = $order->promos->pluck('id')->toArray();
+
+        // Restore cart
+        $this->cart = [];
+        foreach ($order->items as $item) {
+            $snArray = array_values(array_filter(array_map('trim', explode(',', $item->serial_number ?? ''))));
+            $variant = $item->variant;
+
+            $promoDiscounts = [];
+            foreach ($item->promos as $promo) {
+                $promoDiscounts[$promo->id] = ($promoDiscounts[$promo->id] ?? 0) + $promo->pivot->discount_amount;
+            }
+
+            $this->cart[] = [
+                'variant_id' => $item->product_variant_id,
+                'variant_type' => $item->product_variant_type,
+                'name' => $variant->name ?? 'Unknown',
+                'sku' => $variant->item_no ?? ($variant->sku ?? ''),
+                'ram' => $variant->ram ?? '-',
+                'storage' => $variant->storage ?? '-',
+                'color' => $variant->color ?? '-',
+                'price' => (int) $item->price_at_checkout,
+                'qty' => $item->qty,
+                'discount_amount' => (int) ($item->discount_amount / max(1, $item->qty)),
+                'promo_discount' => (int) $item->promo_discount_amount,
+                'applied_promo_id' => $item->applied_promo_id,
+                'serial_numbers' => $snArray,
+                'has_sn' => (bool) ($variant->has_sn ?? true),
+                'database_source' => $variant->database_source ?? 'syihab',
+                'promo_discounts' => $promoDiscounts,
+                'item_id' => $item->id, // Important for updating SN later
+            ];
+        }
+
+        $this->isSoFulfillment = true;
+        $this->loadedSoOrderId = $order->id;
+        $this->paymentMode = null;
+        $this->paymentWizardStep = 1;
+        $this->activePaymentIndex = 0;
+        
+        $hasDo = $order->accurateDocs->where('doc_type', 'DELIVERY_ORDER')->isNotEmpty();
+        $this->showSoModal = false;
+        
+        $paid = $order->payments()
+            ->where('status', 'PAID')
+            ->sum('amount');
+        
+        $this->soPaidAmount = $paid;
+        
+        $remaining = max(0, $order->grand_total - $paid);
+        $this->payments[0]['amount'] = $remaining;
+        // Kita juga perlu me-reset subtotal agar perhitungan valid. Nanti diatur di Computed properties.
+
+        $this->dispatch('toast', title: 'Berhasil', message: 'Faktur SO berhasil dimuat.', type: 'success');
+        
+        if ($hasDo) {
+            $this->goToStep(4);
+        } else {
+            $this->goToStep(2);
+        }
+    }
+
     // ─── Draft Sales Properties ──────────────────────────────
     public $showDraftModal = false;
     public $draftOrders = [];

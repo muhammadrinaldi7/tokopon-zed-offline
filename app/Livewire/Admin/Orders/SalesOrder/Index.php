@@ -15,6 +15,7 @@ class Index extends Component
     public function render()
     {
         $orders = Order::query()
+            ->with(['user', 'accurateDocs'])
             ->where('order_channel', 'SO')
             ->when($this->search, function ($q) {
                 $q->where('order_number', 'like', '%' . $this->search . '%')

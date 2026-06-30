@@ -13,14 +13,17 @@
         </div>
 
         <div class="flex items-center gap-3">
-            @if ($this->getRemainingBalance() > 0)
-                <button type="button" wire:click="$set('showDpModal', true)"
-                    class="px-5 py-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold rounded-xl text-sm transition-colors shadow-sm flex items-center gap-2 border border-emerald-200">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            @if (
+                $order->order_status !== 'completed' &&
+                $order->order_status !== 'cancelled' &&
+                $this->getRemainingBalance() > 0)
+                <button type="button" wire:click="openDpModal"
+                    class="px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-colors shadow-sm shadow-emerald-500/20 flex items-center gap-2 text-sm">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    Terima Pembayaran / DP
+                    Uang Muka (DP)
                 </button>
             @endif
 
@@ -171,18 +174,34 @@
 
                 @if ($hasAccurateDocs)
                     {{-- Node 1: Sales Order --}}
-                    @php $soDoc = $order->accurateDocs->where('doc_type', 'SALES_ORDER')->first(); @endphp
-                    <div id="node-so" style="z-index: 10;">
-                        <div
-                            class="w-48 bg-[#eff6ff] border-2 border-[#1c69d4] rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
-                            <div class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider mb-1">Sales Order
-                            </div>
-                            <div class="text-xs font-bold text-gray-800 mb-1">
-                                {{ $soDoc ? $soDoc->doc_number : $order->accurate_so_number }}</div>
-                            <div class="text-[10px] text-gray-500">
-                                {{ $soDoc ? $soDoc->created_at->format('d/m/Y H:i') : ($order->order_date ? $order->order_date->format('d/m/Y') : '-') }}
+                    @php 
+                        $soDoc = $order->accurateDocs->where('doc_type', 'SALES_ORDER')->first(); 
+                        $doDoc = $order->accurateDocs->where('doc_type', 'DELIVERY_ORDER')->first();
+                    @endphp
+                    <div class="flex flex-col md:flex-row items-start md:items-center gap-16">
+                        <div id="node-so" style="z-index: 10;">
+                            <div
+                                class="w-48 bg-[#eff6ff] border-2 border-[#1c69d4] rounded-xl p-4 text-center shadow-sm cursor-move hover:shadow-md transition-all">
+                                <div class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider mb-1">Sales Order
+                                </div>
+                                <div class="text-xs font-bold text-gray-800 mb-1">
+                                    {{ $soDoc ? $soDoc->doc_number : $order->accurate_so_number }}</div>
+                                <div class="text-[10px] text-gray-500">
+                                    {{ $soDoc ? $soDoc->created_at->format('d/m/Y H:i') : ($order->order_date ? $order->order_date->format('d/m/Y') : '-') }}
+                                </div>
                             </div>
                         </div>
+
+                        @if($doDoc)
+                        <div id="node-do" style="z-index: 10;">
+                            <div
+                                class="w-48 bg-orange-50 border-2 border-orange-500 rounded-xl p-4 text-center shadow-sm cursor-move hover:shadow-md transition-shadow">
+                                <div class="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Delivery Order</div>
+                                <div class="text-[10px] font-semibold text-orange-800 mb-1">{{ $doDoc->doc_number }}</div>
+                                <div class="text-[10px] text-gray-500">{{ $doDoc->created_at->format('d/m/Y H:i') }}</div>
+                            </div>
+                        </div>
+                        @endif
                     </div>
 
                     {{-- DPs --}}
@@ -415,129 +434,48 @@
 
     {{-- DP Modal --}}
     @if ($showDpModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-                <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                    <h3 class="font-bold text-gray-800">Terima Uang Muka (DP)</h3>
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-gray-50 rounded-2xl shadow-xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="p-5 border-b border-gray-100 bg-white flex justify-between items-center shrink-0">
+                    <div>
+                        <h3 class="font-bold text-gray-800 text-lg">Terima Uang Muka (DP)</h3>
+                        <p class="text-xs text-gray-500">Total Tagihan: Rp {{ number_format($this->getRemainingBalance(), 0, ',', '.') }}</p>
+                    </div>
                     <button wire:click="$set('showDpModal', false)"
-                        class="text-gray-400 hover:text-rose-500 font-bold">&times;</button>
+                        class="text-gray-400 hover:text-rose-500 font-bold text-2xl leading-none">&times;</button>
                 </div>
-                <form wire:submit="saveDp" class="p-6 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Sisa
-                            Tagihan (Maksimal)</label>
-                        <div class="text-lg font-black text-rose-500 bg-rose-50 p-3 rounded-xl border border-rose-100">
-                            Rp {{ number_format($this->getRemainingBalance(), 0, ',', '.') }}
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Nominal DP
-                            Dibayar (Rp) *</label>
-                        <input type="text" x-data="{
-                            raw: $wire.entangle('dp_amount'),
-                            format(val) {
-                                let num = String(val || '').replace(/\D/g, '');
-                                return num === '' ? '' : new Intl.NumberFormat('id-ID').format(num);
-                            }
-                        }" x-bind:value="format(raw)"
-                            x-on:input="
-                                let formatted = format($event.target.value);
-                                $event.target.value = formatted;
-                                raw = formatted.replace(/\D/g, '');
-                            "
-                            class="w-full p-2 rounded-lg border-gray-300 text-sm focus:ring-emerald-500 focus:border-emerald-500 shadow-sm font-bold"
-                            required>
-                        @error('dp_amount')
-                            <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
-                        @enderror
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tanggal
-                            Pembayaran *</label>
-                        <input type="date" wire:model="dp_date"
-                            class="w-full rounded-lg p-2 border-gray-300 text-sm focus:ring-emerald-500 focus:border-emerald-500 shadow-sm"
-                            required>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Metode
-                            Pembayaran (Ke Rekening) *</label>
-                        <select wire:model.live="payment_method_id"
-                            class="w-full rounded-lg p-2 border-gray-300 text-sm focus:ring-emerald-500 focus:border-emerald-500 shadow-sm"
-                            required>
-                            <option value="">-- Pilih Rekening Penerima --</option>
-                            @foreach ($paymentMethods as $method)
-                                <option value="{{ $method->id }}">{{ $method->name }}</option>
-                            @endforeach
-                        </select>
-                        @error('payment_method_id')
-                            <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
-                        @enderror
-                    </div>
-
-                    @if ($this->selectedPaymentMethod && $this->selectedPaymentMethod->rates->count() > 0)
+                <div class="p-6 overflow-y-auto flex-1">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Pilih
-                                Tarif MDR *</label>
-                            <select wire:model="payment_method_rate_id"
-                                class="w-full rounded-lg p-2 border-gray-300 text-sm focus:ring-emerald-500 focus:border-emerald-500 shadow-sm"
-                                required>
-                                <option value="">-- Pilih Tarif MDR --</option>
-                                @foreach ($this->selectedPaymentMethod->rates as $rate)
-                                    <option value="{{ $rate->id }}">{{ $rate->name }}
-                                        ({{ (float) ($rate->percentage ?? $rate->mdr_percentage) }}%)
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('payment_method_rate_id')
-                                <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
-                            @enderror
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tanggal Pembayaran *</label>
+                            <input type="date" wire:model="dp_date" class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white" required>
                         </div>
-                    @endif
-
-                    <div>
-                        <label
-                            class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">No. Kontrak (Opsional)</label>
-                        <input type="text" wire:model="dp_contract_number"
-                            class="w-full p-2 rounded-lg border-gray-300 text-sm focus:ring-emerald-500 focus:border-emerald-500 shadow-sm"
-                            placeholder="Contoh: PO-1234 / KTR-5678">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">No. Kontrak / Referensi</label>
+                            <input type="text" wire:model="dp_contract_number" class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white" placeholder="Opsional">
+                        </div>
                     </div>
-
-                    <div>
-                        <label
-                            class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Catatan/Referensi</label>
-                        <input type="text" wire:model="dp_notes"
-                            class="w-full p-2 rounded-lg border-gray-300 text-sm focus:ring-emerald-500 focus:border-emerald-500 shadow-sm"
-                            placeholder="Contoh: Transfer BCA a/n Budi">
-                    </div>
-
-                    <div class="pt-4 border-t border-gray-100 flex justify-end gap-3">
-                        <button type="button" wire:click="$set('showDpModal', false)"
-                            class="px-4 py-2 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition-colors">Batal</button>
-                        <button type="submit"
-                            class="px-4 py-2 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 transition-colors shadow-sm flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Simpan DP
-                        </button>
-                    </div>
-                </form>
+                    
+                    @include('livewire.zoffline.pos.partials.wizard.step4-payment', ['hideSplit' => true, 'allowEditAmount' => true, 'hideFooter' => true])
+                </div>
+                <div class="p-5 bg-white border-t border-gray-100 shrink-0 flex justify-end gap-3">
+                    <button type="button" wire:click="$set('showDpModal', false)"
+                        class="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">Batal</button>
+                    <button type="button" wire:click="saveDp"
+                        class="px-6 py-2.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-colors shadow-sm flex items-center gap-2">
+                        Simpan Pembayaran DP
+                    </button>
+                </div>
             </div>
         </div>
     @endif
 
     {{-- Invoice / Fulfillment Modal --}}
     @if ($showInvoiceModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6"
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6"
             style="margin: 0 !important;">
-            <div class="bg-white rounded-t-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-full" x-data
-                @click.outside="$wire.set('showInvoiceModal', false)">
-                <div
-                    class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-white/50 backdrop-blur-md">
+            <div class="bg-gray-50 rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh]">
+                <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
                     <div class="flex items-center gap-3">
                         <div class="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -547,7 +485,7 @@
                         </div>
                         <div>
                             <h2 class="text-gray-900 font-bold text-xl leading-tight">Terbitkan Faktur</h2>
-                            <p class="text-xs font-medium text-gray-500">Input Serial Number dan Pelunasan Akhir</p>
+                            <p class="text-xs font-medium text-gray-500">Input Serial Number dan Pelunasan Akhir (Sisa Tagihan: Rp {{ number_format($this->getRemainingBalance(), 0, ',', '.') }})</p>
                         </div>
                     </div>
                     <button type="button" wire:click="$set('showInvoiceModal', false)"
@@ -559,199 +497,108 @@
                     </button>
                 </div>
 
-                <form wire:submit.prevent="submitFaktur" class="flex flex-col flex-1 overflow-hidden">
-                    <div class="p-6 space-y-5 overflow-y-auto flex-1">
-                        <div
-                            class="bg-blue-50/50 border border-blue-100 text-blue-800 text-sm p-4 rounded-xl flex gap-3 items-start">
-                            <svg class="w-5 h-5 shrink-0 mt-0.5 text-blue-600" fill="none" stroke="currentColor"
-                                viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            <div>
-                                Faktur Penjualan (Sales Invoice) akan dibuat di Accurate untuk memotong stok. Pastikan
-                                Anda
-                                memasukkan <strong>Serial Number</strong> (dipisah koma) sesuai jumlah kuantitas jika
-                                barang
-                                tersebut merupakan perangkat ber-SN.
-                            </div>
+                <div class="p-6 space-y-5 overflow-y-auto flex-1">
+                    <div
+                        class="bg-blue-50/50 border border-blue-100 text-blue-800 text-sm p-4 rounded-xl flex gap-3 items-start">
+                        <svg class="w-5 h-5 shrink-0 mt-0.5 text-blue-600" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            Faktur Penjualan (Sales Invoice) akan dibuat di Accurate untuk memotong stok. Pastikan Anda memasukkan <strong>Serial Number</strong> (dipisah koma) sesuai jumlah kuantitas jika barang tersebut merupakan perangkat ber-SN.
                         </div>
+                    </div>
 
-                        <div class="space-y-4">
-                            @foreach ($order->items as $item)
-                                @php
-                                    $variant = $item->variant;
-                                    if ($variant && get_class($variant) === \App\Models\ProductAccurate::class) {
-                                        $itemName = $variant->name;
-                                        $sku = $variant->item_no ?? '';
-                                        $subDesc = '';
-                                    } else {
-                                        $isNew = $item->product_variant_type === \App\Models\ProductVariant::class;
-                                        $itemName = $isNew
-                                            ? $variant->product->name ?? 'Unknown'
-                                            : $variant->secondProduct->name ?? 'Unknown';
-                                        $sku = $variant->sku ?? '';
-                                        $subDesc = trim(($variant->storage ?? '') . ' ' . ($variant->color ?? ''));
-                                    }
-                                @endphp
-                                <div
-                                    class="p-4 border {{ empty($sku) ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50/50' }} rounded-xl flex flex-col gap-3">
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <div class="flex items-center gap-2 mb-1">
-                                                @if (empty($sku))
-                                                    <span
-                                                        class="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded">NO
-                                                        SKU</span>
-                                                @else
-                                                    <span
-                                                        class="px-2 py-0.5 bg-blue-100/50 border border-blue-200 text-blue-700 text-[10px] font-bold rounded">{{ $sku }}</span>
-                                                @endif
-                                                @if ($order->accurate_so_number)
-                                                    <span
-                                                        class="px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-700 text-[10px] font-bold rounded">SO:
-                                                        {{ $order->accurate_so_number }}</span>
-                                                @endif
-                                            </div>
-                                            <p class="font-bold text-gray-800 text-sm mt-1.5">{{ $itemName }}</p>
-                                            <p class="text-xs text-gray-500">{{ $subDesc }} @if ($subDesc)
-                                                    •
-                                                @endif Harga: Rp
-                                                {{ number_format($item->price_at_checkout, 0, ',', '.') }}</p>
-                                        </div>
-                                        <div class="flex flex-col items-end">
-                                            <div
-                                                class="bg-white border border-gray-200 px-3 py-1 rounded-lg text-sm font-bold text-gray-700 shadow-sm mb-1">
-                                                Qty: {{ $item->qty }}
-                                            </div>
-                                            <div class="text-xs font-bold text-gray-800">
-                                                Total: Rp
-                                                {{ number_format($item->price_at_checkout * $item->qty, 0, ',', '.') }}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    @if (empty($sku))
-                                        <p class="text-xs text-red-600 italic">⚠️ Produk ini tidak memiliki SKU.
-                                            Accurate
-                                            akan menolak transaksi ini. Harap tambahkan SKU di menu Produk.</p>
-                                    @endif
-
+                    <div class="space-y-4">
+                        @foreach ($order->items as $item)
+                            @php
+                                $variant = $item->variant;
+                                if ($variant && get_class($variant) === \App\Models\ProductAccurate::class) {
+                                    $itemName = $variant->name;
+                                    $sku = $variant->item_no ?? '';
+                                    $subDesc = '';
+                                } else {
+                                    $isNew = $item->product_variant_type === \App\Models\ProductVariant::class;
+                                    $itemName = $isNew
+                                        ? $variant->product->name ?? 'Unknown'
+                                        : $variant->secondProduct->name ?? 'Unknown';
+                                    $sku = $variant->sku ?? '';
+                                    $subDesc = trim(($variant->storage ?? '') . ' ' . ($variant->color ?? ''));
+                                }
+                            @endphp
+                            <div class="p-4 border {{ empty($sku) ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white' }} rounded-xl flex flex-col gap-3">
+                                <div class="flex justify-between items-start">
                                     <div>
-                                        <label
-                                            class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
-                                            Serial Number / IMEI (Scan Barcode)
-                                        </label>
+                                        <div class="font-bold text-gray-800">{{ $itemName }}</div>
+                                        <div class="text-xs text-gray-500">{{ $subDesc }} | Qty:
+                                            {{ $item->qty }}</div>
+                                        @if (empty($sku))
+                                            <div class="text-xs font-bold text-red-500 mt-1">Error: Produk ini
+                                                belum ada SKU (Item No) dari Accurate.</div>
+                                        @endif
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="font-bold text-gray-800">Rp
+                                            {{ number_format($item->price_at_checkout, 0, ',', '.') }}</div>
+                                        @if ($item->discount_amount > 0)
+                                            <div class="text-[10px] text-emerald-600 font-bold">Disc: Rp
+                                                {{ number_format($item->discount_amount, 0, ',', '.') }}</div>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <label
+                                        class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Input
+                                        Serial Number (Pisah dengan koma jika > 1)</label>
+                                    @if ($item->qty > 1)
                                         <div class="space-y-2">
                                             @for ($i = 0; $i < $item->qty; $i++)
-                                                <div class="flex items-center gap-2">
-                                                    <span
-                                                        class="text-[10px] font-bold text-gray-400 bg-gray-100 px-2.5 py-2.5 rounded-lg border border-gray-200 shadow-sm">{{ $i + 1 }}</span>
-                                                    <input type="text"
-                                                        wire:model="invoice_sns.{{ $item->id }}.{{ $i }}"
-                                                        class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                                                        placeholder="Scan SN / IMEI ke-{{ $i + 1 }}...">
-                                                </div>
+                                                <input type="text"
+                                                    wire:model.defer="invoice_sns.{{ $item->id }}.{{ $i }}"
+                                                    class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors"
+                                                    placeholder="SN untuk item ke-{{ $i + 1 }}">
                                             @endfor
                                         </div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-
-                        @if ($this->getRemainingBalance() > 0)
-                            <div class="pt-6 border-t border-gray-200 mt-4">
-                                <h3 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                    <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
-                                    Pelunasan Sisa Tagihan (Rp
-                                    {{ number_format($this->getRemainingBalance(), 0, ',', '.') }})
-                                </h3>
-
-                                <div class="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label
-                                                class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Tanggal
-                                                Pelunasan *</label>
-                                            <input type="date" wire:model="invoice_date"
-                                                class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                                                required>
-                                        </div>
-                                        <div>
-                                            <label
-                                                class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Ke
-                                                Rekening Bank *</label>
-                                            <select wire:model.live="invoice_payment_method_id"
-                                                class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                                                required>
-                                                <option value="">-- Pilih Rekening --</option>
-                                                @foreach ($paymentMethods as $method)
-                                                    <option value="{{ $method->id }}">{{ $method->name }}</option>
-                                                @endforeach
-                                            </select>
-                                            @error('invoice_payment_method_id')
-                                                <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
-                                            @enderror
-                                        </div>
-                                    </div>
-
-                                    @if ($this->selectedInvoicePaymentMethod && $this->selectedInvoicePaymentMethod->rates->count() > 0)
-                                        <div>
-                                            <label
-                                                class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Pilih
-                                                Tarif MDR *</label>
-                                            <select wire:model="invoice_payment_method_rate_id"
-                                                class="w-full rounded-lg p-2.5 border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                                                required>
-                                                <option value="">-- Pilih Tarif MDR --</option>
-                                                @foreach ($this->selectedInvoicePaymentMethod->rates as $rate)
-                                                    <option value="{{ $rate->id }}">{{ $rate->name }}
-                                                        ({{ (float) ($rate->percentage ?? $rate->mdr_percentage) }}%)
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                            @error('invoice_payment_method_rate_id')
-                                                <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
-                                            @enderror
-                                        </div>
+                                    @else
+                                        <input type="text"
+                                            wire:model.defer="invoice_sns.{{ $item->id }}.0"
+                                            class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors"
+                                            placeholder="Masukkan IMEI/SN">
                                     @endif
-
-                                    <div>
-                                        <label
-                                            class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">No. Kontrak (Opsional)</label>
-                                        <input type="text" wire:model="invoice_contract_number"
-                                            class="w-full p-2.5 rounded-lg border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                                            placeholder="Contoh: PO-1234 / KTR-5678">
-                                    </div>
-
-                                    <div>
-                                        <label
-                                            class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Catatan/Referensi</label>
-                                        <input type="text" wire:model="invoice_notes"
-                                            class="w-full p-2.5 rounded-lg border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm"
-                                            placeholder="Contoh: Lunas via Transfer BCA">
-                                    </div>
                                 </div>
                             </div>
-                        @endif
-                    </div> <!-- Tutup div p-6 overflow-y-auto -->
-
-                    <div
-                        class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 shrink-0 rounded-b-2xl">
-                        <button type="button" wire:click="$set('showInvoiceModal', false)"
-                            class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">Batal</button>
-                        <button type="submit"
-                            class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2"
-                            wire:loading.attr="disabled">
-                            <span wire:loading.remove wire:target="submitFaktur">Simpan & Terbitkan Faktur</span>
-                            <span wire:loading wire:target="submitFaktur">Memproses...</span>
-                        </button>
+                        @endforeach
                     </div>
-                </form>
+
+                    @if ($this->getRemainingBalance() > 0)
+                        <div class="mt-8 border-t border-gray-200 pt-6">
+                            <h4 class="font-black text-gray-800 mb-4 text-lg">Pelunasan Sisa Tagihan</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tanggal Pembayaran *</label>
+                                    <input type="date" wire:model="invoice_date" class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white" required>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">No. Kontrak / Referensi</label>
+                                    <input type="text" wire:model="invoice_contract_number" class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white" placeholder="Opsional">
+                                </div>
+                            </div>
+                            @include('livewire.zoffline.pos.partials.wizard.step4-payment', ['hideSplit' => false, 'hideFooter' => true])
+                        </div>
+                    @endif
+                </div>
+
+                <div class="p-5 bg-white border-t border-gray-100 flex justify-end shrink-0 gap-3">
+                    <button type="button" wire:click="$set('showInvoiceModal', false)"
+                        class="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">Batal</button>
+                    <button type="button" wire:click="submitFaktur"
+                        wire:loading.attr="disabled"
+                        class="px-6 py-2.5 bg-[#1c69d4] text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2">
+                        <span wire:loading.remove wire:target="submitFaktur">Terbitkan Faktur</span>
+                        <span wire:loading wire:target="submitFaktur">Memproses...</span>
+                    </button>
+                </div>
             </div>
         </div>
     @endif
@@ -836,9 +683,24 @@
                 const colorDPRec = '#14b8a6'; // teal-500
                 const colorSI = '#a855f7'; // purple-500
                 const colorSR = '#3b82f6'; // blue-500
+                const colorDO = '#f97316'; // orange-500
 
                 const nodeSO = document.getElementById('node-so');
                 if (nodeSO) makeDraggable(nodeSO);
+
+                const nodeDO = document.getElementById('node-do');
+                if (nodeDO) {
+                    makeDraggable(nodeDO);
+                    if (nodeSO) {
+                        lines.push(new LeaderLine(nodeSO, nodeDO, {
+                            color: colorDO,
+                            size: 3,
+                            path: 'fluid',
+                            endPlug: 'arrow3',
+                            dropShadow: true
+                        }));
+                    }
+                }
 
                 // Loop DPs
                 document.querySelectorAll('.node-dp-inv').forEach(el => {

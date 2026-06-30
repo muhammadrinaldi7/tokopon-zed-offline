@@ -177,6 +177,7 @@
                                             <p class="font-bold text-neutral-800 text-sm leading-none">Rp
                                                 {{ number_format($item['price'], 0, ',', '.') }}</p>
                                         </div>
+                                        @if(!$isSoFulfillment)
                                         <button wire:click="openEditPriceModal({{ $index }})"
                                             class="w-8 h-8 flex items-center justify-center text-blue-500 bg-blue-50 hover:bg-blue-100 hover:text-blue-600 rounded-lg transition-colors tooltip shrink-0"
                                             title="Edit Harga Transaksi">
@@ -186,6 +187,7 @@
                                                     d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                             </svg>
                                         </button>
+                                        @endif
                                     </div>
                                 </div>
 
@@ -209,6 +211,7 @@
                                                     {{ number_format($item['discount_amount'], 0, ',', '.') }}</p>
                                             </div>
                                         @endif
+                                        @if(!$isSoFulfillment)
                                         <button wire:click="openManualDiscountModal({{ $index }})"
                                             class="h-8 px-3 flex items-center justify-center text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg transition-colors text-xs font-bold shrink-0">
                                             <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24"
@@ -218,6 +221,7 @@
                                             </svg>
                                             {{ isset($item['discount_amount']) && $item['discount_amount'] > 0 ? 'Ubah' : 'Cashback' }}
                                         </button>
+                                        @endif
                                     </div>
                                 @endif
                             </div>
@@ -291,6 +295,7 @@
                                         </div>
 
                                         {{-- Qty Control --}}
+                                        @if(!$isSoFulfillment)
                                         <div
                                             class="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm mt-2">
                                             <button wire:click="decrementCartItem({{ $index }})"
@@ -301,11 +306,17 @@
                                             <button wire:click="incrementCartItem({{ $index }})"
                                                 class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-r-lg transition font-black text-lg">+</button>
                                         </div>
+                                        @else
+                                        <div class="mt-2 text-right">
+                                            <span class="text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg">Qty: {{ $item['qty'] }}</span>
+                                        </div>
+                                        @endif
                                     </div>
 
                                 </div>
 
                                 {{-- Tombol Hapus (Selalu Tampil) --}}
+                                @if(!$isSoFulfillment)
                                 <div
                                     class="flex justify-end border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 lg:mt-auto">
                                     <button wire:click="removeFromCart({{ $index }})"
@@ -319,6 +330,7 @@
                                         Hapus
                                     </button>
                                 </div>
+                                @endif
                             </div>
 
                         </div>
