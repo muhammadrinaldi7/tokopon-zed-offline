@@ -7,7 +7,7 @@ $kernel->bootstrap();
 
 $service = app(\App\Services\AccurateService::class);
 
-$id = 1047;
+$id = 1099;
 $databaseSource = 'second';
 
 list($host, $token, $secretKey) = $service->getCredentials($databaseSource);

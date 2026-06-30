@@ -20,8 +20,7 @@ class SalesReceiptHandler implements WebhookHandlerInterface
             return;
         }
 
-        $businessUnit = \App\Models\BusinessUnit::where('code', $log->business_unit_code)->first();
-        $dbSource = $businessUnit ? $businessUnit->code : 'syihab';
+        $dbSource = $log->database_source ?? 'syihab';
         $accurateService = app(AccurateService::class);
 
         foreach ($payload['data'] as $dataItem) {
