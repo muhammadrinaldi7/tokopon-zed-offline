@@ -185,7 +185,6 @@ jobs:
           # Path tujuan di CloudPanel (SESUAIKAN DENGAN NAMA DOMAINMU!)
           target: "/home/${{ secrets.VPS_USERNAME }}/htdocs/pos.zedgroup.tech/"
           # Mencegah folder root tambahan ikut ter-copy
-          strip_components: 1
 
       - name: ⚙️ Menjalankan perintah post-deploy di server
         uses: appleboy/ssh-action@v1.0.3
