@@ -104,21 +104,31 @@ class SalesReceiptHandler implements WebhookHandlerInterface
 
                         foreach ($pendingPayments as $payment) {
                             $pm = $payment->paymentMethod;
+                            $rate = $payment->paymentMethodRate;
                             
+                            // Hitung MDR
+                            $pct = $rate ? ($rate->mdr_percentage ?? 0) : ($pm->mdr_percentage ?? 0);
+                            $rowMdr = $pct > 0 ? round((float)$payment->amount * (float)$pct / 100, 0) : 0;
+                            $expectedNetAmount = (float)$payment->amount - $rowMdr;
+                            $grossAmount = (float)$payment->amount;
+
                             // Pastikan nominal pembayaran dari webhook SAMA dengan tagihan PENDING
-                            // Gunakan margin error 1 rupiah untuk menghindari masalah floating point
-                            if (abs((float)$payment->amount - $paymentAmount) < 1) {
+                            // Cek apakah sama dengan Net Amount atau Gross Amount (toleransi 5 rupiah)
+                            $matchNet = abs($expectedNetAmount - $paymentAmount) <= 5;
+                            $matchGross = abs($grossAmount - $paymentAmount) <= 5;
+
+                            if ($matchNet || $matchGross) {
                                 if ($pm && !empty($pm->accurate_customer_no)) {
                                     $paymentUpdated = $payment->update([
                                         'status' => 'PAID',
                                         'paid_at' => now(),
                                     ]);
-                                    Log::info("Updated OrderPayment {$payment->id} status to PAID (Finance Settled). Result: " . ($paymentUpdated ? 'Success' : 'Failed'));
+                                    Log::info("Updated OrderPayment {$payment->id} status to PAID (Finance Settled). Result: " . ($paymentUpdated ? 'Success' : 'Failed') . " | Matched: " . ($matchNet ? 'Net Amount' : 'Gross Amount'));
                                 } else {
                                     Log::info("Skipped OrderPayment {$payment->id} because it is not a finance payment method (accurate_customer_no empty).");
                                 }
                             } else {
-                                Log::info("Skipped OrderPayment {$payment->id} because amount does not match (Payment: {$payment->amount}, Webhook: {$paymentAmount}).");
+                                Log::info("Skipped OrderPayment {$payment->id} because amount does not match. (Gross: {$grossAmount}, Net: {$expectedNetAmount}, Webhook: {$paymentAmount})");
                             }
                         }
                     } else {
