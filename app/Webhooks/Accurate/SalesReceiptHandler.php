@@ -83,33 +83,46 @@ class SalesReceiptHandler implements WebhookHandlerInterface
 
                     // Update accurate_receipt_no on Order if not already present
                     $existingReceipts = array_map('trim', explode(',', $order->accurate_receipt_no ?? ''));
+                    $isNewReceipt = false;
+
                     if (!in_array($salesReceiptNo, $existingReceipts)) {
                         $newReceiptNo = empty($order->accurate_receipt_no) ? $salesReceiptNo : $order->accurate_receipt_no . ', ' . $salesReceiptNo;
                         $updated = $order->update(['accurate_receipt_no' => $newReceiptNo]);
                         Log::info("Order {$order->id} accurate_receipt_no updated to {$newReceiptNo}. Result: " . ($updated ? 'Success' : 'Failed'));
+                        $isNewReceipt = true;
                     } else {
                         Log::info("Receipt No {$salesReceiptNo} already exists in Order {$order->id}");
                     }
 
-                    // Find PENDING finance payments for this order
-                    $pendingPayments = OrderPayment::where('order_id', $order->id)
-                        ->where('status', 'PENDING')
-                        ->get();
+                    if ($isNewReceipt) {
+                        // Find PENDING finance payments for this order
+                        $pendingPayments = OrderPayment::where('order_id', $order->id)
+                            ->where('status', 'PENDING')
+                            ->get();
 
-                    Log::info("Found {$pendingPayments->count()} PENDING payments for Order {$order->id}");
+                        Log::info("Found {$pendingPayments->count()} PENDING payments for Order {$order->id}");
 
-                    foreach ($pendingPayments as $payment) {
-                        // Cek apakah payment method-nya finance (punya accurate_customer_no)
-                        $pm = $payment->paymentMethod;
-                        if ($pm && !empty($pm->accurate_customer_no)) {
-                            $paymentUpdated = $payment->update([
-                                'status' => 'PAID',
-                                'paid_at' => now(),
-                            ]);
-                            Log::info("Updated OrderPayment {$payment->id} status to PAID (Finance Settled). Result: " . ($paymentUpdated ? 'Success' : 'Failed'));
-                        } else {
-                            Log::info("Skipped OrderPayment {$payment->id} because it is not a finance payment method (accurate_customer_no empty).");
+                        foreach ($pendingPayments as $payment) {
+                            $pm = $payment->paymentMethod;
+                            
+                            // Pastikan nominal pembayaran dari webhook SAMA dengan tagihan PENDING
+                            // Gunakan margin error 1 rupiah untuk menghindari masalah floating point
+                            if (abs((float)$payment->amount - $paymentAmount) < 1) {
+                                if ($pm && !empty($pm->accurate_customer_no)) {
+                                    $paymentUpdated = $payment->update([
+                                        'status' => 'PAID',
+                                        'paid_at' => now(),
+                                    ]);
+                                    Log::info("Updated OrderPayment {$payment->id} status to PAID (Finance Settled). Result: " . ($paymentUpdated ? 'Success' : 'Failed'));
+                                } else {
+                                    Log::info("Skipped OrderPayment {$payment->id} because it is not a finance payment method (accurate_customer_no empty).");
+                                }
+                            } else {
+                                Log::info("Skipped OrderPayment {$payment->id} because amount does not match (Payment: {$payment->amount}, Webhook: {$paymentAmount}).");
+                            }
                         }
+                    } else {
+                        Log::info("Skipped payment update because Receipt No {$salesReceiptNo} is already processed or created by POS.");
                     }
 
                     // Record the OrderAccurateDoc
