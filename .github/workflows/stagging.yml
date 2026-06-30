@@ -119,7 +119,7 @@ jobs:
  # --- JOB BARU: DEPLOY KE VPS ---
   # --- JOB BARU: DEPLOY KE VPS VIA FTP ---
   deploy_vps:
-    needs: deploy-docker # Menunggu deploy staging web hosting selesai
+    needs: deploy # Menunggu deploy staging web hosting selesai
     runs-on: ubuntu-latest
 
     steps:
@@ -181,7 +181,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           # Path sumber (semua file di repository)
-          source: "./"
+          source: "deploy.zip"
           # Path tujuan di CloudPanel (SESUAIKAN DENGAN NAMA DOMAINMU!)
           target: "/home/${{ secrets.VPS_USERNAME }}/htdocs/pos.zedgroup.tech/"
           # Mencegah folder root tambahan ikut ter-copy
@@ -213,7 +213,7 @@ jobs:
             php artisan view:cache
 
   deploy-docker:
-    needs: deploy
+    needs: deploy_vps
     runs-on: ubuntu-latest
 
     steps:
