@@ -55,7 +55,8 @@
                 </div>
 
                 @if ($dateRange === 'custom')
-                    <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                    <div
+                        class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
                         <input type="date" wire:model.live="startDate"
                             class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700">
                         <span class="text-gray-400 text-sm font-bold">-</span>
@@ -125,18 +126,37 @@
     </div>
 
     {{-- SECTION 2: TOP PERFORMERS (LISTS WITH REVENUE) --}}
-    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
-        <svg class="w-5 h-5 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd"
-                d="M10 2a1 1 0 01.932.638l2.164 5.05 5.534.804a1 1 0 01.554 1.706l-4.004 3.902.945 5.51a1 1 0 01-1.451 1.054L10 17.643l-4.947 2.602a1 1 0 01-1.451-1.054l.945-5.51-4.004-3.902a1 1 0 01.554-1.706l5.534-.804 2.164-5.05A1 1 0 0110 2z"
-                clip-rule="evenodd"></path>
-        </svg>
-        Peringkat Tertinggi (Top Performers)
-    </h2>
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+        <h2 class="text-lg font-bold text-gray-800 flex items-center">
+            <svg class="w-5 h-5 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                    d="M10 2a1 1 0 01.932.638l2.164 5.05 5.534.804a1 1 0 01.554 1.706l-4.004 3.902.945 5.51a1 1 0 01-1.451 1.054L10 17.643l-4.947 2.602a1 1 0 01-1.451-1.054l.945-5.51-4.004-3.902a1 1 0 01.554-1.706l5.534-.804 2.164-5.05A1 1 0 0110 2z"
+                    clip-rule="evenodd"></path>
+            </svg>
+            Peringkat Tertinggi (Top Performers)
+        </h2>
+        <div class="flex items-center gap-2">
+            <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                <select wire:model.live="topPerformerSortBy"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 pr-6 rounded-lg cursor-pointer">
+                    <option value="revenue">Berdasarkan Nominal</option>
+                    <option value="qty">Berdasarkan Qty/Transaksi</option>
+                </select>
+            </div>
+            <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                <select wire:model.live="topPerformerLimit"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 pr-6 rounded-lg cursor-pointer">
+                    <option value="5">Top 5</option>
+                    <option value="10">Top 10</option>
+                    <option value="20">Top 20</option>
+                </select>
+            </div>
+        </div>
+    </div>
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {{-- Top Products --}}
         <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
-            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top 5 Produk</h3>
+            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top {{ $topPerformerLimit }} Produk</h3>
             <div class="space-y-4">
                 @forelse($topProducts as $index => $tp)
                     <div class="flex items-center justify-between">
@@ -163,7 +183,7 @@
 
         {{-- Top Sales --}}
         <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
-            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top 5 Kasir/Sales
+            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top {{ $topPerformerLimit }} Kasir/Sales
             </h3>
             <div class="space-y-4">
                 @forelse($topSales as $index => $ts)
@@ -189,11 +209,11 @@
             </div>
         </div>
 
-        {{-- Top Branches --}}
+        {{-- Top Brands --}}
         <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
-            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top 5 Cabang</h3>
+            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Top {{ $topPerformerLimit }} Brand</h3>
             <div class="space-y-4">
-                @forelse($topBranches as $index => $tb)
+                @forelse($topBrands as $index => $tb)
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <div
@@ -202,7 +222,7 @@
                             <div>
                                 <p class="text-sm font-bold text-gray-800 line-clamp-1" title="{{ $tb['name'] }}">
                                     {{ $tb['name'] }}</p>
-                                <p class="text-xs text-gray-500">{{ $tb['total_transactions'] }} Transaksi</p>
+                                <p class="text-xs text-gray-500">{{ $tb['total_qty'] }} Pcs Terjual</p>
                             </div>
                         </div>
                         <div class="text-right">
@@ -221,15 +241,18 @@
     <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center border-t pt-8 mt-8">
         <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z">
+            </path>
         </svg>
-        Laporan Transaksi Kasir
+        Transaksi Kasir
     </h2>
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden mb-8">
+    <div
+        class="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden mb-8">
         <div class="overflow-x-auto overflow-y-auto" style="max-height: 400px;">
             <table class="w-full text-left border-collapse relative">
                 <thead class="sticky top-0 z-10 shadow-sm">
-                    <tr class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    <tr
+                        class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
                         <th class="px-6 py-4 bg-gray-50">Nama Kasir</th>
                         <th class="px-6 py-4 bg-gray-50 text-center">Qty</th>
                         <th class="px-6 py-4 bg-gray-50 text-right">Amount (Struk)</th>
@@ -244,23 +267,86 @@
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
                                         {{ substr($cData['name'], 0, 1) }}
                                     </div>
                                     <span class="text-sm font-bold text-gray-800">{{ $cData['name'] }}</span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-600 text-center font-medium">{{ $cData['qty'] }}</td>
-                            <td class="px-6 py-4 text-sm font-bold text-gray-800 text-right">Rp {{ number_format($cData['amount'], 0, ',', '.') }}</td>
-                            <td class="px-6 py-4 text-sm font-medium text-red-500 text-right">Rp {{ number_format($cData['cashback'], 0, ',', '.') }}</td>
-                            <td class="px-6 py-4 text-sm font-medium text-green-500 text-right">Rp {{ number_format($cData['promo'], 0, ',', '.') }}</td>
-                            <td class="px-6 py-4 text-sm font-bold text-blue-600 text-right">Rp {{ number_format($cData['tunai'], 0, ',', '.') }}</td>
-                            <td class="px-6 py-4 text-sm font-bold text-purple-600 text-right">Rp {{ number_format($cData['non_tunai'], 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600 text-center font-medium">{{ $cData['qty'] }}
+                            </td>
+                            <td class="px-6 py-4 text-sm font-bold text-gray-800 text-right">Rp
+                                {{ number_format($cData['amount'], 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm font-medium text-red-500 text-right">Rp
+                                {{ number_format($cData['cashback'], 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm font-medium text-green-500 text-right">Rp
+                                {{ number_format($cData['promo'], 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm font-bold text-blue-600 text-right">Rp
+                                {{ number_format($cData['tunai'], 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm font-bold text-purple-600 text-right">Rp
+                                {{ number_format($cData['non_tunai'], 0, ',', '.') }}</td>
                         </tr>
                     @empty
                         <tr>
                             <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">
                                 Belum ada data transaksi kasir pada rentang waktu ini.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {{-- SECTION 2.6: CASHBACK PER SALES --}}
+    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center border-t pt-8 mt-8">
+        <svg class="w-5 h-5 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+            </path>
+        </svg>
+        Laporan Cashback per Sales
+    </h2>
+    <div
+        class="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] overflow-hidden mb-8">
+        <div class="overflow-x-auto overflow-y-auto" style="max-height: 400px;">
+            <table class="w-full text-left border-collapse relative">
+                <thead class="sticky top-0 z-10 shadow-sm">
+                    <tr class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-4 bg-gray-50">Nama Sales</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right">Cashback Amount</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right">Cashback Quantity</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @forelse($cashbackPerSales as $cbData)
+                        <tr class="hover:bg-gray-50/50 transition-colors">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-sm">
+                                        {{ substr($cbData['name'], 0, 1) }}
+                                    </div>
+                                    <span class="text-sm font-bold text-gray-800">{{ $cbData['name'] }}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="text-sm font-bold text-gray-800">Rp {{ number_format($cbData['cashback_amount'], 0, ',', '.') }}</span>
+                                    <span class="text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-600 mt-1">{{ $cbData['amount_pct'] }}%</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="text-sm font-bold text-gray-800">{{ $cbData['cashback_qty'] }} Pcs</span>
+                                    <span class="text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-600 mt-1">{{ $cbData['qty_pct'] }}%</span>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="3" class="px-6 py-8 text-center text-sm text-gray-500">
+                                Belum ada data cashback pada rentang waktu ini.
                             </td>
                         </tr>
                     @endforelse
@@ -562,8 +648,12 @@
 
                 updateCharts(newData) {
                     this.charts.trend.updateOptions({
-                        series: [{ data: newData.trend.series }],
-                        xaxis: { categories: newData.trend.labels }
+                        series: [{
+                            data: newData.trend.series
+                        }],
+                        xaxis: {
+                            categories: newData.trend.labels
+                        }
                     });
 
                     this.charts.brandProportion.updateOptions({

@@ -84,8 +84,8 @@ class ProcessAccurateWebhookJob implements ShouldQueue
             'RECEIVE_ITEM' => \App\Webhooks\Accurate\ReceiveItemHandler::class,
 
             // KUMPULAN EVENT PENJUALAN:
-            'SALES_INVOICE',
-            'SALES_RECEIPT' => \App\Webhooks\Accurate\SalesInvoiceHandler::class,
+            'SALES_INVOICE' => \App\Webhooks\Accurate\SalesInvoiceHandler::class,
+            'SALES_RECEIPT' => \App\Webhooks\Accurate\SalesReceiptHandler::class,
 
             // EVENT VENDOR:
             'VENDOR' => \App\Webhooks\Accurate\VendorSaveHandler::class,
