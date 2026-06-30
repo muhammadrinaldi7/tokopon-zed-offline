@@ -196,6 +196,12 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           # Jalankan perintah tambahan (misal restart layanan atau clear cache)
           script: |
+
+            #Jaga-jaga jika folder terhapus, perintah ini akan otomatis membuat foldernya kembali
+            mkdir -p /home/${{ secrets.SERVER_USERNAME }}/htdocs/pos.zedgroup.tech/
+            
+            # Pindah ke folder project
+           
             cd /home/${{ secrets.VPS_USERNAME }}/htdocs/pos.zedgroup.tech/
             unzip -q -o deploy.zip
             rm deploy.zip
