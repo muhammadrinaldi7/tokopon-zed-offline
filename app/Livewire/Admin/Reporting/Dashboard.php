@@ -17,6 +17,9 @@ class Dashboard extends Component
     public $branchFilter = '';
     public $businessUnitFilter = '';
 
+    public $topPerformerSortBy = 'revenue'; // 'revenue' or 'qty'
+    public $topPerformerLimit = 5;
+
     public $businessUnits = [];
 
     public function mount()
@@ -38,10 +41,20 @@ class Dashboard extends Component
         }
     }
 
-    public function updatedStartDate() { $this->dateRange = 'custom'; }
-    public function updatedEndDate() { $this->dateRange = 'custom'; }
-    public function updatedBranchFilter() { /* Automatically triggers render */ }
-    public function updatedBusinessUnitFilter() { /* Automatically triggers render */ }
+    public function updatedStartDate()
+    {
+        $this->dateRange = 'custom';
+    }
+    public function updatedEndDate()
+    {
+        $this->dateRange = 'custom';
+    }
+    public function updatedBranchFilter()
+    { /* Automatically triggers render */
+    }
+    public function updatedBusinessUnitFilter()
+    { /* Automatically triggers render */
+    }
 
     private function setDateRange()
     {
@@ -86,12 +99,12 @@ class Dashboard extends Component
 
         $query = Order::whereBetween('created_at', [$start, $end])
             ->where('order_status', 'COMPLETED')
-            ->when($this->branchFilter, function($q) {
+            ->when($this->branchFilter, function ($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
             })
-            ->when($this->businessUnitFilter, function($q) {
+            ->when($this->businessUnitFilter, function ($q) {
                 $q->where('business_unit_id', $this->businessUnitFilter);
-            }, function($q) {
+            }, function ($q) {
                 $user = \Illuminate\Support\Facades\Auth::user();
                 if (!$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
                     $q->where('business_unit_id', $user->business_unit_id);
@@ -102,11 +115,11 @@ class Dashboard extends Component
         $orderIds = (clone $query)->pluck('id');
         $totalGross = (clone $query)->sum('total_amount');
         $totalDiscount = (clone $query)->sum('discount_amount');
-        
+
         $totalMdr = \App\Models\OrderPayment::whereIn('order_id', $orderIds)
             ->with(['paymentMethod', 'paymentMethodRate'])
             ->get()
-            ->sum(function($payment) {
+            ->sum(function ($payment) {
                 $rate = $payment->paymentMethodRate;
                 $pct = $rate ? $rate->mdr_percentage : ($payment->paymentMethod->mdr_percentage ?? 0);
                 return round($payment->amount * $pct / 100);
@@ -125,26 +138,26 @@ class Dashboard extends Component
 
         $mtdQuery = Order::where('order_status', 'COMPLETED')
             ->whereBetween('created_at', [$startOfThisMonth, $now])
-            ->when($this->branchFilter, function($q) {
+            ->when($this->branchFilter, function ($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
             })
-            ->when($this->businessUnitFilter, function($q) {
+            ->when($this->businessUnitFilter, function ($q) {
                 $q->where('business_unit_id', $this->businessUnitFilter);
-            }, function($q) {
+            }, function ($q) {
                 $user = \Illuminate\Support\Facades\Auth::user();
                 if (!$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
                     $q->where('business_unit_id', $user->business_unit_id);
                 }
             });
-        
+
         $lastMtdQuery = Order::where('order_status', 'COMPLETED')
             ->whereBetween('created_at', [$startOfLastMonth, $sameDayLastMonth])
-            ->when($this->branchFilter, function($q) {
+            ->when($this->branchFilter, function ($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
             })
-            ->when($this->businessUnitFilter, function($q) {
+            ->when($this->businessUnitFilter, function ($q) {
                 $q->where('business_unit_id', $this->businessUnitFilter);
-            }, function($q) {
+            }, function ($q) {
                 $user = \Illuminate\Support\Facades\Auth::user();
                 if (!$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
                     $q->where('business_unit_id', $user->business_unit_id);
@@ -157,7 +170,7 @@ class Dashboard extends Component
         $mtdMdr = \App\Models\OrderPayment::whereIn('order_id', $mtdOrderIds)
             ->with(['paymentMethod', 'paymentMethodRate'])
             ->get()
-            ->sum(function($payment) {
+            ->sum(function ($payment) {
                 $rate = $payment->paymentMethodRate;
                 $pct = $rate ? $rate->mdr_percentage : ($payment->paymentMethod->mdr_percentage ?? 0);
                 return round($payment->amount * $pct / 100);
@@ -166,7 +179,7 @@ class Dashboard extends Component
         $lastMtdMdr = \App\Models\OrderPayment::whereIn('order_id', $lastMtdOrderIds)
             ->with(['paymentMethod', 'paymentMethodRate'])
             ->get()
-            ->sum(function($payment) {
+            ->sum(function ($payment) {
                 $rate = $payment->paymentMethodRate;
                 $pct = $rate ? $rate->mdr_percentage : ($payment->paymentMethod->mdr_percentage ?? 0);
                 return round($payment->amount * $pct / 100);
@@ -174,7 +187,7 @@ class Dashboard extends Component
 
         $mtdNetSales = (clone $mtdQuery)->sum('grand_total') - $mtdMdr;
         $lastMtdNetSales = (clone $lastMtdQuery)->sum('grand_total') - $lastMtdMdr;
-        
+
         $mtdTransactions = (clone $mtdQuery)->count();
         $lastMtdTransactions = (clone $lastMtdQuery)->count();
 
@@ -184,7 +197,7 @@ class Dashboard extends Component
         $mtdDiscount = (clone $mtdQuery)->sum('discount_amount');
         $lastMtdDiscount = (clone $lastMtdQuery)->sum('discount_amount');
 
-        $calculateGrowth = function($current, $last) {
+        $calculateGrowth = function ($current, $last) {
             if ($last > 0) {
                 return (($current - $last) / $last) * 100;
             }
@@ -199,18 +212,18 @@ class Dashboard extends Component
         ];
 
         // Fetch all orders for chart processing
-        $orders = (clone $query)->with(['salesBy'])->get();
+        $orders = (clone $query)->with(['salesBy', 'handledBy', 'items', 'payments.paymentMethod'])->get();
 
         // --- 3. TREND DATA (Line/Area Chart) ---
         $daysDiff = $start->diffInDays($end);
         $isSingleDay = $start->isSameDay($end);
         $isYearly = $daysDiff > 60;
 
-        $trendDataRaw = $orders->groupBy(function($order) use ($isSingleDay, $isYearly) {
+        $trendDataRaw = $orders->groupBy(function ($order) use ($isSingleDay, $isYearly) {
             if ($isSingleDay) return $order->created_at->format('H:00');
             if ($isYearly) return $order->created_at->format('M Y');
             return $order->created_at->format('d M');
-        })->map(function($group) {
+        })->map(function ($group) {
             return $group->sum('grand_total');
         })->toArray();
 
@@ -248,16 +261,31 @@ class Dashboard extends Component
         ];
 
         // --- 4. BRAND PROPORTION (Donut Chart) ---
-        $orderItemsForBrand = OrderItem::with('variant.product.brand')
+        $orderItemsForBrand = OrderItem::with(['variant' => function ($morphTo) {
+            $morphTo->morphWith([
+                \App\Models\ProductVariant::class => ['accurateData'],
+                \App\Models\SecondProductVariant::class => ['accurateData'],
+            ]);
+        }])
             ->whereIn('order_id', $orderIds)
             ->get();
 
-        $brandDataRaw = $orderItemsForBrand->groupBy(function($item) {
-            return $item->variant?->product?->brand?->name ?? 'Unknown';
-        })->map(function($group) {
+        $brandDataRaw = $orderItemsForBrand->groupBy(function ($item) {
+            if ($item->variant instanceof \App\Models\ProductAccurate) {
+                return $item->variant->brandName ?? 'Unknown';
+            }
+            return $item->variant?->accurateData?->brandName ?? 'Unknown';
+        })->map(function ($group) {
+            $firstVariant = $group->first()->variant;
+            $brandName = $firstVariant instanceof \App\Models\ProductAccurate 
+                ? ($firstVariant->brandName ?? 'Unknown') 
+                : ($firstVariant?->accurateData?->brandName ?? 'Unknown');
+
             return [
-                'name' => $group->first()->variant?->product?->brand?->name ?? 'Unknown',
-                'total' => $group->sum(function($item) { return $item->price_at_checkout * $item->qty; })
+                'name' => $brandName,
+                'total' => $group->sum(function ($item) {
+                    return $item->price_at_checkout * $item->qty;
+                })
             ];
         })->sortByDesc('total')->values();
 
@@ -268,7 +296,7 @@ class Dashboard extends Component
 
         // --- 5. PAYMENT METHOD PROPORTION (Donut Chart) ---
         $orderPaymentsForChart = \App\Models\OrderPayment::with('paymentMethod')->whereIn('order_id', $orderIds)->get();
-        $pmData = $orderPaymentsForChart->groupBy('payment_method_id')->map(function($group) {
+        $pmData = $orderPaymentsForChart->groupBy('payment_method_id')->map(function ($group) {
             $pm = $group->first()->paymentMethod;
             return [
                 'name' => $pm ? $pm->name : 'Unknown',
@@ -282,42 +310,50 @@ class Dashboard extends Component
         ];
 
         // --- 6. TOP LISTS (Products, Branches, Sales) ---
-        $topProducts = $orderItemsForBrand->groupBy('product_variant_id')->map(function($group) {
-                $first = $group->first();
-                $variant = $first->variant;
-                $name = $variant?->name ?? $variant?->product?->name ?? $first->product_name ?? 'Unknown Product';
-                $sku = $variant?->sku ?? '-';
+        $topProducts = $orderItemsForBrand->groupBy('product_variant_id')->map(function ($group) {
+            $first = $group->first();
+            $variant = $first->variant;
+            $name = $variant?->name ?? $variant?->product?->name ?? $first->product_name ?? 'Unknown Product';
+            $sku = $variant?->sku ?? '-';
 
-                return [
-                    'sku' => $sku,
-                    'name' => $name,
-                    'total_qty' => $group->sum('qty'),
-                    'total_revenue' => $group->sum('subtotal')
-                ];
-            })
-            ->sortByDesc('total_qty')
-            ->take(5)
+            return [
+                'sku' => $sku,
+                'name' => $name,
+                'total_qty' => $group->sum('qty'),
+                'total_revenue' => $group->sum('subtotal')
+            ];
+        })
+            ->sortByDesc($this->topPerformerSortBy === 'qty' ? 'total_qty' : 'total_revenue')
+            ->take($this->topPerformerLimit)
             ->values()
             ->toArray();
 
-        $topBranches = $orders->groupBy(function($order) {
-            return $order->shipping_address_snapshot['store'] ?? 'Unknown';
-        })->map(function($group) {
-            return [
-                'name' => $group->first()->shipping_address_snapshot['store'] ?? 'Unknown',
-                'total_transactions' => $group->count(),
-                'total_revenue' => $group->sum('grand_total')
-            ];
-        })->sortByDesc('total_revenue')->take(5)->values()->toArray();
+        $topBrands = $orderItemsForBrand->groupBy(function ($item) {
+            if ($item->variant instanceof \App\Models\ProductAccurate) {
+                return $item->variant->brandName ?? 'Unknown';
+            }
+            return $item->variant?->accurateData?->brandName ?? 'Unknown';
+        })->map(function ($group) {
+            $firstVariant = $group->first()->variant;
+            $brandName = $firstVariant instanceof \App\Models\ProductAccurate 
+                ? ($firstVariant->brandName ?? 'Unknown') 
+                : ($firstVariant?->accurateData?->brandName ?? 'Unknown');
 
-        $topSales = $orders->groupBy('sales_id')->map(function($group) {
+            return [
+                'name' => $brandName,
+                'total_qty' => $group->sum('qty'),
+                'total_revenue' => $group->sum('subtotal')
+            ];
+        })->sortByDesc($this->topPerformerSortBy === 'qty' ? 'total_qty' : 'total_revenue')->take($this->topPerformerLimit)->values()->toArray();
+
+        $topSales = $orders->groupBy('sales_id')->map(function ($group) {
             $sales = $group->first()->salesBy;
             return [
                 'name' => $sales ? $sales->name : 'No Sales',
                 'total_transactions' => $group->count(),
                 'total_revenue' => $group->sum('grand_total')
             ];
-        })->sortByDesc('total_revenue')->take(5)->values()->toArray();
+        })->sortByDesc($this->topPerformerSortBy === 'qty' ? 'total_transactions' : 'total_revenue')->take($this->topPerformerLimit)->values()->toArray();
 
 
         $availableBranches = Branch::orderBy('name')->pluck('name');
@@ -329,6 +365,88 @@ class Dashboard extends Component
             'paymentMethod' => $paymentMethodData
         ]);
 
+        // --- 7. TRANSAKSI KASIR ---
+        $cashierData = $orders->groupBy('handled_by')->map(function ($group) {
+            $cashier = $group->first()->handledBy;
+
+            $qty = 0;
+            $amount = 0;
+            $cashback = 0;
+            $promo = 0;
+            $tunai = 0;
+            $nonTunai = 0;
+
+            foreach ($group as $order) {
+                $amount += $order->grand_total;
+
+                foreach ($order->items as $item) {
+                    $qty += $item->qty;
+                    $cashback += $item->discount_amount;
+                    $promo += $item->promo_discount_amount;
+                }
+
+                foreach ($order->payments as $payment) {
+                    $bankName = strtolower($payment->paymentMethod->bank_name ?? '');
+                    if (str_contains($bankName, 'finance') || $bankName === 'finance') {
+                        $nonTunai += $payment->amount;
+                    } else {
+                        $tunai += $payment->amount;
+                    }
+                }
+            }
+
+            return [
+                'name' => $cashier ? $cashier->name : 'Unknown',
+                'qty' => $qty,
+                'amount' => $amount,
+                'cashback' => $cashback,
+                'promo' => $promo,
+                'tunai' => $tunai,
+                'non_tunai' => $nonTunai,
+            ];
+        })->sortByDesc('amount')->values()->toArray();
+
+        // --- 8. CASHBACK PER SALES ---
+        $cashbackPerSalesRaw = $orders->groupBy('sales_id')->map(function ($group) {
+            $sales = $group->first()->salesBy;
+            $cashbackAmount = 0;
+            $cashbackQty = 0;
+            $totalSalesQty = 0;
+            $totalSalesAmount = 0;
+
+            foreach ($group as $order) {
+                $totalSalesAmount += $order->grand_total;
+                foreach ($order->items as $item) {
+                    $totalSalesQty += $item->qty;
+                    if ($item->discount_amount > 0) {
+                        $cashbackAmount += $item->discount_amount;
+                        $cashbackQty += $item->qty;
+                    }
+                }
+            }
+
+            return [
+                'name' => $sales ? $sales->name : 'No Sales',
+                'cashback_amount' => $cashbackAmount,
+                'cashback_qty' => $cashbackQty,
+                'total_sales_qty' => $totalSalesQty,
+                'total_sales_amount' => $totalSalesAmount,
+            ];
+        });
+
+        $totalCashbackAmount = $cashbackPerSalesRaw->sum('cashback_amount');
+        $totalCashbackQty = $cashbackPerSalesRaw->sum('cashback_qty');
+
+        $cashbackPerSales = $cashbackPerSalesRaw->map(function ($data) {
+            $amountPct = $data['total_sales_amount'] > 0 ? ($data['cashback_amount'] / $data['total_sales_amount']) * 100 : 0;
+            $qtyPct = $data['total_sales_qty'] > 0 ? ($data['cashback_qty'] / $data['total_sales_qty']) * 100 : 0;
+            
+            $data['amount_pct'] = round($amountPct, 2);
+            $data['qty_pct'] = round($qtyPct, 2);
+            
+            return $data;
+        })->sortByDesc('cashback_amount')->values()->toArray();
+
         return view('livewire.admin.reporting.dashboard', [
             'totalGross' => $totalGross,
             'totalDiscount' => $totalDiscount,
@@ -339,10 +457,12 @@ class Dashboard extends Component
             'trendData' => $trendData,
             'brandProportionData' => $brandProportionData,
             'paymentMethodData' => $paymentMethodData,
-            'topBranches' => $topBranches,
+            'topBrands' => $topBrands,
             'topSales' => $topSales,
             'topProducts' => $topProducts,
-            'availableBranches' => $availableBranches
+            'availableBranches' => $availableBranches,
+            'cashierData' => $cashierData,
+            'cashbackPerSales' => $cashbackPerSales
         ])->layout('layouts.admin');
     }
 }

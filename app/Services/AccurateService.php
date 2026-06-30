@@ -955,8 +955,39 @@ class AccurateService
             }
             return [];
         } else {
-            Log::info('API Accurate Sales Receipt Error: ' . $response->body());
             throw new \Exception('API Accurate Sales Receipt Error: ' . $response->body());
+        }
+    }
+
+    public function getDetailSalesReceipt($id, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/sales-receipt/detail.do', [
+            'id' => $id
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data['d'])) {
+                return $data['d'];
+            }
+            return null;
+        } else {
+            Log::error('API Accurate Get Detail Sales Receipt Error: ' . $response->body());
+            throw new \Exception('API Accurate Get Detail Sales Receipt Error: ' . $response->body());
         }
     }
 

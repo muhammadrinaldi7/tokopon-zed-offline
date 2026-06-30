@@ -470,11 +470,14 @@ trait WithCheckoutAndReceipt
             foreach ($this->payments as $payment) {
                 $rowTotal = (float)$payment['amount'];
 
+                $pm = \App\Models\PaymentMethod::find($payment['payment_method_id']);
+                $isFinance = $pm && !empty($pm->accurate_customer_no);
+
                 OrderPayment::create([
                     'order_id' => $order->id,
                     'xendit_external_id' => 'ORD-BUY-' . date('YmdHis') . rand(1000, 9999),
                     'amount' => $rowTotal,
-                    'status' => 'PAID',
+                    'status' => $isFinance ? 'PENDING' : 'PAID',
                     'payment_method_id' => $payment['payment_method_id'],
                     'payment_method_rate_id' => $payment['payment_method_rate_id'] ?: null,
                     'no_kontrak' => $payment['no_kontrak'] ?? null,
