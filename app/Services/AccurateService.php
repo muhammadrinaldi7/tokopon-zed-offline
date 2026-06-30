@@ -639,6 +639,37 @@ class AccurateService
     }
 
 
+    public function postDeliveryOrder($deliveryOrderData, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/delivery-order/save.do', $deliveryOrderData);
+
+        Log::info('API Accurate Delivery Order Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Delivery Order Error: ' . $response->body());
+            throw new \Exception('API Accurate Delivery Order Error: ' . $response->body());
+        }
+    }
 
     public function postSalesInvoice($salesInvoiceData, $databaseSource = 'syihab')
     {
