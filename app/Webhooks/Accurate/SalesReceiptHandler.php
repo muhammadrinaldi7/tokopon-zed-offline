@@ -71,11 +71,16 @@ class SalesReceiptHandler implements WebhookHandlerInterface
                         continue;
                     }
 
+                    Log::info("Order found: ID {$order->id}. Updating accurate_receipt_no with {$salesReceiptNo}");
+
                     // Update accurate_receipt_no on Order if not already present
                     $existingReceipts = array_map('trim', explode(',', $order->accurate_receipt_no ?? ''));
                     if (!in_array($salesReceiptNo, $existingReceipts)) {
                         $newReceiptNo = empty($order->accurate_receipt_no) ? $salesReceiptNo : $order->accurate_receipt_no . ', ' . $salesReceiptNo;
-                        $order->update(['accurate_receipt_no' => $newReceiptNo]);
+                        $updated = $order->update(['accurate_receipt_no' => $newReceiptNo]);
+                        Log::info("Order {$order->id} accurate_receipt_no updated to {$newReceiptNo}. Result: " . ($updated ? 'Success' : 'Failed'));
+                    } else {
+                        Log::info("Receipt No {$salesReceiptNo} already exists in Order {$order->id}");
                     }
 
                     // Find PENDING finance payments for this order
@@ -83,15 +88,19 @@ class SalesReceiptHandler implements WebhookHandlerInterface
                         ->where('status', 'PENDING')
                         ->get();
 
+                    Log::info("Found {$pendingPayments->count()} PENDING payments for Order {$order->id}");
+
                     foreach ($pendingPayments as $payment) {
                         // Cek apakah payment method-nya finance (punya accurate_customer_no)
                         $pm = $payment->paymentMethod;
                         if ($pm && !empty($pm->accurate_customer_no)) {
-                            $payment->update([
+                            $paymentUpdated = $payment->update([
                                 'status' => 'PAID',
                                 'paid_at' => now(),
                             ]);
-                            Log::info("Updated OrderPayment {$payment->id} status to PAID (Finance Settled).");
+                            Log::info("Updated OrderPayment {$payment->id} status to PAID (Finance Settled). Result: " . ($paymentUpdated ? 'Success' : 'Failed'));
+                        } else {
+                            Log::info("Skipped OrderPayment {$payment->id} because it is not a finance payment method (accurate_customer_no empty).");
                         }
                     }
 
