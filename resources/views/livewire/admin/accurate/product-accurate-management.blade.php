@@ -127,7 +127,7 @@
                                         </span>
                                     @endif
                                     
-                                    <button wire:click="syncSerialNumber({{ $product->accurate_id }})"
+                                    <button wire:click="syncSerialNumber('{{ $product->accurate_id }}')"
                                         class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700">
                                         Sync Serial Number
                                     </button>

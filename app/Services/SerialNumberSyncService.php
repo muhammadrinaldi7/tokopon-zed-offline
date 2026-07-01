@@ -32,6 +32,7 @@ class SerialNumberSyncService
                 $sources = \App\Models\BusinessUnit::where('is_active', true)->pluck('code')->toArray();
             }
 
+
             $totalProcessed = 0;
 
             foreach ($sources as $source) {
@@ -185,12 +186,12 @@ class SerialNumberSyncService
 
             if ($accurateVendorId) {
                 $localVendor = \App\Models\Vendor::where('accurate_vendor_id', $accurateVendorId)
-                                                 ->where('database_source', $databaseSource)
-                                                 ->first();
+                    ->where('database_source', $databaseSource)
+                    ->first();
                 if (!$localVendor && $vendorName) {
                     $localVendor = \App\Models\Vendor::where('vendor_name', $vendorName)
-                                                     ->where('database_source', $databaseSource)
-                                                     ->first();
+                        ->where('database_source', $databaseSource)
+                        ->first();
                 }
                 if ($localVendor) {
                     $localVendorId = $localVendor->id;
@@ -314,12 +315,12 @@ class SerialNumberSyncService
 
             if ($accurateVendorId) {
                 $localVendor = \App\Models\Vendor::where('accurate_vendor_id', $accurateVendorId)
-                                                 ->where('database_source', $databaseSource)
-                                                 ->first();
+                    ->where('database_source', $databaseSource)
+                    ->first();
                 if (!$localVendor && $vendorName) {
                     $localVendor = \App\Models\Vendor::where('vendor_name', $vendorName)
-                                                     ->where('database_source', $databaseSource)
-                                                     ->first();
+                        ->where('database_source', $databaseSource)
+                        ->first();
                 }
                 if ($localVendor) {
                     $localVendorId = $localVendor->id;
@@ -512,7 +513,6 @@ class SerialNumberSyncService
                 }
 
                 return ['updated' => false, 'old_price' => $oldPrice, 'new_price' => $unitPrice];
-
             } catch (\Exception $e) {
                 Log::warning("Price Sync [{$sku}] gagal dari source {$source}: " . $e->getMessage());
                 continue;
