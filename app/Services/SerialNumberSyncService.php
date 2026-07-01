@@ -103,18 +103,28 @@ class SerialNumberSyncService
 
             $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
             $localWarehouseId = null;
-            if ($accurateWarehouseId && $bu) {
-                $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
+            $productAccurateId = null;
+
+            if ($bu) {
+                if ($accurateWarehouseId) {
+                    $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
+                        ->where('business_unit_id', $bu->id)
+                        ->first();
+                    $localWarehouseId = $localWarehouse ? $localWarehouse->id : null;
+                }
+
+                $pa = \App\Models\ProductAccurate::where('item_no', $sku)
                     ->where('business_unit_id', $bu->id)
                     ->first();
-                $localWarehouseId = $localWarehouse ? $localWarehouse->id : null;
+                $productAccurateId = $pa ? $pa->id : null;
             }
 
             $upsertData[] = [
-                'accurate_sn_id'   => $accurateSnId,
-                'item_no'          => $sku,
-                'warehouse_id'     => $localWarehouseId,
-                'business_unit_id' => $bu ? $bu->id : null,
+                'accurate_sn_id'      => $accurateSnId,
+                'item_no'             => $sku,
+                'warehouse_id'        => $localWarehouseId,
+                'business_unit_id'    => $bu ? $bu->id : null,
+                'product_accurate_id' => $productAccurateId,
                 'serial_number'    => $serialNumberStr,
                 'status'           => 'Available',
                 'created_at'       => now(),
@@ -130,7 +140,7 @@ class SerialNumberSyncService
                 ProductSerialNumber::upsert(
                     $upsertData,
                     ['serial_number'], // <- Acuan Pencarian (Unique)
-                    ['accurate_sn_id', 'item_no', 'warehouse_id', 'business_unit_id', 'status', 'updated_at'] // <- Yang di-update
+                    ['accurate_sn_id', 'item_no', 'warehouse_id', 'business_unit_id', 'product_accurate_id', 'status', 'updated_at'] // <- Yang di-update
                 );
                 Log::info("Webhook/Sync Berhasil: Upsert " . count($upsertData) . " Serial Number untuk SKU {$sku}");
             } catch (\Exception $e) {
@@ -223,13 +233,22 @@ class SerialNumberSyncService
 
                 $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
                 $localWarehouseId = null;
-                if ($accurateWarehouseId && $bu) {
-                    $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
+                $productAccurateId = null;
+
+                if ($bu) {
+                    if ($accurateWarehouseId) {
+                        $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
+                            ->where('business_unit_id', $bu->id)
+                            ->first();
+                        if ($localWarehouse) {
+                            $localWarehouseId = $localWarehouse->id;
+                        }
+                    }
+
+                    $pa = \App\Models\ProductAccurate::where('item_no', $sku)
                         ->where('business_unit_id', $bu->id)
                         ->first();
-                    if ($localWarehouse) {
-                        $localWarehouseId = $localWarehouse->id;
-                    }
+                    $productAccurateId = $pa ? $pa->id : null;
                 }
 
                 $snList = $item['detailSerialNumber'] ?? [];
@@ -266,6 +285,7 @@ class SerialNumberSyncService
                             'item_no' => $sku,
                             'warehouse_id' => $localWarehouseId,
                             'business_unit_id' => $bu ? $bu->id : null,
+                            'product_accurate_id' => $productAccurateId,
                             'hpp' => $hpp,
                             'vendor_id' => $localVendorId,
                             'status' => $finalStatus,
@@ -352,13 +372,22 @@ class SerialNumberSyncService
 
                 $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
                 $localWarehouseId = null;
-                if ($accurateWarehouseId && $bu) {
-                    $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
+                $productAccurateId = null;
+
+                if ($bu) {
+                    if ($accurateWarehouseId) {
+                        $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
+                            ->where('business_unit_id', $bu->id)
+                            ->first();
+                        if ($localWarehouse) {
+                            $localWarehouseId = $localWarehouse->id;
+                        }
+                    }
+
+                    $pa = \App\Models\ProductAccurate::where('item_no', $sku)
                         ->where('business_unit_id', $bu->id)
                         ->first();
-                    if ($localWarehouse) {
-                        $localWarehouseId = $localWarehouse->id;
-                    }
+                    $productAccurateId = $pa ? $pa->id : null;
                 }
 
                 $snList = $item['detailSerialNumber'] ?? [];
@@ -391,6 +420,7 @@ class SerialNumberSyncService
                             'item_no' => $sku,
                             'warehouse_id' => $localWarehouseId,
                             'business_unit_id' => $bu ? $bu->id : null,
+                            'product_accurate_id' => $productAccurateId,
                             'hpp' => $hpp,
                             'vendor_id' => $localVendorId,
                             'status' => $finalStatus,

@@ -35,6 +35,6 @@ class ProductSerialNumber extends Model
 
     public function productAccurate()
     {
-        return $this->belongsTo(ProductAccurate::class, 'item_no', 'item_no');
+        return $this->belongsTo(ProductAccurate::class, 'product_accurate_id');
     }
 }
