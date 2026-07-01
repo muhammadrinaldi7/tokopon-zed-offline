@@ -88,7 +88,20 @@ class ItemSaveHandler implements WebhookHandlerInterface
             Log::error("Webhook Gagal: Gagal update ProductAccurate SKU {$itemNo}. Error: " . $e->getMessage());
         }
 
-        // 4. Update ke Database POS lokal JIKA BARANG SUDAH DI-GENERATE
+        // 4. Sinkronisasi Serial Number JIKA BARANG MEMILIKI SN
+        $needsSn = $hasSnAccurate;
+
+        if ($needsSn) {
+            try {
+                $syncService = app(SerialNumberSyncService::class);
+                $syncService->syncFromAccurate($itemNo, $dbSource);
+                Log::info("Webhook SN Sync sukses (dari ItemSaveHandler) untuk SKU: {$itemNo}");
+            } catch (\Exception $e) {
+                Log::error("Webhook SN Sync failed (dari ItemSaveHandler) for SKU {$itemNo}: " . $e->getMessage());
+            }
+        }
+
+        // 5. Update ke Database POS lokal JIKA BARANG SUDAH DI-GENERATE
         $variant = ProductVariant::where('sku', $itemNo)->first()
             ?? SecondProductVariant::where('sku', $itemNo)->first();
 
@@ -107,24 +120,6 @@ class ItemSaveHandler implements WebhookHandlerInterface
                 Log::info("Webhook Berhasil: Varian POS SKU {$itemNo} ikut diupdate.");
             } catch (\Exception $e) {
                 Log::error("Webhook Gagal: Gagal update varian POS SKU {$itemNo}. Error: " . $e->getMessage());
-            }
-
-            // 5. Sync Serial Number Jika Perlu
-            $needsSn = false;
-            if ($variant instanceof SecondProductVariant) {
-                $needsSn = true;
-            } elseif ($variant instanceof ProductVariant) {
-                $needsSn = (bool) ($variant->has_sn ?? false);
-            }
-
-            if ($needsSn) {
-                try {
-                    $syncService = app(SerialNumberSyncService::class);
-                    $syncService->syncFromAccurate($itemNo, $dbSource);
-                    Log::info("Webhook SN Sync sukses (dari ItemSaveHandler) untuk SKU: {$itemNo}");
-                } catch (\Exception $e) {
-                    Log::error("Webhook SN Sync failed (dari ItemSaveHandler) for SKU {$itemNo}: " . $e->getMessage());
-                }
             }
         }
     }
