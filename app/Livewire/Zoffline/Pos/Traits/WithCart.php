@@ -812,6 +812,11 @@ trait WithCart
                 // Set diskon (hanya salah satu yang terpilih)
                 $this->cart[$cartIndex]['discount_amount'] = (int) $amount;
             }
+            
+            if (!empty($this->selectedPromos)) {
+                $this->applyPromosToCart();
+            }
+            
             $this->syncSinglePaymentAmount();
         }
         $this->closeManualDiscountModal();
@@ -857,6 +862,11 @@ trait WithCart
             }
 
             $this->cart[$this->editPriceCartIndex]['price'] = $newPrice;
+            
+            if (!empty($this->selectedPromos)) {
+                $this->applyPromosToCart();
+            }
+            
             $this->syncSinglePaymentAmount();
             $this->dispatch('toast', title: 'Berhasil', message: 'Harga satuan berhasil diubah.', type: 'success');
             $this->closeEditPriceModal();
