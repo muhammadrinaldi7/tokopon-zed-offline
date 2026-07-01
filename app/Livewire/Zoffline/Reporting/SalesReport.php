@@ -552,9 +552,11 @@ class SalesReport extends Component
                 'PELANGGAN',
                 'TELEPON',
                 'CABANG',
+                'SKU',
                 'NAMA PRODUK',
                 'MERK PRODUK',
                 'CATEGORY',
+                'VENDOR',
                 'WARNA',
                 'STORAGE',
                 'SN (SerialNumber)',
@@ -571,21 +573,25 @@ class SalesReport extends Component
                 'MDR 1 (%)',
                 'BEBAN MDR 1 (Rp)',
                 'TIPE BEBAN MDR 1',
+                'NO KONTRAK 1',
                 'METODE 2',
                 'NOMINAL 2 (Rp)',
                 'MDR 2 (%)',
                 'BEBAN MDR 2 (Rp)',
                 'TIPE BEBAN MDR 2',
+                'NO KONTRAK 2',
                 'METODE 3',
                 'NOMINAL 3 (Rp)',
                 'MDR 3 (%)',
                 'BEBAN MDR 3 (Rp)',
                 'TIPE BEBAN MDR 3',
+                'NO KONTRAK 3',
                 'METODE 4',
                 'NOMINAL 4 (Rp)',
                 'MDR 4 (%)',
                 'BEBAN MDR 4 (Rp)',
                 'TIPE BEBAN MDR 4',
+                'NO KONTRAK 4',
                 'TOTAL PEMBAYARAN'
             ], $separator);
 
@@ -608,7 +614,8 @@ class SalesReport extends Component
                                 'amount' => 0,
                                 'mdr_pct' => $pmrPct,
                                 'mdr_amount' => 0,
-                                'mdr_name' => $pmrName
+                                'mdr_name' => $pmrName,
+                                'no_kontrak' => $payment->no_kontrak ?? '-'
                             ];
                         }
                         $orderPayments[$key]['amount'] += $payment->amount;
@@ -621,7 +628,8 @@ class SalesReport extends Component
                         'amount' => $order->grand_total,
                         'mdr_pct' => 0,
                         'mdr_amount' => 0,
-                        'mdr_name' => '-'
+                        'mdr_name' => '-',
+                        'no_kontrak' => '-'
                     ];
                 }
                 $orderPayments = array_values($orderPayments);
@@ -713,9 +721,27 @@ class SalesReport extends Component
                         $weight = $actualItemSubtotal / $totalOrderActualSubtotal;
 
                         $variant = $item->variant;
+                        $sku = $variant?->item_no ?? $variant?->sku ?? $variant?->accurateData?->item_no ?? '-';
                         $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
                         $merk = $variant?->brandName ?? $variant?->accurateData?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
                         $category = $variant?->categoryName ?? $variant?->accurateData?->categoryName ?? 'Unknown';
+                        $snList = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
+                        $vendor = '-';
+
+                        if (!empty($snList)) {
+                            $psns = \App\Models\ProductSerialNumber::with('vendor')
+                                ->whereIn('serial_number', $snList)
+                                ->get()
+                                ->keyBy('serial_number');
+
+                            $vendorNames = [];
+                            foreach ($snList as $sn) {
+                                $vendorNames[] = $psns->get($sn)?->vendor?->vendor_name ?? '-';
+                            }
+
+                            $vendorNames = array_unique($vendorNames);
+                            $vendor = implode(', ', $vendorNames);
+                        }
 
                         $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
                         $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];
@@ -732,9 +758,11 @@ class SalesReport extends Component
                             $order->user ? $order->user->name : 'Walk-in',
                             $order->user ? $order->user->profile->phone_number : '-',
                             $branch,
+                            $sku,
                             $name,
                             $merk,
                             $category,
+                            $vendor,
                             $variant?->color ?? '-',
                             ($variant?->ram ? $variant->ram . ' ' : '') . ($variant?->storage ? $variant->storage : '') ?? '-',
                             $item->serial_number ?? '-',
@@ -774,6 +802,7 @@ class SalesReport extends Component
                                 $rowData[] = $upm['mdr_pct'];
                                 $rowData[] = $allocatedMdr;
                                 $rowData[] = $upm['mdr_name'];
+                                $rowData[] = $upm['no_kontrak'];
 
                                 $itemTotalPembayaranKotor += $allocatedNominalKotor;
                             } else {
@@ -781,6 +810,7 @@ class SalesReport extends Component
                                 $rowData[] = '0';
                                 $rowData[] = '0';
                                 $rowData[] = '0';
+                                $rowData[] = '-';
                                 $rowData[] = '-';
                             }
                         }
@@ -802,6 +832,9 @@ class SalesReport extends Component
                         $order->user ? $order->user->name : 'Walk-in',
                         $order->user ? $order->user->profile->phone_number : '-',
                         $branch,
+                        '-',
+                        '-',
+                        '-',
                         '-',
                         '-',
                         '-',
@@ -830,6 +863,7 @@ class SalesReport extends Component
                             $rowData[] = $upm['mdr_pct'];
                             $rowData[] = $upm['mdr_amount'];
                             $rowData[] = $upm['mdr_name'];
+                            $rowData[] = $upm['no_kontrak'];
 
                             $itemTotalPembayaranKotor += $upm['amount'];
                         } else {
@@ -837,6 +871,7 @@ class SalesReport extends Component
                             $rowData[] = '0';
                             $rowData[] = '0';
                             $rowData[] = '0';
+                            $rowData[] = '-';
                             $rowData[] = '-';
                         }
                     }
@@ -867,7 +902,7 @@ class SalesReport extends Component
 
         $totalGross = $this->ordersQuery->sum('total_amount');
         $netQuery = clone $this->ordersQuery;
-        $totalNet = $netQuery->get()->sum(function($order) {
+        $totalNet = $netQuery->get()->sum(function ($order) {
             return $order->grand_total - $order->mdr_amount;
         });
 
