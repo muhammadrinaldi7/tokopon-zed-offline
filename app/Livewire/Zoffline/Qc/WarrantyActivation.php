@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\WithFileUploads;
 
 #[Layout('layouts.z')]
@@ -19,7 +20,9 @@ class WarrantyActivation extends Component
 {
     use WithFileUploads;
 
+    #[Url(as: 'sn')]
     public $searchQuery = '';
+    
     public $foundItem = null;
     public $isInspecting = false;
     public $errorMessage = '';
@@ -40,6 +43,13 @@ class WarrantyActivation extends Component
     // Warranty Result State
     public $generatedWarranties = [];
 
+    public function mount()
+    {
+        if (!empty($this->searchQuery)) {
+            $this->searchItem();
+        }
+    }
+
     public function searchItem()
     {
         $this->validate([
@@ -57,9 +67,17 @@ class WarrantyActivation extends Component
 
         $activeUnitId = Auth::user()->getActiveBusinessUnitId();
 
-        $item = OrderItem::with(['order.user', 'order.businessUnit', 'variant'])
-            ->where('serial_number', $this->searchQuery)
-            ->first();
+        $items = OrderItem::with(['order.user', 'order.businessUnit', 'variant'])
+            ->where('serial_number', 'LIKE', '%' . $this->searchQuery . '%')
+            ->get();
+
+        $search = strtolower(trim($this->searchQuery));
+        $item = $items->first(function ($i) use ($search) {
+            $sns = array_map(function($s) {
+                return strtolower(trim($s));
+            }, explode(',', $i->serial_number));
+            return in_array($search, $sns);
+        });
 
         if (!$item) {
             $this->errorMessage = 'Barang dengan Serial Number tersebut tidak ditemukan di sistem.';
@@ -71,7 +89,8 @@ class WarrantyActivation extends Component
             return;
         }
 
-        if ($item->inspections()->exists()) {
+        $hasInspection = \App\Models\DeviceInspection::where('imei', $this->searchQuery)->exists();
+        if ($hasInspection) {
             $this->errorMessage = 'Barang ini sudah pernah diinspeksi (Aktivasi Garansi Selesai).';
             return;
         }
@@ -174,7 +193,7 @@ class WarrantyActivation extends Component
         ]);
 
         $inspection = new DeviceInspection([
-            'imei' => $this->foundItem->serial_number,
+            'imei' => $this->searchQuery,
             'second_product_variant_id' => null, // Not a second hand device
             'qc_template_id' => $this->template?->id,
             'inspectable_type' => get_class($this->foundItem),
@@ -227,7 +246,7 @@ class WarrantyActivation extends Component
             $warranty = \App\Models\Warranty::create([
                 'warranty_policy_id' => $policy->id, 
                 'order_item_id' => $this->foundItem->id,
-                'serial_number' => $this->foundItem->serial_number,
+                'serial_number' => $this->searchQuery,
                 'customer_user_id' => $order->user_id,
                 'type' => $policy->coverage_type, // full_cover atau ganti_unit
                 'duration_days' => $policy->duration_days,

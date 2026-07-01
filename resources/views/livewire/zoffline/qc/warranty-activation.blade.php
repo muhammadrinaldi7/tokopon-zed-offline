@@ -94,7 +94,7 @@
                         </div>
                         <div class="col-span-2 border-t border-gray-200 pt-3">
                             <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Produk (SN: <span
-                                    class="font-mono text-gray-900">{{ $foundItem->serial_number }}</span>)</p>
+                                    class="font-mono text-gray-900">{{ $searchQuery }}</span>)</p>
                             <p class="font-bold text-gray-900 text-lg">{{ $foundItem->product_name }}</p>
                         </div>
                     </div>
@@ -115,7 +115,7 @@
                     <div>
                         <h2 class="text-xl font-bold text-gray-900">Form Aktivasi Garansi (QC Unboxing)</h2>
                         <p class="text-sm text-gray-500">SN: <span
-                                class="font-mono font-bold text-gray-800">{{ $foundItem->serial_number }}</span></p>
+                                class="font-mono font-bold text-gray-800">{{ $searchQuery }}</span></p>
                     </div>
                 </div>
 

@@ -35,7 +35,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view-reporting');
     Route::get('/zoffline/check-serial-number', CheckSerialNumber::class)->name('zoffline.check-serial-number')->middleware('can:view-warehouse-stocks');
     Route::get('/zoffline/check-serial-number/{sn}/history', SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
-    
+
     // Zoffline Approvals & Settings
     Route::get('/zoffline/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('zoffline.approvals.index');
     Route::get('/zoffline/approval-rules', \App\Livewire\Admin\Settings\ApprovalRule\Index::class)->name('zoffline.approval-rules.index')->middleware('can:manage-settings');
