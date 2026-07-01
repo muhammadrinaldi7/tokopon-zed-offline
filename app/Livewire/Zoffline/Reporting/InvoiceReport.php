@@ -191,10 +191,18 @@ class InvoiceReport extends Component
         $orders = $this->ordersQuery->paginate(20);
         $availableBranches = \App\Models\Branch::orderBy('name')->pluck('name');
 
-        $totalGross = $this->ordersQuery->sum('total_amount');
-        $netQuery = clone $this->ordersQuery;
-        $totalNet = $netQuery->leftJoin('payment_method_rates', 'orders.payment_method_rate_id', '=', 'payment_method_rates.id')
-            ->sum(\Illuminate\Support\Facades\DB::raw('orders.grand_total - ((orders.grand_total * COALESCE(payment_method_rates.mdr_percentage, 0)) / 100)'));
+        $totalGross = $this->ordersQuery->sum('orders.total_amount');
+        
+        $totalGrandTotal = (clone $this->ordersQuery)->sum('orders.grand_total');
+
+        $totalMdr = \Illuminate\Support\Facades\DB::table('order_payments')
+            ->joinSub(clone $this->ordersQuery->select('orders.id'), 'filtered_orders', function ($join) {
+                $join->on('order_payments.order_id', '=', 'filtered_orders.id');
+            })
+            ->leftJoin('payment_method_rates', 'order_payments.payment_method_rate_id', '=', 'payment_method_rates.id')
+            ->sum(\Illuminate\Support\Facades\DB::raw('(order_payments.amount * COALESCE(payment_method_rates.mdr_percentage, 0)) / 100'));
+
+        $totalNet = $totalGrandTotal - $totalMdr;
 
         return view('livewire.zoffline.reporting.invoice-report', [
             'orders' => $orders,
