@@ -267,11 +267,47 @@
                             </div>
                         </div>
 
-                        <!-- Input IMEI / SN Opsional -->
-                        <div class="mt-4 pt-3 border-t border-gray-100">
-                            <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Kunci IMEI / SN (Opsional)</label>
-                            <input type="text" wire:model.defer="items.{{ $index }}.serial_number" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors" placeholder="Masukkan IMEI/SN jika ingin dikunci sejak SO (Pisahkan dengan koma jika > 1)">
-                            <p class="text-[10px] text-gray-500 mt-1">*Jika diisi, IMEI ini akan langsung dikunci di Pesanan Penjualan Accurate.</p>
+                        <div class="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <!-- Kunci IMEI -->
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Kunci IMEI / SN (Opsional)</label>
+                                <input type="text" wire:model.defer="items.{{ $index }}.serial_number" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors" placeholder="Ketik IMEI dipisah koma jika > 1">
+                                <p class="text-[10px] text-gray-500 mt-1">*Akan dikunci otomatis di SO Accurate.</p>
+                            </div>
+
+                            <!-- Multi Sales per Item -->
+                            <div class="relative">
+                                <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Tenaga Penjual (Bisa Multi-Sales)</label>
+                                <div class="flex flex-wrap gap-2 mb-2">
+                                    @foreach($item['sales_names'] ?? [] as $sIndex => $sName)
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold shadow-sm">
+                                            {{ $sName }}
+                                            <button type="button" wire:click="removeItemSales({{ $index }}, {{ $sIndex }})" class="text-emerald-500 hover:text-emerald-700 hover:bg-emerald-100 p-0.5 rounded-md transition-colors">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            </button>
+                                        </span>
+                                    @endforeach
+                                </div>
+                                <div class="relative">
+                                    <input type="text" wire:model.live.debounce.300ms="items.{{ $index }}.searchSales" class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors placeholder-gray-400" placeholder="Ketik nama karyawan untuk menambah sales...">
+                                    <div wire:loading wire:target="items.{{ $index }}.searchSales" class="absolute right-3 top-3 text-[#1c69d4]">
+                                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                
+                                @if (!empty($item['salesSearchResults']))
+                                    <div class="absolute z-30 mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto">
+                                        @foreach ($item['salesSearchResults'] as $res)
+                                            <div wire:click="selectItemSales({{ $index }}, {{ $res['id'] }}, '{{ addslashes($res['name']) }}')" class="px-4 py-3 hover:bg-emerald-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors">
+                                                <div class="font-bold text-gray-800 text-sm">{{ $res['name'] }}</div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 @endforeach

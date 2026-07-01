@@ -68,7 +68,7 @@
                                         <span
                                             class="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold uppercase rounded-md border border-blue-200">DP
                                             Dibayar</span>
-                                    @elseif($order->order_status === 'completed')
+                                    @elseif($order->order_status === 'COMPLETED')
                                         <span
                                             class="px-2.5 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase rounded-md border border-emerald-200">Selesai</span>
                                     @else

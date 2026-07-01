@@ -106,6 +106,10 @@ class Create extends Component
             'total' => 0,
             'product_name' => '',
             'serial_number' => '', // Tambahan untuk Kunci IMEI di SO
+            'searchSales' => '',
+            'salesSearchResults' => [],
+            'sales_ids' => $this->sales_id ? [$this->sales_id] : [], // Default ke master sales_id
+            'sales_names' => $this->searchSales ? [$this->searchSales] : [],
         ];
         $this->calculateTotals();
     }
@@ -155,6 +159,32 @@ class Create extends Component
                     $this->items[$index]['unit_price'] = $variant ? $variant->base_price : 0;
                 } else {
                     $this->items[$index]['unit_price'] = 0;
+                }
+            }
+
+            if ($field === 'searchSales') {
+                $term = $value;
+                if (strlen($term) >= 1) {
+                    $user = Auth::user();
+                    $businessUnitId = $user->getActiveBusinessUnitId() ?? 1;
+
+                    $this->items[$index]['salesSearchResults'] = \App\Models\Employe::active()
+                        ->where('business_unit_id', $businessUnitId)
+                        ->where(function ($q) use ($user) {
+                            $q->where('branch_id', $user->branch_id)
+                                ->orWhereNull('branch_id');
+                        })
+                        ->where('name', 'like', '%' . $term . '%')
+                        ->take(5)
+                        ->get()
+                        ->map(function ($s) {
+                            return [
+                                'id' => $s->id,
+                                'name' => $s->name,
+                            ];
+                        })->toArray();
+                } else {
+                    $this->items[$index]['salesSearchResults'] = [];
                 }
             }
 
@@ -231,6 +261,33 @@ class Create extends Component
         $this->sales_id = $id;
         $this->searchSales = $name;
         $this->salesSearchResults = [];
+
+        // Terapkan ke semua item yang belum punya sales_ids
+        foreach ($this->items as $index => $item) {
+            if (empty($item['sales_ids'])) {
+                $this->items[$index]['sales_ids'] = [$id];
+                $this->items[$index]['sales_names'] = [$name];
+            }
+        }
+    }
+
+    public function selectItemSales($index, $id, $name)
+    {
+        if (!in_array($id, $this->items[$index]['sales_ids'])) {
+            $this->items[$index]['sales_ids'][] = $id;
+            $this->items[$index]['sales_names'][] = $name;
+        }
+        $this->items[$index]['searchSales'] = '';
+        $this->items[$index]['salesSearchResults'] = [];
+    }
+
+    public function removeItemSales($index, $salesIndex)
+    {
+        unset($this->items[$index]['sales_ids'][$salesIndex]);
+        unset($this->items[$index]['sales_names'][$salesIndex]);
+        
+        $this->items[$index]['sales_ids'] = array_values($this->items[$index]['sales_ids']);
+        $this->items[$index]['sales_names'] = array_values($this->items[$index]['sales_names']);
     }
 
     public function createNewCustomer()
@@ -437,6 +494,7 @@ class Create extends Component
                     'discount_amount' => $item['discount'],
                     'subtotal' => $item['total'],
                     'serial_number' => $item['serial_number'] ?? null, // Simpan IMEI
+                    'sales_ids' => !empty($item['sales_ids']) ? json_encode($item['sales_ids']) : null,
                 ]);
             }
 
@@ -473,6 +531,19 @@ class Create extends Component
                         'useTax1'   => false,
                         'itemCashDiscount' => (float)$item['discount'],
                     ];
+
+                    // Map sales_ids to Accurate employee numbers
+                    if (!empty($item['sales_ids'])) {
+                        $employeeNos = \App\Models\Employe::whereIn('id', $item['sales_ids'])
+                            ->pluck('employee_no')
+                            ->filter()
+                            ->values()
+                            ->toArray();
+                            
+                        if (!empty($employeeNos)) {
+                            $detailData['salesmanListNumber'] = $employeeNos;
+                        }
+                    }
 
                     // Jika user mengisi SN / IMEI, kirim ke Accurate untuk mencadangkan SN
                     if (!empty($item['serial_number'])) {
@@ -538,6 +609,7 @@ class Create extends Component
                                 'itemNo' => $variant->item_no ?? 'ITEM-UNKNOWN',
                                 'quantity' => (float)$item['qty'],
                                 'warehouseName' => $warehouseName,
+                                'salesOrderNumber' => $soResult['r']['number'],
                             ];
 
                             if (!empty($item['serial_number'])) {

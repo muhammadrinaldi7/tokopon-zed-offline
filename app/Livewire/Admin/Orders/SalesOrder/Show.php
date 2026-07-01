@@ -398,6 +398,11 @@ class Show extends Component
                 $accurateBranchName = 'GSK ' . $accurateBranchName;
             }
 
+            $detailSalesman = [];
+            if ($this->order->salesBy && !empty($this->order->salesBy->employee_no)) {
+                $detailSalesman[] = (string) $this->order->salesBy->employee_no;
+            }
+
             $detailItems = [];
             foreach ($this->order->items as $item) {
                 // Update local serial numbers first
@@ -435,6 +440,10 @@ class Show extends Component
                     'detailName' => $detailName,
                     'itemCashDiscount' => (float)$item->discount_amount,
                 ];
+
+                if (!empty($detailSalesman)) {
+                    $detailItemData['salesmanListNumber'] = $detailSalesman;
+                }
 
                 // Attach SN payload
                 $cleanSNs = array_filter(array_map('trim', explode(',', $snInput)));
@@ -508,13 +517,34 @@ class Show extends Component
                 $siData['detailDownPayment'] = $validDpInvoices;
             }
 
+            if ($remBal > 0) {
+                $mdrExpenses = [];
+                foreach ($this->payments as $payment) {
+                    $rate = $payment['payment_method_rate_id'] ? \App\Models\PaymentMethodRate::find($payment['payment_method_rate_id']) : null;
+                    $pct = $this->getMdrPercentage($payment);
+                    $rowMdr = $pct > 0 ? round((float)$payment['amount'] * $pct / 100, 0) : 0;
+
+                    if ($rowMdr > 0 && $rate && $rate->accurate_account_no) {
+                        $mdrExpenses[] = [
+                            'accountNo' => $rate->accurate_account_no,
+                            'expenseAmount' => -abs((float)$rowMdr),
+                            'expenseNotes' => 'MDR ' . ($rate->name ?? ' ')
+                        ];
+                    }
+                }
+
+                if (!empty($mdrExpenses)) {
+                    $siData['detailExpense'] = $mdrExpenses;
+                }
+            }
+
             Log::info('Accurate SI Sync Payload: ' . json_encode($siData));
             $siResult = $accurateService->postSalesInvoice($siData, $dbSource);
 
             if (isset($siResult['r']['number'])) {
                 $this->order->update([
                     'accurate_invoice_no' => $siResult['r']['number'],
-                    'order_status' => 'completed'
+                    'order_status' => 'COMPLETED'
                 ]);
 
                 \App\Models\OrderAccurateDoc::create([

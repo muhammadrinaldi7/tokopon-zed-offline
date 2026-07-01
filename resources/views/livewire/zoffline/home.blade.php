@@ -180,20 +180,22 @@
                                 </div>
                                 <span class="block text-xs sm:text-sm text-center leading-tight">Aktivasi Garansi</span>
                             </button>
-                            <button wire:click="navigateToActivationList" @click="openGaransiModal = false"
-                                class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
-                                <div
-                                    class="w-12 h-12 rounded-xl bg-blue-100/50 flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+                            @can('activation-list')
+                                <button wire:click="navigateToActivationList" @click="openGaransiModal = false"
+                                    class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
+                                    <div
+                                        class="w-12 h-12 rounded-xl bg-blue-100/50 flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
 
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5" />
-                                    </svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5" />
+                                        </svg>
 
-                                </div>
-                                <span class="block text-xs sm:text-sm text-center leading-tight">List Aktivasi</span>
-                            </button>
+                                    </div>
+                                    <span class="block text-xs sm:text-sm text-center leading-tight">List Aktivasi</span>
+                                </button>
+                            @endcan
                             <button wire:click="navigateToKlaimGaransi" @click="openGaransiModal = false"
                                 class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
                                 <div

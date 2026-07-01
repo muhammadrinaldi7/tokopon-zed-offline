@@ -686,6 +686,11 @@ trait WithCheckoutAndReceipt
 
     public function processPiutang()
     {
+        if ($this->isSoFulfillment) {
+            $this->dispatch('toast', title: 'Tidak Diizinkan', message: 'SO tidak dapat diproses sebagai Piutang POS baru.', type: 'error');
+            return;
+        }
+
         $handler = Auth::user();
         if (!$handler || !$handler->branch || !$handler->warehouse) {
             $this->dispatch('toast', title: 'Akses Ditolak', message: 'Akun Anda belum terhubung dengan Cabang (Branch) atau Gudang. Harap hubungi Admin.', type: 'error');
@@ -1604,6 +1609,7 @@ trait WithCheckoutAndReceipt
                     'itemNo' => $sku,
                     'quantity' => (float)$cartItem['qty'],
                     'warehouseName' => $warehouseName,
+                    'salesOrderNumber' => $order->accurate_so_number,
                 ];
                 if (!empty($detailSNs)) {
                     $doItem['detailSerialNumber'] = $detailSNs;
@@ -1789,7 +1795,7 @@ trait WithCheckoutAndReceipt
                 }
             }
 
-            $order->update(['order_status' => 'completed']);
+            $order->update(['order_status' => 'COMPLETED']);
             \Illuminate\Support\Facades\DB::commit();
 
             $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);

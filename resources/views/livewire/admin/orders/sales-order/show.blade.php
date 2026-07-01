@@ -14,7 +14,7 @@
 
         <div class="flex items-center gap-3">
             @if (
-                $order->order_status !== 'completed' &&
+                $order->order_status !== 'COMPLETED' &&
                 $order->order_status !== 'cancelled' &&
                 $this->getRemainingBalance() > 0)
                 <button type="button" wire:click="openDpModal"

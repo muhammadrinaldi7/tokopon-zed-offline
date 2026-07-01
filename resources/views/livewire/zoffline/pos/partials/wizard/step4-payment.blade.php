@@ -592,10 +592,12 @@
                 </span>
             </button>
             @can('piutang-penjualan')
-                <button type="button" @click="showPiutangModal = true"
-                    class="w-full sm:w-auto px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[170px]">
-                    Piutang
-                </button>
+                @if (!$isSoFulfillment)
+                    <button type="button" @click="showPiutangModal = true"
+                        class="w-full sm:w-auto px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[170px]">
+                        Piutang
+                    </button>
+                @endif
             @endcan
             <button type="button" @click="showConfirmModal = true" @if (!$this->isPaymentsValid) disabled @endif
                 class="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
