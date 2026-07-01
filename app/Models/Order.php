@@ -103,6 +103,16 @@ class Order extends Model
         return $this->belongsTo(Branch::class);
     }
 
+    public function paymentMethod()
+    {
+        return $this->belongsTo(PaymentMethod::class);
+    }
+
+    public function paymentMethodRate()
+    {
+        return $this->belongsTo(PaymentMethodRate::class);
+    }
+
 
     // ─── Scopes ────────────────────────────────────────────────
 
