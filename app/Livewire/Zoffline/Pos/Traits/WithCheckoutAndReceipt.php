@@ -1576,6 +1576,11 @@ trait WithCheckoutAndReceipt
                 $accurateBranchName = 'GSK ' . $accurateBranchName;
             }
 
+            $detailSalesman = [];
+            if ($order->salesBy && !empty($order->salesBy->employee_no)) {
+                $detailSalesman[] = (string) $order->salesBy->employee_no;
+            }
+
             // 1. Update SN in Local DB and collect for Accurate
             $doDetailItems = [];
             $siDetailItems = [];
@@ -1624,6 +1629,9 @@ trait WithCheckoutAndReceipt
                     'detailName' => $cartItem['name'],
                     'itemCashDiscount' => ((float)($cartItem['discount_amount'] ?? 0) * (float)$cartItem['qty']) + (float)($cartItem['promo_discount'] ?? 0),
                 ];
+                if (!empty($detailSalesman)) {
+                    $siItem['salesmanListNumber'] = $detailSalesman;
+                }
                 if (!empty($detailSNs)) {
                     $siItem['detailSerialNumber'] = $detailSNs;
                 }

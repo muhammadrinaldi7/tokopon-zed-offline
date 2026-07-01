@@ -1837,6 +1837,80 @@ class AccurateService
             throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
         }
     }
+    public function deleteDeliveryOrder($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $response = Http::withHeaders($config['headers'])
+            ->post($config['host'] . '/delivery-order/delete.do', ['id' => $id]);
+
+        Log::info("API Accurate Delete Delivery Order ({$databaseSource}) ID: {$id} Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete DO: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete DO Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    public function deleteSalesOrder($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $response = Http::withHeaders($config['headers'])
+            ->post($config['host'] . '/sales-order/delete.do', ['id' => $id]);
+
+        Log::info("API Accurate Delete Sales Order ({$databaseSource}) ID: {$id} Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete SO: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete SO Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
+     * Rollback order documents in Accurate with correct Bottom-Up order.
+     */
+    public function rollbackOrderDocuments(\App\Models\Order $order)
+    {
+        $dbSource = strtolower($order->businessUnit->code ?? 'syihab');
+        $docs = $order->accurateDocs;
+
+        // Correct Deletion Order: SALES_RECEIPT -> SALES_INVOICE -> DP_RECEIPT -> DP_INVOICE -> DELIVERY_ORDER -> SALES_ORDER
+        $orderedTypes = ['SALES_RECEIPT', 'receipt', 'DP_RECEIPT', 'SALES_INVOICE', 'invoice', 'DP_INVOICE', 'DELIVERY_ORDER', 'SALES_ORDER'];
+
+        foreach ($orderedTypes as $type) {
+            $matchedDocs = $docs->where('doc_type', $type)->where('status', 'SUCCESS');
+            foreach ($matchedDocs as $doc) {
+                if ($doc->accurate_id) {
+                    if (in_array($type, ['SALES_RECEIPT', 'receipt', 'DP_RECEIPT'])) {
+                        $this->deleteSalesReceipt($doc->accurate_id, $dbSource);
+                    } elseif (in_array($type, ['SALES_INVOICE', 'invoice', 'DP_INVOICE'])) {
+                        $this->deleteSalesInvoice($doc->accurate_id, $dbSource);
+                    } elseif ($type === 'DELIVERY_ORDER') {
+                        $this->deleteDeliveryOrder($doc->accurate_id, $dbSource);
+                    } elseif ($type === 'SALES_ORDER') {
+                        $this->deleteSalesOrder($doc->accurate_id, $dbSource);
+                    }
+                    $doc->update(['status' => 'CANCELLED']);
+                }
+            }
+        }
+    }
+
     /**
      * Memproses pencairan refund (uang keluar) untuk kasus Downgrade.
      * Menggunakan Sales Receipt dengan nilai chequeAmount minus.

@@ -247,17 +247,14 @@ class Pos extends Component
             $this->customerEmail = $order->user->email ?? '';
         }
 
-        // Restore sales (handled_by or current user)
-        $salesUser = $order->handledBy ?? \Illuminate\Support\Facades\Auth::user();
-        if ($salesUser) {
-            $employe = \App\Models\Employe::where('user_id', $salesUser->id)->first();
-            if ($employe) {
-                $this->selectedSales = [[
-                    'id' => $employe->id,
-                    'name' => $employe->name,
-                    'employee_no' => $employe->employee_no
-                ]];
-            }
+        // Restore sales from salesBy
+        $this->selectedSales = [];
+        if ($order->salesBy) {
+            $this->selectedSales = [[
+                'id' => $order->salesBy->id,
+                'name' => $order->salesBy->name,
+                'employee_no' => $order->salesBy->employee_no
+            ]];
         }
 
         $this->notes = $order->notes;

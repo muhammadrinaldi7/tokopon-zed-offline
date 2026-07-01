@@ -37,6 +37,20 @@
                     Terbitkan Faktur
                 </button>
             @endif
+
+            @if ($order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'cancellation')->exists())
+                <span class="px-4 py-2 bg-yellow-100 text-yellow-700 font-bold rounded-xl text-sm border border-yellow-200">
+                    Menunggu Approval Batal
+                </span>
+            @elseif ($order->order_status !== 'CANCELLED' && $order->order_status !== 'cancelled' && $order->order_status !== 'COMPLETED')
+                <button type="button" @click="$dispatch('openCancelModal', { orderId: {{ $order->id }} })"
+                    class="px-5 py-2.5 bg-red-100 text-red-600 hover:bg-red-200 font-bold rounded-xl text-sm transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Batalkan
+                </button>
+            @endif
         </div>
     </div>
 
@@ -782,4 +796,5 @@
             });
         });
     </script>
+    <livewire:components.cancel-order-modal />
 </div>

@@ -36,25 +36,9 @@ class ApprovalRequest extends Model
                 throw new \Exception("Order not found.");
             }
 
-            // Execute Accurate Deletion
-            $accurateDocs = $order->accurateDocs;
-            
-            // Accurate rules: must delete receipt first, then invoice
-            $receiptDoc = $accurateDocs->whereIn('doc_type', ['SALES_RECEIPT', 'DP_RECEIPT', 'receipt'])->first();
-            $invoiceDoc = $accurateDocs->whereIn('doc_type', ['SALES_INVOICE', 'DP_INVOICE', 'invoice'])->first();
-
+            // Execute Accurate Deletion using the new rollback method
             $accurateService = app(\App\Services\AccurateService::class);
-            $dbSource = strtolower($order->businessUnit->code ?? 'syihab');
-
-            if ($receiptDoc && $receiptDoc->accurate_id) {
-                $accurateService->deleteSalesReceipt($receiptDoc->accurate_id, $dbSource);
-                $receiptDoc->update(['status' => 'CANCELLED']);
-            }
-
-            if ($invoiceDoc && $invoiceDoc->accurate_id) {
-                $accurateService->deleteSalesInvoice($invoiceDoc->accurate_id, $dbSource);
-                $invoiceDoc->update(['status' => 'CANCELLED']);
-            }
+            $accurateService->rollbackOrderDocuments($order);
 
             // Update local order status
             $order->update(['order_status' => 'CANCELLED']);

@@ -96,6 +96,19 @@
                                             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                 </a>
+                                @if ($order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'cancellation')->exists())
+                                    <span title="Menunggu Approval Batal" class="inline-flex items-center justify-center p-2 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-600 ml-1">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    </span>
+                                @elseif ($order->order_status !== 'CANCELLED' && $order->order_status !== 'cancelled' && $order->order_status !== 'COMPLETED')
+                                    <button type="button" @click="$dispatch('openCancelModal', { orderId: {{ $order->id }} })"
+                                        class="inline-flex items-center justify-center p-2 bg-white border border-gray-200 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors shadow-sm ml-1"
+                                        title="Batalkan Transaksi">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                @endif
                             </td>
                         </tr>
                     @empty
@@ -118,4 +131,6 @@
             {{ $orders->links() }}
         </div>
     </div>
+    
+    <livewire:components.cancel-order-modal />
 </div>

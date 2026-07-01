@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use App\Livewire\Zoffline\Pos\Traits\WithPaymentAndPromo;
 
@@ -45,6 +46,12 @@ class Show extends Component
         $this->dp_amount = $this->getRemainingBalance();
         $this->dp_date = Carbon::now()->format('Y-m-d');
         // dd($this->order);
+    }
+
+    #[On('orderCancellationSubmitted')]
+    public function orderCancellationSubmitted()
+    {
+        $this->order->refresh();
     }
 
     public function getRemainingBalance()
