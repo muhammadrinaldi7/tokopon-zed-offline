@@ -10,6 +10,7 @@ use App\Livewire\Pages\SellPhone;
 use App\Livewire\Pages\SellPhoneHistory;
 use App\Livewire\Pages\TradeIn;
 use App\Livewire\Pages\UserProfile;
+use App\Livewire\Zoffline\Qc\ActivationList;
 use App\Livewire\Zoffline\Warehouse\CekStock;
 use App\Livewire\Zoffline\Warehouse\CheckSerialNumber;
 use App\Livewire\Zoffline\Warehouse\SerialNumberHistory;
@@ -35,6 +36,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view-reporting');
     Route::get('/zoffline/check-serial-number', CheckSerialNumber::class)->name('zoffline.check-serial-number')->middleware('can:view-warehouse-stocks');
     Route::get('/zoffline/check-serial-number/{sn}/history', SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
+    Route::get('/zoffline/qc/list-activation', ActivationList::class)->name('zoffline.qc.list-activation');
 
     // Zoffline Approvals & Settings
     Route::get('/zoffline/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('zoffline.approvals.index');

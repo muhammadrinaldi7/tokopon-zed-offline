@@ -258,7 +258,6 @@
         @endcan
 
         @can('view-reporting')
-
             <div x-data="{ openReporting: {{ request()->routeIs('admin.reporting.*') ? 'true' : 'false' }} }">
                 <button @click="openReporting = !openReporting" type="button"
                     class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.*') ? $activeClass : $inactiveClass }}">
@@ -282,12 +281,12 @@
 
                 <div x-show="openReporting && !sidebarCollapsed" style="display: none;"
                     class="pl-12 mt-1 mb-2 space-y-1">
-                    @can('reporting-dashboard')
+                    {{-- @can('reporting-dashboard')
                         <a href="{{ route('admin.reporting.index') }}" wire:navigate
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.index') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                             Dashboard
                         </a>
-                    @endcan
+                    @endcan --}}
                     {{-- @can('reporting-sales')
                         <a href="{{ route('admin.reporting.sales') }}" wire:navigate
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.reporting.sales') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">

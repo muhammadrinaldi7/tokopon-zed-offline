@@ -1029,7 +1029,7 @@ trait WithCheckoutAndReceipt
         }
 
         // 2. Tarik variabel dari env untuk Qontak
-        $fullUrl = env('QONTAK_API_URL');
+        $fullUrl = config('services.qontak.api_url');
         if (empty($fullUrl)) {
             $this->dispatch('toast', title: 'Gagal', message: 'URL Qontak tidak ditemukan di konfigurasi (.env).', type: 'error');
             return;
@@ -1043,9 +1043,8 @@ trait WithCheckoutAndReceipt
         $parsedUrl = parse_url($fullUrl);
         $baseUrl = ($parsedUrl['scheme'] ?? 'https') . '://' . ($parsedUrl['host'] ?? '');
         $endpoint = $parsedUrl['path'] ?? '';
-
-        $clientId = env('QONTAK_CLIENT_ID');
-        $clientSecret = env('QONTAK_CLIENT_SECRET');
+        $clientId = config('services.qontak.client_id');
+        $clientSecret = config('services.qontak.client_secret');
 
         // ─── 3. PROSES GENERATE PDF & SIMPAN KE STORAGE PUBLIK ────
         try {
@@ -1086,8 +1085,8 @@ trait WithCheckoutAndReceipt
         $payload = [
             'to_name' => $order->user->name ?? 'Customer',
             'to_number' => $phone,
-            'channel_integration_id' => env('QONTAK_CHANNEL_INTEGRATION_ID'),
-            'message_template_id' => env('QONTAK_TEMPLATE_ID'),
+            'channel_integration_id' =>  config('services.qontak.integration_id'),
+            'message_template_id' => config('services.qontak.template_id'),
             'language' => [
                 'code' => 'id'
             ],
@@ -1459,13 +1458,13 @@ trait WithCheckoutAndReceipt
             }
         }
         $order->items()->delete();
-        
+
         // Kembalikan kuota promo sebelum detach
         $promoIds = $order->promos()->pluck('promos.id')->toArray();
         if (!empty($promoIds)) {
             \App\Models\Promo::whereIn('id', $promoIds)->decrement('used_quota');
         }
-        
+
         $order->promos()->detach();
     }
 
@@ -1627,7 +1626,7 @@ trait WithCheckoutAndReceipt
 
             // 2. Check if DO exists, if not and has SN -> Create DO
             $doDoc = $order->accurateDocs()->where('doc_type', 'DELIVERY_ORDER')->where('status', 'SUCCESS')->first();
-            
+
             if (!$doDoc && $hasSN) {
                 $doData = [
                     'customerNo' => $order->user->getAccurateCustomerNo($dbSource),
@@ -1710,7 +1709,7 @@ trait WithCheckoutAndReceipt
                         ];
                     }
                 }
-                
+
                 if (!empty($mdrExpenses)) {
                     $siData['detailExpense'] = $mdrExpenses;
                 }
@@ -1799,7 +1798,6 @@ trait WithCheckoutAndReceipt
 
             $this->resetCheckout();
             $this->dispatch('toast', title: 'Transaksi Berhasil', message: 'Pelunasan SO ' . $order->order_number . ' berhasil diproses.', type: 'success');
-
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
             Log::error('POS SO Fulfillment Error: ' . $e->getMessage());
