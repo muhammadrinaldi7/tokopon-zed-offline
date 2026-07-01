@@ -32,6 +32,8 @@ class SerialNumberSyncService
                 $sources = \App\Models\BusinessUnit::where('is_active', true)->pluck('code')->toArray();
             }
 
+            $totalProcessed = 0;
+
             foreach ($sources as $source) {
                 $snData = null;
                 try {
@@ -43,19 +45,24 @@ class SerialNumberSyncService
                 }
 
                 if (!empty($snData)) {
-                    // If we found data in one source, process it and return early 
-                    // (Assuming a SKU belongs to one source/DB primarily)
-                    return $this->processSnData($sku, $snData, $source);
+                    $totalProcessed += $this->processSnData($sku, $snData, $source);
+                } else {
+                    // Jika tidak ada data dari Accurate untuk BUID ini, kita harus membuat SN untuk BUID ini menjadi Unavailable.
+                    // Karena jika sebelumnya ada, berarti sekarang sudah habis/terjual.
+                    $bu = \App\Models\BusinessUnit::where('code', $source)->first();
+                    if ($bu) {
+                        $warehouseIds = \App\Models\Warehouse::where('business_unit_id', $bu->id)->pluck('id')->toArray();
+                        if (!empty($warehouseIds)) {
+                            ProductSerialNumber::where('item_no', $sku)
+                                ->where('status', 'Available')
+                                ->whereIn('warehouse_id', $warehouseIds)
+                                ->update(['status' => 'Unavailable']);
+                        }
+                    }
                 }
             }
 
-            // Jika masih kosong setelah cek semua source, berarti SN tidak ada
-            // Jika tadinya ada di DB lokal, kita set Unavailable semua
-            ProductSerialNumber::where('item_no', $sku)
-                ->where('status', 'Available')
-                ->update(['status' => 'Unavailable']);
-
-            return 0;
+            return $totalProcessed;
         } catch (\Exception $e) {
             Log::error("Failed to sync SN for SKU {$sku}: " . $e->getMessage());
             throw $e;
@@ -67,11 +74,16 @@ class SerialNumberSyncService
      */
     private function processSnData($sku, $accurateData, $databaseSource = 'syihab')
     {
-        // Ambil list Serial Number yang ada di DB lokal
+        // Dapatkan ID gudang untuk BUID ini agar pencarian SN lokal tidak menyasar BUID lain
+        $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+        $warehouseIds = $bu ? \App\Models\Warehouse::where('business_unit_id', $bu->id)->pluck('id')->toArray() : [];
+
+        // Ambil list Serial Number yang ada di DB lokal KHUSUS untuk BUID ini
         // Jangan gunakan pluck('id', 'serial_number') karena PHP akan mengubah key string angka menjadi integer,
         // yang akan membuat query WHERE IN() gagal di MySQL saat membandingkan string.
         $existingSns = ProductSerialNumber::where('item_no', $sku)
             ->where('status', 'Available')
+            ->whereIn('warehouse_id', $warehouseIds)
             ->pluck('serial_number')
             ->toArray();
 
@@ -124,7 +136,7 @@ class SerialNumberSyncService
             }
         }
 
-        // Update status menjadi Unavailable untuk SN yang hilang dari API
+        // Update status menjadi Unavailable untuk SN yang hilang dari API (hanya untuk BUID ini)
         $missingSnList = array_diff($existingSns, $processedSerialNumbers);
 
         // Pastikan array hanya berisi string sebelum di binding ke Eloquent (PDO string binding)
@@ -133,6 +145,7 @@ class SerialNumberSyncService
         if (count($missingSnList) > 0) {
             ProductSerialNumber::whereIn('serial_number', $missingSnList)
                 ->where('status', 'Available')
+                ->whereIn('warehouse_id', $warehouseIds)
                 ->update(['status' => 'Unavailable']);
         }
 
