@@ -1558,6 +1558,7 @@ trait WithCheckoutAndReceipt
     public function processSoFulfillment($grandTotal)
     {
         try {
+            \Illuminate\Support\Facades\DB::beginTransaction();
             $order = Order::with(['items.variant', 'user', 'accurateDocs', 'businessUnit'])->find($this->loadedSoOrderId);
             if (!$order) {
                 \Illuminate\Support\Facades\DB::rollBack();
@@ -1581,30 +1582,42 @@ trait WithCheckoutAndReceipt
                 $detailSalesman[] = (string) $order->salesBy->employee_no;
             }
 
-            // 1. Update SN in Local DB and collect for Accurate
+            // --- 1. SYNC LOCAL DATABASE WITH POS CART ---
+            $subTotal = collect($this->cart)->sum(fn($i) => (float)$i['price'] * (float)$i['qty']);
+            $discountTotal = collect($this->cart)->sum(fn($i) => (float)($i['discount_amount'] ?? 0) * (float)$i['qty']);
+            $promoDiscountTotal = collect($this->cart)->sum(fn($i) => (float)($i['promo_discount'] ?? 0));
+            
+            $order->update([
+                'sub_total' => $subTotal,
+                'discount_total' => $discountTotal,
+                'promo_discount' => $promoDiscountTotal,
+                'grand_total' => $grandTotal,
+            ]);
+
+            $this->restoreStockFromOldItems($order);
+            $this->createOrderItemsFromCart($order);
+
+            if (!empty($this->selectedPromos)) {
+                $order->promos()->sync($this->selectedPromos);
+                \App\Models\Promo::whereIn('id', $this->selectedPromos)->increment('used_quota');
+            }
+
+            // --- 2. COLLECT DATA FOR ACCURATE ---
             $doDetailItems = [];
             $siDetailItems = [];
             $hasSN = false;
 
             foreach ($this->cart as $cartItem) {
-                $orderItem = \App\Models\OrderItem::find($cartItem['item_id'] ?? 0);
-                if ($orderItem) {
-                    $snInput = implode(',', array_filter(array_map('trim', $cartItem['serial_numbers'] ?? [])));
-                    if ($snInput !== ($orderItem->serial_number ?? '')) {
-                        $orderItem->update(['serial_number' => $snInput]);
-                    }
-                    if (!empty($snInput)) {
-                        $hasSN = true;
-                    }
+                $rawSns = $cartItem['serial_numbers'] ?? [];
+                $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
+                
+                if (!empty($cleanSns)) {
+                    $hasSN = true;
                 }
 
                 $detailSNs = [];
-                if (!empty($cartItem['serial_numbers'])) {
-                    foreach ($cartItem['serial_numbers'] as $sn) {
-                        if (trim($sn)) {
-                            $detailSNs[] = ['serialNumberNo' => trim($sn), 'quantity' => 1];
-                        }
-                    }
+                foreach ($cleanSns as $sn) {
+                    $detailSNs[] = ['serialNumberNo' => $sn, 'quantity' => 1];
                 }
 
                 $sku = $cartItem['sku'] ?: 'ITEM-UNKNOWN';
@@ -1614,8 +1627,10 @@ trait WithCheckoutAndReceipt
                     'itemNo' => $sku,
                     'quantity' => (float)$cartItem['qty'],
                     'warehouseName' => $warehouseName,
-                    'salesOrderNumber' => $order->accurate_so_number,
                 ];
+                if (!empty($cartItem['item_id'])) {
+                    $doItem['salesOrderNumber'] = $order->accurate_so_number;
+                }
                 if (!empty($detailSNs)) {
                     $doItem['detailSerialNumber'] = $detailSNs;
                 }
@@ -1667,12 +1682,15 @@ trait WithCheckoutAndReceipt
             // 3. Create SI (Sales Invoice)
             if (!$order->accurate_invoice_no) {
                 if ($doDoc) {
-                    foreach ($siDetailItems as &$i) {
+                    foreach ($siDetailItems as $index => &$i) {
                         $i['deliveryOrderNumber'] = $doDoc->doc_number;
                     }
                 } elseif ($order->accurate_so_number) {
-                    foreach ($siDetailItems as &$i) {
-                        $i['salesOrderNumber'] = $order->accurate_so_number;
+                    foreach ($siDetailItems as $index => &$i) {
+                        // Hanya set salesOrderNumber ke SI jika item tersebut berasal dari SO
+                        if (!empty($this->cart[$index]['item_id'])) {
+                            $i['salesOrderNumber'] = $order->accurate_so_number;
+                        }
                     }
                 }
 

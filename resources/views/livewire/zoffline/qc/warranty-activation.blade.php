@@ -192,15 +192,12 @@
                                         <template x-if="!previewUrl">
                                             <label
                                                 class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center select-none overflow-hidden cursor-pointer z-10">
-                                                <input type="file" accept="image/*" capture="environment"
-                                                    wire:model="{{ $propertyName }}" class="hidden"
+                                                <input type="file" accept="image/*" capture="environment" class="hidden"
                                                     @change="
-                                                        const file = $event.target.files[0];
-                                                        if (file) {
-                                                            previewUrl = URL.createObjectURL(file);
-                                                        } else {
-                                                            previewUrl = null;
+                                                        if($event.target.files.length > 0) {
+                                                            previewUrl = URL.createObjectURL($event.target.files[0]);
                                                         }
+                                                        customCompressHandler($event, '{{ $propertyName }}');
                                                     ">
                                                 <div
                                                     class="absolute inset-0 flex items-center justify-center z-0 group-hover:scale-110 transition-transform duration-300">
