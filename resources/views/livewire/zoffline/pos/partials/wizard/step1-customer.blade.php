@@ -55,7 +55,8 @@
                 class="p-4 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-full flex items-center gap-2 transition-all shadow-sm"
                 title="Faktur Pesanan (SO)">
                 <svg class="w-5 h-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
             </button>
             <button wire:click="openDraft"
@@ -515,14 +516,24 @@
                                             <span
                                                 class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider">{{ $order->order_status }}</span>
                                         </div>
-                                        <div class="text-sm text-gray-500">
-                                            {{ $order->user->name ?? 'Tanpa Nama' }} &bull;
+                                        <div class="text-xs text-gray-500">
+                                            No SO: {{ $order->accurate_so_number ?? '-' }} <br>
+                                            {{ $order->user->name ?? 'Tanpa Nama' }}
+                                            ({{ $order->user->profile->phone_number ?? '-' }})
+                                            &bull;
                                             {{ \Carbon\Carbon::parse($order->order_date)->format('d M Y') }}
+                                        </div>
+                                        <div class="text-xs text-gray-500">
+                                            Kasir: {{ $order->handledBy->name ?? 'Tanpa Nama' }}
                                         </div>
                                     </div>
                                     <div class="text-right flex flex-col items-end gap-2">
-                                        <div class="font-black text-lg text-gray-900 group-hover:text-blue-700">Rp
+                                        <div class="font-black text-md text-gray-900 group-hover:text-blue-700">Rp
                                             {{ number_format($order->grand_total, 0, ',', '.') }}</div>
+                                        <div class="text-xs text-gray-500">
+                                            DP:
+                                            {{ $order->payments->sum('amount') < $order->grand_total ? 'Rp ' . number_format($order->payments->sum('amount'), 0, ',', '.') : 'Lunas' }}
+                                        </div>
                                         <button wire:click="loadSoOrder({{ $order->id }})"
                                             class="px-4 py-1.5 bg-blue-100 text-blue-700 font-bold rounded-lg hover:bg-blue-200 transition-colors text-sm shadow-sm">
                                             Proses Faktur

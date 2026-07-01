@@ -219,10 +219,13 @@ class Pos extends Component
     public function openSoList()
     {
         $user = \Illuminate\Support\Facades\Auth::user();
+        $userBranchId = $user->branch_id ?? null;
+
         $this->soOrders = Order::with(['user', 'accurateDocs'])
             ->where('order_channel', 'SO')
             ->whereIn('order_status', ['pending', 'down_payment'])
             ->where('business_unit_id', $user->getActiveBusinessUnitId())
+            ->where('branch_id', $userBranchId)
             ->latest()
             ->take(20)
             ->get();
