@@ -35,7 +35,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view-reporting');
     Route::get('/zoffline/check-serial-number', CheckSerialNumber::class)->name('zoffline.check-serial-number')->middleware('can:view-warehouse-stocks');
     Route::get('/zoffline/check-serial-number/{sn}/history', SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
-    
+
     // Zoffline Approvals & Settings
     Route::get('/zoffline/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('zoffline.approvals.index');
     Route::get('/zoffline/approval-rules', \App\Livewire\Admin\Settings\ApprovalRule\Index::class)->name('zoffline.approval-rules.index')->middleware('can:manage-settings');
@@ -50,6 +50,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/staff', \App\Livewire\Zoffline\Reporting\StaffReport::class)->name('staff');
         Route::get('/laba-rugi', \App\Livewire\Zoffline\Reporting\IncomeStatement::class)->name('income-statement');
         Route::get('/closing-kasir', \App\Livewire\Zoffline\Reporting\ClosingKasirReport::class)->name('closing-kasir');
+        Route::get('/dashboard', \App\Livewire\Zoffline\Reporting\Dashboard::class)->name('dashboard-bm');
     });
 });
 
@@ -109,9 +110,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     });
 
     // Reporting
-    Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
-        Route::get('/', Dashboard::class)->name('index');
-    });
+    Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {});
 
     // Settings
     Route::get('/settings/business-units', \App\Livewire\Admin\Settings\BusinessUnitIndex::class)->name('settings.business-units')->middleware('can:manage-settings');

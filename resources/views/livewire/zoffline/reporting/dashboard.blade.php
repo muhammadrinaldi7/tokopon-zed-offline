@@ -3,127 +3,74 @@
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
     {{-- Top Header & Filters --}}
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <div class="flex flex-col items-start mb-6 gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-800 tracking-tight">Dashboard Analitik</h1>
             <p class="text-sm text-gray-500 mt-1">Menampilkan data berdasarkan rentang tanggal yang dipilih.</p>
         </div>
 
-        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <button wire:click="exportCsv"
-                class="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 w-full">
+            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
+                <select wire:model.live="businessUnitFilter"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 cursor-pointer w-full truncate">
+                    <option value="">Semua Unit Usaha</option>
+                    @foreach ($businessUnits as $bu)
+                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
+                <select wire:model.live="branchFilter"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 cursor-pointer w-full truncate">
+                    <option value="">Semua Cabang</option>
+                    @foreach ($availableBranches as $branch)
+                        <option value="{{ $branch }}">{{ $branch }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
+                <select wire:model.live="dateRange"
+                    class="border-none text-sm font-bold text-blue-600 focus:ring-0 bg-transparent p-0 cursor-pointer w-full truncate">
+                    <option value="today">Hari Ini</option>
+                    <option value="yesterday">Kemarin</option>
+                    <option value="last_7_days">7 Hari Terakhir</option>
+                    <option value="this_week">Minggu Ini</option>
+                    <option value="this_month">Bulan Ini</option>
+                    <option value="this_year">Tahun Ini</option>
+                    <option value="custom">Kustom</option>
+                </select>
+            </div>
+
+            @if ($dateRange === 'custom')
+                <div
+                    class="md:col-span-2 lg:col-span-2 flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm">
+                    <input type="date" wire:model.live="startDate"
+                        class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700 w-full text-center">
+                    <span class="text-gray-400 text-sm font-bold">-</span>
+                    <input type="date" wire:model.live="endDate"
+                        class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700 w-full text-center">
+                </div>
+            @endif
+
+            <button wire:click="exportCsv" wire:loading.attr="disabled"
+                class="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors w-full h-full min-h-[40px] {{ $dateRange === 'custom' ? 'md:col-span-1 lg:col-span-5' : 'md:col-span-1 lg:col-span-2' }}">
+                <svg wire:loading.remove wire:target="exportCsv" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                 </svg>
+                <svg wire:loading wire:target="exportCsv" class="animate-spin w-4 h-4 shrink-0 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
                 Export CSV
             </button>
-
-            <div class="flex flex-wrap items-center gap-2">
-                <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
-                    <select wire:model.live="businessUnitFilter"
-                        class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 pr-6 rounded-lg cursor-pointer">
-                        <option value="">Semua Unit Usaha</option>
-                        @foreach ($businessUnits as $bu)
-                            <option value="{{ $bu->id }}">{{ $bu->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
-                    <select wire:model.live="branchFilter"
-                        class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 pr-6 rounded-lg cursor-pointer">
-                        <option value="">Semua Cabang</option>
-                        @foreach ($availableBranches as $branch)
-                            <option value="{{ $branch }}">{{ $branch }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
-                    <select wire:model.live="dateRange"
-                        class="border-none text-sm font-bold text-blue-600 focus:ring-0 bg-transparent p-0 pr-6 rounded-lg cursor-pointer">
-                        <option value="today">Hari Ini</option>
-                        <option value="yesterday">Kemarin</option>
-                        <option value="last_7_days">7 Hari Terakhir</option>
-                        <option value="this_week">Minggu Ini</option>
-                        <option value="this_month">Bulan Ini</option>
-                        <option value="this_year">Tahun Ini</option>
-                        <option value="custom">Kustom</option>
-                    </select>
-                </div>
-
-                @if ($dateRange === 'custom')
-                    <div
-                        class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
-                        <input type="date" wire:model.live="startDate"
-                            class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700">
-                        <span class="text-gray-400 text-sm font-bold">-</span>
-                        <input type="date" wire:model.live="endDate"
-                            class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700">
-                    </div>
-                @endif
-            </div>
         </div>
     </div>
 
-    {{-- SECTION 1: TOP KPI CARDS (NUMBERS ONLY, BASED ON SELECTED DATE FILTER) --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        {{-- Net Sales --}}
-        <div
-            class="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-5 shadow-lg text-white relative overflow-hidden flex flex-col justify-center">
-            <p class="text-xs font-bold text-blue-200 uppercase tracking-wider mb-1">Keuntungan (Net Sales)</p>
-            <h3 class="text-2xl font-black">Rp {{ number_format($totalNet, 0, ',', '.') }}</h3>
-        </div>
 
-        {{-- Gross Sales --}}
-        <div
-            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col justify-center">
-            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total Gross</p>
-            <h3 class="text-xl font-bold text-gray-800">Rp {{ number_format($totalGross, 0, ',', '.') }}</h3>
-        </div>
-
-        {{-- Diskon --}}
-        <div
-            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col justify-center">
-            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total Diskon</p>
-            <h3 class="text-xl font-bold text-red-500">- Rp {{ number_format($totalDiscount, 0, ',', '.') }}</h3>
-        </div>
-
-        {{-- Total QTY Sold --}}
-        <div
-            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col justify-center border-l-4 border-l-yellow-400">
-            <div class="flex items-center justify-between mb-1">
-                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Qty Terjual</p>
-                <div class="text-yellow-500">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                    </svg>
-                </div>
-            </div>
-            <h3 class="text-2xl font-black text-gray-800">{{ number_format($totalQty, 0, ',', '.') }} <span
-                    class="text-sm font-normal text-gray-500">Pcs</span></h3>
-        </div>
-
-        {{-- Total Transactions --}}
-        <div
-            class="bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col justify-center border-l-4 border-l-purple-500">
-            <div class="flex items-center justify-between mb-1">
-                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Transaksi</p>
-                <div class="text-purple-500">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                        </path>
-                    </svg>
-                </div>
-            </div>
-            <h3 class="text-2xl font-black text-gray-800">{{ number_format($totalTransactions, 0, ',', '.') }} <span
-                    class="text-sm font-normal text-gray-500">Struk</span></h3>
-        </div>
-    </div>
 
     {{-- SECTION 2: TOP PERFORMERS (LISTS WITH REVENUE) --}}
     <div class="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
@@ -433,7 +380,8 @@
         <div class="overflow-x-auto overflow-y-auto" style="max-height: 400px;">
             <table class="w-full text-left border-collapse relative">
                 <thead class="sticky top-0 z-10 shadow-sm">
-                    <tr class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    <tr
+                        class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
                         <th class="px-6 py-4 bg-gray-50">Nama Pelanggan / No Order</th>
                         <th class="px-6 py-4 bg-gray-50 text-center">Metode (Jenis Piutang)</th>
                         <th class="px-6 py-4 bg-gray-50 text-right">Total Struk</th>
@@ -445,20 +393,25 @@
                         <tr class="hover:bg-yellow-50/30 transition duration-150 ease-in-out">
                             <td class="px-6 py-4">
                                 <div class="flex flex-col">
-                                    <span class="text-sm font-bold text-gray-800">{{ $piutang['customer_name'] }}</span>
-                                    <span class="text-xs text-gray-500 mt-1">{{ $piutang['order_number'] }} &bull; {{ \Carbon\Carbon::parse($piutang['date'])->format('d M Y H:i') }}</span>
+                                    <span
+                                        class="text-sm font-bold text-gray-800">{{ $piutang['customer_name'] }}</span>
+                                    <span class="text-xs text-gray-500 mt-1">{{ $piutang['order_number'] }} &bull;
+                                        {{ \Carbon\Carbon::parse($piutang['date'])->format('d M Y H:i') }}</span>
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-center">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded bg-gray-100 text-gray-800 text-xs font-bold border {{ $piutang['payment_method'] === 'Piutang Toko' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-blue-200 bg-blue-50 text-blue-700' }}">
+                                <span
+                                    class="inline-flex items-center px-2.5 py-0.5 rounded bg-gray-100 text-gray-800 text-xs font-bold border {{ $piutang['payment_method'] === 'Piutang Toko' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-blue-200 bg-blue-50 text-blue-700' }}">
                                     {{ $piutang['payment_method'] }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <span class="text-sm font-bold text-gray-800">Rp {{ number_format($piutang['grand_total'], 0, ',', '.') }}</span>
+                                <span class="text-sm font-bold text-gray-800">Rp
+                                    {{ number_format($piutang['grand_total'], 0, ',', '.') }}</span>
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <span class="text-sm font-bold text-red-600">Rp {{ number_format($piutang['unpaid_amount'], 0, ',', '.') }}</span>
+                                <span class="text-sm font-bold text-red-600">Rp
+                                    {{ number_format($piutang['unpaid_amount'], 0, ',', '.') }}</span>
                             </td>
                         </tr>
                     @empty

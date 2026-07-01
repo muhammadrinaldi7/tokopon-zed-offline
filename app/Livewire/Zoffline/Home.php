@@ -102,6 +102,11 @@ class Home extends Component
     {
         return $this->redirectRoute('zoffline.approval-rules.index', navigate: true);
     }
+
+    public function navigateToDashboardBM()
+    {
+        return $this->redirectRoute('reporting.dashboard-bm', navigate: true);
+    }
     public function render()
     {
         return view('livewire.zoffline.home');

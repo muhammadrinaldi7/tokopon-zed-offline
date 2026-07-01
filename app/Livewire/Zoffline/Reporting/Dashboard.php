@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Admin\Reporting;
+namespace App\Livewire\Zoffline\Reporting;
 
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -277,8 +277,8 @@ class Dashboard extends Component
             return $item->variant?->accurateData?->brandName ?? 'Unknown';
         })->map(function ($group) {
             $firstVariant = $group->first()->variant;
-            $brandName = $firstVariant instanceof \App\Models\ProductAccurate 
-                ? ($firstVariant->brandName ?? 'Unknown') 
+            $brandName = $firstVariant instanceof \App\Models\ProductAccurate
+                ? ($firstVariant->brandName ?? 'Unknown')
                 : ($firstVariant?->accurateData?->brandName ?? 'Unknown');
 
             return [
@@ -335,8 +335,8 @@ class Dashboard extends Component
             return $item->variant?->accurateData?->brandName ?? 'Unknown';
         })->map(function ($group) {
             $firstVariant = $group->first()->variant;
-            $brandName = $firstVariant instanceof \App\Models\ProductAccurate 
-                ? ($firstVariant->brandName ?? 'Unknown') 
+            $brandName = $firstVariant instanceof \App\Models\ProductAccurate
+                ? ($firstVariant->brandName ?? 'Unknown')
                 : ($firstVariant?->accurateData?->brandName ?? 'Unknown');
 
             return [
@@ -440,10 +440,10 @@ class Dashboard extends Component
         $cashbackPerSales = $cashbackPerSalesRaw->map(function ($data) {
             $amountPct = $data['total_sales_amount'] > 0 ? ($data['cashback_amount'] / $data['total_sales_amount']) * 100 : 0;
             $qtyPct = $data['total_sales_qty'] > 0 ? ($data['cashback_qty'] / $data['total_sales_qty']) * 100 : 0;
-            
+
             $data['amount_pct'] = round($amountPct, 2);
             $data['qty_pct'] = round($qtyPct, 2);
-            
+
             return $data;
         })->sortByDesc('cashback_amount')->values()->toArray();
 
@@ -453,7 +453,7 @@ class Dashboard extends Component
                 $bankName = strtolower($payment->paymentMethod->bank_name ?? '');
                 return str_contains($bankName, 'finance') || $bankName === 'finance';
             });
-            
+
             return $leasingPayments->map(function ($payment) use ($order) {
                 return [
                     'leasing_name' => $payment->paymentMethod->name ?? 'Unknown',
@@ -522,11 +522,11 @@ class Dashboard extends Component
             ->flatMap(function ($order) {
                 // Find pending payments for this order
                 $pendingPayments = $order->payments->where('status', 'PENDING');
-                
+
                 return $pendingPayments->map(function ($payment) use ($order) {
                     $pm = $payment->paymentMethod;
                     $rate = $payment->paymentMethodRate;
-                    
+
                     // Hitung MDR
                     $pct = $rate ? ($rate->mdr_percentage ?? 0) : ($pm->mdr_percentage ?? 0);
                     $rowMdr = $pct > 0 ? round((float)$payment->amount * (float)$pct / 100, 0) : 0;
@@ -550,7 +550,7 @@ class Dashboard extends Component
             ->values()
             ->toArray();
 
-        return view('livewire.admin.reporting.dashboard', [
+        return view('livewire.zoffline.reporting.dashboard', [
             'totalGross' => $totalGross,
             'totalDiscount' => $totalDiscount,
             'totalNet' => $totalNet,
@@ -568,6 +568,6 @@ class Dashboard extends Component
             'cashbackPerSales' => $cashbackPerSales,
             'leasingPerforma' => $leasingPerforma,
             'piutangTransactions' => $piutangTransactions
-        ])->layout('layouts.admin');
+        ])->layout('layouts.z');
     }
 }
