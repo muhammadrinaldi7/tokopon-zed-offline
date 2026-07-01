@@ -50,6 +50,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/staff', \App\Livewire\Zoffline\Reporting\StaffReport::class)->name('staff');
         Route::get('/laba-rugi', \App\Livewire\Zoffline\Reporting\IncomeStatement::class)->name('income-statement');
         Route::get('/closing-kasir', \App\Livewire\Zoffline\Reporting\ClosingKasirReport::class)->name('closing-kasir');
+        Route::get('/dashboard', \App\Livewire\Zoffline\Reporting\Dashboard::class)->name('dashboard-bm');
     });
 });
 
@@ -109,9 +110,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     });
 
     // Reporting
-    Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
-        Route::get('/', Dashboard::class)->name('index');
-    });
+    Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {});
 
     // Settings
     Route::get('/settings/business-units', \App\Livewire\Admin\Settings\BusinessUnitIndex::class)->name('settings.business-units')->middleware('can:manage-settings');
