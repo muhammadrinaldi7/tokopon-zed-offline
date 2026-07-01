@@ -423,21 +423,24 @@
                                 </div>
                                 <span class="block text-xs sm:text-sm text-center leading-tight">Manajemen Pembelian</span>
                             </button>
+                            @can('view-dashboard-bm')
+                                <button wire:click="navigateToDashboardBM" @click="openReportModal = false"
+                                    class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
+                                    <div
+                                        class="w-12 h-12 rounded-xl bg-purple-100/50 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                                d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                                d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                                        </svg>
+                                    </div>
+                                    <span class="block text-xs sm:text-sm text-center leading-tight">Dashboard BM</span>
+                                </button>
+                            @endcan
 
-                            <button wire:click="navigateToDashboardBM" @click="openReportModal = false"
-                                class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
-                                <div
-                                    class="w-12 h-12 rounded-xl bg-purple-100/50 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                            d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                            d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-                                    </svg>
-                                </div>
-                                <span class="block text-xs sm:text-sm text-center leading-tight">Dashboard BM</span>
-                            </button>
+
                         </div>
 
                         <button @click="openReportModal = false"
