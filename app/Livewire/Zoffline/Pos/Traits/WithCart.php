@@ -227,13 +227,11 @@ trait WithCart
         // 2. Jika valid SN atau sedang offline (error), coba cari di tabel SN lokal
         if ($isConfirmedSn || $skuFromAccurate === 'error') {
             // Cari data SN secara global tanpa memfilter Business Unit (BU) ID terlebih dahulu
-            $localSnRecordGlobal = \App\Models\ProductSerialNumber::with('productAccurate')
-                ->where('serial_number', $sn)
-                ->first();
+            $localSnRecordGlobal = \App\Models\ProductSerialNumber::where('serial_number', $sn)->first();
 
             if ($localSnRecordGlobal) {
                 // Cek apakah Business Unit (BU) Sesuai
-                $productBuId = $localSnRecordGlobal->productAccurate->business_unit_id ?? null;
+                $productBuId = $localSnRecordGlobal->business_unit_id;
 
                 if ($productBuId !== null && $productBuId != $buId) {
                     // SN Terdaftar tapi milik Business Unit (Cabang) lain

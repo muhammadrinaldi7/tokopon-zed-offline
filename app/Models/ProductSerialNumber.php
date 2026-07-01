@@ -13,6 +13,11 @@ class ProductSerialNumber extends Model
         return $this->belongsTo(Warehouse::class);
     }
 
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
+    }
+
     public function getVariantAttribute()
     {
         $variant = \App\Models\ProductVariant::with('product')->where('sku', $this->item_no)->first();

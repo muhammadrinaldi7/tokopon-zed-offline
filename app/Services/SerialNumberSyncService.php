@@ -111,13 +111,14 @@ class SerialNumberSyncService
             }
 
             $upsertData[] = [
-                'accurate_sn_id' => $accurateSnId,
-                'item_no'        => $sku,
-                'warehouse_id'   => $localWarehouseId,
-                'serial_number'  => $serialNumberStr,
-                'status'         => 'Available',
-                'created_at'     => now(),
-                'updated_at'     => now(),
+                'accurate_sn_id'   => $accurateSnId,
+                'item_no'          => $sku,
+                'warehouse_id'     => $localWarehouseId,
+                'business_unit_id' => $bu ? $bu->id : null,
+                'serial_number'    => $serialNumberStr,
+                'status'           => 'Available',
+                'created_at'       => now(),
+                'updated_at'       => now(),
             ];
 
             $processedSerialNumbers[] = $serialNumberStr;
@@ -129,7 +130,7 @@ class SerialNumberSyncService
                 ProductSerialNumber::upsert(
                     $upsertData,
                     ['serial_number'], // <- Acuan Pencarian (Unique)
-                    ['accurate_sn_id', 'item_no', 'warehouse_id', 'status', 'updated_at'] // <- Yang di-update
+                    ['accurate_sn_id', 'item_no', 'warehouse_id', 'business_unit_id', 'status', 'updated_at'] // <- Yang di-update
                 );
                 Log::info("Webhook/Sync Berhasil: Upsert " . count($upsertData) . " Serial Number untuk SKU {$sku}");
             } catch (\Exception $e) {
@@ -264,6 +265,7 @@ class SerialNumberSyncService
                             'serial_number' => $sn,
                             'item_no' => $sku,
                             'warehouse_id' => $localWarehouseId,
+                            'business_unit_id' => $bu ? $bu->id : null,
                             'hpp' => $hpp,
                             'vendor_id' => $localVendorId,
                             'status' => $finalStatus,
@@ -388,6 +390,7 @@ class SerialNumberSyncService
                             'serial_number' => $sn,
                             'item_no' => $sku,
                             'warehouse_id' => $localWarehouseId,
+                            'business_unit_id' => $bu ? $bu->id : null,
                             'hpp' => $hpp,
                             'vendor_id' => $localVendorId,
                             'status' => $finalStatus,
