@@ -82,12 +82,12 @@ class Home extends Component
     {
         return $this->redirectRoute('zoffline.pos', navigate: true);
     }
-    
+
     public function navigateToSalesOrderCreate()
     {
         return $this->redirectRoute('admin.sales-orders.create', navigate: true);
     }
-    
+
     public function navigateToSalesOrderIndex()
     {
         return $this->redirectRoute('admin.sales-orders.index', navigate: true);
@@ -101,6 +101,10 @@ class Home extends Component
     public function navigateToApprovalRules()
     {
         return $this->redirectRoute('zoffline.approval-rules.index', navigate: true);
+    }
+    public function navigateToActivationList()
+    {
+        return $this->redirectRoute('zoffline.qc.list-activation', navigate: true);
     }
 
     public function navigateToDashboardBM()

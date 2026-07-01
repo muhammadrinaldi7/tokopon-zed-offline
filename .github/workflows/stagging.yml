@@ -37,7 +37,7 @@ jobs:
     #     run: vendor/bin/phpunit
 
   deploy:
-    needs: test
+    needs: deploy_vps
     runs-on: ubuntu-latest
 
     steps:
@@ -119,7 +119,7 @@ jobs:
  # --- JOB BARU: DEPLOY KE VPS ---
   # --- JOB BARU: DEPLOY KE VPS VIA FTP ---
   deploy_vps:
-    needs: deploy # Menunggu deploy staging web hosting selesai
+    needs: test # Menunggu deploy staging web hosting selesai
     runs-on: ubuntu-latest
 
     steps:
@@ -218,7 +218,7 @@ jobs:
             php artisan view:cache
 
   deploy-docker:
-    needs: deploy_vps
+    needs: deploy
     runs-on: ubuntu-latest
 
     steps:

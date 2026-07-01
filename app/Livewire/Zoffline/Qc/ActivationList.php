@@ -23,10 +23,16 @@ class ActivationList extends Component
     public $statusFilter = 'all'; // all, active, inactive
 
     #[Url]
+    public $branchFilter = 'all';
+
+    #[Url]
     public $dateStart = null;
     
     #[Url]
     public $dateEnd = null;
+
+    public $showQcModal = false;
+    public $selectedInspection = null;
 
     public function mount()
     {
@@ -44,22 +50,47 @@ class ActivationList extends Component
         $this->resetPage();
     }
 
+    public function updatedBranchFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function viewQc($inspectionId)
+    {
+        $this->selectedInspection = \App\Models\DeviceInspection::with('media', 'inspector')->find($inspectionId);
+        if ($this->selectedInspection) {
+            $this->showQcModal = true;
+        }
+    }
+    
+    public function closeQcModal()
+    {
+        $this->showQcModal = false;
+        $this->selectedInspection = null;
+    }
+
     public function render()
     {
         $activeUnitId = Auth::user()->getActiveBusinessUnitId();
         
+        $branches = \App\Models\Branch::where('business_unit_id', $activeUnitId)->get();
+
         $query = OrderItem::with(['order.user', 'inspections'])
             ->whereNotNull('serial_number')
             ->where('serial_number', '!=', '')
             ->whereHas('order', function($q) use ($activeUnitId) {
                 $q->where('business_unit_id', $activeUnitId)
-                  ->where('status', 'COMPLETED');
+                  ->where('order_status', 'COMPLETED');
                 
                 if ($this->dateStart && $this->dateEnd) {
                     $q->whereBetween('created_at', [
                         Carbon::parse($this->dateStart)->startOfDay(),
                         Carbon::parse($this->dateEnd)->endOfDay()
                     ]);
+                }
+
+                if ($this->branchFilter !== 'all') {
+                    $q->where('branch_id', $this->branchFilter);
                 }
             });
 
@@ -86,7 +117,11 @@ class ActivationList extends Component
             $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
             
             foreach ($sns as $sn) {
-                $isActivated = $item->inspections->contains('imei', $sn);
+                $inspection = $item->inspections->first(function ($i) use ($sn) {
+                    return strtolower(trim($i->imei)) === strtolower(trim($sn));
+                });
+                
+                $isActivated = $inspection ? true : false;
 
                 // Status Filter
                 if ($this->statusFilter === 'active' && !$isActivated) continue;
@@ -100,6 +135,7 @@ class ActivationList extends Component
                     'product_name' => $item->product_name,
                     'serial_number' => $sn,
                     'is_activated' => $isActivated,
+                    'inspection_id' => $isActivated ? $inspection->id : null,
                 ]);
             }
         }
@@ -118,7 +154,8 @@ class ActivationList extends Component
         );
 
         return view('livewire.zoffline.qc.activation-list', [
-            'paginatedItems' => $paginator
+            'paginatedItems' => $paginator,
+            'branches' => $branches
         ]);
     }
 }
