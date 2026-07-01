@@ -23,6 +23,11 @@ class Create extends Component
     public $searchCustomer = '';
     public $customerSearchResults = [];
 
+    // Sales
+    public $sales_id;
+    public $searchSales = '';
+    public $salesSearchResults = [];
+
     // New Customer
     public $showNewCustomerModal = false;
     public $new_customer_name = '';
@@ -192,6 +197,42 @@ class Create extends Component
         $this->customerSearchResults = [];
     }
 
+    public function updatedSearchSales($value)
+    {
+        if (strlen($value) >= 1) {
+            $user = Auth::user();
+            $businessUnitId = $user->getActiveBusinessUnitId() ?? 1;
+
+            $this->salesSearchResults = \App\Models\Employe::active()
+                ->where('business_unit_id', $businessUnitId)
+                ->with('branch')
+                ->where(function ($q) use ($user) {
+                    $q->where('branch_id', $user->branch_id)
+                        ->orWhereNull('branch_id');
+                })
+                ->where('name', 'like', '%' . $value . '%')
+                ->take(10)
+                ->get()
+                ->map(function ($s) {
+                    return [
+                        'id' => $s->id,
+                        'name' => $s->name,
+                        'employee_no' => $s->employee_no,
+                        'branch_name' => $s->branch ? $s->branch->name : 'Semua Cabang',
+                    ];
+                })->toArray();
+        } else {
+            $this->salesSearchResults = [];
+        }
+    }
+
+    public function selectSales($id, $name)
+    {
+        $this->sales_id = $id;
+        $this->searchSales = $name;
+        $this->salesSearchResults = [];
+    }
+
     public function createNewCustomer()
     {
         $this->validate([
@@ -243,7 +284,7 @@ class Create extends Component
                     $accurateService = app(\App\Services\AccurateService::class);
                     $businessUnit = \App\Models\BusinessUnit::find($this->business_unit_id);
                     $dbSource = $businessUnit ? $businessUnit->code : 'syihab';
-                    
+
                     $accurateService->syncCustomer($user, $dbSource);
                     $user->refresh();
                 }
@@ -377,6 +418,7 @@ class Create extends Component
                 'grand_total' => $this->grand_total,
                 'order_status' => 'pending',
                 'handled_by' => Auth::id(),
+                'sales_id' => $this->sales_id,
                 'notes' => $this->notes,
                 'shipping_address_snapshot' => [
                     'type' => 'MINACCURATE',

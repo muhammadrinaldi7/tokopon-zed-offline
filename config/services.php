@@ -40,5 +40,12 @@ return [
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
     ],
+    'qontak' => [
+        'api_url' => env('QONTAK_API_URL', 'https://api.mekari.com/qontak/chat/v1/broadcasts/whatsapp/direct'),
+        'client_id' => env('QONTAK_CLIENT_ID'),
+        'client_secret' => env('QONTAK_CLIENT_SECRET'),
+        'integration_id' => env('QONTAK_CHANNEL_INTEGRATION_ID'),
+        'template_id' => env('QONTAK_TEMPLATE_ID'),
+    ],
 
 ];

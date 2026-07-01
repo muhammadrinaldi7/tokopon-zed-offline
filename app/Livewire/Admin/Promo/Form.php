@@ -54,7 +54,7 @@ class Form extends Component
     public $search_bundle_sku = '';
     public $bundle_sku_search_results = [];
 
-    public function mount(Promo $promo = null)
+    public function mount(?Promo $promo = null)
     {
         if ($promo && $promo->exists) {
             $this->promo = $promo;

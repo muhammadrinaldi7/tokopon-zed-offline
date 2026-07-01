@@ -1030,11 +1030,19 @@ trait WithCheckoutAndReceipt
 
         // 2. Tarik variabel dari env untuk Qontak
         $fullUrl = env('QONTAK_API_URL');
-        $method = 'POST';
+        if (empty($fullUrl)) {
+            $this->dispatch('toast', title: 'Gagal', message: 'URL Qontak tidak ditemukan di konfigurasi (.env).', type: 'error');
+            return;
+        }
 
+        if (!preg_match("~^(?:f|ht)tps?://~i", $fullUrl)) {
+            $fullUrl = "https://" . $fullUrl;
+        }
+
+        $method = 'POST';
         $parsedUrl = parse_url($fullUrl);
-        $baseUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
-        $endpoint = $parsedUrl['path'];
+        $baseUrl = ($parsedUrl['scheme'] ?? 'https') . '://' . ($parsedUrl['host'] ?? '');
+        $endpoint = $parsedUrl['path'] ?? '';
 
         $clientId = env('QONTAK_CLIENT_ID');
         $clientSecret = env('QONTAK_CLIENT_SECRET');

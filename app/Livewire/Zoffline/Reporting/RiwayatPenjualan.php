@@ -46,7 +46,7 @@ class RiwayatPenjualan extends Component
         $user = Auth::user();
         $userBranchId = $user->branch_id ?? null;
 
-        $orders = Order::with(['user', 'items', 'payments', 'salesBy', 'approvalRequests' => function($q) {
+        $orders = Order::with(['user', 'items', 'payments', 'salesBy', 'approvalRequests' => function ($q) {
             $q->where('request_type', 'cancellation');
         }])
             ->where('order_channel', 'POS')
@@ -277,13 +277,22 @@ class RiwayatPenjualan extends Component
             $phone = '62' . substr($phone, 1);
         }
 
-        $fullUrl = env('QONTAK_API_URL');
+        $fullUrl = config('services.qontak.api_url');
+        if (empty($fullUrl)) {
+            $this->dispatch('toast', title: 'Gagal', message: 'URL Qontak tidak ditemukan di konfigurasi (.env).', type: 'error');
+            return;
+        }
+
+        if (!preg_match("~^(?:f|ht)tps?://~i", $fullUrl)) {
+            $fullUrl = "https://" . $fullUrl;
+        }
+
         $method = 'POST';
         $parsedUrl = parse_url($fullUrl);
-        $baseUrl = $parsedUrl['scheme'] . '://' . $parsedUrl['host'];
-        $endpoint = $parsedUrl['path'];
-        $clientId = env('QONTAK_CLIENT_ID');
-        $clientSecret = env('QONTAK_CLIENT_SECRET');
+        $baseUrl = ($parsedUrl['scheme'] ?? 'https') . '://' . ($parsedUrl['host'] ?? '');
+        $endpoint = $parsedUrl['path'] ?? '';
+        $clientId = config('services.qontak.client_id');
+        $clientSecret = config('services.qontak.client_secret');
 
         try {
             $pdf = $this->generateReceiptPdf($order);
@@ -309,8 +318,8 @@ class RiwayatPenjualan extends Component
         $payload = [
             'to_name' => $order->user->name ?? 'Customer',
             'to_number' => $phone,
-            'channel_integration_id' => env('QONTAK_CHANNEL_INTEGRATION_ID'),
-            'message_template_id' => env('QONTAK_TEMPLATE_ID'),
+            'channel_integration_id' =>  config('services.qontak.integration_id'),
+            'message_template_id' => config('services.qontak.template_id'),
             'language' => ['code' => 'id'],
             'parameters' => [
                 'header' => [

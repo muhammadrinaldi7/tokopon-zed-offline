@@ -97,6 +97,34 @@
                             <span class="text-xs text-red-500 mt-2 block">{{ $message }}</span>
                         @enderror
                     </div>
+
+                    <div class="relative">
+                        <div class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 flex justify-between items-center">
+                            <label>Pramuniaga (Sales)</label>
+                            <div class="flex items-center gap-2">
+                                <div wire:loading wire:target="searchSales" class="text-[#1c69d4]">
+                                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="text" wire:model.live.debounce.300ms="searchSales" class="w-full px-4 py-3 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors font-medium placeholder-gray-400" placeholder="Ketik nama sales (Opsional)..." autocomplete="off">
+
+                        @if (!empty($salesSearchResults))
+                            <div class="absolute z-20 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto">
+                                @foreach ($salesSearchResults as $res)
+                                    <div wire:click="selectSales({{ $res['id'] }}, '{{ addslashes($res['name']) }}')" class="px-5 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors group">
+                                        <div class="font-bold text-gray-800 group-hover:text-[#1c69d4] text-sm">{{ $res['name'] }}</div>
+                                        <div class="text-xs font-medium text-gray-500 mt-1">{{ $res['employee_no'] ?? 'N/A' }} &bull; {{ $res['branch_name'] }}</div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        <input type="hidden" wire:model="sales_id">
+                    </div>
                 </div>
             </div>
 

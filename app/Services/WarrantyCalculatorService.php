@@ -22,8 +22,18 @@ class WarrantyCalculatorService
         // Identifikasi Status Kondisi Barang (Baru/Bekas)
         $isNew = $orderItem->product_variant_type === \App\Models\ProductVariant::class;
 
-        // Identifikasi Status Harga (Normal/Diskon Kasir)
-        $isDiscounted = (float)$orderItem->discount_amount > 0;
+        // Identifikasi Status Harga (Normal/Diskon Kasir atau Internal Promo)
+        $hasManualDiscount = (float)$orderItem->discount_amount > 0;
+
+        $hasInternalPromo = false;
+        foreach ($orderItem->promos as $promo) {
+            if (strtolower(trim($promo->category)) === 'internal') {
+                $hasInternalPromo = true;
+                break;
+            }
+        }
+
+        $isDiscounted = $hasManualDiscount || $hasInternalPromo;
 
         // 1. EVALUASI GARANSI UTAMA (MAIN WARRANTY)
         $targetType = $isDiscounted ? 'store_discount' : 'store_normal';
