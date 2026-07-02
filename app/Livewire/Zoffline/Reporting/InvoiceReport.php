@@ -84,7 +84,7 @@ class InvoiceReport extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        return Order::with(['user', 'salesBy', 'paymentMethod', 'items.variant.product', 'promos'])
+        return Order::with(['user', 'accurateDocs', 'salesBy', 'paymentMethod', 'items.variant.product', 'promos'])
             ->whereBetween('orders.created_at', [$start, $end])
             ->where('orders.order_status', 'COMPLETED')
             ->when($this->search, function ($query) {
@@ -123,6 +123,7 @@ class InvoiceReport extends Component
                 'order_number',
                 'catatan',
                 'no_kontrak',
+                'bankName',
                 'paymentMethod',
                 'variantMethod',
                 'amount',
@@ -144,6 +145,7 @@ class InvoiceReport extends Component
                     foreach ($order->payments as $payment) {
 
                         // Ekstrak data dari relasi (LEFT JOIN payment_methods & payment_method_rates)
+                        $bankName = $payment->paymentMethod->bank_name ?? null;
                         $pmName = $payment->paymentMethod->name ?? null;
                         $pmrName = $payment->paymentMethodRate->name ?? null;
                         $mdrPct = $payment->paymentMethodRate->mdr_percentage ?? 0;
@@ -159,6 +161,7 @@ class InvoiceReport extends Component
                             $orderNo,
                             $order->notes,
                             $payment->no_kontrak,
+                            $bankName,
                             $pmName,
                             $pmrName,
                             $amount,
@@ -192,7 +195,7 @@ class InvoiceReport extends Component
         $availableBranches = \App\Models\Branch::orderBy('name')->pluck('name');
 
         $totalGross = $this->ordersQuery->sum('orders.total_amount');
-        
+
         $totalGrandTotal = (clone $this->ordersQuery)->sum('orders.grand_total');
 
         $totalMdr = \Illuminate\Support\Facades\DB::table('order_payments')
@@ -203,9 +206,10 @@ class InvoiceReport extends Component
             ->sum(\Illuminate\Support\Facades\DB::raw('(order_payments.amount * COALESCE(payment_method_rates.mdr_percentage, 0)) / 100'));
 
         $totalNet = $totalGrandTotal - $totalMdr;
-
+        // dd($this->ordersQuery);
         return view('livewire.zoffline.reporting.invoice-report', [
             'orders' => $orders,
+            // 'payment' => $orders->accurateDocs->where('doc_type', 'SALES_RECEIPT')->get(),
             'availableBranches' => $availableBranches,
             'summary' => [
                 'count' => $orders->total(),

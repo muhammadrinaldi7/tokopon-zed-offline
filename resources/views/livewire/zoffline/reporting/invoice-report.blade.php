@@ -1,11 +1,10 @@
 <div class="p-6 bg-[#f7f7f7] min-h-screen">
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-800 tracking-tight">Laporan Penjualan</h1>
-            <p class="text-sm text-gray-500 mt-1">Rekapitulasi transaksi mendetail</p>
-        </div>
-
-        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+    <div class="flex flex-col  justify-between items-start mb-6 gap-4">
+        <div class="flex flex-col md:flex-row gap-2 justify-between w-full">
+            <div class="">
+                <h1 class="text-2xl font-bold text-gray-800 tracking-tight">Laporan Pembayaran</h1>
+                <p class="text-sm text-gray-500 mt-1">Rekapitulasi Pembayaran</p>
+            </div>
             <div class="flex items-center bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
                 <span class="text-xs text-gray-500 mr-2 font-medium">Separator:</span>
                 <select wire:model="csvSeparator"
@@ -14,7 +13,9 @@
                     <option value=",">Comma (,)</option>
                 </select>
             </div>
+        </div>
 
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
             {{-- <button wire:click="exportCsv" wire:loading.attr="disabled"
                 class="flex items-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
                 <svg wire:loading.remove wire:target="exportCsv" class="w-4 h-4" fill="none" stroke="currentColor"
@@ -53,25 +54,6 @@
                 <span wire:loading wire:target="exportCsvOpsi2">Memproses...</span>
             </button> --}}
 
-            <button wire:click="exportCsvOrderPayments" wire:loading.attr="disabled"
-                class="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
-                <svg wire:loading.remove wire:target="exportCsvOrderPayments" class="w-4 h-4" fill="none"
-                    stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                </svg>
-                <svg wire:loading wire:target="exportCsvOrderPayments" class="animate-spin w-4 h-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                        stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                    </path>
-                </svg>
-                <span wire:loading.remove wire:target="exportCsvOrderPayments">Export CSV</span>
-                <span wire:loading wire:target="exportCsvOrderPayments">Memproses...</span>
-            </button>
-
             <div class="flex items-center gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
                 <select wire:model.live="branchFilter"
                     class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent py-1.5 pl-3 pr-8 rounded-lg cursor-pointer hover:bg-gray-50">
@@ -103,6 +85,24 @@
                     </div>
                 @endif
             </div>
+            <button wire:click="exportCsvOrderPayments" wire:loading.attr="disabled"
+                class="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
+                <svg wire:loading.remove wire:target="exportCsvOrderPayments" class="w-4 h-4" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                <svg wire:loading wire:target="exportCsvOrderPayments" class="animate-spin w-4 h-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                        stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
+                </svg>
+                <span wire:loading.remove wire:target="exportCsvOrderPayments">Export CSV</span>
+                <span wire:loading wire:target="exportCsvOrderPayments">Memproses...</span>
+            </button>
         </div>
     </div>
 
@@ -194,11 +194,18 @@
                             </td>
                             <td class="px-5 py-3">
                                 <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-[11px] font-medium">
-                                    {{ $order->shipping_address_snapshot['store'] ?? 'Unknown' }}
+                                    {{ $order->branch->name ?? 'Unknown' }}
                                 </span>
                             </td>
                             <td class="px-5 py-3 text-xs font-medium text-gray-700">
-                                {{ $order->paymentMethod ? $order->paymentMethod->name : '-' }}
+                                @forelse ($order->payments as $payment)
+                                    {{ $payment->paymentMethod->bank_name }}
+                                    {{ $payment->paymentMethodRate->name ?? '-' }}<br>
+                                    ({{ number_format($payment->amount, 0, ',', '.') }})
+                                    <br>
+                                @empty
+                                    -
+                                @endforelse
                             </td>
                             <td class="px-5 py-3 text-right">
                                 <p class="text-xs font-bold text-gray-800">Rp
