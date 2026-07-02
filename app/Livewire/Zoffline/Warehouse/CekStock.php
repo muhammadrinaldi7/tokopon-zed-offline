@@ -118,25 +118,13 @@ class CekStock extends Component
                 ->groupBy('warehouse_id'); // Menghasilkan array dengan key berupa warehouse_id
 
             // =========================================================================
-            // GABUNGKAN STOCK DARI VARIANT LAMA JIKA ADA
+            // AMBIL STOCK HANYA DARI PRODUCT ACCURATE
             // =========================================================================
             $allStocks = collect();
             
             // 1. Ambil stok langsung dari ProductAccurate
             foreach ($accurate->warehouseStocks as $ws) {
                 $allStocks->push($ws);
-            }
-
-            // 2. Ambil dari variant lama (jika masih ada)
-            foreach ($accurate->productVariants as $pv) {
-                foreach ($pv->warehouseStocks as $ws) {
-                    $allStocks->push($ws);
-                }
-            }
-            foreach ($accurate->secondProductVariants as $sv) {
-                foreach ($sv->warehouseStocks as $ws) {
-                    $allStocks->push($ws);
-                }
             }
 
             $groupedStocks = $allStocks->groupBy('warehouse_id');
