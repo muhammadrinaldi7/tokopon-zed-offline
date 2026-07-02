@@ -15,7 +15,11 @@ class Index extends Component
 
     public $search = '';
     public $filterStatus = 'PENDING';
+    
+    // Final Level Confirmations
     public $confirmingApprovalId = null;
+    public $confirmingRequestType = null;
+    public $extensionDays = 7;
 
     public function updatingSearch()
     {
@@ -47,6 +51,7 @@ class Index extends Component
 
         if ($nextLevel >= $request->required_level) {
             $this->confirmingApprovalId = $id;
+            $this->confirmingRequestType = $request->request_type;
         } else {
             $this->approve($id); // Langsung setujui kalau belum tahap akhir
         }
@@ -56,13 +61,15 @@ class Index extends Component
     {
         if ($this->confirmingApprovalId) {
             $this->approve($this->confirmingApprovalId);
-            $this->confirmingApprovalId = null;
+            $this->cancelApprove();
         }
     }
 
     public function cancelApprove()
     {
         $this->confirmingApprovalId = null;
+        $this->confirmingRequestType = null;
+        $this->extensionDays = 7;
     }
 
     public function approve($id)
@@ -98,10 +105,12 @@ class Index extends Component
             $request->save();
 
             try {
-                $request->executeCancellation();
-                $this->dispatch('toast', title: 'Berhasil', message: 'Persetujuan berhasil dan transaksi dibatalkan di Accurate.', type: 'success');
+                $request->executeAction([
+                    'extension_days' => $this->extensionDays
+                ]);
+                $this->dispatch('toast', title: 'Berhasil', message: 'Persetujuan berhasil dieksekusi.', type: 'success');
             } catch (\Exception $e) {
-                $this->dispatch('toast', title: 'Error Accurate', message: 'Gagal mengeksekusi ke Accurate: ' . $e->getMessage(), type: 'error');
+                $this->dispatch('toast', title: 'Error Eksekusi', message: 'Gagal mengeksekusi persetujuan: ' . $e->getMessage(), type: 'error');
             }
         } else {
             $request->save();

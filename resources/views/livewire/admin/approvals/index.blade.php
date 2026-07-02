@@ -106,6 +106,22 @@
     <div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-gray-900/50 backdrop-blur-sm p-4">
         <div class="relative w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-100">
             <div class="p-6 text-center">
+                @if($confirmingRequestType === 'WARRANTY_EXTENSION')
+                <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4 border-4 border-blue-50">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                
+                <h3 class="mb-2 text-xl font-bold text-gray-900">Perpanjang Garansi</h3>
+                <p class="text-sm text-gray-500 mb-4 font-medium leading-relaxed">
+                    Silakan tentukan berapa lama garansi akan diperpanjang (dihitung sejak hari ini atau dari batas kadaluarsa).
+                </p>
+                <div class="mb-6 text-left">
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Durasi (Hari)</label>
+                    <input type="number" wire:model="extensionDays" class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center font-bold text-lg" min="1" max="365">
+                </div>
+                @else
                 <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 border-4 border-red-50">
                     <svg class="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -117,14 +133,21 @@
                     Anda berada di tingkat persetujuan terakhir. Jika Anda menyetujui ini, dokumen <b>Sales Receipt</b> dan <b>Sales Invoice</b> terkait akan otomatis dihapus secara permanen di Accurate.
                     <br><br>Apakah Anda yakin ingin melanjutkan?
                 </p>
+                @endif
                 
                 <div class="flex justify-center gap-3">
                     <button wire:click="cancelApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-blue-700 focus:ring-4 focus:ring-gray-100 transition-colors">
                         Batal
                     </button>
+                    @if($confirmingRequestType === 'WARRANTY_EXTENSION')
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20">
+                        Setujui Perpanjangan
+                    </button>
+                    @else
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-300 transition-colors shadow-md shadow-red-500/20">
                         Ya, Setujui & Hapus
                     </button>
+                    @endif
                 </div>
             </div>
         </div>

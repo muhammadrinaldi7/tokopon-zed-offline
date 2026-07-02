@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Livewire\WithFileUploads;
 use App\Models\DeviceInspection;
 use App\Models\QcTemplate;
+use Livewire\Attributes\Computed;
 
 #[Layout('layouts.z')]
 class WarrantyClaim extends Component
@@ -31,6 +32,7 @@ class WarrantyClaim extends Component
     public $customer_name = '';
     public $customer_phone = '';
 
+    public $hasPendingExtensionRequest = false;
     public $isSubmitted = false;
 
     // Service Center Form fields
@@ -100,6 +102,64 @@ class WarrantyClaim extends Component
             $this->customer_name = $user->name;
             $this->customer_phone = $user->profile->phone_number ?? '';
         }
+
+        $this->checkPendingRequest();
+    }
+
+    #[Computed]
+    public function warranty()
+    {
+        if (!$this->selectedWarrantyId) return null;
+        return Warranty::find($this->selectedWarrantyId);
+    }
+
+    public function checkPendingRequest()
+    {
+        $this->hasPendingExtensionRequest = false;
+        if ($this->selectedWarrantyId) {
+            $pending = \App\Models\ApprovalRequest::where('approvable_type', Warranty::class)
+                ->where('approvable_id', $this->selectedWarrantyId)
+                ->where('request_type', 'WARRANTY_EXTENSION')
+                ->where('status', 'PENDING')
+                ->exists();
+            $this->hasPendingExtensionRequest = $pending;
+        }
+    }
+
+    public function requestWarrantyExtension()
+    {
+        if (!$this->selectedWarrantyId) return;
+
+        $warranty = $this->warranty;
+        if (!$warranty) return;
+
+        $user = Auth::user();
+
+        // Check if there is already a pending request
+        $existing = \App\Models\ApprovalRequest::where('approvable_type', Warranty::class)
+                ->where('approvable_id', $warranty->id)
+                ->where('request_type', 'WARRANTY_EXTENSION')
+                ->where('status', 'PENDING')
+                ->first();
+
+        if ($existing) {
+            $this->dispatch('toast', title: 'Info', message: 'Sudah ada pengajuan perpanjangan garansi yang menunggu persetujuan.', type: 'info');
+            return;
+        }
+
+        \App\Models\ApprovalRequest::create([
+            'requested_by' => $user->id,
+            'approvable_type' => Warranty::class,
+            'approvable_id' => $warranty->id,
+            'request_type' => 'WARRANTY_EXTENSION',
+            'reason' => 'Pengajuan toleransi perpanjangan garansi (otomatis).',
+            'required_level' => 1,
+            'current_level' => 0,
+            'status' => 'PENDING',
+        ]);
+
+        $this->checkPendingRequest();
+        $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan perpanjangan garansi telah dikirim ke Manajer.', type: 'success');
     }
 
     public function openQcHistory()
