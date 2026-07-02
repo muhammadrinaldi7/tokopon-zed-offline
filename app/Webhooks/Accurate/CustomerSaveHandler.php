@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 
 class CustomerSaveHandler extends Controller implements WebhookHandlerInterface
 {
-        public function handle(AccurateWebhookLog $log): void
+    public function handle(AccurateWebhookLog $log): void
     {
         $payload = $log->payload;
         $dbSource = $log->database_source;
@@ -26,7 +26,7 @@ class CustomerSaveHandler extends Controller implements WebhookHandlerInterface
                     if ($action === 'WRITE') {
                         $this->syncCustomerDetail($customerNo, $vendorId, $dbSource);
                     } elseif ($action === 'DELETE') {
-                        $this->handleDeletedCustomer($customerNo);
+                        $this->handleDeletedCustomer($customerNo, $dbSource);
                     }
                 }
             }
@@ -36,6 +36,20 @@ class CustomerSaveHandler extends Controller implements WebhookHandlerInterface
     private function syncCustomerDetail($customerNo, $customerId, $dbSource)
     {
         try {
+            $businessUnitId = \App\Models\BusinessUnit::where('code', $dbSource)->value('id');
+
+            // Cek apakah customer sudah tersinkron di DB lokal
+            $existsLocal = \App\Models\UserAccurateCustomer::where('accurate_customer_no', $customerNo)
+                ->when($businessUnitId, function($q) use ($businessUnitId) {
+                    return $q->where('business_unit_id', $businessUnitId);
+                })
+                ->exists();
+
+            if ($existsLocal) {
+                Log::info("Webhook Customer diabaikan (Echo): Customer No {$customerNo} sudah tersinkronisasi dari POS.");
+                return;
+            }
+
             $service = app(AccurateService::class);
             $accurateCustomer = $service->getCustomerDetail($customerNo, $dbSource);
 
@@ -47,17 +61,36 @@ class CustomerSaveHandler extends Controller implements WebhookHandlerInterface
                 $phone = $accurateCustomer['mobilePhone'] ?? $accurateCustomer['workPhone'] ?? null;
                 $accurateCustomerId = $accurateCustomer['id'] ?? $customerId;
                 $customerNo = $accurateCustomer['customerNo'] ?? $customerNo;
-                $user = User::updateOrCreate(
-                    [
-                        // Kita gunakan accurate_customer_id sebagai acuan pencarian yang utama
-                        'accurate_customer_id' => $accurateCustomerId
-                    ],
-                    [
-                        'accurate_customer_no' => $accurateCustomer['customerNo'] ?? $customerNo,
+
+                $userAccurate = \App\Models\UserAccurateCustomer::where('accurate_customer_id', $accurateCustomerId)
+                    ->when($businessUnitId, function($q) use ($businessUnitId) {
+                        return $q->where('business_unit_id', $businessUnitId);
+                    })
+                    ->first();
+
+                if ($userAccurate && $userAccurate->user) {
+                    $user = $userAccurate->user;
+                    $user->update([
                         'name' => $name,
                         'email' => $email,
-                    ]
-                );
+                    ]);
+                    $userAccurate->update([
+                        'accurate_customer_no' => $accurateCustomer['customerNo'] ?? $customerNo
+                    ]);
+                } else {
+                    $user = User::create([
+                        'name' => $name,
+                        'email' => $email,
+                        'business_unit_id' => $businessUnitId,
+                    ]);
+
+                    \App\Models\UserAccurateCustomer::create([
+                        'user_id' => $user->id,
+                        'business_unit_id' => $businessUnitId,
+                        'accurate_customer_id' => $accurateCustomerId,
+                        'accurate_customer_no' => $accurateCustomer['customerNo'] ?? $customerNo,
+                    ]);
+                }
 
                 if ($user) {
                     $user->profile()->updateOrCreate(
@@ -76,11 +109,19 @@ class CustomerSaveHandler extends Controller implements WebhookHandlerInterface
         }
     }
 
-    private function handleDeletedCustomer($customerNo)
+    private function handleDeletedCustomer($customerNo, $dbSource)
     {
         try {
-            $user = User::where('accurate_customer_no', $customerNo)->first();
-            if ($user) {
+            $businessUnitId = \App\Models\BusinessUnit::where('code', $dbSource)->value('id');
+
+            $userAccurate = \App\Models\UserAccurateCustomer::where('accurate_customer_no', $customerNo)
+                ->when($businessUnitId, function($q) use ($businessUnitId) {
+                    return $q->where('business_unit_id', $businessUnitId);
+                })
+                ->first();
+
+            if ($userAccurate && $userAccurate->user) {
+                $user = $userAccurate->user;
                 // Hapus langsung customer di DB lokal sesuai konfirmasi User
                 $user->delete();
                 Log::info("Customer Dihapus via Webhook Accurate: Customer No {$customerNo}");

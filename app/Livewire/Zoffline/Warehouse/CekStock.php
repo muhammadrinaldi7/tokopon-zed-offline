@@ -154,7 +154,7 @@ class CekStock extends Component
                 if ($totalStock > 0 || $whSns->count() > 0) {
                     $this->stockData[] = [
                         'warehouse_name' => $wh->name ?? 'Gudang Tidak Diketahui',
-                        'stock' => max($totalStock, $whSns->count()), // Ambil yang paling besar untuk antisipasi beda data
+                        'stock' => $totalStock,
                         'is_current_user_warehouse' => $wh->id === $userWarehouseId,
                         'sns' => $whSns->map(function ($sn) {
                             return [
