@@ -44,9 +44,32 @@
     <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] overflow-hidden">
         <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <h3 class="font-bold text-gray-700 text-sm">Daftar Stok Produk</h3>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center gap-3">
+                @if($isAdmin)
+                    <div class="relative">
+                        <select wire:model.live="filterBU" class="border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] py-2 px-3 bg-white" title="Filter Business Unit">
+                            <option value="">Semua BU</option>
+                            @foreach($businessUnits as $bu)
+                                <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
                 <div class="relative">
-                    <input type="date" wire:model.live="filterDate" class="border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] py-2 px-3 bg-white" title="Filter Tanggal Tarik Stok">
+                    <select wire:model.live="filterCategory" class="border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] py-2 px-3 bg-white" title="Filter Kategori">
+                        <option value="">Semua Kategori</option>
+                        @foreach($availableCategories as $cat)
+                            <option value="{{ $cat }}">{{ $cat }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="relative">
+                    <select wire:model.live="filterWarehouse" class="border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] py-2 px-3 bg-white" title="Filter Gudang">
+                        <option value="">Semua Gudang</option>
+                        @foreach($availableWarehouses as $wh)
+                            <option value="{{ $wh }}">{{ $wh }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="relative">
                     <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari SKU / Nama Produk..." 
@@ -80,12 +103,7 @@
                                 <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
                             @endif
                         </th>
-                        <th class="px-5 py-4 font-bold text-center cursor-pointer hover:bg-gray-50" wire:click="sortBy('sync_date')">
-                            Tanggal Tarik Stok
-                            @if($sortField === 'sync_date')
-                                <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
-                            @endif
-                        </th>
+
                         <th class="px-5 py-4 font-bold text-right cursor-pointer hover:bg-gray-50" wire:click="sortBy('base_cost')">
                             Harga Beli
                             @if($sortField === 'base_cost')
@@ -118,9 +136,13 @@
                             <td class="px-5 py-3">
                                 <p class="text-xs font-bold text-gray-800">{{ $item['name'] }}</p>
                                 <p class="text-[11px] text-gray-500 mt-0.5">
-                                    <span class="font-semibold text-gray-600">Color:</span> {{ $item['color'] }} <span class="mx-1">•</span> 
                                     <span class="font-semibold text-gray-600">Vendor:</span> {{ $item['vendor_name'] ?? '-' }}
                                 </p>
+                                @if(isset($item['sn']) && $item['sn'] !== '-')
+                                    <p class="text-[11px] text-gray-500 mt-1 max-w-xs truncate" title="{{ $item['sn'] }}">
+                                        <span class="font-semibold text-gray-600">SN:</span> {{ $item['sn'] }}
+                                    </p>
+                                @endif
                             </td>
                             <td class="px-5 py-3">
                                 <p class="text-sm font-black {{ $item['stock'] > 0 ? 'text-green-600' : 'text-red-500' }}">{{ $item['stock'] }} Pcs</p>
@@ -129,9 +151,7 @@
                                     {{ $item['warehouse_name'] }}
                                 </p>
                             </td>
-                            <td class="px-5 py-3 text-center">
-                                <p class="text-xs font-medium text-gray-700">{{ $item['sync_datetime'] }}</p>
-                            </td>
+
                             <td class="px-5 py-3 text-right">
                                 <p class="text-xs font-bold text-gray-700">Rp {{ number_format($item['base_cost'], 0, ',', '.') }}</p>
                             </td>
@@ -146,7 +166,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-5 py-8 text-center text-gray-400 text-sm">
+                            <td colspan="6" class="px-5 py-8 text-center text-gray-400 text-sm">
                                 Tidak ada data stok yang ditemukan.
                             </td>
                         </tr>
