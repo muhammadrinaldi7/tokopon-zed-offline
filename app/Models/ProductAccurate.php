@@ -41,4 +41,9 @@ class ProductAccurate extends Model
     {
         return $this->morphMany(WarehouseStock::class, 'variant', 'variant_type', 'variant_id');
     }
+
+    public function productSerialNumbers()
+    {
+        return $this->hasMany(ProductSerialNumber::class, 'product_accurate_id', 'id');
+    }
 }
