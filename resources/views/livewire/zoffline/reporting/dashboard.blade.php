@@ -1,6 +1,6 @@
 <div class="p-6 bg-[#f7f7f7] min-h-screen" x-data="dashboardAnalytics()">
     {{-- Scripts for ApexCharts --}}
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    {{-- <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script> --}}
 
     {{-- Top Header & Filters --}}
     <div class="flex flex-col items-start mb-6 gap-4">
@@ -56,14 +56,18 @@
 
             <button wire:click="exportCsv" wire:loading.attr="disabled"
                 class="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors w-full h-full min-h-[40px] {{ $dateRange === 'custom' ? 'md:col-span-1 lg:col-span-5' : 'md:col-span-1 lg:col-span-2' }}">
-                <svg wire:loading.remove wire:target="exportCsv" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg">
+                <svg wire:loading.remove wire:target="exportCsv" class="w-4 h-4 shrink-0" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                 </svg>
-                <svg wire:loading wire:target="exportCsv" class="animate-spin w-4 h-4 shrink-0 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <svg wire:loading wire:target="exportCsv" class="animate-spin w-4 h-4 shrink-0 text-white"
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                        stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
                 </svg>
                 Export CSV
             </button>
@@ -382,24 +386,15 @@
                 <thead class="sticky top-0 z-10 shadow-sm">
                     <tr
                         class="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                        <th class="px-6 py-4 bg-gray-50">Nama Pelanggan / No Order</th>
-                        <th class="px-6 py-4 bg-gray-50 text-center">Metode (Jenis Piutang)</th>
-                        <th class="px-6 py-4 bg-gray-50 text-right">Total Struk</th>
+                        <th class="px-6 py-4 bg-gray-50 text-left">Metode (Jenis Piutang)</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right">Total Piutang</th>
                         <th class="px-6 py-4 bg-gray-50 text-right">Sisa Tagihan / Utang</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
                     @forelse($piutangTransactions as $piutang)
                         <tr class="hover:bg-yellow-50/30 transition duration-150 ease-in-out">
-                            <td class="px-6 py-4">
-                                <div class="flex flex-col">
-                                    <span
-                                        class="text-sm font-bold text-gray-800">{{ $piutang['customer_name'] }}</span>
-                                    <span class="text-xs text-gray-500 mt-1">{{ $piutang['order_number'] }} &bull;
-                                        {{ \Carbon\Carbon::parse($piutang['date'])->format('d M Y H:i') }}</span>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 text-center">
+                            <td class="px-6 py-4 text-left">
                                 <span
                                     class="inline-flex items-center px-2.5 py-0.5 rounded bg-gray-100 text-gray-800 text-xs font-bold border {{ $piutang['payment_method'] === 'Piutang Toko' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-blue-200 bg-blue-50 text-blue-700' }}">
                                     {{ $piutang['payment_method'] }}
@@ -407,11 +402,11 @@
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <span class="text-sm font-bold text-gray-800">Rp
-                                    {{ number_format($piutang['grand_total'], 0, ',', '.') }}</span>
+                                    {{ number_format($piutang['total'], 0, ',', '.') }}</span>
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <span class="text-sm font-bold text-red-600">Rp
-                                    {{ number_format($piutang['unpaid_amount'], 0, ',', '.') }}</span>
+                                    {{ number_format($piutang['sisa'], 0, ',', '.') }}</span>
                             </td>
                         </tr>
                     @empty
@@ -427,14 +422,13 @@
     </div>
 
     {{-- SECTION 3: ANALYTICS CHARTS --}}
+    {{-- 
     <div class="grid grid-cols-1 gap-6 mb-8">
-        {{-- Trend Chart --}}
         <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
             <h2 class="text-lg font-bold text-gray-800 mb-4">Tren Omzet Penjualan</h2>
             <div id="chart-trend" wire:ignore class="w-full h-80"></div>
         </div>
 
-        {{-- Donuts (Brand & Payment side by side if possible, or stacked) --}}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)]">
                 <h2 class="text-lg font-bold text-gray-800 mb-4 text-center">Proporsi Brand</h2>
@@ -446,7 +440,8 @@
                 <div id="chart-payment-method" wire:ignore class="w-full flex justify-center items-center"></div>
             </div>
         </div>
-    </div>
+    </div> 
+    --}}
 
 
     {{-- SECTION 4: MONTH-TO-DATE (MTD) ANALYTICS --}}
@@ -582,7 +577,7 @@
 
 
     {{-- Alpine Component Logic for ApexCharts --}}
-    <script>
+    {{-- <script>
         document.addEventListener('alpine:init', () => {
             Alpine.data('dashboardAnalytics', () => ({
                 charts: {
@@ -739,5 +734,5 @@
                 }
             }));
         });
-    </script>
+    </script> --}}
 </div>
