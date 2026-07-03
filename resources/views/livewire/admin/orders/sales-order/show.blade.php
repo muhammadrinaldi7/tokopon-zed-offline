@@ -38,7 +38,7 @@
                 </button>
             @endif
 
-            @if ($order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'cancellation')->exists())
+            @if ($order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'ORDER_CANCELLATION')->exists())
                 <span class="px-4 py-2 bg-yellow-100 text-yellow-700 font-bold rounded-xl text-sm border border-yellow-200">
                     Menunggu Approval Batal
                 </span>

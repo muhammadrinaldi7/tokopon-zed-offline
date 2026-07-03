@@ -1621,6 +1621,7 @@ class AccurateService
     public function processWarrantyReplacement(\App\Models\WarrantyClaim $claim, $newImei, $newItemNo = null, $newPrice = 0, $priceDifference = 0, $replacementType = 'same', $bankNo = null, $originalPriceFromUI = null)
     {
         $businessUnitCode = $claim->warranty->policy->businessUnit->code ?? 'syihab';
+        // dd($claim->customer, $claim->customer->getAccurateCustomerNo($businessUnitCode));
 
         // 1. Ambil Data Referensi dari Database
         // Ambil No Pelanggan yang TEPAT sesuai dengan Business Unit tempat garansi ini diterbitkan
@@ -1629,7 +1630,20 @@ class AccurateService
 
         // Simulasi mendapatkan nomor invoice lama dan item lama dari order system
         $order = $claim->warranty->orderItem->order ?? null;
-        $originalInvoiceNo = $order->accurate_invoice_no ?? $order->order_number ?? 'INV-UNKNOWN';
+        $originalInvoiceNo = $order->accurate_invoice_no ?? null;
+        
+        if (!$originalInvoiceNo && $order) {
+            $siDoc = $order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->first();
+            if ($siDoc) {
+                $originalInvoiceNo = $siDoc->doc_number;
+            }
+        }
+        
+        // Validasi: Accurate mewajibkan nomor Faktur Penjualan (Sales Invoice) untuk Retur.
+        // Jika tidak ada, jangan paksakan hit API agar tidak error berantakan.
+        if (!$originalInvoiceNo) {
+            throw new \Exception("Faktur Penjualan (Sales Invoice) Accurate untuk pesanan ini tidak ditemukan di sistem. Pastikan pesanan asli sudah dibuatkan invoice-nya di Accurate.");
+        }
 
         // Ambil Item No (SKU) dari relasi Variant
         $variant = $claim->warranty->orderItem->variant ?? null;
@@ -1658,6 +1672,10 @@ class AccurateService
         // Ambil Nama Cabang berdasarkan User yang login
         $branchName = Auth::user()->branch->name ?? 'Cabang Utama';
 
+        // Ambil konfigurasi pajak dari Business Unit
+        $businessUnit = $claim->warranty->policy->businessUnit;
+        $isTaxable = $businessUnit->is_taxable ?? false;
+
         // Gudang Retur idealnya diambil dari settingan Business Unit,
         // Contoh: $claim->warranty->policy->businessUnit->settings['return_warehouse'] ?? 'GSK - Return'
         $warehouseReturnName = 'GSK - Return';
@@ -1672,8 +1690,8 @@ class AccurateService
             'invoiceNumber' => $originalInvoiceNo, // <--- Relasi ke faktur lama dihidupkan kembali
             'returnDate' => now()->format('d/m/Y'),
             'branchName' => $branchName,
-            'taxable' => false, // Nonaktifkan pajak agar nilai retur pas
-            'inclusiveTax' => false,
+            'taxable' => $isTaxable,
+            'inclusiveTax' => $isTaxable,
             'description' => "Retur Klaim Garansi Ganti Unit. Referensi Faktur: {$originalInvoiceNo}. SN Rusak: {$claim->serial_number}",
             'detailItem' => [
                 [
@@ -1700,8 +1718,8 @@ class AccurateService
             'customerNo' => $customerNo,
             'transDate' => now()->format('d/m/Y'),
             'branchName' => $branchName,
-            'taxable' => false, // Nonaktifkan pajak agar piutang pas
-            'inclusiveTax' => false,
+            'taxable' => $isTaxable,
+            'inclusiveTax' => $isTaxable,
             'description' => "Penggantian Unit Klaim Garansi untuk Faktur: {$originalInvoiceNo}. SN Pengganti: {$newImei}",
             'detailItem' => [
                 [
@@ -1729,7 +1747,16 @@ class AccurateService
         // --- PROSES 3: SALES RECEIPT (SETTLEMENT / REFUND) ---
         Log::info("Mempersiapkan Sales Receipt untuk pelunasan Invoice Baru: {$newInvoiceNo} menggunakan overpayment Invoice Lama: {$originalInvoiceNo}");
 
-        $finalBankNo = $bankNo ?: '110101'; // Gunakan parameter bank, jika kosong fallback ke Kas default
+        if (!$bankNo) {
+            // Karena Sales Receipt membutuhkan bankNo meskipun saldonya 0 (offsetting), 
+            // kita ambil salah satu akun kas/bank yang valid dari business unit ini.
+            $defaultBank = \App\Models\AccurateGlAccount::where('account_type', 'CASH_BANK')
+                ->where('database_source', $businessUnitCode)
+                ->first();
+            $finalBankNo = $defaultBank ? $defaultBank->account_no : '110101';
+        } else {
+            $finalBankNo = $bankNo;
+        }
 
         // Logika Offsetting Piutang (Kelebihan bayar vs Tagihan baru)
         if ($chequeAmount < 0) {
@@ -1923,7 +1950,7 @@ class AccurateService
         $order = $claim->warranty->orderItem->order ?? null;
         $originalInvoiceNo = $order->accurate_invoice_no ?? $order->order_number ?? 'INV-UNKNOWN';
 
-        $branchName = 'GSK - Banjarbaru'; // Harusnya dari BusinessUnit, tapi sementara hardcode sesuai current logic
+        $branchName = Auth::user()->branch->name ?? 'Cabang Utama';
 
         // Payload Penerimaan Penjualan (Uang Keluar)
         $receiptPayload = [

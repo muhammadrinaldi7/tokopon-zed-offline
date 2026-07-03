@@ -47,7 +47,7 @@ class RiwayatPenjualan extends Component
         $userBranchId = $user->branch_id ?? null;
 
         $orders = Order::with(['user', 'items', 'payments', 'salesBy', 'approvalRequests' => function ($q) {
-            $q->where('request_type', 'cancellation');
+            $q->where('request_type', 'ORDER_CANCELLATION');
         }])
             ->where('order_channel', 'POS')
             ->where('order_status', '!=', 'DRAFT')
@@ -393,7 +393,7 @@ class RiwayatPenjualan extends Component
         }
 
         // Check if there is already a pending request
-        $existing = $order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'cancellation')->first();
+        $existing = $order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'ORDER_CANCELLATION')->first();
         if ($existing) {
             $this->dispatch('toast', title: 'Info', message: 'Transaksi ini sudah dalam proses pengajuan pembatalan.', type: 'info');
             $this->closeCancelModal();
@@ -401,13 +401,13 @@ class RiwayatPenjualan extends Component
         }
 
         // Fetch required level from ApprovalRule
-        $requiredLevel = \App\Models\ApprovalRule::where('module', 'cancellation')->max('level');
+        $requiredLevel = \App\Models\ApprovalRule::where('module', 'ORDER_CANCELLATION')->max('level');
         if (!$requiredLevel) {
             $requiredLevel = 1; // Default fallback if no rules defined
         }
 
         $order->approvalRequests()->create([
-            'request_type' => 'cancellation',
+            'request_type' => 'ORDER_CANCELLATION',
             'requested_by' => Auth::id(),
             'reason' => $this->cancelReason,
             'status' => 'PENDING',

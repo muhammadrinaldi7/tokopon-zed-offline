@@ -33,6 +33,7 @@
                 <thead>
                     <tr class="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wider">
                         <th class="p-4 font-bold rounded-tl-xl">No. Pesanan (SO)</th>
+                        <th class="p-4 font-bold">Cabang</th>
                         <th class="p-4 font-bold">Tanggal</th>
                         <th class="p-4 font-bold">Pelanggan</th>
                         <th class="p-4 font-bold">Total Nilai</th>
@@ -50,6 +51,7 @@
                                         {{ $order->accurate_so_number }}</div>
                                 @endif
                             </td>
+                            <td class="p-4 text-gray-600">{{ $order->branch->name ?? 'Unknown' }}</td>
                             <td class="p-4 text-gray-600">
                                 {{ $order->order_date ? $order->order_date->format('d M Y') : $order->created_at->format('d M Y') }}
                             </td>
@@ -76,9 +78,14 @@
                                             class="px-2.5 py-1 bg-gray-50 text-gray-600 text-[10px] font-bold uppercase rounded-md border border-gray-200">{{ $order->order_status }}</span>
                                     @endif
 
-                                    @if($order->accurateDocs->where('doc_type', 'DELIVERY_ORDER')->isNotEmpty())
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 text-orange-600 text-[9px] font-bold uppercase rounded border border-orange-200">
-                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    @if ($order->accurateDocs->where('doc_type', 'DELIVERY_ORDER')->isNotEmpty())
+                                        <span
+                                            class="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 text-orange-600 text-[9px] font-bold uppercase rounded border border-orange-200">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7" />
+                                            </svg>
                                             DO TERCETAK
                                         </span>
                                     @endif
@@ -96,16 +103,27 @@
                                             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                 </a>
-                                @if ($order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'cancellation')->exists())
-                                    <span title="Menunggu Approval Batal" class="inline-flex items-center justify-center p-2 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-600 ml-1">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                @if ($order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'ORDER_CANCELLATION')->exists())
+                                    <span title="Menunggu Approval Batal"
+                                        class="inline-flex items-center justify-center p-2 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-600 ml-1">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                            stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
                                     </span>
-                                @elseif ($order->order_status !== 'CANCELLED' && $order->order_status !== 'cancelled' && $order->order_status !== 'COMPLETED')
-                                    <button type="button" @click="$dispatch('openCancelModal', { orderId: {{ $order->id }} })"
+                                @elseif (
+                                    $order->order_status !== 'CANCELLED' &&
+                                        $order->order_status !== 'cancelled' &&
+                                        $order->order_status !== 'COMPLETED')
+                                    <button type="button"
+                                        @click="$dispatch('openCancelModal', { orderId: {{ $order->id }} })"
                                         class="inline-flex items-center justify-center p-2 bg-white border border-gray-200 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors shadow-sm ml-1"
                                         title="Batalkan Transaksi">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                            stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M6 18L18 6M6 6l12 12" />
                                         </svg>
                                     </button>
                                 @endif
@@ -131,6 +149,6 @@
             {{ $orders->links() }}
         </div>
     </div>
-    
+
     <livewire:components.cancel-order-modal />
 </div>

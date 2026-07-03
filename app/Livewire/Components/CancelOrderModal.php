@@ -45,7 +45,7 @@ class CancelOrderModal extends Component
         }
 
         // Check if there is already a pending request
-        $existing = $order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'cancellation')->first();
+        $existing = $order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'ORDER_CANCELLATION')->first();
         if ($existing) {
             $this->dispatch('toast', title: 'Info', message: 'Transaksi ini sudah dalam proses pengajuan pembatalan.', type: 'info');
             $this->closeModal();
@@ -53,13 +53,13 @@ class CancelOrderModal extends Component
         }
 
         // Fetch required level from ApprovalRule
-        $requiredLevel = ApprovalRule::where('module', 'cancellation')->max('level');
+        $requiredLevel = ApprovalRule::where('module', 'ORDER_CANCELLATION')->max('level');
         if (!$requiredLevel) {
             $requiredLevel = 1; // Default fallback if no rules defined
         }
 
         $order->approvalRequests()->create([
-            'request_type' => 'cancellation',
+            'request_type' => 'ORDER_CANCELLATION',
             'requested_by' => Auth::id(),
             'reason' => $this->cancelReason,
             'status' => 'PENDING',

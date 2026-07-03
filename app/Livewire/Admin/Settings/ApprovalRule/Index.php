@@ -11,10 +11,10 @@ class Index extends Component
 {
     public $rules = [];
     public $roles = [];
-    public $module = 'cancellation';
+    public $module = 'ORDER_CANCELLATION';
     public $availableModules = [
-        'cancellation' => 'Pembatalan Transaksi POS',
-        'special_discount' => 'Diskon Khusus',
+        'ORDER_CANCELLATION' => 'Pembatalan Transaksi POS',
+        'WARRANTY_EXTENSION' => 'Perpanjangan Garansi',
         'purchase_order' => 'Persetujuan Pembelian (PO)',
     ];
 

@@ -108,7 +108,12 @@ class Index extends Component
                 $request->executeAction([
                     'extension_days' => $this->extensionDays
                 ]);
-                $this->dispatch('toast', title: 'Berhasil', message: 'Persetujuan berhasil dieksekusi.', type: 'success');
+                
+                $msg = $request->request_type === 'ORDER_CANCELLATION' 
+                    ? 'Persetujuan berhasil dan transaksi dibatalkan di Accurate.'
+                    : 'Persetujuan berhasil dieksekusi.';
+                    
+                $this->dispatch('toast', title: 'Berhasil', message: $msg, type: 'success');
             } catch (\Exception $e) {
                 $this->dispatch('toast', title: 'Error Eksekusi', message: 'Gagal mengeksekusi persetujuan: ' . $e->getMessage(), type: 'error');
             }

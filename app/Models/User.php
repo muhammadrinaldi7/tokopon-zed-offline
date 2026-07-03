@@ -68,7 +68,7 @@ class User extends Authenticatable implements HasMedia
             })
             ->first();
 
-        return $pivot ? $pivot->accurate_customer_no : 'CASH';
+        return $pivot ? $pivot->accurate_customer_no : 'UMUM';
     }
 
     public function getAccurateCustomerNoAttribute()
