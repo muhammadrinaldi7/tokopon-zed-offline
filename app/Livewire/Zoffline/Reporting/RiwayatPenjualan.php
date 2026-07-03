@@ -14,6 +14,13 @@ class RiwayatPenjualan extends Component
     use WithPagination;
 
     public $search = '';
+    
+    // Filters
+    public $filterStartDate = '';
+    public $filterEndDate = '';
+    public $filterStatus = '';
+    public $filterPaymentMethod = '';
+
     public $showReceiptModal = false;
     public $completedOrder = null;
 
@@ -41,6 +48,17 @@ class RiwayatPenjualan extends Component
         $this->resetPage();
     }
 
+    public function updatedFilterStartDate() { $this->resetPage(); }
+    public function updatedFilterEndDate() { $this->resetPage(); }
+    public function updatedFilterStatus() { $this->resetPage(); }
+    public function updatedFilterPaymentMethod() { $this->resetPage(); }
+
+    public function clearFilters()
+    {
+        $this->reset(['search', 'filterStartDate', 'filterEndDate', 'filterStatus', 'filterPaymentMethod']);
+        $this->resetPage();
+    }
+
     public function render()
     {
         $user = Auth::user();
@@ -63,6 +81,20 @@ class RiwayatPenjualan extends Component
                         ->orWhereHas('items', function ($iq) {
                             $iq->where('serial_number', 'like', '%' . $this->search . '%');
                         });
+                });
+            })
+            ->when($this->filterStartDate, function ($query) {
+                $query->whereDate('created_at', '>=', $this->filterStartDate);
+            })
+            ->when($this->filterEndDate, function ($query) {
+                $query->whereDate('created_at', '<=', $this->filterEndDate);
+            })
+            ->when($this->filterStatus, function ($query) {
+                $query->where('order_status', $this->filterStatus);
+            })
+            ->when($this->filterPaymentMethod, function ($query) {
+                $query->whereHas('payments', function ($pq) {
+                    $pq->where('payment_method_id', $this->filterPaymentMethod);
                 });
             })
             ->orderBy('created_at', 'desc')

@@ -8,19 +8,56 @@
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm border border-neutral-100 overflow-hidden">
-            <div
-                class="p-4 border-b border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-neutral-50/50">
-                <div class="relative max-w-md w-full">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg class="h-5 w-5 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd"
-                                d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                                clip-rule="evenodd" />
-                        </svg>
+            <div class="p-4 border-b border-neutral-100 bg-neutral-50/50">
+                <div class="flex flex-col xl:flex-row gap-4">
+                    <div class="relative flex-1">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd"
+                                    d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <input wire:model.live.debounce.300ms="search" type="text"
+                            class="block w-full pl-10 pr-3 py-2 border border-neutral-200 rounded-xl leading-5 bg-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out shadow-sm"
+                            placeholder="Cari nomor struk, SN, atau pelanggan...">
                     </div>
-                    <input wire:model.live.debounce.300ms="search" type="text"
-                        class="block w-full pl-10 pr-3 py-2 border border-neutral-200 rounded-xl leading-5 bg-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out shadow-sm"
-                        placeholder="Cari nomor struk, SN, atau pelanggan...">
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div
+                            class="flex items-center gap-2 bg-white border border-neutral-200 rounded-xl px-2 py-1 shadow-sm">
+                            <input type="date" wire:model.live="filterStartDate"
+                                class="border-none focus:ring-0 text-sm py-1" title="Tanggal Awal">
+                            <span class="text-neutral-400 text-xs font-medium">s/d</span>
+                            <input type="date" wire:model.live="filterEndDate"
+                                class="border-none focus:ring-0 text-sm py-1" title="Tanggal Akhir">
+                        </div>
+
+                        <select wire:model.live="filterStatus"
+                            class="bg-white border border-neutral-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-sm min-w-[130px]">
+                            <option value="">Semua Status</option>
+                            <option value="COMPLETED">Selesai</option>
+                            <option value="CANCELLED">Batal</option>
+                        </select>
+
+                        {{-- <select wire:model.live="filterPaymentMethod" class="bg-white border border-neutral-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-sm min-w-[150px]">
+                            <option value="">Metode Bayar</option>
+                            @foreach ($paymentMethods as $pm)
+                                <option value="{{ $pm->id }}">{{ $pm->name }}</option>
+                            @endforeach
+                        </select> --}}
+
+                        @if ($search || $filterStartDate || $filterEndDate || $filterStatus || $filterPaymentMethod)
+                            <button wire:click="clearFilters"
+                                class="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                                title="Reset Filter">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        @endif
+                    </div>
                 </div>
             </div>
 
@@ -134,8 +171,8 @@
                                                 </svg>
                                                 Struk
                                             </button>
-                                            
-                                            @if(!$pendingCancel && $order->order_status !== 'CANCELLED')
+
+                                            @if (!$pendingCancel && $order->order_status !== 'CANCELLED')
                                                 <button wire:click="requestCancellation({{ $order->id }})"
                                                     class="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-[10px] font-bold transition-all border border-red-100 uppercase mt-1">
                                                     Batalkan
@@ -157,7 +194,8 @@
                                             </path>
                                         </svg>
                                     </div>
-                                    <h3 class="mt-2 text-sm font-bold text-neutral-900">Belum ada riwayat penjualan</h3>
+                                    <h3 class="mt-2 text-sm font-bold text-neutral-900">Belum ada riwayat penjualan
+                                    </h3>
                                     <p class="mt-1 text-sm text-neutral-500">Transaksi baru akan muncul di sini.</p>
                                 </td>
                             </tr>
@@ -176,29 +214,39 @@
     @include('livewire.zoffline.pos.modal.receipt-struk')
 
     {{-- MODAL AJUKAN PEMBATALAN --}}
-    @if($showCancelModal)
+    @if ($showCancelModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/50 backdrop-blur-sm">
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden" @click.outside="$wire.closeCancelModal()">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+                @click.outside="$wire.closeCancelModal()">
                 <div class="p-6">
                     <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
                         <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                     </div>
                     <h3 class="text-lg font-bold text-center text-neutral-900 mb-2">Ajukan Pembatalan Transaksi</h3>
-                    <p class="text-sm text-center text-neutral-500 mb-6">Penghapusan faktur di Accurate memerlukan persetujuan. Silakan isi alasan pembatalan.</p>
-                    
+                    <p class="text-sm text-center text-neutral-500 mb-6">Penghapusan faktur di Accurate memerlukan
+                        persetujuan. Silakan isi alasan pembatalan.</p>
+
                     <div>
-                        <label class="block text-xs font-bold text-neutral-700 uppercase mb-2">Alasan Pembatalan</label>
-                        <textarea wire:model="cancelReason" rows="3" class="w-full px-4 py-3 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all resize-none text-sm" placeholder="Contoh: Salah input nominal, customer retur, dsb..."></textarea>
-                        @error('cancelReason') <span class="text-xs text-red-500 font-medium mt-1">{{ $message }}</span> @enderror
+                        <label class="block text-xs font-bold text-neutral-700 uppercase mb-2">Alasan
+                            Pembatalan</label>
+                        <textarea wire:model="cancelReason" rows="3"
+                            class="w-full px-4 py-3 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all resize-none text-sm"
+                            placeholder="Contoh: Salah input nominal, customer retur, dsb..."></textarea>
+                        @error('cancelReason')
+                            <span class="text-xs text-red-500 font-medium mt-1">{{ $message }}</span>
+                        @enderror
                     </div>
                 </div>
                 <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex gap-3">
-                    <button wire:click="closeCancelModal" class="flex-1 px-4 py-2.5 text-sm font-bold text-neutral-600 bg-white border border-neutral-200 rounded-xl hover:bg-neutral-50 transition-all">
+                    <button wire:click="closeCancelModal"
+                        class="flex-1 px-4 py-2.5 text-sm font-bold text-neutral-600 bg-white border border-neutral-200 rounded-xl hover:bg-neutral-50 transition-all">
                         Tutup
                     </button>
-                    <button wire:click="submitCancellation" class="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-all shadow-sm shadow-red-600/20">
+                    <button wire:click="submitCancellation"
+                        class="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-all shadow-sm shadow-red-600/20">
                         Kirim Pengajuan
                     </button>
                 </div>
