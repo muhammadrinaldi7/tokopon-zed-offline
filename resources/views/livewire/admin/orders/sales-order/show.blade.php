@@ -1,24 +1,26 @@
 <div class="max-w-7xl mx-auto p-4 md:p-6 min-h-screen">
-    <div class="mb-6 flex justify-between items-start">
+    <div class="mb-6 flex flex-col md:flex-row md:justify-between md:items-start gap-4">
         <div>
             <a href="{{ route('admin.sales-orders.index') }}" wire:navigate
-                class="text-sm font-medium text-gray-500 hover:text-[#1c69d4] flex items-center gap-1 mb-2 transition-colors">
+                class="text-sm font-semibold text-gray-500 hover:text-[#1c69d4] flex items-center gap-2 mb-3 transition-colors w-fit bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
                 Kembali ke Daftar SO
             </a>
-            <h1 class="text-2xl font-bold text-gray-800">Detail & Peta Relasi SO</h1>
-            <p class="text-gray-500 text-sm mt-1">SO Number: {{ $order->order_number }}</p>
+            <h1 class="text-2xl font-black text-gray-800 tracking-tight">Detail & Peta Relasi SO</h1>
+            <p class="text-gray-500 text-sm mt-1 font-medium flex items-center gap-2">
+                <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                SO Number: <span class="text-gray-700 font-bold">{{ $order->order_number }}</span>
+            </p>
         </div>
 
-        <div class="flex items-center gap-3">
-            @if (
-                $order->order_status !== 'COMPLETED' &&
-                $order->order_status !== 'cancelled' &&
-                $this->getRemainingBalance() > 0)
+        <div class="flex flex-wrap items-center gap-3">
+            @if ($order->order_status !== 'COMPLETED' && $order->order_status !== 'cancelled' && $this->getRemainingBalance() > 0)
                 <button type="button" wire:click="openDpModal"
-                    class="px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-colors shadow-sm shadow-emerald-500/20 flex items-center gap-2 text-sm">
+                    class="px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-all active:scale-95 shadow-sm shadow-emerald-500/20 flex items-center gap-2 text-sm">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -29,7 +31,7 @@
 
             @if (!$order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->exists())
                 <button type="button" wire:click="openInvoiceModal"
-                    class="px-5 py-2.5 bg-[#1c69d4] text-white hover:bg-blue-700 font-bold rounded-xl text-sm transition-colors shadow-sm flex items-center gap-2">
+                    class="px-5 py-2.5 bg-[#1c69d4] text-white hover:bg-blue-700 font-bold rounded-xl text-sm transition-all active:scale-95 shadow-sm shadow-blue-500/20 flex items-center gap-2">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
@@ -39,16 +41,23 @@
             @endif
 
             @if ($order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'ORDER_CANCELLATION')->exists())
-                <span class="px-4 py-2 bg-yellow-100 text-yellow-700 font-bold rounded-xl text-sm border border-yellow-200">
+                <span
+                    class="px-4 py-2.5 bg-yellow-50 text-yellow-700 font-bold rounded-xl text-sm border border-yellow-200 flex items-center gap-2 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                     Menunggu Approval Batal
                 </span>
-            @elseif ($order->order_status !== 'CANCELLED' && $order->order_status !== 'cancelled' && $order->order_status !== 'COMPLETED')
+            @elseif (
+                $order->order_status !== 'CANCELLED' &&
+                    $order->order_status !== 'cancelled' &&
+                    $order->order_status !== 'COMPLETED')
                 <button type="button" @click="$dispatch('openCancelModal', { orderId: {{ $order->id }} })"
-                    class="px-5 py-2.5 bg-red-100 text-red-600 hover:bg-red-200 font-bold rounded-xl text-sm transition-colors flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    class="px-5 py-2.5 bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300 font-bold rounded-xl text-sm transition-all active:scale-95 shadow-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                    Batalkan
+                    Batalkan SO
                 </button>
             @endif
         </div>
@@ -58,11 +67,49 @@
 
     {{-- SO Details --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white lg:col-span-3 rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
+                <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Informasi Tambahan
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                <div>
+                    <span class="block text-xs font-bold text-gray-400 uppercase">Pelanggan</span>
+                    <span class="font-semibold text-gray-800">{{ $order->user->name ?? '-' }}</span>
+                </div>
+                <div>
+                    <span class="block text-xs font-bold text-gray-400 uppercase">No. Telpon</span>
+                    <span class="font-semibold text-gray-800">{{ $order->user->profile->phone_number ?? '-' }}</span>
+                </div>
+                <div>
+                    <span class="block text-xs font-bold text-gray-400 uppercase">Cabang</span>
+                    <span class="font-semibold text-gray-800">{{ $order->branch->name ?? '-' }}</span>
+                </div>
+                @if ($order->accurate_so_number)
+                    <div>
+                        <span class="block text-xs font-bold text-gray-400 uppercase">Accurate SO No.</span>
+                        <span class="font-bold text-[#1c69d4]">{{ $order->accurate_so_number }}</span>
+                    </div>
+                @endif
+                <div>
+                    <span class="block text-xs font-bold text-gray-400 uppercase">Catatan</span>
+                    <span class="text-gray-600">{{ $order->notes ?? '-' }}</span>
+                </div>
+            </div>
+        </div>
         <div class="lg:col-span-2 space-y-6">
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3">Daftar Barang</h3>
-                <table class="w-full text-left border-collapse">
-                    <thead>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 overflow-hidden">
+                <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    Daftar Barang
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[500px]">
+                        <thead>
                         <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                             <th class="p-3 font-bold rounded-tl-lg">Produk</th>
                             <th class="p-3 font-bold text-center">Qty</th>
@@ -102,12 +149,18 @@
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
 
-        <div class="space-y-6">
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3">Ringkasan Nilai SO</h3>
+        <div class="lg:col-span-1 space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-6">
+                <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Ringkasan Nilai SO
+                </h3>
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between text-gray-500">
                         <span>Subtotal</span>
@@ -143,32 +196,10 @@
                 </div>
             </div>
 
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3">Informasi Tambahan</h3>
-                <div class="space-y-3 text-sm">
-                    <div>
-                        <span class="block text-xs font-bold text-gray-400 uppercase">Pelanggan</span>
-                        <span class="font-semibold text-gray-800">{{ $order->user->name ?? '-' }}</span>
-                    </div>
-                    <div>
-                        <span class="block text-xs font-bold text-gray-400 uppercase">Unit Usaha</span>
-                        <span class="font-semibold text-gray-800">{{ $order->businessUnit->name ?? '-' }}</span>
-                    </div>
-                    @if ($order->accurate_so_number)
-                        <div>
-                            <span class="block text-xs font-bold text-gray-400 uppercase">Accurate SO No.</span>
-                            <span class="font-bold text-[#1c69d4]">{{ $order->accurate_so_number }}</span>
-                        </div>
-                    @endif
-                    <div>
-                        <span class="block text-xs font-bold text-gray-400 uppercase">Catatan</span>
-                        <span class="text-gray-600">{{ $order->notes ?? '-' }}</span>
-                    </div>
-                </div>
-            </div>
+
         </div>
         {{-- Relationship Map (SAP B1 Style) --}}
-        <div class="bg-white col-span-3 rounded-2xl shadow-sm border border-gray-100 p-8 mb-6 overflow-x-auto"
+        <div class="bg-white lg:col-span-3 rounded-2xl shadow-sm border border-gray-100 p-8 mb-6 overflow-x-auto"
             id="scrollable-map-wrapper">
             <h3 class="font-bold text-gray-800 mb-6 flex items-center gap-2">
                 <svg class="w-5 h-5 text-[#1c69d4]" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -188,15 +219,16 @@
 
                 @if ($hasAccurateDocs)
                     {{-- Node 1: Sales Order --}}
-                    @php 
-                        $soDoc = $order->accurateDocs->where('doc_type', 'SALES_ORDER')->first(); 
+                    @php
+                        $soDoc = $order->accurateDocs->where('doc_type', 'SALES_ORDER')->first();
                         $doDoc = $order->accurateDocs->where('doc_type', 'DELIVERY_ORDER')->first();
                     @endphp
                     <div class="flex flex-col md:flex-row items-start md:items-center gap-16">
                         <div id="node-so" style="z-index: 10;">
                             <div
                                 class="w-48 bg-[#eff6ff] border-2 border-[#1c69d4] rounded-xl p-4 text-center shadow-sm cursor-move hover:shadow-md transition-all">
-                                <div class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider mb-1">Sales Order
+                                <div class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider mb-1">Sales
+                                    Order
                                 </div>
                                 <div class="text-xs font-bold text-gray-800 mb-1">
                                     {{ $soDoc ? $soDoc->doc_number : $order->accurate_so_number }}</div>
@@ -206,15 +238,18 @@
                             </div>
                         </div>
 
-                        @if($doDoc)
-                        <div id="node-do" style="z-index: 10;">
-                            <div
-                                class="w-48 bg-orange-50 border-2 border-orange-500 rounded-xl p-4 text-center shadow-sm cursor-move hover:shadow-md transition-shadow">
-                                <div class="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Delivery Order</div>
-                                <div class="text-[10px] font-semibold text-orange-800 mb-1">{{ $doDoc->doc_number }}</div>
-                                <div class="text-[10px] text-gray-500">{{ $doDoc->created_at->format('d/m/Y H:i') }}</div>
+                        @if ($doDoc)
+                            <div id="node-do" style="z-index: 10;">
+                                <div
+                                    class="w-48 bg-orange-50 border-2 border-orange-500 rounded-xl p-4 text-center shadow-sm cursor-move hover:shadow-md transition-shadow">
+                                    <div class="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">
+                                        Delivery Order</div>
+                                    <div class="text-[10px] font-semibold text-orange-800 mb-1">
+                                        {{ $doDoc->doc_number }}</div>
+                                    <div class="text-[10px] text-gray-500">
+                                        {{ $doDoc->created_at->format('d/m/Y H:i') }}</div>
+                                </div>
                             </div>
-                        </div>
                         @endif
                     </div>
 
@@ -453,7 +488,8 @@
                 <div class="p-5 border-b border-gray-100 bg-white flex justify-between items-center shrink-0">
                     <div>
                         <h3 class="font-bold text-gray-800 text-lg">Terima Uang Muka (DP)</h3>
-                        <p class="text-xs text-gray-500">Total Tagihan: Rp {{ number_format($this->getRemainingBalance(), 0, ',', '.') }}</p>
+                        <p class="text-xs text-gray-500">Total Tagihan: Rp
+                            {{ number_format($this->getRemainingBalance(), 0, ',', '.') }}</p>
                     </div>
                     <button wire:click="$set('showDpModal', false)"
                         class="text-gray-400 hover:text-rose-500 font-bold text-2xl leading-none">&times;</button>
@@ -461,16 +497,27 @@
                 <div class="p-6 overflow-y-auto flex-1">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tanggal Pembayaran *</label>
-                            <input type="date" wire:model="dp_date" class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white" required>
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tanggal
+                                Pembayaran *</label>
+                            <input type="date" wire:model="dp_date"
+                                class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white"
+                                required>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">No. Kontrak / Referensi</label>
-                            <input type="text" wire:model="dp_contract_number" class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white" placeholder="Opsional">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">No.
+                                Kontrak / Referensi</label>
+                            <input type="text" wire:model="dp_contract_number"
+                                class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white"
+                                placeholder="Opsional">
                         </div>
                     </div>
-                    
-                    @include('livewire.zoffline.pos.partials.wizard.step4-payment', ['hideSplit' => true, 'allowEditAmount' => true, 'hideFooter' => true])
+
+                    @include('livewire.zoffline.pos.partials.wizard.step4-payment', [
+                        'hideSplit' => true,
+                        'allowEditAmount' => true,
+                        'hideFooter' => true,
+                    ])
                 </div>
                 <div class="p-5 bg-white border-t border-gray-100 shrink-0 flex justify-end gap-3">
                     <button type="button" wire:click="$set('showDpModal', false)"
@@ -499,7 +546,8 @@
                         </div>
                         <div>
                             <h2 class="text-gray-900 font-bold text-xl leading-tight">Terbitkan Faktur</h2>
-                            <p class="text-xs font-medium text-gray-500">Input Serial Number dan Pelunasan Akhir (Sisa Tagihan: Rp {{ number_format($this->getRemainingBalance(), 0, ',', '.') }})</p>
+                            <p class="text-xs font-medium text-gray-500">Input Serial Number dan Pelunasan Akhir (Sisa
+                                Tagihan: Rp {{ number_format($this->getRemainingBalance(), 0, ',', '.') }})</p>
                         </div>
                     </div>
                     <button type="button" wire:click="$set('showInvoiceModal', false)"
@@ -520,7 +568,9 @@
                                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                         <div>
-                            Faktur Penjualan (Sales Invoice) akan dibuat di Accurate untuk memotong stok. Pastikan Anda memasukkan <strong>Serial Number</strong> (dipisah koma) sesuai jumlah kuantitas jika barang tersebut merupakan perangkat ber-SN.
+                            Faktur Penjualan (Sales Invoice) akan dibuat di Accurate untuk memotong stok. Pastikan Anda
+                            memasukkan <strong>Serial Number</strong> (dipisah koma) sesuai jumlah kuantitas jika barang
+                            tersebut merupakan perangkat ber-SN.
                         </div>
                     </div>
 
@@ -541,7 +591,8 @@
                                     $subDesc = trim(($variant->storage ?? '') . ' ' . ($variant->color ?? ''));
                                 }
                             @endphp
-                            <div class="p-4 border {{ empty($sku) ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white' }} rounded-xl flex flex-col gap-3">
+                            <div
+                                class="p-4 border {{ empty($sku) ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white' }} rounded-xl flex flex-col gap-3">
                                 <div class="flex justify-between items-start">
                                     <div>
                                         <div class="font-bold text-gray-800">{{ $itemName }}</div>
@@ -575,8 +626,7 @@
                                             @endfor
                                         </div>
                                     @else
-                                        <input type="text"
-                                            wire:model.defer="invoice_sns.{{ $item->id }}.0"
+                                        <input type="text" wire:model.defer="invoice_sns.{{ $item->id }}.0"
                                             class="w-full px-4 py-2.5 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors"
                                             placeholder="Masukkan IMEI/SN">
                                     @endif
@@ -590,15 +640,26 @@
                             <h4 class="font-black text-gray-800 mb-4 text-lg">Pelunasan Sisa Tagihan</h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tanggal Pembayaran *</label>
-                                    <input type="date" wire:model="invoice_date" class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white" required>
+                                    <label
+                                        class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tanggal
+                                        Pembayaran *</label>
+                                    <input type="date" wire:model="invoice_date"
+                                        class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white"
+                                        required>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">No. Kontrak / Referensi</label>
-                                    <input type="text" wire:model="invoice_contract_number" class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white" placeholder="Opsional">
+                                    <label
+                                        class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">No.
+                                        Kontrak / Referensi</label>
+                                    <input type="text" wire:model="invoice_contract_number"
+                                        class="w-full rounded-xl p-3 border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white"
+                                        placeholder="Opsional">
                                 </div>
                             </div>
-                            @include('livewire.zoffline.pos.partials.wizard.step4-payment', ['hideSplit' => false, 'hideFooter' => true])
+                            @include('livewire.zoffline.pos.partials.wizard.step4-payment', [
+                                'hideSplit' => false,
+                                'hideFooter' => true,
+                            ])
                         </div>
                     @endif
                 </div>
@@ -606,8 +667,7 @@
                 <div class="p-5 bg-white border-t border-gray-100 flex justify-end shrink-0 gap-3">
                     <button type="button" wire:click="$set('showInvoiceModal', false)"
                         class="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">Batal</button>
-                    <button type="button" wire:click="submitFaktur"
-                        wire:loading.attr="disabled"
+                    <button type="button" wire:click="submitFaktur" wire:loading.attr="disabled"
                         class="px-6 py-2.5 bg-[#1c69d4] text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2">
                         <span wire:loading.remove wire:target="submitFaktur">Terbitkan Faktur</span>
                         <span wire:loading wire:target="submitFaktur">Memproses...</span>
