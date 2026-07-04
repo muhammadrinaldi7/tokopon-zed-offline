@@ -68,32 +68,11 @@
                                 </div>
                             </td>
                             <td class="py-4 px-6">
-                                @if ($claim->status === 'pending')
-                                    <span
-                                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Pending
-                                    </span>
-                                @elseif($claim->status === 'approved')
-                                    <span
-                                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Disetujui
-                                    </span>
-                                @elseif($claim->status === 'in_repair')
-                                    <span
-                                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span> Diproses
-                                    </span>
-                                @elseif($claim->status === 'completed')
-                                    <span
-                                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Selesai
-                                    </span>
-                                @elseif($claim->status === 'rejected')
-                                    <span
-                                        class="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-xs font-bold">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Ditolak
-                                    </span>
-                                @endif
+                                <span
+                                    class="inline-flex items-center gap-1.5 px-3 py-1 {{ $claim->status_badge->bg }} rounded-full text-xs font-bold">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $claim->status_badge->dot }}"></span>
+                                    {{ $claim->status_badge->label }}
+                                </span>
                             </td>
                             <td class="py-4 px-6 text-right">
                                 <button wire:click="openProcessModal({{ $claim->id }})"
@@ -433,7 +412,8 @@
                                 @endforeach
                             </select>
                             <p class="mt-1.5 text-xs text-gray-500">
-                                Akun ini digunakan oleh Accurate untuk membuat Sales Receipt pelunasan faktur atau pencatatan piutang.
+                                Akun ini digunakan oleh Accurate untuk membuat Sales Receipt pelunasan faktur atau
+                                pencatatan piutang.
                             </p>
                             @error('bank_no')
                                 <div
@@ -830,109 +810,146 @@
                         </div>
 
                         <!-- Bottom Section: Tindakan Admin -->
-                        <div class="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-                            <h4
-                                class="text-xs font-black text-gray-400 uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">
-                                Tindakan Keputusan & Integrasi Accurate</h4>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <!-- Catatan Resolusi sekarang dipindah ke Modal masing-masing (Servis / Tolak) -->
+                        <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div class="bg-gray-50 border-b border-gray-100 px-5 py-3 flex justify-between items-center">
+                                <h4 class="text-sm font-black text-gray-700 uppercase tracking-wider">
+                                    Control Panel: Resolusi Klaim
+                                </h4>
+                                <div class="text-xs text-gray-500 font-medium">
+                                    ID: <span class="font-mono text-gray-800">{{ $selectedClaim->claim_number }}</span>
+                                </div>
                             </div>
 
-                            <div class="flex flex-wrap gap-2 mt-6 pt-4 border-t border-gray-100">
-                                @if ($selectedClaim->status === 'pending')
-                                    <button wire:click="openServiceForm"
-                                        class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm transition-colors shadow-sm">
-                                        Setujui Klaim Biasa (Servis)
-                                    </button>
-                                    <button wire:click="openReplacementForm"
-                                        class="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-sm transition-colors shadow-sm">
-                                        Setujui & Ganti Unit (Accurate)
-                                    </button>
-                                    <button wire:click="openRejectForm"
-                                        class="px-6 py-2.5 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold rounded-lg text-sm transition-colors">
-                                        Tolak Klaim (Reject)
-                                    </button>
-                                @endif
+                            <div class="p-5">
+                                <!-- Timestamps & Actors Info -->
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 pb-6 border-b border-gray-100">
+                                    <div>
+                                        <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Diajukan Oleh</span>
+                                        <span class="text-sm font-semibold text-gray-800">{{ $selectedClaim->claimedBy->name ?? 'Kasir / Sistem' }}</span>
+                                        <span class="block text-xs text-gray-500">{{ $selectedClaim->claimed_at ? $selectedClaim->claimed_at->format('d M Y, H:i') : '-' }}</span>
+                                    </div>
+                                    @if($selectedClaim->approvedBy)
+                                    <div>
+                                        <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Di-Approve Oleh</span>
+                                        <span class="text-sm font-semibold text-blue-700">{{ $selectedClaim->approvedBy->name }}</span>
+                                        <span class="block text-xs text-gray-500">{{ $selectedClaim->updated_at->format('d M Y, H:i') }}</span>
+                                    </div>
+                                    @endif
+                                    @if($selectedClaim->resolved_at)
+                                    <div>
+                                        <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Waktu Selesai</span>
+                                        <span class="text-sm font-semibold text-emerald-700">{{ $selectedClaim->resolved_at->format('d M Y, H:i') }}</span>
+                                    </div>
+                                    @endif
+                                </div>
 
-                                @if ($selectedClaim->status === 'approved')
-                                    <button wire:click="updateStatus('in_repair')"
-                                        class="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-sm transition-colors shadow-sm">
-                                        Proses Perbaikan (In Repair)
-                                    </button>
-                                @endif
+                                <h5 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Tindakan Sistem & Accurate</h5>
+                                <div class="flex flex-wrap gap-3">
+                                    @if ($selectedClaim->status === 'pending')
+                                        <button wire:click="openReplacementForm"
+                                            class="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm transition-all shadow-sm shadow-amber-500/20 flex flex-col items-start gap-1">
+                                            <span class="flex items-center gap-2">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                                Ganti Unit (Accurate API)
+                                            </span>
+                                            <span class="text-[10px] font-normal text-amber-100">Otomatis buat Sales Return & Invoice</span>
+                                        </button>
+                                        <button wire:click="openServiceForm"
+                                            class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-all shadow-sm shadow-blue-600/20 flex flex-col items-start gap-1">
+                                            <span class="flex items-center gap-2">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                                Klaim Biasa (Servis)
+                                            </span>
+                                            <span class="text-[10px] font-normal text-blue-200">Perbaikan fisik tanpa ganti unit</span>
+                                        </button>
+                                        <button wire:click="openRejectForm"
+                                            class="px-5 py-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-xl text-sm transition-all flex flex-col items-start gap-1">
+                                            <span class="flex items-center gap-2">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                Tolak Klaim
+                                            </span>
+                                            <span class="text-[10px] font-normal text-rose-500">Batalkan dan tutup kasus ini</span>
+                                        </button>
+                                    @endif
 
-                                @if (in_array($selectedClaim->status, ['approved', 'in_repair']))
-                                    <button wire:click="updateStatus('completed')"
-                                        class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-sm transition-colors shadow-sm">
-                                        Selesai (Completed)
-                                    </button>
-                                @endif
+                                    @if ($selectedClaim->status === 'approved')
+                                        <button wire:click="updateStatus('in_repair')"
+                                            class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-sm transition-colors shadow-sm shadow-purple-500/20 flex items-center gap-2">
+                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                            Mulai Proses Perbaikan (In Repair)
+                                        </button>
+                                    @endif
 
-                                @if ($selectedClaim->status === 'waiting_refund')
-                                    <button wire:click="openRefundForm"
-                                        class="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg text-sm transition-colors shadow-sm">
-                                        Proses Refund Tunai
-                                    </button>
-                                @endif
-                                @if (in_array($selectedClaim->status, ['completed', 'rejected']))
-                                    <div
-                                        class="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-xl text-center shadow-inner">
-                                        @if ($selectedClaim->status === 'completed')
-                                            <p
-                                                class="text-sm font-bold text-emerald-700 flex items-center justify-center gap-2">
-                                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
-                                                    stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                Klaim Garansi telah diselesaikan 
-                                                @if($selectedClaim->resolution === 'replaced')
-                                                    (Ganti Unit).
-                                                @elseif($selectedClaim->resolution === 'repaired')
-                                                    (Service/Perbaikan).
-                                                @else
-                                                    .
-                                                @endif
-                                            </p>
-                                        @else
-                                            <p
-                                                class="text-sm font-bold text-rose-700 flex items-center justify-center gap-2">
-                                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
-                                                    stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                Klaim Garansi ini telah ditolak.
-                                            </p>
-                                        @endif
-                                        @if ($selectedClaim->resolution_notes)
-                                            <p class="text-xs text-gray-500 mt-2">
-                                                {{ $selectedClaim->resolution_notes }}</p>
-                                        @endif
+                                    @if (in_array($selectedClaim->status, ['approved', 'in_repair']))
+                                        <button wire:click="updateStatus('completed')"
+                                            class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-colors shadow-sm shadow-emerald-500/20 flex items-center gap-2">
+                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                            Tandai Selesai (Completed)
+                                        </button>
+                                    @endif
 
-                                        @if($selectedClaim->resolution === 'replaced')
-                                            @php
-                                                $replacementOrder = \App\Models\Order::with('accurateDocs')->where('order_number', 'WR-' . $selectedClaim->claim_number)->first();
-                                            @endphp
-                                            @if($replacementOrder && $replacementOrder->accurateDocs->count() > 0)
-                                                <div class="mt-4 text-left border-t border-emerald-100 pt-3">
-                                                    <p class="text-xs font-bold text-emerald-800 mb-2">Dokumen Accurate (Auto-Generated):</p>
-                                                    <div class="flex flex-wrap gap-2">
-                                                        @foreach($replacementOrder->accurateDocs as $doc)
-                                                            <div class="bg-white border border-emerald-200 px-3 py-1.5 rounded-lg shadow-sm text-xs flex items-center gap-2">
-                                                                <span class="font-bold text-gray-600">{{ ucwords(strtolower(str_replace('_', ' ', $doc->doc_type))) }}</span>
-                                                                <span class="font-mono text-emerald-700 font-bold">{{ $doc->doc_number }}</span>
-                                                            </div>
-                                                        @endforeach
-                                                    </div>
+                                    @if ($selectedClaim->status === 'waiting_refund')
+                                        <button wire:click="openRefundForm"
+                                            class="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition-colors shadow-sm shadow-orange-500/20 flex items-center gap-2 animate-pulse">
+                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                            Proses Pencairan Refund Tunai
+                                        </button>
+                                    @endif
+
+                                    @if (in_array($selectedClaim->status, ['completed', 'rejected']))
+                                        <div class="w-full px-6 py-5 bg-gray-50/80 border border-gray-200 rounded-2xl shadow-inner relative overflow-hidden">
+                                            <div class="absolute top-0 left-0 w-1 h-full {{ $selectedClaim->status === 'completed' ? 'bg-emerald-500' : 'bg-rose-500' }}"></div>
+                                            
+                                            @if ($selectedClaim->status === 'completed')
+                                                <p class="text-base font-black text-emerald-800 flex items-center gap-2">
+                                                    <svg class="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    Klaim Garansi telah diselesaikan 
+                                                    @if ($selectedClaim->resolution === 'replaced')
+                                                        <span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-xs ml-1">(Ganti Unit)</span>
+                                                    @elseif($selectedClaim->resolution === 'repaired')
+                                                        <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs ml-1">(Service/Perbaikan)</span>
+                                                    @endif
+                                                </p>
+                                            @else
+                                                <p class="text-base font-black text-rose-800 flex items-center gap-2">
+                                                    <svg class="w-6 h-6 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    Klaim Garansi ini telah ditolak.
+                                                </p>
+                                            @endif
+
+                                            @if ($selectedClaim->resolution_notes)
+                                                <div class="mt-3 bg-white p-3 rounded-lg border border-gray-100 text-sm text-gray-600 italic">
+                                                    <span class="font-bold text-gray-400 not-italic mr-2">"</span>{{ $selectedClaim->resolution_notes }}<span class="font-bold text-gray-400 not-italic ml-2">"</span>
                                                 </div>
                                             @endif
-                                        @endif
-                                    </div>
-                                @endif
+
+                                            @if ($selectedClaim->resolution === 'replaced')
+                                                @php
+                                                    $replacementOrder = \App\Models\Order::with('accurateDocs')
+                                                        ->where('order_number', 'WR-' . $selectedClaim->claim_number)
+                                                        ->first();
+                                                @endphp
+                                                @if ($replacementOrder && $replacementOrder->accurateDocs->count() > 0)
+                                                    <div class="mt-5 border-t border-gray-200 pt-4">
+                                                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Dokumen Accurate (Auto-Generated):</p>
+                                                        <div class="flex flex-wrap gap-3">
+                                                            @foreach ($replacementOrder->accurateDocs as $doc)
+                                                                <div class="bg-white border-b-2 border-emerald-400 px-4 py-2.5 rounded-t-lg shadow-sm flex flex-col gap-1 min-w-[140px]">
+                                                                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{{ str_replace('_', ' ', $doc->doc_type) }}</span>
+                                                                    <span class="font-mono text-gray-800 font-bold text-sm">{{ $doc->doc_number }}</span>
+                                                                </div>
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                @endif
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
                             </div>
                         </div>
                     @else
@@ -1098,108 +1115,153 @@
 <!-- Modal Konfirmasi Retur Accurate -->
 @if ($showReplacementConfirmModal && $selectedClaimId)
     @php
-        $selectedClaim = $selectedClaimObj ?? \App\Models\WarrantyClaim::with('warranty.orderItem.variant')->find($selectedClaimId);
+        $selectedClaim =
+            $selectedClaimObj ?? \App\Models\WarrantyClaim::with('warranty.orderItem.variant')->find($selectedClaimId);
         $oldProductName = $selectedClaim->warranty->orderItem->product_name ?? '-';
         $oldImei = $selectedClaim->warranty->serial_number ?? '-';
-        
+
         $newProductName = $replacement_type === 'different' ? $replacement_product_name : $oldProductName;
         $newPrice = $replacement_type === 'different' ? $replacement_price : $original_price;
         $diff = $newPrice - $original_price;
     @endphp
     <div class="fixed inset-0 z-[150] flex items-center justify-center p-4">
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" wire:click="cancelReplacementConfirm"></div>
-        
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+            wire:click="cancelReplacementConfirm"></div>
+
         <!-- Modal Content -->
-        <div class="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-200" style="animation: scaleUp 0.2s ease-out">
+        <div class="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-200"
+            style="animation: scaleUp 0.2s ease-out">
             <!-- Header -->
             <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-amber-50">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                    <div
+                        class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                     </div>
                     <h3 class="text-xl font-bold text-amber-900">Konfirmasi Eksekusi Accurate</h3>
                 </div>
-                <button type="button" wire:click="cancelReplacementConfirm" class="text-gray-400 hover:text-gray-500 hover:bg-white p-2 rounded-xl transition-colors">
+                <button type="button" wire:click="cancelReplacementConfirm"
+                    class="text-gray-400 hover:text-gray-500 hover:bg-white p-2 rounded-xl transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
 
             <!-- Body -->
             <div class="px-6 py-5">
-                <p class="text-sm text-gray-600 mb-4">Anda akan memproses retur garansi ini ke Accurate. Berikut adalah ringkasan aksi yang akan dicatat:</p>
-                
+                <p class="text-sm text-gray-600 mb-4">Anda akan memproses retur garansi ini ke Accurate. Berikut
+                    adalah ringkasan aksi yang akan dicatat:</p>
+
                 <div class="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-4 relative overflow-hidden">
                     <div class="absolute left-6 top-10 bottom-10 w-0.5 bg-gray-200 z-0"></div>
-                    
+
                     <!-- Produk Lama -->
                     <div class="relative z-10 flex gap-4 mb-5">
-                        <div class="w-8 h-8 rounded-full bg-gray-200 border-4 border-gray-50 flex items-center justify-center shrink-0">
-                            <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                        <div
+                            class="w-8 h-8 rounded-full bg-gray-200 border-4 border-gray-50 flex items-center justify-center shrink-0">
+                            <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z">
+                                </path>
+                            </svg>
                         </div>
                         <div>
-                            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-0.5">Ditarik (Sales Return)</div>
+                            <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-0.5">Ditarik
+                                (Sales Return)</div>
                             <div class="text-gray-900 font-medium text-sm">{{ $oldProductName }}</div>
-                            <div class="text-xs text-gray-500 mt-0.5">IMEI: <span class="font-mono font-medium text-gray-700">{{ $oldImei }}</span></div>
+                            <div class="text-xs text-gray-500 mt-0.5">IMEI: <span
+                                    class="font-mono font-medium text-gray-700">{{ $oldImei }}</span></div>
                         </div>
                     </div>
 
                     <!-- Produk Baru -->
                     <div class="relative z-10 flex gap-4">
-                        <div class="w-8 h-8 rounded-full bg-amber-100 border-4 border-gray-50 flex items-center justify-center shrink-0">
-                            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        <div
+                            class="w-8 h-8 rounded-full bg-amber-100 border-4 border-gray-50 flex items-center justify-center shrink-0">
+                            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7"></path>
+                            </svg>
                         </div>
                         <div>
-                            <div class="text-xs font-bold text-amber-600 uppercase tracking-wider mb-0.5">Pengganti (Sales Invoice Baru)</div>
+                            <div class="text-xs font-bold text-amber-600 uppercase tracking-wider mb-0.5">Pengganti
+                                (Sales Invoice Baru)</div>
                             <div class="text-gray-900 font-medium text-sm">{{ $newProductName }}</div>
-                            <div class="text-xs text-gray-500 mt-0.5">IMEI: <span class="font-mono font-medium text-amber-700">{{ $replacement_imei }}</span></div>
+                            <div class="text-xs text-gray-500 mt-0.5">IMEI: <span
+                                    class="font-mono font-medium text-amber-700">{{ $replacement_imei }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                @if($diff > 0)
-                <div class="bg-blue-50 border border-blue-100 rounded-xl p-3.5 flex gap-3">
-                    <div class="bg-blue-100 text-blue-600 p-2 rounded-lg shrink-0 h-fit">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                @if ($diff > 0)
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-3.5 flex gap-3">
+                        <div class="bg-blue-100 text-blue-600 p-2 rounded-lg shrink-0 h-fit">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-sm font-bold text-blue-900">Upgrade Unit (+ Rp
+                                {{ number_format($diff, 0, ',', '.') }})</div>
+                            <div class="text-xs text-blue-700 leading-relaxed mt-0.5">Pelanggan memilih unit yang
+                                lebih mahal. Accurate akan secara otomatis mencatat selisih ini sebagai piutang
+                                (Sales Invoice baru lebih besar nilainya), lalu dibayarkan melalui Sales Receipt ke
+                                bank/kas yang Anda pilih.</div>
+                        </div>
                     </div>
-                    <div>
-                        <div class="text-sm font-bold text-blue-900">Upgrade Unit (+ Rp {{ number_format($diff, 0, ',', '.') }})</div>
-                        <div class="text-xs text-blue-700 leading-relaxed mt-0.5">Pelanggan memilih unit yang lebih mahal. Accurate akan secara otomatis mencatat selisih ini sebagai piutang (Sales Invoice baru lebih besar nilainya), lalu dibayarkan melalui Sales Receipt ke bank/kas yang Anda pilih.</div>
-                    </div>
-                </div>
                 @elseif($diff < 0)
-                <div class="bg-rose-50 border border-rose-100 rounded-xl p-3.5 flex gap-3">
-                    <div class="bg-rose-100 text-rose-600 p-2 rounded-lg shrink-0 h-fit">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
+                    <div class="bg-rose-50 border border-rose-100 rounded-xl p-3.5 flex gap-3">
+                        <div class="bg-rose-100 text-rose-600 p-2 rounded-lg shrink-0 h-fit">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-sm font-bold text-rose-900">Downgrade Unit (- Rp
+                                {{ number_format(abs($diff), 0, ',', '.') }})</div>
+                            <div class="text-xs text-rose-700 leading-relaxed mt-0.5">Pelanggan memilih unit yang
+                                lebih murah. Klaim ini akan dialihkan ke status "Menunggu Refund" agar kasir bisa
+                                mencairkan uang tunai tersebut.</div>
+                        </div>
                     </div>
-                    <div>
-                        <div class="text-sm font-bold text-rose-900">Downgrade Unit (- Rp {{ number_format(abs($diff), 0, ',', '.') }})</div>
-                        <div class="text-xs text-rose-700 leading-relaxed mt-0.5">Pelanggan memilih unit yang lebih murah. Klaim ini akan dialihkan ke status "Menunggu Refund" agar kasir bisa mencairkan uang tunai tersebut.</div>
-                    </div>
-                </div>
                 @else
-                <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3.5 flex gap-3">
-                    <div class="bg-emerald-100 text-emerald-600 p-2 rounded-lg shrink-0 h-fit">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-3.5 flex gap-3">
+                        <div class="bg-emerald-100 text-emerald-600 p-2 rounded-lg shrink-0 h-fit">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-sm font-bold text-emerald-900">Ganti Unit Sama (1:1)</div>
+                            <div class="text-xs text-emerald-700 leading-relaxed mt-0.5">Penukaran unit tanpa ada
+                                biaya tambahan (Selisih Rp 0). Sales Invoice dan Sales Receipt baru akan otomatis
+                                memotong sisa overpayment dari Retur tanpa melibatkan uang baru.</div>
+                        </div>
                     </div>
-                    <div>
-                        <div class="text-sm font-bold text-emerald-900">Ganti Unit Sama (1:1)</div>
-                        <div class="text-xs text-emerald-700 leading-relaxed mt-0.5">Penukaran unit tanpa ada biaya tambahan (Selisih Rp 0). Sales Invoice dan Sales Receipt baru akan otomatis memotong sisa overpayment dari Retur tanpa melibatkan uang baru.</div>
-                    </div>
-                </div>
                 @endif
             </div>
 
             <!-- Footer -->
             <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
-                <button type="button" wire:click="cancelReplacementConfirm" class="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-200 hover:text-gray-900 rounded-xl transition-colors">
+                <button type="button" wire:click="cancelReplacementConfirm"
+                    class="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-200 hover:text-gray-900 rounded-xl transition-colors">
                     Kembali
                 </button>
-                <button type="button" wire:click="approveReplacement" class="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-sm transition-all flex items-center gap-2" wire:loading.attr="disabled" wire:target="approveReplacement">
+                <button type="button" wire:click="approveReplacement"
+                    class="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-sm transition-all flex items-center gap-2"
+                    wire:loading.attr="disabled" wire:target="approveReplacement">
                     <span wire:loading.remove wire:target="approveReplacement">Yakin, Eksekusi Sekarang</span>
                     <span wire:loading wire:target="approveReplacement">Sedang Menembak API...</span>
                 </button>

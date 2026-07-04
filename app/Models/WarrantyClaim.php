@@ -60,5 +60,49 @@ class WarrantyClaim extends Model
     {
         return $this->hasOne(ServiceCenterTicket::class);
     }
+
+    public function getStatusBadgeAttribute()
+    {
+        $statuses = [
+            'pending' => [
+                'label' => 'Pending',
+                'bg' => 'bg-amber-100 text-amber-700',
+                'dot' => 'bg-amber-500'
+            ],
+            'approved' => [
+                'label' => 'Disetujui',
+                'bg' => 'bg-blue-100 text-blue-700',
+                'dot' => 'bg-blue-500'
+            ],
+            'in_repair' => [
+                'label' => 'Diproses',
+                'bg' => 'bg-purple-100 text-purple-700',
+                'dot' => 'bg-purple-500'
+            ],
+            'waiting_refund' => [
+                'label' => 'Menunggu Refund',
+                'bg' => 'bg-orange-100 text-orange-700',
+                'dot' => 'bg-orange-500'
+            ],
+            'completed' => [
+                'label' => 'Selesai',
+                'bg' => 'bg-emerald-100 text-emerald-700',
+                'dot' => 'bg-emerald-500'
+            ],
+            'rejected' => [
+                'label' => 'Ditolak',
+                'bg' => 'bg-rose-100 text-rose-700',
+                'dot' => 'bg-rose-500'
+            ],
+        ];
+
+        $status = $statuses[$this->status] ?? [
+            'label' => ucfirst(str_replace('_', ' ', $this->status)),
+            'bg' => 'bg-gray-100 text-gray-700',
+            'dot' => 'bg-gray-500'
+        ];
+
+        return (object) $status;
+    }
 }
 
