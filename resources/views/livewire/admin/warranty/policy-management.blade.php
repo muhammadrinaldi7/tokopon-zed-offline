@@ -209,6 +209,27 @@
                             </div>
                         </div>
 
+                        <!-- Pengaturan Tambahan Klaim -->
+                        <div class="col-span-2 grid grid-cols-2 gap-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Kebijakan Garansi Baru (Retur) <span
+                                        class="text-red-500">*</span></label>
+                                <select wire:model="replacement_type"
+                                    class="w-full p-2 rounded-xl border-gray-200 focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm">
+                                    <option value="continue">Meneruskan Sisa Masa Aktif Lama</option>
+                                    <option value="reset">Reset Penuh (Masa Aktif Baru)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Batas Maksimal Klaim <span
+                                        class="text-red-500">*</span></label>
+                                <input type="number" wire:model="max_claims"
+                                    class="w-full p-2 rounded-xl border-gray-200 focus:ring-[#1c69d4] focus:border-[#1c69d4] text-sm"
+                                    min="1">
+                                <p class="text-[10px] text-gray-500 mt-1">Berapa kali pelanggan boleh menukar unit selama masa garansi.</p>
+                            </div>
+                        </div>
+
                         @if ($type == 'addon_warranty')
                             <!-- Product Select Trigger -->
                             <div class="col-span-2 p-4 bg-indigo-50 border-indigo-100 rounded-xl border">

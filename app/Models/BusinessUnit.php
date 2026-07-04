@@ -19,6 +19,8 @@ class BusinessUnit extends Model
         'accurate_token',
         'accurate_secret_key',
         'accurate_database_id',
+        'accurate_return_warehouse_id',
+        'accurate_return_warehouse_name',
         'is_taxable',
         'is_active',
     ];

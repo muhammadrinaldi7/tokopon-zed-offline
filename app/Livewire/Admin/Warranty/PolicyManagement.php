@@ -28,6 +28,8 @@ class PolicyManagement extends Component
     public $brand_list = [];
     public $addon_product_list = [];
     public $searchProduct = '';
+    public $replacement_type = 'continue'; // continue, reset
+    public $max_claims = 1;
     public $is_active = true;
 
     public function updatingSearch()
@@ -49,8 +51,10 @@ class PolicyManagement extends Component
         $this->brand_list = [];
         $this->addon_product_list = [];
         $this->searchProduct = '';
+        $this->replacement_type = 'continue';
+        $this->max_claims = 1;
         $this->is_active = true;
-        
+
         $this->showModal = true;
     }
 
@@ -64,7 +68,7 @@ class PolicyManagement extends Component
         $this->coverage_scope = is_array($policy->coverage_scope) ? $policy->coverage_scope : [];
         $this->duration_days = $policy->duration_days;
         $this->brand_rule = $policy->brand_rule;
-        
+
         $this->brand_list = $policy->brand_list;
         if (is_string($this->brand_list)) {
             $this->brand_list = json_decode($this->brand_list, true) ?? [];
@@ -72,6 +76,8 @@ class PolicyManagement extends Component
 
         $this->addon_product_list = $policy->addon_trigger_keywords ?? [];
         $this->searchProduct = '';
+        $this->replacement_type = $policy->replacement_type ?? 'continue';
+        $this->max_claims = $policy->max_claims ?? 1;
         $this->is_active = $policy->is_active;
 
         $this->isEdit = true;
@@ -87,6 +93,8 @@ class PolicyManagement extends Component
             'coverage_scope' => 'array',
             'duration_days' => 'required|integer|min:1',
             'brand_rule' => 'required|in:all_brands,include,exclude',
+            'replacement_type' => 'required|in:continue,reset',
+            'max_claims' => 'required|integer|min:1',
         ]);
 
         $data = [
@@ -98,6 +106,8 @@ class PolicyManagement extends Component
             'brand_rule' => $this->type !== 'addon_warranty' ? $this->brand_rule : 'all_brands',
             'brand_list' => ($this->type !== 'addon_warranty' && $this->brand_rule !== 'all_brands') ? array_map('intval', $this->brand_list) : [],
             'addon_trigger_keywords' => $this->type === 'addon_warranty' ? array_map('intval', $this->addon_product_list) : null,
+            'replacement_type' => $this->replacement_type,
+            'max_claims' => $this->max_claims,
             'business_unit_id' => \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId(),
             'is_active' => $this->is_active,
         ];
@@ -129,13 +139,13 @@ class PolicyManagement extends Component
     public function render()
     {
         $activeUnitId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
-        
+
         $policies = WarrantyPolicy::where('business_unit_id', $activeUnitId)
             ->where('name', 'like', '%' . $this->search . '%')
             ->orderBy('id', 'desc')
             ->paginate(15);
-            
-        $brands = \App\Models\Brand::where('is_active', true)->orderBy('name')->get();
+
+        $brands = \App\Models\Brand::orderBy('name')->get();
 
         $searchedProducts = collect();
         if ($this->type === 'addon_warranty' && strlen($this->searchProduct) > 2) {

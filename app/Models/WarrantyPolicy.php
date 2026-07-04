@@ -20,6 +20,8 @@ class WarrantyPolicy extends Model
         'is_active',
         'business_unit_id',
         'coverage_scope',
+        'replacement_type',
+        'max_claims',
     ];
 
     protected $casts = [

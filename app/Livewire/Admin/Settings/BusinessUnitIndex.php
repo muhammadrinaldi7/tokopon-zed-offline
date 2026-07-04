@@ -23,6 +23,8 @@ class BusinessUnitIndex extends Component
     public $accurate_secret_key;
     public $accurate_webhook_token;
     public $accurate_database_id;
+    public $accurate_return_warehouse_id;
+    public $accurate_return_warehouse_name;
     public $is_taxable = false;
     public $is_active = true;
 
@@ -53,6 +55,8 @@ class BusinessUnitIndex extends Component
         $this->accurate_secret_key = '';
         $this->accurate_webhook_token = '';
         $this->accurate_database_id = '';
+        $this->accurate_return_warehouse_id = '';
+        $this->accurate_return_warehouse_name = '';
         $this->is_taxable = false;
         $this->is_active = true;
     }
@@ -85,6 +89,8 @@ class BusinessUnitIndex extends Component
         $this->accurate_secret_key = $unit->accurate_secret_key;
         $this->accurate_webhook_token = $unit->accurate_webhook_token;
         $this->accurate_database_id = $unit->accurate_database_id;
+        $this->accurate_return_warehouse_id = $unit->accurate_return_warehouse_id;
+        $this->accurate_return_warehouse_name = $unit->accurate_return_warehouse_name;
         $this->is_taxable = (bool)$unit->is_taxable;
         $this->is_active = $unit->is_active;
         $this->showModal = true;
@@ -117,6 +123,8 @@ class BusinessUnitIndex extends Component
                 'accurate_secret_key' => $this->accurate_secret_key,
                 'accurate_webhook_token' => $this->accurate_webhook_token,
                 'accurate_database_id' => $this->accurate_database_id,
+                'accurate_return_warehouse_id' => $this->accurate_return_warehouse_id,
+                'accurate_return_warehouse_name' => $this->accurate_return_warehouse_name,
                 'is_taxable' => $this->is_taxable,
                 'is_active' => $this->is_active,
             ]

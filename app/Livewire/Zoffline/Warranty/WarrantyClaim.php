@@ -339,11 +339,31 @@ class WarrantyClaim extends Component
             return;
         }
 
+        // Cek batas maksimal klaim
+        $maxClaims = $warranty->policy->max_claims ?? 1;
+        $claimsUsed = $warranty->claims_used ?? 0;
+        
+        if ($claimsUsed >= $maxClaims) {
+            $this->showServiceCenterForm = true;
+            $this->dispatch('toast', title: 'Batas Klaim Terlampaui', message: "Garansi ini sudah diklaim maksimal ({$maxClaims} kali). Silakan gunakan form Service Center berbayar.", type: 'warning');
+            return;
+        }
+
+        // Cek apakah sudah ada klaim aktif
+        $existingClaim = WarrantyClaimModel::where('warranty_id', $warranty->id)
+            ->whereIn('status', ['pending', 'approved', 'in_repair'])
+            ->first();
+
+        if ($existingClaim) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Sudah ada klaim aktif (Nomor: ' . $existingClaim->claim_number . ') untuk perangkat ini.', type: 'error');
+            return;
+        }
+
         // Save QC Inspection First
         $inspectionId = $this->saveInspection();
 
-        // Generate claim number for active warranty
-        $claimNumber = 'CLM-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        // Generate claim number for active warranty (timestamp + uniqid to prevent collision)
+        $claimNumber = 'CLM-' . date('YmdHis') . '-' . strtoupper(substr(uniqid(), -4));
 
         $claim = WarrantyClaimModel::create([
             'claim_number' => $claimNumber,
@@ -370,11 +390,24 @@ class WarrantyClaim extends Component
             'estimated_cost' => 'nullable|numeric',
         ]);
 
+        // Cek apakah sudah ada tiket servis aktif
+        $existingClaim = WarrantyClaimModel::where('warranty_id', $this->selectedWarrantyId)
+            ->whereIn('status', ['out_of_warranty_service'])
+            ->whereHas('serviceCenterTicket', function ($query) {
+                $query->whereNotIn('status', ['completed', 'cancelled', 'returned']);
+            })
+            ->first();
+
+        if ($existingClaim) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Sudah ada tiket Service Center aktif (Nomor: ' . $existingClaim->claim_number . ') untuk perangkat ini.', type: 'error');
+            return;
+        }
+
         // Save QC Inspection First
         $inspectionId = $this->saveInspection();
 
         $warranty = Warranty::with('orderItem.variant')->find($this->selectedWarrantyId);
-        $claimNumber = 'SRV-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        $claimNumber = 'SRV-' . date('YmdHis') . '-' . strtoupper(substr(uniqid(), -4));
 
         // Create Claim Header
         $claim = WarrantyClaimModel::create([

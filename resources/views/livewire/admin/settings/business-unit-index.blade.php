@@ -181,6 +181,18 @@
                                         placeholder="Opsional, jika webhook memakai URL token (AppKey)"
                                         class="w-full p-2 text-sm border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
                                 </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Gudang Retur ID (Opsional)</label>
+                                        <input type="text" wire:model="accurate_return_warehouse_id" placeholder="ID Gudang Retur"
+                                            class="w-full p-2 text-sm border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Gudang Retur Nama</label>
+                                        <input type="text" wire:model="accurate_return_warehouse_name" placeholder="Misal: GSK - Return"
+                                            class="w-full p-2 text-sm border-gray-300 rounded-2xl shadow-sm border border-neutral-100-sm focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

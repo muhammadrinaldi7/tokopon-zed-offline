@@ -29,6 +29,7 @@
                 <option value="pending">Menunggu Persetujuan (Pending)</option>
                 <option value="approved">Disetujui (Approved)</option>
                 <option value="in_repair">Dalam Perbaikan (In Repair)</option>
+                <option value="waiting_refund">Menunggu Refund Kasir</option>
                 <option value="completed">Selesai (Completed)</option>
                 <option value="rejected">Ditolak (Rejected)</option>
             </select>
@@ -311,8 +312,9 @@
                                                     </div>
                                                     <input type="number"
                                                         wire:model.live.debounce.300ms="original_price"
-                                                        class="w-full bg-white border border-amber-200 rounded-lg pl-8 pr-2 py-2 text-sm font-bold text-amber-900 focus:ring-amber-500 focus:border-amber-500 shadow-sm"
-                                                        title="Ubah jika nilai faktur Accurate berbeda (misal karena diskon/MDR)">
+                                                        {{ !auth()->user()->can('edit_warranty_return_price') ? 'readonly' : '' }}
+                                                        class="w-full {{ !auth()->user()->can('edit_warranty_return_price') ? 'bg-gray-100 cursor-not-allowed' : 'bg-white' }} border border-amber-200 rounded-lg pl-8 pr-2 py-2 text-sm font-bold text-amber-900 focus:ring-amber-500 focus:border-amber-500 shadow-sm"
+                                                        title="{{ !auth()->user()->can('edit_warranty_return_price') ? 'Anda tidak memiliki akses untuk mengubah harga retur' : 'Ubah jika nilai faktur Accurate berbeda (misal karena diskon/MDR)' }}">
                                                 </div>
                                             </div>
                                             <div class="flex-1">
@@ -885,7 +887,14 @@
                                                         stroke-width="2"
                                                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                Klaim Garansi telah diselesaikan.
+                                                Klaim Garansi telah diselesaikan 
+                                                @if($selectedClaim->resolution === 'replaced')
+                                                    (Ganti Unit).
+                                                @elseif($selectedClaim->resolution === 'repaired')
+                                                    (Service/Perbaikan).
+                                                @else
+                                                    .
+                                                @endif
                                             </p>
                                         @else
                                             <p
@@ -902,6 +911,25 @@
                                         @if ($selectedClaim->resolution_notes)
                                             <p class="text-xs text-gray-500 mt-2">
                                                 {{ $selectedClaim->resolution_notes }}</p>
+                                        @endif
+
+                                        @if($selectedClaim->resolution === 'replaced')
+                                            @php
+                                                $replacementOrder = \App\Models\Order::with('accurateDocs')->where('order_number', 'WR-' . $selectedClaim->claim_number)->first();
+                                            @endphp
+                                            @if($replacementOrder && $replacementOrder->accurateDocs->count() > 0)
+                                                <div class="mt-4 text-left border-t border-emerald-100 pt-3">
+                                                    <p class="text-xs font-bold text-emerald-800 mb-2">Dokumen Accurate (Auto-Generated):</p>
+                                                    <div class="flex flex-wrap gap-2">
+                                                        @foreach($replacementOrder->accurateDocs as $doc)
+                                                            <div class="bg-white border border-emerald-200 px-3 py-1.5 rounded-lg shadow-sm text-xs flex items-center gap-2">
+                                                                <span class="font-bold text-gray-600">{{ ucwords(strtolower(str_replace('_', ' ', $doc->doc_type))) }}</span>
+                                                                <span class="font-mono text-emerald-700 font-bold">{{ $doc->doc_number }}</span>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
                                         @endif
                                     </div>
                                 @endif

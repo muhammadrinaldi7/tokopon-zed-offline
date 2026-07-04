@@ -1631,14 +1631,14 @@ class AccurateService
         // Simulasi mendapatkan nomor invoice lama dan item lama dari order system
         $order = $claim->warranty->orderItem->order ?? null;
         $originalInvoiceNo = $order->accurate_invoice_no ?? null;
-        
+
         if (!$originalInvoiceNo && $order) {
             $siDoc = $order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->first();
             if ($siDoc) {
                 $originalInvoiceNo = $siDoc->doc_number;
             }
         }
-        
+
         // Validasi: Accurate mewajibkan nomor Faktur Penjualan (Sales Invoice) untuk Retur.
         // Jika tidak ada, jangan paksakan hit API agar tidak error berantakan.
         if (!$originalInvoiceNo) {
@@ -1677,8 +1677,7 @@ class AccurateService
         $isTaxable = $businessUnit->is_taxable ?? false;
 
         // Gudang Retur idealnya diambil dari settingan Business Unit,
-        // Contoh: $claim->warranty->policy->businessUnit->settings['return_warehouse'] ?? 'GSK - Return'
-        $warehouseReturnName = 'GSK - Return';
+        $warehouseReturnName = $claim->warranty->policy->businessUnit->accurate_return_warehouse_name ?? 'GSK - Return';
         $warehouseMainName = Auth::user()->warehouse->name ?? 'Gudang Utama';
 
         // --- PROSES 1: SALES RETURN (MENARIK IMEI LAMA) ---
@@ -1708,7 +1707,8 @@ class AccurateService
         ];
 
         Log::info("Payload Sales Return:", $returnPayload);
-        $this->postSalesReturn($returnPayload, $businessUnitCode);
+        $returnResponse = $this->postSalesReturn($returnPayload, $businessUnitCode);
+        $newReturnNo = $returnResponse['r']['number'] ?? null;
 
         // --- PROSES 2: SALES INVOICE (MENGELUARKAN IMEI BARU) ---
         Log::info("Mempersiapkan Sales Invoice ke Accurate untuk IMEI Baru: " . $newImei);
@@ -1794,14 +1794,29 @@ class AccurateService
 
         Log::info("Payload Sales Receipt (Offsetting):", $receiptPayload);
 
+        $receiptResponse = null;
         try {
-            $this->postSalesReceipt($receiptPayload, $businessUnitCode);
+            $receiptResponse = $this->postSalesReceipt($receiptPayload, $businessUnitCode);
         } catch (\Exception $e) {
             Log::error("Sales Receipt Gagal: " . $e->getMessage());
             throw $e;
         }
 
-        return true;
+        return [
+            'success' => true,
+            'sales_return' => [
+                'id' => $returnResponse['r']['id'] ?? null,
+                'number' => $newReturnNo,
+            ],
+            'sales_invoice' => [
+                'id' => $invoiceResponse['r']['id'] ?? null,
+                'number' => $newInvoiceNo,
+            ],
+            'sales_receipt' => [
+                'id' => $receiptResponse['r']['id'] ?? null,
+                'number' => $receiptResponse['r']['number'] ?? null,
+            ],
+        ];
     }
 
 
