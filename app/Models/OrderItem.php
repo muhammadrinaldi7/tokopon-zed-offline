@@ -8,6 +8,36 @@ class OrderItem extends Model
 {
     protected $guarded = ['id'];
 
+    protected static function booted()
+    {
+        static::created(function ($orderItem) {
+            if (!empty($orderItem->serial_number)) {
+                $sns = array_filter(array_map('trim', explode(',', $orderItem->serial_number)));
+                foreach ($sns as $sn) {
+                    \App\Models\OrderItemSerialNumber::firstOrCreate([
+                        'order_item_id' => $orderItem->id,
+                        'serial_number' => $sn
+                    ]);
+                }
+            }
+        });
+
+        static::updated(function ($orderItem) {
+            if ($orderItem->isDirty('serial_number')) {
+                \App\Models\OrderItemSerialNumber::where('order_item_id', $orderItem->id)->delete();
+                if (!empty($orderItem->serial_number)) {
+                    $sns = array_filter(array_map('trim', explode(',', $orderItem->serial_number)));
+                    foreach ($sns as $sn) {
+                        \App\Models\OrderItemSerialNumber::firstOrCreate([
+                            'order_item_id' => $orderItem->id,
+                            'serial_number' => $sn
+                        ]);
+                    }
+                }
+            }
+        });
+    }
+
     public function order()
     {
         return $this->belongsTo(Order::class);
