@@ -2,14 +2,12 @@
 
 namespace App\Webhooks\Accurate;
 
-use App\Http\Controllers\Controller;
 use App\Models\AccurateWebhookLog;
 use App\Models\User;
 use App\Services\AccurateService;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
-class CustomerSaveHandler extends Controller implements WebhookHandlerInterface
+class CustomerSaveHandler implements WebhookHandlerInterface
 {
     public function handle(AccurateWebhookLog $log): void
     {

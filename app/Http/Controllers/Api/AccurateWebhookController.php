@@ -54,6 +54,13 @@ class AccurateWebhookController extends Controller
             $eventType = $payload['type'] ?? 'UNKNOWN';
             $uuid = $payload['uuid'] ?? md5(json_encode($payload) . time());
 
+            // Pengecekan Idempotency: Abaikan jika webhook dengan UUID yang sama sudah pernah masuk
+            $existingLog = \App\Models\AccurateWebhookLog::where('event_id', $uuid)->first();
+            if ($existingLog) {
+                Log::info("Accurate Webhook Ditolak (Duplikat): Event ID {$uuid} sudah pernah diproses.");
+                continue; // Skip payload ini, lanjut ke payload berikutnya
+            }
+
             // 5. Simpan ke Database
             $log = \App\Models\AccurateWebhookLog::create([
                 'event_type' => $eventType,

@@ -14,6 +14,26 @@ class ProcessAccurateWebhookJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * Maksimal percobaan job jika gagal
+     */
+    public $tries = 5;
+
+    /**
+     * Maksimal waktu (detik) yang diperbolehkan sebelum job dinyatakan timeout
+     */
+    public $timeout = 120;
+
+    /**
+     * Waktu tunda (detik) sebelum mencoba ulang (exponential backoff)
+     */
+    public $backoff = [10, 30, 60, 120, 300];
+
+    /**
+     * Jika terjadi exception berturut-turut hingga jumlah ini, maka gagalkan job sepenuhnya
+     */
+    public $maxExceptions = 3;
+
     public $logId;
 
     /**

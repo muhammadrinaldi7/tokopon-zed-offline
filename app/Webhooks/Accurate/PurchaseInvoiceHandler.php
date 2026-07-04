@@ -8,8 +8,11 @@ use App\Models\WarehouseStock;
 use App\Services\AccurateService;
 use Illuminate\Support\Facades\Log;
 
+use App\Webhooks\Accurate\Traits\StockSyncTrait;
+
 class PurchaseInvoiceHandler implements WebhookHandlerInterface
 {
+    use StockSyncTrait;
     public function handle(AccurateWebhookLog $log): void
     {
         $payload = $log->payload;
@@ -56,44 +59,5 @@ class PurchaseInvoiceHandler implements WebhookHandlerInterface
         }
     }
 
-    private function syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource): void
-    {
-        // 1. Validasi DB Lokal: Pastikan Gudang ada di Laravel Anda
-        // Handle 'GSK ' prefix from Accurate Second DB
-        $localWarehouseName = $dbSource === 'second' ? str_replace('GSK ', '', $warehouseName) : $warehouseName;
-        $warehouse = Warehouse::where('name', $localWarehouseName)->first();
-        if (!$warehouse) return;
 
-        // 2. Validasi DB Lokal: Pastikan Varian (SKU) ada di Laravel Anda
-        // Wajib menggunakan ProductAccurate karena tabel warehouse_stocks 
-        // berelasi polymorphic (morphTo) ke variant_id dan variant_type milik ProductAccurate.
-        $productAccurate = \App\Models\ProductAccurate::where('item_no', $itemNo)
-            ->where('database_source', $dbSource)
-            ->first();
-
-        if (!$productAccurate) return;
-
-        // 3. Tembak API Accurate (Hanya dieksekusi jika gudang & produk valid)
-        $service = app(AccurateService::class);
-        $stockData = $service->getStockPerItemWarehouse($itemNo, $warehouseName, $dbSource);
-
-        $qty = $stockData['availableStock'] ?? 0;
-
-        try {
-            // 4. Update Stok di Database Laravel
-            WarehouseStock::updateOrCreate(
-                [
-                    'warehouse_id' => $warehouse->id,
-                    'variant_id'   => $productAccurate->id,
-                    'variant_type' => get_class($productAccurate),
-                ],
-                [
-                    'stock'        => (int) $qty
-                ]
-            );
-            Log::info("Webhook Berhasil: Update Stok SKU {$itemNo} di Gudang {$warehouseName} menjadi {$qty}");
-        } catch (\Exception $e) {
-            Log::error("Webhook Gagal: Gagal update stok SKU {$itemNo} di Gudang {$warehouseName}. Error: " . $e->getMessage());
-        }
-    }
 }

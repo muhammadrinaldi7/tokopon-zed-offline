@@ -75,13 +75,17 @@ class SerialNumberSyncService
      */
     private function processSnData($sku, $accurateData, $databaseSource = 'syihab')
     {
-        // Dapatkan ID gudang untuk BUID ini agar pencarian SN lokal tidak menyasar BUID lain
         $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
-        $warehouseIds = $bu ? \App\Models\Warehouse::where('business_unit_id', $bu->id)->pluck('id')->toArray() : [];
+        if (!$bu) return 0;
+        
+        $warehouseMap = \App\Models\Warehouse::where('business_unit_id', $bu->id)->pluck('id', 'warehouse_id')->toArray();
+        $warehouseIds = array_values($warehouseMap);
+        
+        $pa = \App\Models\ProductAccurate::where('item_no', $sku)
+            ->where('business_unit_id', $bu->id)
+            ->first();
+        $productAccurateId = $pa ? $pa->id : null;
 
-        // Ambil list Serial Number yang ada di DB lokal KHUSUS untuk BUID ini
-        // Jangan gunakan pluck('id', 'serial_number') karena PHP akan mengubah key string angka menjadi integer,
-        // yang akan membuat query WHERE IN() gagal di MySQL saat membandingkan string.
         $existingSns = ProductSerialNumber::where('item_no', $sku)
             ->where('status', 'Available')
             ->whereIn('warehouse_id', $warehouseIds)
@@ -97,27 +101,9 @@ class SerialNumberSyncService
             $accurateSnId = $item['serialNumber']['id'] ?? null;
 
             if (!$serialNumberStr || !$accurateWarehouseId) continue;
-
-            // Konversi paksa ke string (berjaga-jaga jika payload API mereturn tipe integer)
             $serialNumberStr = (string) $serialNumberStr;
 
-            $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
-            $localWarehouseId = null;
-            $productAccurateId = null;
-
-            if ($bu) {
-                if ($accurateWarehouseId) {
-                    $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
-                        ->where('business_unit_id', $bu->id)
-                        ->first();
-                    $localWarehouseId = $localWarehouse ? $localWarehouse->id : null;
-                }
-
-                $pa = \App\Models\ProductAccurate::where('item_no', $sku)
-                    ->where('business_unit_id', $bu->id)
-                    ->first();
-                $productAccurateId = $pa ? $pa->id : null;
-            }
+            $localWarehouseId = $warehouseMap[$accurateWarehouseId] ?? null;
 
             $upsertData[] = [
                 'accurate_sn_id'      => $accurateSnId,
@@ -213,91 +199,7 @@ class SerialNumberSyncService
             $detailItems = $detail['detailItem'] ?? [];
             Log::info("ReceiveItem {$receiveItemId}: Ditemukan " . count($detailItems) . " detail item untuk diproses.");
 
-            foreach ($detailItems as $item) {
-                Log::info("ReceiveItem {$receiveItemId}: Memproses iterasi item", ['item_data' => $item]);
-
-                $sku = $item['item']['no'] ?? $item['detailName'] ?? null; // Coba fallback
-                // Pada output receive-item, item no ada di `item.no` namun API return array nested, mari pastikan format:
-                if (isset($item['item']['no'])) {
-                    $sku = $item['item']['no'];
-                } elseif (isset($item['itemNo'])) {
-                    $sku = $item['itemNo'];
-                } elseif (isset($item['no'])) {
-                    $sku = $item['no'];
-                }
-
-                if (!$sku) continue; // Skip jika tidak ada SKU
-
-                $hpp = $item['itemCost'] ?? 0;
-                $accurateWarehouseId = $item['warehouseId'] ?? ($item['warehouse']['id'] ?? null);
-
-                $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
-                $localWarehouseId = null;
-                $productAccurateId = null;
-
-                if ($bu) {
-                    if ($accurateWarehouseId) {
-                        $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
-                            ->where('business_unit_id', $bu->id)
-                            ->first();
-                        if ($localWarehouse) {
-                            $localWarehouseId = $localWarehouse->id;
-                        }
-                    }
-
-                    $pa = \App\Models\ProductAccurate::where('item_no', $sku)
-                        ->where('business_unit_id', $bu->id)
-                        ->first();
-                    $productAccurateId = $pa ? $pa->id : null;
-                }
-
-                $snList = $item['detailSerialNumber'] ?? [];
-
-                foreach ($snList as $snItem) {
-                    $sn = $snItem['serialNumber']['number'] ?? null;
-                    if (!$sn) continue;
-                    $sn = (string)$sn;
-
-                    // 3. Proses Update/Insert ke DB Lokal
-                    $existingSn = ProductSerialNumber::where('serial_number', $sn)->first();
-
-                    // Tentukan qc_status
-                    $qcStatus = $databaseSource === 'second' ? 'Pending Inbound' : null;
-
-                    if ($existingSn) {
-                        // Jika sudah ada, update hpp dan vendor_id (biarkan statusnya tidak berubah)
-                        // Jangan ubah qc_status jika barang sudah ada (mungkin sudah di-QC)
-                        $existingSn->update([
-                            'hpp' => $hpp,
-                            'vendor_id' => $localVendorId,
-                            'receipt_date' => $receiptDate,
-                        ]);
-                        $updatedCount++;
-                    } else {
-                        // CEK EKSTRA: Pastikan SN ini belum pernah terjual (belum ada di order_items)
-                        // order_items menyimpan SN dalam bentuk string dipisah koma
-                        $isAlreadySold = \App\Models\OrderItem::whereRaw('FIND_IN_SET(?, REPLACE(serial_number, " ", ""))', [$sn])->exists();
-                        $finalStatus = $isAlreadySold ? 'Unavailable' : 'Available';
-
-                        // Jika belum ada, buat baru
-                        ProductSerialNumber::create([
-                            'serial_number' => $sn,
-                            'item_no' => $sku,
-                            'warehouse_id' => $localWarehouseId,
-                            'business_unit_id' => $bu ? $bu->id : null,
-                            'product_accurate_id' => $productAccurateId,
-                            'hpp' => $hpp,
-                            'vendor_id' => $localVendorId,
-                            'status' => $finalStatus,
-                            'receipt_date' => $receiptDate,
-                            'qc_status' => $qcStatus,
-                        ]);
-                        $updatedCount++;
-                    }
-                }
-            }
-
-            return $updatedCount;
+            return $this->processDocumentDetailItems($detailItems, $databaseSource, $receiptDate, $localVendorId);
         } catch (\Exception $e) {
             Log::error("Failed to sync Receive Item {$receiveItemId}: " . $e->getMessage());
             throw $e;
@@ -353,92 +255,85 @@ class SerialNumberSyncService
             $detailItems = $detail['detailItem'] ?? [];
             Log::info("PurchaseInvoice {$purchaseInvoiceId}: Ditemukan " . count($detailItems) . " detail item untuk diproses.");
 
-            foreach ($detailItems as $item) {
-                Log::info("PurchaseInvoice {$purchaseInvoiceId}: Memproses iterasi item", ['item_data' => $item]);
-
-                $sku = $item['item']['no'] ?? $item['detailName'] ?? null; // Coba fallback
-                if (isset($item['item']['no'])) {
-                    $sku = $item['item']['no'];
-                } elseif (isset($item['itemNo'])) {
-                    $sku = $item['itemNo'];
-                } elseif (isset($item['no'])) {
-                    $sku = $item['no'];
-                }
-
-                if (!$sku) continue; // Skip jika tidak ada SKU
-
-                $hpp = $item['unitPrice'] ?? $item['itemCost'] ?? 0;
-                $accurateWarehouseId = $item['warehouseId'] ?? ($item['warehouse']['id'] ?? null);
-
-                $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
-                $localWarehouseId = null;
-                $productAccurateId = null;
-
-                if ($bu) {
-                    if ($accurateWarehouseId) {
-                        $localWarehouse = Warehouse::where('warehouse_id', $accurateWarehouseId)
-                            ->where('business_unit_id', $bu->id)
-                            ->first();
-                        if ($localWarehouse) {
-                            $localWarehouseId = $localWarehouse->id;
-                        }
-                    }
-
-                    $pa = \App\Models\ProductAccurate::where('item_no', $sku)
-                        ->where('business_unit_id', $bu->id)
-                        ->first();
-                    $productAccurateId = $pa ? $pa->id : null;
-                }
-
-                $snList = $item['detailSerialNumber'] ?? [];
-
-                foreach ($snList as $snItem) {
-                    $sn = $snItem['serialNumber']['number'] ?? null;
-                    if (!$sn) continue;
-                    $sn = (string)$sn;
-
-                    // 3. Proses Update/Insert ke DB Lokal
-                    $existingSn = ProductSerialNumber::where('serial_number', $sn)->first();
-
-                    // Tentukan qc_status
-                    $qcStatus = $databaseSource === 'second' ? 'Pending Inbound' : null;
-
-                    if ($existingSn) {
-                        $existingSn->update([
-                            'hpp' => $hpp,
-                            'vendor_id' => $localVendorId,
-                            'receipt_date' => $receiptDate,
-                        ]);
-                        $updatedCount++;
-                    } else {
-                        // CEK EKSTRA: Pastikan SN ini belum pernah terjual (belum ada di order_items)
-                        $isAlreadySold = \App\Models\OrderItem::whereRaw('FIND_IN_SET(?, REPLACE(serial_number, " ", ""))', [$sn])->exists();
-                        $finalStatus = $isAlreadySold ? 'Unavailable' : 'Available';
-
-                        ProductSerialNumber::create([
-                            'serial_number' => $sn,
-                            'item_no' => $sku,
-                            'warehouse_id' => $localWarehouseId,
-                            'business_unit_id' => $bu ? $bu->id : null,
-                            'product_accurate_id' => $productAccurateId,
-                            'hpp' => $hpp,
-                            'vendor_id' => $localVendorId,
-                            'status' => $finalStatus,
-                            'receipt_date' => $receiptDate,
-                            'qc_status' => $qcStatus,
-                        ]);
-                        $updatedCount++;
-                    }
-                }
-            }
-
-            return $updatedCount;
+            return $this->processDocumentDetailItems($detailItems, $databaseSource, $receiptDate, $localVendorId);
         } catch (\Exception $e) {
             Log::error("Failed to sync Purchase Invoice {$purchaseInvoiceId}: " . $e->getMessage());
             throw $e;
         }
     }
 
+    private function processDocumentDetailItems($detailItems, $databaseSource, $receiptDate, $localVendorId)
+    {
+        $updatedCount = 0;
+        
+        $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+        if (!$bu) return 0;
+        
+        // 1. PRE-FETCH: Ambil semua gudang untuk Business Unit ini (O(1) query)
+        $warehouseMap = \App\Models\Warehouse::where('business_unit_id', $bu->id)->pluck('id', 'warehouse_id')->toArray();
+        
+        // 2. PRE-FETCH: Kumpulkan semua SKU yang ada di detail item untuk meminimalisir query ke ProductAccurate
+        $skus = [];
+        foreach ($detailItems as $item) {
+            $sku = $item['item']['no'] ?? $item['detailName'] ?? $item['itemNo'] ?? $item['no'] ?? null;
+            if ($sku) $skus[] = $sku;
+        }
+        // Ambil semua ProductAccurate yang sesuai (O(1) query)
+        $paMap = \App\Models\ProductAccurate::where('business_unit_id', $bu->id)
+            ->whereIn('item_no', $skus)
+            ->pluck('id', 'item_no')
+            ->toArray();
+
+        // 3. Iterasi dan Proses (Tanpa N+1 Query)
+        foreach ($detailItems as $item) {
+            $sku = $item['item']['no'] ?? $item['detailName'] ?? $item['itemNo'] ?? $item['no'] ?? null;
+            if (!$sku) continue;
+
+            $hpp = $item['unitPrice'] ?? $item['itemCost'] ?? 0;
+            $accurateWarehouseId = $item['warehouseId'] ?? ($item['warehouse']['id'] ?? null);
+
+            $localWarehouseId = $warehouseMap[$accurateWarehouseId] ?? null;
+            $productAccurateId = $paMap[$sku] ?? null;
+
+            $snList = $item['detailSerialNumber'] ?? [];
+            foreach ($snList as $snItem) {
+                $sn = $snItem['serialNumber']['number'] ?? null;
+                if (!$sn) continue;
+                $sn = (string)$sn;
+
+                $existingSn = ProductSerialNumber::where('serial_number', $sn)->first();
+                $qcStatus = $databaseSource === 'second' ? 'Pending Inbound' : null;
+
+                if ($existingSn) {
+                    $existingSn->update([
+                        'hpp' => $hpp,
+                        'vendor_id' => $localVendorId,
+                        'receipt_date' => $receiptDate,
+                    ]);
+                    $updatedCount++;
+                } else {
+                    $isAlreadySold = \App\Models\OrderItemSerialNumber::where('serial_number', $sn)->exists();
+                    $finalStatus = $isAlreadySold ? 'Unavailable' : 'Available';
+
+                    ProductSerialNumber::create([
+                        'serial_number' => $sn,
+                        'item_no' => $sku,
+                        'warehouse_id' => $localWarehouseId,
+                        'business_unit_id' => $bu->id,
+                        'product_accurate_id' => $productAccurateId,
+                        'hpp' => $hpp,
+                        'vendor_id' => $localVendorId,
+                        'status' => $finalStatus,
+                        'receipt_date' => $receiptDate,
+                        'qc_status' => $qcStatus,
+                    ]);
+                    $updatedCount++;
+                }
+            }
+        }
+        
+        return $updatedCount;
+    }
 
     public function syncHppFromNearestCost($itemNo, $databaseSource = null)
     {

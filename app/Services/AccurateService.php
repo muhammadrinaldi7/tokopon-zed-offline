@@ -44,7 +44,7 @@ class AccurateService
         $param = [
             "no" => $itemNo
         ];
-        $response = Http::withHeaders($config['headers'])
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
             ->get($config['host'] . '/item/detail.do', $param);
 
         Log::info("API Accurate Item Detail ({$databaseSource}): " . $response->body());
@@ -78,7 +78,7 @@ class AccurateService
         $config = $this->getHeaders($databaseSource);
 
         // API tujuan adalah purchase-invoice/save.do dengan method POST
-        $response = Http::withHeaders($config['headers'])
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
             ->post($config['host'] . '/purchase-invoice/save.do', $payload);
 
         Log::info("API Accurate Save PI ({$databaseSource}) Payload: " . json_encode($payload));
@@ -157,7 +157,7 @@ class AccurateService
         // CONTOH HIT API MENGGUNAKAN LARAVEL HTTP CLIENT:
         // Pastikan Anda sudah mengatur ACCURATE_HOST dan ACCURATE_TOKEN di .env Anda
         // dd($vendorData);
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
@@ -207,7 +207,7 @@ class AccurateService
     {
         $config = $this->getHeaders($databaseSource);
 
-        $response = Http::withHeaders($config['headers'])
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
             ->get($config['host'] . '/warehouse/list.do');
 
         Log::info('API Accurate Success: ' . $response->body());
@@ -232,7 +232,7 @@ class AccurateService
     {
         $config = $this->getHeaders($databaseSource);
 
-        $response = Http::withHeaders($config['headers'])
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
             ->get($config['host'] . '/branch/list.do');
 
         Log::info('API Accurate Success: ' . $response->body());
@@ -269,7 +269,7 @@ class AccurateService
         // 3. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
@@ -306,7 +306,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -350,7 +350,7 @@ class AccurateService
             "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory,manageSN,itemType",
         ];
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization'   => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature' => $signature,
@@ -391,7 +391,7 @@ class AccurateService
             "filter.keywords.op" => "CONTAIN",
             "filter.keywords.val" => "hp",
         ];
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -431,7 +431,7 @@ class AccurateService
             "itemNo" => $itemNo
         ];
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -475,7 +475,7 @@ class AccurateService
             'sp.pageSize' => 100
         ];
 
-        $response = \Illuminate\Support\Facades\Http::withHeaders([
+        $response = \Illuminate\Support\Facades\Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature' => $signature
@@ -529,7 +529,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -593,7 +593,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -614,7 +614,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -647,7 +647,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -679,7 +679,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -710,7 +710,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -753,7 +753,7 @@ class AccurateService
             ];
 
             // Hit ke endpoint karyawan milik Accurate Online
-            $response = Http::withHeaders([
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
                 'Authorization'   => 'Bearer ' . $token,
                 'X-Api-Timestamp' => $timestamp,
                 'X-Api-Signature' => $signature,
@@ -805,7 +805,7 @@ class AccurateService
                 "fields" => "id,vendorNo,name,email,mobilePhone,suspended"
             ];
 
-            $response = Http::withHeaders([
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
                 'Authorization'   => 'Bearer ' . $token,
                 'X-Api-Timestamp' => $timestamp,
                 'X-Api-Signature' => $signature,
@@ -863,7 +863,7 @@ class AccurateService
             "vendorNo" => $vendorNo
         ];
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -903,7 +903,7 @@ class AccurateService
             "customerNo" => $customerNo
         ];
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -934,7 +934,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -967,7 +967,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -997,7 +997,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -1034,7 +1034,7 @@ class AccurateService
     //         $timestamp = now()->toIso8601String();
     //         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-    //         $response = Http::withHeaders([
+    //         $response = Http::timeout(30)->retry(2, 500)->withHeaders([
     //             'Authorization' => 'Bearer ' . $token,
     //             'X-Api-Timestamp' => $timestamp,
     //             'X-Api-Signature'  => $signature,
@@ -1076,7 +1076,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -1116,7 +1116,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization'   => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature' => $signature,
@@ -1148,7 +1148,7 @@ class AccurateService
             $timestamp = now()->toIso8601String();
             $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-            $response = Http::withHeaders([
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
                 'Authorization' => 'Bearer ' . $token,
                 'X-Api-Timestamp' => $timestamp,
                 'X-Api-Signature'  => $signature,
@@ -1189,7 +1189,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -1218,7 +1218,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
@@ -1249,7 +1249,7 @@ class AccurateService
     //     $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
     //     try {
-    //         $response = Http::withHeaders([
+    //         $response = Http::timeout(30)->retry(2, 500)->withHeaders([
     //             'Authorization'   => 'Bearer ' . $token,
     //             'X-Api-Timestamp' => $timestamp,
     //             'X-Api-Signature' => $signature,
@@ -1282,7 +1282,7 @@ class AccurateService
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
         try {
-            $response = Http::withHeaders([
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
                 'Authorization'   => 'Bearer ' . $token,
                 'X-Api-Timestamp' => $timestamp,
                 'X-Api-Signature' => $signature,
@@ -1350,7 +1350,7 @@ class AccurateService
         $config = $this->getHeaders($databaseSource);
 
         try {
-            $response = Http::withHeaders($config['headers'])
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
                 ->get($config['host'] . '/item/search-by-item-or-sn.do', [
                     // Tetap pertahankan strtoupper + trim agar aman dari masalah case-sensitive kemarin
                     'keywords' => trim($sn)
@@ -1398,7 +1398,7 @@ class AccurateService
         ];
 
         // 3. Eksekusi POST ke endpoint bulk-save
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization'   => 'Bearer ' . env('ACCURATE_TOKEN'),
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature' => $signature,
@@ -1440,7 +1440,7 @@ class AccurateService
             $timestamp = now()->toIso8601String();
             $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-            $response = Http::withHeaders([
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
                 'Authorization'   => 'Bearer ' . $token,
                 'X-Api-Timestamp' => $timestamp,
                 'X-Api-Signature' => $signature,
@@ -1487,7 +1487,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization'   => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature' => $signature,
@@ -1513,7 +1513,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization'   => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature' => $signature,
@@ -1554,7 +1554,7 @@ class AccurateService
             // Filter for unreceived POs typically status is OPEN or PARTIAL, wait we will just pull list and filter if needed
             // Accurate PO statuses: UNAPPROVED, APPROVED, CLOSED, REJECTED, WAITING_RECEIPT
 
-            $response = Http::withHeaders([
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
                 'Authorization'   => 'Bearer ' . $token,
                 'X-Api-Timestamp' => $timestamp,
                 'X-Api-Signature' => $signature,
@@ -1593,7 +1593,7 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
-        $response = Http::withHeaders([
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization'   => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature' => $signature,
@@ -1817,7 +1817,7 @@ class AccurateService
     {
         $config = $this->getHeaders($databaseSource);
 
-        $response = Http::withHeaders($config['headers'])
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
             ->post($config['host'] . '/sales-receipt/delete.do', ['id' => $id]);
 
         Log::info("API Accurate Delete Sales Receipt ({$databaseSource}) ID: {$id} Response: " . $response->body());
@@ -1847,7 +1847,7 @@ class AccurateService
     {
         $config = $this->getHeaders($databaseSource);
 
-        $response = Http::withHeaders($config['headers'])
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
             ->post($config['host'] . '/sales-invoice/delete.do', ['id' => $id]);
 
         Log::info("API Accurate Delete Sales Invoice ({$databaseSource}) ID: {$id} Response: " . $response->body());
@@ -1868,7 +1868,7 @@ class AccurateService
     {
         $config = $this->getHeaders($databaseSource);
 
-        $response = Http::withHeaders($config['headers'])
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
             ->post($config['host'] . '/delivery-order/delete.do', ['id' => $id]);
 
         Log::info("API Accurate Delete Delivery Order ({$databaseSource}) ID: {$id} Response: " . $response->body());
@@ -1890,7 +1890,7 @@ class AccurateService
     {
         $config = $this->getHeaders($databaseSource);
 
-        $response = Http::withHeaders($config['headers'])
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
             ->post($config['host'] . '/sales-order/delete.do', ['id' => $id]);
 
         Log::info("API Accurate Delete Sales Order ({$databaseSource}) ID: {$id} Response: " . $response->body());
