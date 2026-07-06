@@ -177,7 +177,7 @@
                                             <p class="font-bold text-neutral-800 text-sm leading-none">Rp
                                                 {{ number_format($item['price'], 0, ',', '.') }}</p>
                                         </div>
-                                        @if(!$isSoFulfillment)
+
                                         <button wire:click="openEditPriceModal({{ $index }})"
                                             class="w-8 h-8 flex items-center justify-center text-blue-500 bg-blue-50 hover:bg-blue-100 hover:text-blue-600 rounded-lg transition-colors tooltip shrink-0"
                                             title="Edit Harga Transaksi">
@@ -187,7 +187,7 @@
                                                     d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                             </svg>
                                         </button>
-                                        @endif
+
                                     </div>
                                 </div>
 
@@ -211,7 +211,7 @@
                                                     {{ number_format($item['discount_amount'], 0, ',', '.') }}</p>
                                             </div>
                                         @endif
-                                        @if(!$isSoFulfillment)
+
                                         <button wire:click="openManualDiscountModal({{ $index }})"
                                             class="h-8 px-3 flex items-center justify-center text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg transition-colors text-xs font-bold shrink-0">
                                             <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24"
@@ -221,7 +221,7 @@
                                             </svg>
                                             {{ isset($item['discount_amount']) && $item['discount_amount'] > 0 ? 'Ubah' : 'Cashback' }}
                                         </button>
-                                        @endif
+
                                     </div>
                                 @endif
                             </div>
@@ -295,7 +295,7 @@
                                         </div>
 
                                         {{-- Qty Control --}}
-                                        @if(!$isSoFulfillment)
+                                        {{-- @if (!$isSoFulfillment) --}}
                                         <div
                                             class="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm mt-2">
                                             <button wire:click="decrementCartItem({{ $index }})"
@@ -306,30 +306,32 @@
                                             <button wire:click="incrementCartItem({{ $index }})"
                                                 class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-r-lg transition font-black text-lg">+</button>
                                         </div>
-                                        @else
-                                        <div class="mt-2 text-right">
-                                            <span class="text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg">Qty: {{ $item['qty'] }}</span>
-                                        </div>
-                                        @endif
+                                        {{-- @else
+                                            <div class="mt-2 text-right">
+                                                <span
+                                                    class="text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg">Qty:
+                                                    {{ $item['qty'] }}</span>
+                                            </div>
+                                        @endif --}}
                                     </div>
 
                                 </div>
 
                                 {{-- Tombol Hapus (Selalu Tampil) --}}
-                                @if(!$isSoFulfillment)
-                                <div
-                                    class="flex justify-end border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 lg:mt-auto">
-                                    <button wire:click="removeFromCart({{ $index }})"
-                                        class="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 hover:text-rose-600 rounded-lg transition-colors"
-                                        title="Hapus Item">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
-                                            stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                        Hapus
-                                    </button>
-                                </div>
+                                @if (!$isSoFulfillment)
+                                    <div
+                                        class="flex justify-end border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 lg:mt-auto">
+                                        <button wire:click="removeFromCart({{ $index }})"
+                                            class="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 hover:text-rose-600 rounded-lg transition-colors"
+                                            title="Hapus Item">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            Hapus
+                                        </button>
+                                    </div>
                                 @endif
                             </div>
 
@@ -356,7 +358,7 @@
             Kembali
         </button>
         <button wire:click="nextStep" wire:loading.attr="disabled" wire:target="nextStep"
-            @if($this->hasZeroPriceItem) disabled @endif
+            @if ($this->hasZeroPriceItem) disabled @endif
             class="px-8 py-3.5 text-white font-black rounded-xl shadow-[0_8px_15px_-3px_rgba(28,105,212,0.3)] hover:shadow-[0_12px_20px_-3px_rgba(28,105,212,0.4)] hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-75 disabled:cursor-wait {{ $this->hasZeroPriceItem ? 'bg-gray-400 hover:bg-gray-400 cursor-not-allowed shadow-none hover:shadow-none hover:-translate-y-0' : 'bg-[#668DFF] hover:bg-[#4f7df8]' }}">
             <span wire:loading.remove wire:target="nextStep">Lanjut</span>
             <svg wire:loading.remove wire:target="nextStep" class="w-5 h-5" fill="none" viewBox="0 0 24 24"

@@ -266,11 +266,33 @@ trait WithCheckoutAndReceipt
             $mdrAmt = $this->mdrAmount();
             $grandTotal = max(0, $subtotal - $totalDiscountAmount);
 
-            \Illuminate\Support\Facades\DB::beginTransaction();
-
             if ($this->isSoFulfillment) {
+                $order = Order::find($this->loadedSoOrderId);
+                if ($order) {
+                    $dpInvoices = $order->accurateDocs()
+                        ->where('doc_type', 'DP_INVOICE')
+                        ->where('status', 'SUCCESS')
+                        ->get();
+                    $dpPaid = 0;
+                    foreach ($dpInvoices as $dpInv) {
+                        $hasReceipt = $order->accurateDocs()
+                            ->where('doc_type', 'DP_RECEIPT')
+                            ->where('status', 'SUCCESS')
+                            ->where('created_at', '>=', $dpInv->created_at)
+                            ->exists();
+                        if ($hasReceipt) {
+                            $dpPaid += (float) $dpInv->amount;
+                        }
+                    }
+                    if ($grandTotal < $dpPaid) {
+                        $this->dispatch('toast', title: 'Error', message: 'Grand Total (Rp ' . number_format($grandTotal, 0, ',', '.') . ') tidak boleh lebih kecil dari Uang Muka (DP) yang sudah dibayar (Rp ' . number_format($dpPaid, 0, ',', '.') . ').', type: 'error');
+                        return;
+                    }
+                }
                 return $this->processSoFulfillment($grandTotal);
             }
+
+            \Illuminate\Support\Facades\DB::beginTransaction();
 
             if ($this->isPiutangSettlement) {
                 $order = Order::find($this->loadedDraftId);
@@ -1566,6 +1588,12 @@ trait WithCheckoutAndReceipt
                 return;
             }
 
+            if ($order->order_status === 'COMPLETED' || $order->order_status === 'PAID') {
+                \Illuminate\Support\Facades\DB::rollBack();
+                $this->dispatch('toast', title: 'Peringatan', message: 'Pesanan SO ini sudah lunas/selesai (COMPLETED) dan tidak dapat diproses lagi.', type: 'warning');
+                return;
+            }
+
             $accurateService = app(AccurateService::class);
             $dbSource = $order->businessUnit->code ?? 'syihab';
             $handler = Auth::user();
@@ -1676,6 +1704,8 @@ trait WithCheckoutAndReceipt
                         'amount' => $order->grand_total,
                         'status' => 'SUCCESS',
                     ]);
+                } else {
+                    throw new \Exception('Gagal membuat Pengiriman Pesanan (DO) di Accurate: ' . ($doResult['d'][0] ?? json_encode($doResult)));
                 }
             }
 
@@ -1757,6 +1787,8 @@ trait WithCheckoutAndReceipt
                         'amount' => $order->grand_total,
                         'status' => 'SUCCESS',
                     ]);
+                } else {
+                    throw new \Exception('Gagal membuat Faktur Penjualan (SI) di Accurate: ' . ($siResult['d'][0] ?? json_encode($siResult)));
                 }
             }
 
@@ -1814,6 +1846,8 @@ trait WithCheckoutAndReceipt
                             'amount' => (float) $netReceiptAmount,
                             'status' => 'SUCCESS',
                         ]);
+                    } else {
+                        throw new \Exception('Gagal membuat Penerimaan Penjualan (SR) di Accurate: ' . ($srResult['d'][0] ?? json_encode($srResult)));
                     }
                 }
                 if (!empty($srNumbers)) {
@@ -1830,9 +1864,9 @@ trait WithCheckoutAndReceipt
 
             $this->resetCheckout();
             $this->dispatch('toast', title: 'Transaksi Berhasil', message: 'Pelunasan SO ' . $order->order_number . ' berhasil diproses.', type: 'success');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \Illuminate\Support\Facades\DB::rollBack();
-            Log::error('POS SO Fulfillment Error: ' . $e->getMessage());
+            Log::error('POS SO Fulfillment Error: ' . $e->getMessage() . "\nTrace: " . $e->getTraceAsString());
             $this->dispatch('toast', title: 'Error', message: 'Gagal memproses pelunasan SO: ' . $e->getMessage(), type: 'error');
         }
     }

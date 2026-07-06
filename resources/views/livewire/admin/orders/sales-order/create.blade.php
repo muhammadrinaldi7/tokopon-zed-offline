@@ -71,14 +71,21 @@
                                 </button>
                             </div>
                         </div>
-                        <input type="text" wire:model.live.debounce.300ms="searchCustomer" class="w-full px-4 py-3 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors font-medium placeholder-gray-400" placeholder="Ketik nama / email pelanggan..." autocomplete="off">
+                        <input type="text" wire:model.live.debounce.300ms="searchCustomer" class="w-full px-4 py-3 rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-gray-50 focus:bg-white transition-colors font-medium placeholder-gray-400" placeholder="Ketik nama / email / no telp pelanggan..." autocomplete="off">
 
                         @if (!empty($customerSearchResults))
                             <div class="absolute z-20 mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto">
                                 @foreach ($customerSearchResults as $res)
-                                    <div wire:click="selectCustomer({{ $res['id'] }}, '{{ addslashes($res['name']) }}')" class="px-5 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors">
-                                        <div class="font-bold text-gray-900 text-sm">{{ $res['name'] }}</div>
-                                        <div class="text-xs text-gray-500 mt-0.5">{{ $res['email'] }}</div>
+                                    <div wire:click="selectCustomer({{ $res['id'] }}, '{{ addslashes($res['name']) }}')" class="px-5 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors flex justify-between items-center">
+                                        <div>
+                                            <div class="font-bold text-gray-900 text-sm">{{ $res['name'] }}</div>
+                                            <div class="text-xs text-gray-500 mt-0.5">{{ $res['email'] }}</div>
+                                        </div>
+                                        @if(isset($res['phone']) && $res['phone'] !== '-')
+                                            <div class="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-md">
+                                                {{ $res['phone'] }}
+                                            </div>
+                                        @endif
                                     </div>
                                 @endforeach
                             </div>

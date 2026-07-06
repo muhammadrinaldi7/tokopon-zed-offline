@@ -204,15 +204,20 @@ class Create extends Component
             $this->customerSearchResults = User::role('user')
                 ->where(function ($q) use ($value) {
                     $q->where('name', 'like', '%' . $value . '%')
-                        ->orWhere('email', 'like', '%' . $value . '%');
+                        ->orWhere('email', 'like', '%' . $value . '%')
+                        ->orWhereHas('profile', function ($q2) use ($value) {
+                            $q2->where('phone_number', 'like', '%' . $value . '%');
+                        });
                 })
+                ->with('profile')
                 ->take(10)
                 ->get()
                 ->map(function ($u) {
                     return [
                         'id' => $u->id,
                         'name' => $u->name,
-                        'email' => $u->email
+                        'email' => $u->email,
+                        'phone' => $u->profile->phone_number ?? '-'
                     ];
                 })->toArray();
         } else {
