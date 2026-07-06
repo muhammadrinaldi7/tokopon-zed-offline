@@ -11,7 +11,8 @@
             <h1 class="text-2xl font-black text-gray-800 tracking-tight">Detail & Peta Relasi SO</h1>
             <p class="text-gray-500 text-sm mt-1 font-medium flex items-center gap-2">
                 <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 SO Number: <span class="text-gray-700 font-bold">{{ $order->order_number }}</span>
             </p>
@@ -29,7 +30,7 @@
                 </button>
             @endif
 
-            @if (!$order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->exists())
+            {{-- @if (!$order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->exists())
                 <button type="button" wire:click="openInvoiceModal"
                     class="px-5 py-2.5 bg-[#1c69d4] text-white hover:bg-blue-700 font-bold rounded-xl text-sm transition-all active:scale-95 shadow-sm shadow-blue-500/20 flex items-center gap-2">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -38,13 +39,14 @@
                     </svg>
                     Terbitkan Faktur
                 </button>
-            @endif
+            @endif --}}
 
             @if ($order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'ORDER_CANCELLATION')->exists())
                 <span
                     class="px-4 py-2.5 bg-yellow-50 text-yellow-700 font-bold rounded-xl text-sm border border-yellow-200 flex items-center gap-2 shadow-sm">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     Menunggu Approval Batal
                 </span>
@@ -70,7 +72,8 @@
         <div class="bg-white lg:col-span-3 rounded-2xl shadow-sm border border-gray-100 p-6">
             <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
                 <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Informasi Tambahan
             </h3>
@@ -103,52 +106,53 @@
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 overflow-hidden">
                 <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
                     <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
                     Daftar Barang
                 </h3>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse min-w-[500px]">
                         <thead>
-                        <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                            <th class="p-3 font-bold rounded-tl-lg">Produk</th>
-                            <th class="p-3 font-bold text-center">Qty</th>
-                            <th class="p-3 font-bold text-right">Harga</th>
-                            <th class="p-3 font-bold text-right">Diskon</th>
-                            <th class="p-3 font-bold text-right rounded-tr-lg">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        @foreach ($order->items as $item)
-                            <tr>
-                                <td class="p-3 text-sm font-semibold text-gray-800">
-                                    @if ($item->variant && get_class($item->variant) === \App\Models\ProductAccurate::class)
-                                        {{ $item->variant->name }}
-                                        <div class="text-xs font-normal text-gray-500">
-                                            {{ $item->variant->item_no ?? '' }}
-                                        </div>
-                                    @elseif($item->variant)
-                                        {{ $item->variant->product->name ?? ($item->variant->secondProduct->name ?? 'Unknown') }}
-                                        <div class="text-xs font-normal text-gray-500">
-                                            {{ $item->variant->storage ?? '' }}
-                                            {{ $item->variant->color ?? '' }}</div>
-                                    @else
-                                        Unknown Product
-                                    @endif
-                                </td>
-                                <td class="p-3 text-sm text-center">{{ $item->qty }}</td>
-                                <td class="p-3 text-sm text-right">Rp
-                                    {{ number_format($item->price_at_checkout, 0, ',', '.') }}
-                                </td>
-                                <td class="p-3 text-sm text-right text-red-500">
-                                    {{ $item->discount_amount > 0 ? '-Rp ' . number_format($item->discount_amount, 0, ',', '.') : '-' }}
-                                </td>
-                                <td class="p-3 text-sm text-right font-bold text-gray-800">Rp
-                                    {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                            <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                <th class="p-3 font-bold rounded-tl-lg">Produk</th>
+                                <th class="p-3 font-bold text-center">Qty</th>
+                                <th class="p-3 font-bold text-right">Harga</th>
+                                <th class="p-3 font-bold text-right">Diskon</th>
+                                <th class="p-3 font-bold text-right rounded-tr-lg">Total</th>
                             </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach ($order->items as $item)
+                                <tr>
+                                    <td class="p-3 text-sm font-semibold text-gray-800">
+                                        @if ($item->variant && get_class($item->variant) === \App\Models\ProductAccurate::class)
+                                            {{ $item->variant->name }}
+                                            <div class="text-xs font-normal text-gray-500">
+                                                {{ $item->variant->item_no ?? '' }}
+                                            </div>
+                                        @elseif($item->variant)
+                                            {{ $item->variant->product->name ?? ($item->variant->secondProduct->name ?? 'Unknown') }}
+                                            <div class="text-xs font-normal text-gray-500">
+                                                {{ $item->variant->storage ?? '' }}
+                                                {{ $item->variant->color ?? '' }}</div>
+                                        @else
+                                            Unknown Product
+                                        @endif
+                                    </td>
+                                    <td class="p-3 text-sm text-center">{{ $item->qty }}</td>
+                                    <td class="p-3 text-sm text-right">Rp
+                                        {{ number_format($item->price_at_checkout, 0, ',', '.') }}
+                                    </td>
+                                    <td class="p-3 text-sm text-right text-red-500">
+                                        {{ $item->discount_amount > 0 ? '-Rp ' . number_format($item->discount_amount, 0, ',', '.') : '-' }}
+                                    </td>
+                                    <td class="p-3 text-sm text-right font-bold text-gray-800">Rp
+                                        {{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -157,7 +161,8 @@
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-6">
                 <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
                     <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     Ringkasan Nilai SO
                 </h3>

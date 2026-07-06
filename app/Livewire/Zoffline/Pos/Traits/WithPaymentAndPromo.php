@@ -187,6 +187,10 @@ trait WithPaymentAndPromo
         $totalPaid = 0;
         $grandTotal = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0));
 
+        if ($grandTotal == 0) {
+            return true;
+        }
+
         foreach ($this->payments as $p) {
             // Jika kategori kosong, invalid
             if (empty($p['category'])) {

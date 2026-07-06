@@ -14,7 +14,7 @@ class RiwayatPenjualan extends Component
     use WithPagination;
 
     public $search = '';
-    
+
     // Filters
     public $filterStartDate = '';
     public $filterEndDate = '';
@@ -48,10 +48,22 @@ class RiwayatPenjualan extends Component
         $this->resetPage();
     }
 
-    public function updatedFilterStartDate() { $this->resetPage(); }
-    public function updatedFilterEndDate() { $this->resetPage(); }
-    public function updatedFilterStatus() { $this->resetPage(); }
-    public function updatedFilterPaymentMethod() { $this->resetPage(); }
+    public function updatedFilterStartDate()
+    {
+        $this->resetPage();
+    }
+    public function updatedFilterEndDate()
+    {
+        $this->resetPage();
+    }
+    public function updatedFilterStatus()
+    {
+        $this->resetPage();
+    }
+    public function updatedFilterPaymentMethod()
+    {
+        $this->resetPage();
+    }
 
     public function clearFilters()
     {
@@ -67,7 +79,7 @@ class RiwayatPenjualan extends Component
         $orders = Order::with(['user', 'items', 'payments', 'salesBy', 'approvalRequests' => function ($q) {
             $q->where('request_type', 'ORDER_CANCELLATION');
         }])
-            ->where('order_channel', 'POS')
+            ->whereIn('order_channel', ['POS', 'SO'])
             ->where('order_status', '!=', 'DRAFT')
             ->where('business_unit_id', $user->getActiveBusinessUnitId())
             ->where('branch_id', $userBranchId)

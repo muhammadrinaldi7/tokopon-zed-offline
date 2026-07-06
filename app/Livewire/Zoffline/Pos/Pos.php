@@ -223,7 +223,7 @@ class Pos extends Component
 
         $this->soOrders = Order::with(['user', 'accurateDocs'])
             ->where('order_channel', 'SO')
-            ->whereIn('order_status', ['pending', 'down_payment'])
+            ->whereIn('order_status', ['pending', 'down_payment', 'paid'])
             ->where('business_unit_id', $user->getActiveBusinessUnitId())
             ->where('branch_id', $userBranchId)
             ->latest()

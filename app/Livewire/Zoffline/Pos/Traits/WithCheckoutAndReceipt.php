@@ -634,6 +634,9 @@ trait WithCheckoutAndReceipt
                     $promosAppliedToSR = false; // Flag agar promo hanya diaplikasikan 1x di SR pertama
 
                     foreach ($this->payments as $index => $payment) {
+                        $rowTotal = (float)($payment['amount'] ?? 0);
+                        if ($rowTotal <= 0) continue;
+
                         $pm = \App\Models\PaymentMethod::findOrFail($payment['payment_method_id']);
 
                         // SKIP jika ini adalah payment finance (punya accurate_customer_no)
@@ -1588,7 +1591,7 @@ trait WithCheckoutAndReceipt
                 return;
             }
 
-            if ($order->order_status === 'COMPLETED' || $order->order_status === 'PAID') {
+            if ($order->order_status === 'COMPLETED') {
                 \Illuminate\Support\Facades\DB::rollBack();
                 $this->dispatch('toast', title: 'Peringatan', message: 'Pesanan SO ini sudah lunas/selesai (COMPLETED) dan tidak dapat diproses lagi.', type: 'warning');
                 return;
@@ -1630,7 +1633,26 @@ trait WithCheckoutAndReceipt
                 \App\Models\Promo::whereIn('id', $this->selectedPromos)->increment('used_quota');
             }
 
-            // --- 2. COLLECT DATA FOR ACCURATE ---
+            // 4. Update order status and Create local OrderPayments BEFORE Accurate
+            $order->update(['order_status' => 'COMPLETED']);
+            foreach ($this->payments as $payment) {
+                $rowTotal = (float)($payment['amount'] ?? 0);
+                if ($rowTotal <= 0) continue;
+
+                OrderPayment::create([
+                    'order_id' => $order->id,
+                    'xendit_external_id' => 'ORD-SO-POS-' . date('YmdHis') . rand(1000, 9999),
+                    'amount' => $rowTotal,
+                    'status' => 'PAID',
+                    'payment_method_id' => $payment['payment_method_id'],
+                    'payment_method_rate_id' => $payment['payment_method_rate_id'] ?: null,
+                    'no_kontrak' => $payment['no_kontrak'] ?? null,
+                ]);
+            }
+            \Illuminate\Support\Facades\DB::commit();
+
+            try {
+                // --- 2. COLLECT DATA FOR ACCURATE ---
             $doDetailItems = [];
             $siDetailItems = [];
             $hasSN = false;
@@ -1796,17 +1818,8 @@ trait WithCheckoutAndReceipt
             if ($order->accurate_invoice_no) {
                 $srNumbers = [];
                 foreach ($this->payments as $payment) {
-                    $rowTotal = (float)$payment['amount'];
-
-                    OrderPayment::create([
-                        'order_id' => $order->id,
-                        'xendit_external_id' => 'ORD-SO-POS-' . date('YmdHis') . rand(1000, 9999),
-                        'amount' => $rowTotal,
-                        'status' => 'PAID',
-                        'payment_method_id' => $payment['payment_method_id'],
-                        'payment_method_rate_id' => $payment['payment_method_rate_id'] ?: null,
-                        'no_kontrak' => $payment['no_kontrak'] ?? null,
-                    ]);
+                    $rowTotal = (float)($payment['amount'] ?? 0);
+                    if ($rowTotal <= 0) continue;
 
                     $pm = \App\Models\PaymentMethod::findOrFail($payment['payment_method_id']);
                     if (!empty($pm->accurate_customer_no)) {
@@ -1855,8 +1868,10 @@ trait WithCheckoutAndReceipt
                 }
             }
 
-            $order->update(['order_status' => 'COMPLETED']);
-            \Illuminate\Support\Facades\DB::commit();
+            } catch (\Exception $e) {
+                Log::error('POS Accurate Integration Error (SO Fulfillment): ' . $e->getMessage() . "\nTrace: " . $e->getTraceAsString());
+                $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate gagal.', type: 'warning');
+            }
 
             $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
             $this->showCheckoutModal = false;
