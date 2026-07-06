@@ -111,7 +111,7 @@
         $selectedClaim = $selectedClaimObj;
     @endphp
     @if ($selectedClaim)
-        <div class="fixed inset-0 z-[110] flex items-center justify-center p-4">
+        <div wire:key="modal-replacement-form" class="fixed inset-0 z-[110] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"></div>
             <div
                 class="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
@@ -444,12 +444,12 @@
                     <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100">
                         <button type="button" wire:click="closeReplacementForm"
                             class="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">Batal</button>
-                        <button type="button" wire:click="confirmReplacement"
+                        <button type="button" wire:click="approveReplacement"
                             class="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2"
-                            wire:loading.attr="disabled" wire:target="confirmReplacement">
-                            <span wire:loading.remove wire:target="confirmReplacement">Eksekusi Retur
+                            wire:loading.attr="disabled" wire:target="approveReplacement">
+                            <span wire:loading.remove wire:target="approveReplacement">Eksekusi Retur
                                 Accurate</span>
-                            <span wire:loading wire:target="confirmReplacement">Memproses...</span>
+                            <span wire:loading wire:target="approveReplacement">Sedang Menembak API...</span>
                         </button>
                     </div>
                 </div>
@@ -464,7 +464,7 @@
         $selectedClaim = $selectedClaimObj;
     @endphp
     @if ($selectedClaim)
-        <div class="fixed inset-0 z-[110] flex items-center justify-center p-4">
+        <div wire:key="modal-service-form" class="fixed inset-0 z-[110] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-gray-900/60 min-h-screen backdrop-blur-sm transition-opacity"></div>
             <div
                 class="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
@@ -549,7 +549,7 @@
         $selectedClaim = $selectedClaimObj;
     @endphp
     @if ($selectedClaim)
-        <div class="fixed inset-0 z-[110] flex items-center justify-center p-4">
+        <div wire:key="modal-reject-form" class="fixed inset-0 z-[110] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"></div>
             <div
                 class="relative bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
@@ -630,7 +630,7 @@
 
 <!-- Process Modal -->
 @if ($showModal)
-    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div wire:key="modal-process" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" wire:click="closeModal">
         </div>
 
@@ -1178,7 +1178,7 @@
     $selectedClaim = $selectedClaimObj;
 @endphp
 @if ($selectedClaim)
-    <div class="fixed inset-0 z-[120] flex items-center justify-center p-4">
+    <div wire:key="modal-refund" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"></div>
         <div
             class="relative bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
@@ -1251,7 +1251,7 @@
     $newPrice = $replacement_type === 'different' ? $replacement_price : $original_price;
     $diff = $newPrice - $original_price;
 @endphp
-<div class="fixed inset-0 z-[150] flex items-center justify-center p-4">
+        <div wire:key="modal-confirm-replacement" class="fixed inset-0 flex items-center justify-center p-4" style="z-index: 150;">
     <!-- Backdrop -->
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
         wire:click="cancelReplacementConfirm"></div>

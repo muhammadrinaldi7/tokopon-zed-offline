@@ -1620,7 +1620,7 @@ class AccurateService
      */
     public function processWarrantyReplacement(\App\Models\WarrantyClaim $claim, $newImei, $newItemNo = null, $newPrice = 0, $priceDifference = 0, $replacementType = 'same', $bankNo = null, $originalPriceFromUI = null)
     {
-        $businessUnitCode = $claim->warranty->policy->businessUnit->code ?? 'syihab';
+        $businessUnitCode = $claim->warranty->policy?->businessUnit?->code ?? 'syihab';
         // dd($claim->customer, $claim->customer->getAccurateCustomerNo($businessUnitCode));
 
         // 1. Ambil Data Referensi dari Database
@@ -1673,11 +1673,11 @@ class AccurateService
         $branchName = Auth::user()->branch->name ?? 'Cabang Utama';
 
         // Ambil konfigurasi pajak dari Business Unit
-        $businessUnit = $claim->warranty->policy->businessUnit;
-        $isTaxable = $businessUnit->is_taxable ?? false;
+        $businessUnit = $claim->warranty->policy->businessUnit ?? null;
+        $isTaxable = $businessUnit?->is_taxable ?? false;
 
         // Gudang Retur idealnya diambil dari settingan Business Unit,
-        $warehouseReturnName = $claim->warranty->policy->businessUnit->accurate_return_warehouse_name ?? 'GSK - Return';
+        $warehouseReturnName = $claim->warranty->policy?->businessUnit?->accurate_return_warehouse_name ?? 'GSK - Return';
         $warehouseMainName = Auth::user()->warehouse->name ?? 'Gudang Utama';
 
         // --- PROSES 1: SALES RETURN (MENARIK IMEI LAMA) ---
@@ -1709,6 +1709,10 @@ class AccurateService
         Log::info("Payload Sales Return:", $returnPayload);
         $returnResponse = $this->postSalesReturn($returnPayload, $businessUnitCode);
         $newReturnNo = $returnResponse['r']['number'] ?? null;
+        
+        if (!$newReturnNo) {
+            throw new \Exception("Gagal mendapatkan nomor Sales Return dari respon Accurate.");
+        }
 
         // --- PROSES 2: SALES INVOICE (MENGELUARKAN IMEI BARU) ---
         Log::info("Mempersiapkan Sales Invoice ke Accurate untuk IMEI Baru: " . $newImei);
@@ -1740,8 +1744,7 @@ class AccurateService
         $newInvoiceNo = $invoiceResponse['r']['number'] ?? null;
 
         if (!$newInvoiceNo) {
-            Log::warning("Gagal mendapatkan nomor invoice baru dari respon Accurate, otomatisasi pelunasan dilewati.");
-            return true;
+            throw new \Exception("Gagal mendapatkan nomor Sales Invoice dari respon Accurate.");
         }
 
         // --- PROSES 3: SALES RECEIPT (SETTLEMENT / REFUND) ---
@@ -1959,7 +1962,7 @@ class AccurateService
      */
     public function processDowngradeRefund(\App\Models\WarrantyClaim $claim, $bankNo, $refundAmount)
     {
-        $businessUnitCode = $claim->warranty->policy->businessUnit->code ?? 'syihab';
+        $businessUnitCode = $claim->warranty->policy?->businessUnit?->code ?? 'syihab';
 
         $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
         $order = $claim->warranty->orderItem->order ?? null;

@@ -174,14 +174,27 @@ class ClaimManagement extends Component
 
     public function confirmReplacement()
     {
-        $this->validate([
+        $validator = \Illuminate\Support\Facades\Validator::make([
+            'replacement_imei' => $this->replacement_imei,
+            'replacement_item_no' => $this->replacement_item_no,
+            'bank_no' => $this->bank_no,
+            'original_price' => $this->original_price,
+            'replacement_type' => $this->replacement_type,
+        ], [
             'replacement_imei' => 'required|string|min:3',
             'replacement_item_no' => 'required_if:replacement_type,different',
             'bank_no' => 'required',
             'original_price' => 'required|numeric|min:0'
         ]);
 
+        if ($validator->fails()) {
+            $this->setErrorBag($validator->getMessageBag());
+            $this->dispatch('toast', title: 'Validasi Gagal', message: 'Mohon periksa kembali form, pastikan IMEI dan Bank sudah terisi.', type: 'warning');
+            return;
+        }
+
         $this->showReplacementConfirmModal = true;
+        \Illuminate\Support\Facades\Log::info("confirmReplacement: showReplacementConfirmModal set to TRUE, selectedClaimId=" . $this->selectedClaimId);
     }
 
     public function cancelReplacementConfirm()
@@ -213,7 +226,8 @@ class ClaimManagement extends Component
             // $newPrice digunakan sbg targetPrice di service
             $accurateResult = $accurateService->processWarrantyReplacement($claim, $this->replacement_imei, $newItemNo, $newPrice, $priceDifference, $this->replacement_type, $this->bank_no, $originalPrice);
         } catch (\Exception $e) {
-            $this->addError('replacement_imei', 'Gagal memproses Accurate: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error("Approve Replacement Error: " . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses Accurate: ' . $e->getMessage(), type: 'error');
             $this->showReplacementConfirmModal = false;
             return;
         }
@@ -281,7 +295,7 @@ class ClaimManagement extends Component
 
         $newOrderNumber = 'WR-' . $claim->claim_number;
         $order = Order::create([
-            'business_unit_id' => $claim->warranty->policy->business_unit_id ?? (Auth::user()->getActiveBusinessUnitId() ?? 1),
+            'business_unit_id' => $claim->warranty->policy?->business_unit_id ?? (Auth::user()->getActiveBusinessUnitId() ?? 1),
             'user_id' => $claim->customer_user_id,
             'order_number' => $newOrderNumber,
             'accurate_invoice_no' => $newInvoiceNo,
