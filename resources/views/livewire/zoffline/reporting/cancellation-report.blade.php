@@ -133,7 +133,7 @@
                                     {{ $req->reason ?? '-' }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    @if ($req->status === 'APPROVED')
+                                    @if ($req->status === 'COMPLETED')
                                         <span
                                             class="inline-flex items-center px-2 py-0.5 rounded border border-emerald-200 text-[10px] font-bold bg-emerald-50 text-emerald-700 uppercase">
                                             ✓ Disetujui
