@@ -1630,8 +1630,8 @@ trait WithCheckoutAndReceipt
             $this->createOrderItemsFromCart($order);
 
             if (!empty($this->selectedPromos)) {
-                $order->promos()->sync($this->selectedPromos);
-                \App\Models\Promo::whereIn('id', $this->selectedPromos)->increment('used_quota');
+                $promoService = app(\App\Services\PromoCalculatorService::class);
+                $promoService->recordPromosToOrder($order, $this->cart, $this->selectedPromos);
             }
 
             // 4. Update order status and Create local OrderPayments BEFORE Accurate
