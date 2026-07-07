@@ -41,10 +41,13 @@
                         </td>
                         <td class="px-6 py-4">
                             <span class="inline-block px-2 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold rounded uppercase mb-1">
-                                {{ $req->request_type }}
+                                {{ str_replace('_', ' ', $req->request_type) }}
                             </span>
                             <div class="text-xs text-gray-500 mt-1 font-mono">
-                                @if($req->approvable_type === 'App\Models\Order')
+                                @if($req->request_type === 'CUSTOM_CASHBACK')
+                                    Item: {{ $req->payload['product_name'] ?? '-' }}<br>
+                                    Nominal: Rp {{ number_format($req->payload['amount'] ?? 0, 0, ',', '.') }}
+                                @elseif($req->approvable_type === 'App\Models\Order')
                                     Order: {{ $req->approvable->order_number ?? '-' }}
                                 @else
                                     ID: {{ $req->approvable_id }}
@@ -121,6 +124,17 @@
                     <label class="block text-sm font-bold text-gray-700 mb-1">Durasi (Hari)</label>
                     <input type="number" wire:model="extensionDays" class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center font-bold text-lg" min="1" max="365">
                 </div>
+                @elseif($confirmingRequestType === 'CUSTOM_CASHBACK')
+                <div class="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4 border-4 border-emerald-50">
+                    <svg class="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                
+                <h3 class="mb-2 text-xl font-bold text-gray-900">Konfirmasi Cashback Kustom</h3>
+                <p class="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
+                    Anda akan menyetujui permintaan cashback kustom ini. Diskon akan langsung diterapkan di perangkat Kasir secara otomatis.
+                </p>
                 @else
                 <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 border-4 border-red-50">
                     <svg class="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -142,6 +156,10 @@
                     @if($confirmingRequestType === 'WARRANTY_EXTENSION')
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20">
                         Setujui Perpanjangan
+                    </button>
+                    @elseif($confirmingRequestType === 'CUSTOM_CASHBACK')
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-300 transition-colors shadow-md shadow-emerald-500/20">
+                        Setujui Cashback
                     </button>
                     @else
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-300 transition-colors shadow-md shadow-red-500/20">

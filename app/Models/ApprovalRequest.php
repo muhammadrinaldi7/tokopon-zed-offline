@@ -8,6 +8,10 @@ class ApprovalRequest extends Model
 {
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'payload' => 'array',
+    ];
+
     public function approvable()
     {
         return $this->morphTo();
@@ -29,7 +33,6 @@ class ApprovalRequest extends Model
             throw new \Exception("Cannot execute a request that is not approved.");
         }
 
-        // Handle Order Cancellation
         if ($this->approvable_type === \App\Models\Order::class && $this->request_type === 'ORDER_CANCELLATION') {
             $order = $this->approvable;
             if (!$order) {
@@ -44,6 +47,13 @@ class ApprovalRequest extends Model
             $order->update(['order_status' => 'CANCELLED']);
             $this->update(['status' => 'COMPLETED']);
             
+            return true;
+        }
+
+        // Handle Custom Cashback (executed externally via POS cashier polling)
+        if ($this->request_type === 'CUSTOM_CASHBACK') {
+            // Kita tidak mengubah status menjadi COMPLETED di sini karena 
+            // itu akan dihandle oleh kasir saat statusnya ditarik dari PENDING -> APPROVED
             return true;
         }
 

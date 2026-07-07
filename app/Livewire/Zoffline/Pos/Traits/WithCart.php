@@ -822,6 +822,15 @@ trait WithCart
     public function toggleManualDiscount($cartIndex, $amount)
     {
         if (isset($this->cart[$cartIndex])) {
+            // Batalkan status loading custom cashback jika memilih preset
+            if (isset($this->pendingCustomCashbacks[$cartIndex])) {
+                $oldReq = \App\Models\ApprovalRequest::find($this->pendingCustomCashbacks[$cartIndex]);
+                if ($oldReq && $oldReq->status === 'PENDING') {
+                    $oldReq->update(['status' => 'REJECTED', 'reason' => 'Dibatalkan oleh kasir (memilih preset)']);
+                }
+                unset($this->pendingCustomCashbacks[$cartIndex]);
+            }
+
             // Jika amount yang sama diklik lagi, batalkan (toggle off)
             if (($this->cart[$cartIndex]['discount_amount'] ?? 0) == $amount) {
                 $this->cart[$cartIndex]['discount_amount'] = 0;
@@ -837,6 +846,122 @@ trait WithCart
             $this->syncSinglePaymentAmount();
         }
         $this->closeManualDiscountModal();
+    }
+
+    // ─── Custom Cashback (Admin ACC) ───────────────────────────
+    public $showCustomCashbackModal = false;
+    public $customCashbackAmount = 0;
+    public $customCashbackCartIndex = null;
+    public $pendingCustomCashbacks = []; // format: [cartIndex => requestId]
+
+    public function openCustomCashbackModal($index)
+    {
+        // Tutup modal diskon preset jika terbuka
+        $this->closeManualDiscountModal();
+        
+        $this->customCashbackCartIndex = $index;
+        $this->customCashbackAmount = 0;
+        $this->showCustomCashbackModal = true;
+    }
+
+    public function closeCustomCashbackModal()
+    {
+        $this->showCustomCashbackModal = false;
+        $this->customCashbackCartIndex = null;
+        $this->customCashbackAmount = 0;
+    }
+
+    public function requestCustomCashback($passedAmount = null)
+    {
+        if ($this->customCashbackCartIndex === null || !isset($this->cart[$this->customCashbackCartIndex])) {
+            return;
+        }
+
+        $amount = $passedAmount !== null ? (int) $passedAmount : (int) $this->customCashbackAmount;
+        if ($amount <= 0) {
+            $this->closeCustomCashbackModal();
+            $this->dispatch('toast', title: 'Error', message: 'Nominal cashback tidak valid.', type: 'error');
+            return;
+        }
+
+        $item = $this->cart[$this->customCashbackCartIndex];
+
+        // Minta level ACC yang dibutuhkan dari ApprovalRule
+        $requiredLevel = \App\Models\ApprovalRule::where('module', 'CUSTOM_CASHBACK')->max('level');
+        if (!$requiredLevel) {
+            $requiredLevel = 1;
+        }
+
+        $user = Auth::user();
+
+        // Buat ApprovalRequest
+        $request = \App\Models\ApprovalRequest::create([
+            'approvable_type' => \App\Models\User::class,
+            'approvable_id' => $user->id,
+            'request_type' => 'CUSTOM_CASHBACK',
+            'requested_by' => $user->id,
+            'reason' => "Permintaan cashback kustom sebesar Rp " . number_format($amount, 0, ',', '.') . " untuk item: {$item['name']}",
+            'status' => 'PENDING',
+            'required_level' => $requiredLevel,
+            'current_level' => 0,
+            'payload' => [
+                'cart_index' => $this->customCashbackCartIndex,
+                'amount' => $amount,
+                'product_name' => $item['name']
+            ]
+        ]);
+
+        // Batalkan request yang masih pending untuk item ini jika ada
+        if (isset($this->pendingCustomCashbacks[$this->customCashbackCartIndex])) {
+            $oldRequest = \App\Models\ApprovalRequest::find($this->pendingCustomCashbacks[$this->customCashbackCartIndex]);
+            if ($oldRequest && $oldRequest->status === 'PENDING') {
+                $oldRequest->update(['status' => 'REJECTED', 'reason' => 'Dibatalkan oleh kasir (request ulang)']);
+            }
+        }
+
+        $this->pendingCustomCashbacks[$this->customCashbackCartIndex] = $request->id;
+        $this->closeCustomCashbackModal();
+        $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan ACC Cashback berhasil dikirim.', type: 'success');
+    }
+
+    public function checkCustomCashbackStatus()
+    {
+        if (empty($this->pendingCustomCashbacks)) {
+            return;
+        }
+
+        foreach ($this->pendingCustomCashbacks as $cartIndex => $requestId) {
+            $request = \App\Models\ApprovalRequest::find($requestId);
+            if (!$request) {
+                unset($this->pendingCustomCashbacks[$cartIndex]);
+                continue;
+            }
+
+            if ($request->status === 'APPROVED') {
+                $payload = $request->payload;
+                // Pastikan menggunakan index dari payload atau $cartIndex
+                $amount = $payload['amount'];
+
+                if (isset($this->cart[$cartIndex])) {
+                    $this->cart[$cartIndex]['discount_amount'] = (int) $amount;
+                    
+                    if (!empty($this->selectedPromos)) {
+                        $this->applyPromosToCart();
+                    }
+                    $this->syncSinglePaymentAmount();
+
+                    $this->dispatch('toast', title: 'ACC Disetujui', message: "Cashback Kustom Rp " . number_format($amount, 0, ',', '.') . " berhasil diterapkan.", type: 'success');
+                }
+
+                // Mark as completed
+                $request->update(['status' => 'COMPLETED']);
+                unset($this->pendingCustomCashbacks[$cartIndex]);
+                
+            } elseif ($request->status === 'REJECTED') {
+                unset($this->pendingCustomCashbacks[$cartIndex]);
+                $this->dispatch('toast', title: 'ACC Ditolak', message: 'Pengajuan Cashback Kustom ditolak oleh Admin.', type: 'error');
+            }
+        }
     }
 
     // ─── Edit Price Modal ──────────────────────────────────────
