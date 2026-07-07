@@ -151,5 +151,37 @@
             </div>
         </div>
 
+        @can('laporan-cancel-order')
+            <div wire:click="navigateToCancellation"
+                class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+                <div class="rounded-full w-16 h-16 bg-red-50 flex items-center justify-center text-red-600">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Laporan Pembatalan</h2>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Performa kasir dan histori order batal</p>
+                </div>
+            </div>
+        @endcan
+
+        @can('laporan-sales-order')
+            <div wire:click="navigateToSalesOrder"
+                class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+                <div class="rounded-full w-16 h-16 bg-blue-50 flex items-center justify-center text-blue-600">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Laporan Sales Order</h2>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau SO outstanding dan sisa piutang DP</p>
+                </div>
+            </div>
+        @endcan
+
     </div>
 </div>

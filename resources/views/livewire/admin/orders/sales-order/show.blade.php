@@ -54,6 +54,14 @@
                 $order->order_status !== 'CANCELLED' &&
                     $order->order_status !== 'cancelled' &&
                     $order->order_status !== 'COMPLETED')
+                <button type="button" @click="$dispatch('openSwapModal', { orderId: {{ $order->id }} })"
+                    class="px-5 py-2.5 bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300 font-bold rounded-xl text-sm transition-all active:scale-95 shadow-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    Ubah Barang (Swap)
+                </button>
+
                 <button type="button" @click="$dispatch('openCancelModal', { orderId: {{ $order->id }} })"
                     class="px-5 py-2.5 bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300 font-bold rounded-xl text-sm transition-all active:scale-95 shadow-sm flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -862,4 +870,5 @@
         });
     </script>
     <livewire:components.cancel-order-modal />
+    <livewire:components.swap-item-modal />
 </div>

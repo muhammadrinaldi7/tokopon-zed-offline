@@ -296,23 +296,24 @@
 
                                         {{-- Qty Control --}}
                                         {{-- @if (!$isSoFulfillment) --}}
-                                        <div
-                                            class="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm mt-2">
-                                            <button wire:click="decrementCartItem({{ $index }})"
-                                                class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-l-lg transition font-black text-lg">-</button>
-                                            <input type="number" wire:model.lazy="cart.{{ $index }}.qty"
-                                                class="w-12 h-9 text-center bg-transparent border-x border-gray-100 text-sm font-bold p-0 focus:ring-0"
-                                                min="1">
-                                            <button wire:click="incrementCartItem({{ $index }})"
-                                                class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-r-lg transition font-black text-lg">+</button>
-                                        </div>
-                                        {{-- @else
-                                            <div class="mt-2 text-right">
-                                                <span
-                                                    class="text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg">Qty:
-                                                    {{ $item['qty'] }}</span>
+                                        @if (!$isSoFulfillment)
+                                            <div
+                                                class="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm mt-2">
+                                                <button wire:click="decrementCartItem({{ $index }})"
+                                                    class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-l-lg transition font-black text-lg">-</button>
+                                                <input type="number" wire:model.lazy="cart.{{ $index }}.qty"
+                                                    class="w-12 h-9 text-center bg-transparent border-x border-gray-100 text-sm font-bold p-0 focus:ring-0"
+                                                    min="1">
+                                                <button wire:click="incrementCartItem({{ $index }})"
+                                                    class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-[#1c69d4] hover:bg-blue-50 rounded-r-lg transition font-black text-lg">+</button>
                                             </div>
-                                        @endif --}}
+                                        @else
+                                            <div class="mt-2 text-left">
+                                                <span class="text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200">
+                                                    Qty: {{ $item['qty'] }}
+                                                </span>
+                                            </div>
+                                        @endif
                                     </div>
 
                                 </div>

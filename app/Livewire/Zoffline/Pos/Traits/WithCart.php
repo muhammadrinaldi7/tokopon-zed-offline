@@ -199,6 +199,12 @@ trait WithCart
 
     public function processScan()
     {
+        if ($this->loadedSoOrderId) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Tidak dapat menambah produk baru pada mode pelunasan SO. Silakan input SN pada item yang sudah ada.', type: 'error');
+            $this->scanned_sn = '';
+            return;
+        }
+
         $sn = trim($this->scanned_sn);
 
         if (empty($sn)) {
@@ -536,6 +542,11 @@ trait WithCart
 
     public function removeFromCart($index)
     {
+        if ($this->loadedSoOrderId) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak dapat menghapus barang pada pesanan SO yang sedang ditarik.', type: 'error');
+            return;
+        }
+
         unset($this->cart[$index]);
         $this->cart = array_values($this->cart); // re-index
         
@@ -547,6 +558,10 @@ trait WithCart
 
     public function validateCartItemQty($index, $newQty)
     {
+        if ($this->loadedSoOrderId) {
+            return;
+        }
+
         if (!isset($this->cart[$index])) return;
 
         $newQty = (int) $newQty;
@@ -597,6 +612,8 @@ trait WithCart
 
     public function incrementCartItem($index)
     {
+        if ($this->loadedSoOrderId) return;
+
         if (isset($this->cart[$index])) {
             $this->validateCartItemQty($index, $this->cart[$index]['qty'] + 1);
             $this->syncSinglePaymentAmount();
@@ -605,6 +622,8 @@ trait WithCart
 
     public function decrementCartItem($index)
     {
+        if ($this->loadedSoOrderId) return;
+
         if (isset($this->cart[$index]) && $this->cart[$index]['qty'] > 1) {
             $this->validateCartItemQty($index, $this->cart[$index]['qty'] - 1);
             $this->syncSinglePaymentAmount();

@@ -52,6 +52,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/staff', \App\Livewire\Zoffline\Reporting\StaffReport::class)->name('staff');
         Route::get('/laba-rugi', \App\Livewire\Zoffline\Reporting\IncomeStatement::class)->name('income-statement');
         Route::get('/closing-kasir', \App\Livewire\Zoffline\Reporting\ClosingKasirReport::class)->name('closing-kasir');
+        Route::get('/pembatalan', \App\Livewire\Zoffline\Reporting\CancellationReport::class)->name('pembatalan');
+        Route::get('/sales-order', \App\Livewire\Zoffline\Reporting\SalesOrderReport::class)->name('sales-order');
         Route::get('/dashboard', \App\Livewire\Zoffline\Reporting\Dashboard::class)->name('dashboard-bm');
         Route::get('/laporan-pembayaran', \App\Livewire\Zoffline\Reporting\InvoiceReport::class)->name('pembayaran');
     });

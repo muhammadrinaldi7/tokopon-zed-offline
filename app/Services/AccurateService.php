@@ -638,6 +638,40 @@ class AccurateService
         }
     }
 
+    public function closeSalesOrder($soNumber, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $payload = [
+            'number' => $soNumber,
+            'orderClosed' => true
+        ];
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-order/manual-close-order.do', $payload);
+
+        Log::info('API Accurate Close SO Success: ' . $response->body());
+        
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            return $data ?? [];
+        } else {
+            Log::info('API Accurate Close SO Error: ' . $response->body());
+            throw new \Exception('API Accurate Close SO Error: ' . $response->body());
+        }
+    }
+
 
     public function postDeliveryOrder($deliveryOrderData, $databaseSource = 'syihab')
     {
@@ -1934,16 +1968,42 @@ class AccurateService
         $dbSource = strtolower($order->businessUnit->code ?? 'syihab');
         $docs = $order->accurateDocs;
 
-        // Correct Deletion Order: SALES_RECEIPT -> SALES_INVOICE -> DP_RECEIPT -> DP_INVOICE -> DELIVERY_ORDER -> SALES_ORDER
-        $orderedTypes = ['SALES_RECEIPT', 'receipt', 'DP_RECEIPT', 'SALES_INVOICE', 'invoice', 'DP_INVOICE', 'DELIVERY_ORDER', 'SALES_ORDER'];
+        // 1. CEK DOWN PAYMENT (DP)
+        $dpReceiptDocs = $docs->where('doc_type', 'DP_RECEIPT')->where('status', 'SUCCESS');
+        $dpInvoiceDocs = $docs->where('doc_type', 'DP_INVOICE')->where('status', 'SUCCESS');
+        $hasDP = $dpReceiptDocs->isNotEmpty() && $dpInvoiceDocs->isNotEmpty();
+
+        if ($hasDP) {
+            $dpInvoiceNo = $dpInvoiceDocs->first()->doc_number;
+            $this->refundDownPayment($order, $dpInvoiceNo, $dbSource);
+        }
+
+        // 2. DELETE DOCUMENTS (Kecuali DP)
+        $orderedTypes = ['SALES_RECEIPT', 'receipt', 'SALES_INVOICE', 'invoice', 'DELIVERY_ORDER'];
+        
+        // Accurate tidak mengizinkan penghapusan SALES_ORDER jika ada DP_INVOICE yang terikat.
+        // Jika tidak ada DP, kita hapus SO nya sekalian.
+        if (!$hasDP) {
+            $orderedTypes[] = 'SALES_ORDER';
+        } else {
+            // Jika ada DP (SO tidak dihapus), kita kirim request CLOSE ke SO tersebut agar tidak menggantung
+            $soDoc = $docs->where('doc_type', 'SALES_ORDER')->where('status', 'SUCCESS')->first();
+            if ($soDoc && $soDoc->doc_number) {
+                try {
+                    $this->closeSalesOrder($soDoc->doc_number, $dbSource);
+                } catch (\Exception $e) {
+                    Log::warning("Gagal menutup (Close) SO {$order->order_number} di Accurate: " . $e->getMessage());
+                }
+            }
+        }
 
         foreach ($orderedTypes as $type) {
             $matchedDocs = $docs->where('doc_type', $type)->where('status', 'SUCCESS');
             foreach ($matchedDocs as $doc) {
                 if ($doc->accurate_id) {
-                    if (in_array($type, ['SALES_RECEIPT', 'receipt', 'DP_RECEIPT'])) {
+                    if (in_array($type, ['SALES_RECEIPT', 'receipt'])) {
                         $this->deleteSalesReceipt($doc->accurate_id, $dbSource);
-                    } elseif (in_array($type, ['SALES_INVOICE', 'invoice', 'DP_INVOICE'])) {
+                    } elseif (in_array($type, ['SALES_INVOICE', 'invoice'])) {
                         $this->deleteSalesInvoice($doc->accurate_id, $dbSource);
                     } elseif ($type === 'DELIVERY_ORDER') {
                         $this->deleteDeliveryOrder($doc->accurate_id, $dbSource);
@@ -1952,6 +2012,64 @@ class AccurateService
                     }
                     $doc->update(['status' => 'CANCELLED']);
                 }
+            }
+        }
+    }
+
+    /**
+     * Memproses pengembalian uang muka (Refund DP) ke customer akibat pembatalan SO
+     */
+    public function refundDownPayment(\App\Models\Order $order, $dpInvoiceNo, $dbSource)
+    {
+        $payments = $order->payments()->where('status', 'PAID')->get();
+        if ($payments->isEmpty()) {
+            return;
+        }
+
+        $branchName = \Illuminate\Support\Facades\Auth::user()->branch->name ?? 'Cabang Utama';
+        $customerNo = $order->user ? $order->user->getAccurateCustomerNo($dbSource) : 'UMUM';
+
+        foreach ($payments as $payment) {
+            $refundAmount = (float)$payment->amount;
+            if ($refundAmount <= 0) continue;
+
+            $pm = $payment->paymentMethod;
+            // Gunakan bank asal uang tersebut masuk (sesuai pilihan User: "Gunakan otomatis akun Bank/Kas asal pada saat DP tersebut dibayarkan")
+            $bankNo = $pm->accurate_bank_no ?? 'KAS-CASH';
+
+            $receiptPayload = [
+                'customerNo' => $customerNo,
+                'bankNo' => $bankNo,
+                'transDate' => now()->format('d/m/Y'),
+                'branchName' => $branchName,
+                'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
+                'useCredit' => false,
+                'description' => "Pengembalian Dana (Refund DP) Pembatalan SO: {$order->order_number}",
+                'detailInvoice' => [
+                    [
+                        'invoiceNo' => $dpInvoiceNo,
+                        'paymentAmount' => -$refundAmount
+                    ]
+                ]
+            ];
+
+            Log::info("Payload Refund DP (Uang Keluar) SO {$order->order_number}:", $receiptPayload);
+
+            try {
+                $result = $this->postSalesReceipt($receiptPayload, $dbSource);
+                if (isset($result['r']['number'])) {
+                    \App\Models\OrderAccurateDoc::create([
+                        'order_id' => $order->id,
+                        'doc_type' => 'DP_REFUND',
+                        'doc_number' => $result['r']['number'],
+                        'accurate_id' => $result['r']['id'] ?? null,
+                        'amount' => -$refundAmount,
+                        'status' => 'SUCCESS',
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error("Refund DP Gagal untuk SO {$order->order_number}: " . $e->getMessage());
+                // Jangan me-lempar error agar proses rollback (penghapusan DO/SI) tetap bisa berjalan
             }
         }
     }
