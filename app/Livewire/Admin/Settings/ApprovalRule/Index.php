@@ -16,6 +16,7 @@ class Index extends Component
         'ORDER_CANCELLATION' => 'Pembatalan Transaksi POS',
         'WARRANTY_EXTENSION' => 'Perpanjangan Garansi',
         'purchase_order' => 'Persetujuan Pembelian (PO)',
+        'CUSTOM_CASHBACK' => 'Persetujuan cashback (PC)',
     ];
 
     public function mount()
