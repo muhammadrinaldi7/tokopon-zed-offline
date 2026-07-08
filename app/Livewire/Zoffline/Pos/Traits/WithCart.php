@@ -547,8 +547,37 @@ trait WithCart
             return;
         }
 
+        // Batalkan status loading custom cashback jika menghapus item
+        if (isset($this->pendingCustomCashbacks[$index])) {
+            $oldReq = \App\Models\ApprovalRequest::find($this->pendingCustomCashbacks[$index]);
+            if ($oldReq && $oldReq->status === 'PENDING') {
+                $oldReq->update(['status' => 'REJECTED', 'reason' => 'Dibatalkan otomatis (item dihapus dari keranjang)']);
+            }
+            unset($this->pendingCustomCashbacks[$index]);
+        }
+
         unset($this->cart[$index]);
         $this->cart = array_values($this->cart); // re-index
+
+        // Geser index pending custom cashback yang ada di keranjang karena re-index
+        $newPendingCashbacks = [];
+        foreach ($this->pendingCustomCashbacks as $oldIdx => $reqId) {
+            $newIdx = $oldIdx > $index ? $oldIdx - 1 : $oldIdx;
+            $newPendingCashbacks[$newIdx] = $reqId;
+
+            // Update payload di database agar admin melihat index yang benar
+            if ($newIdx !== $oldIdx) {
+                $req = \App\Models\ApprovalRequest::find($reqId);
+                if ($req && $req->status === 'PENDING') {
+                    $payload = $req->payload;
+                    if (is_array($payload)) {
+                        $payload['cart_index'] = $newIdx;
+                        $req->update(['payload' => $payload]);
+                    }
+                }
+            }
+        }
+        $this->pendingCustomCashbacks = $newPendingCashbacks;
         
         if (!empty($this->selectedPromos)) {
             $this->applyPromosToCart();

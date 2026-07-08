@@ -249,6 +249,17 @@
                         </tr>
                     @endforelse
                 </tbody>
+                <tfoot class="bg-blue-50/50 border-t-2 border-gray-200 font-bold">
+                    <tr>
+                        <td class="px-6 py-4 text-right text-gray-700 uppercase tracking-wider text-xs">Total Keseluruhan</td>
+                        <td class="px-6 py-4 text-sm text-gray-800 text-center">{{ collect($cashierData)->sum('qty') }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-800 text-right">Rp {{ number_format(collect($cashierData)->sum('amount'), 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 text-sm text-red-600 text-right">Rp {{ number_format(collect($cashierData)->sum('cashback'), 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 text-sm text-green-600 text-right">Rp {{ number_format(collect($cashierData)->sum('promo'), 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 text-sm text-blue-600 text-right">Rp {{ number_format(collect($cashierData)->sum('tunai'), 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 text-sm text-purple-600 text-right">Rp {{ number_format(collect($cashierData)->sum('non_tunai'), 0, ',', '.') }}</td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
