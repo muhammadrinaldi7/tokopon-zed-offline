@@ -47,7 +47,7 @@ trait WithCheckoutAndReceipt
 
         // Validate QC Serah Terima for Second items with SN
         foreach ($this->cart as $item) {
-            if (($item['variant_type'] ?? '') === \App\Models\SecondProductVariant::class && (!isset($item['has_sn']) || $item['has_sn'])) {
+            if (!empty($item['is_second']) && (!isset($item['has_sn']) || $item['has_sn'])) {
                 $sns = array_filter($item['serial_numbers'] ?? [], fn($value) => trim($value) !== '');
                 foreach ($sns as $sn) {
                     $hasPassedQc = \App\Models\DeviceInspection::where('imei', $sn)

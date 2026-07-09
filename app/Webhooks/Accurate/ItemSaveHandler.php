@@ -3,8 +3,7 @@
 namespace App\Webhooks\Accurate;
 
 use App\Models\AccurateWebhookLog;
-use App\Models\ProductVariant;
-use App\Models\SecondProductVariant;
+use App\Models\ProductAccurate;
 use App\Services\AccurateService;
 use App\Services\SerialNumberSyncService;
 use Illuminate\Support\Facades\Log;
@@ -102,35 +101,15 @@ class ItemSaveHandler implements WebhookHandlerInterface
         }
 
         // 5. Update ke Database POS lokal JIKA BARANG SUDAH DI-GENERATE
-        $variant = ProductVariant::where('sku', $itemNo)->first()
-            ?? SecondProductVariant::where('sku', $itemNo)->first();
-
-        if ($variant) {
-            try {
-                // Update harga varian
-                $variant->update(['price' => $newPrice]);
-
-                // Update nama di tabel Induk agar seragam dengan Accurate
-                if ($variant instanceof ProductVariant && $variant->product) {
-                    $variant->product->update(['name' => $newName]);
-                } elseif ($variant instanceof SecondProductVariant && $variant->secondProduct) {
-                    $variant->secondProduct->update(['name' => $newName]);
-                }
-
-                Log::info("Webhook Berhasil: Varian POS SKU {$itemNo} ikut diupdate.");
-            } catch (\Exception $e) {
-                Log::error("Webhook Gagal: Gagal update varian POS SKU {$itemNo}. Error: " . $e->getMessage());
-            }
-        }
+        // (Langkah 5 dihapus karena data POS sekarang murni menggunakan ProductAccurate)
     }
 
     private function handleDeletedItem($itemNo)
     {
-        // Contoh penanganan jika barang dihapus dari Accurate
-        $variant = ProductVariant::where('sku', $itemNo)->first();
-        if ($variant) {
-            // $variant->update(['is_active' => false]);
-            Log::info("Item Dihapus di Accurate: SKU {$itemNo}");
+        $accurateItem = ProductAccurate::where('item_no', $itemNo)->first();
+        if ($accurateItem) {
+            $accurateItem->update(['is_active' => false]);
+            Log::info("Item Dihapus/Dinonaktifkan di Accurate: SKU {$itemNo}");
         }
     }
 }

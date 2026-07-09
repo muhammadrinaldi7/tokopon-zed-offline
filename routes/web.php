@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 // ─── POS Landing Page (requires auth + admin role) ──────────────
-Route::get('/tesrenaldi', \App\Livewire\Admin\Pos\PointOfSale::class)->middleware(['auth', 'admin'])->name('/');
+// Route::get('/tesrenaldi', \App\Livewire\Admin\Pos\PointOfSale::class)->middleware(['auth', 'admin'])->name('/');
 Route::middleware(['auth'])->group(function () {
     Route::get('/', \App\Livewire\Zoffline\Home::class)->name('zoffline');
     Route::get('/zoffline/pos', \App\Livewire\Zoffline\Pos\Pos::class)->name('zoffline.pos')->middleware('can:view-pos');
@@ -78,7 +78,7 @@ Route::middleware(['auth'])->group(function () {
 
 // ─── Admin Routes (requires auth + admin role) ──────────────────
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/pos', \App\Livewire\Admin\Pos\PointOfSale::class)->name('pos')->middleware('can:view-pos');
+    // Route::get('/pos', \App\Livewire\Admin\Pos\PointOfSale::class)->name('pos')->middleware('can:view-pos');
     Route::livewire('/dashboard', 'pages::admin.dashboard')->name('dashboard')->middleware('can:view_dashboard');
     Route::get('/purchase-invoice-export', AccurateInvoiceExport::class)->name('purchase.invoice.export');
 

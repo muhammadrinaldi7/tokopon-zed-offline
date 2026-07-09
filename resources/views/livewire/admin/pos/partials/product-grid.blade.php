@@ -44,9 +44,9 @@
                         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                             @foreach ($results as $product)
                                 <button
-                                    wire:click="openVariantPicker({{ $product->id }}, {{ $product->is_second_catalog ? 'true' : 'false' }})"
+                                    wire:click="addToCart({{ $product->id }})"
                                     class="bg-white rounded-xl border border-gray-100 hover:border-[#1c69d4]/50 hover:shadow-md transition-all p-4 text-left group relative">
-                                    @if ($product->is_second_catalog)
+                                    @if (strtolower($product->database_source) === 'second')
                                         <span
                                             class="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase z-10">Second</span>
                                     @endif
@@ -69,10 +69,9 @@
                                         class="font-bold text-gray-800 text-sm truncate mt-0.5 group-hover:text-[#1c69d4] transition-colors">
                                         {{ $product->name }}</h3>
                                     <p class="text-[#1c69d4] font-bold text-sm mt-1">Rp
-                                        {{ number_format($product->starting_price ?? ($product->variants->min('price') ?? 0), 0, ',', '.') }}
+                                        {{ number_format($product->base_price ?? 0, 0, ',', '.') }}
                                     </p>
-                                    <p class="text-[10px] text-gray-400 mt-1">{{ $product->variants->count() }} varian
-                                    </p>
+                                    <p class="text-[10px] text-gray-400 mt-1">SKU: {{ $product->item_no }}</p>
                                 </button>
                             @endforeach
                         </div>

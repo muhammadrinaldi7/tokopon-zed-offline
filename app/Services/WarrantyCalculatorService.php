@@ -20,7 +20,9 @@ class WarrantyCalculatorService
         $businessUnitId = $order->business_unit_id;
 
         // Identifikasi Status Kondisi Barang (Baru/Bekas)
-        $isNew = $orderItem->product_variant_type === \App\Models\ProductVariant::class;
+        // Mengecek database_source dari item (karena variant adalah ProductAccurate)
+        $variant = $orderItem->variant; 
+        $isNew = $variant && strtolower($variant->database_source) !== 'second';
 
         // Identifikasi Status Harga (Normal/Diskon Kasir atau Internal Promo)
         $hasManualDiscount = (float)$orderItem->discount_amount > 0;
@@ -127,15 +129,8 @@ class WarrantyCalculatorService
         foreach ($order->items as $oItem) {
             $accurateId = null;
 
-            // Ambil ProductAccurate ID berdasarkan Polymorphic Variant
             if ($oItem->variant) {
-                if ($oItem->product_variant_type === \App\Models\ProductVariant::class) {
-                    $accurateId = $oItem->variant->product_accurate_id;
-                } elseif ($oItem->product_variant_type === \App\Models\SecondProductVariant::class) {
-                    $accurateId = $oItem->variant->product_accurate_id;
-                } elseif ($oItem->product_variant_type === \App\Models\ProductAccurate::class) {
-                    $accurateId = $oItem->variant->id; // Variant IS the ProductAccurate itself
-                }
+                $accurateId = $oItem->variant->id; // Variant IS the ProductAccurate itself
             }
 
             // Jika item ini adalah asuransi yang terdaftar di Policy, tambahkan kuantitasnya
@@ -158,25 +153,12 @@ class WarrantyCalculatorService
         return $totalPurchasedQty > $usedQty;
     }
 
-    /**
-     * Helper untuk extract Brand ID dari Polymorphic variant
-     */
     private function extractBrandId($orderItem)
     {
         if (!$orderItem || !$orderItem->variant) return null;
 
         $variant = $orderItem->variant;
-        $variantClass = get_class($variant);
-
-        if ($variantClass === \App\Models\ProductAccurate::class) {
-            $brand = \App\Models\Brand::where('name', $variant->brandName)->first();
-            return $brand->id ?? null;
-        } elseif ($variantClass === \App\Models\SecondProductVariant::class) {
-            return $variant->device->brand_id ?? null;
-        } elseif ($variantClass === \App\Models\ProductVariant::class) {
-            return $variant->product->brand_id ?? null;
-        }
-
-        return null;
+        $brand = \App\Models\Brand::where('name', $variant->brandName)->first();
+        return $brand->id ?? null;
     }
 }

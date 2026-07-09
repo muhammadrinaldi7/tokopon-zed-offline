@@ -423,19 +423,17 @@ class SerialNumberSyncService
                 $unitPrice = (int) $unitPrice;
 
                 // Cari variant lokal berdasarkan SKU
-                $variant = \App\Models\ProductVariant::where('sku', $sku)->first();
+                $productAccurate = \App\Models\ProductAccurate::where('item_no', $sku)
+                    ->where('database_source', $source)
+                    ->first();
 
-                if (!$variant) {
-                    $variant = \App\Models\SecondProductVariant::where('sku', $sku)->first();
-                }
+                if (!$productAccurate) continue;
 
-                if (!$variant) continue;
-
-                $oldPrice = (int) $variant->price;
+                $oldPrice = (int) $productAccurate->base_price;
 
                 // Hanya update jika harga berubah
                 if ($oldPrice !== $unitPrice) {
-                    $variant->update(['price' => $unitPrice]);
+                    $productAccurate->update(['base_price' => $unitPrice]);
                     Log::info("Price Sync [{$sku}]: Harga berubah dari Rp " . number_format($oldPrice) . " → Rp " . number_format($unitPrice) . " (source: {$source})");
                     return ['updated' => true, 'old_price' => $oldPrice, 'new_price' => $unitPrice];
                 }

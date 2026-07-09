@@ -29,42 +29,19 @@ trait WithCart
     {
         if (strlen($this->search) < 2) return collect();
 
-        $newProducts = collect();
-        $secondProducts = collect();
+        $query = \App\Models\ProductAccurate::where('is_active', true)
+            ->where(function ($q) {
+                $q->where('name', 'like', '%' . $this->search . '%')
+                  ->orWhere('item_no', 'like', '%' . $this->search . '%');
+            });
 
-        if ($this->productType !== 'second') {
-            $newProducts = Product::with(['variants', 'brand', 'media'])
-                ->where('is_active', true)
-                ->where(function ($q) {
-                    $q->where('name', 'like', '%' . $this->search . '%')
-                        ->orWhereHas('variants', function ($q2) {
-                            $q2->where('sku', 'like', '%' . $this->search . '%');
-                        });
-                })
-                ->take(10)->get()
-                ->map(function ($p) {
-                    $p->is_second_catalog = false;
-                    return $p;
-                });
+        if ($this->productType === 'new') {
+            $query->where('database_source', 'syihab');
+        } elseif ($this->productType === 'second') {
+            $query->where('database_source', 'second');
         }
 
-        if ($this->productType !== 'new') {
-            $secondProducts = SecondProduct::with(['variants', 'brand', 'media'])
-                ->where('is_active', true)
-                ->where(function ($q) {
-                    $q->where('name', 'like', '%' . $this->search . '%')
-                        ->orWhereHas('variants', function ($q2) {
-                            $q2->where('sku', 'like', '%' . $this->search . '%');
-                        });
-                })
-                ->take(10)->get()
-                ->map(function ($p) {
-                    $p->is_second_catalog = true;
-                    return $p;
-                });
-        }
-
-        return $newProducts->concat($secondProducts);
+        return $query->take(15)->get();
     }
 
     #[Computed]
@@ -73,81 +50,35 @@ trait WithCart
         return collect($this->cart)->sum(fn($item) => $item['price'] * $item['qty']);
     }
 
-    public function openVariantPicker($productId, $isSecond = false)
+    public function addToCart($productId)
     {
+        $product = \App\Models\ProductAccurate::find($productId);
+        if (!$product) return;
+
         $warehouseId = Auth::user()->warehouse_id;
 
-        if ($isSecond) {
-            $product = SecondProduct::with([
-                'variants' => function ($q) use ($warehouseId) {
-                    $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
-                        $q2->where('warehouse_id', $warehouseId);
-                    }]);
-                },
-                'brand'
-            ])->find($productId);
-
-            $this->variantModalVariants = $product->variants->map(fn($v) => [
-                'id' => $v->id,
-                'label' => $v->color . ' - ' . $v->storage,
-                'condition' => $v->condition ?? '',
-                'price' => $v->price,
-                'stock' => $v->warehouseStocks->first()?->stock ?? 0,
-                'sku' => $v->sku ?? '',
-            ])->toArray();
+        // Cek stok (abaikan jika tipe Jasa/Service)
+        $isNonInventory = in_array(strtoupper($product->itemType ?? ''), ['SERVICE', 'NON_INVENTORY']);
+        if ($isNonInventory) {
+            $stock = 9999;
         } else {
-            $product = Product::with([
-                'variants' => function ($q) use ($warehouseId) {
-                    $q->with(['warehouseStocks' => function ($q2) use ($warehouseId) {
-                        $q2->where('warehouse_id', $warehouseId);
-                    }]);
-                },
-                'brand'
-            ])->find($productId);
-
-            $this->variantModalVariants = $product->variants->map(fn($v) => [
-                'id' => $v->id,
-                'label' => $v->color . ' - ' . $v->storage,
-                'condition' => '',
-                'price' => $v->price,
-                'stock' => $v->warehouseStocks->first()?->stock ?? 0,
-                'sku' => $v->sku ?? '',
-            ])->toArray();
-        }
-        $this->variantModalProduct = $product;
-        $this->variantModalIsSecond = $isSecond;
-        $this->showVariantModal = true;
-    }
-
-    public function addVariantToCart($variantId)
-    {
-        $isSecond = $this->variantModalIsSecond;
-        $product = $this->variantModalProduct;
-        $warehouseId = Auth::user()->warehouse_id;
-
-        if ($isSecond) {
-            $variant = SecondProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
-                $q->where('warehouse_id', $warehouseId);
-            }])->find($variantId);
-            $variantType = SecondProductVariant::class;
-        } else {
-            $variant = ProductVariant::with(['warehouseStocks' => function ($q) use ($warehouseId) {
-                $q->where('warehouse_id', $warehouseId);
-            }])->find($variantId);
-            $variantType = ProductVariant::class;
+            $warehouseStock = \App\Models\WarehouseStock::where([
+                'variant_id' => $product->id,
+                'variant_type' => \App\Models\ProductAccurate::class,
+                'warehouse_id' => $warehouseId
+            ])->first();
+            $stock = $warehouseStock ? (int) $warehouseStock->stock : 0;
         }
 
-        $stock = $variant ? ($variant->warehouseStocks->first()?->stock ?? 0) : 0;
-
-        if (!$variant || $stock <= 0) {
-            $this->dispatch('toast', title: 'Stok Habis', message: 'Varian ini tidak tersedia.', type: 'warning');
+        if ($stock <= 0) {
+            $this->dispatch('toast', title: 'Stok Habis', message: 'Stok produk ini tidak tersedia di gudang Anda.', type: 'warning');
             return;
         }
 
         // Check if already in cart
         $existingIndex = collect($this->cart)->search(
             fn($item) =>
-            $item['variant_id'] == $variantId && $item['variant_type'] == $variantType
+            $item['variant_id'] == $product->id && $item['variant_type'] == \App\Models\ProductAccurate::class
         );
 
         if ($existingIndex !== false) {
@@ -163,23 +94,20 @@ trait WithCart
             }
         } else {
             $this->cart[] = [
-                'variant_id' => $variant->id,
-                'variant_type' => $variantType,
+                'variant_id' => $product->id,
+                'variant_type' => \App\Models\ProductAccurate::class,
                 'name' => $product->name,
-                'storage' => $variant->storage ?? '-',
-                'color' => $variant->color ?? '-',
-                'price' => (int) $variant->price,
+                'storage' => '-',
+                'color' => '-',
+                'price' => (int) $product->base_price,
                 'qty' => 1,
                 'serial_number' => '', // legacy
                 'serial_numbers' => [''], // array of SNs based on qty
-                'sku' => $variant->sku ?? '',
-                'is_second' => $isSecond,
+                'sku' => $product->item_no ?? '',
+                'is_second' => strtolower($product->database_source) === 'second',
             ];
         }
 
-        $this->showVariantModal = false;
-        $this->variantModalProduct = null;
-        $this->variantModalVariants = [];
         if (method_exists($this, 'syncSinglePaymentAmount')) {
             $this->syncSinglePaymentAmount();
         }

@@ -4,8 +4,6 @@ namespace App\Webhooks\Accurate;
 
 use App\Models\AccurateWebhookLog;
 use App\Models\Warehouse;
-use App\Models\ProductVariant;
-use App\Models\SecondProductVariant;
 use App\Models\WarehouseStock;
 use App\Services\AccurateService;
 use Illuminate\Support\Facades\Log;
