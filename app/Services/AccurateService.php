@@ -1974,8 +1974,10 @@ class AccurateService
         $hasDP = $dpReceiptDocs->isNotEmpty() && $dpInvoiceDocs->isNotEmpty();
 
         if ($hasDP) {
-            $dpInvoiceNo = $dpInvoiceDocs->first()->doc_number;
-            $this->refundDownPayment($order, $dpInvoiceNo, $dbSource);
+            // Sesuai request Akuntansi: Jangan lakukan refund otomatis via Sales Receipt minus.
+            // Biarkan DP Invoice menggantung sebagai "Uang Muka Belum Terpakai" (Unapplied DP) di Accurate.
+            // Tim Akuntansi akan mengurus pengembalian atau pengalihannya secara manual.
+            Log::info("Pembatalan SO: {$order->order_number} memiliki DP. Melewati proses Refund Otomatis.");
         }
 
         // 2. DELETE DOCUMENTS (Kecuali DP)
