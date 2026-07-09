@@ -260,16 +260,12 @@ class Dashboard extends Component
             'series' => array_values($filledTrendData),
         ];
 
-        // --- 4. BRAND PROPORTION (Donut Chart) ---
-        $orderItemsForBrand = OrderItem::with(['variant' => function ($morphTo) {
-            $morphTo->morphWith([
-                \App\Models\ProductVariant::class => ['accurateData'],
-                \App\Models\SecondProductVariant::class => ['accurateData'],
-            ]);
-        }])
+        // --- 4. BRAND PROPORTION (Donut Chart) - DISABLED ---
+        $orderItemsForBrand = OrderItem::with('variant')
             ->whereIn('order_id', $orderIds)
             ->get();
 
+        /*
         $brandDataRaw = $orderItemsForBrand->groupBy(function ($item) {
             if ($item->variant instanceof \App\Models\ProductAccurate) {
                 return $item->variant->brandName ?? 'Unknown';
@@ -288,10 +284,11 @@ class Dashboard extends Component
                 })
             ];
         })->sortByDesc('total')->values();
+        */
 
         $brandProportionData = [
-            'labels' => $brandDataRaw->pluck('name')->toArray(),
-            'series' => $brandDataRaw->pluck('total')->toArray(),
+            'labels' => [], // $brandDataRaw->pluck('name')->toArray(),
+            'series' => [], // $brandDataRaw->pluck('total')->toArray(),
         ];
 
         // --- 5. PAYMENT METHOD PROPORTION (Donut Chart) ---

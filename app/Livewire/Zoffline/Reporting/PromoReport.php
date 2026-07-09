@@ -109,10 +109,6 @@ class PromoReport extends Component
                     $q->where(function ($qItem) {
                         $qItem->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($q2) {
                             $q2->where('brandName', $this->brandFilter);
-                        })->orWhereHasMorph('variant', [\App\Models\ProductVariant::class], function ($q2) {
-                            $q2->whereHas('product.brand', function ($q3) {
-                                $q3->where('name', $this->brandFilter);
-                            });
                         });
                     });
                 });
@@ -209,9 +205,12 @@ class PromoReport extends Component
         $orders = $this->ordersQuery->paginate(20);
 
         // Ambil list brand yang unik dari order-order yang ada (untuk filter)
-        $availableBrands = \App\Models\Brand::orderBy('name')->pluck('name')
-            ->merge(\App\Models\ProductAccurate::whereNotNull('brandName')->distinct()->pluck('brandName'))
-            ->unique()->sort()->values();
+        $availableBrands = \App\Models\ProductAccurate::whereNotNull('brandName')
+            ->distinct()
+            ->pluck('brandName')
+            ->unique(fn($brand) => strtolower(trim($brand)))
+            ->sort(SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
 
         return view('livewire.zoffline.reporting.promo-report', compact('orders', 'availableBrands'))->layout('layouts.z');
     }
