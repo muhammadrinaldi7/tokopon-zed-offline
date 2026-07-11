@@ -307,6 +307,9 @@ class RiwayatPenjualan extends Component
         $order = Order::with('user.profile')->find($orderId);
         $phone = $order->user->profile->phone_number ?? null;
 
+        \Illuminate\Support\Facades\Log::error('=== DEBUG PHONE QONTAK ===');
+        \Illuminate\Support\Facades\Log::error('RAW PHONE: ' . var_export($phone, true));
+
         $userAktif = Auth::user();
         if (!$userAktif->hasRole('admin') && $order->is_wa_sent) {
             $this->dispatch('toast', title: 'Akses Ditolak', message: 'Struk WhatsApp hanya dapat dikirim sekali oleh Kasir/FL.', type: 'warning');
@@ -318,9 +321,16 @@ class RiwayatPenjualan extends Component
             return;
         }
 
+        // Sanitize phone number (remove non-numeric characters like spaces, dashes, +)
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+
         if (str_starts_with($phone, '0')) {
             $phone = '62' . substr($phone, 1);
+        } elseif (str_starts_with($phone, '8')) {
+            $phone = '62' . $phone;
         }
+
+        \Illuminate\Support\Facades\Log::error('PROCESSED PHONE TO QONTAK: ' . var_export($phone, true));
 
         $fullUrl = config('services.qontak.api_url');
         if (empty($fullUrl)) {
