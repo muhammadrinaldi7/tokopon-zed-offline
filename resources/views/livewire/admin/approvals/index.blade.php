@@ -24,6 +24,7 @@
                     <tr>
                         <th class="px-6 py-3 font-semibold">Tgl Pengajuan</th>
                         <th class="px-6 py-3 font-semibold">Pemohon</th>
+                        <th class="px-6 py-3 font-semibold">Cabang</th>
                         <th class="px-6 py-3 font-semibold">Tipe & Dokumen</th>
                         <th class="px-6 py-3 font-semibold">Alasan</th>
                         <th class="px-6 py-3 font-semibold">Status & Level</th>
@@ -38,6 +39,9 @@
                         </td>
                         <td class="px-6 py-4">
                             <span class="font-bold text-gray-900">{{ $req->requestedBy->name ?? '-' }}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="text-gray-900">{{ $req->requestedBy->branch->name ?? '-' }}</span>
                         </td>
                         <td class="px-6 py-4">
                             <span class="inline-block px-2 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold rounded uppercase mb-1">
@@ -86,7 +90,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-12 text-center">
+                        <td colspan="7" class="px-6 py-12 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                             </svg>

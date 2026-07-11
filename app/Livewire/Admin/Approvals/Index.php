@@ -154,7 +154,7 @@ class Index extends Component
 
     public function render()
     {
-        $requests = ApprovalRequest::with(['approvable', 'requestedBy', 'histories.actedBy'])
+        $requests = ApprovalRequest::with(['approvable', 'requestedBy.branch', 'histories.actedBy'])
             ->when($this->search, function ($q) {
                 $q->whereHas('requestedBy', function ($uq) {
                     $uq->where('name', 'like', '%' . $this->search . '%');
