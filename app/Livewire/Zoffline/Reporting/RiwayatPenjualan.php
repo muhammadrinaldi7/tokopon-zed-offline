@@ -32,6 +32,7 @@ class RiwayatPenjualan extends Component
     public function reprintOrder($orderId)
     {
         $this->completedOrder = Order::with(['items.variant', 'user', 'payments.paymentMethod', 'handledBy', 'salesBy'])->find($orderId);
+
         if ($this->completedOrder) {
             $this->showReceiptModal = true;
         }

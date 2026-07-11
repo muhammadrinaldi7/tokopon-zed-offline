@@ -211,7 +211,7 @@
         </div>
     </div>
 
-    @include('livewire.zoffline.pos.modal.receipt-struk')
+    @include('livewire.zoffline.pos.modal.riwayat-receipt')
 
     {{-- MODAL AJUKAN PEMBATALAN --}}
     @if ($showCancelModal)
