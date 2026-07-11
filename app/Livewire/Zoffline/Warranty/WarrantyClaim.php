@@ -196,6 +196,7 @@ class WarrantyClaim extends Component
     {
         $this->qc_results = [];
         $brandId = null;
+        $deviceCategory = null;
         $variant = $this->warranty->orderItem->variant ?? null;
         
         // Cek brand_name dari ProductAccurate
@@ -203,8 +204,10 @@ class WarrantyClaim extends Component
             $brandName = null;
             if ($variant instanceof \App\Models\ProductAccurate) {
                 $brandName = $variant->brandName;
+                $deviceCategory = \App\Models\QcTemplate::normalizeDeviceCategory($variant->categoryName);
             } elseif (method_exists($variant, 'accurateData') && $variant->accurateData) {
                 $brandName = $variant->accurateData->brandName;
+                $deviceCategory = \App\Models\QcTemplate::normalizeDeviceCategory($variant->accurateData->categoryName);
             }
 
             if ($brandName) {
@@ -218,7 +221,7 @@ class WarrantyClaim extends Component
             $brandId = $variant->product->brand_id;
         }
 
-        $this->template = \App\Models\QcTemplate::findForBrand($brandId);
+        $this->template = \App\Models\QcTemplate::findForBrandAndCategory($brandId, $deviceCategory);
 
         if ($this->template) {
             $items = $this->template->items;
@@ -231,39 +234,10 @@ class WarrantyClaim extends Component
                     'name' => $item['name'] ?? 'Unknown',
                     'type' => $item['type'] ?? 'boolean',
                     'value' => ($item['type'] ?? 'boolean') === 'boolean' ? 1 : '', // Default to 1 (Pass)
-                    'category' => $this->getCategoryForQc($item['name'] ?? '')
+                    'category' => $item['category'] ?? 'Lainnya'
                 ];
             }
         }
-    }
-
-    private function getCategoryForQc($name)
-    {
-        $map = [
-            'LCD' => 'Layar & Tampilan',
-            'Touch Screen' => 'Layar & Tampilan',
-            'Kamera Belakang 1/2/3' => 'Kamera',
-            'Kamera Depan' => 'Kamera',
-            'Flash Light' => 'Kamera',
-            'Power On/Off' => 'Tombol Fisik',
-            'Volume' => 'Tombol Fisik',
-            'Mute Switch (Silent)' => 'Tombol Fisik',
-            'Tombol' => 'Tombol Fisik',
-            'Home Button' => 'Sensor & Biometrik',
-            'Touch ID / Face ID' => 'Sensor & Biometrik',
-            'Wifi / Bluetooth' => 'Konektivitas',
-            'Signal' => 'Konektivitas',
-            'BackGlass / Housing' => 'Fisik Bodi',
-            'Health Battery' => 'Baterai',
-            'Speaker Atas' => 'Audio & Suara',
-            'Speaker Bawah' => 'Audio & Suara',
-            'Microphone' => 'Audio & Suara',
-            'Port Charging' => 'Port & Sensor',
-            'Port Handsfree' => 'Port & Sensor',
-            'Sensor Proximity' => 'Port & Sensor',
-            'Taptic / Vibrate' => 'Audio & Suara',
-        ];
-        return $map[$name] ?? 'Lainnya';
     }
 
     private function saveInspection()

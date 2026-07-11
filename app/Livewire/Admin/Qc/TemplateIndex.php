@@ -17,6 +17,7 @@ class TemplateIndex extends Component
     // Form fields
     public $name     = '';
     public $brand_id = '';
+    public $device_category = '';
     public $is_default = false;
     public $is_active  = true;
     public $max_weight_threshold = 3;
@@ -45,15 +46,17 @@ class TemplateIndex extends Component
         $this->templateId   = $template->id;
         $this->name         = $template->name;
         $this->brand_id     = $template->brand_id ?? '';
+        $this->device_category = $template->device_category ?? '';
         $this->is_default   = $template->is_default;
         $this->is_active    = $template->is_active;
         $this->max_weight_threshold = $template->max_weight_threshold ?? 3;
         
         $loadedItems = $template->items ?? [];
-        // Inject default weight and is_fatal if editing an old template
+        // Inject default weight, is_fatal, and category if editing an old template
         $this->items = collect($loadedItems)->map(function ($item) {
             $item['weight'] = $item['weight'] ?? 1;
             $item['is_fatal'] = $item['is_fatal'] ?? false;
+            $item['category'] = $item['category'] ?? 'Lainnya';
             return $item;
         })->toArray();
 
@@ -76,6 +79,7 @@ class TemplateIndex extends Component
             ->filter(fn($item) => !empty(trim($item['name'] ?? '')))
             ->map(function ($item) {
                 return [
+                    'category' => $item['category'] ?? 'Lainnya',
                     'name' => $item['name'],
                     'type' => $item['type'] ?? 'boolean',
                     'weight' => (int) ($item['weight'] ?? 1),
@@ -95,6 +99,7 @@ class TemplateIndex extends Component
             [
                 'name'       => $this->name,
                 'brand_id'   => $this->brand_id ?: null,
+                'device_category' => $this->device_category ?: null,
                 'is_default' => $this->is_default,
                 'is_active'  => $this->is_active,
                 'max_weight_threshold' => $this->max_weight_threshold,
@@ -124,6 +129,7 @@ class TemplateIndex extends Component
         QcTemplate::create([
             'name'       => $original->name . ' (Salinan)',
             'brand_id'   => $original->brand_id,
+            'device_category' => $original->device_category,
             'is_default' => false,
             'is_active'  => true,
             'max_weight_threshold' => $original->max_weight_threshold,
@@ -138,7 +144,7 @@ class TemplateIndex extends Component
 
     public function addItem()
     {
-        $this->items[] = ['name' => '', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false];
+        $this->items[] = ['category' => 'Lainnya', 'name' => '', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false];
     }
 
     public function removeItem($index)
@@ -165,28 +171,28 @@ class TemplateIndex extends Component
     private function loadDefaultItems(): void
     {
         $this->items = [
-            ['name' => 'LCD', 'type' => 'boolean', 'weight' => 2, 'is_fatal' => false],
-            ['name' => 'Touch Screen', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Health Battery', 'type' => 'text', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Kamera Belakang 1/2/3', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Kamera Depan', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Power On/Off', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Volume', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Mute Switch (Silent)', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Home Button', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Touch ID / Face ID', 'type' => 'boolean', 'weight' => 0, 'is_fatal' => true],
-            ['name' => 'Microphone', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Sensor Proximity', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Speaker Atas', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Speaker Bawah', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Port Charging', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Port Handsfree', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Flash Light', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Taptic / Vibrate', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Wifi / Bluetooth', 'type' => 'boolean', 'weight' => 0, 'is_fatal' => true],
-            ['name' => 'Signal', 'type' => 'boolean', 'weight' => 0, 'is_fatal' => true],
-            ['name' => 'BackGlass / Housing', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
-            ['name' => 'Tombol', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Layar & Tampilan', 'name' => 'LCD', 'type' => 'boolean', 'weight' => 2, 'is_fatal' => false],
+            ['category' => 'Layar & Tampilan', 'name' => 'Touch Screen', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Baterai', 'name' => 'Health Battery', 'type' => 'text', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Kamera', 'name' => 'Kamera Belakang 1/2/3', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Kamera', 'name' => 'Kamera Depan', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Tombol Fisik', 'name' => 'Power On/Off', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Tombol Fisik', 'name' => 'Volume', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Tombol Fisik', 'name' => 'Mute Switch (Silent)', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Tombol Fisik', 'name' => 'Home Button', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Sensor & Biometrik', 'name' => 'Touch ID / Face ID', 'type' => 'boolean', 'weight' => 0, 'is_fatal' => true],
+            ['category' => 'Audio & Suara', 'name' => 'Microphone', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Port & Sensor', 'name' => 'Sensor Proximity', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Audio & Suara', 'name' => 'Speaker Atas', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Audio & Suara', 'name' => 'Speaker Bawah', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Port & Sensor', 'name' => 'Port Charging', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Port & Sensor', 'name' => 'Port Handsfree', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Kamera', 'name' => 'Flash Light', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Audio & Suara', 'name' => 'Taptic / Vibrate', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Konektivitas', 'name' => 'Wifi / Bluetooth', 'type' => 'boolean', 'weight' => 0, 'is_fatal' => true],
+            ['category' => 'Konektivitas', 'name' => 'Signal', 'type' => 'boolean', 'weight' => 0, 'is_fatal' => true],
+            ['category' => 'Fisik Bodi', 'name' => 'BackGlass / Housing', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
+            ['category' => 'Tombol Fisik', 'name' => 'Tombol', 'type' => 'boolean', 'weight' => 1, 'is_fatal' => false],
         ];
     }
 
@@ -205,6 +211,7 @@ class TemplateIndex extends Component
         $this->templateId = null;
         $this->name       = '';
         $this->brand_id   = '';
+        $this->device_category = '';
         $this->is_default = false;
         $this->is_active  = true;
         $this->max_weight_threshold = 3;

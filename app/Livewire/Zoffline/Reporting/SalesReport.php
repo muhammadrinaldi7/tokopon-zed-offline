@@ -750,7 +750,7 @@ class SalesReport extends Component
                         $penjualanBersih = round(($item->subtotal / 1.11) - ($item->discount_amount ?? 0) - $itemPromosTotal);
 
                         $rowData = [
-                            $order->created_at->format('Y-m-d H:i'),
+                            $order->order_date ? $order->order_date->format('Y-m-d') : $order->created_at->format('Y-m-d'),
                             $order->order_number,
                             $order->accurate_invoice_no ?? '-',
                             $order->handledBy ? $order->handledBy->name : '-',

@@ -185,6 +185,21 @@
                             </div>
 
                             <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Kategori Perangkat (Opsional)</label>
+                                <select wire:model="device_category"
+                                    class="w-full bg-gray-50 border-transparent rounded-lg py-3 px-4 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all font-semibold text-gray-900">
+                                    <option value="">-- Berlaku untuk Semua Kategori --</option>
+                                    <option value="smartphone">Smartphone / Handphone</option>
+                                    <option value="smartwatch">Smartwatch</option>
+                                    <option value="tablet">Tablet / iPad</option>
+                                    <option value="laptop">Laptop / MacBook</option>
+                                    <option value="accessories">Aksesoris (Charger, dll)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Maksimal Bobot Minus (Treshold) *</label>
                                 <div class="flex items-center gap-2">
                                     <input type="number" wire:model="max_weight_threshold" required min="0"
@@ -255,28 +270,44 @@
                                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" /></svg>
                                         <span class="text-[10px] font-black leading-none mt-0.5">{{ $index + 1 }}</span>
                                     </div>
+                                    <div class="w-full md:w-32 shrink-0">
+                                        <select wire:model="items.{{ $index }}.category"
+                                            class="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-xs font-semibold focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all">
+                                            <option value="Layar & Tampilan">Layar & Tampilan</option>
+                                            <option value="Baterai">Baterai</option>
+                                            <option value="Kamera">Kamera</option>
+                                            <option value="Tombol Fisik">Tombol Fisik</option>
+                                            <option value="Sensor & Biometrik">Sensor & Biometrik</option>
+                                            <option value="Audio & Suara">Audio & Suara</option>
+                                            <option value="Port & Sensor">Port & Sensor</option>
+                                            <option value="Konektivitas">Konektivitas</option>
+                                            <option value="Fisik Bodi">Fisik Bodi</option>
+                                            <option value="Kelengkapan">Kelengkapan</option>
+                                            <option value="Lainnya">Lainnya</option>
+                                        </select>
+                                    </div>
                                     
-                                    <div class="flex-1 min-w-[200px]">
-                                        <input type="text" wire:model="items.{{ $index }}.name" placeholder="Nama Pengecekan (cth: LCD, Baterai, Face ID)" required
-                                            class="w-full bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm font-semibold focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all">
+                                    <div class="flex-1 min-w-[150px]">
+                                        <input type="text" wire:model="items.{{ $index }}.name" placeholder="Nama Pengecekan" required
+                                            class="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-xs font-semibold focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all">
                                     </div>
 
-                                    <div class="w-full md:w-32 shrink-0">
+                                    <div class="w-full md:w-24 shrink-0">
                                         <select wire:model="items.{{ $index }}.type"
-                                            class="w-full bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm font-semibold focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all">
+                                            class="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-xs font-semibold focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all">
                                             <option value="boolean">OK / NOT OK</option>
                                             <option value="text">Input Teks</option>
                                         </select>
                                     </div>
                                     
-                                    <div class="w-full md:w-24 shrink-0 flex items-center gap-2">
+                                    <div class="w-full md:w-20 shrink-0 flex items-center gap-1.5">
                                         <label class="text-[10px] font-bold text-gray-400 uppercase">Bobot</label>
                                         <input type="number" wire:model="items.{{ $index }}.weight" required min="0" title="Bobot minus jika rusak"
-                                            class="w-full bg-white border border-gray-200 rounded-lg py-2 px-2 text-sm font-semibold text-center focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all">
+                                            class="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 text-xs font-semibold text-center focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all">
                                     </div>
                                     
-                                    <div class="w-full md:w-24 shrink-0 flex items-center justify-center gap-2">
-                                        <label class="flex items-center gap-2 cursor-pointer">
+                                    <div class="w-full md:w-16 shrink-0 flex items-center justify-center gap-1.5">
+                                        <label class="flex items-center gap-1.5 cursor-pointer">
                                             <input type="checkbox" wire:model="items.{{ $index }}.is_fatal" class="w-4 h-4 text-rose-500 border-gray-300 rounded focus:ring-rose-500">
                                             <span class="text-xs font-bold text-rose-600">Fatal</span>
                                         </label>

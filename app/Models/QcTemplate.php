@@ -41,17 +41,82 @@ class QcTemplate extends Model
     // ─── Helpers ─────────────────────────────────────
 
     /**
-     * Cari template terbaik untuk brand tertentu.
-     * Prioritas: brand-specific → default → pertama aktif.
+     * Cari template terbaik untuk brand + jenis perangkat.
+     * Prioritas:
+     *   1. Brand + Device Category (paling spesifik)
+     *   2. Kategori Saja (tanpa brand) -> ex: "Smartwatch" umum
+     *   3. Brand saja (tanpa device_category / null)
+     *   4. Template default
+     *   5. Template aktif pertama (fallback terakhir)
      */
-    public static function findForBrand(?int $brandId): ?self
+    public static function findForBrandAndCategory(?int $brandId, ?string $deviceCategory = null): ?self
     {
-        if ($brandId) {
-            $specific = self::active()->where('brand_id', $brandId)->first();
+        // 1. Brand + Category (paling spesifik)
+        if ($brandId && $deviceCategory) {
+            $specific = self::active()
+                ->where('brand_id', $brandId)
+                ->where('device_category', $deviceCategory)
+                ->first();
             if ($specific) return $specific;
         }
 
+        // 2. Kategori saja (Tanpa Brand) -> Lebih spesifik dari sekadar Brand
+        if ($deviceCategory) {
+            $categoryOnly = self::active()
+                ->whereNull('brand_id')
+                ->where('device_category', $deviceCategory)
+                ->first();
+            if ($categoryOnly) return $categoryOnly;
+        }
+
+        // 3. Brand saja (tanpa kategori)
+        if ($brandId) {
+            $brandOnly = self::active()
+                ->where('brand_id', $brandId)
+                ->whereNull('device_category')
+                ->first();
+            if ($brandOnly) return $brandOnly;
+        }
+
+        // 4. Default
+        // 5. Fallback
         return self::active()->default()->first()
             ?? self::active()->first();
+    }
+
+    /**
+     * Mapping categoryName dari Accurate ke device_category yang seragam.
+     */
+    public static function normalizeDeviceCategory(?string $categoryName): ?string
+    {
+        if (!$categoryName) return null;
+
+        $lower = strtolower(trim($categoryName));
+
+        $map = [
+            'handphone' => 'smartphone',
+            'hp baru'   => 'smartphone',
+            'hp second' => 'smartphone',
+            'smartphone'=> 'smartphone',
+
+            'smartwatch'    => 'smartwatch',
+            'iwatch second' => 'smartwatch',
+
+            'tablet'       => 'tablet',
+            'ipad second'  => 'tablet',
+
+            'laptop'         => 'laptop',
+            'notebook'       => 'laptop',
+            'macbook second' => 'laptop',
+
+            'accessories' => 'accessories',
+            'add on'      => 'accessories',
+            'case'        => 'accessories',
+            'adapter'     => 'accessories',
+            'headset'     => 'accessories',
+            'powerbank'   => 'accessories',
+        ];
+
+        return $map[$lower] ?? null;
     }
 }

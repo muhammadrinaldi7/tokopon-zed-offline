@@ -83,13 +83,16 @@ class InspectionForm extends Component
     {
         $model = $this->getInspectableModel();
         $brandId = null;
+        $deviceCategory = null;
 
         if ($model) {
             if (method_exists($model, 'buybackDevice')) {
                 $brandId = $model->buybackDevice?->brand_id;
+                // For buyback, there is no direct category mapping yet
             } elseif (method_exists($model, 'accurateData') && $model->accurateData) {
                 // Untuk SecondProductVariant / ProductVariant
                 $brandName = $model->accurateData->brandName;
+                $deviceCategory = QcTemplate::normalizeDeviceCategory($model->accurateData->categoryName);
                 if ($brandName) {
                     $brand = \App\Models\Brand::where('name', 'like', '%' . $brandName . '%')->first();
                     $brandId = $brand->id ?? null;
@@ -100,8 +103,10 @@ class InspectionForm extends Component
                     $brandName = null;
                     if ($variant instanceof \App\Models\ProductAccurate) {
                         $brandName = $variant->brandName;
+                        $deviceCategory = QcTemplate::normalizeDeviceCategory($variant->categoryName);
                     } elseif (method_exists($variant, 'accurateData') && $variant->accurateData) {
                         $brandName = $variant->accurateData->brandName;
+                        $deviceCategory = QcTemplate::normalizeDeviceCategory($variant->accurateData->categoryName);
                     }
                     if ($brandName) {
                         $brand = \App\Models\Brand::where('name', 'like', '%' . $brandName . '%')->first();
@@ -114,7 +119,7 @@ class InspectionForm extends Component
             }
         }
 
-        $this->template = QcTemplate::findForBrand($brandId);
+        $this->template = QcTemplate::findForBrandAndCategory($brandId, $deviceCategory);
 
         if ($this->template) {
             $this->qc_max_weight_threshold = $this->template->max_weight_threshold ?? 3;
@@ -126,41 +131,10 @@ class InspectionForm extends Component
                     'value' => $item['type'] === 'boolean' ? false : '', // default values
                     'weight' => $item['weight'] ?? 1,
                     'is_fatal' => $item['is_fatal'] ?? false,
-                    'category' => $this->getQcCategory($item['name'])
+                    'category' => $item['category'] ?? 'Lainnya'
                 ];
             }
         }
-    }
-
-    public function getQcCategory($name)
-    {
-        $map = [
-            'LCD' => 'Layar & Bodi',
-            'Touch Screen' => 'Layar & Bodi',
-            'BackGlass / Housing' => 'Layar & Bodi',
-            'Health Battery' => 'Baterai',
-            'Power On/Off' => 'Tombol & Fisik',
-            'Volume' => 'Tombol & Fisik',
-            'Mute Switch (Silent)' => 'Tombol & Fisik',
-            'Home Button' => 'Tombol & Fisik',
-            'Taptic / Vibrate' => 'Tombol & Fisik',
-            'Tombol' => 'Tombol & Fisik',
-            'Kamera Belakang' => 'Kamera & Biometrik',
-            'Kamera Belakang 1/2/3' => 'Kamera & Biometrik',
-            'Kamera Depan' => 'Kamera & Biometrik',
-            'Flash Light' => 'Kamera & Biometrik',
-            'Touch ID / Face ID' => 'Kamera & Biometrik',
-            'Wifi / Bluetooth' => 'Konektivitas',
-            'Signal' => 'Konektivitas',
-            'Speaker Atas' => 'Audio & Suara',
-            'Speaker Bawah' => 'Audio & Suara',
-            'Mic' => 'Audio & Suara',
-            'Layar' => 'Layar & Bodi',
-            'Bodi' => 'Layar & Bodi',
-            'Baterai' => 'Baterai',
-            'Kamera' => 'Kamera & Biometrik',
-        ];
-        return $map[$name] ?? 'Fungsi Lainnya';
     }
 
     public function calculateAutoVerdict()

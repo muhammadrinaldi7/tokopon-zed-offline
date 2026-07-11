@@ -128,9 +128,6 @@ class SellPhone extends Component
         $this->qc_max_weight_threshold = 3;
 
         if ($this->selected_brand_id) {
-            $brand = \App\Models\Brand::find($this->selected_brand_id);
-            $isApple = $brand && strtolower($brand->name) === 'apple';
-
             $this->available_models = \App\Models\BuybackDevice::where('brand_id', $this->selected_brand_id)
                 ->where('is_active', true)
                 ->select('model_name')
@@ -138,27 +135,47 @@ class SellPhone extends Component
                 ->pluck('model_name')
                 ->toArray();
 
-            // Load QC Template untuk Buyback (berdasarkan brand)
-            $this->qc_template = \App\Models\QcTemplate::findForBrand($this->selected_brand_id);
-            if ($this->qc_template) {
-                $this->qc_max_weight_threshold = $this->qc_template->max_weight_threshold ?? 3;
-
-                foreach ($this->qc_template->items as $item) {
-                    if ($item['name'] === 'Health Battery' && !$isApple) {
-                        continue; // Skip Health Battery for non-Apple brands
-                    }
-
-                    $this->qc_results[] = [
-                        'name' => $item['name'],
-                        'type' => $item['type'],
-                        'value' => $item['type'] === 'boolean' ? null : '',
-                        'weight' => $item['weight'] ?? 1,
-                        'is_fatal' => $item['is_fatal'] ?? false,
-                        'category' => $this->getQcCategory($item['name'])
-                    ];
-                }
-            }
+            $this->loadQcTemplate();
         } else {
+        }
+    }
+
+    private function loadQcTemplate()
+    {
+        $this->qc_results = [];
+        $this->qc_notes = '';
+        $this->qc_max_weight_threshold = 3;
+
+        $brandId = $this->selected_brand_id;
+        $deviceCategory = null;
+
+        if ($this->buyback_device && $this->buyback_device->productAccurate) {
+            $deviceCategory = \App\Models\QcTemplate::normalizeDeviceCategory($this->buyback_device->productAccurate->categoryName);
+        }
+
+        $brand = \App\Models\Brand::find($brandId);
+        $isApple = $brand && strtolower($brand->name) === 'apple';
+
+        // Load QC Template untuk Buyback (berdasarkan brand dan kategori)
+        $this->qc_template = \App\Models\QcTemplate::findForBrandAndCategory($brandId, $deviceCategory);
+        
+        if ($this->qc_template) {
+            $this->qc_max_weight_threshold = $this->qc_template->max_weight_threshold ?? 3;
+
+            foreach ($this->qc_template->items as $item) {
+                if ($item['name'] === 'Health Battery' && !$isApple) {
+                    continue; // Skip Health Battery for non-Apple brands
+                }
+
+                $this->qc_results[] = [
+                    'name' => $item['name'],
+                    'type' => $item['type'],
+                    'value' => $item['type'] === 'boolean' ? null : '',
+                    'weight' => $item['weight'] ?? 1,
+                    'is_fatal' => $item['is_fatal'] ?? false,
+                    'category' => $item['category'] ?? 'Lainnya'
+                ];
+            }
         }
     }
 
@@ -211,36 +228,7 @@ class SellPhone extends Component
         }
     }
 
-    public function getQcCategory($name)
-    {
-        $map = [
-            'LCD' => 'Layar & Bodi',
-            'Touch Screen' => 'Layar & Bodi',
-            'BackGlass / Housing' => 'Layar & Bodi',
-            'Health Battery' => 'Baterai',
-            'Power On/Off' => 'Tombol & Fisik',
-            'Volume' => 'Tombol & Fisik',
-            'Mute Switch (Silent)' => 'Tombol & Fisik',
-            'Home Button' => 'Tombol & Fisik',
-            'Taptic / Vibrate' => 'Tombol & Fisik',
-            'Tombol' => 'Tombol & Fisik',
-            'Kamera Belakang' => 'Kamera & Biometrik',
-            'Kamera Belakang 1/2/3' => 'Kamera & Biometrik',
-            'Kamera Depan' => 'Kamera & Biometrik',
-            'Flash Light' => 'Kamera & Biometrik',
-            'Touch ID / Face ID' => 'Kamera & Biometrik',
-            'Wifi / Bluetooth' => 'Konektivitas',
-            'Signal' => 'Konektivitas',
-            'Speaker Atas' => 'Audio & Suara',
-            'Speaker Bawah' => 'Audio & Suara',
-            'Microphone' => 'Audio & Suara',
-            'Port Charging' => 'Port & Sensor',
-            'Port Handsfree' => 'Port & Sensor',
-            'Sensor Proximity' => 'Port & Sensor',
-        ];
 
-        return $map[$name] ?? 'Lainnya';
-    }
 
     public function updatedSelectedModelName()
     {
@@ -265,14 +253,20 @@ class SellPhone extends Component
     public function updatedBuybackDeviceId()
     {
         if ($this->buyback_device_id) {
-            $this->buyback_device = \App\Models\BuybackDevice::with('tier')->find($this->buyback_device_id);
+            $this->buyback_device = \App\Models\BuybackDevice::with(['tier', 'productAccurate'])->find($this->buyback_device_id);
             $this->device_rules = $this->buyback_device ? $this->buyback_device->getFlatRules() : [];
             $this->selected_rules = [];
             $this->calculatePrice();
+            
+            // Reload QC template now that we might have a specific device category
+            $this->loadQcTemplate();
         } else {
             $this->buyback_device = null;
             $this->device_rules = [];
             $this->final_price = 0;
+            
+            // Reload without specific device
+            $this->loadQcTemplate();
         }
     }
 
