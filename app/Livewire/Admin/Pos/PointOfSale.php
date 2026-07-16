@@ -530,6 +530,9 @@ class PointOfSale extends Component
         $order = Order::with('user.profile')->find($orderId);
         $phone = $order->user->profile->phone_number ?? null;
 
+        \Illuminate\Support\Facades\Log::error('=== DEBUG PHONE QONTAK ===');
+        \Illuminate\Support\Facades\Log::error('RAW PHONE: ' . var_export($phone, true));
+
         // ─── VALIDASI PEMBATASAN AKSES UTK FRONT-LINER (FL) ───
         $userAktif = Auth::user();
         if (!$userAktif->hasRole('admin') && $order->is_wa_sent) {
@@ -542,10 +545,17 @@ class PointOfSale extends Component
             return;
         }
 
+        // Sanitize phone number (remove non-numeric characters like spaces, dashes, +)
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+
         // Standardisasi nomor HP (08xx -> 628xx)
         if (str_starts_with($phone, '0')) {
             $phone = '62' . substr($phone, 1);
+        } elseif (str_starts_with($phone, '8')) {
+            $phone = '62' . $phone;
         }
+
+        \Illuminate\Support\Facades\Log::error('PROCESSED PHONE TO QONTAK: ' . var_export($phone, true));
 
         // 2. Tarik variabel dari env untuk Qontak
         $fullUrl = env('QONTAK_API_URL');
