@@ -1,0 +1,1235 @@
+### Table: password_reset_tokens
+Columns:
+- email [varchar] NOT NULL (PRIMARY KEY)
+- token [varchar] NOT NULL
+- created_at [datetime]
+
+### Table: permissions
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- guard_name [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+
+### Table: roles
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- guard_name [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+
+### Table: model_has_permissions
+Columns:
+- permission_id [INTEGER] NOT NULL (PRIMARY KEY)
+- model_type [varchar] NOT NULL (PRIMARY KEY)
+- model_id [INTEGER] NOT NULL (PRIMARY KEY)
+Relations (Foreign Keys):
+- permission_id -> permissions(id)
+
+### Table: model_has_roles
+Columns:
+- role_id [INTEGER] NOT NULL (PRIMARY KEY)
+- model_type [varchar] NOT NULL (PRIMARY KEY)
+- model_id [INTEGER] NOT NULL (PRIMARY KEY)
+Relations (Foreign Keys):
+- role_id -> roles(id)
+
+### Table: role_has_permissions
+Columns:
+- permission_id [INTEGER] NOT NULL (PRIMARY KEY)
+- role_id [INTEGER] NOT NULL (PRIMARY KEY)
+Relations (Foreign Keys):
+- role_id -> roles(id)
+- permission_id -> permissions(id)
+
+### Table: conversations
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER] NOT NULL
+- status [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- user_id -> users(id)
+
+### Table: messages
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER] NOT NULL
+- message [TEXT] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- conversation_id [INTEGER] NOT NULL
+Relations (Foreign Keys):
+- conversation_id -> conversations(id)
+- user_id -> users(id)
+
+### Table: user_profiles
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER] NOT NULL
+- full_name [varchar] NOT NULL
+- phone_number [varchar]
+- birth_date [date]
+- gender [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- user_id -> users(id)
+
+### Table: user_addresses
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER] NOT NULL
+- label_address [varchar] NOT NULL
+- recipient_name [varchar] NOT NULL
+- phone_number [varchar] NOT NULL
+- full_address [TEXT] NOT NULL
+- province_id [varchar]
+- city_id [varchar]
+- district_id [varchar]
+- postal_code [varchar]
+- is_primary [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- user_id -> users(id)
+
+### Table: product_erzaps
+Columns:
+- erzap_id [varchar] NOT NULL (PRIMARY KEY)
+- name [varchar]
+- base_price [numeric] NOT NULL
+- discount_price [numeric]
+- stock [INTEGER] NOT NULL
+- barcode [varchar]
+- raw_data [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+- source [varchar] NOT NULL
+
+### Table: order_shippings
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- order_id [INTEGER] NOT NULL
+- biteship_order_id [varchar]
+- courier_company [varchar]
+- courier_type [varchar]
+- tracking_number [varchar]
+- shipping_cost [numeric] NOT NULL
+- status [varchar] NOT NULL
+- shipping_payload [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- order_id -> orders(id)
+
+### Table: media
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- model_type [varchar] NOT NULL
+- model_id [INTEGER] NOT NULL
+- uuid [varchar]
+- collection_name [varchar] NOT NULL
+- name [varchar] NOT NULL
+- file_name [varchar] NOT NULL
+- mime_type [varchar]
+- disk [varchar] NOT NULL
+- conversions_disk [varchar]
+- size [INTEGER] NOT NULL
+- manipulations [TEXT] NOT NULL
+- custom_properties [TEXT] NOT NULL
+- generated_conversions [TEXT] NOT NULL
+- responsive_images [TEXT] NOT NULL
+- order_column [INTEGER]
+- created_at [datetime]
+- updated_at [datetime]
+
+### Table: carts
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER]
+- session_id [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- user_id -> users(id)
+
+### Table: cart_items
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- cart_id [INTEGER] NOT NULL
+- product_variant_id [INTEGER] NOT NULL
+- qty [INTEGER] NOT NULL
+- notes [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- product_variant_id -> product_variants(id)
+- cart_id -> carts(id)
+
+### Table: settings
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- key [varchar] NOT NULL
+- value [TEXT]
+- type [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+
+### Table: product_reviews
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER] NOT NULL
+- product_id [INTEGER] NOT NULL
+- order_item_id [INTEGER] NOT NULL
+- rating [INTEGER] NOT NULL
+- comment [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- order_item_id -> order_items(id)
+- product_id -> products(id)
+- user_id -> users(id)
+
+### Table: trade_in_unit_options
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- trade_in_id [INTEGER] NOT NULL
+- product_variant_id [INTEGER] NOT NULL
+- is_selected [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- product_variant_id -> product_variants(id)
+- trade_in_id -> trade_ins(id)
+
+### Table: buyback_tiers
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- min_price [numeric]
+- max_price [numeric]
+- rules [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+
+### Table: user_bank_accounts
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER] NOT NULL
+- bank_name [varchar] NOT NULL
+- account_number [varchar] NOT NULL
+- account_name [varchar] NOT NULL
+- is_primary [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- user_id -> users(id)
+
+### Table: product_variants
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- product_id [INTEGER] NOT NULL
+- sku [varchar]
+- condition [varchar] NOT NULL
+- ram [varchar]
+- storage [varchar]
+- color [varchar]
+- price [numeric] NOT NULL
+- stock [INTEGER] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- trade_in_id [INTEGER]
+- sell_phone_id [INTEGER]
+- product_accurate_id [INTEGER]
+- has_sn [tinyint(1)] NOT NULL
+Relations (Foreign Keys):
+- product_accurate_id -> product_accurates(id)
+- trade_in_id -> trade_ins(id)
+- product_id -> products(id)
+- sell_phone_id -> sell_phones(id)
+
+### Table: second_product_variants
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- second_product_id [INTEGER] NOT NULL
+- sell_phone_id [INTEGER]
+- product_accurate_id [INTEGER]
+- sku [varchar]
+- condition_desc [varchar]
+- ram [varchar]
+- storage [varchar]
+- color [varchar]
+- buy_price [numeric] NOT NULL
+- price [numeric] NOT NULL
+- stock [INTEGER] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- has_sn [tinyint(1)] NOT NULL
+Relations (Foreign Keys):
+- product_accurate_id -> product_accurates(id)
+- sell_phone_id -> sell_phones(id)
+- second_product_id -> second_products(id)
+
+### Table: trade_ins
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER] NOT NULL
+- target_product_id [INTEGER] NOT NULL
+- old_phone_brand [varchar] NOT NULL
+- old_phone_model [varchar] NOT NULL
+- old_phone_ram [varchar]
+- old_phone_storage [varchar]
+- old_phone_minus_desc [TEXT]
+- appraised_value [numeric]
+- status [varchar] NOT NULL
+- customer_shipping_receipt [varchar]
+- order_id [INTEGER]
+- created_at [datetime]
+- updated_at [datetime]
+- buyback_device_id [INTEGER]
+- purchase_invoice_number [varchar]
+- sales_invoice_number [varchar]
+- sales_receipt_number [varchar]
+- topup_amount [numeric]
+- handled_by [INTEGER]
+- product_variant_id [INTEGER]
+- target_product_type [varchar]
+- product_variant_type [varchar]
+- imei [varchar]
+Relations (Foreign Keys):
+- handled_by -> users(id)
+- order_id -> orders(id)
+- user_id -> users(id)
+- buyback_device_id -> buyback_devices(id)
+
+### Table: payment_method_rates
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- payment_method_id [INTEGER] NOT NULL
+- name [varchar] NOT NULL
+- mdr_percentage [numeric] NOT NULL
+- is_active [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- accurate_account_no [varchar]
+Relations (Foreign Keys):
+- payment_method_id -> payment_methods(id)
+
+### Table: order_payments
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- order_id [INTEGER] NOT NULL
+- xendit_external_id [varchar] NOT NULL
+- xendit_invoice_url [varchar]
+- payment_method [varchar]
+- amount [numeric] NOT NULL
+- status [varchar] NOT NULL
+- paid_at [datetime]
+- payment_payload [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+- payment_method_id [INTEGER]
+- payment_method_rate_id [INTEGER]
+- no_kontrak [varchar]
+Relations (Foreign Keys):
+- payment_method_rate_id -> payment_method_rates(id)
+- order_id -> orders(id)
+- payment_method_id -> payment_methods(id)
+
+### Table: warehouse_stocks
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- warehouse_id [INTEGER] NOT NULL
+- variant_id [INTEGER] NOT NULL
+- variant_type [varchar] NOT NULL
+- stock [INTEGER] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- warehouse_id -> warehouses(id)
+
+### Table: qc_templates
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- brand_id [INTEGER]
+- is_default [tinyint(1)] NOT NULL
+- items [TEXT] NOT NULL
+- is_active [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- max_weight_threshold [INTEGER] NOT NULL
+- device_category [varchar]
+Relations (Foreign Keys):
+- brand_id -> brands(id)
+
+### Table: device_inspections
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- imei [varchar] NOT NULL
+- second_product_variant_id [INTEGER]
+- qc_template_id [INTEGER]
+- inspectable_type [varchar]
+- inspectable_id [INTEGER]
+- label [varchar]
+- checklist_results [TEXT] NOT NULL
+- passed_count [INTEGER] NOT NULL
+- failed_count [INTEGER] NOT NULL
+- total_items [INTEGER] NOT NULL
+- verdict [varchar] NOT NULL
+- inspector_notes [TEXT]
+- inspected_by [INTEGER] NOT NULL
+- inspected_at [datetime] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- is_pushed [tinyint(1)] NOT NULL
+Relations (Foreign Keys):
+- inspected_by -> users(id)
+- qc_template_id -> qc_templates(id)
+- second_product_variant_id -> second_product_variants(id)
+
+### Table: order_promos
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- order_id [INTEGER] NOT NULL
+- promo_id [INTEGER] NOT NULL
+- discount_applied [numeric] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- promo_id -> promos(id)
+- order_id -> orders(id)
+
+### Table: promo_skus
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- promo_id [INTEGER] NOT NULL
+- sku [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- promo_id -> promos(id)
+
+### Table: promo_bundle_skus
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- promo_id [INTEGER] NOT NULL
+- sku [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- discount_type [varchar]
+- discount_value [numeric]
+- max_discount [numeric]
+Relations (Foreign Keys):
+- promo_id -> promos(id)
+
+### Table: accurate_webhook_logs
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- event_type [varchar] NOT NULL
+- database_source [varchar]
+- event_id [varchar]
+- payload [TEXT]
+- status [varchar] NOT NULL
+- error_message [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+
+### Table: accurate_gl_accounts
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- account_no [varchar] NOT NULL
+- name [varchar] NOT NULL
+- account_type [varchar]
+- database_source [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+
+### Table: vendors
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- accurate_vendor_id [varchar]
+- vendor_no [varchar] NOT NULL
+- vendor_name [varchar] NOT NULL
+- email [varchar]
+- phone [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+- database_source [varchar]
+
+### Table: business_units
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- code [varchar] NOT NULL
+- name [varchar] NOT NULL
+- accurate_host [varchar]
+- accurate_token [varchar]
+- accurate_secret_key [varchar]
+- is_active [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- accurate_database_id [varchar]
+- accurate_webhook_token [varchar]
+- is_taxable [tinyint(1)] NOT NULL
+- customer_prefix [varchar]
+- order_prefix [varchar]
+- draft_prefix [varchar]
+- store_title [varchar]
+- receipt_show_discount [tinyint(1)] NOT NULL
+- prefix [varchar]
+- accurate_return_warehouse_id [varchar]
+- accurate_return_warehouse_name [varchar]
+
+### Table: user_accurate_customers
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER] NOT NULL
+- business_unit_id [INTEGER] NOT NULL
+- accurate_customer_id [varchar]
+- accurate_customer_no [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+- user_id -> users(id)
+
+### Table: users
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- email [varchar] NOT NULL
+- email_verified_at [datetime]
+- password [varchar] NOT NULL
+- remember_token [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+- two_factor_secret [TEXT]
+- two_factor_recovery_codes [TEXT]
+- two_factor_confirmed_at [datetime]
+- provider [varchar]
+- provider_id [varchar]
+- avatar [varchar]
+- identity [varchar]
+- npwp [varchar]
+- branch_id [INTEGER]
+- warehouse_id [INTEGER]
+- business_unit_id [INTEGER]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+- branch_id -> branches(id)
+- warehouse_id -> warehouses(id)
+
+### Table: payment_methods
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- bank_name [varchar]
+- account_number [varchar]
+- account_owner [varchar]
+- accurate_bank_no [varchar]
+- is_active [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- mdr_percentage [numeric] NOT NULL
+- business_unit_id [INTEGER]
+- category [varchar] NOT NULL
+- accurate_customer_no [varchar]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+
+### Table: employes
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- accurate_employee_id [INTEGER]
+- employee_no [varchar]
+- name [varchar] NOT NULL
+- email [varchar]
+- phone_number [varchar]
+- position [varchar]
+- is_active [tinyint(1)] NOT NULL
+- user_id [INTEGER]
+- created_at [datetime]
+- updated_at [datetime]
+- branch_id [INTEGER]
+- business_unit_id [INTEGER]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+- user_id -> users(id)
+- branch_id -> branches(id)
+
+### Table: user_accurate_vendors
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER] NOT NULL
+- business_unit_id [INTEGER] NOT NULL
+- accurate_vendor_id [varchar]
+- accurate_vendor_no [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+- user_id -> users(id)
+
+### Table: branches
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- branch_id [INTEGER]
+- name [varchar] NOT NULL
+- status [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+- second_branch_id [INTEGER]
+- business_unit_id [INTEGER]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+
+### Table: warehouses
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- warehouse_id [INTEGER]
+- name [varchar] NOT NULL
+- status [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+- second_warehouse_id [INTEGER]
+- business_unit_id [INTEGER]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+
+### Table: order_accurate_docs
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- order_id [INTEGER] NOT NULL
+- doc_type [varchar] NOT NULL
+- doc_number [varchar]
+- accurate_id [INTEGER]
+- amount [numeric] NOT NULL
+- status [varchar]
+- payload [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- order_id -> orders(id)
+
+### Table: promo_branches
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- promo_id [INTEGER] NOT NULL
+- branch_id [INTEGER] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- branch_id -> branches(id)
+- promo_id -> promos(id)
+
+### Table: order_items
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- order_id [INTEGER] NOT NULL
+- product_variant_id [INTEGER] NOT NULL
+- qty [INTEGER] NOT NULL
+- price_at_checkout [numeric] NOT NULL
+- subtotal [numeric] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- product_variant_type [varchar]
+- serial_number [varchar]
+- discount_amount [numeric] NOT NULL
+- applied_promo_id [INTEGER]
+- promo_discount_amount [numeric] NOT NULL
+- product_name [varchar]
+- sales_ids [TEXT]
+Relations (Foreign Keys):
+- applied_promo_id -> promos(id)
+- order_id -> orders(id)
+
+### Table: promo_payment_methods
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- promo_id [INTEGER] NOT NULL
+- payment_method_id [INTEGER] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- payment_method_id -> payment_methods(id)
+- promo_id -> promos(id)
+
+### Table: manual_discount_presets
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- amount [INTEGER] NOT NULL
+- brand_id [INTEGER]
+- is_active [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- brand_id -> brands(id)
+
+### Table: categories
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- slug [varchar] NOT NULL
+- icon [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+- business_unit_id [INTEGER]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+
+### Table: brands
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- slug [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- business_unit_id [INTEGER]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+
+### Table: products
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- slug [varchar] NOT NULL
+- category_id [INTEGER] NOT NULL
+- brand_id [INTEGER]
+- description [TEXT]
+- specifications [TEXT]
+- starting_price [numeric]
+- total_stock [INTEGER] NOT NULL
+- thumbnail_image [varchar]
+- has_active_erzap [tinyint(1)] NOT NULL
+- is_active [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- has_active_accurate [tinyint(1)] NOT NULL
+- business_unit_id [INTEGER]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+- category_id -> categories(id)
+- brand_id -> brands(id)
+
+### Table: second_products
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- slug [varchar] NOT NULL
+- category_id [INTEGER]
+- brand_id [INTEGER]
+- description [TEXT]
+- starting_price [numeric]
+- total_stock [INTEGER] NOT NULL
+- thumbnail_image [varchar]
+- is_active [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- has_active_accurate [tinyint(1)] NOT NULL
+- business_unit_id [INTEGER]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+- category_id -> categories(id)
+- brand_id -> brands(id)
+
+### Table: product_accurates
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- accurate_id [varchar] NOT NULL
+- database_source [varchar] NOT NULL
+- item_no [varchar]
+- name [varchar]
+- base_price [numeric] NOT NULL
+- stock [INTEGER] NOT NULL
+- raw_data [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+- base_cost [numeric]
+- vendor_name [varchar]
+- id_brand_accurate [INTEGER]
+- brandName [varchar]
+- id_category_accurate [INTEGER]
+- categoryName [varchar]
+- has_sn [tinyint(1)] NOT NULL
+- business_unit_id [INTEGER]
+- itemType [varchar]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+
+### Table: buyback_devices
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- brand_id [INTEGER] NOT NULL
+- buyback_tier_id [INTEGER]
+- model_name [varchar] NOT NULL
+- ram [varchar]
+- storage [varchar] NOT NULL
+- base_price [numeric] NOT NULL
+- is_active [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- second_product_variant_id [INTEGER]
+- product_accurate_id [INTEGER]
+- color [varchar]
+Relations (Foreign Keys):
+- buyback_tier_id -> buyback_tiers(id)
+- brand_id -> brands(id)
+- second_product_variant_id -> second_product_variants(id)
+
+### Table: purchase_orders
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- accurate_po_id [INTEGER]
+- po_number [varchar] NOT NULL
+- vendor_id [INTEGER]
+- po_date [date]
+- status [varchar] NOT NULL
+- database_source [varchar]
+- description [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- vendor_id -> vendors(id)
+
+### Table: purchase_order_items
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- purchase_order_id [INTEGER] NOT NULL
+- item_no [varchar] NOT NULL
+- item_name [varchar]
+- unit_price [numeric] NOT NULL
+- quantity_ordered [INTEGER] NOT NULL
+- quantity_received [INTEGER] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- quantity_pushed [INTEGER] NOT NULL
+Relations (Foreign Keys):
+- purchase_order_id -> purchase_orders(id)
+
+### Table: cashier_shifts
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- business_unit_id [INTEGER] NOT NULL
+- user_id [INTEGER] NOT NULL
+- branch_id [INTEGER] NOT NULL
+- shift_date [date] NOT NULL
+- opened_at [datetime] NOT NULL
+- closed_at [datetime]
+- starting_cash [numeric] NOT NULL
+- expected_cash [numeric]
+- actual_cash [numeric]
+- cash_difference [numeric]
+- total_cash_sales [numeric] NOT NULL
+- total_non_cash_sales [numeric] NOT NULL
+- total_transactions [INTEGER] NOT NULL
+- status [varchar] NOT NULL
+- opening_notes [TEXT]
+- closing_notes [TEXT]
+- reconciliation_status [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- branch_id -> branches(id)
+- user_id -> users(id)
+- business_unit_id -> business_units(id)
+
+### Table: cashier_shift_denominations
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- cashier_shift_id [INTEGER] NOT NULL
+- type [varchar] NOT NULL
+- denomination [numeric] NOT NULL
+- quantity [INTEGER] NOT NULL
+- subtotal [numeric] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- cashier_shift_id -> cashier_shifts(id)
+
+### Table: migration_invoices
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- invoice_no [varchar] NOT NULL
+- invoice_date [date] NOT NULL
+- vendor_id [varchar] NOT NULL
+- branch_name [varchar]
+- description [TEXT]
+- is_exported [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+
+### Table: migration_invoice_items
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- migration_invoice_id [INTEGER] NOT NULL
+- item_code [varchar] NOT NULL
+- quantity [numeric] NOT NULL
+- unit [varchar] NOT NULL
+- unit_price [numeric] NOT NULL
+- warehouse_name [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+- serial_numbers [TEXT]
+Relations (Foreign Keys):
+- migration_invoice_id -> migration_invoices(id)
+
+### Table: sell_phones
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER] NOT NULL
+- phone_brand [varchar] NOT NULL
+- phone_model [varchar] NOT NULL
+- phone_ram [varchar]
+- phone_storage [varchar]
+- minus_desc [TEXT]
+- appraised_value [numeric]
+- status [varchar] NOT NULL
+- customer_shipping_receipt [varchar]
+- bank_name [varchar]
+- bank_account_number [varchar]
+- bank_account_name [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+- buyback_device_id [INTEGER]
+- handled_by [INTEGER]
+- invoice_number [varchar]
+- imei [varchar]
+- accurate_pi_no [varchar]
+- payment_receipt_path [varchar]
+- store_bank_no [varchar]
+- business_unit_id [INTEGER]
+- reject_reason [TEXT]
+- is_price_adjusted [tinyint(1)] NOT NULL
+- branch_id [INTEGER]
+Relations (Foreign Keys):
+- branch_id -> branches(id)
+- handled_by -> users(id)
+- user_id -> users(id)
+- buyback_device_id -> buyback_devices(id)
+- business_unit_id -> business_units(id)
+
+### Table: orders
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER] NOT NULL
+- order_number [varchar] NOT NULL
+- total_amount [numeric] NOT NULL
+- shipping_cost [numeric] NOT NULL
+- discount_amount [numeric] NOT NULL
+- grand_total [numeric] NOT NULL
+- order_status [varchar] NOT NULL
+- shipping_address_snapshot [TEXT] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- order_channel [varchar] NOT NULL
+- handled_by [INTEGER]
+- accurate_invoice_no [varchar]
+- accurate_receipt_no [varchar]
+- is_wa_sent [tinyint(1)] NOT NULL
+- is_email_sent [tinyint(1)] NOT NULL
+- sales_id [INTEGER]
+- notes [TEXT]
+- accurate_so_id [INTEGER]
+- accurate_so_number [varchar]
+- order_date [date]
+- business_unit_id [INTEGER]
+- branch_id [INTEGER]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+- user_id -> users(id)
+- handled_by -> users(id)
+- sales_id -> employes(id)
+- branch_id -> branches(id)
+
+### Table: warranty_replacements
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- warranty_claim_id [INTEGER] NOT NULL
+- old_imei [varchar] NOT NULL
+- new_imei [varchar] NOT NULL
+- processed_by [INTEGER]
+- system_notes [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- processed_by -> users(id)
+- warranty_claim_id -> warranty_claims(id)
+
+### Table: warranties
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- warranty_policy_id [INTEGER]
+- order_item_id [INTEGER]
+- serial_number [varchar] NOT NULL
+- customer_user_id [INTEGER]
+- activated_at [datetime]
+- expires_at [datetime]
+- status [varchar] NOT NULL
+- claims_used [INTEGER] NOT NULL
+- device_inspection_id [INTEGER]
+- source [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- type [varchar]
+- duration_days [INTEGER]
+Relations (Foreign Keys):
+- warranty_policy_id -> warranty_policies(id)
+- order_item_id -> order_items(id)
+- customer_user_id -> users(id)
+- device_inspection_id -> device_inspections(id)
+
+### Table: warranty_policies
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- type [varchar] NOT NULL
+- duration_days [INTEGER] NOT NULL
+- coverage [TEXT]
+- is_active [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- coverage_type [varchar] NOT NULL
+- brand_rule [varchar] NOT NULL
+- brand_list [TEXT]
+- addon_trigger_keywords [TEXT]
+- business_unit_id [INTEGER]
+- coverage_scope [TEXT]
+- replacement_type [varchar] NOT NULL
+- max_claims [INTEGER] NOT NULL
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+
+### Table: service_center_tickets
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- warranty_claim_id [INTEGER] NOT NULL
+- customer_name [varchar] NOT NULL
+- customer_phone [varchar] NOT NULL
+- device_type [varchar] NOT NULL
+- imei_sn [varchar] NOT NULL
+- physical_condition_on_receipt [TEXT]
+- accessories_included [TEXT]
+- reported_issue [TEXT] NOT NULL
+- estimated_cost [numeric]
+- status [varchar] NOT NULL
+- technician_notes [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- warranty_claim_id -> warranty_claims(id)
+
+### Table: warranty_claims
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- claim_number [varchar] NOT NULL
+- warranty_id [INTEGER] NOT NULL
+- customer_user_id [INTEGER]
+- serial_number [varchar] NOT NULL
+- issue_description [TEXT] NOT NULL
+- diagnosis [TEXT]
+- status [varchar] NOT NULL
+- resolution [varchar]
+- resolution_notes [TEXT]
+- claimed_by [INTEGER]
+- approved_by [INTEGER]
+- claimed_at [datetime]
+- resolved_at [datetime]
+- device_inspection_id [INTEGER]
+- created_at [datetime]
+- updated_at [datetime]
+- resolution_type [varchar]
+- technician_notes [TEXT]
+- receiving_inspection_id [INTEGER]
+- refund_amount [numeric]
+Relations (Foreign Keys):
+- receiving_inspection_id -> device_inspections(id)
+- warranty_id -> warranties(id)
+- customer_user_id -> users(id)
+- claimed_by -> users(id)
+- approved_by -> users(id)
+- device_inspection_id -> device_inspections(id)
+
+### Table: promos
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- name [varchar] NOT NULL
+- code [varchar]
+- category [varchar] NOT NULL
+- brand_id [INTEGER]
+- accurate_account_no [varchar]
+- discount_type [varchar] NOT NULL
+- discount_value [numeric] NOT NULL
+- max_discount [numeric]
+- start_date [datetime]
+- end_date [datetime]
+- is_active [tinyint(1)] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- min_transaction_amount [numeric]
+- min_qty [INTEGER]
+- apply_to_all_items [tinyint(1)] NOT NULL
+- is_bundle [tinyint(1)] NOT NULL
+- bundle_max_qty [INTEGER]
+- bundle_discount_type [varchar]
+- bundle_discount_value [numeric]
+- bundle_max_discount [numeric]
+- is_multiply [tinyint(1)] NOT NULL
+- is_combinable [tinyint(1)] NOT NULL
+- quota [INTEGER]
+- used_quota [INTEGER] NOT NULL
+- description [TEXT]
+- business_unit_id [INTEGER]
+Relations (Foreign Keys):
+- business_unit_id -> business_units(id)
+- brand_id -> brands(id)
+
+### Table: order_item_promos
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- order_item_id [INTEGER] NOT NULL
+- promo_id [INTEGER] NOT NULL
+- discount_amount [numeric] NOT NULL
+- serial_number [varchar]
+- vendor_name [varchar]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- promo_id -> promos(id)
+- order_item_id -> order_items(id)
+
+### Table: approval_requests
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- approvable_type [varchar] NOT NULL
+- approvable_id [INTEGER] NOT NULL
+- request_type [varchar] NOT NULL
+- requested_by [INTEGER] NOT NULL
+- reason [TEXT]
+- status [varchar] NOT NULL
+- required_level [INTEGER] NOT NULL
+- current_level [INTEGER] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- payload [TEXT]
+Relations (Foreign Keys):
+- requested_by -> users(id)
+
+### Table: approval_histories
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- approval_request_id [INTEGER] NOT NULL
+- acted_by [INTEGER] NOT NULL
+- action [varchar] NOT NULL
+- level [INTEGER] NOT NULL
+- notes [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- acted_by -> users(id)
+- approval_request_id -> approval_requests(id)
+
+### Table: approval_rules
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- module [varchar] NOT NULL
+- level [INTEGER] NOT NULL
+- role_id [INTEGER] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- role_id -> roles(id)
+
+### Table: product_serial_numbers
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- accurate_sn_id [INTEGER]
+- item_no [varchar] NOT NULL
+- warehouse_id [INTEGER]
+- serial_number [varchar] NOT NULL
+- status [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+- hpp [numeric]
+- vendor_id [INTEGER]
+- receipt_date [date]
+- qc_status [varchar]
+- business_unit_id [INTEGER]
+- product_accurate_id [INTEGER]
+Relations (Foreign Keys):
+- product_accurate_id -> product_accurates(id)
+- vendor_id -> vendors(id)
+- warehouse_id -> warehouses(id)
+- business_unit_id -> business_units(id)
+
+### Table: order_item_serial_numbers
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- order_item_id [INTEGER] NOT NULL
+- serial_number [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- order_item_id -> order_items(id)
+
+### Table: warranty_claim_histories
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- claim_id [INTEGER] NOT NULL
+- status [varchar] NOT NULL
+- notes [TEXT]
+- changed_by [INTEGER]
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- changed_by -> users(id)
+- claim_id -> warranty_claims(id)
+
+### Table: agent_conversations
+Columns:
+- id [varchar] NOT NULL (PRIMARY KEY)
+- user_id [INTEGER]
+- title [varchar] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+
+### Table: agent_conversation_messages
+Columns:
+- id [varchar] NOT NULL (PRIMARY KEY)
+- conversation_id [varchar] NOT NULL
+- user_id [INTEGER]
+- agent [varchar] NOT NULL
+- role [varchar] NOT NULL
+- content [TEXT] NOT NULL
+- attachments [TEXT] NOT NULL
+- tool_calls [TEXT] NOT NULL
+- tool_results [TEXT] NOT NULL
+- usage [TEXT] NOT NULL
+- meta [TEXT] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+
+### Table: ai_settings
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- provider [varchar] NOT NULL
+- model [varchar] NOT NULL
+- api_key [varchar]
+- system_prompt [TEXT]
+- created_at [datetime]
+- updated_at [datetime]
+
+### Table: ai_chat_histories
+Columns:
+- id [INTEGER] NOT NULL (PRIMARY KEY)
+- admin_id [INTEGER] NOT NULL
+- session_id [varchar]
+- role [varchar] NOT NULL
+- message [TEXT] NOT NULL
+- created_at [datetime]
+- updated_at [datetime]
+Relations (Foreign Keys):
+- admin_id -> users(id)

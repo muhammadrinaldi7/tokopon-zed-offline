@@ -118,6 +118,7 @@ class InvoiceReport extends Component
             // 1. Susun Header sesuai dengan kolom SELECT pada SQL
             $headers = [
                 'created_at',
+                'jam',
                 'nama_toko',
                 'accurate_invoice_no',
                 'order_number',
@@ -150,12 +151,13 @@ class InvoiceReport extends Component
                         $pmrName = $payment->paymentMethodRate->name ?? null;
                         $mdrPct = $payment->paymentMethodRate->mdr_percentage ?? 0;
                         $amount = $payment->amount ?? 0;
-
+                        $jamBayar = $payment->created_at->format('H:i:s');
                         // round(op.amount * pmr.mdr_percentage /100) as mdr
                         $mdr = round(($amount * $mdrPct) / 100);
 
                         fputcsv($file, [
                             $createdAt,
+                            $jamBayar,
                             $namaToko,
                             $invoiceNo,
                             $orderNo,

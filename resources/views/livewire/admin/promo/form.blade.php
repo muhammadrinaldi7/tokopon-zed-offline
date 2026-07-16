@@ -101,11 +101,11 @@
                 @endif
 
                 <div class="{{ $category !== 'brand' ? 'md:col-span-1' : 'md:col-span-2' }}">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">GL Account Accurate (Opsional)</label>
-                    <input type="text" wire:model="accurate_account_no"
-                        class="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono"
+                    <label class="block text-sm font-bold text-gray-700 mb-2">GL Account Accurate (Otomatis)</label>
+                    <input type="text" wire:model="accurate_account_no" readonly disabled
+                        class="w-full bg-gray-100 text-gray-500 cursor-not-allowed border border-gray-300 rounded-xl px-4 py-2 font-mono"
                         placeholder="Misal: 6100.01">
-                    <p class="text-xs text-gray-500 mt-1">Kode akun perkiraan diskon di Accurate Online.</p>
+                    <p class="text-xs text-gray-500 mt-1">Kode akun perkiraan diskon di Accurate Online (Diisi otomatis berdasarkan kategori).</p>
                     @error('accurate_account_no')
                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                     @enderror

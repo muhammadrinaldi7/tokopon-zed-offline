@@ -148,6 +148,20 @@ class Form extends Component
         })->values()->toArray();
     }
 
+    public function updatedSearchVariants()
+    {
+        // Placeholder for any other search variant logic
+    }
+
+    public function updatedCategory($value)
+    {
+        if ($value === 'internal') {
+            $this->accurate_account_no = '40.02.003';
+        } elseif ($value === 'brand') {
+            $this->accurate_account_no = '40.02.004';
+        }
+    }
+
     // ─── Reward SKU (target produk yang dapat diskon) ───────────
 
     public function updatedSearchSku()
@@ -209,6 +223,13 @@ class Form extends Component
 
     public function save()
     {
+        // Paksa isi accurate_account_no agar tidak bisa diakali via client-side
+        if ($this->category === 'internal') {
+            $this->accurate_account_no = '40.02.003';
+        } elseif ($this->category === 'brand') {
+            $this->accurate_account_no = '40.02.004';
+        }
+
         $this->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',

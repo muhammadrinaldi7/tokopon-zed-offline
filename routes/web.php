@@ -1,5 +1,6 @@
 <?php
 
+use App\Ai\Agents\DatabaseAnalyzerAgent;
 use App\Livewire\Admin\Accurate\AccurateInvoiceExport;
 use App\Livewire\Admin\Employe\EmployeManage;
 use App\Livewire\Admin\Vendor\VendorManage;
@@ -17,10 +18,17 @@ use App\Livewire\Zoffline\Warehouse\SerialNumberHistory;
 use App\Livewire\Zoffline\Warranty\WarrantyClaim;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Laravel\Ai\Exceptions\ProviderOverloadedException;
 
 // ─── POS Landing Page (requires auth + admin role) ──────────────
 // Route::get('/tesrenaldi', \App\Livewire\Admin\Pos\PointOfSale::class)->middleware(['auth', 'admin'])->name('/');
 Route::middleware(['auth'])->group(function () {
+    // AI Assistant Routes
+    Route::prefix('admin/ai-assistant')->name('admin.ai-assistant.')->group(function () {
+        Route::get('/', \App\Livewire\Admin\AiAssistant\Chat::class)->name('index');
+        Route::get('/settings', \App\Livewire\Admin\AiAssistant\Settings::class)->name('settings');
+    });
+
     Route::get('/', \App\Livewire\Zoffline\Home::class)->name('zoffline');
     Route::get('/zoffline/pos', \App\Livewire\Zoffline\Pos\Pos::class)->name('zoffline.pos')->middleware('can:view-pos');
     Route::get('/zoffline/pos/open-shift', \App\Livewire\Zoffline\Pos\OpenShift::class)->name('zoffline.pos.open-shift')->middleware('can:view-pos');
@@ -200,3 +208,31 @@ Route::get('/auth/google/callback', [\App\Http\Controllers\GoogleCallbackControl
 Route::post('/web_service/import_produk_json/new.json', [\App\Http\Controllers\Api\ErzapProductController::class, 'store']);
 Route::post('/web_service/import_produk_json/new', [\App\Http\Controllers\Api\ErzapProductController::class, 'store']);
 Route::post('/web_service/sinkronisasi_stok/new', [\App\Http\Controllers\Api\ErzapProductController::class, 'syncStock']);
+
+Route::get('/ai-test', function () {
+    $response = \Laravel\Ai\agent(instructions: 'Anda adalah asisten AI untuk Chatbot Tokopon')
+        ->prompt('Buatkan pantun 2 baris tentang tokopon');
+
+    return $response;
+});
+
+Route::get('/ai-analyze-db', function () {
+    $agent = new DatabaseAnalyzerAgent();
+
+    try {
+        $response = $agent->prompt('Tolong hitung ada berapa jumlah data di dalam tabel users.');
+        return $response;
+    } catch (ProviderOverloadedException $e) {
+        // Tangkap error jika server Gemini kepenuhan
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Maaf, server AI sedang sibuk memproses terlalu banyak permintaan. Silakan coba beberapa detik lagi.'
+        ], 503);
+    } catch (\Exception $e) {
+        // Tangkap error umum lainnya
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
+        ], 500);
+    }
+});
