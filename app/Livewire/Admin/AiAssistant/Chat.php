@@ -7,6 +7,7 @@ use App\Models\AiSetting;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -14,6 +15,12 @@ class Chat extends Component
 {
     public $message = '';
     public $histories = [];
+    public $chatSessionId;
+
+    public function mount()
+    {
+        $this->chatSessionId = (string) Str::uuid();
+    }
 
     #[Layout('layouts.admin')]
     public function render()
@@ -25,6 +32,18 @@ class Chat extends Component
         return view('livewire.admin.ai-assistant.chat');
     }
 
+    public function resetChat()
+    {
+        // Putus ingatan AI dengan membuat ID sesi baru
+        $this->chatSessionId = (string) Str::uuid();
+
+        // (Opsional) Anda juga bisa menghapus history lama di database jika mau
+        // AiChatHistory::where('admin_id', Auth::id())->delete();
+
+        $this->histories = AiChatHistory::where('admin_id', Auth::id())
+            ->orderBy('created_at', 'asc')
+            ->get();
+    }
     public function sendMessage()
     {
         $this->validate([
@@ -32,7 +51,8 @@ class Chat extends Component
         ]);
 
         $adminId = Auth::id();
-        $sessionId = request()->session()->getId();
+        // $sessionId = request()->session()->getId();
+        $sessionId = $this->chatSessionId;
         $userMessage = $this->message;
 
         // Kosongkan input
@@ -64,7 +84,9 @@ class Chat extends Component
             ];
 
             // 3. Lakukan HTTP POST Request ke n8n dengan timeout 60 detik
-            $response = Http::timeout(60)->post($webhookUrl, $payload);
+            $response = Http::withHeaders([
+                'X-Zedpos-Agent-Token' => 'zedpos-2026-banjarbaru',
+            ])->timeout(60)->post($webhookUrl, $payload);
 
             // Cek jika status HTTP 500 atau error lainnya
             if ($response->failed()) {
@@ -93,7 +115,6 @@ class Chat extends Component
                 'role' => 'assistant',
                 'message' => $replyMessage,
             ]);
-
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             // Penanganan error timeout
             Log::error('n8n Webhook Timeout/Connection Error: ' . $e->getMessage());
@@ -118,7 +139,7 @@ class Chat extends Component
         $this->histories = AiChatHistory::where('admin_id', Auth::id())
             ->orderBy('created_at', 'asc')
             ->get();
-            
+
         $this->dispatch('messageSent');
     }
 }
