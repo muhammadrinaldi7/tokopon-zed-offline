@@ -97,7 +97,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            mkdir -p /home/${{ secrets.SSH_USERNAME }}/core-laravel/
+            mkdir -p /home/${{ secrets.SSH_USERNAME }}/htdocs/core-laravel/
 
       # 10. Transfer file deploy.zip ke VPS menggunakan SCP
       - name: 📂 Mentransfer file ke CloudPanel (via SCP)
@@ -108,7 +108,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
           source: "deploy.zip"
-          target: "/home/${{ secrets.SSH_USERNAME }}/core-laravel/"
+          target: "/home/${{ secrets.SSH_USERNAME }}/htdocs/core-laravel/"
 
       # 11. Ekstrak file dan jalankan optimasi Laravel di sisi server
       - name: ⚙️ Menjalankan perintah post-deploy di server
@@ -119,8 +119,8 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            # Masuk ke folder core-laravel
-            cd /home/${{ secrets.SSH_USERNAME }}/core-laravel/
+            # Masuk ke folder/htdocs core-laravel
+            cd /home/${{ secrets.SSH_USERNAME }}/htdocs/core-laravel/
             
             # Ekstrak file dan timpa file lama yang ada di server
             unzip -q -o deploy.zip
