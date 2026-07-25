@@ -72,7 +72,7 @@ class SwapItemModal extends Component
                   ->orWhere('name', 'like', '%' . $this->searchQuery . '%');
             })
             ->whereHas('warehouseStocks', function($q) use ($warehouseId) {
-                $q->where('warehouse_id', $warehouseId)->where('stock', '>', 0);
+                $q->where('warehouse_id', $warehouseId); // Hapus filter stock > 0 agar bisa pilih item indent (stok 0)
             })
             ->get()->map(function($v) {
                 return [
@@ -95,16 +95,32 @@ class SwapItemModal extends Component
 
         DB::beginTransaction();
         try {
+            // Dapatkan nama/SKU item lama dan baru untuk keperluan log notes
+            $oldName = $oldItem->product_name ?? ($oldItem->variant->name ?? 'Unknown');
+            if (empty($oldName) && $oldItem->variant) {
+                $oldName = $oldItem->variant->item_no ?? $oldItem->variant->sku ?? 'Unknown';
+            }
+            
+            $newVariant = $newVariantType::find($newVariantId);
+            $newName = $newVariant ? ($newVariant->name ?? $newVariant->item_no ?? 'Unknown') : 'Unknown';
+
             // Update the Order Item
             $oldItem->product_variant_id = $newVariantId;
             $oldItem->product_variant_type = $newVariantType;
-            $oldItem->price = $newPrice;
-            $oldItem->subtotal = $newPrice * $oldItem->quantity;
+            $oldItem->price_at_checkout = $newPrice;
+            $oldItem->subtotal = $newPrice * $oldItem->qty;
+            $oldItem->serial_number = null; // Reset SN karena item berubah
             $oldItem->save();
 
             // Recalculate Order Totals
-            $this->order->subtotal = $this->order->items()->sum('subtotal');
-            $this->order->grand_total = $this->order->subtotal - $this->order->discount_amount;
+            $this->order->total_amount = $this->order->items()->sum('subtotal');
+            $this->order->grand_total = $this->order->total_amount - $this->order->discount_amount;
+            
+            // Catat history swap di notes (sementara tanpa approval)
+            $user = \Illuminate\Support\Facades\Auth::user()->name ?? 'System';
+            $swapNote = "\n[" . now()->format('Y-m-d H:i') . "] $user melakukan Swap Item dari \"$oldName\" menjadi \"$newName\".";
+            $this->order->notes = ($this->order->notes ?? '') . $swapNote;
+            
             $this->order->save();
 
             // TODO: SYNC TO ACCURATE (Phase 3 Backend Logic)
@@ -142,8 +158,8 @@ class SwapItemModal extends Component
 
             $detailItem[] = [
                 'itemNo' => $itemNo,
-                'unitPrice' => $item->price,
-                'quantity' => $item->quantity,
+                'unitPrice' => (float)$item->price_at_checkout,
+                'quantity' => (float)$item->qty,
             ];
         }
 
