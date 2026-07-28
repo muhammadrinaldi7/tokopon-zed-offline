@@ -67,14 +67,14 @@ class SwapItemModal extends Component
 
         // Cari varian baru dari ProductAccurate yang stoknya tersedia
         $results = \App\Models\ProductAccurate::with('product')
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->where('item_no', 'like', '%' . $this->searchQuery . '%')
-                  ->orWhere('name', 'like', '%' . $this->searchQuery . '%');
+                    ->orWhere('name', 'like', '%' . $this->searchQuery . '%');
             })
-            ->whereHas('warehouseStocks', function($q) use ($warehouseId) {
+            ->whereHas('warehouseStocks', function ($q) use ($warehouseId) {
                 $q->where('warehouse_id', $warehouseId); // Hapus filter stock > 0 agar bisa pilih item indent (stok 0)
             })
-            ->get()->map(function($v) {
+            ->get()->map(function ($v) {
                 return [
                     'id' => $v->id,
                     'type' => \App\Models\ProductAccurate::class,
@@ -100,7 +100,7 @@ class SwapItemModal extends Component
             if (empty($oldName) && $oldItem->variant) {
                 $oldName = $oldItem->variant->item_no ?? $oldItem->variant->sku ?? 'Unknown';
             }
-            
+
             $newVariant = $newVariantType::find($newVariantId);
             $newName = $newVariant ? ($newVariant->name ?? $newVariant->item_no ?? 'Unknown') : 'Unknown';
 
@@ -115,12 +115,12 @@ class SwapItemModal extends Component
             // Recalculate Order Totals
             $this->order->total_amount = $this->order->items()->sum('subtotal');
             $this->order->grand_total = $this->order->total_amount - $this->order->discount_amount;
-            
+
             // Catat history swap di notes (sementara tanpa approval)
             $user = \Illuminate\Support\Facades\Auth::user()->name ?? 'System';
             $swapNote = "\n[" . now()->format('Y-m-d H:i') . "] $user melakukan Swap Item dari \"$oldName\" menjadi \"$newName\".";
             $this->order->notes = ($this->order->notes ?? '') . $swapNote;
-            
+
             $this->order->save();
 
             // TODO: SYNC TO ACCURATE (Phase 3 Backend Logic)
@@ -130,7 +130,6 @@ class SwapItemModal extends Component
             $this->dispatch('toast', title: 'Berhasil', message: 'Item berhasil ditukar!', type: 'success');
             $this->closeModal();
             $this->dispatch('refreshOrderDetails');
-            
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Gagal melakukan Swap Item: " . $e->getMessage());
@@ -149,7 +148,7 @@ class SwapItemModal extends Component
         foreach ($this->order->items as $item) {
             // Fetch Accurate Item No
             $variant = $item->variant;
-            
+
             if ($variant instanceof \App\Models\ProductAccurate) {
                 $itemNo = $variant->item_no;
             } else {
@@ -163,15 +162,20 @@ class SwapItemModal extends Component
             ];
         }
 
+        $dbSource = strtolower($this->order->businessUnit->code ?? 'syihab');
+
+        $branchName = $this->order->branch->name ?? (\Illuminate\Support\Facades\Auth::user()->branch->name ?? 'Banjarbaru');
+
+
         $payload = [
             'id' => $soDoc->accurate_id,
+            'branchName' => $branchName,
             'detailItem' => $detailItem
         ];
 
         // 3. Send update to Accurate
         $accurateService = app(\App\Services\AccurateService::class);
-        $dbSource = strtolower($this->order->businessUnit->code ?? 'syihab');
-        
+
         try {
             $accurateService->postSalesOrder($payload, $dbSource);
         } catch (\Exception $e) {

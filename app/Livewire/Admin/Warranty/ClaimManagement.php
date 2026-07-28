@@ -219,45 +219,40 @@ class ClaimManagement extends Component
         $newPrice = $this->replacement_type === 'different' ? $this->replacement_price : $originalPrice;
         $priceDifference = $newPrice - $originalPrice; // Positive if upgrade, negative if downgrade
 
-        // 1. Integrasi API Accurate
-        $accurateResult = null;
-        try {
-            $accurateService = app(AccurateService::class);
-            // $newPrice digunakan sbg targetPrice di service
-            $accurateResult = $accurateService->processWarrantyReplacement($claim, $this->replacement_imei, $newItemNo, $newPrice, $priceDifference, $this->replacement_type, $this->bank_no, $originalPrice);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Approve Replacement Error: " . $e->getMessage());
-            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses Accurate: ' . $e->getMessage(), type: 'error');
-            $this->showReplacementConfirmModal = false;
-            return;
-        }
-
-        // 2. Update Database Lokal
+        // Memulai Transaksi Database Lokal DULUAN agar jika ada error sintaks/enum (seperti Error 1265), Accurate TIDAK terlanjur tereksekusi.
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
+            // 1. Update Database Lokal (Tahap 1: Validasi DB & Status Claim)
             $claim->status = $priceDifference < 0 ? 'waiting_refund' : 'completed'; // Jika downgrade, tunggu kasir proses refund
-        if ($priceDifference < 0) {
-            $claim->refund_amount = abs($priceDifference);
-        }
-        $claim->resolved_at = Carbon::now();
-        $claim->resolution = 'replaced';
-        $noteType = $this->replacement_type === 'same' ? 'Ganti Unit' : ($priceDifference > 0 ? 'Upgrade Unit' : 'Downgrade Unit');
-        $claim->resolution_notes = "{$noteType} ke IMEI: {$this->replacement_imei}" .
-            ($newItemNo ? " (Barang Baru: {$this->replacement_product_name})" : "") .
-            " | {$this->resolution_notes}";
-        $claim->approved_by = Auth::id();
-        $claim->save();
+            if ($priceDifference < 0) {
+                $claim->refund_amount = abs($priceDifference);
+            }
+            $claim->resolved_at = Carbon::now();
+            $claim->resolution = 'replaced';
+            $noteType = $this->replacement_type === 'same' ? 'Ganti Unit' : ($priceDifference > 0 ? 'Upgrade Unit' : 'Downgrade Unit');
+            $claim->resolution_notes = "{$noteType} ke IMEI: {$this->replacement_imei}" .
+                ($newItemNo ? " (Barang Baru: {$this->replacement_product_name})" : "") .
+                " | {$this->resolution_notes}";
+            $claim->approved_by = Auth::id();
+            $claim->save();
 
-        // Nonaktifkan Garansi Lama
-        $oldWarranty = $claim->warranty;
-        $oldWarranty->status = 'replaced';
-        $oldWarranty->save();
+            // Nonaktifkan Garansi Lama (FIX ENUM BUG: 'replaced' diganti 'voided' atau 'claimed_out')
+            $oldWarranty = $claim->warranty;
+            $oldWarranty->status = 'voided'; 
+            $oldWarranty->save();
 
-        // Buat Garansi Baru untuk IMEI Baru
-        $newWarranty = $oldWarranty->replicate();
-        $newWarranty->serial_number = $this->replacement_imei;
-        $newWarranty->status = 'active';
-        $newWarranty->device_inspection_id = null; // Butuh QC baru nanti
+            // Buat Garansi Baru untuk IMEI Baru
+            $newWarranty = $oldWarranty->replicate();
+            $newWarranty->serial_number = $this->replacement_imei;
+            $newWarranty->status = 'active';
+            $newWarranty->device_inspection_id = null; // Butuh QC baru nanti
+            
+            // Simpan sementara agar terpicu query-nya dan mendeteksi error jika ada sebelum ke Accurate
+            $newWarranty->save();
+
+            // 2. Integrasi API Accurate (Dijalankan di DALAM try-catch transaksi DB)
+            $accurateService = app(AccurateService::class);
+            $accurateResult = $accurateService->processWarrantyReplacement($claim, $this->replacement_imei, $newItemNo, $newPrice, $priceDifference, $this->replacement_type, $this->bank_no, $originalPrice);
         
         // Increment claims used
         $newWarranty->claims_used = ($oldWarranty->claims_used ?? 0) + 1;
