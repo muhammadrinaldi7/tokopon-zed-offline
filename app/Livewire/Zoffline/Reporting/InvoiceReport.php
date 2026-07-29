@@ -84,7 +84,7 @@ class InvoiceReport extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        return Order::with(['user', 'accurateDocs', 'salesBy', 'paymentMethod', 'items.variant.product', 'promos'])
+        return Order::with(['user', 'handledBy', 'accurateDocs', 'salesBy', 'paymentMethod', 'items.variant.product', 'promos'])
             ->whereBetween('orders.created_at', [$start, $end])
             ->where('orders.order_status', 'COMPLETED')
             ->when($this->search, function ($query) {
@@ -118,6 +118,7 @@ class InvoiceReport extends Component
             // 1. Susun Header sesuai dengan kolom SELECT pada SQL
             $headers = [
                 'created_at',
+                'nama_kasir',
                 'jam',
                 'nama_toko',
                 'accurate_invoice_no',
@@ -157,6 +158,7 @@ class InvoiceReport extends Component
 
                         fputcsv($file, [
                             $createdAt,
+                            $order->handledBy->name,
                             $jamBayar,
                             $namaToko,
                             $invoiceNo,
