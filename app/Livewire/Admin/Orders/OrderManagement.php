@@ -383,6 +383,8 @@ class OrderManagement extends Component
             $query->where('order_number', 'like', '%' . $this->search . '%')
                 ->orWhereHas('user', function ($q) {
                     $q->where('name', 'like', '%' . $this->search . '%');
+                })->orWhereHas('items', function ($iq) {
+                    $iq->where('serial_number', 'like', '%' . $this->search . '%');
                 });
         }
 

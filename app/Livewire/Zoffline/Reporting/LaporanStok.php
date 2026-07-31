@@ -15,6 +15,7 @@ class LaporanStok extends Component
     public $warehouseId = '';
     public $sortField = 'created_at';
     public $sortDirection = 'desc';
+    public $csvSeparator = ';';
 
     public function updatingSearch()
     {
@@ -84,9 +85,11 @@ class LaporanStok extends Component
             'UMUR (HARI)'
         ];
 
-        $callback = function () use ($data, $columns) {
+        $separator = $this->csvSeparator;
+
+        $callback = function () use ($data, $columns, $separator) {
             $file = fopen('php://output', 'w');
-            fputcsv($file, $columns);
+            fputcsv($file, $columns, $separator);
 
             foreach ($data as $item) {
                 $umur = $item->receipt_date ? intval(\Carbon\Carbon::parse($item->receipt_date)->startOfDay()->diffInDays(now()->startOfDay())) . ' Hari' : '-';
@@ -102,7 +105,7 @@ class LaporanStok extends Component
                     $item->status,
                     $item->receipt_date ? \Carbon\Carbon::parse($item->receipt_date)->format('Y-m-d') : '-',
                     $umur
-                ]);
+                ], $separator);
             }
 
             fclose($file);

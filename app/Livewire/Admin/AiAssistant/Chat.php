@@ -104,6 +104,31 @@ class Chat extends Component
 
             $replyMessage = $responseData['jawaban_ai'];
 
+            // 1. Deteksi apakah AI meminta pembuatan file
+            if (strpos($replyMessage, '[GENERATE_FILE]') !== false) {
+
+                // 2. Ekstrak Tipe File dan Query menggunakan Regex sederhana
+                preg_match('/Tipe:\s*(.*)/', $replyMessage, $matchType);
+                preg_match('/Query:\s*(.*)/', $replyMessage, $matchQuery);
+                preg_match('/Pesan:\s*(.*)/', $replyMessage, $matchPesan);
+
+                $fileType = isset($matchType[1]) ? trim(strtolower($matchType[1])) : 'excel';
+                $sqlQuery = isset($matchQuery[1]) ? trim($matchQuery[1]) : '';
+                $pesanAi  = isset($matchPesan[1]) ? trim($matchPesan[1]) : 'File Anda sedang disiapkan...';
+
+                // Bersihkan tag dari pesan yang akan ditampilkan ke user
+                $replyMessage = $pesanAi . ' ⏳ (Memproses unduhan...)';
+
+                // 3. Simpan data ke session sementara untuk di-download
+                // (Karena Livewire memproses ini via AJAX, file download harus dipicu via event/route terpisah)
+                session()->put('ai_export_data', [
+                    'query' => $sqlQuery,
+                    'type'  => $fileType
+                ]);
+
+                // 4. Perintahkan frontend/browser untuk membuka URL download
+                $this->dispatch('triggerDownload', url: route('ai.export.report'));
+            }
             if (trim($replyMessage) === '') {
                 $replyMessage = '⚠️ (n8n membalas dengan teks kosong. Silakan cek pemetaan output di workflow n8n Anda.)';
             }

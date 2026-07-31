@@ -85,3 +85,11 @@
         </div>
     </div>
 </div>
+<script>
+    document.addEventListener('livewire:init', () => {
+        Livewire.on('triggerDownload', (event) => {
+            // Membuka tab baru/trigger download dari URL yang dikirim Livewire
+            window.open(event.url, '_blank');
+        });
+    });
+</script>

@@ -6,6 +6,14 @@
         </div>
 
         <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                <span class="text-xs text-gray-500 mr-2 font-medium">Separator:</span>
+                <select wire:model="csvSeparator"
+                    class="text-sm border-none bg-transparent focus:ring-0 text-gray-700 p-0 font-medium cursor-pointer w-full text-right truncate">
+                    <option value=";">Semicolon (;)</option>
+                    <option value=",">Comma (,)</option>
+                </select>
+            </div>
             <button wire:click="exportCsv" wire:loading.attr="disabled"
                 class="flex items-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
                 <svg wire:loading.remove wire:target="exportCsv" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"

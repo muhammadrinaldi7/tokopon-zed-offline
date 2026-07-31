@@ -21,6 +21,7 @@ class StockReport extends Component
     public $filterCategory = '';
     public $isAdmin = false;
     public $businessUnits = [];
+    public $csvSeparator = ';';
 
     public function mount()
     {
@@ -92,9 +93,11 @@ class StockReport extends Component
             'UMUR PRODUK (HARI)'
         ];
 
-        $callback = function () use ($data, $columns) {
+        $separator = $this->csvSeparator;
+
+        $callback = function () use ($data, $columns, $separator) {
             $file = fopen('php://output', 'w');
-            fputcsv($file, $columns);
+            fputcsv($file, $columns, $separator);
 
             foreach ($data as $item) {
                 fputcsv($file, [
@@ -107,7 +110,7 @@ class StockReport extends Component
                     $item['base_cost'],
                     $item['base_price'],
                     $item['age_days']
-                ]);
+                ], $separator);
             }
 
             fclose($file);
