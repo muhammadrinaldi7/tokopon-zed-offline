@@ -18,4 +18,9 @@ class OrderItemSerialNumber extends Model
     {
         return $this->belongsTo(OrderItem::class);
     }
+
+    public function warranty()
+    {
+        return $this->hasOne(Warranty::class, 'serial_number', 'serial_number');
+    }
 }

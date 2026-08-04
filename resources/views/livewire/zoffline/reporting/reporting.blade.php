@@ -183,5 +183,21 @@
             </div>
         @endcan
 
+        @can('laporan-garansi')
+            <div wire:click="navigateToWarranty"
+                class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+                <div class="rounded-full w-16 h-16 bg-teal-50 flex items-center justify-center text-teal-600">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Laporan Aktivasi Garansi</h2>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau performa promotor/inspektur garansi</p>
+                </div>
+            </div>
+        @endcan
+
     </div>
 </div>

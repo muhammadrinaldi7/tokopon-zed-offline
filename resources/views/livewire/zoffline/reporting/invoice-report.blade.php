@@ -199,6 +199,7 @@
                             </td>
                             <td class="px-5 py-3 text-xs font-medium text-gray-700">
                                 @forelse ($order->payments as $payment)
+                                    <span class="font-bold text-[10px] uppercase text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{{ $this->getPaymentType($payment) }}</span><br>
                                     {{ $payment->paymentMethod->bank_name }}
                                     {{ $payment->paymentMethodRate->name ?? '-' }}<br>
                                     ({{ number_format($payment->amount, 0, ',', '.') }})

@@ -536,7 +536,7 @@ class SalesReport extends Component
     public function exportCsvOpsi3()
     {
         // Eager load relasi payments untuk performa saat generate CSV
-        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'promos.skus', 'promos.bundleSkus'])->get();
+        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'items.promos', 'promos.skus', 'promos.bundleSkus'])->get();
         $csvFileName = 'laporan_penjualan_kolom_statis_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
         $separator = $this->csvSeparator;
         return response()->streamDownload(function () use ($orders, $separator) {
@@ -634,69 +634,20 @@ class SalesReport extends Component
                 }
                 $orderPayments = array_values($orderPayments);
 
-                // Pra-kalkulasi kelayakan promo
-                $promoEligibleSubtotals = [];
-                foreach ($order->promos as $promo) {
-                    $promoSkus = $promo->skus->pluck('sku')->toArray();
-                    $bundleSkus = $promo->bundleSkus->pluck('sku')->toArray();
-
-                    $validSubtotal = 0;
-                    foreach ($order->items as $item) {
-                        $sku = $item->variant?->sku ?? $item->variant?->item_no;
-                        $isMainEligible = ($promo->apply_to_all_items && !$promo->is_bundle) || in_array($sku, $promoSkus);
-                        $isBundleEligible = $promo->is_bundle && in_array($sku, $bundleSkus);
-
-                        if ($isMainEligible || $isBundleEligible) {
-                            $validSubtotal += $item->subtotal;
-                        }
-                    }
-                    $promoEligibleSubtotals[$promo->id] = $validSubtotal > 0 ? $validSubtotal : 1;
-                }
-
-                // PASS 1: Hitung Subtotal Aktual tiap item untuk Bobot Prorata Nominal Pembayaran
+                // Hitung Subtotal Aktual tiap item menggunakan data diskon promo dari DB (order_item_promos)
                 $itemPromoData = [];
-                $itemActualSubtotals = [];
                 $totalOrderActualSubtotal = 0;
-                $allocatedPromosTracker = [];
-
                 $itemCount = $order->items->count();
-                $currentIndex = 0;
 
                 foreach ($order->items as $item) {
-                    $currentIndex++;
-                    $isLastItem = ($currentIndex === $itemCount);
-                    $sku = $item->variant?->sku ?? $item->variant?->item_no;
-
-                    $itemPromosTotal = 0;
-                    $promoNames = [];
-
-                    foreach ($order->promos as $promo) {
-                        $promoSkus = $promo->skus->pluck('sku')->toArray();
-                        $bundleSkus = $promo->bundleSkus->pluck('sku')->toArray();
-
-                        $isMainEligible = ($promo->apply_to_all_items && !$promo->is_bundle) || in_array($sku, $promoSkus);
-                        $isBundleEligible = $promo->is_bundle && in_array($sku, $bundleSkus);
-
-                        if ($isMainEligible || $isBundleEligible) {
-                            $promoWeight = $item->subtotal / $promoEligibleSubtotals[$promo->id];
-                            $orderAmount = $promo->pivot->discount_applied ?? 0;
-
-                            if ($isLastItem) {
-                                $allocated = $orderAmount - ($allocatedPromosTracker[$promo->id] ?? 0);
-                            } else {
-                                $allocated = round($orderAmount * $promoWeight);
-                                if (!isset($allocatedPromosTracker[$promo->id])) $allocatedPromosTracker[$promo->id] = 0;
-                                $allocatedPromosTracker[$promo->id] += $allocated;
-                            }
-                            $itemPromosTotal += $allocated;
-                            $promoNames[] = $promo->name;
-                        }
-                    }
-
+                    $itemPromosTotal = $item->promos->sum('pivot.discount_amount');
+                    $promoNamesArray = $item->promos->pluck('name')->unique()->toArray();
+                    $promoNamesStr = !empty($promoNamesArray) ? implode(', ', $promoNamesArray) : '-';
+                    
                     $actualItemSubtotal = $item->subtotal - ($item->discount_amount ?? 0) - $itemPromosTotal;
 
                     $itemPromoData[$item->id] = [
-                        'promo_names' => !empty($promoNames) ? implode(', ', $promoNames) : '-',
+                        'promo_names' => $promoNamesStr,
                         'promo_total' => $itemPromosTotal,
                         'actual_subtotal' => $actualItemSubtotal
                     ];
@@ -746,8 +697,8 @@ class SalesReport extends Component
                         $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
                         $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];
 
-                        // Penjualan Bersih = (Qty * Harga / 1.11) - diskon item - diskon promo
-                        $penjualanBersih = round(($item->subtotal / 1.11) - ($item->discount_amount ?? 0) - $itemPromosTotal);
+                        // Penjualan Bersih = (Subtotal setelah semua diskon) / 1.11
+                        $penjualanBersih = round($actualItemSubtotal / 1.11);
 
                         $rowData = [
                             $order->order_date ? $order->order_date->format('Y-m-d') : $order->created_at->format('Y-m-d'),

@@ -125,6 +125,7 @@ class InvoiceReport extends Component
                 'order_number',
                 'catatan',
                 'no_kontrak',
+                'tipe_pembayaran',
                 'bankName',
                 'paymentMethod',
                 'variantMethod',
@@ -148,6 +149,7 @@ class InvoiceReport extends Component
 
                         // Ekstrak data dari relasi (LEFT JOIN payment_methods & payment_method_rates)
                         $bankName = $payment->paymentMethod->bank_name ?? null;
+                        $paymentType = $this->getPaymentType($payment);
                         $pmName = $payment->paymentMethod->name ?? null;
                         $pmrName = $payment->paymentMethodRate->name ?? null;
                         $mdrPct = $payment->paymentMethodRate->mdr_percentage ?? 0;
@@ -165,6 +167,7 @@ class InvoiceReport extends Component
                             $orderNo,
                             $order->notes,
                             $payment->no_kontrak,
+                            $paymentType,
                             $bankName,
                             $pmName,
                             $pmrName,
@@ -179,7 +182,9 @@ class InvoiceReport extends Component
                         $namaToko,
                         $invoiceNo,
                         $orderNo,
+                        null, // catatan
                         null, // no_kontrak
+                        null, // tipe_pembayaran
                         null, // paymentMethod
                         null, // variantMethod
                         null, // amount
@@ -190,6 +195,52 @@ class InvoiceReport extends Component
 
             fclose($file);
         }, $csvFileName);
+    }
+
+    public function getPaymentType($payment)
+    {
+        if (!$payment || !$payment->paymentMethod) {
+            return 'TUNAI';
+        }
+
+        $category = strtoupper($payment->paymentMethod->category ?? '');
+        if ($category === 'TUNAI') {
+            return 'TUNAI';
+        }
+
+        $bankName = strtolower($payment->paymentMethod->bank_name ?? '');
+        $methodName = strtolower($payment->paymentMethod->name ?? '');
+
+        // Daftar keyword untuk layanan Finance / Paylater
+        $financeKeywords = [
+            'Kredivo',
+            'Home Credit Indonesia',
+            'Yessscredit',
+            'Kredit Plus',
+            'Koperasi',
+            'E-digital POS',
+            'Shoope Pay',
+            'VAST',
+            'Samsung Finance Plus',
+            'Avanto',
+            'Akulaku',
+            'Indodana',
+            'Spectra',
+            'Columbus'
+        ];
+
+        foreach ($financeKeywords as $keyword) {
+            if (str_contains($bankName, strtolower($keyword)) || str_contains($methodName, strtolower($keyword))) {
+                return 'FINANCE';
+            }
+        }
+
+        // Cek langsung jika bank_name persis "FINANCE" (dari database)
+        if ($bankName === 'finance') {
+            return 'FINANCE';
+        }
+
+        return 'BANK';
     }
 
     #[Layout('layouts.admin')]

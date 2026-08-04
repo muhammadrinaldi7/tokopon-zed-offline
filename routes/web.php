@@ -64,6 +64,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/closing-kasir', \App\Livewire\Zoffline\Reporting\ClosingKasirReport::class)->name('closing-kasir');
         Route::get('/pembatalan', \App\Livewire\Zoffline\Reporting\CancellationReport::class)->name('pembatalan');
         Route::get('/sales-order', \App\Livewire\Zoffline\Reporting\SalesOrderReport::class)->name('sales-order');
+        Route::get('/warranty', \App\Livewire\Zoffline\Reporting\WarrantyReport::class)->name('warranty');
+        Route::get('/warranty/pdf', [\App\Http\Controllers\WarrantyReportPdfController::class, 'export'])->name('warranty.pdf');
         Route::get('/dashboard', \App\Livewire\Zoffline\Reporting\Dashboard::class)->name('dashboard-bm');
         Route::get('/laporan-pembayaran', \App\Livewire\Zoffline\Reporting\InvoiceReport::class)->name('pembayaran');
     });
