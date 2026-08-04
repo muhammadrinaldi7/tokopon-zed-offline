@@ -41,14 +41,14 @@ class SalesOrderReport extends Component
 
         // Outstanding SOs
         $outstandingQuery = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending']);
-        $outstandingOrders = $outstandingQuery->latest()->paginate(20);
+        $outstandingOrders = $outstandingQuery->with(['items.variant', 'user'])->latest()->paginate(20);
 
         // Metrics
         $totalOutstanding = (clone $outstandingQuery)->count();
         
         $totalPiutang = (clone $outstandingQuery)->get()->sum(function($order) {
             // Sisa tagihan = grand total - total DP
-            $dpPaid = $order->payments()->where('status', 'SUCCESS')->sum('amount');
+            $dpPaid = $order->payments()->where('status', 'PAID')->sum('amount');
             return max(0, $order->grand_total - $dpPaid);
         });
 
@@ -99,12 +99,17 @@ class SalesOrderReport extends Component
             // Output UTF-8 BOM
             fputs($file, "\xEF\xBB\xBF");
 
-            fputcsv($file, ['Tanggal SO', 'Umur (Hari)', 'No SO', 'Nama Pelanggan', 'No HP', 'Total Tagihan (Rp)', 'DP Masuk (Rp)', 'Sisa Tagihan (Rp)']);
+            fputcsv($file, ['Tanggal SO', 'Umur (Hari)', 'No SO', 'Nama Pelanggan', 'No HP', 'Item (Barang)', 'Total Tagihan (Rp)', 'DP Masuk (Rp)', 'Sisa Tagihan (Rp)']);
 
             foreach ($outstandingOrders as $order) {
-                $dpPaid = $order->payments()->where('status', 'SUCCESS')->sum('amount');
+                $dpPaid = $order->payments()->where('status', 'PAID')->sum('amount');
                 $sisaTagihan = max(0, $order->grand_total - $dpPaid);
                 $umurHari = $order->created_at->diffInDays(now());
+                
+                $itemsNames = $order->items->map(function ($item) {
+                    $name = $item->variant->name ?? $item->product_name ?? 'Item';
+                    return $name . ' (x' . $item->qty . ')';
+                })->implode(', ');
                 
                 fputcsv($file, [
                     $order->created_at->format('Y-m-d H:i:s'),
@@ -112,6 +117,7 @@ class SalesOrderReport extends Component
                     $order->order_number,
                     $order->user->name ?? '-',
                     $order->user->phone ?? '-',
+                    $itemsNames,
                     $order->grand_total,
                     $dpPaid,
                     $sisaTagihan

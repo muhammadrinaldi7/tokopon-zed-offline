@@ -75,6 +75,7 @@
                             <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-neutral-500 uppercase tracking-wider">Tanggal</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-neutral-500 uppercase tracking-wider">No SO</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-neutral-500 uppercase tracking-wider">Pelanggan</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-neutral-500 uppercase tracking-wider">Item (Barang)</th>
                             <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-neutral-500 uppercase tracking-wider">Total</th>
                             <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-emerald-600 uppercase tracking-wider">DP Masuk</th>
                             <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-red-600 uppercase tracking-wider">Sisa Tagihan</th>
@@ -83,7 +84,7 @@
                     <tbody class="bg-white divide-y divide-neutral-100">
                         @forelse ($outstandingOrders as $order)
                             @php
-                                $dpPaid = $order->payments()->where('status', 'SUCCESS')->sum('amount');
+                                $dpPaid = $order->payments()->where('status', 'PAID')->sum('amount');
                                 $sisaTagihan = max(0, $order->grand_total - $dpPaid);
                                 $isOld = $order->created_at->diffInDays(now()) > 30;
                             @endphp
@@ -100,6 +101,16 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="text-sm font-bold text-neutral-900">{{ $order->user->name ?? '-' }}</div>
                                     <div class="text-xs text-neutral-500">{{ $order->user->phone ?? '-' }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex flex-col gap-1">
+                                        @foreach($order->items as $item)
+                                            <div class="text-xs">
+                                                <span class="font-bold text-neutral-800">{{ $item->variant->name ?? $item->product_name ?? 'Item' }}</span>
+                                                <span class="text-neutral-500">x{{ $item->qty }}</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-neutral-900">
                                     {{ number_format($order->grand_total, 0, ',', '.') }}
