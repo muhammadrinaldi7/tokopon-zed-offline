@@ -1,6 +1,7 @@
 <?php
 
 use App\Ai\Agents\DatabaseAnalyzerAgent;
+use App\Http\Controllers\AiReportController;
 use App\Livewire\Admin\Accurate\AccurateInvoiceExport;
 use App\Livewire\Admin\Employe\EmployeManage;
 use App\Livewire\Admin\Vendor\VendorManage;
@@ -24,6 +25,7 @@ use Laravel\Ai\Exceptions\ProviderOverloadedException;
 // Route::get('/tesrenaldi', \App\Livewire\Admin\Pos\PointOfSale::class)->middleware(['auth', 'admin'])->name('/');
 Route::middleware(['auth'])->group(function () {
     // AI Assistant Routes
+    Route::get('/ai/export-report', [AiReportController::class, 'download'])->name('ai.export.report');
     Route::prefix('admin/ai-assistant')->name('admin.ai-assistant.')->group(function () {
         Route::get('/', \App\Livewire\Admin\AiAssistant\Chat::class)->name('index');
         Route::get('/settings', \App\Livewire\Admin\AiAssistant\Settings::class)->name('settings');
@@ -62,6 +64,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/closing-kasir', \App\Livewire\Zoffline\Reporting\ClosingKasirReport::class)->name('closing-kasir');
         Route::get('/pembatalan', \App\Livewire\Zoffline\Reporting\CancellationReport::class)->name('pembatalan');
         Route::get('/sales-order', \App\Livewire\Zoffline\Reporting\SalesOrderReport::class)->name('sales-order');
+        Route::get('/warranty', \App\Livewire\Zoffline\Reporting\WarrantyReport::class)->name('warranty');
+        Route::get('/warranty/pdf', [\App\Http\Controllers\WarrantyReportPdfController::class, 'export'])->name('warranty.pdf');
         Route::get('/dashboard', \App\Livewire\Zoffline\Reporting\Dashboard::class)->name('dashboard-bm');
         Route::get('/laporan-pembayaran', \App\Livewire\Zoffline\Reporting\InvoiceReport::class)->name('pembayaran');
     });

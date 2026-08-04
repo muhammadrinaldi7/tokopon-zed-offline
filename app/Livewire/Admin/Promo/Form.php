@@ -35,6 +35,7 @@ class Form extends Component
     // Conditions
     public $min_transaction_amount;
     public $min_qty;
+    public $max_qty;
     public $apply_to_all_items = true;
 
     // Bundle
@@ -79,6 +80,7 @@ class Form extends Component
 
             $this->min_transaction_amount = $promo->min_transaction_amount !== null ? (int) $promo->min_transaction_amount : null;
             $this->min_qty = $promo->min_qty;
+            $this->max_qty = $promo->max_qty;
             $this->apply_to_all_items = $promo->apply_to_all_items;
             $this->is_bundle = $promo->is_bundle;
             $this->bundle_max_qty = $promo->bundle_max_qty;
@@ -250,6 +252,7 @@ class Form extends Component
             'selected_payment_methods' => 'array',
             'min_transaction_amount' => 'nullable|numeric|min:0',
             'min_qty' => 'nullable|integer|min:1',
+            'max_qty' => 'nullable|integer|min:1',
             'apply_to_all_items' => 'boolean',
 
             'is_bundle' => 'boolean',
@@ -298,6 +301,7 @@ class Form extends Component
             'quota' => $this->quota ?: null,
             'min_transaction_amount' => $this->min_transaction_amount ?: null,
             'min_qty' => $this->min_qty ?: null,
+            'max_qty' => $this->max_qty ?: null,
             'apply_to_all_items' => $this->apply_to_all_items,
             'is_bundle' => $this->is_bundle,
             'bundle_discount_type' => $this->is_bundle ? $this->bundle_discount_type : null,

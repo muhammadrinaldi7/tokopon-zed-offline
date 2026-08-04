@@ -46,6 +46,11 @@ class PermissionSeeder extends Seeder
             'reporting-sales',
             'reporting-products',
             'reporting-staff',
+            'laporan-garansi',
+            'laporan-sales-order',
+            'laba-rugi',
+            'closing-kasir-report',
+            'laporan-cancel-order',
 
             // Pendukung Lainnya
             'manage-trade-in',
@@ -102,6 +107,11 @@ class PermissionSeeder extends Seeder
             'reporting-sales',
             'reporting-products',
             'reporting-staff',
+            'laporan-garansi',
+            'laporan-sales-order',
+            'laba-rugi',
+            'closing-kasir-report',
+            'laporan-cancel-order',
             'manage-trade-in',
             'manage-buyback',
             'view_dashboard'
