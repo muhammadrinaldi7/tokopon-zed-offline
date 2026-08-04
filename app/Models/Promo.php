@@ -17,6 +17,7 @@ class Promo extends Model
         'max_discount' => 'decimal:2',
         'min_transaction_amount' => 'decimal:2',
         'min_qty' => 'integer',
+        'max_qty' => 'integer',
         'bundle_discount_value' => 'decimal:2',
         'bundle_max_discount' => 'decimal:2',
         'bundle_max_qty' => 'integer',

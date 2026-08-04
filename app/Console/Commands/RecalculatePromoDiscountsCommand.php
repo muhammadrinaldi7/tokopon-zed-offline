@@ -94,19 +94,53 @@ class RecalculatePromoDiscountsCommand extends Command
                 foreach ($cartItem['promo_discounts'] ?? [] as $promoId => $discAmount) {
                     if ($discAmount > 0) {
                         if (!empty($cleanSns)) {
-                            // Jika ada SN, bagi diskon sebanyak jumlah SN
-                            $discountPerSn = round($discAmount / max(1, count($cleanSns)));
+                            $promo = \App\Models\Promo::with('bundleSkus')->find($promoId);
+                            $maxDiscountPerUnit = (float)$cartItem['price'];
+
+                            if ($promo) {
+                                $isBundleItem = $promo->is_bundle && in_array($cartItem['sku'] ?? '', $promo->bundleSkus->pluck('sku')->toArray());
+
+                                if ($isBundleItem) {
+                                    $bundleSku = $promo->bundleSkus->where('sku', $cartItem['sku'] ?? '')->first();
+                                    $type = ($bundleSku && $bundleSku->discount_value > 0) ? $bundleSku->discount_type : $promo->bundle_discount_type;
+                                    $val = ($bundleSku && $bundleSku->discount_value > 0) ? (float)$bundleSku->discount_value : (float)$promo->bundle_discount_value;
+                                    $max = ($bundleSku && $bundleSku->discount_value > 0) ? (float)$bundleSku->max_discount : (float)$promo->bundle_max_discount;
+
+                                    if ($type === 'fixed') {
+                                        $maxDiscountPerUnit = $val;
+                                    } else {
+                                        $calc = (float)$cartItem['price'] * ($val / 100);
+                                        $maxDiscountPerUnit = ($max > 0) ? min($calc, $max) : $calc;
+                                    }
+                                } else {
+                                    if ($promo->discount_type === 'fixed') {
+                                        $maxDiscountPerUnit = (float)$promo->discount_value;
+                                    } else {
+                                        $calc = (float)$cartItem['price'] * ((float)$promo->discount_value / 100);
+                                        $maxDiscountPerUnit = ($promo->max_discount > 0) ? min($calc, (float)$promo->max_discount) : $calc;
+                                    }
+                                }
+                            }
+
+                            $remainingAmount = $discAmount;
 
                             foreach ($cleanSns as $sn) {
-                                // Cari nama vendor asli dari tabel ProductSerialNumber
+                                if ($remainingAmount <= 0) break;
+
                                 $snModel = \App\Models\ProductSerialNumber::with('vendor')->where('serial_number', $sn)->first();
                                 $actualVendorName = $snModel?->vendor?->vendor_name ?? $vendorNameFallback;
 
-                                $orderItem->promos()->attach($promoId, [
-                                    'discount_amount' => $discountPerSn,
-                                    'serial_number' => $sn,
-                                    'vendor_name' => $actualVendorName,
-                                ]);
+                                $appliedDiscount = round(min($maxDiscountPerUnit, $remainingAmount, (float)$cartItem['price']));
+
+                                if ($appliedDiscount > 0) {
+                                    $orderItem->promos()->attach($promoId, [
+                                        'discount_amount' => $appliedDiscount,
+                                        'serial_number' => $sn,
+                                        'vendor_name' => $actualVendorName,
+                                    ]);
+
+                                    $remainingAmount -= $appliedDiscount;
+                                }
                             }
                         } else {
                             // Jika tidak ada SN, simpan 1 row seperti biasa

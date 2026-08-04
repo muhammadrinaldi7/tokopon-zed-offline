@@ -89,6 +89,13 @@ class PromoCalculatorService
             $eligibleAmount = $eligibleQty * $avgPrice;
         }
 
+        // Cap eligible qty berdasarkan max_qty untuk produk utama
+        if (!$forBundle && $promo->max_qty && $eligibleQty > $promo->max_qty) {
+            $avgPrice = $eligibleQty > 0 ? ($eligibleAmount / $eligibleQty) : 0;
+            $eligibleQty = $promo->max_qty;
+            $eligibleAmount = $eligibleQty * $avgPrice;
+        }
+
         return ['qty' => $eligibleQty, 'amount' => $eligibleAmount];
     }
 
@@ -135,13 +142,24 @@ class PromoCalculatorService
 
                 // Distribusikan
                 $mainSkus = $promo->apply_to_all_items ? array_column($cart, 'sku') : $promo->skus->pluck('sku')->toArray();
+                $isFixed = $promo->discount_type === 'fixed';
+                $remainingDiscount = $mainDiscountValue;
                 foreach ($cart as $key => $item) {
-                    if (in_array($item['sku'], $mainSkus)) {
+                    if (in_array($item['sku'], $mainSkus) && $remainingDiscount > 0) {
                         $itemAmount = $item['qty'] * $item['price'];
-                        $proportion = $eligibleMain['amount'] > 0 ? ($itemAmount / $eligibleMain['amount']) : 0;
-                        $itemDiscount = round($mainDiscountValue * $proportion);
+                        
+                        $proportion = 0;
+                        if ($isFixed) {
+                            $proportion = $eligibleMain['qty'] > 0 ? ($item['qty'] / $eligibleMain['qty']) : 0;
+                        } else {
+                            $proportion = $eligibleMain['amount'] > 0 ? ($itemAmount / $eligibleMain['amount']) : 0;
+                        }
+                        
+                        $itemDiscount = round(min($mainDiscountValue * $proportion, $remainingDiscount, $itemAmount));
                         $cart[$key]['promo_discount'] += $itemDiscount;
                         $cart[$key]['promo_discounts'][$promo->id] = ($cart[$key]['promo_discounts'][$promo->id] ?? 0) + $itemDiscount;
+                        
+                        $remainingDiscount -= $itemDiscount;
                     }
                 }
             }

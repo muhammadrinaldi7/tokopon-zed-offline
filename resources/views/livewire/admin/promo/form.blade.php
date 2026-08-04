@@ -311,7 +311,7 @@
                 </svg>
                 Syarat & Ketentuan
             </h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-2">Minimal Transaksi</label>
 
@@ -349,9 +349,19 @@
                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                     @enderror
                 </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">Maksimal Kuantitas Barang (Pcs)</label>
+                    <input type="number" wire:model="max_qty"
+                        class="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        min="1" placeholder="Kosongkan jika tanpa batas">
+                    <p class="text-xs text-gray-500 mt-1">Maks. jumlah unit yang boleh mendapat diskon per nota.</p>
+                    @error('max_qty')
+                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
 
                 <div
-                    class="flex flex-col gap-4 justify-center md:col-span-2 mt-2 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    class="flex flex-col gap-4 justify-center md:col-span-3 mt-2 bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" wire:model="is_multiply" class="sr-only peer">
                         <div
@@ -378,7 +388,7 @@
                 </div>
 
                 {{-- Toggle Bundling --}}
-                <div class="md:col-span-2 mt-2">
+                <div class="md:col-span-3 mt-2">
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" wire:model.live="is_bundle" class="sr-only peer">
                         <div
@@ -391,7 +401,7 @@
                 </div>
 
                 @if ($is_bundle)
-                    <div class="md:col-span-2 mt-2 bg-amber-50 rounded-xl p-4 border border-amber-200">
+                    <div class="md:col-span-3 mt-2 bg-amber-50 rounded-xl p-4 border border-amber-200">
                         <h4 class="font-bold text-amber-800 mb-4 border-b border-amber-200 pb-2">Aturan Diskon Produk
                             Pendamping (Bundle)</h4>
 
@@ -544,7 +554,7 @@
                     </div>
                 @endif
 
-                <div class="md:col-span-2 mt-4">
+                <div class="md:col-span-3 mt-4">
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" wire:model.live="apply_to_all_items" class="sr-only peer">
                         <div
@@ -555,7 +565,7 @@
                 </div>
 
                 @if (!$apply_to_all_items)
-                    <div class="md:col-span-2 mt-2 bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <div class="md:col-span-3 mt-2 bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <label class="block text-sm font-bold text-gray-700 mb-2">
                             Pilih Barang yang Berlaku (Pilih produk/SKU Utama)
                         </label>
