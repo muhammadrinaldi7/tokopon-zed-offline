@@ -1670,6 +1670,7 @@ trait WithCheckoutAndReceipt
                 'discount_total' => $discountTotal,
                 'promo_discount' => $promoDiscountTotal,
                 'grand_total' => $grandTotal,
+                'notes' => $this->notes,
             ]);
 
             $this->restoreStockFromOldItems($order);
@@ -1759,7 +1760,7 @@ trait WithCheckoutAndReceipt
                         'branchName' => $accurateBranchName,
                         'transDate' => now()->format('d/m/Y'),
                         'salesOrderNumber' => $order->accurate_so_number,
-                        'description' => 'DO Otomatis dari Pelunasan POS',
+                        'description' => 'DO Otomatis dari Pelunasan POS' . (!empty($this->notes) ? ' - ' . $this->notes : ''),
                         'detailItem' => $doDetailItems
                     ];
 
@@ -1800,7 +1801,7 @@ trait WithCheckoutAndReceipt
                         'detailItem' => $siDetailItems,
                         'inclusiveTax' => true,
                         'taxable' => true,
-                        'description' => 'Pelunasan SO via POS'
+                        'description' => 'Pelunasan SO via POS' . (!empty($this->notes) ? ' - ' . $this->notes : '')
                     ];
 
                     // DP
@@ -1892,7 +1893,7 @@ trait WithCheckoutAndReceipt
                             'chequeAmount' => (float) $netReceiptAmount,
                             'transDate' => now()->format('d/m/Y'),
                             'detailInvoice' => [$detailInvoiceItem],
-                            'description' => 'Pelunasan SO via POS'
+                            'description' => 'Pelunasan SO via POS' . (!empty($this->notes) ? ' - ' . $this->notes : '')
                         ];
 
                         $srResult = $accurateService->postSalesReceipt($srData, $dbSource);

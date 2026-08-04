@@ -2,6 +2,7 @@
 
 use App\Ai\Agents\DatabaseAnalyzerAgent;
 use App\Http\Controllers\AiReportController;
+use App\Http\Controllers\WarrantyReportPdfController;
 use App\Livewire\Admin\Accurate\AccurateInvoiceExport;
 use App\Livewire\Admin\Employe\EmployeManage;
 use App\Livewire\Admin\Vendor\VendorManage;
@@ -13,6 +14,7 @@ use App\Livewire\Pages\SellPhoneHistory;
 use App\Livewire\Pages\TradeIn;
 use App\Livewire\Pages\UserProfile;
 use App\Livewire\Zoffline\Qc\ActivationList;
+use App\Livewire\Zoffline\Reporting\WarrantyReport;
 use App\Livewire\Zoffline\Warehouse\CekStock;
 use App\Livewire\Zoffline\Warehouse\CheckSerialNumber;
 use App\Livewire\Zoffline\Warehouse\SerialNumberHistory;
@@ -64,8 +66,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/closing-kasir', \App\Livewire\Zoffline\Reporting\ClosingKasirReport::class)->name('closing-kasir');
         Route::get('/pembatalan', \App\Livewire\Zoffline\Reporting\CancellationReport::class)->name('pembatalan');
         Route::get('/sales-order', \App\Livewire\Zoffline\Reporting\SalesOrderReport::class)->name('sales-order');
-        Route::get('/warranty', \App\Livewire\Zoffline\Reporting\WarrantyReport::class)->name('warranty');
-        Route::get('/warranty/pdf', [\App\Http\Controllers\WarrantyReportPdfController::class, 'export'])->name('warranty.pdf');
+        Route::get('/warranty', WarrantyReport::class)->name('warranty');
+        Route::get('/warranty/pdf', [WarrantyReportPdfController::class, 'export'])->name('warranty.pdf');
         Route::get('/dashboard', \App\Livewire\Zoffline\Reporting\Dashboard::class)->name('dashboard-bm');
         Route::get('/laporan-pembayaran', \App\Livewire\Zoffline\Reporting\InvoiceReport::class)->name('pembayaran');
     });
