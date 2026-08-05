@@ -29,6 +29,11 @@ class RiwayatPenjualan extends Component
     public $cancelOrderId = null;
     public $cancelReason = '';
 
+    // Direct cancellation properties (tanpa approval)
+    public $showDirectCancelModal = false;
+    public $directCancelOrderId = null;
+    public $directCancelReason = '';
+
     public function reprintOrder($orderId)
     {
         $this->completedOrder = Order::with(['items.variant', 'user', 'payments.paymentMethod', 'handledBy', 'salesBy'])->find($orderId);
@@ -430,6 +435,59 @@ class RiwayatPenjualan extends Component
     {
         $this->showCancelModal = false;
         $this->cancelOrderId = null;
+    }
+
+    // Direct Cancellation Methods (tanpa approval)
+    public function requestDirectCancellation($orderId)
+    {
+        $this->directCancelOrderId = $orderId;
+        $this->directCancelReason = '';
+        $this->showDirectCancelModal = true;
+    }
+
+    public function closeDirectCancelModal()
+    {
+        $this->showDirectCancelModal = false;
+        $this->directCancelOrderId = null;
+        $this->directCancelReason = '';
+    }
+
+    public function directCancellation()
+    {
+        $this->validate([
+            'directCancelReason' => 'required|min:5'
+        ], [
+            'directCancelReason.required' => 'Alasan pembatalan wajib diisi.',
+            'directCancelReason.min' => 'Alasan pembatalan minimal 5 karakter.'
+        ]);
+
+        $order = Order::find($this->directCancelOrderId);
+        if (!$order) {
+            $this->dispatch('toast', title: 'Error', message: 'Transaksi tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        try {
+            // 1. Hapus dokumen di Accurate (Sales Receipt, Sales Invoice, DO, SO)
+            $accurateService = app(\App\Services\AccurateService::class);
+            $accurateService->rollbackOrderDocuments($order);
+
+            // 2. Update order status ke DRAFT dan null-kan kolom accurate
+            $order->update([
+                'order_status' => 'DRAFT',
+                'accurate_invoice_no' => null,
+                'accurate_receipt_no' => null,
+            ]);
+
+            // 3. Hapus semua payment terkait order ini
+            $order->payments()->delete();
+
+            $this->dispatch('toast', title: 'Berhasil', message: 'Dokumen Accurate dihapus & transaksi dikembalikan ke Draft.', type: 'success');
+            $this->closeDirectCancelModal();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Direct Cancellation Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Terjadi kesalahan: ' . $e->getMessage(), type: 'error');
+        }
     }
 
     public function submitCancellation()

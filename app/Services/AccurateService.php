@@ -2003,14 +2003,24 @@ class AccurateService
             $matchedDocs = $docs->where('doc_type', $type)->where('status', 'SUCCESS');
             foreach ($matchedDocs as $doc) {
                 if ($doc->accurate_id) {
-                    if (in_array($type, ['SALES_RECEIPT', 'receipt'])) {
-                        $this->deleteSalesReceipt($doc->accurate_id, $dbSource);
-                    } elseif (in_array($type, ['SALES_INVOICE', 'invoice'])) {
-                        $this->deleteSalesInvoice($doc->accurate_id, $dbSource);
-                    } elseif ($type === 'DELIVERY_ORDER') {
-                        $this->deleteDeliveryOrder($doc->accurate_id, $dbSource);
-                    } elseif ($type === 'SALES_ORDER') {
-                        $this->deleteSalesOrder($doc->accurate_id, $dbSource);
+                    try {
+                        if (in_array($type, ['SALES_RECEIPT', 'receipt'])) {
+                            $this->deleteSalesReceipt($doc->accurate_id, $dbSource);
+                        } elseif (in_array($type, ['SALES_INVOICE', 'invoice'])) {
+                            $this->deleteSalesInvoice($doc->accurate_id, $dbSource);
+                        } elseif ($type === 'DELIVERY_ORDER') {
+                            $this->deleteDeliveryOrder($doc->accurate_id, $dbSource);
+                        } elseif ($type === 'SALES_ORDER') {
+                            $this->deleteSalesOrder($doc->accurate_id, $dbSource);
+                        }
+                    } catch (\Exception $e) {
+                        // Jika dokumen sudah dihapus di Accurate, lanjut saja
+                        if (str_contains($e->getMessage(), 'tidak ditemukan atau sudah dihapus')) {
+                            Log::warning("Rollback: Dokumen {$type} ID {$doc->accurate_id} sudah tidak ada di Accurate, skip. ({$e->getMessage()})");
+                        } else {
+                            // Error lain selain "sudah dihapus", tetap throw
+                            throw $e;
+                        }
                     }
                     $doc->update(['status' => 'CANCELLED']);
                 }
