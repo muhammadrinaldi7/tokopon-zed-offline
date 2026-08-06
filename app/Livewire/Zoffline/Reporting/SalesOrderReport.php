@@ -40,7 +40,7 @@ class SalesOrderReport extends Component
             ]);
 
         // Outstanding SOs
-        $outstandingQuery = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending']);
+        $outstandingQuery = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending', 'paid']);
         $outstandingOrders = $outstandingQuery->with(['items.variant', 'user'])->latest()->paginate(20);
 
         // Metrics
@@ -83,7 +83,7 @@ class SalesOrderReport extends Component
                 Carbon::parse($this->dateTo)->endOfDay(),
             ]);
 
-        $outstandingOrders = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending'])->latest()->get();
+        $outstandingOrders = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending', 'paid'])->latest()->get();
 
         $headers = [
             "Content-type"        => "text/csv",
@@ -140,10 +140,10 @@ class SalesOrderReport extends Component
                         fputcsv($file, [
                             $order->created_at->format('Y-m-d H:i:s'),
                             $umurHari,
-                            $order->branch->name ??'-',
+                            $order->branch->name ?? '-',
                             $order->order_number,
-                            $order->handledBy->name ??'-',
-                            $order->salesBy->name??'-',
+                            $order->handledBy->name ?? '-',
+                            $order->salesBy->name ?? '-',
                             $order->user->name ?? '-',
                             $order->user->profile->phone_number ?? '-',
                             $itemName,
