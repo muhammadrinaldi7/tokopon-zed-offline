@@ -255,6 +255,18 @@
                     x-show="sidebarCollapsed" style="display:none;" x-cloak>Pesanan & Tagihan
                     (SO)</span>
             </a>
+
+            <a href="{{ route('admin.orders.reset-to-draft') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.orders.reset-to-draft') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.orders.reset-to-draft') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Reset ke Draft</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Reset ke Draft</span>
+            </a>
         @endcan
 
         @can('view-reporting')
