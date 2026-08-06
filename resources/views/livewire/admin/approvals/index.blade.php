@@ -74,18 +74,26 @@
                             <div class="text-[10px] text-gray-500 mt-1">Level: {{ $req->current_level }} / {{ $req->required_level }}</div>
                         </td>
                         <td class="px-6 py-4 text-center">
-                            @if($req->status === 'PENDING')
                             <div class="flex items-center justify-center gap-2">
-                                <button wire:click="confirmApprove({{ $req->id }})" class="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded transition" title="Setujui">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                {{-- Tombol Lihat Detail (Selalu muncul untuk semua status) --}}
+                                <button wire:click="viewDetail({{ $req->id }})" class="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition" title="Lihat Detail & Struk">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
                                 </button>
-                                <button wire:click="reject({{ $req->id }})" wire:confirm="Tolak pengajuan ini?" class="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded transition" title="Tolak">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
+
+                                @if($req->status === 'PENDING')
+                                    <button wire:click="confirmApprove({{ $req->id }})" class="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition" title="Setujui">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    </button>
+                                    <button wire:click="confirmReject({{ $req->id }})" class="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition" title="Tolak">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    </button>
+                                @else
+                                    <span class="text-xs text-gray-400 font-medium">Terkunci</span>
+                                @endif
                             </div>
-                            @else
-                                <span class="text-xs text-gray-400 font-medium">Terkunci</span>
-                            @endif
                         </td>
                     </tr>
                     @empty
@@ -175,4 +183,50 @@
         </div>
     </div>
     @endif
+
+    <!-- Rejection Modal -->
+    @if($rejectingApprovalId)
+    <div class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden" @click.outside="$wire.cancelReject()">
+            <div class="p-6">
+                <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-4 border border-rose-100">
+                    <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                </div>
+                
+                <h3 class="text-center text-lg font-bold text-gray-900 mb-1">Tolak Pengajuan</h3>
+                <p class="text-center text-xs text-gray-500 mb-4">
+                    Silakan tuliskan alasan penolakan. Alasan ini akan tercatat dalam riwayat persetujuan.
+                </p>
+
+                <div class="mb-5 text-left">
+                    <label class="block text-xs font-bold text-gray-700 mb-1.5">
+                        Alasan Penolakan <span class="text-rose-500">*</span>
+                    </label>
+                    <textarea 
+                        wire:model="rejectionReason" 
+                        rows="3" 
+                        placeholder="Contoh: Dokumen tidak lengkap / Stok sudah terlanjur dialokasikan..."
+                        class="w-full px-3.5 py-2.5 bg-gray-50 border @error('rejectionReason') border-rose-300 ring-1 ring-rose-300 @else border-gray-200 @enderror rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition resize-none"></textarea>
+                    @error('rejectionReason')
+                        <p class="text-rose-600 text-[11px] mt-1 font-medium">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="flex justify-end gap-2.5">
+                    <button wire:click="cancelReject" type="button" class="px-4 py-2 text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
+                        Batal
+                    </button>
+                    <button wire:click="executeReject" type="button" class="px-4 py-2 text-xs font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 focus:ring-4 focus:ring-rose-200 transition shadow-sm shadow-rose-500/20">
+                        Tolak Pengajuan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- Detail & Struk Modal --}}
+    @include('livewire.admin.approvals.partials.approval-detail-modal')
 </div>
