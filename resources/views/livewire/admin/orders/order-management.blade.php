@@ -4,7 +4,21 @@
             <h1 class="text-2xl font-extrabold text-gray-900">Kelola Pesanan</h1>
             <p class="text-gray-500 text-sm mt-1">Pantau dan kelola seluruh transaksi pelanggan.</p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('admin.orders.issues') }}" wire:navigate
+                class="relative px-4 py-2 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors text-sm font-bold flex items-center gap-2">
+                <svg class="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                </svg>
+                <span>Kendala Pesanan</span>
+                @if (($openIssuesTotal ?? 0) > 0)
+                    <span class="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-600 px-1.5 text-[11px] font-extrabold text-white animate-pulse">
+                        {{ $openIssuesTotal }}
+                    </span>
+                @endif
+            </a>
+
             <a href="{{ route('admin.orders.import-draft') }}" wire:navigate
                 class="px-4 py-2 bg-[#1c69d4] text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-bold flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -155,6 +169,21 @@
                                                 d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
                                     </button>
+
+                                    {{-- Order Issues / Comments Button --}}
+                                    <button wire:click="openIssues({{ $order->id }})"
+                                        class="relative p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                                        title="Catatan & Kesalahan Order">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                        </svg>
+                                        @if (($order->open_issues_count ?? 0) > 0)
+                                            <span class="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-extrabold text-white animate-pulse">
+                                                {{ $order->open_issues_count }}
+                                            </span>
+                                        @endif
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -183,5 +212,8 @@
 
     {{-- MODAL: Receipt (Struk) Khusus View Admin --}}
     @include('livewire.zoffline.pos.modal.riwayat-receipt')
+
+    {{-- MODAL: Catatan & Kesalahan Order (Issues) --}}
+    @include('livewire.admin.orders.modal.order-issues-modal')
 </div>
 

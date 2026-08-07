@@ -119,6 +119,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Pesanan
     Route::get('/orders', \App\Livewire\Admin\Orders\OrderManagement::class)->name('orders.management')->middleware('can:manage-orders');
+    Route::get('/orders/issues', \App\Livewire\Admin\Orders\OrderIssuesIndex::class)->name('orders.issues')->middleware('can:manage-orders');
     Route::get('/orders/import-draft', \App\Livewire\Admin\Orders\ImportDraft::class)->name('orders.import-draft')->middleware('can:manage-orders');
     Route::get('/orders/reset-to-draft', \App\Livewire\Admin\Orders\ResetToDraft::class)->name('orders.reset-to-draft')->middleware('can:manage-orders');
 
