@@ -132,13 +132,9 @@
                 <select wire:model.live="categoryFilter"
                     class="w-full px-3 py-2 bg-gray-50 border-gray-200 rounded-xl text-xs focus:ring-[#1c69d4]/20 focus:border-[#1c69d4]">
                     <option value="">Semua Kategori</option>
-                    <option value="SALAH_PRODUK">Salah Produk / Varian</option>
-                    <option value="SALAH_SN">Salah Serial Number (SN)</option>
-                    <option value="SELISIH_BAYAR">Selisih / Salah Bayar</option>
-                    <option value="SALAH_CUSTOMER">Salah Customer</option>
-                    <option value="SALAH_PROMO">Salah Diskon / Promo</option>
-                    <option value="SYNC_ACCURATE">Kendala Accurate</option>
-                    <option value="LAINNYA">Lainnya</option>
+                    <option value="SALAH_METODE_BAYAR">Salah Metode Bayar</option>
+                    <option value="SALAH_DISKON">Salah Input Diskon</option>
+                    <option value="SALAH_ITEM">Salah Input Item</option>
                 </select>
             </div>
 
@@ -189,13 +185,9 @@
                             $isResolved = $issue->status === 'RESOLVED';
                             $order = $issue->order;
                             $categoryInfo = [
-                                'SALAH_PRODUK' => ['label' => 'Salah Produk', 'class' => 'bg-amber-50 text-amber-700 border-amber-200'],
-                                'SALAH_SN' => ['label' => 'Salah SN / IMEI', 'class' => 'bg-purple-50 text-purple-700 border-purple-200'],
-                                'SELISIH_BAYAR' => ['label' => 'Selisih Bayar', 'class' => 'bg-rose-50 text-rose-700 border-rose-200'],
-                                'SALAH_CUSTOMER' => ['label' => 'Salah Customer', 'class' => 'bg-blue-50 text-blue-700 border-blue-200'],
-                                'SALAH_PROMO' => ['label' => 'Salah Promo', 'class' => 'bg-indigo-50 text-indigo-700 border-indigo-200'],
-                                'SYNC_ACCURATE' => ['label' => 'Kendala Accurate', 'class' => 'bg-cyan-50 text-cyan-700 border-cyan-200'],
-                                'LAINNYA' => ['label' => 'Lainnya', 'class' => 'bg-gray-100 text-gray-700 border-gray-200'],
+                                'SALAH_METODE_BAYAR' => ['label' => 'Salah Metode Bayar', 'class' => 'bg-rose-50 text-rose-700 border-rose-200'],
+                                'SALAH_DISKON' => ['label' => 'Salah Input Diskon', 'class' => 'bg-indigo-50 text-indigo-700 border-indigo-200'],
+                                'SALAH_ITEM' => ['label' => 'Salah Input Item', 'class' => 'bg-amber-50 text-amber-700 border-amber-200'],
                             ];
                             $cat = $categoryInfo[$issue->category] ?? ['label' => $issue->category, 'class' => 'bg-gray-100 text-gray-700 border-gray-200'];
                         @endphp
