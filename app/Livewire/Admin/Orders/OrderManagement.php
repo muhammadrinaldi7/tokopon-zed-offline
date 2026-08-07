@@ -26,7 +26,7 @@ class OrderManagement extends Component
     // Properties for Issue Modal
     public $showIssueModal = false;
     public $selectedOrderForIssue = null;
-    public $issueCategory = 'LAINNYA';
+    public $issueCategory = 'SALAH_METODE_BAYAR';
     public $issueComment = '';
 
     public function updatingSearch(): void
@@ -63,7 +63,7 @@ class OrderManagement extends Component
     {
         $this->selectedOrderForIssue = Order::with(['issues.user'])->find($orderId);
         if ($this->selectedOrderForIssue) {
-            $this->issueCategory = 'LAINNYA';
+            $this->issueCategory = 'SALAH_METODE_BAYAR';
             $this->issueComment = '';
             $this->showIssueModal = true;
         }
@@ -73,7 +73,7 @@ class OrderManagement extends Component
     {
         $this->showIssueModal = false;
         $this->selectedOrderForIssue = null;
-        $this->issueCategory = 'LAINNYA';
+        $this->issueCategory = 'SALAH_METODE_BAYAR';
         $this->issueComment = '';
     }
 
@@ -101,7 +101,7 @@ class OrderManagement extends Component
         ]);
 
         $this->issueComment = '';
-        $this->issueCategory = 'LAINNYA';
+        $this->issueCategory = 'SALAH_METODE_BAYAR';
         $this->selectedOrderForIssue->refresh();
         $this->selectedOrderForIssue->load(['issues.user']);
 

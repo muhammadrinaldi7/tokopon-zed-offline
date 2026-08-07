@@ -174,13 +174,9 @@ class OrderIssuesIndex extends Component
             ->first();
 
         $categoryLabels = [
-            'SALAH_PRODUK' => 'Salah Produk / Varian',
-            'SALAH_SN' => 'Salah Serial Number (SN)',
-            'SELISIH_BAYAR' => 'Selisih / Salah Bayar',
-            'SALAH_CUSTOMER' => 'Salah Customer',
-            'SALAH_PROMO' => 'Salah Diskon / Promo',
-            'SYNC_ACCURATE' => 'Kendala Accurate',
-            'LAINNYA' => 'Lainnya',
+            'SALAH_METODE_BAYAR' => 'Salah Metode Bayar',
+            'SALAH_DISKON' => 'Salah Input Diskon',
+            'SALAH_ITEM' => 'Salah Input Item',
         ];
 
         $issues = $this->getFilteredQuery()->paginate(15);

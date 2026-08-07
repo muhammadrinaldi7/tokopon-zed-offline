@@ -52,13 +52,9 @@ class OrderIssuesExport implements FromCollection, WithHeadings, ShouldAutoSize,
         $this->rowNumber++;
 
         $categoryLabels = [
-            'SALAH_PRODUK' => 'Salah Produk / Varian',
-            'SALAH_SN' => 'Salah Serial Number (SN / IMEI)',
-            'SELISIH_BAYAR' => 'Selisih / Salah Bayar',
-            'SALAH_CUSTOMER' => 'Salah Customer',
-            'SALAH_PROMO' => 'Salah Diskon / Promo',
-            'SYNC_ACCURATE' => 'Kendala Accurate / ERP',
-            'LAINNYA' => 'Lainnya',
+            'SALAH_METODE_BAYAR' => 'Salah Metode Bayar',
+            'SALAH_DISKON' => 'Salah Input Diskon',
+            'SALAH_ITEM' => 'Salah Input Item',
         ];
 
         $order = $issue->order;
