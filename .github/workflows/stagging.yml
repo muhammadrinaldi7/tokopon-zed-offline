@@ -228,6 +228,9 @@ jobs:
             # Hubungkan folder storage
             # php artisan storage:link
             
+            # Hapus folder usang yang menyebabkan error ComponentTagCompiler
+            rm -rf /home/${{ secrets.VPS_USERNAME }}/htdocs/zedpos.syihabstore.id/resources/views/admin/ai-assistant
+            
             # Bersihkan cache lama (termasuk view dari Livewire SFC jika ada pembaruan)
             php artisan optimize:clear
             
