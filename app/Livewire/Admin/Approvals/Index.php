@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Approvals;
 
 use App\Models\ApprovalRequest;
+use App\Models\Order;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
@@ -20,6 +21,49 @@ class Index extends Component
     public $confirmingApprovalId = null;
     public $confirmingRequestType = null;
     public $extensionDays = 7;
+
+    // Detail & Struk Modal
+    public $showDetailModal = false;
+    public $detailRequest = null;
+    public $detailOrder = null;
+
+    // Rejection Modal
+    public $rejectingApprovalId = null;
+    public $rejectionReason = '';
+
+    public function viewDetail($id)
+    {
+        $this->detailRequest = ApprovalRequest::with([
+            'approvable',
+            'requestedBy.branch',
+            'histories.actedBy'
+        ])->find($id);
+
+        if (!$this->detailRequest) return;
+
+        if ($this->detailRequest->approvable_type === Order::class || ($this->detailRequest->approvable instanceof Order)) {
+            $this->detailOrder = Order::with([
+                'items.variant',
+                'user.profile',
+                'payments.paymentMethod',
+                'payments.paymentMethodRate',
+                'handledBy',
+                'salesBy',
+                'businessUnit'
+            ])->find($this->detailRequest->approvable_id);
+        } else {
+            $this->detailOrder = null;
+        }
+
+        $this->showDetailModal = true;
+    }
+
+    public function closeDetail()
+    {
+        $this->showDetailModal = false;
+        $this->detailRequest = null;
+        $this->detailOrder = null;
+    }
 
     public function updatingSearch()
     {
@@ -123,7 +167,51 @@ class Index extends Component
         }
     }
 
-    public function reject($id)
+    public function confirmReject($id)
+    {
+        $request = ApprovalRequest::find($id);
+        if (!$request) return;
+
+        $user = Auth::user();
+        $nextLevel = $request->current_level + 1;
+
+        // Validasi Role (Early Check)
+        $rule = ApprovalRule::with('role')->where('module', $request->request_type)->where('level', $nextLevel)->first();
+
+        if ($rule && $rule->role) {
+            if (!$user->hasRole($rule->role->name) && !$user->hasRole('superadmin')) {
+                $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki role yang diizinkan untuk menolak di Level ' . $nextLevel, type: 'error');
+                return;
+            }
+        }
+
+        $this->rejectingApprovalId = $id;
+        $this->rejectionReason = '';
+    }
+
+    public function cancelReject()
+    {
+        $this->rejectingApprovalId = null;
+        $this->rejectionReason = '';
+        $this->resetValidation('rejectionReason');
+    }
+
+    public function executeReject()
+    {
+        $this->validate([
+            'rejectionReason' => 'required|min:5',
+        ], [
+            'rejectionReason.required' => 'Alasan penolakan wajib diisi.',
+            'rejectionReason.min' => 'Alasan penolakan minimal 5 karakter.',
+        ]);
+
+        if ($this->rejectingApprovalId) {
+            $this->reject($this->rejectingApprovalId, $this->rejectionReason);
+            $this->cancelReject();
+        }
+    }
+
+    public function reject($id, $reason = null)
     {
         $request = ApprovalRequest::find($id);
         if (!$request) return;
@@ -141,15 +229,17 @@ class Index extends Component
             }
         }
 
+        $notes = $reason ? $reason . ' (Ditolak oleh ' . $user->name . ')' : 'Rejected by ' . $user->name;
+
         $request->histories()->create([
             'acted_by' => $user->id,
             'action' => 'REJECTED',
             'level' => $request->current_level + 1,
-            'notes' => 'Rejected by ' . $user->name
+            'notes' => $notes
         ]);
 
         $request->update(['status' => 'REJECTED']);
-        $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan pembatalan telah ditolak.', type: 'info');
+        $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan telah ditolak.', type: 'info');
     }
 
     public function render()

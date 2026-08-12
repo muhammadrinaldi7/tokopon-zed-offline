@@ -294,6 +294,21 @@ trait WithCheckoutAndReceipt
 
             \Illuminate\Support\Facades\DB::beginTransaction();
 
+            $lockedDeposits = [];
+            if ($this->useCustomerDeposit && !empty($this->availableCustomerDeposits)) {
+                $depositIds = collect($this->availableCustomerDeposits)->pluck('id')->toArray();
+                $lockedDeposits = \App\Models\CustomerDeposit::whereIn('id', $depositIds)
+                    ->where('status', 'AVAILABLE')
+                    ->lockForUpdate()
+                    ->get();
+                
+                if ($lockedDeposits->count() !== count($this->availableCustomerDeposits)) {
+                    \Illuminate\Support\Facades\DB::rollBack();
+                    $this->dispatch('toast', title: 'Error', message: 'Beberapa deposit sudah tidak tersedia. Silakan muat ulang customer dan coba lagi.', type: 'error');
+                    return;
+                }
+            }
+
             if ($this->isPiutangSettlement) {
                 $order = Order::find($this->loadedDraftId);
 
@@ -506,6 +521,45 @@ trait WithCheckoutAndReceipt
                 ]);
             }
 
+            // Hitung validDpInvoices dan potong deposit secara lokal
+            $validDpInvoices = [];
+            $remainingGrandTotalForDp = (float)($this->subtotal() - $this->totalDiscount());
+            
+            if ($this->useCustomerDeposit && !empty($lockedDeposits)) {
+                foreach ($lockedDeposits as $deposit) {
+                    if (!empty($deposit->accurate_invoice_no) && $remainingGrandTotalForDp > 0) {
+                        $useAmount = min((float)$deposit->balance, $remainingGrandTotalForDp);
+                        $validDpInvoices[] = [
+                            'invoiceNumber' => $deposit->accurate_invoice_no,
+                            'paymentAmount' => $useAmount,
+                        ];
+                        
+                        \App\Models\CustomerDepositUsage::create([
+                            'customer_deposit_id' => $deposit->id,
+                            'order_id' => $order->id,
+                            'amount_used' => $useAmount,
+                        ]);
+
+                        \App\Models\OrderPayment::create([
+                            'order_id' => $order->id,
+                            'xendit_external_id' => 'DP-USE-' . date('YmdHis') . rand(1000, 9999),
+                            'amount' => $useAmount,
+                            'status' => 'PAID',
+                            'paid_at' => \Carbon\Carbon::now(),
+                        ]);
+
+                        $deposit->balance -= $useAmount;
+                        if ($deposit->balance <= 0) {
+                            $deposit->status = 'USED';
+                        }
+                        $deposit->order_id = $order->id; // Record usage origin
+                        $deposit->save();
+                        
+                        $remainingGrandTotalForDp -= $useAmount;
+                    }
+                }
+            }
+
             // KUNCI TRANSAKSI: Jika sampai sini aman, simpan permanen ke DB Lokal
             \Illuminate\Support\Facades\DB::commit();
 
@@ -609,6 +663,12 @@ trait WithCheckoutAndReceipt
                         'description' => $this->notes
                     ];
 
+
+                    
+                    if (count($validDpInvoices) > 0) {
+                        $siData['detailDownPayment'] = $validDpInvoices;
+                    }
+
                     $mdrExpenses = $order->getMdrExpenseDetails();
                     if (!empty($mdrExpenses)) {
                         $siData['detailExpense'] = $mdrExpenses;
@@ -693,6 +753,8 @@ trait WithCheckoutAndReceipt
                 $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate gagal.', type: 'warning');
                 // Sengaja tidak me-rethrow exception agar transaksi POS lokal tetap dianggap berhasil
             }
+
+
 
             // Success! Show receipt
             $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
@@ -923,6 +985,8 @@ trait WithCheckoutAndReceipt
         $this->isSoFulfillment = false;
         $this->isPiutangSettlement = false;
         $this->loadedDraftId = null;
+        $this->loadedSoOrderId = null;
+        $this->soPaidAmount = 0;
         $this->cart = [];
         $this->selectedSales = [];
         $this->notes = '';
@@ -946,6 +1010,12 @@ trait WithCheckoutAndReceipt
         $this->order_date = null;
         $this->currentStep = 1;
         $this->loadedDraftId = null;
+
+        // Reset deposit state
+        $this->useCustomerDeposit = false;
+        $this->availableCustomerDeposits = [];
+        $this->availableCustomerDepositTotal = 0;
+        $this->customDepositAmount = null;
     }
 
     public function closeReceipt()
@@ -982,6 +1052,12 @@ trait WithCheckoutAndReceipt
 
         // Reset promo data
         $this->selectedPromos = [];
+
+        // Reset deposit state
+        $this->useCustomerDeposit = false;
+        $this->availableCustomerDeposits = [];
+        $this->availableCustomerDepositTotal = 0;
+        $this->customDepositAmount = null;
     }
 
     // ─── Kirim Struk via Email (SMTP) ─────────────────────────
@@ -1631,6 +1707,22 @@ trait WithCheckoutAndReceipt
     {
         try {
             \Illuminate\Support\Facades\DB::beginTransaction();
+
+            $lockedDeposits = [];
+            if ($this->useCustomerDeposit && !empty($this->availableCustomerDeposits)) {
+                $depositIds = collect($this->availableCustomerDeposits)->pluck('id')->toArray();
+                $lockedDeposits = \App\Models\CustomerDeposit::whereIn('id', $depositIds)
+                    ->where('status', 'AVAILABLE')
+                    ->lockForUpdate()
+                    ->get();
+                
+                if ($lockedDeposits->count() !== count($this->availableCustomerDeposits)) {
+                    \Illuminate\Support\Facades\DB::rollBack();
+                    $this->dispatch('toast', title: 'Error', message: 'Beberapa deposit sudah tidak tersedia. Silakan muat ulang customer dan coba lagi.', type: 'error');
+                    return;
+                }
+            }
+
             $order = Order::with(['items.variant', 'user', 'accurateDocs', 'businessUnit'])->find($this->loadedSoOrderId);
             if (!$order) {
                 \Illuminate\Support\Facades\DB::rollBack();
@@ -1697,6 +1789,72 @@ trait WithCheckoutAndReceipt
                     'no_kontrak' => $payment['no_kontrak'] ?? null,
                 ]);
             }
+            // Hitung validDpInvoices dan potong deposit secara lokal
+            $dpInvoices = $order->accurateDocs()
+                ->where('doc_type', 'DP_INVOICE')
+                ->where('status', 'SUCCESS')
+                ->get();
+            $validDpInvoices = [];
+            $totalSoDp = 0;
+            foreach ($dpInvoices as $dpInv) {
+                $hasReceipt = $order->accurateDocs()
+                    ->where('doc_type', 'DP_RECEIPT')
+                    ->where('status', 'SUCCESS')
+                    ->where('created_at', '>=', $dpInv->created_at)
+                    ->exists();
+                if ($hasReceipt) {
+                    $validDpInvoices[] = [
+                        'invoiceNumber' => $dpInv->doc_number,
+                        'paymentAmount' => (float) $dpInv->amount,
+                    ];
+                    $totalSoDp += (float) $dpInv->amount;
+                }
+            }
+
+            // Apply Standalone Customer Deposits if enabled
+            $remainingGrandTotalForDp = $grandTotal - $totalSoDp;
+            if ($this->useCustomerDeposit && !empty($lockedDeposits)) {
+                foreach ($lockedDeposits as $deposit) {
+                    if (!empty($deposit->accurate_invoice_no) && $remainingGrandTotalForDp > 0) {
+                        $useAmount = min((float)$deposit->balance, $remainingGrandTotalForDp);
+                        $validDpInvoices[] = [
+                            'invoiceNumber' => $deposit->accurate_invoice_no,
+                            'paymentAmount' => $useAmount,
+                        ];
+                        
+                        \App\Models\CustomerDepositUsage::create([
+                            'customer_deposit_id' => $deposit->id,
+                            'order_id' => $order->id,
+                            'amount_used' => $useAmount,
+                        ]);
+
+                        \App\Models\OrderPayment::create([
+                            'order_id' => $order->id,
+                            'xendit_external_id' => 'DP-USE-' . date('YmdHis') . rand(1000, 9999),
+                            'amount' => $useAmount,
+                            'status' => 'PAID',
+                            'paid_at' => \Carbon\Carbon::now(),
+                        ]);
+
+                        $deposit->balance -= $useAmount;
+                        if ($deposit->balance <= 0) {
+                            $deposit->status = 'USED';
+                        }
+                        $deposit->order_id = $order->id; // Record usage origin
+                        $deposit->save();
+                        
+                        $remainingGrandTotalForDp -= $useAmount;
+                    }
+                }
+            }
+            
+            // Tandai deposit yang berasal dari SO ini (DP SO) menjadi USED
+            \App\Models\CustomerDeposit::where('origin_order_id', $order->id)
+                ->update([
+                    'status' => 'USED',
+                    'order_id' => $order->id, // Ikat kembali ke order untuk history
+                ]);
+
             \Illuminate\Support\Facades\DB::commit();
 
             try {
@@ -1805,24 +1963,8 @@ trait WithCheckoutAndReceipt
                     ];
 
                     // DP
-                    $dpInvoices = $order->accurateDocs()
-                        ->where('doc_type', 'DP_INVOICE')
-                        ->where('status', 'SUCCESS')
-                        ->get();
-                    $validDpInvoices = [];
-                    foreach ($dpInvoices as $dpInv) {
-                        $hasReceipt = $order->accurateDocs()
-                            ->where('doc_type', 'DP_RECEIPT')
-                            ->where('status', 'SUCCESS')
-                            ->where('created_at', '>=', $dpInv->created_at)
-                            ->exists();
-                        if ($hasReceipt) {
-                            $validDpInvoices[] = [
-                                'invoiceNumber' => $dpInv->doc_number,
-                                'paymentAmount' => (float) $dpInv->amount,
-                            ];
-                        }
-                    }
+
+
                     if (count($validDpInvoices) > 0) {
                         $siData['detailDownPayment'] = $validDpInvoices;
                     }
@@ -1857,6 +1999,8 @@ trait WithCheckoutAndReceipt
                             'amount' => $order->grand_total,
                             'status' => 'SUCCESS',
                         ]);
+
+
                     } else {
                         throw new \Exception('Gagal membuat Faktur Penjualan (SI) di Accurate: ' . ($siResult['d'][0] ?? json_encode($siResult)));
                     }

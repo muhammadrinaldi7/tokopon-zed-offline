@@ -95,7 +95,7 @@ class CancellationReport extends Component
             // Output UTF-8 BOM for Excel compatibility
             fputs($file, "\xEF\xBB\xBF");
 
-            fputcsv($file, ['Tanggal', 'Kasir', 'No Order', 'Channel', 'Nilai Transaksi (Rp)', 'Alasan', 'Status', 'Approved By']);
+            fputcsv($file, ['Tanggal', 'Kasir', 'No Order', 'No Accurate', 'Channel', 'Nilai Transaksi (Rp)', 'Alasan', 'Status', 'Approved By']);
 
             foreach ($baseQuery as $req) {
                 $orderNumber = $req->approvable ? $req->approvable->order_number : '-';
@@ -108,10 +108,18 @@ class CancellationReport extends Component
                 ];
                 $statusText = $statusMap[$req->status] ?? $req->status;
 
+                $accurateNo = '-';
+                if ($req->approvable) {
+                    $accurateNo = $req->approvable->order_channel === 'SO' 
+                        ? ($req->approvable->accurate_so_number ?? '-') 
+                        : ($req->approvable->accurate_invoice_no ?? '-');
+                }
+
                 fputcsv($file, [
                     $req->created_at->format('Y-m-d H:i:s'),
                     $req->requestedBy->name ?? '-',
                     $orderNumber,
+                    $accurateNo,
                     $channel,
                     $grandTotal,
                     $req->reason ?? '-',

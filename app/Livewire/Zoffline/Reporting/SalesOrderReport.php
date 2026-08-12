@@ -40,13 +40,13 @@ class SalesOrderReport extends Component
             ]);
 
         // Outstanding SOs
-        $outstandingQuery = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending']);
+        $outstandingQuery = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending', 'paid']);
         $outstandingOrders = $outstandingQuery->with(['items.variant', 'user'])->latest()->paginate(20);
 
         // Metrics
         $totalOutstanding = (clone $outstandingQuery)->count();
-        
-        $totalPiutang = (clone $outstandingQuery)->get()->sum(function($order) {
+
+        $totalPiutang = (clone $outstandingQuery)->get()->sum(function ($order) {
             // Sisa tagihan = grand total - total DP
             $dpPaid = $order->payments()->where('status', 'PAID')->sum('amount');
             return max(0, $order->grand_total - $dpPaid);
@@ -83,7 +83,7 @@ class SalesOrderReport extends Component
                 Carbon::parse($this->dateTo)->endOfDay(),
             ]);
 
-        $outstandingOrders = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending'])->latest()->get();
+        $outstandingOrders = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending', 'paid'])->latest()->get();
 
         $headers = [
             "Content-type"        => "text/csv",
@@ -95,33 +95,64 @@ class SalesOrderReport extends Component
 
         $callback = function () use ($outstandingOrders) {
             $file = fopen('php://output', 'w');
-            
+
             // Output UTF-8 BOM
             fputs($file, "\xEF\xBB\xBF");
 
-            fputcsv($file, ['Tanggal SO', 'Umur (Hari)', 'No SO', 'Nama Pelanggan', 'No HP', 'Item (Barang)', 'Total Tagihan (Rp)', 'DP Masuk (Rp)', 'Sisa Tagihan (Rp)']);
+            fputcsv($file, [
+                'Tanggal SO',
+                'Umur (Hari)',
+                'Cabang',
+                'No SO',
+                'Kasir',
+                'Sales',
+                'Nama Pelanggan',
+                'No HP',
+                'Item (Barang)',
+                'Total Tagihan (Rp)',
+                'DP Masuk (Rp)',
+                'Sisa Tagihan (Rp)'
+            ]);
 
             foreach ($outstandingOrders as $order) {
                 $dpPaid = $order->payments()->where('status', 'PAID')->sum('amount');
                 $sisaTagihan = max(0, $order->grand_total - $dpPaid);
                 $umurHari = $order->created_at->diffInDays(now());
-                
-                $itemsNames = $order->items->map(function ($item) {
-                    $name = $item->variant->name ?? $item->product_name ?? 'Item';
-                    return $name . ' (x' . $item->qty . ')';
-                })->implode(', ');
-                
-                fputcsv($file, [
-                    $order->created_at->format('Y-m-d H:i:s'),
-                    $umurHari,
-                    $order->order_number,
-                    $order->user->name ?? '-',
-                    $order->user->phone ?? '-',
-                    $itemsNames,
-                    $order->grand_total,
-                    $dpPaid,
-                    $sisaTagihan
-                ]);
+
+                if ($order->items->isEmpty()) {
+                    fputcsv($file, [
+                        $order->created_at->format('Y-m-d H:i:s'),
+                        $umurHari,
+                        $order->branch->name ?? '-',
+                        $order->order_number,
+                        $order->handledBy->name ?? '-',
+                        $order->salesBy->name ?? '-',
+                        $order->user->name ?? '-',
+                        $order->user->profile->phone_number ?? '-',
+                        '-',
+                        $order->grand_total,
+                        $dpPaid,
+                        $sisaTagihan
+                    ]);
+                } else {
+                    foreach ($order->items as $item) {
+                        $itemName = ($item->variant->name ?? $item->product_name ?? 'Item') . ' (x' . $item->qty . ')';
+                        fputcsv($file, [
+                            $order->created_at->format('Y-m-d H:i:s'),
+                            $umurHari,
+                            $order->branch->name ?? '-',
+                            $order->order_number,
+                            $order->handledBy->name ?? '-',
+                            $order->salesBy->name ?? '-',
+                            $order->user->name ?? '-',
+                            $order->user->profile->phone_number ?? '-',
+                            $itemName,
+                            $order->grand_total,
+                            $dpPaid,
+                            $sisaTagihan
+                        ]);
+                    }
+                }
             }
             fclose($file);
         };

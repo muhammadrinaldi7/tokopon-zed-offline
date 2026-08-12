@@ -3,6 +3,8 @@
 namespace App\Livewire\Admin\Orders;
 
 use App\Models\Order;
+use App\Models\OrderIssue;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -20,6 +22,12 @@ class OrderManagement extends Component
     // Properties for Receipt Modal
     public $showReceiptModal = false;
     public $completedOrder = null;
+
+    // Properties for Issue Modal
+    public $showIssueModal = false;
+    public $selectedOrderForIssue = null;
+    public $issueCategory = 'SALAH_METODE_BAYAR';
+    public $issueComment = '';
 
     public function updatingSearch(): void
     {
@@ -49,6 +57,85 @@ class OrderManagement extends Component
     {
         $this->showReceiptModal = false;
         $this->completedOrder = null;
+    }
+
+    public function openIssues(int $orderId): void
+    {
+        $this->selectedOrderForIssue = Order::with(['issues.user'])->find($orderId);
+        if ($this->selectedOrderForIssue) {
+            $this->issueCategory = 'SALAH_METODE_BAYAR';
+            $this->issueComment = '';
+            $this->showIssueModal = true;
+        }
+    }
+
+    public function closeIssues(): void
+    {
+        $this->showIssueModal = false;
+        $this->selectedOrderForIssue = null;
+        $this->issueCategory = 'SALAH_METODE_BAYAR';
+        $this->issueComment = '';
+    }
+
+    public function saveIssue(): void
+    {
+        if (!$this->selectedOrderForIssue) {
+            return;
+        }
+
+        $this->validate([
+            'issueCategory' => 'required|string|max:50',
+            'issueComment' => 'required|string|min:3',
+        ], [
+            'issueCategory.required' => 'Kategori wajib dipilih.',
+            'issueComment.required' => 'Catatan kendala wajib diisi.',
+            'issueComment.min' => 'Catatan kendala minimal 3 karakter.',
+        ]);
+
+        OrderIssue::create([
+            'order_id' => $this->selectedOrderForIssue->id,
+            'user_id' => Auth::id(),
+            'category' => $this->issueCategory,
+            'comment' => trim($this->issueComment),
+            'status' => 'OPEN',
+        ]);
+
+        $this->issueComment = '';
+        $this->issueCategory = 'SALAH_METODE_BAYAR';
+        $this->selectedOrderForIssue->refresh();
+        $this->selectedOrderForIssue->load(['issues.user']);
+
+        $this->dispatch('toast', title: 'Berhasil', message: 'Catatan kendala berhasil ditambahkan.', type: 'success');
+    }
+
+    public function toggleIssueStatus(int $issueId): void
+    {
+        $issue = OrderIssue::find($issueId);
+        if ($issue) {
+            $newStatus = $issue->status === 'OPEN' ? 'RESOLVED' : 'OPEN';
+            $issue->update(['status' => $newStatus]);
+
+            if ($this->selectedOrderForIssue) {
+                $this->selectedOrderForIssue->refresh();
+                $this->selectedOrderForIssue->load(['issues.user']);
+            }
+
+            $message = $newStatus === 'RESOLVED' ? 'Kendala ditandai Selesai.' : 'Kendala dibuka kembali.';
+            $this->dispatch('toast', title: 'Berhasil', message: $message, type: 'info');
+        }
+    }
+
+    public function deleteIssue(int $issueId): void
+    {
+        $issue = OrderIssue::find($issueId);
+        if ($issue) {
+            $issue->delete();
+            if ($this->selectedOrderForIssue) {
+                $this->selectedOrderForIssue->refresh();
+                $this->selectedOrderForIssue->load(['issues.user']);
+            }
+            $this->dispatch('toast', title: 'Berhasil', message: 'Catatan kendala dihapus.', type: 'success');
+        }
     }
 
     /**
@@ -377,6 +464,7 @@ class OrderManagement extends Component
     public function render()
     {
         $query = Order::with(['user', 'items', 'shipping'])
+            ->withCount(['openIssues'])
             ->orderByDesc('created_at');
 
         if ($this->search) {
@@ -401,6 +489,7 @@ class OrderManagement extends Component
         return view('livewire.admin.orders.order-management', [
             'orders' => $query->paginate(10),
             'warehouses' => \App\Models\Warehouse::all(),
+            'openIssuesTotal' => OrderIssue::where('status', 'OPEN')->count(),
         ]);
     }
 }

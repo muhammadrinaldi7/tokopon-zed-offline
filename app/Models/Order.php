@@ -83,6 +83,21 @@ class Order extends Model
         return $this->hasMany(OrderAccurateDoc::class);
     }
 
+    public function resetLogs()
+    {
+        return $this->hasMany(OrderResetLog::class);
+    }
+
+    public function issues()
+    {
+        return $this->hasMany(OrderIssue::class)->latest();
+    }
+
+    public function openIssues()
+    {
+        return $this->hasMany(OrderIssue::class)->where('status', 'OPEN');
+    }
+
     public function shipping()
     {
         // hasOne karena 1 order biasanya 1 pengiriman

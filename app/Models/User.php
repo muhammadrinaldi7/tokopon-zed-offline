@@ -181,4 +181,9 @@ class User extends Authenticatable implements HasMedia
     {
         return $this->belongsTo(Warehouse::class);
     }
+
+    public function orderIssues()
+    {
+        return $this->hasMany(OrderIssue::class);
+    }
 }

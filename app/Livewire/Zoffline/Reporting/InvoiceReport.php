@@ -86,7 +86,7 @@ class InvoiceReport extends Component
 
         return Order::with(['user', 'handledBy', 'accurateDocs', 'salesBy', 'paymentMethod', 'items.variant.product', 'promos'])
             ->whereBetween('orders.created_at', [$start, $end])
-            ->whereIn('orders.order_status', ['COMPLETED', 'down_payment'])
+            ->whereIn('orders.order_status', ['COMPLETED', 'down_payment', 'paid'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('orders.order_number', 'like', '%' . $this->search . '%')
@@ -139,14 +139,16 @@ class InvoiceReport extends Component
             foreach ($orders as $order) {
                 // Sama dengan JSON_VALUE(o.shipping_address_snapshot,'$.store')
                 $namaToko = $order->shipping_address_snapshot['store'] ?? null;
-                $createdAt = $order->created_at->format('Y-m-d H:i:s');
+
                 $invoiceNo = $order->accurate_invoice_no ?? $order->accurate_so_number ?? null;
                 $orderNo = $order->order_number;
 
                 // Simulasi: LEFT JOIN order_payments op ON o.id = op.order_id
                 if ($order->payments && $order->payments->count() > 0) {
                     foreach ($order->payments as $payment) {
-
+                        $paymentDate = $payment->paid_at ?? $payment->created_at;
+                        $createdAt = $paymentDate ? $paymentDate->format('Y-m-d') : null;
+                        
                         // Ekstrak data dari relasi (LEFT JOIN payment_methods & payment_method_rates)
                         $bankName = $payment->paymentMethod->bank_name ?? null;
                         $paymentType = $this->getPaymentType($payment);
@@ -154,7 +156,9 @@ class InvoiceReport extends Component
                         $pmrName = $payment->paymentMethodRate->name ?? null;
                         $mdrPct = $payment->paymentMethodRate->mdr_percentage ?? 0;
                         $amount = $payment->amount ?? 0;
-                        $jamBayar = $payment->created_at->format('H:i:s');
+                        
+                        $jamBayar = $paymentDate ? $paymentDate->format('H:i:s') : null;
+                        
                         // round(op.amount * pmr.mdr_percentage /100) as mdr
                         $mdr = round(($amount * $mdrPct) / 100);
 
@@ -179,6 +183,8 @@ class InvoiceReport extends Component
                     // Sifat LEFT JOIN: Jika order tidak memiliki payment, baris tetap dirender dengan value payment kosong (null)
                     fputcsv($file, [
                         $createdAt,
+                        $order->handledBy->name,
+                        $jamBayar ?? '-',
                         $namaToko,
                         $invoiceNo,
                         $orderNo,

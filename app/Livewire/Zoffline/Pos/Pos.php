@@ -132,6 +132,26 @@ class Pos extends Component
         if ($this->isPiutangSettlement && $step != 4) {
             return; // Cannot move to other steps
         }
+
+        if ($step == 4 && $this->selectedCustomerId) {
+            $orderId = $this->loadedSoOrderId ?? 0;
+            $this->availableCustomerDeposits = \App\Models\CustomerDeposit::where('user_id', $this->selectedCustomerId)
+                ->where('status', 'AVAILABLE')
+                ->where('balance', '>', 0)
+                ->where('business_unit_id', \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId())
+                ->where(function($q) use ($orderId) {
+                    $q->whereNull('origin_order_id')
+                      ->orWhere('origin_order_id', '!=', $orderId);
+                })
+                ->get()
+                ->toArray();
+            
+            $this->availableCustomerDepositTotal = collect($this->availableCustomerDeposits)->sum('balance');
+            if ($this->availableCustomerDepositTotal <= 0) {
+                $this->useCustomerDeposit = false;
+            }
+        }
+
         $this->currentStep = $step;
     }
 
@@ -148,13 +168,13 @@ class Pos extends Component
         // 1. Update nama dan email di tabel users
         $user = $this->existingCustomerToUpdate;
         $user->name = $this->customerName;
-        
+
         if (!empty($this->customerEmail)) {
             $user->email = $this->customerEmail;
         } else {
             $this->customerEmail = $user->email ?? '';
         }
-        
+
         $user->save();
 
         // 2. Update nama di user_profiles jika ada fieldnya, misal full_name
@@ -301,22 +321,22 @@ class Pos extends Component
         $this->paymentMode = null;
         $this->paymentWizardStep = 1;
         $this->activePaymentIndex = 0;
-        
+
         $hasDo = $order->accurateDocs->where('doc_type', 'DELIVERY_ORDER')->isNotEmpty();
         $this->showSoModal = false;
-        
+
         $paid = $order->payments()
             ->where('status', 'PAID')
             ->sum('amount');
-        
+
         $this->soPaidAmount = $paid;
-        
+
         $remaining = max(0, $order->grand_total - $paid);
         $this->payments[0]['amount'] = $remaining;
         // Kita juga perlu me-reset subtotal agar perhitungan valid. Nanti diatur di Computed properties.
 
         $this->dispatch('toast', title: 'Berhasil', message: 'Faktur SO berhasil dimuat.', type: 'success');
-        
+
         if ($hasDo) {
             $this->goToStep(4);
         } else {
@@ -560,13 +580,13 @@ class Pos extends Component
         }
 
         $order->items()->delete();
-        
+
         // Kembalikan kuota promo sebelum detach
         $promoIds = $order->promos()->pluck('promos.id')->toArray();
         if (!empty($promoIds)) {
             \App\Models\Promo::whereIn('id', $promoIds)->decrement('used_quota');
         }
-        
+
         $order->promos()->detach();
         $order->delete();
 
@@ -608,7 +628,7 @@ class Pos extends Component
     {
         $unit = \Illuminate\Support\Facades\Auth::user()->businessUnit?->code ?? 'all';
         $this->databaseSource = $unit !== 'all' ? $unit : 'syihab';
-        
+
         if ($unit === 'second') {
             $this->productType = 'second';
         } elseif ($unit === 'all') {
@@ -814,7 +834,7 @@ class Pos extends Component
         // Check if previously selected promos are still eligible
         $eligibleIds = $eligiblePromos->pluck('id')->toArray();
         $needsUpdate = false;
-        
+
         // Pastikan format awalnya adalah array
         if (!is_array($this->selectedPromos)) {
             $this->selectedPromos = $this->selectedPromos ? [$this->selectedPromos] : [];

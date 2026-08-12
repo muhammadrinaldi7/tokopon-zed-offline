@@ -47,7 +47,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/cek-stock', CekStock::class)->name('zoffline.cek-stock')->middleware('can:view-stock');
     Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view-reporting');
     Route::get('/zoffline/check-serial-number', CheckSerialNumber::class)->name('zoffline.check-serial-number')->middleware('can:view-warehouse-stocks');
-    Route::get('/zoffline/check-serial-number/{sn}/history', SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
+    Route::get('/zoffline/check-serial-number/history', SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
     Route::get('/zoffline/qc/list-activation', ActivationList::class)->name('zoffline.qc.list-activation');
 
     // Zoffline Approvals & Settings
@@ -68,6 +68,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/sales-order', \App\Livewire\Zoffline\Reporting\SalesOrderReport::class)->name('sales-order');
         Route::get('/warranty', WarrantyReport::class)->name('warranty');
         Route::get('/warranty/pdf', [WarrantyReportPdfController::class, 'export'])->name('warranty.pdf');
+        Route::get('/return-report', \App\Livewire\Zoffline\Reporting\ReturnReport::class)->name('return-report');
         Route::get('/dashboard', \App\Livewire\Zoffline\Reporting\Dashboard::class)->name('dashboard-bm');
         Route::get('/laporan-pembayaran', \App\Livewire\Zoffline\Reporting\InvoiceReport::class)->name('pembayaran');
     });
@@ -119,7 +120,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Pesanan
     Route::get('/orders', \App\Livewire\Admin\Orders\OrderManagement::class)->name('orders.management')->middleware('can:manage-orders');
+    Route::get('/orders/issues', \App\Livewire\Admin\Orders\OrderIssuesIndex::class)->name('orders.issues')->middleware('can:manage-orders');
     Route::get('/orders/import-draft', \App\Livewire\Admin\Orders\ImportDraft::class)->name('orders.import-draft')->middleware('can:manage-orders');
+    Route::get('/orders/reset-to-draft', \App\Livewire\Admin\Orders\ResetToDraft::class)->name('orders.reset-to-draft')->middleware('can:manage-orders');
+
+    // Customer Deposits
+    Route::get('/customer-deposits', \App\Livewire\Admin\Finance\CustomerDeposit\Index::class)->name('customer-deposits.index')->middleware('can:manage-orders');
 
     // Sales Order (Mini Accurate)
     Route::prefix('sales-orders')->name('sales-orders.')->middleware('can:manage-orders')->group(function () {

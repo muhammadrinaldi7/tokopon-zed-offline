@@ -31,13 +31,13 @@ class Show extends Component
     public $dp_contract_number;
 
     // Invoice Form
-    public $showInvoiceModal = false;
-    public $invoice_sns = [];
+    
+    
     public $invoice_payment_method_id;
     public $invoice_payment_method_rate_id;
-    public $invoice_date;
-    public $invoice_notes;
-    public $invoice_contract_number;
+    
+    
+    
 
     public function mount(Order $order)
     {
@@ -119,31 +119,39 @@ class Show extends Component
     }
 
 
+    /**
+     * Override dari WithPaymentAndPromo::isPaymentsValid()
+     * DP boleh parsial, berbeda dengan POS yang harus exact match.
+     */
     #[Computed]
     public function isPaymentsValid()
     {
-        $totalPaid = 0;
+        $depositToUse = $this->depositToUseAmount();
+        $totalPaid = $depositToUse;
 
         foreach ($this->payments as $p) {
-            // Jika kategori kosong, invalid
-            if (empty($p['category'])) {
-                return false;
-            }
-
-            // Jika ada baris yang belum dipilih payment method-nya
-            if (empty($p['payment_method_id'])) {
-                return false;
-            }
-
-            // Jika Non-Tunai, harus punya rate
-            if ($p['category'] === 'NON-TUNAI' && empty($p['payment_method_rate_id'])) {
-                $pm = \App\Models\PaymentMethod::find($p['payment_method_id']);
-                if ($pm && $pm->rates()->where('is_active', true)->count() > 0 && empty($p['payment_method_rate_id'])) {
+            $amount = (float) preg_replace('/[^0-9]/', '', (string)($p['amount'] ?? 0));
+            if ($amount > 0) {
+                // Jika kategori kosong, invalid
+                if (empty($p['category'])) {
+                    $this->dispatch('toast', title: 'Pilih Metode Pembayaran', message: 'Anda memiliki sisa nominal Rp '.number_format($amount,0,',','.').' yang harus dipilih metode pembayarannya. (Atau ubah nominal menjadi 0).', type: 'warning');
                     return false;
                 }
-            }
 
-            $totalPaid += (float)$p['amount'];
+                // Jika ada baris yang belum dipilih payment method-nya
+                if (empty($p['payment_method_id'])) {
+                    return false;
+                }
+
+                // Jika Non-Tunai, harus punya rate
+                if ($p['category'] === 'NON-TUNAI' && empty($p['payment_method_rate_id'])) {
+                    $pm = \App\Models\PaymentMethod::find($p['payment_method_id']);
+                    if ($pm && $pm->rates()->where('is_active', true)->count() > 0 && empty($p['payment_method_rate_id'])) {
+                        return false;
+                    }
+                }
+            }
+            $totalPaid += $amount;
         }
 
         // Jika tidak ada pembayaran yang diisi
@@ -151,14 +159,8 @@ class Show extends Component
             return false;
         }
 
-        // Untuk pelunasan invoice (showInvoiceModal), harus sama persis
-        if ($this->showInvoiceModal) {
-            $grandTotal = max(0, $this->subtotal() - (int)$this->totalDiscount());
-            return abs($grandTotal - $totalPaid) < 0.01;
-        }
-
         // Untuk DP (showDpModal), boleh parsial asal tidak melebihi sisa tagihan
-        return $totalPaid <= $this->getRemainingBalance();
+        return round($totalPaid, 2) <= round($this->getRemainingBalance(), 2);
     }
 
     public function openDpModal()
@@ -167,57 +169,139 @@ class Show extends Component
         $this->dp_date = \Carbon\Carbon::now()->format('Y-m-d');
         $this->dp_notes = '';
         $this->dp_contract_number = '';
+        
+        $this->availableCustomerDeposits = \App\Models\CustomerDeposit::where('user_id', $this->order->user_id)
+            ->where('status', 'AVAILABLE')
+            ->where('balance', '>', 0)
+            ->where('business_unit_id', $this->order->business_unit_id)
+            ->where(function($q) {
+                $q->whereNull('origin_order_id')
+                  ->orWhere('origin_order_id', '!=', $this->order->id);
+            })
+            ->get()
+            ->toArray();
+        $this->availableCustomerDepositTotal = collect($this->availableCustomerDeposits)->sum('balance');
+        $this->useCustomerDeposit = false;
+        $this->isPartialPaymentAllowed = true;
 
-        // $this->setPaymentMode('tunai');
-        $this->payments[0]['amount'] = $this->getRemainingBalance();
+        // Default nominal cash/transfer ke 0 agar tidak memaksa user membayar sisa tagihan
+        $this->payments[0]['amount'] = 0;
     }
     public function saveDp()
     {
         if (!$this->isPaymentsValid()) {
-            $this->dispatch('toast', title: 'Validasi Gagal', message: 'Harap periksa kembali isian pembayaran Anda.', type: 'warning');
+            $this->dispatch('toast', title: 'Validasi Gagal', message: 'Nominal DP tidak valid.', type: 'warning');
             return;
         }
 
         $paymentData = $this->payments[0];
+        $actualAmount = (float) preg_replace('/[^0-9]/', '', (string)($paymentData['amount'] ?? 0));
+        $depositToUse = $this->depositToUseAmount();
 
         try {
-            DB::beginTransaction();
+            \Illuminate\Support\Facades\DB::beginTransaction();
 
-            $payment = OrderPayment::create([
-                'order_id' => $this->order->id,
-                'payment_method_id' => $paymentData['payment_method_id'],
-                'payment_method_rate_id' => $paymentData['payment_method_rate_id'] ?: null,
-                'amount' => $paymentData['amount'],
-                'status' => 'PAID',
-                'xendit_external_id' => 'DP-MANUAL-' . date('YmdHis') . rand(1000, 9999),
-                'paid_at' => \Carbon\Carbon::parse($this->dp_date),
-                'payment_payload' => [
-                    'notes' => $this->dp_notes,
-                    'contract_number' => $this->dp_contract_number,
-                ],
-            ]);
+            if ($depositToUse > 0 && !empty($this->availableCustomerDeposits)) {
+                $depositIds = collect($this->availableCustomerDeposits)->pluck('id')->toArray();
+                $lockedDeposits = \App\Models\CustomerDeposit::whereIn('id', $depositIds)
+                    ->where('status', 'AVAILABLE')
+                    ->lockForUpdate()
+                    ->get();
+                
+                $remainingDpNeeded = $depositToUse;
+                foreach ($lockedDeposits as $existingDeposit) {
+                    if ($remainingDpNeeded > 0) {
+                        $useAmount = min((float)$existingDeposit->balance, $remainingDpNeeded);
+                        
+                        \App\Models\CustomerDepositUsage::create([
+                            'customer_deposit_id' => $existingDeposit->id,
+                            'order_id' => $this->order->id,
+                            'amount_used' => $useAmount,
+                        ]);
 
-            // Update Order Status if needed
+                        $existingDeposit->balance -= $useAmount;
+                        if ($existingDeposit->balance <= 0) {
+                            $existingDeposit->status = 'USED';
+                        }
+                        $existingDeposit->save();
+                        
+                        \App\Models\OrderPayment::create([
+                            'order_id' => $this->order->id,
+                            'xendit_external_id' => 'DP-USE-' . date('YmdHis') . rand(1000, 9999),
+                            'amount' => $useAmount,
+                            'status' => 'PAID',
+                            'no_kontrak' => $this->dp_contract_number,
+                            'paid_at' => \Carbon\Carbon::parse($this->dp_date),
+                        ]);
+                        
+                        // Buat OrderAccurateDoc agar muncul di Peta Relasi Tokopon
+                        if ($existingDeposit->accurate_invoice_no) {
+                            $doc = \App\Models\OrderAccurateDoc::firstOrNew([
+                                'order_id' => $this->order->id,
+                                'doc_type' => 'DP_INVOICE',
+                                'doc_number' => $existingDeposit->accurate_invoice_no,
+                            ]);
+                            $doc->amount = ($doc->amount ?? 0) + $useAmount;
+                            $doc->status = 'SUCCESS';
+                            $doc->save();
+                        }
+                        if ($existingDeposit->accurate_receipt_no) {
+                            $doc = \App\Models\OrderAccurateDoc::firstOrNew([
+                                'order_id' => $this->order->id,
+                                'doc_type' => 'DP_RECEIPT',
+                                'doc_number' => $existingDeposit->accurate_receipt_no,
+                            ]);
+                            $doc->amount = ($doc->amount ?? 0) + $useAmount;
+                            $doc->status = 'SUCCESS';
+                            $doc->save();
+                        }
+
+                        $remainingDpNeeded -= $useAmount;
+                    }
+                }
+            }
+
+            if ($actualAmount > 0) {
+                $deposit = \App\Models\CustomerDeposit::create([
+                    'user_id' => $this->order->user_id,
+                    'origin_order_id' => $this->order->id,
+                    'business_unit_id' => $this->order->business_unit_id,
+                    'amount' => $actualAmount,
+                    'balance' => $actualAmount,
+                    'payment_method_id' => $paymentData['payment_method_id'],
+                    'status' => 'AVAILABLE',
+                    'notes' => 'DP dari SO ' . ($this->order->accurate_so_number ?? $this->order->order_number) . ' - ' . $this->dp_notes,
+                    'created_by' => \Illuminate\Support\Facades\Auth::id(),
+                ]);
+
+                \App\Models\OrderPayment::create([
+                    'order_id' => $this->order->id,
+                    'xendit_external_id' => 'DP-SO-' . date('YmdHis') . rand(1000, 9999),
+                    'amount' => $actualAmount,
+                    'status' => 'PAID',
+                    'payment_method_id' => $paymentData['payment_method_id'],
+                    'no_kontrak' => $this->dp_contract_number,
+                    'paid_at' => \Carbon\Carbon::parse($this->dp_date),
+                ]);
+            }
+
             if ($this->order->order_status === 'pending') {
                 $this->order->update(['order_status' => 'down_payment']);
             }
 
-            // Check if fully paid
             if ($this->getRemainingBalance() == 0) {
-                // Not automatically completed since delivery/invoice is needed, but we can mark it
                 $this->order->update(['order_status' => 'paid']);
             }
 
-            DB::commit();
-
-            // Trigger Sync to Accurate (Down Payment)
+            // Memindahkan DB::commit ke akhir agar jika Accurate gagal, DP tidak terbuat di lokal
             try {
-                $accurateService = app(AccurateService::class);
-                $customerUser = $this->order->user;
-                $businessUnit = $this->order->businessUnit;
-                $dbSource = $businessUnit ? $businessUnit->code : 'syihab';
+                if ($actualAmount > 0) {
+                    $accurateService = app(\App\Services\AccurateService::class);
+                    $customerUser = $this->order->user;
+                    $businessUnit = $this->order->businessUnit;
+                    $dbSource = $businessUnit ? $businessUnit->code : 'syihab';
 
-                $handler = $this->order->handledBy ?? Auth::user();
+                $handler = $this->order->handledBy ?? \Illuminate\Support\Facades\Auth::user();
                 if (!$handler || !$handler->branch) {
                     throw new \Exception('Staf pembuat SO ini belum dialokasikan ke Cabang (Branch) tertentu.');
                 }
@@ -228,7 +312,6 @@ class Show extends Component
                     $accurateBranchName = 'GSK ' . $accurateBranchName;
                 }
 
-                // Hitung MDR
                 $pmId = $paymentData['payment_method_id'];
                 $pm = \App\Models\PaymentMethod::find($pmId);
                 $rate = null;
@@ -256,27 +339,21 @@ class Show extends Component
                     ];
                 }
 
-                if (!$this->order->accurate_so_number) {
-                    throw new \Exception('Sales Order ini belum memiliki nomor sinkronisasi Accurate. Harap sinkronkan/buat SO di Accurate terlebih dahulu sebelum mencatat DP.');
-                }
-
-                // STEP 1: Faktur Uang Muka Penjualan (Down Payment Invoice)
                 $dpInvData = [
                     'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
                     'branchName' => $accurateBranchName,
                     'dpAmount'   => (float)$paymentData['amount'],
-                    'soNumber'   => $this->order->accurate_so_number,
-                    'transDate'  => Carbon::parse($this->dp_date)->format('d/m/Y'),
+                    'transDate'  => \Carbon\Carbon::parse($this->dp_date)->format('d/m/Y'),
                     'inclusiveTax' => false,
                     'isTaxable' => false,
-                    'description' => 'Uang Muka (DP) SO: ' . $this->order->accurate_so_number . ($this->dp_contract_number ? '. No Kontrak: ' . $this->dp_contract_number : '') . '. ' . $this->dp_notes,
+                    'description' => 'Uang Muka (DP) Standalone dari SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number) . ($this->dp_contract_number ? '. No Kontrak: ' . $this->dp_contract_number : '') . '. ' . $this->dp_notes,
                 ];
 
                 if ($this->dp_contract_number) {
                     $dpInvData['poNumber'] = $this->dp_contract_number;
                 }
 
-                Log::info('Accurate DP Invoice Payload: ' . json_encode($dpInvData));
+                \Illuminate\Support\Facades\Log::info('Accurate DP Invoice Payload: ' . json_encode($dpInvData));
                 $dpInvResult = $accurateService->postDownPaymentInvoice($dpInvData, $dbSource);
 
                 if (!isset($dpInvResult['r']['number'])) {
@@ -284,25 +361,25 @@ class Show extends Component
                 }
 
                 $dpInvoiceNo = $dpInvResult['r']['number'];
+                $deposit->update(['accurate_invoice_no' => $dpInvoiceNo]);
 
                 \App\Models\OrderAccurateDoc::create([
                     'order_id' => $this->order->id,
                     'doc_type' => 'DP_INVOICE',
                     'doc_number' => $dpInvoiceNo,
                     'accurate_id' => $dpInvResult['r']['id'] ?? null,
-                    'amount' => (float) $paymentData['amount'],
+                    'amount' => (float)$paymentData['amount'],
                     'status' => 'SUCCESS',
                 ]);
 
-                // STEP 2: Penerimaan Penjualan (Sales Receipt) untuk Uang Muka
                 $srData = [
                     'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
                     'branchName' => $accurateBranchName,
                     'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
-                    'transDate' => Carbon::parse($this->dp_date)->format('d/m/Y'),
+                    'transDate' => \Carbon\Carbon::parse($this->dp_date)->format('d/m/Y'),
                     'receiptAmount' => (float)$netReceiptAmount,
                     'chequeAmount' => (float)$netReceiptAmount,
-                    'description' => 'Penerimaan DP SO: ' . $this->order->accurate_so_number . ($this->dp_contract_number ? '. No Kontrak: ' . $this->dp_contract_number : '') . '. ' . $this->dp_notes,
+                    'description' => 'Penerimaan DP Standalone dari SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number) . ($this->dp_contract_number ? '. No Kontrak: ' . $this->dp_contract_number : '') . '. ' . $this->dp_notes,
                     'detailInvoice' => [
                         [
                             'invoiceNo' => $dpInvoiceNo,
@@ -315,345 +392,36 @@ class Show extends Component
                     $srData['detailInvoice'][0]['detailDiscount'] = $detailDiscounts;
                 }
 
-                Log::info('Accurate DP Receipt Payload: ' . json_encode($srData));
+                \Illuminate\Support\Facades\Log::info('Accurate DP Receipt Payload: ' . json_encode($srData));
                 $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
 
                 if (isset($srResult['r']['number'])) {
+                    $deposit->update(['accurate_receipt_no' => $srResult['r']['number']]);
                     \App\Models\OrderAccurateDoc::create([
                         'order_id' => $this->order->id,
                         'doc_type' => 'DP_RECEIPT',
                         'doc_number' => $srResult['r']['number'],
                         'accurate_id' => $srResult['r']['id'] ?? null,
-                        'amount' => (float) $netReceiptAmount,
+                        'amount' => (float)$paymentData['amount'],
                         'status' => 'SUCCESS',
                     ]);
-
-                    if (!$this->order->accurate_receipt_no) {
-                        $this->order->update(['accurate_receipt_no' => $srResult['r']['number']]);
-                    } else {
-                        $this->order->update(['accurate_receipt_no' => $this->order->accurate_receipt_no . ', ' . $srResult['r']['number']]);
-                    }
                 }
-            } catch (\Exception $e) {
-                Log::error('Accurate DP Sync Error: ' . $e->getMessage());
-                $this->dispatch('toast', title: 'Sync Accurate Gagal', message: 'DP tersimpan di sistem, namun gagal tersinkron ke Accurate: ' . $e->getMessage(), type: 'warning');
-            }
-
-            $this->showDpModal = false;
-            $this->order->refresh();
-
-            $this->dispatch('toast', title: 'Berhasil', message: 'Uang Muka (DP) berhasil dicatat!', type: 'success');
+            } // End of if ($actualAmount > 0)
         } catch (\Exception $e) {
-            DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Accurate DP Sync Error: ' . $e->getMessage());
+            throw new \Exception('DP gagal tersinkron ke Accurate: ' . $e->getMessage());
+        }
+
+        \Illuminate\Support\Facades\DB::commit();
+
+        $this->showDpModal = false;
+        $this->order->refresh();
+
+        $this->dispatch('toast', title: 'Berhasil', message: 'Uang Muka (DP) berhasil dicatat!', type: 'success');
+        
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
             $this->dispatch('toast', title: 'Error', message: 'Gagal menyimpan DP: ' . $e->getMessage(), type: 'error');
-        }
-    }
-
-    public function openInvoiceModal()
-    {
-        $this->invoice_sns = [];
-        foreach ($this->order->items as $item) {
-            $existing = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
-            $sns = [];
-            for ($i = 0; $i < $item->qty; $i++) {
-                $sns[] = $existing[$i] ?? '';
-            }
-            $this->invoice_sns[$item->id] = $sns;
-        }
-        $this->invoice_date = \Carbon\Carbon::now()->format('Y-m-d');
-        $this->invoice_notes = '';
-        $this->invoice_contract_number = '';
-
-        // $this->setPaymentMode('tunai');
-        $this->payments[0]['amount'] = $this->getRemainingBalance();
-
-        $this->showInvoiceModal = true;
-    }
-
-    public function submitFaktur()
-    {
-        $rules = [
-            'invoice_sns.*.*' => 'nullable|string'
-        ];
-
-        $this->validate($rules);
-
-        $remBal = $this->getRemainingBalance();
-        if ($remBal > 0) {
-            if (!$this->isPaymentsValid()) {
-                $this->dispatch('toast', title: 'Validasi Gagal', message: 'Harap periksa kembali isian pembayaran pelunasan Anda.', type: 'warning');
-                return;
-            }
-        }
-
-        try {
-            DB::beginTransaction();
-
-            // Trigger Sync to Accurate (Sales Invoice from SO)
-            $accurateService = app(AccurateService::class);
-            $businessUnit = $this->order->businessUnit;
-            $dbSource = $businessUnit ? $businessUnit->code : 'syihab';
-
-            $handler = $this->order->handledBy ?? Auth::user();
-            if (!$handler || !$handler->branch) {
-                throw new \Exception('Staf pembuat SO ini belum dialokasikan ke Cabang (Branch) tertentu.');
-            }
-            $branchName = $handler->branch->name;
-
-            $accurateBranchName = $branchName;
-            if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
-                $accurateBranchName = 'GSK ' . $accurateBranchName;
-            }
-
-            $detailSalesman = [];
-            if ($this->order->salesBy && !empty($this->order->salesBy->employee_no)) {
-                $detailSalesman[] = (string) $this->order->salesBy->employee_no;
-            }
-
-            $detailItems = [];
-            foreach ($this->order->items as $item) {
-                // Update local serial numbers first
-                $snArray = $this->invoice_sns[$item->id] ?? [];
-                if (is_array($snArray)) {
-                    $snInput = implode(', ', array_filter(array_map('trim', $snArray)));
-                } else {
-                    $snInput = trim($snArray);
-                }
-
-                if ($snInput !== ($item->serial_number ?? '')) {
-                    $item->update(['serial_number' => $snInput]);
-                }
-
-                $variant = $item->variant;
-                if ($variant && get_class($variant) === \App\Models\ProductAccurate::class) {
-                    $itemName = $variant->name;
-                    $sku = $variant->item_no ?? null;
-                    $detailName = trim($itemName);
-                } else {
-                    $isNew = $item->product_variant_type === \App\Models\ProductVariant::class;
-                    $itemName = $isNew ? ($variant->product->name ?? 'Unknown') : ($variant->secondProduct->name ?? 'Unknown');
-                    $sku = $variant->sku ?? null;
-                    $detailName = trim($itemName . ' ' . ($variant->color ?? '') . ' ' . ($variant->storage ?? ''));
-                }
-
-                if (empty($sku)) {
-                    throw new \Exception("Gagal: Produk '{$itemName}' belum memiliki SKU (Item No). Harap lengkapi SKU produk di database agar bisa dikirim ke Accurate.");
-                }
-
-                $detailItemData = [
-                    'itemNo' => $sku,
-                    'unitPrice' => (float)$item->price_at_checkout,
-                    'quantity' => (float)$item->qty,
-                    'detailName' => $detailName,
-                    'itemCashDiscount' => (float)$item->discount_amount,
-                ];
-
-                if (!empty($detailSalesman)) {
-                    $detailItemData['salesmanListNumber'] = $detailSalesman;
-                }
-
-                // Attach SN payload
-                $cleanSNs = array_filter(array_map('trim', explode(',', $snInput)));
-                if (count($cleanSNs) > 0) {
-                    $detailSNs = [];
-                    foreach ($cleanSNs as $sn) {
-                        $detailSNs[] = ['serialNumberNo' => $sn, 'quantity' => 1];
-                    }
-                    $detailItemData['detailSerialNumber'] = $detailSNs;
-                }
-
-                $detailItems[] = $detailItemData;
-            }
-
-            $siData = [
-                'customerNo' => $this->order->user->getAccurateCustomerNo($dbSource),
-                'branchName' => $accurateBranchName,
-                'transDate' => now()->format('d/m/Y'),
-                'detailItem' => $detailItems,
-                'inclusiveTax' => true,
-                'taxable' => true,
-                'description' => 'Pelunasan SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number) . ($this->invoice_contract_number ? '. No Kontrak: ' . $this->invoice_contract_number : '')
-            ];
-
-            if ($this->invoice_contract_number) {
-                $siData['poNumber'] = $this->invoice_contract_number;
-            }
-
-            $doDoc = $this->order->accurateDocs()
-                ->where('doc_type', 'DELIVERY_ORDER')
-                ->where('status', 'SUCCESS')
-                ->first();
-
-            if ($doDoc) {
-                foreach ($siData['detailItem'] as &$i) {
-                    $i['deliveryOrderNumber'] = $doDoc->doc_number;
-                }
-            } elseif ($this->order->accurate_so_number) {
-                foreach ($siData['detailItem'] as &$i) {
-                    $i['salesOrderNumber'] = $this->order->accurate_so_number;
-                }
-            }
-
-            // Apply DP only if the DP was successfully paid (DP_RECEIPT exists)
-            $dpInvoices = $this->order->accurateDocs()
-                ->where('doc_type', 'DP_INVOICE')
-                ->where('status', 'SUCCESS')
-                ->get();
-
-            $validDpInvoices = [];
-            foreach ($dpInvoices as $dpInv) {
-                // Check if this DP Invoice was actually paid via DP_RECEIPT
-                // We link them by checking if there's any successful DP_RECEIPT for this order
-                // Actually, a better way is to verify if there's a DP_RECEIPT created after this DP_INVOICE.
-                // In Accurate, if it's unpaid, it errors out.
-                $hasReceipt = $this->order->accurateDocs()
-                    ->where('doc_type', 'DP_RECEIPT')
-                    ->where('status', 'SUCCESS')
-                    ->where('created_at', '>=', $dpInv->created_at)
-                    ->exists();
-
-                if ($hasReceipt) {
-                    $validDpInvoices[] = [
-                        'invoiceNumber' => $dpInv->doc_number,
-                        'paymentAmount' => (float) $dpInv->amount,
-                    ];
-                }
-            }
-
-            if (count($validDpInvoices) > 0) {
-                $siData['detailDownPayment'] = $validDpInvoices;
-            }
-
-            if ($remBal > 0) {
-                $mdrExpenses = [];
-                foreach ($this->payments as $payment) {
-                    $rate = $payment['payment_method_rate_id'] ? \App\Models\PaymentMethodRate::find($payment['payment_method_rate_id']) : null;
-                    $pct = $this->getMdrPercentage($payment);
-                    $rowMdr = $pct > 0 ? round((float)$payment['amount'] * $pct / 100, 0) : 0;
-
-                    if ($rowMdr > 0 && $rate && $rate->accurate_account_no) {
-                        $mdrExpenses[] = [
-                            'accountNo' => $rate->accurate_account_no,
-                            'expenseAmount' => -abs((float)$rowMdr),
-                            'expenseNotes' => 'MDR ' . ($rate->name ?? ' ')
-                        ];
-                    }
-                }
-
-                if (!empty($mdrExpenses)) {
-                    $siData['detailExpense'] = $mdrExpenses;
-                }
-            }
-
-            Log::info('Accurate SI Sync Payload: ' . json_encode($siData));
-            $siResult = $accurateService->postSalesInvoice($siData, $dbSource);
-
-            if (isset($siResult['r']['number'])) {
-                $this->order->update([
-                    'accurate_invoice_no' => $siResult['r']['number'],
-                    'order_status' => 'COMPLETED'
-                ]);
-
-                \App\Models\OrderAccurateDoc::create([
-                    'order_id' => $this->order->id,
-                    'doc_type' => 'SALES_INVOICE',
-                    'doc_number' => $siResult['r']['number'],
-                    'accurate_id' => $siResult['r']['id'] ?? null,
-                    'amount' => $this->order->grand_total,
-                    'status' => 'SUCCESS',
-                ]);
-
-                // Settlement if balance > 0
-                if ($remBal > 0) {
-                    foreach ($this->payments as $paymentData) {
-                        $feeAmount = 0;
-                        $netReceiptAmount = (float)$paymentData['amount'];
-                        $rate = null;
-
-                        $pmId = $paymentData['payment_method_id'];
-                        $pm = \App\Models\PaymentMethod::find($pmId);
-
-                        if ($pm && $paymentData['payment_method_rate_id']) {
-                            $rate = \App\Models\PaymentMethodRate::find($paymentData['payment_method_rate_id']);
-                        } elseif ($pm && $pm->rates()->where('is_active', true)->exists()) {
-                            $rate = $pm->rates()->where('is_active', true)->first();
-                        }
-
-                        if ($rate) {
-                            $feePercentage = $rate->percentage ?? $rate->mdr_percentage;
-                            $feeAmount = ((float)$paymentData['amount'] * $feePercentage) / 100;
-                            $netReceiptAmount = (float)$paymentData['amount'] - $feeAmount;
-                        }
-
-                        \App\Models\OrderPayment::create([
-                            'order_id' => $this->order->id,
-                            'payment_method_id' => $paymentData['payment_method_id'],
-                            'payment_method_rate_id' => $paymentData['payment_method_rate_id'] ?: null,
-                            'amount' => $paymentData['amount'],
-                            'fee_amount' => $feeAmount,
-                            'payment_date' => $this->invoice_date,
-                            'notes' => $this->invoice_notes,
-                            'status' => 'PAID',
-                            'xendit_external_id' => 'PELUNASAN-' . date('YmdHis') . rand(1000, 9999),
-                            'paid_at' => \Carbon\Carbon::parse($this->invoice_date),
-                            'payment_payload' => [
-                                'notes' => $this->invoice_notes,
-                                'contract_number' => $this->invoice_contract_number,
-                            ],
-                        ]);
-
-                        $srData = [
-                            'customerNo' => $this->order->user->getAccurateCustomerNo($dbSource),
-                            'branchName' => $accurateBranchName,
-                            'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
-                            'transDate' => \Carbon\Carbon::parse($this->invoice_date)->format('d/m/Y'),
-                            'receiptAmount' => (float)$netReceiptAmount,
-                            'chequeAmount' => (float)$netReceiptAmount,
-                            'description' => 'Pelunasan Faktur SO: ' . ($this->order->accurate_so_number ?? $this->order->order_number) . ($this->invoice_contract_number ? '. No Kontrak: ' . $this->invoice_contract_number : '') . '. ' . $this->invoice_notes,
-                            'detailInvoice' => [
-                                [
-                                    'invoiceNo' => $siResult['r']['number'],
-                                    'paymentAmount' => (float)$paymentData['amount'],
-                                ]
-                            ]
-                        ];
-
-                        if ($feeAmount > 0) {
-                            $srData['detailInvoice'][0]['detailDiscount'] = [
-                                [
-                                    'accountNo' => $rate->accurate_account_no ?? '7100.04',
-                                    'amount' => (float)$feeAmount,
-                                    'departmentName' => $accurateBranchName,
-                                    'discountNotes' => 'Potongan MDR ' . ($rate->name ?? 'Payment Gateway'),
-                                ]
-                            ];
-                        }
-
-                        Log::info('Accurate SR Invoice Settlement Payload: ' . json_encode($srData));
-                        $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
-
-                        if (isset($srResult['r']['number'])) {
-                            \App\Models\OrderAccurateDoc::create([
-                                'order_id' => $this->order->id,
-                                'doc_type' => 'SALES_RECEIPT',
-                                'doc_number' => $srResult['r']['number'],
-                                'accurate_id' => $srResult['r']['id'] ?? null,
-                                'amount' => $paymentData['amount'],
-                                'status' => 'SUCCESS',
-                            ]);
-                        }
-                    }
-                }
-            }
-
-            DB::commit();
-            $this->showInvoiceModal = false;
-            $this->dispatch('toast', title: 'Berhasil', message: 'Faktur Penjualan diterbitkan dan pelunasan selesai!', type: 'success');
-            $this->order->refresh();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Accurate SI Sync Error: ' . $e->getMessage());
-            $this->dispatch('toast', title: 'Error', message: 'Gagal membuat faktur: ' . $e->getMessage(), type: 'error');
         }
     }
 

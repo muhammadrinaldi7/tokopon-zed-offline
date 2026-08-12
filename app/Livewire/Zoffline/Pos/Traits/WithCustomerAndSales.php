@@ -57,6 +57,7 @@ trait WithCustomerAndSales
             $this->customerEmail = $customer->email ?? '';
         }
         $this->searchCustomer = '';
+        $this->useCustomerDeposit = false;
     }
 
     public function clearSelectedCustomer()
@@ -66,6 +67,7 @@ trait WithCustomerAndSales
         $this->customerPhone = '';
         $this->customerEmail = '';
         $this->isNewCustomer = false;
+        $this->useCustomerDeposit = false;
     }
 
     // ─── Sales Actions ──────────────────────────────────────

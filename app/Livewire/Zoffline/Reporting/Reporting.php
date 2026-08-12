@@ -68,6 +68,11 @@ class Reporting extends Component
         return $this->redirectRoute('reporting.warranty', navigate: true);
     }
 
+    public function navigateToReturnReport()
+    {
+        return $this->redirectRoute('reporting.return-report', navigate: true);
+    }
+
     public function render()
     {
         return view('livewire.zoffline.reporting.reporting');

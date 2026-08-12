@@ -90,6 +90,9 @@
                                 No Order</th>
                             <th scope="col"
                                 class="px-6 py-3 text-left text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                                No Accurate</th>
+                            <th scope="col"
+                                class="px-6 py-3 text-left text-xs font-bold text-neutral-500 uppercase tracking-wider">
                                 Nilai (Rp)</th>
                             <th scope="col"
                                 class="px-6 py-3 text-left text-xs font-bold text-neutral-500 uppercase tracking-wider">
@@ -120,6 +123,17 @@
                                         @else
                                             <span
                                                 class="ml-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] rounded border border-emerald-200">POS</span>
+                                        @endif
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-neutral-600">
+                                    @if ($req->approvable)
+                                        @if ($req->approvable->order_channel === 'SO')
+                                            {{ $req->approvable->accurate_so_number ?? '-' }}
+                                        @else
+                                            {{ $req->approvable->accurate_invoice_no ?? '-' }}
                                         @endif
                                     @else
                                         -
