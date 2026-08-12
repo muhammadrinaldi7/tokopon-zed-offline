@@ -16,9 +16,9 @@ class SerialNumberHistory extends Component
     public $history = [];
 
 
-    public function mount($sn)
+    public function mount()
     {
-        $this->sn = urldecode($sn);
+        $this->sn = request()->query('sn', '');
         $this->loadHistory();
     }
 
