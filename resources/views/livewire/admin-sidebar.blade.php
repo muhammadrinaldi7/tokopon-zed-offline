@@ -228,6 +228,16 @@
         @endcan
 
         @can('manage-orders')
+            <a href="{{ route('admin.customer-deposits.index') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.customer-deposits.*') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.customer-deposits.*') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="font-medium">Deposit Pelanggan</span>
+            </a>
+
             <a href="{{ route('admin.orders.management') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.orders.management') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('admin.orders.management') ? $activeIconClass : $inactiveIconClass }}"
@@ -272,8 +282,7 @@
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.orders.reset-to-draft') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('admin.orders.reset-to-draft') ? $activeIconClass : $inactiveIconClass }}"
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Reset ke Draft</span><span
                     class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"

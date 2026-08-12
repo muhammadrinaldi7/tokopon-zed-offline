@@ -1,4 +1,34 @@
 <div class="space-y-6">
+    @if($availableCustomerDepositTotal > 0)
+    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4 flex items-center justify-between">
+        <div>
+            <h3 class="font-bold text-blue-900">Deposit Tersedia</h3>
+            <p class="text-sm text-blue-700 mt-1">
+                Pelanggan memiliki deposit Rp {{ number_format($availableCustomerDepositTotal, 0, ',', '.') }}.
+                @if($useCustomerDeposit)
+                    <div class="mt-2 flex items-center gap-2">
+                        <span class="font-semibold text-gray-700">Akan digunakan:</span>
+                        <div class="relative max-w-xs">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 font-medium">Rp</span>
+                            <input type="text" x-data x-mask:dynamic="$money($input, '.')" wire:model.live.debounce.500ms="customDepositAmount" class="block w-full pl-10 pr-3 py-1 text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="0">
+                        </div>
+                    </div>
+                @endif
+            </p>
+        </div>
+        <div>
+            <label class="flex items-center cursor-pointer">
+                <div class="relative">
+                    <input type="checkbox" wire:model.live="useCustomerDeposit" class="sr-only peer">
+                    <div class="block bg-gray-300 w-14 h-8 rounded-full transition-colors duration-300 ease-in-out peer-checked:bg-blue-600 @if($useCustomerDeposit) bg-blue-600 @endif"></div>
+                    <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition transform duration-300 ease-in-out @if($useCustomerDeposit) translate-x-6 @endif"></div>
+                </div>
+                <span class="ml-3 text-sm font-medium text-gray-700">Gunakan Deposit</span>
+            </label>
+        </div>
+    </div>
+    @endif
+
     {{-- METODE PEMBAYARAN WIZARD (Dipindah ke atas) --}}
     <div class="flex flex-col">
         <div class="flex items-center justify-between mb-4">
@@ -495,7 +525,7 @@
 
                     @php
                         $totalPaid = collect($payments)->sum('amount');
-                        $target = max(0, $this->subtotal() - (int) $this->totalDiscount() - ($isSoFulfillment ? ($soPaidAmount ?? 0) : 0));
+                        $target = max(0, $this->subtotal() - (int) $this->totalDiscount() - ($isSoFulfillment ? ($soPaidAmount ?? 0) : 0) - ($useCustomerDeposit ? $availableCustomerDepositTotal : 0));
                         $kurang = $target - $totalPaid;
                     @endphp
 
@@ -550,9 +580,9 @@
         {{-- Diskon & Catatan --}}
         <div class="space-y-1.5">
             <label class="text-xs font-bold text-gray-600 uppercase">Catatan</label>
-            <input type="text" wire:model.lazy="notes"
-                class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20"
-                placeholder="Catatan tambahan...">
+            <textarea wire:model="notes" rows="3"
+                class="w-full bg-white border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4]/20 resize-y"
+                placeholder="Catatan tambahan..."></textarea>
         </div>
 
 
@@ -901,11 +931,18 @@
                                                     {{ number_format($soPaidAmount, 0, ',', '.') }}</span>
                                             </div>
                                         @endif
+                                        @if($useCustomerDeposit && $availableCustomerDepositTotal > 0)
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-600 font-medium">Gunakan Deposit</span>
+                                                <span class="font-bold text-emerald-500">- Rp
+                                                    {{ number_format($availableCustomerDepositTotal, 0, ',', '.') }}</span>
+                                            </div>
+                                        @endif
                                         <div class="border-t border-[#1c69d4]/20 my-2 pt-2">
                                             <div class="flex justify-between items-center">
                                                 <span class="text-gray-800 font-black">Grand Total</span>
                                                 <span class="font-black text-xl sm:text-2xl text-[#1c69d4]">Rp
-                                                    {{ number_format(max(0, $this->subtotal - $this->totalDiscount - ($isSoFulfillment ? ($soPaidAmount ?? 0) : 0)), 0, ',', '.') }}</span>
+                                                    {{ number_format(max(0, $this->subtotal - $this->totalDiscount - ($isSoFulfillment ? ($soPaidAmount ?? 0) : 0) - ($useCustomerDeposit ? $availableCustomerDepositTotal : 0)), 0, ',', '.') }}</span>
                                             </div>
                                         </div>
                                     </div>

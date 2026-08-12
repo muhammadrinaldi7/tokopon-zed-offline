@@ -1026,6 +1026,8 @@ trait WithCart
 
             $newPrice = (int) $this->editPriceValue;
 
+            $oldPrice = $item['price'] ?? 0;
+
             if ($newPrice < $basePrice) {
                 $this->dispatch('toast', title: 'Gagal', message: 'Harga tidak boleh kurang dari harga dasar (Rp ' . number_format($basePrice, 0, ',', '.') . ').', type: 'error');
                 $this->closeEditPriceModal();
@@ -1034,6 +1036,13 @@ trait WithCart
 
             $this->cart[$this->editPriceCartIndex]['price'] = $newPrice;
             
+            if ($oldPrice != $newPrice) {
+                $user = \Illuminate\Support\Facades\Auth::user()->name ?? 'System';
+                $itemName = $item['name'] ?? 'Unknown Item';
+                $priceLog = "\n[" . now()->format('Y-m-d H:i') . "] $user mengubah harga '$itemName' dari Rp " . number_format($oldPrice, 0, ',', '.') . " menjadi Rp " . number_format($newPrice, 0, ',', '.');
+                $this->notes = ($this->notes ?? '') . $priceLog;
+            }
+
             if (!empty($this->selectedPromos)) {
                 $this->applyPromosToCart();
             }

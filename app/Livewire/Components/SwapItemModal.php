@@ -110,6 +110,20 @@ class SwapItemModal extends Component
             $oldItem->price_at_checkout = $newPrice;
             $oldItem->subtotal = $newPrice * $oldItem->qty;
             $oldItem->serial_number = null; // Reset SN karena item berubah
+
+            // Validasi: Grand Total baru tidak boleh lebih kecil dari DP yang sudah dibayar
+            $newGrandTotal = $this->order->items()
+                ->where('id', '!=', $oldItem->id)
+                ->sum('subtotal') + ($newPrice * $oldItem->qty) - $this->order->discount_amount;
+            $totalDp = $this->order->payments()->where('status', 'PAID')->sum('amount');
+            if ($newGrandTotal < $totalDp) {
+                throw new \Exception(
+                    'Grand Total baru (Rp ' . number_format($newGrandTotal, 0, ',', '.') . 
+                    ') tidak boleh lebih kecil dari DP yang sudah dibayar (Rp ' . 
+                    number_format($totalDp, 0, ',', '.') . ').'
+                );
+            }
+
             $oldItem->save();
 
             // Recalculate Order Totals

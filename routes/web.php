@@ -123,6 +123,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/orders/import-draft', \App\Livewire\Admin\Orders\ImportDraft::class)->name('orders.import-draft')->middleware('can:manage-orders');
     Route::get('/orders/reset-to-draft', \App\Livewire\Admin\Orders\ResetToDraft::class)->name('orders.reset-to-draft')->middleware('can:manage-orders');
 
+    // Customer Deposits
+    Route::get('/customer-deposits', \App\Livewire\Admin\Finance\CustomerDeposit\Index::class)->name('customer-deposits.index')->middleware('can:manage-orders');
+
     // Sales Order (Mini Accurate)
     Route::prefix('sales-orders')->name('sales-orders.')->middleware('can:manage-orders')->group(function () {
         Route::get('/', \App\Livewire\Admin\Orders\SalesOrder\Index::class)->name('index');

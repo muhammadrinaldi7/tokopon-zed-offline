@@ -468,6 +468,8 @@ class RiwayatPenjualan extends Component
         }
 
         try {
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
             // 1. Hapus dokumen di Accurate (Sales Receipt, Sales Invoice, DO, SO)
             $accurateService = app(\App\Services\AccurateService::class);
             $accurateService->rollbackOrderDocuments($order);
@@ -479,12 +481,32 @@ class RiwayatPenjualan extends Component
                 'accurate_receipt_no' => null,
             ]);
 
-            // 3. Hapus semua payment terkait order ini
+            // 3. Kembalikan saldo deposit yang terpakai
+            $usages = \App\Models\CustomerDepositUsage::where('order_id', $order->id)->get();
+            foreach ($usages as $usage) {
+                $deposit = $usage->customerDeposit;
+                if ($deposit) {
+                    $deposit->balance += (float) $usage->amount_used;
+                    $deposit->status = 'AVAILABLE';
+                    $deposit->save();
+                }
+                $usage->delete();
+            }
+
+            // Kembalikan deposit SO (yang berasal dari DP SO ini) ke AVAILABLE
+            \App\Models\CustomerDeposit::where('origin_order_id', $order->id)
+                ->where('status', 'USED')
+                ->update(['status' => 'AVAILABLE', 'order_id' => null]);
+
+            // 4. Hapus semua payment terkait order ini
             $order->payments()->delete();
+
+            \Illuminate\Support\Facades\DB::commit();
 
             $this->dispatch('toast', title: 'Berhasil', message: 'Dokumen Accurate dihapus & transaksi dikembalikan ke Draft.', type: 'success');
             $this->closeDirectCancelModal();
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
             \Illuminate\Support\Facades\Log::error('Direct Cancellation Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Terjadi kesalahan: ' . $e->getMessage(), type: 'error');
         }

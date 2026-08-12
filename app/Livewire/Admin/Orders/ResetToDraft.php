@@ -115,6 +115,8 @@ class ResetToDraft extends Component
         }
 
         try {
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
             $oldHandledBy = $order->handled_by;
             $newHandledBy = !empty($this->reassignCashierId) ? (int) $this->reassignCashierId : $oldHandledBy;
 
@@ -169,14 +171,34 @@ class ResetToDraft extends Component
                 'handled_by' => $newHandledBy,
             ]);
 
+            // Kembalikan saldo deposit yang terpakai
+            $usages = \App\Models\CustomerDepositUsage::where('order_id', $order->id)->get();
+            foreach ($usages as $usage) {
+                $deposit = $usage->customerDeposit;
+                if ($deposit) {
+                    $deposit->balance += (float) $usage->amount_used;
+                    $deposit->status = 'AVAILABLE';
+                    $deposit->save();
+                }
+                $usage->delete();
+            }
+
+            // Kembalikan deposit SO (yang berasal dari DP SO ini) ke AVAILABLE
+            \App\Models\CustomerDeposit::where('origin_order_id', $order->id)
+                ->where('status', 'USED')
+                ->update(['status' => 'AVAILABLE', 'order_id' => null]);
+
             // 4. Hapus semua payment terkait order ini
             $order->payments()->delete();
+
+            \Illuminate\Support\Facades\DB::commit();
 
             Log::info("Admin Reset to Draft: Order {$order->order_number} reset by " . Auth::user()->name . ". Alasan: {$this->directCancelReason}. Kasir: {$oldHandledBy} -> {$newHandledBy}");
 
             $this->dispatch('toast', title: 'Berhasil', message: 'Dokumen Accurate dihapus, history dicatat, & transaksi dikembalikan ke Draft.', type: 'success');
             $this->closeDirectCancelModal();
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
             Log::error('Admin Reset to Draft Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Terjadi kesalahan: ' . $e->getMessage(), type: 'error');
         }

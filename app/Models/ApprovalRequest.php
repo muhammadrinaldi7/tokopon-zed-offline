@@ -45,6 +45,24 @@ class ApprovalRequest extends Model
 
             // Update local order status
             $order->update(['order_status' => 'CANCELLED']);
+
+            // Restore deposit balances if this order used any deposits
+            $usages = \App\Models\CustomerDepositUsage::where('order_id', $order->id)->get();
+            foreach ($usages as $usage) {
+                $deposit = $usage->customerDeposit;
+                if ($deposit) {
+                    $deposit->balance += (float)$usage->amount_used;
+                    $deposit->status = 'AVAILABLE'; // Ensure it's available again
+                    $deposit->save();
+                }
+                $usage->delete(); // Remove the usage record since the order is cancelled
+            }
+
+            // Kembalikan deposit SO (yang berasal dari DP SO ini) ke AVAILABLE
+            \App\Models\CustomerDeposit::where('origin_order_id', $order->id)
+                ->where('status', 'USED')
+                ->update(['status' => 'AVAILABLE', 'order_id' => null]);
+
             $this->update(['status' => 'COMPLETED']);
             
             return true;
