@@ -85,7 +85,7 @@ class SalesReport extends Component
 
         return Order::with(['user', 'salesBy', 'payments.paymentMethod', 'payments.paymentMethodRate', 'items.variant', 'promos'])
             ->whereBetween('orders.created_at', [$start, $end])
-            ->where('orders.order_status', 'COMPLETED', 'paid', 'down_payment')
+            ->whereIn('orders.order_status', ['COMPLETED', 'paid', 'down_payment'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('orders.order_number', 'like', '%' . $this->search . '%')
