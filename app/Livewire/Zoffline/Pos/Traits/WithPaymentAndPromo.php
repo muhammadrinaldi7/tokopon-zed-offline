@@ -32,9 +32,9 @@ trait WithPaymentAndPromo
         // Pastikan tidak melebihi total deposit yang tersedia atau total tagihan
         $grandTotalBeforeDeposit = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0));
         $maxAllowed = min($this->availableCustomerDepositTotal, $grandTotalBeforeDeposit);
-        
+
         $cleanedAmount = (float) preg_replace('/[^0-9]/', '', (string)$this->customDepositAmount);
-        
+
         if ($cleanedAmount > $maxAllowed) {
             $this->customDepositAmount = $maxAllowed;
         } elseif ($cleanedAmount < 0 || empty($this->customDepositAmount)) {
@@ -49,7 +49,7 @@ trait WithPaymentAndPromo
         if ($this->paymentMode !== 'split' && isset($this->payments[0])) {
             $depositToUse = $this->depositToUseAmount();
             $remaining = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0) - $depositToUse);
-            
+
             // Jika partial payment diizinkan (seperti DP), jangan paksa nominal ke sisa tagihan
             if (!$this->isPartialPaymentAllowed) {
                 $this->payments[0]['amount'] = $remaining;
@@ -238,11 +238,11 @@ trait WithPaymentAndPromo
     public function depositToUseAmount()
     {
         if (!$this->useCustomerDeposit) return 0;
-        
+
         if ($this->customDepositAmount !== null) {
             return (float) preg_replace('/[^0-9]/', '', (string)$this->customDepositAmount);
         }
-        
+
         $grandTotalBeforeDeposit = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0));
         return min($this->availableCustomerDepositTotal, $grandTotalBeforeDeposit);
     }
@@ -277,7 +277,11 @@ trait WithPaymentAndPromo
                     return false;
                 }
             }
-
+            if ($p['category'] === 'NON-TUNAI' && $p['bank_name'] === 'FINANCE') {
+                if (empty($p['no_kontrak'])) {
+                    return false;
+                }
+            }
             $totalPaid += (float) preg_replace('/[^0-9]/', '', (string)($p['amount'] ?? 0));
         }
 
@@ -372,7 +376,7 @@ trait WithPaymentAndPromo
 
                 // Ekstrak nama lokasi dari payment method (contoh: "Tunai Banjarbaru" -> "banjarbaru")
                 $methodLocation = trim(str_replace('tunai', '', $methodNameLower));
-                
+
                 if (empty($methodLocation)) return false;
 
                 // Gunakan str_contains agar "gsk - banjarbaru" bisa cocok dengan "banjarbaru"

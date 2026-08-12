@@ -197,6 +197,20 @@
                     <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau performa promotor/inspektur garansi</p>
                 </div>
             </div>
+            
+            <div wire:click="navigateToReturnReport"
+                class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+                <div class="rounded-full w-16 h-16 bg-fuchsia-50 flex items-center justify-center text-fuchsia-600">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Laporan Retur</h2>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau dan kontrol barang klaim retur</p>
+                </div>
+            </div>
         @endcan
 
     </div>
