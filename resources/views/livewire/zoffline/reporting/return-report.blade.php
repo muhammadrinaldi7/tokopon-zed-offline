@@ -65,8 +65,8 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tgl Klaim & No Resi</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Pelanggan</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Produk & SN</th>
+                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Pelanggan & Sales</th>
+                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Produk, Qty & Harga</th>
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Kendala</th>
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Resolusi</th>
@@ -82,13 +82,19 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900">{{ $claim->customer->name ?? '-' }}</div>
-                                <div class="text-sm text-gray-500">{{ $claim->customer->profile->phone_number ?? '-' }}</div>
+                                <div class="text-xs text-gray-500">{{ $claim->customer->profile->phone_number ?? '-' }}</div>
+                                <div class="text-xs text-indigo-600 font-medium mt-1">Sales: {{ $claim->warranty->orderItem->order->salesBy->name ?? '-' }}</div>
                             </td>
                             <td class="px-6 py-4">
                                 <div class="text-sm font-medium text-gray-900 line-clamp-2">
                                     {{ $claim->warranty->orderItem->product_name ?? ($claim->warranty->orderItem->variant->name ?? 'Produk Tidak Diketahui') }}
                                 </div>
-                                <div class="text-xs font-mono font-bold text-gray-500 mt-1">SN: {{ $claim->serial_number }}</div>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-xs font-mono font-bold text-gray-500">SN: {{ $claim->serial_number }}</span>
+                                    <span class="text-xs text-gray-400">&bull;</span>
+                                    <span class="text-xs font-medium text-gray-600">Qty: {{ $claim->warranty->orderItem->qty ?? 1 }}</span>
+                                </div>
+                                <div class="text-xs font-bold text-emerald-600 mt-1">Rp {{ number_format($claim->warranty->orderItem->price_at_checkout ?? 0, 0, ',', '.') }}</div>
                             </td>
                             <td class="px-6 py-4">
                                 <div class="text-sm text-gray-900 line-clamp-2" title="{{ $claim->issue_description }}">{{ $claim->issue_description }}</div>
@@ -220,6 +226,10 @@
                                                 <dt class="text-gray-500">No. Invoice Accurate</dt>
                                                 <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->accurate_invoice_no ?? '-' }}</dd>
                                             </div>
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">Nama Sales</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->salesBy->name ?? '-' }}</dd>
+                                            </div>
                                         </dl>
                                     </div>
 
@@ -251,6 +261,10 @@
                                             <div class="flex justify-between">
                                                 <dt class="text-gray-500">Serial Number</dt>
                                                 <dd class="font-mono font-bold text-gray-900">{{ $this->selectedClaim->serial_number }}</dd>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">Harga Satuan & Qty</dt>
+                                                <dd class="font-medium text-gray-900">Rp {{ number_format($this->selectedClaim->warranty->orderItem->price_at_checkout ?? 0, 0, ',', '.') }} ({{ $this->selectedClaim->warranty->orderItem->qty ?? 1 }}x)</dd>
                                             </div>
                                         </dl>
                                     </div>

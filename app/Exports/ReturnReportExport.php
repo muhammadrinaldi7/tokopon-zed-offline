@@ -35,8 +35,16 @@ class ReturnReportExport implements FromCollection, WithHeadings, ShouldAutoSize
             'No. Invoice Accurate',
             'Nama Pelanggan',
             'No. HP Pelanggan',
+            'Nama Sales',
             'Produk',
             'Serial Number',
+            'QTY',
+            'HARGA SATUAN (Rp)',
+            'DISKON ITEM (Rp)',
+            'NAMA PROMO',
+            'DISKON PROMO (Rp)',
+            'SUBTOTAL ITEM (Rp)',
+            'PENJUALAN BERSIH',
             'Kendala / Keluhan',
             'Diagnosis',
             'Status',
@@ -54,16 +62,40 @@ class ReturnReportExport implements FromCollection, WithHeadings, ShouldAutoSize
         $productName = $claim->warranty->orderItem->product_name 
             ?? ($claim->warranty->orderItem->variant->name ?? 'Produk Tidak Diketahui');
 
+        $item = $claim->warranty->orderItem;
+        $qty = $item->qty ?? 1;
+        $hargaSatuan = $item->price_at_checkout ?? 0;
+        $diskonItem = $item->discount_amount ?? 0;
+        $subtotalItem = $item->subtotal ?? ($hargaSatuan * $qty);
+
+        $promoNames = '-';
+        $diskonPromo = 0;
+        if ($item && $item->relationLoaded('promos') && $item->promos->count() > 0) {
+            $promoNames = $item->promos->pluck('name')->unique()->implode(', ');
+            $diskonPromo = $item->promos->sum('pivot.discount_amount');
+        }
+
+        $actualSubtotal = $subtotalItem - $diskonItem - $diskonPromo;
+        $penjualanBersih = round($actualSubtotal / 1.11);
+
         return [
             $this->rowNumber,
             $claim->claim_number,
             $claim->claimed_at ? $claim->claimed_at->format('Y-m-d H:i:s') : '-',
-            $claim->warranty->orderItem->order->order_number ?? '-',
-            $claim->warranty->orderItem->order->accurate_invoice_no ?? '-',
+            $item->order->order_number ?? '-',
+            $item->order->accurate_invoice_no ?? '-',
             $claim->customer->name ?? '-',
             $claim->customer->profile->phone_number ?? '-',
+            $item->order->salesBy->name ?? '-',
             $productName,
             $claim->serial_number,
+            $qty,
+            $hargaSatuan,
+            $diskonItem,
+            $promoNames,
+            $diskonPromo,
+            $subtotalItem,
+            $penjualanBersih,
             $claim->issue_description,
             $claim->diagnosis ?? '-',
             $claim->status_badge->label ?? '-',

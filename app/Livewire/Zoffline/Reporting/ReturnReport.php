@@ -81,7 +81,8 @@ class ReturnReport extends Component
         return WarrantyClaim::with([
             'customer.profile', 
             'warranty.orderItem.variant',
-            'warranty.orderItem.order'
+            'warranty.orderItem.order',
+            'warranty.orderItem.promos'
         ])
         ->when($this->startDate && $this->endDate, function ($q) {
             $start = Carbon::parse($this->startDate)->startOfDay();
