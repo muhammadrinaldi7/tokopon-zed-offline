@@ -1,8 +1,22 @@
 <div class="p-6">
     <div class="flex flex-col items-start gap-4 mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Laporan Retur</h1>
-            <p class="text-sm text-gray-500 mt-1">Gunakan laporan ini untuk memantau data klaim garansi dan barang retur.</p>
+        <div class="flex items-center justify-between w-full">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Laporan Retur</h1>
+                <p class="text-sm text-gray-500 mt-1">Gunakan laporan ini untuk memantau data klaim garansi dan barang retur.</p>
+            </div>
+            <div>
+                <button wire:click="exportExcel"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm disabled:opacity-50"
+                    wire:loading.attr="disabled" wire:target="exportExcel">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span wire:loading.remove wire:target="exportExcel">Export Excel</span>
+                    <span wire:loading wire:target="exportExcel">Mengekspor...</span>
+                </button>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
@@ -56,6 +70,7 @@
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Kendala</th>
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Resolusi</th>
+                        <th class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -96,10 +111,16 @@
                                     <span class="text-xs text-gray-400 italic">Belum ada</span>
                                 @endif
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right">
+                                <button wire:click="showDetail({{ $claim->id }})"
+                                    class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-fuchsia-600 hover:text-fuchsia-700 bg-fuchsia-50 hover:bg-fuchsia-100 rounded-lg transition-colors">
+                                    Lihat Detail
+                                </button>
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-12 text-center">
+                            <td colspan="7" class="px-6 py-12 text-center">
                                 <div class="flex flex-col items-center justify-center">
                                     <svg class="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24">
@@ -123,4 +144,155 @@
             </div>
         @endif
     </div>
+
+    <!-- Slide-over Panel Detail -->
+    @if($showDetailPanel && $this->selectedClaim)
+        <div class="fixed inset-0 overflow-hidden z-50">
+            <div class="absolute inset-0 overflow-hidden">
+                <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="closeDetail"></div>
+
+                <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+                    <div class="pointer-events-auto w-screen max-w-md transform transition-all duration-300 ease-in-out">
+                        <div class="flex h-full flex-col overflow-y-scroll bg-white shadow-xl">
+                            <div class="bg-gray-50 px-4 py-6 sm:px-6">
+                                <div class="flex items-center justify-between">
+                                    <h2 class="text-lg font-bold text-gray-900" id="slide-over-title">
+                                        Detail Klaim: {{ $this->selectedClaim->claim_number }}
+                                    </h2>
+                                    <div class="ml-3 flex h-7 items-center">
+                                        <button type="button" wire:click="closeDetail" class="rounded-md bg-gray-50 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500">
+                                            <span class="sr-only">Close panel</span>
+                                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="relative flex-1 px-4 py-6 sm:px-6">
+                                <div class="space-y-6">
+                                    <!-- Informasi Klaim -->
+                                    <div>
+                                        <h3 class="text-sm font-bold text-gray-500 mb-3 border-b pb-2">INFORMASI KLAIM</h3>
+                                        <dl class="space-y-2 text-sm">
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">Tgl Klaim</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->claimed_at ? $this->selectedClaim->claimed_at->format('d/m/Y H:i') : '-' }}</dd>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">Tgl Selesai</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->resolved_at ? $this->selectedClaim->resolved_at->format('d/m/Y H:i') : '-' }}</dd>
+                                            </div>
+                                            <div class="flex justify-between items-center">
+                                                <dt class="text-gray-500">Status</dt>
+                                                <dd>
+                                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold {{ $this->selectedClaim->status_badge->bg }}">
+                                                        <span class="w-1.5 h-1.5 rounded-full {{ $this->selectedClaim->status_badge->dot }}"></span>
+                                                        {{ $this->selectedClaim->status_badge->label }}
+                                                    </span>
+                                                </dd>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">Resolusi</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->resolution ? ucfirst($this->selectedClaim->resolution) : '-' }}</dd>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">Dibuat Oleh</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->claimedBy->name ?? '-' }}</dd>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">Disetujui Oleh</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->approvedBy->name ?? '-' }}</dd>
+                                            </div>
+                                        </dl>
+                                    </div>
+
+                                    <!-- Informasi Transaksi -->
+                                    <div>
+                                        <h3 class="text-sm font-bold text-gray-500 mb-3 border-b pb-2">INFORMASI TRANSAKSI</h3>
+                                        <dl class="space-y-2 text-sm">
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">No. Pesanan</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->order_number ?? '-' }}</dd>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">No. Invoice Accurate</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->accurate_invoice_no ?? '-' }}</dd>
+                                            </div>
+                                        </dl>
+                                    </div>
+
+                                    <!-- Informasi Pelanggan -->
+                                    <div>
+                                        <h3 class="text-sm font-bold text-gray-500 mb-3 border-b pb-2">INFORMASI PELANGGAN</h3>
+                                        <dl class="space-y-2 text-sm">
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">Nama</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->customer->name ?? '-' }}</dd>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">No. HP</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->customer->profile->phone_number ?? '-' }}</dd>
+                                            </div>
+                                        </dl>
+                                    </div>
+
+                                    <!-- Informasi Produk -->
+                                    <div>
+                                        <h3 class="text-sm font-bold text-gray-500 mb-3 border-b pb-2">INFORMASI PRODUK</h3>
+                                        <dl class="space-y-2 text-sm">
+                                            <div>
+                                                <dt class="text-gray-500">Produk</dt>
+                                                <dd class="font-medium text-gray-900 mt-1">
+                                                    {{ $this->selectedClaim->warranty->orderItem->product_name ?? ($this->selectedClaim->warranty->orderItem->variant->name ?? 'Produk Tidak Diketahui') }}
+                                                </dd>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">Serial Number</dt>
+                                                <dd class="font-mono font-bold text-gray-900">{{ $this->selectedClaim->serial_number }}</dd>
+                                            </div>
+                                        </dl>
+                                    </div>
+
+                                    <!-- Detail Masalah -->
+                                    <div>
+                                        <h3 class="text-sm font-bold text-gray-500 mb-3 border-b pb-2">DETAIL MASALAH & RESOLUSI</h3>
+                                        <dl class="space-y-4 text-sm">
+                                            <div>
+                                                <dt class="text-gray-500 font-bold">Kendala / Keluhan</dt>
+                                                <dd class="mt-1 text-gray-900 bg-gray-50 p-3 rounded-lg">{{ $this->selectedClaim->issue_description ?: '-' }}</dd>
+                                            </div>
+                                            <div>
+                                                <dt class="text-gray-500 font-bold">Diagnosis Teknisi</dt>
+                                                <dd class="mt-1 text-gray-900 bg-gray-50 p-3 rounded-lg">{{ $this->selectedClaim->diagnosis ?: '-' }}</dd>
+                                            </div>
+                                            <div>
+                                                <dt class="text-gray-500 font-bold">Catatan Resolusi</dt>
+                                                <dd class="mt-1 text-gray-900 bg-gray-50 p-3 rounded-lg">{{ $this->selectedClaim->resolution_notes ?: '-' }}</dd>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500 font-bold">Nominal Refund</dt>
+                                                <dd class="font-medium text-red-600">
+                                                    {{ $this->selectedClaim->refund_amount ? 'Rp ' . number_format($this->selectedClaim->refund_amount, 0, ',', '.') : '-' }}
+                                                </dd>
+                                            </div>
+                                        </dl>
+                                    </div>
+                                    
+                                    @can('manage-orders')
+                                    <div class="pt-4 border-t">
+                                        <a href="{{ route('admin.warranty.claims', ['search' => $this->selectedClaim->claim_number]) }}" class="w-full flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-fuchsia-600 hover:bg-fuchsia-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-fuchsia-500">
+                                            Buka di Manajemen Klaim
+                                        </a>
+                                    </div>
+                                    @endcan
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
