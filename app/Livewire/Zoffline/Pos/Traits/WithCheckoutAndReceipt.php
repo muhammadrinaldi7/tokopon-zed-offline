@@ -552,7 +552,6 @@ trait WithCheckoutAndReceipt
                         if ($deposit->balance <= 0) {
                             $deposit->status = 'USED';
                         }
-                        $deposit->order_id = $order->id; // Record usage origin
                         $deposit->save();
                         
                         $remainingGrandTotalForDp -= $useAmount;
@@ -1756,11 +1755,11 @@ trait WithCheckoutAndReceipt
             $subTotal = collect($this->cart)->sum(fn($i) => (float)$i['price'] * (float)$i['qty']);
             $discountTotal = collect($this->cart)->sum(fn($i) => (float)($i['discount_amount'] ?? 0) * (float)$i['qty']);
             $promoDiscountTotal = collect($this->cart)->sum(fn($i) => (float)($i['promo_discount'] ?? 0));
+            $totalDiscountAmount = $discountTotal + $promoDiscountTotal;
 
             $order->update([
-                'sub_total' => $subTotal,
-                'discount_total' => $discountTotal,
-                'promo_discount' => $promoDiscountTotal,
+                'total_amount' => $subTotal,
+                'discount_amount' => $totalDiscountAmount,
                 'grand_total' => $grandTotal,
                 'notes' => $this->notes,
             ]);
@@ -1840,7 +1839,6 @@ trait WithCheckoutAndReceipt
                         if ($deposit->balance <= 0) {
                             $deposit->status = 'USED';
                         }
-                        $deposit->order_id = $order->id; // Record usage origin
                         $deposit->save();
                         
                         $remainingGrandTotalForDp -= $useAmount;
@@ -1852,7 +1850,6 @@ trait WithCheckoutAndReceipt
             \App\Models\CustomerDeposit::where('origin_order_id', $order->id)
                 ->update([
                     'status' => 'USED',
-                    'order_id' => $order->id, // Ikat kembali ke order untuk history
                 ]);
 
             \Illuminate\Support\Facades\DB::commit();
