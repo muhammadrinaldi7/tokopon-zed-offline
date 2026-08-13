@@ -3,7 +3,7 @@ name: Deploy Laravel to Stagging Server
 on:
   push:
     branches:
-      - stagging_prod
+      - zedpos
 
 jobs:
   test:
