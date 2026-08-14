@@ -177,7 +177,6 @@ class SwapItemModal extends Component
             $this->syncSwapToAccurate();
 
             DB::commit();
-            $this->dispatch('toast', title: 'Berhasil', message: 'Item berhasil ditukar!', type: 'success');
             $this->closeModal();
             $this->dispatch('refreshOrderDetails');
         } catch (\Exception $e) {
@@ -204,6 +203,8 @@ class SwapItemModal extends Component
         // 2. Re-build the entire detailItem payload for the SO based on the new items
         $detailItem = [];
         $hasExistingId = false;
+        $localItemNos = []; // Simpan semua itemNo yang ada di SO lokal
+        
         foreach ($this->order->items as $item) {
             // Fetch Accurate Item No
             $variant = $item->variant;
@@ -262,6 +263,21 @@ class SwapItemModal extends Component
             }
 
             $detailItem[] = $dItem;
+            $localItemNos[] = $dItem['itemNo'];
+        }
+
+        // 2C. HAPUS barang lama di Accurate yang sudah tidak ada di SO lokal
+        // Memanfaatkan parameter `_status => 'delete'` dari API Accurate
+        foreach ($existingDetailItems as $exItem) {
+            $exItemNo = $exItem['itemNo'] ?? ($exItem['item']['no'] ?? '');
+            $exId = $exItem['id'] ?? null;
+            
+            if ($exId && !in_array($exItemNo, $localItemNos)) {
+                $detailItem[] = [
+                    'id' => $exId,
+                    '_status' => 'delete'
+                ];
+            }
         }
 
         $branchName = $this->order->branch->name ?? (\Illuminate\Support\Facades\Auth::user()->branch->name ?? 'Banjarbaru');
@@ -276,10 +292,7 @@ class SwapItemModal extends Component
         try {
             $accurateService->postSalesOrder($payload, $dbSource);
 
-            // Tampilkan warning jika Accurate akan melakukan Append (karena tidak ada ID lama yang terkirim)
-            if (!$hasExistingId) {
-                $this->dispatch('toast', title: 'Perhatian Accurate', message: 'Item berhasil diswap di sistem. Namun karena ini adalah satu-satunya item di SO, Accurate menolaknya untuk diganti langsung. Harap hapus baris barang lama secara manual di web Accurate.', type: 'warning');
-            }
+            $this->dispatch('toast', title: 'Berhasil', message: 'Item berhasil diswap dan sinkron dengan Accurate.', type: 'success');
         } catch (\Exception $e) {
             Log::warning("Gagal sync Swap Item ke Accurate SO: " . $e->getMessage());
             throw $e;
