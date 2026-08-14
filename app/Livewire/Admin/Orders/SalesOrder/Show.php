@@ -54,6 +54,13 @@ class Show extends Component
         $this->order->refresh();
     }
 
+    #[On('refreshOrderDetails')]
+    public function refreshOrderDetails()
+    {
+        $this->order->refresh();
+        $this->dp_amount = $this->getRemainingBalance();
+    }
+
     public function getRemainingBalance()
     {
         $paid = $this->order->payments()->sum('amount');

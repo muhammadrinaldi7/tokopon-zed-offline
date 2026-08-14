@@ -19,6 +19,7 @@ class SwapItemModal extends Component
     public $swappingItemId = null;
     public $searchQuery = '';
     public $searchResults = [];
+    public $selectedCandidate = null;
 
     #[On('openSwapModal')]
     public function openModal($orderId)
@@ -34,6 +35,7 @@ class SwapItemModal extends Component
         $this->swappingItemId = null;
         $this->searchQuery = '';
         $this->searchResults = [];
+        $this->selectedCandidate = null;
     }
 
     public function closeModal()
@@ -54,6 +56,23 @@ class SwapItemModal extends Component
     public function cancelSwap()
     {
         $this->resetSwapState();
+    }
+
+    public function selectCandidate($id, $type, $price, $name, $sku, $stock)
+    {
+        $this->selectedCandidate = [
+            'id' => $id,
+            'type' => $type,
+            'price' => $price,
+            'name' => $name,
+            'sku' => $sku,
+            'stock' => $stock
+        ];
+    }
+
+    public function clearCandidate()
+    {
+        $this->selectedCandidate = null;
     }
 
     public function updatedSearchQuery()
@@ -88,8 +107,14 @@ class SwapItemModal extends Component
         $this->searchResults = $results->toArray();
     }
 
-    public function executeSwap($newVariantId, $newVariantType, $newPrice)
+    public function executeSwap()
     {
+        if (!$this->selectedCandidate) return;
+
+        $newVariantId = $this->selectedCandidate['id'];
+        $newVariantType = $this->selectedCandidate['type'];
+        $newPrice = $this->selectedCandidate['price'];
+
         $oldItem = OrderItem::find($this->swappingItemId);
         if (!$oldItem || !$this->order) return;
 
@@ -178,7 +203,7 @@ class SwapItemModal extends Component
 
         // 2. Re-build the entire detailItem payload for the SO based on the new items
         $detailItem = [];
-        $index = 0;
+        $hasExistingId = false;
         foreach ($this->order->items as $item) {
             // Fetch Accurate Item No
             $variant = $item->variant;
@@ -226,12 +251,17 @@ class SwapItemModal extends Component
                 }
             }
 
-            if (isset($existingDetailItems[$index]['id'])) {
-                $dItem['id'] = $existingDetailItems[$index]['id'];
+            // Cari ID baris lama yang cocok berdasarkan itemNo
+            foreach ($existingDetailItems as $exItem) {
+                $exItemNo = $exItem['itemNo'] ?? ($exItem['item']['no'] ?? '');
+                if ($exItemNo === $dItem['itemNo']) {
+                    $dItem['id'] = $exItem['id'];
+                    $hasExistingId = true;
+                    break;
+                }
             }
 
             $detailItem[] = $dItem;
-            $index++;
         }
 
         $branchName = $this->order->branch->name ?? (\Illuminate\Support\Facades\Auth::user()->branch->name ?? 'Banjarbaru');
@@ -245,6 +275,11 @@ class SwapItemModal extends Component
         // 3. Send update to Accurate
         try {
             $accurateService->postSalesOrder($payload, $dbSource);
+
+            // Tampilkan warning jika Accurate akan melakukan Append (karena tidak ada ID lama yang terkirim)
+            if (!$hasExistingId) {
+                $this->dispatch('toast', title: 'Perhatian Accurate', message: 'Item berhasil diswap di sistem. Namun karena ini adalah satu-satunya item di SO, Accurate menolaknya untuk diganti langsung. Harap hapus baris barang lama secara manual di web Accurate.', type: 'warning');
+            }
         } catch (\Exception $e) {
             Log::warning("Gagal sync Swap Item ke Accurate SO: " . $e->getMessage());
             throw $e;
