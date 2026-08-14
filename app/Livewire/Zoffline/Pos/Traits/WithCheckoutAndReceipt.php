@@ -1758,6 +1758,7 @@ trait WithCheckoutAndReceipt
             $totalDiscountAmount = $discountTotal + $promoDiscountTotal;
 
             $order->update([
+                'order_date' => now()->format('Y-m-d'),
                 'total_amount' => $subTotal,
                 'discount_amount' => $totalDiscountAmount,
                 'grand_total' => $grandTotal,

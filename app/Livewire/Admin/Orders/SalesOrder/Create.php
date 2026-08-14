@@ -22,11 +22,17 @@ class Create extends Component
     public $user_id;
     public $searchCustomer = '';
     public $customerSearchResults = [];
+    public $selectedCustomerName = null;
+    public $selectedCustomerEmail = null;
+    public $selectedCustomerPhone = null;
 
     // Sales
     public $sales_id;
     public $searchSales = '';
     public $salesSearchResults = [];
+    public $selectedSalesName = null;
+    public $selectedSalesBranch = null;
+    public $selectedSalesNo = null;
 
     // New Customer
     public $showNewCustomerModal = false;
@@ -80,6 +86,14 @@ class Create extends Component
                 'items.*.variant_id.required' => 'Ada baris produk yang belum dipilih.',
                 'items.*.qty.min' => 'Kuantitas minimal 1.',
             ]);
+
+            // Validasi SN jika ada yang lupa menekan enter
+            foreach ($this->items as $idx => $item) {
+                if (!empty(trim($item['scanned_sn'] ?? ''))) {
+                    $this->addError('items', 'Ada input IMEI yang belum ditekan Enter pada baris ke-' . ($idx + 1));
+                    return;
+                }
+            }
         }
 
         if ($this->wizardStep < 3) {
@@ -105,11 +119,8 @@ class Create extends Component
             'discount' => 0,
             'total' => 0,
             'product_name' => '',
-            'serial_number' => '', // Tambahan untuk Kunci IMEI di SO
-            'searchSales' => '',
-            'salesSearchResults' => [],
-            'sales_ids' => $this->sales_id ? [$this->sales_id] : [], // Default ke master sales_id
-            'sales_names' => $this->searchSales ? [$this->searchSales] : [],
+            'serial_numbers' => [], // Validated SNs as badges
+            'scanned_sn' => '', // Current input string
         ];
         $this->calculateTotals();
     }
@@ -162,29 +173,16 @@ class Create extends Component
                 }
             }
 
-            if ($field === 'searchSales') {
-                $term = $value;
-                if (strlen($term) >= 1) {
-                    $user = Auth::user();
-                    $businessUnitId = $user->getActiveBusinessUnitId() ?? 1;
-
-                    $this->items[$index]['salesSearchResults'] = \App\Models\Employe::active()
-                        ->where('business_unit_id', $businessUnitId)
-                        ->where(function ($q) use ($user) {
-                            $q->where('branch_id', $user->branch_id)
-                                ->orWhereNull('branch_id');
-                        })
-                        ->where('name', 'like', '%' . $term . '%')
-                        ->take(5)
-                        ->get()
-                        ->map(function ($s) {
-                            return [
-                                'id' => $s->id,
-                                'name' => $s->name,
-                            ];
-                        })->toArray();
-                } else {
-                    $this->items[$index]['salesSearchResults'] = [];
+            // Handle Qty change to ensure serial_numbers count doesn't exceed qty
+            if ($field === 'qty') {
+                $item = $this->items[$index];
+                $newQty = max(1, (int)$value);
+                
+                $currentSns = $item['serial_numbers'] ?? [];
+                if (count($currentSns) > $newQty) {
+                    // Potong SN yang berlebih
+                    $this->items[$index]['serial_numbers'] = array_slice($currentSns, 0, $newQty);
+                    $this->dispatch('toast', title: 'Info', message: 'Jumlah Kunci IMEI disesuaikan karena Qty berkurang.', type: 'warning');
                 }
             }
 
@@ -225,11 +223,110 @@ class Create extends Component
         }
     }
 
-    public function selectCustomer($id, $name)
+    public function addSn($itemIndex)
+    {
+        $sn = trim($this->items[$itemIndex]['scanned_sn'] ?? '');
+        $variantId = $this->items[$itemIndex]['variant_id'];
+        $qty = (int)($this->items[$itemIndex]['qty'] ?? 1);
+        $currentSns = $this->items[$itemIndex]['serial_numbers'] ?? [];
+
+        if (empty($sn)) {
+            return;
+        }
+
+        if (count($currentSns) >= $qty) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Jumlah IMEI tidak boleh melebihi Qty barang.', type: 'error');
+            $this->items[$itemIndex]['scanned_sn'] = '';
+            return;
+        }
+
+        if (empty($variantId)) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Pilih produk terlebih dahulu.', type: 'error');
+            $this->items[$itemIndex]['scanned_sn'] = '';
+            return;
+        }
+
+        // Cek duplikasi input dalam satu SO ini (baik di baris yang sama maupun beda baris)
+        foreach ($this->items as $idx => $item) {
+            foreach ($item['serial_numbers'] ?? [] as $s) {
+                if (trim($s) === $sn) {
+                    $this->dispatch('toast', title: 'Gagal', message: 'SN sudah dimasukkan di pesanan ini.', type: 'error');
+                    $this->items[$itemIndex]['scanned_sn'] = '';
+                    return;
+                }
+            }
+        }
+
+        // --- Logika POS ---
+        $warehouseId = Auth::user()->warehouse_id;
+        $buId = $this->business_unit_id ?? Auth::user()->getActiveBusinessUnitId();
+
+        $localSnRecord = \App\Models\ProductSerialNumber::where('serial_number', $sn)->first();
+
+        if (!$localSnRecord) {
+            $this->dispatch('toast', title: 'Gagal', message: "SN '{$sn}' tidak ditemukan di sistem lokal.", type: 'error');
+            $this->items[$itemIndex]['scanned_sn'] = '';
+            return;
+        }
+
+        if ($localSnRecord->product_accurate_id != $variantId) {
+            $productName = $localSnRecord->productAccurate ? $localSnRecord->productAccurate->name : 'Produk Lain';
+            $this->dispatch('toast', title: 'Gagal', message: "SN ini milik produk: {$productName}", type: 'error');
+            $this->items[$itemIndex]['scanned_sn'] = '';
+            return;
+        }
+
+        if ($localSnRecord->business_unit_id !== null && $localSnRecord->business_unit_id != $buId) {
+            $this->dispatch('toast', title: 'Gagal', message: "SN terdaftar untuk Cabang/Unit Usaha lain.", type: 'error');
+            $this->items[$itemIndex]['scanned_sn'] = '';
+            return;
+        }
+
+        if ($localSnRecord->warehouse_id != $warehouseId) {
+            $actualWarehouseName = \App\Models\Warehouse::where('id', $localSnRecord->warehouse_id)->value('name') ?? 'Gudang Lain';
+            $this->dispatch('toast', title: 'Gagal', message: "SN ada di {$actualWarehouseName}.", type: 'error');
+            $this->items[$itemIndex]['scanned_sn'] = '';
+            return;
+        }
+
+        if ($localSnRecord->status === 'Unavailable') {
+            $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "SN sudah Terjual atau Draft.", type: 'warning');
+            $this->items[$itemIndex]['scanned_sn'] = '';
+            return;
+        }
+
+        // Lolos validasi, masukkan ke array sebagai Badge
+        $this->items[$itemIndex]['serial_numbers'][] = $sn;
+        $this->items[$itemIndex]['scanned_sn'] = '';
+        $this->dispatch('toast', title: 'Berhasil', message: 'SN ditambahkan.', type: 'success');
+    }
+
+    public function removeSn($itemIndex, $snIndex)
+    {
+        if (isset($this->items[$itemIndex]['serial_numbers'][$snIndex])) {
+            unset($this->items[$itemIndex]['serial_numbers'][$snIndex]);
+            // Re-index array
+            $this->items[$itemIndex]['serial_numbers'] = array_values($this->items[$itemIndex]['serial_numbers']);
+        }
+    }
+
+    public function selectCustomer($id, $name, $email = null, $phone = null)
     {
         $this->user_id = $id;
-        $this->searchCustomer = $name;
+        $this->searchCustomer = '';
         $this->customerSearchResults = [];
+        $this->selectedCustomerName = $name;
+        $this->selectedCustomerEmail = $email;
+        $this->selectedCustomerPhone = $phone;
+    }
+
+    public function clearCustomer()
+    {
+        $this->user_id = null;
+        $this->searchCustomer = '';
+        $this->selectedCustomerName = null;
+        $this->selectedCustomerEmail = null;
+        $this->selectedCustomerPhone = null;
     }
 
     public function updatedSearchSales($value)
@@ -261,38 +358,23 @@ class Create extends Component
         }
     }
 
-    public function selectSales($id, $name)
+    public function selectSales($id, $name, $branchName = null, $employeeNo = null)
     {
         $this->sales_id = $id;
-        $this->searchSales = $name;
+        $this->searchSales = '';
         $this->salesSearchResults = [];
-
-        // Terapkan ke semua item yang belum punya sales_ids
-        foreach ($this->items as $index => $item) {
-            if (empty($item['sales_ids'])) {
-                $this->items[$index]['sales_ids'] = [$id];
-                $this->items[$index]['sales_names'] = [$name];
-            }
-        }
+        $this->selectedSalesName = $name;
+        $this->selectedSalesBranch = $branchName;
+        $this->selectedSalesNo = $employeeNo;
     }
 
-    public function selectItemSales($index, $id, $name)
+    public function clearSales()
     {
-        if (!in_array($id, $this->items[$index]['sales_ids'])) {
-            $this->items[$index]['sales_ids'][] = $id;
-            $this->items[$index]['sales_names'][] = $name;
-        }
-        $this->items[$index]['searchSales'] = '';
-        $this->items[$index]['salesSearchResults'] = [];
-    }
-
-    public function removeItemSales($index, $salesIndex)
-    {
-        unset($this->items[$index]['sales_ids'][$salesIndex]);
-        unset($this->items[$index]['sales_names'][$salesIndex]);
-        
-        $this->items[$index]['sales_ids'] = array_values($this->items[$index]['sales_ids']);
-        $this->items[$index]['sales_names'] = array_values($this->items[$index]['sales_names']);
+        $this->sales_id = null;
+        $this->searchSales = '';
+        $this->selectedSalesName = null;
+        $this->selectedSalesBranch = null;
+        $this->selectedSalesNo = null;
     }
 
     public function createNewCustomer()
@@ -355,7 +437,7 @@ class Create extends Component
                 // Tetap lanjut meskipun gagal sync (bisa disync nanti saat simpan SO)
             }
 
-            $this->selectCustomer($user->id, $user->name);
+            $this->selectCustomer($user->id, $user->name, $user->email, $user->profile->phone_number ?? null);
             $this->showNewCustomerModal = false;
 
             // Reset fields
@@ -498,7 +580,7 @@ class Create extends Component
                     'price_at_checkout' => $item['unit_price'],
                     'discount_amount' => $item['discount'],
                     'subtotal' => $item['total'],
-                    'serial_number' => $item['serial_number'] ?? null, // Simpan IMEI
+                    'serial_number' => isset($item['serial_numbers']) ? implode(',', array_filter(array_map('trim', $item['serial_numbers']))) : null, // Simpan IMEI gabungan
                     'sales_ids' => !empty($item['sales_ids']) ? json_encode($item['sales_ids']) : null,
                 ]);
             }
@@ -551,8 +633,9 @@ class Create extends Component
                     }
 
                     // Jika user mengisi SN / IMEI, kirim ke Accurate untuk mencadangkan SN
-                    if (!empty($item['serial_number'])) {
-                        $sns = array_filter(array_map('trim', explode(',', $item['serial_number'])));
+                    $joinedSn = isset($item['serial_numbers']) ? implode(',', array_filter(array_map('trim', $item['serial_numbers']))) : '';
+                    if (!empty($joinedSn)) {
+                        $sns = explode(',', $joinedSn);
                         if (count($sns) > 0) {
                             $detailSNs = [];
                             foreach ($sns as $sn) {
@@ -593,7 +676,8 @@ class Create extends Component
                     // CEK APAKAH ADA ITEM YANG PUNYA SN (JIKA YA, BUAT DELIVERY ORDER)
                     $hasSN = false;
                     foreach ($this->items as $item) {
-                        if (!empty($item['serial_number'])) {
+                        $joinedSnCheck = isset($item['serial_numbers']) ? implode(',', array_filter(array_map('trim', $item['serial_numbers']))) : '';
+                        if (!empty($joinedSnCheck)) {
                             $hasSN = true;
                             break;
                         }
@@ -617,8 +701,9 @@ class Create extends Component
                                 'salesOrderNumber' => $soResult['r']['number'],
                             ];
 
-                            if (!empty($item['serial_number'])) {
-                                $sns = array_filter(array_map('trim', explode(',', $item['serial_number'])));
+                            $joinedDoSn = isset($item['serial_numbers']) ? implode(',', array_filter(array_map('trim', $item['serial_numbers']))) : '';
+                            if (!empty($joinedDoSn)) {
+                                $sns = explode(',', $joinedDoSn);
                                 if (count($sns) > 0) {
                                     $detailSNs = [];
                                     foreach ($sns as $sn) {
