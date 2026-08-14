@@ -199,11 +199,11 @@ trait WithCart
 
     public function processScan()
     {
-        if ($this->loadedSoOrderId) {
-            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Tidak dapat menambah produk baru pada mode pelunasan SO. Silakan input SN pada item yang sudah ada.', type: 'error');
-            $this->scanned_sn = '';
-            return;
-        }
+        // if ($this->loadedSoOrderId) {
+        //     $this->dispatch('toast', title: 'Akses Ditolak', message: 'Tidak dapat menambah produk baru pada mode pelunasan SO. Silakan input SN pada item yang sudah ada.', type: 'error');
+        //     $this->scanned_sn = '';
+        //     return;
+        // }
 
         $sn = trim($this->scanned_sn);
 
@@ -542,7 +542,7 @@ trait WithCart
 
     public function removeFromCart($index)
     {
-        if ($this->loadedSoOrderId) {
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) {
             $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak dapat menghapus barang pada pesanan SO yang sedang ditarik.', type: 'error');
             return;
         }
@@ -587,7 +587,7 @@ trait WithCart
 
     public function validateCartItemQty($index, $newQty)
     {
-        if ($this->loadedSoOrderId) {
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) {
             return;
         }
 
@@ -641,7 +641,7 @@ trait WithCart
 
     public function incrementCartItem($index)
     {
-        if ($this->loadedSoOrderId) return;
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) return;
 
         if (isset($this->cart[$index])) {
             $this->validateCartItemQty($index, $this->cart[$index]['qty'] + 1);
@@ -651,7 +651,7 @@ trait WithCart
 
     public function decrementCartItem($index)
     {
-        if ($this->loadedSoOrderId) return;
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) return;
 
         if (isset($this->cart[$index]) && $this->cart[$index]['qty'] > 1) {
             $this->validateCartItemQty($index, $this->cart[$index]['qty'] - 1);
