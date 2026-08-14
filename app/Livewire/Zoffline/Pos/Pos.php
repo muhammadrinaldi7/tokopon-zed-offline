@@ -232,25 +232,46 @@ class Pos extends Component
     // ─── SO Fulfillment Properties ──────────────────────────
     public $showSoModal = false;
     public $soOrders = [];
+    public $searchSoKeyword = '';
     public $isSoFulfillment = false;
     public $loadedSoOrderId = null;
     public $soPaidAmount = 0;
 
+    public function updatedSearchSoKeyword()
+    {
+        $this->fetchSoOrders();
+    }
+
     public function openSoList()
+    {
+        $this->searchSoKeyword = '';
+        $this->fetchSoOrders();
+        $this->showSoModal = true;
+    }
+
+    public function fetchSoOrders()
     {
         $user = \Illuminate\Support\Facades\Auth::user();
         $userBranchId = $user->branch_id ?? null;
 
-        $this->soOrders = Order::with(['user', 'accurateDocs'])
+        $query = Order::with(['user', 'accurateDocs'])
             ->where('order_channel', 'SO')
             ->whereIn('order_status', ['pending', 'down_payment', 'paid'])
             ->where('business_unit_id', $user->getActiveBusinessUnitId())
-            ->where('branch_id', $userBranchId)
-            ->latest()
-            ->take(20)
-            ->get();
+            ->where('branch_id', $userBranchId);
 
-        $this->showSoModal = true;
+        if (!empty($this->searchSoKeyword)) {
+            $keyword = $this->searchSoKeyword;
+            $query->where(function($q) use ($keyword) {
+                $q->where('order_number', 'like', '%' . $keyword . '%')
+                  ->orWhere('accurate_so_number', 'like', '%' . $keyword . '%')
+                  ->orWhereHas('user', function($q2) use ($keyword) {
+                      $q2->where('name', 'like', '%' . $keyword . '%');
+                  });
+            });
+        }
+
+        $this->soOrders = $query->latest()->take(20)->get();
     }
 
     public function loadSoOrder($orderId)
