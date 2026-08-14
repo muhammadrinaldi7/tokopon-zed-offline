@@ -109,12 +109,22 @@ class SwapItemModal extends Component
             $oldItem->product_variant_type = $newVariantType;
             $oldItem->price_at_checkout = $newPrice;
             $oldItem->subtotal = $newPrice * $oldItem->qty;
-            $oldItem->serial_number = null; // Reset SN karena item berubah
+            // Reset SN karena item berubah
+            $oldItem->serial_number = null; 
+            
+            // Reset diskon karena item diganti (tidak boleh mewarisi diskon barang lama)
+            $oldItem->discount_amount = 0;
+            $oldItem->promo_discount_amount = 0;
+
+            // Recalculate Order Global Discount
+            $newOrderDiscount = $this->order->items()
+                ->where('id', '!=', $oldItem->id)
+                ->sum(DB::raw('discount_amount + promo_discount_amount'));
 
             // Validasi: Grand Total baru tidak boleh lebih kecil dari DP yang sudah dibayar
             $newGrandTotal = $this->order->items()
                 ->where('id', '!=', $oldItem->id)
-                ->sum('subtotal') + ($newPrice * $oldItem->qty) - $this->order->discount_amount;
+                ->sum('subtotal') + ($newPrice * $oldItem->qty) - $newOrderDiscount;
             $totalDp = $this->order->payments()->where('status', 'PAID')->sum('amount');
             if ($newGrandTotal < $totalDp) {
                 throw new \Exception(
@@ -128,6 +138,7 @@ class SwapItemModal extends Component
 
             // Recalculate Order Totals
             $this->order->total_amount = $this->order->items()->sum('subtotal');
+            $this->order->discount_amount = $newOrderDiscount;
             $this->order->grand_total = $this->order->total_amount - $this->order->discount_amount;
 
             // Catat history swap di notes (sementara tanpa approval)
@@ -169,11 +180,44 @@ class SwapItemModal extends Component
                 $itemNo = $variant->accurate_item_no ?? $variant->sku ?? $variant->item_no;
             }
 
-            $detailItem[] = [
+            $dItem = [
                 'itemNo' => $itemNo,
                 'unitPrice' => (float)$item->price_at_checkout,
                 'quantity' => (float)$item->qty,
+                'detailName' => $item->product_name ?? ($variant->name ?? 'Unknown'),
+                'itemCashDiscount' => (float)($item->discount_amount + $item->promo_discount_amount),
             ];
+
+            // 2A. Tambahkan Serial Number (jika ada)
+            if (!empty($item->serial_number)) {
+                $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                if (count($sns) > 0) {
+                    $detailSNs = [];
+                    foreach ($sns as $sn) {
+                        $detailSNs[] = ['serialNumberNo' => $sn, 'quantity' => 1];
+                    }
+                    $dItem['detailSerialNumber'] = $detailSNs;
+                }
+            }
+
+            // 2B. Tambahkan Salesman (jika ada)
+            $salesIds = $item->sales_ids;
+            if (is_string($salesIds)) {
+                $salesIds = json_decode($salesIds, true);
+            }
+            if (!empty($salesIds) && is_array($salesIds)) {
+                $employeeNos = \App\Models\Employe::whereIn('id', $salesIds)
+                    ->pluck('employee_no')
+                    ->filter()
+                    ->values()
+                    ->toArray();
+                    
+                if (!empty($employeeNos)) {
+                    $dItem['salesmanListNumber'] = $employeeNos;
+                }
+            }
+
+            $detailItem[] = $dItem;
         }
 
         $dbSource = strtolower($this->order->businessUnit->code ?? 'syihab');

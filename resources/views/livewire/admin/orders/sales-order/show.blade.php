@@ -538,4 +538,6 @@
         </div>
     @endif
 
+    <livewire:components.swap-item-modal />
+    <livewire:components.cancel-order-modal />
 </div>
