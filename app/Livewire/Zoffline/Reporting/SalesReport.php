@@ -84,7 +84,7 @@ class SalesReport extends Component
         $end = Carbon::parse($this->endDate)->endOfDay();
 
         return Order::with(['user', 'salesBy', 'payments.paymentMethod', 'payments.paymentMethodRate', 'items.variant', 'promos'])
-            ->whereBetween('orders.created_at', [$start, $end])
+            ->whereBetween('orders.order_date', [$start, $end])
             ->whereIn('orders.order_status', ['COMPLETED'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
@@ -102,7 +102,7 @@ class SalesReport extends Component
                 $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
             })
             ->where('orders.business_unit_id', Auth::user()->getActiveBusinessUnitId())
-            ->latest('orders.created_at');
+            ->latest('orders.order_date');
     }
 
     public function exportCsvOpsi3()
