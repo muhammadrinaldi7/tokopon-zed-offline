@@ -168,8 +168,17 @@ class SwapItemModal extends Component
         $soDoc = $this->order->accurateDocs()->where('doc_type', 'SALES_ORDER')->where('status', 'SUCCESS')->first();
         if (!$soDoc || !$soDoc->accurate_id) return;
 
+        $dbSource = strtolower($this->order->businessUnit->code ?? 'syihab');
+        $accurateService = app(\App\Services\AccurateService::class);
+
+        // Fetch existing SO details from Accurate to get detailItem IDs
+        // Ini wajib dilakukan agar saat dikirim ulang, Accurate akan UPDATE (menimpa) baris yang sudah ada, BUKAN menambah baris baru.
+        $existingSo = $accurateService->getSalesOrderDetail($soDoc->accurate_id, $dbSource);
+        $existingDetailItems = $existingSo['detailItem'] ?? [];
+
         // 2. Re-build the entire detailItem payload for the SO based on the new items
         $detailItem = [];
+        $index = 0;
         foreach ($this->order->items as $item) {
             // Fetch Accurate Item No
             $variant = $item->variant;
@@ -217,13 +226,15 @@ class SwapItemModal extends Component
                 }
             }
 
+            if (isset($existingDetailItems[$index]['id'])) {
+                $dItem['id'] = $existingDetailItems[$index]['id'];
+            }
+
             $detailItem[] = $dItem;
+            $index++;
         }
 
-        $dbSource = strtolower($this->order->businessUnit->code ?? 'syihab');
-
         $branchName = $this->order->branch->name ?? (\Illuminate\Support\Facades\Auth::user()->branch->name ?? 'Banjarbaru');
-
 
         $payload = [
             'id' => $soDoc->accurate_id,
@@ -232,8 +243,6 @@ class SwapItemModal extends Component
         ];
 
         // 3. Send update to Accurate
-        $accurateService = app(\App\Services\AccurateService::class);
-
         try {
             $accurateService->postSalesOrder($payload, $dbSource);
         } catch (\Exception $e) {
