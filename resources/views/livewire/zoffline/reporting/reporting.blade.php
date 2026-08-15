@@ -116,6 +116,20 @@
                     <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Ringkasan laba kotor</p>
                 </div>
             </div>
+
+            <!-- New Profit Report -->
+            <div wire:click="navigateToProfitReport"
+                class="w-full h-64 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out text-white">
+                <div class="rounded-full w-16 h-16 bg-blue-500/30 flex items-center justify-center text-white">
+                    <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-white">Laba Bersih Transaksi</h2>
+                    <p class="text-blue-100 text-sm mt-2 line-clamp-2">Analisis Net Profit & HPP per Invoice</p>
+                </div>
+            </div>
         @endcan
 
         @can('closing-kasir-report')
