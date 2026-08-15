@@ -113,10 +113,11 @@ class SwapItemModal extends Component
 
         $newVariantId = $this->selectedCandidate['id'];
         $newVariantType = $this->selectedCandidate['type'];
-        $newPrice = $this->selectedCandidate['price'];
 
         $oldItem = OrderItem::find($this->swappingItemId);
         if (!$oldItem || !$this->order) return;
+
+        $newPrice = $this->selectedCandidate['price'];
 
         DB::beginTransaction();
         try {
@@ -182,7 +183,7 @@ class SwapItemModal extends Component
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Gagal melakukan Swap Item: " . $e->getMessage());
-            $this->dispatch('toast', title: 'Gagal', message: 'Terjadi kesalahan sistem.', type: 'error');
+            $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
         }
     }
 
