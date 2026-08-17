@@ -31,7 +31,8 @@ class User extends Authenticatable implements HasMedia
         'npwp',
         'business_unit_id',
         'warehouse_id',
-        'branch_id'
+        'branch_id',
+        'telegram_chat_id'
     ];
 
     public function businessUnit()

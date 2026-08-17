@@ -21,7 +21,26 @@ class ApprovalController extends Controller
         $rule = \App\Models\ApprovalRule::with('role')->where('module', $approval->request_type)->where('level', $nextLevel)->first();
         $targetRole = $rule && $rule->role ? strtolower($rule->role->name) : 'manager';
 
-        // Persiapkan data yang akan dikirim
+        $cabangId = $approval->requestedBy->branch_id ?? null;
+
+        $localRoles = ['bm', 'supervisor', 'admin'];
+        // Role global misalnya manageroperasional, superadmin, dsb.
+
+        $query = \App\Models\User::role($targetRole)
+            ->whereNotNull('telegram_chat_id')
+            ->where('telegram_chat_id', '!=', '');
+
+        if (in_array($targetRole, $localRoles) && $cabangId) {
+            $query->where('branch_id', $cabangId);
+        }
+
+        $targetUsers = $query->get();
+
+        if ($targetUsers->isEmpty()) {
+            Log::info("Telegram Webhook: Tidak ada user dengan role {$targetRole} dan telegram_chat_id yang valid untuk cabang {$cabangId}");
+            return false;
+        }
+
         $kasirName = $approval->requestedBy->name ?? 'Kasir';
         $tipe = str_replace('_', ' ', $approval->request_type) . " (Level {$nextLevel})";
 
@@ -30,21 +49,30 @@ class ApprovalController extends Controller
             $orderInfo = $approval->approvable->order_number;
         }
 
-        try {
-            // PAYLOAD BARU: Kita hanya mengirim approval_id, bukan link
-            $response = Http::timeout(5)->post($n8nWebhookUrl, [
-                'target_role' => $targetRole,
-                'judul'       => "Pengajuan {$tipe} untuk {$orderInfo}",
-                'kasir'       => $kasirName,
-                'waktu'       => $approval->created_at->format('d M Y H:i'),
-                'keterangan'  => $approval->reason ?? '-',
-                'approval_id' => $approval->id,
-            ]);
-            return $response->successful();
-        } catch (\Exception $e) {
-            Log::error('Gagal kirim Webhook Telegram: ' . $e->getMessage());
-            return false;
+        $successCount = 0;
+
+        foreach ($targetUsers as $user) {
+            try {
+                $response = Http::timeout(5)->post($n8nWebhookUrl, [
+                    'chat_id_penerima' => $user->telegram_chat_id,
+                    'judul'            => "Pengajuan {$tipe} untuk {$orderInfo}",
+                    'kasir'            => $kasirName,
+                    'branch'           => $approval->requestedBy->branch->name,
+                    'waktu'            => $approval->created_at->format('d M Y H:i'),
+                    'keterangan'       => $approval->reason ?? '-',
+                    'action'           => 'PENDING',
+                    'approval_id'      => $approval->id,
+                ]);
+
+                if ($response->successful()) {
+                    $successCount++;
+                }
+            } catch (\Exception $e) {
+                Log::error("Gagal kirim Webhook Telegram ke user {$user->id}: " . $e->getMessage());
+            }
         }
+
+        return $successCount > 0;
     }
 
     /**
