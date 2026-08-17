@@ -940,6 +940,8 @@ trait WithCart
             ]
         ]);
 
+        \App\Http\Controllers\ApprovalController::sendTelegramNotification($request);
+
         // Batalkan request yang masih pending untuk item ini jika ada
         if (isset($this->pendingCustomCashbacks[$this->customCashbackCartIndex])) {
             $oldRequest = \App\Models\ApprovalRequest::find($this->pendingCustomCashbacks[$this->customCashbackCartIndex]);

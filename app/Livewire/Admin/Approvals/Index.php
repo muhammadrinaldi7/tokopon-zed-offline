@@ -163,6 +163,10 @@ class Index extends Component
             }
         } else {
             $request->save();
+            
+            // Trigger notifikasi untuk level selanjutnya
+            \App\Http\Controllers\ApprovalController::sendTelegramNotification($request);
+            
             $this->dispatch('toast', title: 'Berhasil', message: 'Disetujui. Menunggu persetujuan level selanjutnya.', type: 'success');
         }
     }
