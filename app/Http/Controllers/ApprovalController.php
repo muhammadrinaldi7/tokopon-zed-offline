@@ -62,6 +62,7 @@ class ApprovalController extends Controller
                     'keterangan'       => $approval->reason ?? '-',
                     'action'           => 'PENDING',
                     'approval_id'      => $approval->id,
+                    'req_level'        => $nextLevel,
                 ]);
 
                 if ($response->successful()) {
@@ -87,8 +88,23 @@ class ApprovalController extends Controller
         }
 
         // Tangkap data dari body JSON yang dikirim n8n
+        Log::info('Webhook Telegram Masuk:', $request->all());
+        
         $id = $request->input('approval_id');
         $action = $request->input('action'); // 'approve' atau 'reject'
+        $reqLevel = (int) $request->input('req_level');
+        $chatId = $request->input('telegram_chat_id');
+
+        // 2. MENDETEKSI SIAPA PENGEKLIK
+        if (!$chatId) {
+            return response()->json(['success' => false, 'message' => 'Telegram Chat ID tidak ditemukan.']);
+        }
+        
+        $user = \App\Models\User::where('telegram_chat_id', $chatId)->first();
+        
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Akun dengan Chat ID tersebut tidak terdaftar di sistem.']);
+        }
 
         $approval = ApprovalRequest::find($id);
 
@@ -99,8 +115,22 @@ class ApprovalController extends Controller
         if ($approval->status !== 'PENDING') {
             return response()->json(['success' => false, 'message' => "Pengajuan ini sudah berstatus: " . $approval->status]);
         }
+        
+        // 3. MENGUNCI LEVEL (LEVEL LOCK VALIDATION)
+        $expectedLevel = $approval->current_level + 1;
+        if ($reqLevel !== $expectedLevel) {
+            return response()->json(['success' => false, 'message' => 'Tombol ini sudah kadaluarsa (Pengajuan sudah diproses ke tahap selanjutnya/sebelumnya).']);
+        }
 
-        $approverId = 1; // Asumsi ID manajer
+        // 4. VALIDASI JABATAN (ROLE AUTHORIZATION)
+        $rule = \App\Models\ApprovalRule::with('role')->where('module', $approval->request_type)->where('level', $expectedLevel)->first();
+        $targetRole = $rule && $rule->role ? strtolower($rule->role->name) : 'manager';
+
+        if (!$user->hasRole($targetRole)) {
+            return response()->json(['success' => false, 'message' => "Anda tidak memiliki hak akses ({$targetRole}) untuk menyetujui level ini."]);
+        }
+
+        $approverId = $user->id; 
         $pesan = "";
 
         // 3. Eksekusi Perubahan Status

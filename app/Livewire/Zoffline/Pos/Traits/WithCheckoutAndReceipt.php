@@ -211,7 +211,7 @@ trait WithCheckoutAndReceipt
             $this->dispatch('toast', title: 'Draft Disimpan', message: 'Transaksi berhasil disimpan sebagai Draft dan stok telah dikunci.', type: 'success');
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
-            Log::error('POS Save Draft Error: ' . $e->getMessage());
+            Log::channel('pos_accurate')->error('POS Save Draft Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Gagal menyimpan draft: ' . $e->getMessage(), type: 'error');
         }
     }
@@ -418,7 +418,7 @@ trait WithCheckoutAndReceipt
                         }
                     }
                 } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error('POS Accurate Integration Error (Pelunasan Piutang): ' . $e->getMessage());
+                    Log::channel('pos_accurate')->error('POS Accurate Integration Error (Pelunasan Piutang): ' . $e->getMessage());
                 }
 
                 $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
@@ -728,7 +728,7 @@ trait WithCheckoutAndReceipt
                             ],
                             'description' => $this->notes
                         ];
-                        Log::info('POS Accurate Integration SR Data: ' . json_encode($srData));
+                        Log::channel('pos_accurate')->info('POS Accurate Integration SR Data: ' . json_encode($srData));
                         $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
                         if (isset($srResult['r']['number'])) {
                             $srNumbers[] = $srResult['r']['number'];
@@ -748,7 +748,7 @@ trait WithCheckoutAndReceipt
                     }
                 }
             } catch (\Exception $e) {
-                Log::error('POS Accurate Integration Error: ' . $e->getMessage());
+                Log::channel('pos_accurate')->error('POS Accurate Integration Error: ' . $e->getMessage());
                 $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate gagal.', type: 'warning');
                 // Sengaja tidak me-rethrow exception agar transaksi POS lokal tetap dianggap berhasil
             }
@@ -765,7 +765,7 @@ trait WithCheckoutAndReceipt
         } catch (\Exception $e) {
             // BATALKAN semua penulisan DB lokal jika terjadi kegagalan sebelum commit
             \Illuminate\Support\Facades\DB::rollBack();
-            Log::error('POS Payment Error: ' . $e->getMessage());
+            Log::channel('pos_accurate')->error('POS Payment Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
         }
     }
@@ -962,7 +962,7 @@ trait WithCheckoutAndReceipt
                     }
                 }
             } catch (\Exception $e) {
-                Log::error('POS Accurate Integration Error (Piutang): ' . $e->getMessage());
+                Log::channel('pos_accurate')->error('POS Accurate Integration Error (Piutang): ' . $e->getMessage());
             }
 
             $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
@@ -974,7 +974,7 @@ trait WithCheckoutAndReceipt
             $this->dispatch('toast', title: 'Transaksi Piutang Berhasil', message: 'Order ' . $orderNumber . ' berhasil diproses.', type: 'success');
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
-            Log::error('POS Payment Error: ' . $e->getMessage());
+            Log::channel('pos_accurate')->error('POS Payment Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
         }
     }
@@ -1101,7 +1101,7 @@ trait WithCheckoutAndReceipt
 
             $this->dispatch('toast', title: 'Berhasil', message: 'Struk digital telah dikirim ke ' . $email, type: 'success');
         } catch (\Exception $e) {
-            Log::error('POS Email Error: ' . $e->getMessage());
+            Log::channel('pos_accurate')->error('POS Email Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Koneksi SMTP bermasalah: ' . $e->getMessage(), type: 'error');
         }
     }
@@ -1117,8 +1117,8 @@ trait WithCheckoutAndReceipt
         $order = Order::with('user.profile')->find($orderId);
         $phone = $order->user->profile->phone_number ?? null;
 
-        \Illuminate\Support\Facades\Log::error('=== DEBUG PHONE QONTAK ===');
-        \Illuminate\Support\Facades\Log::error('RAW PHONE: ' . var_export($phone, true));
+        Log::channel('pos_accurate')->error('=== DEBUG PHONE QONTAK ===');
+        Log::channel('pos_accurate')->error('RAW PHONE: ' . var_export($phone, true));
         // ─── VALIDASI PEMBATASAN AKSES UTK FRONT-LINER (FL) ───
         $userAktif = Auth::user();
         if (!$userAktif->hasRole('admin') && $order->is_wa_sent) {
@@ -1141,7 +1141,7 @@ trait WithCheckoutAndReceipt
             $phone = '62' . $phone;
         }
 
-        \Illuminate\Support\Facades\Log::error('PROCESSED PHONE TO QONTAK: ' . var_export($phone, true));
+        Log::channel('pos_accurate')->error('PROCESSED PHONE TO QONTAK: ' . var_export($phone, true));
 
         // 2. Tarik variabel dari env untuk Qontak
         $fullUrl = config('services.qontak.api_url');
@@ -1179,7 +1179,7 @@ trait WithCheckoutAndReceipt
             // Ambil URL Publik asset (Menggunakan konfigurasi APP_URL di .env)
             $pdfPublicUrl = asset('storage/' . $path);
         } catch (\Exception $e) {
-            Log::error('Qontak PDF Storage Error: ' . $e->getMessage());
+            Log::channel('pos_accurate')->error('Qontak PDF Storage Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Gagal menyimpan file PDF struk ke server.', type: 'error');
             return;
         }
@@ -1259,16 +1259,16 @@ trait WithCheckoutAndReceipt
 
                 $this->dispatch('toast', title: 'Berhasil', message: 'Struk WA dengan PDF berhasil dikirim!', type: 'success');
             } else {
-                Log::error('=== DEBUG MEKARI QONTAK ERROR ===');
-                Log::error('Status Code: ' . $response->status());
-                Log::error('Response Body: ' . $response->body());
-                Log::error('Generated URL PDF: ' . $pdfPublicUrl);
-                Log::error('=================================');
+                Log::channel('pos_accurate')->error('=== DEBUG MEKARI QONTAK ERROR ===');
+                Log::channel('pos_accurate')->error('Status Code: ' . $response->status());
+                Log::channel('pos_accurate')->error('Response Body: ' . $response->body());
+                Log::channel('pos_accurate')->error('Generated URL PDF: ' . $pdfPublicUrl);
+                Log::channel('pos_accurate')->error('=================================');
 
                 $this->dispatch('toast', title: 'Gagal API', message: 'Mekari: Code ' . $response->status(), type: 'error');
             }
         } catch (\Exception $e) {
-            Log::error('Qontak HMAC Integration Crash: ' . $e->getMessage());
+            Log::channel('pos_accurate')->error('Qontak HMAC Integration Crash: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
         }
     }
@@ -1291,7 +1291,7 @@ trait WithCheckoutAndReceipt
             // Mengubah kata 'thermal' menjadi 'dot matrix' atau 'kasir'
             $this->dispatch('toast', title: 'Sukses', message: 'Perintah cetak kasir terkirim ke ' . "PrinterKasir", type: 'success');
         } catch (\Exception $e) {
-            Log::error('ESCPOS Print Error: ' . $e->getMessage());
+            Log::channel('pos_accurate')->error('ESCPOS Print Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Cetak Gagal', message: 'Tidak dapat mencetak ke "PrinterKasir" : ' . $e->getMessage(), type: 'error');
         }
     }
@@ -1446,7 +1446,7 @@ trait WithCheckoutAndReceipt
             $orderNumber = $this->completedOrder->order_number ?? 'terbaru';
             $this->dispatch('print-receipt', base64Data: $base64, orderNumber: $orderNumber);
         } catch (\Exception $e) {
-            Log::error('ESCPOS Base64 Generation Error: ' . $e->getMessage());
+            Log::channel('pos_accurate')->error('ESCPOS Base64 Generation Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan: ' . $e->getMessage(), type: 'error');
         }
     }
@@ -2058,7 +2058,7 @@ trait WithCheckoutAndReceipt
                     }
                 }
             } catch (\Exception $e) {
-                Log::error('POS Accurate Integration Error (SO Fulfillment): ' . $e->getMessage() . "\nTrace: " . $e->getTraceAsString());
+                Log::channel('pos_accurate')->error('POS Accurate Integration Error (SO Fulfillment): ' . $e->getMessage() . "\nTrace: " . $e->getTraceAsString());
                 $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate gagal.', type: 'warning');
             }
 
@@ -2070,7 +2070,7 @@ trait WithCheckoutAndReceipt
             $this->dispatch('toast', title: 'Transaksi Berhasil', message: 'Pelunasan SO ' . $order->order_number . ' berhasil diproses.', type: 'success');
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\DB::rollBack();
-            Log::error('POS SO Fulfillment Error: ' . $e->getMessage() . "\nTrace: " . $e->getTraceAsString());
+            Log::channel('pos_accurate')->error('POS SO Fulfillment Error: ' . $e->getMessage() . "\nTrace: " . $e->getTraceAsString());
             $this->dispatch('toast', title: 'Error', message: 'Gagal memproses pelunasan SO: ' . $e->getMessage(), type: 'error');
         }
     }

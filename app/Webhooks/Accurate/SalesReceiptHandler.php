@@ -16,7 +16,7 @@ class SalesReceiptHandler implements WebhookHandlerInterface
         $payload = $log->payload;
 
         if (!isset($payload['data']) || !is_array($payload['data'])) {
-            Log::warning("Accurate Webhook Sales Receipt Data tidak memiliki array 'data': " . json_encode($payload));
+            Log::channel('pos_accurate')->warning("Accurate Webhook Sales Receipt Data tidak memiliki array 'data': " . json_encode($payload));
             return;
         }
 
@@ -30,7 +30,7 @@ class SalesReceiptHandler implements WebhookHandlerInterface
             $salesReceiptNo = $dataItem['salesReceiptNo'] ?? null;
 
             if (!$salesReceiptId && !$salesReceiptNo) {
-                Log::warning("Accurate Webhook Sales Receipt Data tidak memiliki salesReceiptId atau salesReceiptNo: " . json_encode($dataItem));
+                Log::channel('pos_accurate')->warning("Accurate Webhook Sales Receipt Data tidak memiliki salesReceiptId atau salesReceiptNo: " . json_encode($dataItem));
                 continue;
             }
 
@@ -42,13 +42,13 @@ class SalesReceiptHandler implements WebhookHandlerInterface
                 }
 
                 if (!$detail) {
-                    Log::warning("Accurate Webhook Sales Receipt Detail not found for id: {$salesReceiptId}");
+                    Log::channel('pos_accurate')->warning("Accurate Webhook Sales Receipt Detail not found for id: {$salesReceiptId}");
                     continue;
                 }
 
                 $detailInvoices = $detail['detailInvoice'] ?? [];
                 if (empty($detailInvoices)) {
-                    Log::warning("Accurate Webhook Sales Receipt Detail does not contain detailInvoice: " . json_encode($detail));
+                    Log::channel('pos_accurate')->warning("Accurate Webhook Sales Receipt Detail does not contain detailInvoice: " . json_encode($detail));
                     continue;
                 }
 
@@ -60,7 +60,7 @@ class SalesReceiptHandler implements WebhookHandlerInterface
                         continue;
                     }
 
-                    Log::info("Processing Webhook Sales Receipt for Invoice: {$invoiceNo}, Amount: {$paymentAmount}");
+                    Log::channel('pos_accurate')->info("Processing Webhook Sales Receipt for Invoice: {$invoiceNo}, Amount: {$paymentAmount}");
 
                     // Find local order with this accurate_invoice_no scoped by Business Unit
                     $query = Order::where(function ($q) use ($invoiceNo) {
@@ -75,11 +75,11 @@ class SalesReceiptHandler implements WebhookHandlerInterface
                     $order = $query->first();
 
                     if (!$order) {
-                        Log::warning("Order not found for accurate_invoice_no: {$invoiceNo}");
+                        Log::channel('pos_accurate')->warning("Order not found for accurate_invoice_no: {$invoiceNo}");
                         continue;
                     }
 
-                    Log::info("Order found: ID {$order->id}. Updating accurate_receipt_no with {$salesReceiptNo}");
+                    Log::channel('pos_accurate')->info("Order found: ID {$order->id}. Updating accurate_receipt_no with {$salesReceiptNo}");
 
                     // Update accurate_receipt_no on Order if not already present
                     $existingReceipts = array_map('trim', explode(',', $order->accurate_receipt_no ?? ''));
@@ -88,10 +88,10 @@ class SalesReceiptHandler implements WebhookHandlerInterface
                     if (!in_array($salesReceiptNo, $existingReceipts)) {
                         $newReceiptNo = empty($order->accurate_receipt_no) ? $salesReceiptNo : $order->accurate_receipt_no . ', ' . $salesReceiptNo;
                         $updated = $order->update(['accurate_receipt_no' => $newReceiptNo]);
-                        Log::info("Order {$order->id} accurate_receipt_no updated to {$newReceiptNo}. Result: " . ($updated ? 'Success' : 'Failed'));
+                        Log::channel('pos_accurate')->info("Order {$order->id} accurate_receipt_no updated to {$newReceiptNo}. Result: " . ($updated ? 'Success' : 'Failed'));
                         $isNewReceipt = true;
                     } else {
-                        Log::info("Receipt No {$salesReceiptNo} already exists in Order {$order->id}");
+                        Log::channel('pos_accurate')->info("Receipt No {$salesReceiptNo} already exists in Order {$order->id}");
                     }
 
                     if ($isNewReceipt) {
@@ -100,7 +100,7 @@ class SalesReceiptHandler implements WebhookHandlerInterface
                             ->where('status', 'PENDING')
                             ->get();
 
-                        Log::info("Found {$pendingPayments->count()} PENDING payments for Order {$order->id}");
+                        Log::channel('pos_accurate')->info("Found {$pendingPayments->count()} PENDING payments for Order {$order->id}");
 
                         foreach ($pendingPayments as $payment) {
                             $pm = $payment->paymentMethod;
@@ -123,16 +123,16 @@ class SalesReceiptHandler implements WebhookHandlerInterface
                                         'status' => 'PAID',
                                         'paid_at' => now(),
                                     ]);
-                                    Log::info("Updated OrderPayment {$payment->id} status to PAID (Finance Settled). Result: " . ($paymentUpdated ? 'Success' : 'Failed') . " | Matched: " . ($matchNet ? 'Net Amount' : 'Gross Amount'));
+                                    Log::channel('pos_accurate')->info("Updated OrderPayment {$payment->id} status to PAID (Finance Settled). Result: " . ($paymentUpdated ? 'Success' : 'Failed') . " | Matched: " . ($matchNet ? 'Net Amount' : 'Gross Amount'));
                                 } else {
-                                    Log::info("Skipped OrderPayment {$payment->id} because it is not a finance payment method (accurate_customer_no empty).");
+                                    Log::channel('pos_accurate')->info("Skipped OrderPayment {$payment->id} because it is not a finance payment method (accurate_customer_no empty).");
                                 }
                             } else {
-                                Log::info("Skipped OrderPayment {$payment->id} because amount does not match. (Gross: {$grossAmount}, Net: {$expectedNetAmount}, Webhook: {$paymentAmount})");
+                                Log::channel('pos_accurate')->info("Skipped OrderPayment {$payment->id} because amount does not match. (Gross: {$grossAmount}, Net: {$expectedNetAmount}, Webhook: {$paymentAmount})");
                             }
                         }
                     } else {
-                        Log::info("Skipped payment update because Receipt No {$salesReceiptNo} is already processed or created by POS.");
+                        Log::channel('pos_accurate')->info("Skipped payment update because Receipt No {$salesReceiptNo} is already processed or created by POS.");
                     }
 
                     // Record the OrderAccurateDoc
@@ -154,7 +154,7 @@ class SalesReceiptHandler implements WebhookHandlerInterface
                 }
 
             } catch (\Exception $e) {
-                Log::error("Error processing Sales Receipt Webhook for id {$salesReceiptId}: " . $e->getMessage());
+                Log::channel('pos_accurate')->error("Error processing Sales Receipt Webhook for id {$salesReceiptId}: " . $e->getMessage());
             }
         }
     }

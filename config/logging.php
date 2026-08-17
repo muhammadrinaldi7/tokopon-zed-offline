@@ -127,6 +127,15 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        // Channel khusus untuk memantau transaksi POS & Accurate
+        'pos_accurate' => [
+            'driver' => 'daily', // pakai 'daily' agar log dipisah per hari (misal pos_accurate-2026-08-17.log)
+            'path' => storage_path('logs/pos_accurate.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 30, // Simpan log hingga 30 hari ke belakang
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];
