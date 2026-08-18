@@ -75,7 +75,22 @@ class ApprovalController extends Controller
 
         return $successCount > 0;
     }
+    /**
+     * Helper khusus untuk mengirim pesan log ke Grup Telegram
+     */
+    public static function sendGroupNotification($pesan_teks)
+    {
+        // Ganti dengan URL Webhook Workflow 3 Anda yang baru
+        $n8nGroupWebhook = 'https://n8n.zedgroup.tech/webhook/approval-group-log';
 
+        try {
+            Http::timeout(5)->post($n8nGroupWebhook, [
+                'pesan_grup' => $pesan_teks
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Gagal kirim log grup: " . $e->getMessage());
+        }
+    }
     /**
      * Proses persetujuan via API (Ditembak oleh n8n secara otomatis di belakang layar ketika tombol callback ditekan)
      */
@@ -89,7 +104,7 @@ class ApprovalController extends Controller
 
         // Tangkap data dari body JSON yang dikirim n8n
         Log::info('Webhook Telegram Masuk:', $request->all());
-        
+
         $id = $request->input('approval_id');
         $action = $request->input('action'); // 'approve' atau 'reject'
         $reqLevel = (int) $request->input('req_level');
@@ -99,9 +114,9 @@ class ApprovalController extends Controller
         if (!$chatId) {
             return response()->json(['success' => false, 'message' => 'Telegram Chat ID tidak ditemukan.']);
         }
-        
+
         $user = \App\Models\User::where('telegram_chat_id', $chatId)->first();
-        
+
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Akun dengan Chat ID tersebut tidak terdaftar di sistem.']);
         }
@@ -115,7 +130,7 @@ class ApprovalController extends Controller
         if ($approval->status !== 'PENDING') {
             return response()->json(['success' => false, 'message' => "Pengajuan ini sudah berstatus: " . $approval->status]);
         }
-        
+
         // 3. MENGUNCI LEVEL (LEVEL LOCK VALIDATION)
         $expectedLevel = $approval->current_level + 1;
         if ($reqLevel !== $expectedLevel) {
@@ -130,7 +145,7 @@ class ApprovalController extends Controller
             return response()->json(['success' => false, 'message' => "Anda tidak memiliki hak akses ({$targetRole}) untuk menyetujui level ini."]);
         }
 
-        $approverId = $user->id; 
+        $approverId = $user->id;
         $pesan = "";
 
         // 3. Eksekusi Perubahan Status
@@ -152,6 +167,26 @@ class ApprovalController extends Controller
                 try {
                     $approval->executeAction(['extension_days' => 7]);
                     $pesan = "✅ Pengajuan telah DISETUJUI sepenuhnya.";
+                    
+                    $kasirName = $approval->requestedBy->name ?? 'Kasir';
+                    $tipe = str_replace('_', ' ', $approval->request_type) . " (Level {$approval->required_level})";
+                    $orderInfo = '-';
+                    if ($approval->approvable_type === \App\Models\Order::class && $approval->approvable) {
+                        $orderInfo = $approval->approvable->order_number;
+                    }
+                    $cabang = $approval->requestedBy->branch->name ?? '-';
+                    $waktu = $approval->created_at->format('d M Y H:i');
+                    $alasan = $approval->reason ?? '-';
+
+                    $teksGrup = "✅ *APPROVAL SUKSES*\n\n"
+                              . "Pengajuan: {$tipe} untuk {$orderInfo}\n"
+                              . "Kasir: {$kasirName}\n"
+                              . "Waktu: {$waktu}\n"
+                              . "Cabang: {$cabang}\n"
+                              . "Keterangan: \"{$alasan}\"\n\n"
+                              . "Telah disetujui sepenuhnya oleh *{$user->name}*.";
+                              
+                    self::sendGroupNotification($teksGrup);
                 } catch (\Exception $e) {
                     $pesan = "⚠️ Disetujui, tapi gagal eksekusi aksi: " . $e->getMessage();
                 }
@@ -174,6 +209,8 @@ class ApprovalController extends Controller
 
             $approval->update(['status' => 'REJECTED']);
             $pesan = "❌ Pengajuan telah DITOLAK.";
+            $teksGrup = "❌ *APPROVAL DITOLAK*\nPengajuan {$approval->request_type} (ID: {$approval->id}) telah DITOLAK oleh {$user->name}.";
+            self::sendGroupNotification($teksGrup);
         } else {
             return response()->json(['success' => false, 'message' => 'Action tidak dikenali.']);
         }
