@@ -73,6 +73,22 @@ class ApprovalController extends Controller
             }
         }
 
+        // --- KIRIM NOTIFIKASI KE GRUP JUGA ---
+        $alasan = $approval->reason ?? '-';
+        $cabang = $approval->requestedBy->branch->name ?? '-';
+        $waktuFormat = $approval->created_at->format('d M Y H:i');
+        
+        $teksGrup = "🔔 *PENGAJUAN BARU*\n\n"
+                  . "Pengajuan: {$tipe} untuk {$orderInfo}\n"
+                  . "Kasir: {$kasirName}\n"
+                  . "Waktu: {$waktuFormat}\n"
+                  . "Cabang: {$cabang}\n"
+                  . "Keterangan: \"{$alasan}\"\n\n"
+                  . "⏳ _Menunggu persetujuan dari divisi terkait._";
+                  
+        self::sendGroupNotification($teksGrup);
+        // -------------------------------------
+
         return $successCount > 0;
     }
     /**
