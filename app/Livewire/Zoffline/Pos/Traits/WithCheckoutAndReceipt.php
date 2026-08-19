@@ -1856,6 +1856,22 @@ trait WithCheckoutAndReceipt
             \Illuminate\Support\Facades\DB::commit();
 
             try {
+                // --- CUSTOMER SWAP FOR FINANCE (RUTE A) ---
+                $financePayment = null;
+                foreach ($this->payments as $payment) {
+                    $pm = \App\Models\PaymentMethod::find($payment['payment_method_id']);
+                    if ($pm && !empty($pm->accurate_customer_no)) {
+                        $financePayment = $pm;
+                        break;
+                    }
+                }
+                
+                $isFinance = $financePayment ? true : false;
+                $invoiceCustomerNo = $financePayment 
+                    ? $financePayment->accurate_customer_no 
+                    : $order->user->getAccurateCustomerNo($dbSource);
+                // ------------------------------------------
+
                 // --- 2. COLLECT DATA FOR ACCURATE ---
                 $doDetailItems = [];
                 $siDetailItems = [];
@@ -1882,7 +1898,7 @@ trait WithCheckoutAndReceipt
                         'quantity' => (float)$cartItem['qty'],
                         'warehouseName' => $warehouseName,
                     ];
-                    if (!empty($cartItem['item_id'])) {
+                    if (!empty($cartItem['item_id']) && !$isFinance) {
                         $doItem['salesOrderNumber'] = $order->accurate_so_number;
                     }
                     if (!empty($detailSNs)) {
@@ -1912,13 +1928,16 @@ trait WithCheckoutAndReceipt
 
                 if (!$doDoc && $hasSN) {
                     $doData = [
-                        'customerNo' => $order->user->getAccurateCustomerNo($dbSource),
+                        'customerNo' => $invoiceCustomerNo,
                         'branchName' => $accurateBranchName,
                         'transDate' => now()->format('d/m/Y'),
-                        'salesOrderNumber' => $order->accurate_so_number,
                         'description' => 'DO Otomatis dari Pelunasan POS' . (!empty($this->notes) ? ' - ' . $this->notes : ''),
                         'detailItem' => $doDetailItems
                     ];
+                    
+                    if (!$isFinance) {
+                        $doData['salesOrderNumber'] = $order->accurate_so_number;
+                    }
 
                     $doResult = $accurateService->postDeliveryOrder($doData, $dbSource);
                     if (isset($doResult['r']['number'])) {
@@ -1941,7 +1960,7 @@ trait WithCheckoutAndReceipt
                         foreach ($siDetailItems as $index => &$i) {
                             $i['deliveryOrderNumber'] = $doDoc->doc_number;
                         }
-                    } elseif ($order->accurate_so_number) {
+                    } elseif ($order->accurate_so_number && !$isFinance) {
                         foreach ($siDetailItems as $index => &$i) {
                             // Hanya set salesOrderNumber ke SI jika item tersebut berasal dari SO
                             if (!empty($this->cart[$index]['item_id'])) {
@@ -1951,7 +1970,7 @@ trait WithCheckoutAndReceipt
                     }
 
                     $siData = [
-                        'customerNo' => $order->user->getAccurateCustomerNo($dbSource),
+                        'customerNo' => $invoiceCustomerNo,
                         'branchName' => $accurateBranchName,
                         'transDate' => now()->format('d/m/Y'),
                         'detailItem' => $siDetailItems,
@@ -1963,7 +1982,7 @@ trait WithCheckoutAndReceipt
                     // DP
 
 
-                    if (count($validDpInvoices) > 0) {
+                    if (count($validDpInvoices) > 0 && !$isFinance) {
                         $siData['detailDownPayment'] = $validDpInvoices;
                     }
 
@@ -1998,7 +2017,14 @@ trait WithCheckoutAndReceipt
                             'status' => 'SUCCESS',
                         ]);
 
-
+                        if ($isFinance && $order->accurate_so_number) {
+                            try {
+                                $accurateService->closeSalesOrder($order->accurate_so_number, $dbSource);
+                                Log::channel('pos_accurate')->info("Sales Order {$order->accurate_so_number} ditutup paksa karena pelunasan menggunakan Leasing.");
+                            } catch (\Exception $e) {
+                                Log::channel('pos_accurate')->error("Gagal menutup SO {$order->accurate_so_number} secara otomatis: " . $e->getMessage());
+                            }
+                        }
                     } else {
                         throw new \Exception('Gagal membuat Faktur Penjualan (SI) di Accurate: ' . ($siResult['d'][0] ?? json_encode($siResult)));
                     }
@@ -2028,7 +2054,7 @@ trait WithCheckoutAndReceipt
                         ];
 
                         $srData = [
-                            'customerNo' => $order->user->getAccurateCustomerNo($dbSource),
+                            'customerNo' => $invoiceCustomerNo,
                             'branchName' => $branchName,
                             'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
                             'receiptAmount' => (float) $netReceiptAmount,
