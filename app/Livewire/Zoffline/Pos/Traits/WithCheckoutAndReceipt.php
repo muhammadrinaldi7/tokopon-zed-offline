@@ -80,6 +80,13 @@ trait WithCheckoutAndReceipt
             return;
         }
 
+        foreach ($this->payments as $p) {
+            if (($p['category'] ?? '') === 'NON-TUNAI' && strtoupper($p['bank_name'] ?? '') === 'FINANCE' && empty($p['no_kontrak'])) {
+                $this->dispatch('toast', title: 'Nomor Kontrak Wajib', message: 'Nomor kontrak wajib diisi untuk metode pembayaran Finance.', type: 'warning');
+                return;
+            }
+        }
+
         if (!$this->isPaymentsValid()) {
             $this->dispatch('toast', title: 'Pembayaran Belum Sesuai', message: 'Pastikan total pembayaran cocok dengan tagihan dan semua metode pembayaran sudah dipilih.', type: 'warning');
             return;
@@ -250,6 +257,13 @@ trait WithCheckoutAndReceipt
                             return;
                         }
                     }
+                }
+            }
+
+            foreach ($this->payments as $p) {
+                if (($p['category'] ?? '') === 'NON-TUNAI' && strtoupper($p['bank_name'] ?? '') === 'FINANCE' && empty($p['no_kontrak'])) {
+                    $this->dispatch('toast', title: 'Nomor Kontrak Wajib', message: 'Nomor kontrak wajib diisi untuk metode pembayaran Finance.', type: 'error');
+                    return;
                 }
             }
 

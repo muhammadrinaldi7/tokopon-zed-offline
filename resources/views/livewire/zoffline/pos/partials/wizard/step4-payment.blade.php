@@ -387,12 +387,14 @@
 
                     @if (strtolower($methodObj->bank_name ?? '') === 'finance')
                         <div class="space-y-3">
-                            <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Nomor Kontrak
-                                (Opsional)</label>
+                            <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Nomor Kontrak <span class="text-rose-500 font-bold">* (Wajib diisi)</span></label>
                             <input type="text"
                                 wire:model.live.debounce.500ms="payments.{{ $activePaymentIndex }}.no_kontrak"
-                                class="w-full bg-white border-2 border-gray-300 rounded-2xl px-5 py-4 text-xl font-bold text-gray-800 focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/20 transition-all"
+                                class="w-full bg-white border-2 {{ empty($payment['no_kontrak'] ?? '') ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200' : 'border-gray-300 focus:border-[#1c69d4] focus:ring-[#1c69d4]/20' }} rounded-2xl px-5 py-4 text-xl font-bold text-gray-800 focus:ring-4 transition-all"
                                 placeholder="Masukkan Nomor Kontrak">
+                            @if (empty($payment['no_kontrak'] ?? ''))
+                                <p class="text-sm text-rose-500 font-semibold mt-1">Nomor kontrak wajib diisi untuk pembayaran Finance.</p>
+                            @endif
                         </div>
                     @endif
 
