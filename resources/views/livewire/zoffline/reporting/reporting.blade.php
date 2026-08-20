@@ -227,5 +227,21 @@
             </div>
         @endcan
 
+        @can('manage-orders')
+            <div wire:click="navigateToOrderIssues"
+                class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+                <div class="rounded-full w-16 h-16 bg-rose-50 flex items-center justify-center text-rose-600">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Laporan Kendala</h2>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau, tindak lanjuti, dan rekap seluruh catatan kendala transaksi pelanggan.</p>
+                </div>
+            </div>
+        @endcan
+
     </div>
 </div>

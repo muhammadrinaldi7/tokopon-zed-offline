@@ -73,6 +73,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/return-report', \App\Livewire\Zoffline\Reporting\ReturnReport::class)->name('return-report');
         Route::get('/dashboard', \App\Livewire\Zoffline\Reporting\Dashboard::class)->name('dashboard-bm');
         Route::get('/laporan-pembayaran', \App\Livewire\Zoffline\Reporting\InvoiceReport::class)->name('pembayaran');
+        Route::get('/order-issues', \App\Livewire\Admin\Orders\OrderIssuesIndex::class)->name('order-issues');
     });
 });
 

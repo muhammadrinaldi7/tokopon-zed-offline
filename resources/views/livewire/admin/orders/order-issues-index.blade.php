@@ -3,7 +3,7 @@
     <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <div class="flex items-center gap-2">
-                <a href="{{ route('admin.orders.management') }}" wire:navigate
+                <a href="{{ request()->routeIs('reporting.*') ? route('zoffline.reporting') : route('admin.orders.management') }}" wire:navigate
                     class="text-gray-400 hover:text-gray-700 transition">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -15,6 +15,7 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
+            @if(!request()->routeIs('reporting.*'))
             <a href="{{ route('admin.orders.management') }}" wire:navigate
                 class="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition text-xs font-bold flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -22,6 +23,7 @@
                 </svg>
                 Kelola Pesanan
             </a>
+            @endif
 
             <button wire:click="exportExcel" wire:loading.attr="disabled"
                 class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition text-xs font-bold flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
