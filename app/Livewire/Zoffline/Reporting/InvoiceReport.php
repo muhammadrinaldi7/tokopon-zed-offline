@@ -148,7 +148,7 @@ class InvoiceReport extends Component
                     foreach ($order->payments as $payment) {
                         $paymentDate = $payment->paid_at ?? $payment->created_at;
                         $createdAt = $paymentDate ? $paymentDate->format('Y-m-d') : null;
-                        
+
                         // Ekstrak data dari relasi (LEFT JOIN payment_methods & payment_method_rates)
                         $bankName = $payment->paymentMethod->bank_name ?? null;
                         $paymentType = $this->getPaymentType($payment);
@@ -156,9 +156,9 @@ class InvoiceReport extends Component
                         $pmrName = $payment->paymentMethodRate->name ?? null;
                         $mdrPct = $payment->paymentMethodRate->mdr_percentage ?? 0;
                         $amount = $payment->amount ?? 0;
-                        
-                        $jamBayar = $paymentDate ? $paymentDate->format('H:i:s') : null;
-                        
+
+                        $jamBayar = $payment ? $payment->created_at->format('H:i:s') : null;
+
                         // round(op.amount * pmr.mdr_percentage /100) as mdr
                         $mdr = round(($amount * $mdrPct) / 100);
 

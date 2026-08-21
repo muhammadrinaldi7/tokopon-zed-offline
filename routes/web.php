@@ -225,30 +225,32 @@ Route::post('/web_service/import_produk_json/new.json', [\App\Http\Controllers\A
 Route::post('/web_service/import_produk_json/new', [\App\Http\Controllers\Api\ErzapProductController::class, 'store']);
 Route::post('/web_service/sinkronisasi_stok/new', [\App\Http\Controllers\Api\ErzapProductController::class, 'syncStock']);
 
-Route::get('/ai-test', function () {
-    $response = \Laravel\Ai\agent(instructions: 'Anda adalah asisten AI untuk Chatbot Tokopon')
-        ->prompt('Buatkan pantun 2 baris tentang tokopon');
+Route::middleware(['auth', 'admin'])->group(function () {
+    Route::get('/ai-test', function () {
+        $response = \Laravel\Ai\agent(instructions: 'Anda adalah asisten AI untuk Chatbot Tokopon')
+            ->prompt('Buatkan pantun 2 baris tentang tokopon');
 
-    return $response;
-});
-
-Route::get('/ai-analyze-db', function () {
-    $agent = new DatabaseAnalyzerAgent();
-
-    try {
-        $response = $agent->prompt('Tolong hitung ada berapa jumlah data di dalam tabel users.');
         return $response;
-    } catch (ProviderOverloadedException $e) {
-        // Tangkap error jika server Gemini kepenuhan
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Maaf, server AI sedang sibuk memproses terlalu banyak permintaan. Silakan coba beberapa detik lagi.'
-        ], 503);
-    } catch (\Exception $e) {
-        // Tangkap error umum lainnya
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
-        ], 500);
-    }
+    });
+
+    Route::get('/ai-analyze-db', function () {
+        $agent = new DatabaseAnalyzerAgent();
+
+        try {
+            $response = $agent->prompt('Tolong hitung ada berapa jumlah data di dalam tabel users.');
+            return $response;
+        } catch (ProviderOverloadedException $e) {
+            // Tangkap error jika server Gemini kepenuhan
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Maaf, server AI sedang sibuk memproses terlalu banyak permintaan. Silakan coba beberapa detik lagi.'
+            ], 503);
+        } catch (\Exception $e) {
+            // Tangkap error umum lainnya
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
+            ], 500);
+        }
+    });
 });

@@ -32,7 +32,7 @@ class AiReportController extends Controller
             $query .= " LIMIT 100";
         }
 
-        $connectionName = env('AI_DB_CONNECTION', 'mysql_readonly');
+        $connectionName = config('database.ai_connection', 'mysql_readonly');
 
         try {
             $results = DB::connection($connectionName)->select($query);

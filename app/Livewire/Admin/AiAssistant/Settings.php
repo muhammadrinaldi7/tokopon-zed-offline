@@ -8,20 +8,20 @@ use Livewire\Component;
 
 class Settings extends Component
 {
-    public $provider;
-    public $model;
+    public $webhook_url;
+    public $webhook_token;
     public $system_prompt;
 
     public function mount()
     {
         $setting = AiSetting::first();
         if ($setting) {
-            $this->provider = $setting->provider ?? 'gemini';
-            $this->model = $setting->model;
+            $this->webhook_url = $setting->api_key;
+            $this->webhook_token = $setting->model;
             $this->system_prompt = $setting->system_prompt;
         } else {
-            $this->provider = 'gemini';
-            $this->model = 'gemini-3.5-flash';
+            $this->webhook_url = '';
+            $this->webhook_token = '';
             $this->system_prompt = "Anda adalah Agen AI Analis Database profesional untuk sistem aplikasi Tokopon. Tugas Anda adalah menjawab pertanyaan user dengan cara menganalisis database secara akurat.";
         }
     }
@@ -35,7 +35,8 @@ class Settings extends Component
     public function saveSettings()
     {
         $this->validate([
-            'model' => 'required|string',
+            'webhook_url' => 'required|url',
+            'webhook_token' => 'required|string',
             'system_prompt' => 'required|string',
         ]);
 
@@ -44,8 +45,9 @@ class Settings extends Component
             $setting = new AiSetting();
         }
 
-        $setting->provider = $this->provider;
-        $setting->model = $this->model;
+        $setting->provider = 'n8n'; // hardcode to n8n since it's the only one used
+        $setting->api_key = $this->webhook_url;
+        $setting->model = $this->webhook_token;
         $setting->system_prompt = $this->system_prompt;
         $setting->save();
 
