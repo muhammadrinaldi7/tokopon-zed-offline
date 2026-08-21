@@ -347,7 +347,7 @@ class AccurateService
         $param = [
             "sp.page"     => $page,
             "sp.pageSize" => $pageSize,
-            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory,manageSN,itemType",
+            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory,manageSN,itemType,charField1,charField2",
         ];
 
         $response = Http::timeout(30)->retry(2, 500)->withHeaders([

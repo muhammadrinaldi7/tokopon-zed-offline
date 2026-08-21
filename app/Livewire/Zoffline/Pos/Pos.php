@@ -789,13 +789,14 @@ class Pos extends Component
             $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
         });
 
+        // Filter hanya produk Add-On (dari Accurate charField1 = "Ya")
+        $query->where('is_addon', true);
+
         if (strlen($this->searchAddons) >= 2) {
             $query->where(function ($q) {
                 $q->where('name', 'like', '%' . $this->searchAddons . '%')
                     ->orWhere('item_no', 'like', '%' . $this->searchAddons . '%');
             });
-        } else {
-            $query->where('categoryName', 'like', '%ADD ON%');
         }
 
         $newProducts = $query->take(20)->get();

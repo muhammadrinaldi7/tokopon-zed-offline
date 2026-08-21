@@ -14,6 +14,7 @@ class ProductAccurate extends Model
         'base_price' => 'decimal:2',
         'base_cost' => 'decimal:2',
         'has_sn' => 'boolean',
+        'is_addon' => 'boolean',
         'business_unit_id' => 'integer',
     ];
 
