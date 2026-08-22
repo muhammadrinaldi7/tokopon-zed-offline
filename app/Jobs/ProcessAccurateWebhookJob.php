@@ -50,7 +50,7 @@ class ProcessAccurateWebhookJob implements ShouldQueue
     public function handle(): void
     {
         $log = AccurateWebhookLog::find($this->logId);
-        if (!$log || $log->status !== 'pending') {
+        if (!$log || $log->status === 'success') {
             return;
         }
 

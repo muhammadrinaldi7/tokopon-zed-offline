@@ -13,6 +13,8 @@ use Livewire\WithFileUploads;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
+use PhpOffice\PhpSpreadsheet\Cell\StringValueBinder;
 
 class AccurateInvoiceExport extends Component
 {
@@ -182,7 +184,7 @@ class AccurateInvoiceExport extends Component
     }
 
     // 2. Fungsi Import CSV dari User
-    public function importData()
+    public function importData($directSync = false)
     {
         $this->validate([
             'file' => 'required|mimes:xlsx,xls,csv|max:10240',
@@ -192,8 +194,12 @@ class AccurateInvoiceExport extends Component
 
         DB::beginTransaction();
         try {
+            // Gunakan StringValueBinder agar semua cell dibaca sebagai string murni
+            // Hal ini mencegah Excel menghilangkan angka 0 di depan kode barang (misal: 00123 jadi 123)
+            $importConfig = new class extends StringValueBinder implements WithCustomValueBinder {};
+            
             // Excel::toArray mengembalikan array dari sheet. Kita ambil sheet pertama (index 0).
-            $sheets = Excel::toArray(new class {}, $filePath);
+            $sheets = Excel::toArray($importConfig, $filePath);
             if (empty($sheets) || empty($sheets[0])) {
                 throw new \Exception("File kosong atau format tidak didukung.");
             }
@@ -341,6 +347,10 @@ class AccurateInvoiceExport extends Component
             $this->reset('file');
             $this->messageSuccess = 'Data Excel berhasil divalidasi dan diimpor ke database draft!';
             $this->messageError = null;
+
+            if ($directSync) {
+                $this->pushToAccurateApi();
+            }
         } catch (\Exception $e) {
             DB::rollBack();
             $this->messageError = 'Gagal memproses file. Error: ' . $e->getMessage();

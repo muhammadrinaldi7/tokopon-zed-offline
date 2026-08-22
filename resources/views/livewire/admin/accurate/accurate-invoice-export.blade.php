@@ -53,16 +53,26 @@
             </div>
         </div>
 
-        <form wire:submit="importData" class="flex items-center gap-4">
+        <form class="flex flex-col gap-4">
             <input type="file" wire:model="file" accept=".xlsx,.xls,.csv"
                 class="block w-full text-sm text-gray-700 border border-gray-300 rounded cursor-pointer bg-white focus:outline-none file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                 required>
-            <button type="submit"
-                class="px-5 py-2 font-bold text-white bg-blue-600 rounded whitespace-nowrap hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                wire:loading.attr="disabled">
-                <span wire:loading.remove wire:target="importData">Proses & Simpan Draft</span>
-                <span wire:loading wire:target="importData">Sedang Membaca Excel...</span>
-            </button>
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="button" wire:click="importData(false)"
+                    class="px-5 py-2 font-bold text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    wire:loading.attr="disabled" wire:target="importData">
+                    <span wire:loading.remove wire:target="importData(false)">Simpan ke Draft Saja</span>
+                    <span wire:loading wire:target="importData(false)">Sedang Menyimpan...</span>
+                </button>
+                
+                <button type="button" wire:click="importData(true)"
+                    class="px-5 py-2 font-bold text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm flex items-center"
+                    wire:loading.attr="disabled" wire:target="importData">
+                    <svg wire:loading.remove wire:target="importData(true)" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <span wire:loading.remove wire:target="importData(true)">Unggah & Langsung Sinkron (1-Klik)</span>
+                    <span wire:loading wire:target="importData(true)">Sedang Memproses 1-Klik...</span>
+                </button>
+            </div>
         </form>
         @error('file')
             <span class="block mt-2 text-sm text-red-600 font-medium">{{ $message }}</span>
