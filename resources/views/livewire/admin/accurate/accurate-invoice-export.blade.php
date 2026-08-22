@@ -14,9 +14,9 @@
     <div class="p-5 mb-8 bg-gray-50 border border-gray-200 rounded-lg">
         <div class="flex items-start justify-between mb-4">
             <div>
-                <h3 class="mb-2 text-lg font-semibold text-gray-800">1. Upload Data CSV (Erzap)</h3>
+                <h3 class="mb-2 text-lg font-semibold text-gray-800">1. Upload Data Excel (.xlsx)</h3>
                 <p class="text-sm text-gray-600">
-                    Unduh template, isi dengan data transaksi masa lalu, lalu unggah ke sistem.
+                    Unduh template, isi dengan data transaksi masa lalu di Microsoft Excel, lalu unggah ke sistem.
                 </p>
             </div>
 
@@ -54,14 +54,14 @@
         </div>
 
         <form wire:submit="importData" class="flex items-center gap-4">
-            <input type="file" wire:model="file" accept=".csv"
+            <input type="file" wire:model="file" accept=".xlsx,.xls,.csv"
                 class="block w-full text-sm text-gray-700 border border-gray-300 rounded cursor-pointer bg-white focus:outline-none file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                 required>
             <button type="submit"
                 class="px-5 py-2 font-bold text-white bg-blue-600 rounded whitespace-nowrap hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 wire:loading.attr="disabled">
                 <span wire:loading.remove wire:target="importData">Proses & Simpan Draft</span>
-                <span wire:loading wire:target="importData">Sedang Membaca CSV...</span>
+                <span wire:loading wire:target="importData">Sedang Membaca Excel...</span>
             </button>
         </form>
         @error('file')
@@ -72,7 +72,7 @@
     <div class="flex items-center justify-between mb-4">
         <div>
             <h3 class="text-lg font-semibold text-gray-800">2. Kirim Data ke Accurate</h3>
-            <p class="text-sm text-gray-600">Total data siap dikirim: <span
+            <p class="text-sm text-gray-600" wire:poll.5s>Total data antrean draft: <span
                     class="font-bold">{{ $draftInvoices->total() }}</span> Faktur</p>
         </div>
 
@@ -96,10 +96,10 @@
                             d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
                         </path>
                     </svg>
-                    Push ke API Accurate
+                    Mulai Sinkronisasi (Background)
                 </span>
                 <span wire:loading wire:target="pushToAccurateApi">
-                    Menyinkronkan Data...
+                    Menyiapkan Job...
                 </span>
             </button>
         </div>
@@ -119,7 +119,14 @@
             <tbody class="divide-y divide-gray-200">
                 @forelse($draftInvoices as $invoice)
                     <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="p-3 text-sm text-gray-800 font-medium">{{ $invoice->invoice_no }}</td>
+                        <td class="p-3 text-sm text-gray-800 font-medium">
+                            {{ $invoice->invoice_no }}
+                            @if($invoice->sync_error)
+                                <div class="mt-1 text-xs text-red-600 bg-red-50 p-1.5 rounded border border-red-200">
+                                    <span class="font-bold">Gagal:</span> {{ $invoice->sync_error }}
+                                </div>
+                            @endif
+                        </td>
                         <td class="p-3 text-sm text-gray-600">
                             {{ \Carbon\Carbon::parse($invoice->invoice_date)->format('d/m/Y') }}</td>
                         <td class="p-3 text-sm text-gray-600">{{ $invoice->vendor_id }}</td>
