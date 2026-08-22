@@ -24,6 +24,11 @@ class PushInvoiceToAccurateJob implements ShouldQueue
     public $tries = 3;
 
     /**
+     * Maksimal waktu (detik) yang diperbolehkan sebelum job dimatikan paksa (timeout).
+     */
+    public $timeout = 120;
+
+    /**
      * Waktu tunggu (detik) sebelum retry jika gagal.
      */
     public $backoff = 10;
@@ -110,5 +115,23 @@ class PushInvoiceToAccurateJob implements ShouldQueue
             // Melempar kembali exception agar Laravel Queue melakukan Retry (jika belum batas $tries)
             throw $e;
         }
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        // Fungsi ini otomatis dipanggil Laravel jika job gagal total 
+        // (misalnya karena TimeoutExceededException atau melebih batas $tries)
+        
+        $errorMsg = $exception->getMessage();
+        if (empty($errorMsg) && $exception instanceof \Illuminate\Queue\TimeoutExceededException) {
+            $errorMsg = "Gagal memproses (Timeout): Server Accurate tidak merespons dalam " . $this->timeout . " detik.";
+        }
+
+        $this->invoice->update([
+            'sync_error' => substr($errorMsg, 0, 1000)
+        ]);
     }
 }
