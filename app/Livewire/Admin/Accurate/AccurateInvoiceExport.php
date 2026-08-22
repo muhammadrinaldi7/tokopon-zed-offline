@@ -19,6 +19,8 @@ class AccurateInvoiceExport extends Component
     use WithFileUploads;
 
     public $file;
+    public $messageSuccess = null;
+    public $messageError = null;
 
     // 1. Fungsi Unduh Template (Sudah ada kolom serial_numbers)
     public function downloadTemplate()
@@ -170,10 +172,12 @@ class AccurateInvoiceExport extends Component
                 $inv->delete();
             }
             DB::commit();
-            session()->flash('success', 'Semua data draft berhasil dikosongkan.');
+            $this->messageSuccess = 'Semua data draft berhasil dikosongkan.';
+            $this->messageError = null;
         } catch (\Exception $e) {
             DB::rollBack();
-            session()->flash('error', 'Gagal mengosongkan draft: ' . $e->getMessage());
+            $this->messageError = 'Gagal mengosongkan draft: ' . $e->getMessage();
+            $this->messageSuccess = null;
         }
     }
 
@@ -296,7 +300,8 @@ class AccurateInvoiceExport extends Component
             // Jika ada error, batalkan proses dan tampilkan semua pesan
             if (count($errors) > 0) {
                 DB::rollBack();
-                session()->flash('error', implode('<br>', $errors));
+                $this->messageError = implode('<br>', $errors);
+                $this->messageSuccess = null;
                 return;
             }
 
@@ -334,10 +339,12 @@ class AccurateInvoiceExport extends Component
 
             DB::commit();
             $this->reset('file');
-            session()->flash('success', 'Data CSV berhasil divalidasi dan diimpor ke database draft!');
+            $this->messageSuccess = 'Data Excel berhasil divalidasi dan diimpor ke database draft!';
+            $this->messageError = null;
         } catch (\Exception $e) {
             DB::rollBack();
-            session()->flash('error', 'Gagal memproses file. Error: ' . $e->getMessage());
+            $this->messageError = 'Gagal memproses file. Error: ' . $e->getMessage();
+            $this->messageSuccess = null;
         }
     }
 
@@ -426,7 +433,8 @@ class AccurateInvoiceExport extends Component
         $invoices = MigrationInvoice::where('is_exported', false)->get();
 
         if ($invoices->isEmpty()) {
-            session()->flash('error', 'Semua faktur sudah berhasil disinkronisasi ke Accurate.');
+            $this->messageError = 'Semua faktur sudah berhasil disinkronisasi ke Accurate.';
+            $this->messageSuccess = null;
             return;
         }
 
@@ -438,7 +446,8 @@ class AccurateInvoiceExport extends Component
             $jobCount++;
         }
 
-        session()->flash('success', "Memulai sinkronisasi! $jobCount faktur sedang diproses di latar belakang (Background Job).");
+        $this->messageSuccess = "Memulai sinkronisasi! $jobCount faktur sedang diproses di latar belakang (Background Job).";
+        $this->messageError = null;
     }
     #[Layout('layouts.admin')]
     public function render()
