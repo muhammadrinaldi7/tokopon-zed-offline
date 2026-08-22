@@ -141,6 +141,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {});
 
     // Settings
+    Route::get('/settings/system-reset', \App\Livewire\Admin\Settings\SystemReset::class)->name('settings.system-reset')->middleware('can:manage-settings');
+    Route::get('/settings/system-reset/export', [\App\Http\Controllers\SystemResetExportController::class, 'exportSo'])->name('settings.system-reset.export-so')->middleware('can:manage-settings');
     Route::get('/settings/telegram', \App\Livewire\Admin\Settings\TelegramConnection::class)->name('settings.telegram')->middleware('can:manage-settings');
     Route::get('/settings/business-units', \App\Livewire\Admin\Settings\BusinessUnitIndex::class)->name('settings.business-units')->middleware('can:manage-settings');
     Route::get('/settings/payment-methods', \App\Livewire\Admin\Settings\PaymentMethodIndex::class)->name('settings.payment-methods')->middleware('can:manage-settings');

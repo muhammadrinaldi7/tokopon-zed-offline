@@ -1,0 +1,141 @@
+name: Deploy Laravel to Stagging Server
+
+on:
+  push:
+    branches:
+      - stagging-prod
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer Dependencies (with dev)
+        run: composer install --no-interaction --optimize-autoloader
+
+      - name: Copy .env.example to .env
+        run: cp .env.example .env
+
+      - name: Generate APP_KEY
+        run: php artisan key:generate
+
+    #   - name: Run PHPUnit tests
+    #     run: vendor/bin/phpunit
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Ambil kode terbaru dari Repositori GitHub
+      - name: 🚚 Mengambil kode terbaru dari GitHub
+        uses: actions/checkout@v4
+
+      # 2. Setup Lingkungan PHP
+      - name: ⚙️ Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+          extensions: mbstring, xml, ctype, iconv, mysql, zip
+
+      # 3. Cache Dependencies Composer agar build lebih cepat
+      - name: 📦 Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      # 4. Install Laravel Dependencies
+      - name: 📥 Install Composer Dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      # 5. Setup Lingkungan Node.js
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 6. Cache Dependencies NPM
+      - name: 📦 Cache NPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+
+      # 7. Install & Build Asset (Vite/Mix) untuk Production
+      - name: 🏗️ Install Node dependencies & Build Assets
+        run: |
+          npm install
+          npm run build
+
+      # 8. Kompres proyek menjadi file ZIP (Mengecualikan folder yang tidak diperlukan di server)
+      - name: 🤐 Compress files
+        run: zip -q -r deploy.zip . -x "node_modules/*" "vendor/*" ".git/*" "tests/*"
+
+      # 9. Pastikan folder tujuan di VPS sudah siap sebelum file ditransfer
+      - name: 🛠️ Menyiapkan folder core di VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            mkdir -p /home/${{ secrets.SSH_USERNAME }}/htdocs/core-laravel/
+
+      # 10. Transfer file deploy.zip ke VPS menggunakan SCP
+      - name: 📂 Mentransfer file ke CloudPanel (via SCP)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "deploy.zip"
+          target: "/home/${{ secrets.SSH_USERNAME }}/htdocs/core-laravel/"
+
+      # 11. Ekstrak file dan jalankan optimasi Laravel di sisi server
+      - name: ⚙️ Menjalankan perintah post-deploy di server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            # Masuk ke folder/htdocs core-laravel
+            cd /home/${{ secrets.SSH_USERNAME }}/htdocs/core-laravel/
+            
+            # Ekstrak file dan timpa file lama yang ada di server
+            unzip -q -o deploy.zip
+            rm deploy.zip
+            
+            # Pasang vendor production langsung di server jika ada pembaruan package
+            composer install --no-dev --optimize-autoloader
+            
+            # Jalankan optimasi caching Laravel
+            php artisan optimize:clear
+            php artisan config:cache
+            php artisan event:cache
+            php artisan route:cache
+            php artisan view:cache
+
+ # --- JOB BARU: DEPLOY KE VPS ---
+  # --- JOB BARU: DEPLOY KE VPS VIA FTP ---
+ 
