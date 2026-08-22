@@ -58,7 +58,7 @@ class CancelOrderModal extends Component
             $requiredLevel = 1; // Default fallback if no rules defined
         }
 
-        $order->approvalRequests()->create([
+        $request = $order->approvalRequests()->create([
             'request_type' => 'ORDER_CANCELLATION',
             'requested_by' => Auth::id(),
             'reason' => $this->cancelReason,
@@ -66,6 +66,8 @@ class CancelOrderModal extends Component
             'required_level' => $requiredLevel,
             'current_level' => 0
         ]);
+
+        \App\Http\Controllers\ApprovalController::sendTelegramNotification($request);
 
         $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan pembatalan berhasil dikirim ke Pusat.', type: 'success');
         $this->dispatch('orderCancellationSubmitted'); // So parent can refresh

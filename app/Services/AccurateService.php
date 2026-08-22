@@ -347,7 +347,7 @@ class AccurateService
         $param = [
             "sp.page"     => $page,
             "sp.pageSize" => $pageSize,
-            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory,manageSN,itemType",
+            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory,manageSN,itemType,charField1,charField2",
         ];
 
         $response = Http::timeout(30)->retry(2, 500)->withHeaders([
@@ -636,6 +636,33 @@ class AccurateService
             Log::info('API Accurate Sales Order Error: ' . $response->body());
             throw new \Exception('API Accurate Sales Order Error: ' . $response->body());
         }
+    }
+
+    public function getSalesOrderDetail($id, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/sales-order/detail.do', [
+            'id' => $id,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? null;
+            }
+        }
+
+        Log::error("Accurate API Get Sales Order Detail Failed ({$databaseSource}): " . $response->body());
+        return null;
     }
 
     public function closeSalesOrder($soNumber, $databaseSource = 'syihab')

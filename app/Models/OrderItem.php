@@ -88,4 +88,9 @@ class OrderItem extends Model
     {
         return $this->hasMany(Warranty::class);
     }
+
+    public function serialNumbers()
+    {
+        return $this->hasMany(OrderItemSerialNumber::class, 'order_item_id');
+    }
 }

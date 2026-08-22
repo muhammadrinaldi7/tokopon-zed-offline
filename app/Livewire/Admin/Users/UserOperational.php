@@ -34,6 +34,7 @@ class UserOperational extends Component
     public $createBusinessUnitId = '';
     public $createBranchId = '';
     public $createWarehouseId = '';
+    public $createTelegramChatId = '';
 
     public function mount()
     {
@@ -104,6 +105,7 @@ class UserOperational extends Component
         $this->createBusinessUnitId = $this->editingUser->business_unit_id;
         $this->createBranchId = $this->editingUser->branch_id;
         $this->createWarehouseId = $this->editingUser->warehouse_id;
+        $this->createTelegramChatId = $this->editingUser->telegram_chat_id;
         $this->isEditModalOpen = true;
     }
 
@@ -124,6 +126,7 @@ class UserOperational extends Component
                 'business_unit_id' => $this->createBusinessUnitId ?: null,
                 'branch_id' => $this->createBranchId ?: null,
                 'warehouse_id' => $this->createWarehouseId ?: null,
+                'telegram_chat_id' => $this->createTelegramChatId ?: null,
             ]);
 
             $this->isEditModalOpen = false;
@@ -184,6 +187,7 @@ class UserOperational extends Component
             'business_unit_id' => $this->createBusinessUnitId ?: null,
             'branch_id' => $this->createBranchId ?: null,
             'warehouse_id' => $this->createWarehouseId ?: null,
+            'telegram_chat_id' => $this->createTelegramChatId ?: null,
         ]);
 
         $user->syncRoles($this->selectedCreateRoles);
@@ -204,6 +208,7 @@ class UserOperational extends Component
         $this->createBusinessUnitId = '';
         $this->createBranchId = '';
         $this->createWarehouseId = '';
+        $this->createTelegramChatId = '';
     }
     // Di dalam Class Index.php Anda
     #[On('refresh-user-table')]

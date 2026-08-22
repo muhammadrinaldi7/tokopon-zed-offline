@@ -7,6 +7,8 @@ use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
 use App\Models\WarrantyClaim;
 use Carbon\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\ReturnReportExport;
 
 #[Layout('layouts.z')]
 class ReturnReport extends Component
@@ -17,6 +19,9 @@ class ReturnReport extends Component
     public $startDate;
     public $endDate;
     public $status = '';
+
+    public $showDetailPanel = false;
+    public $selectedClaimId = null;
 
     public function mount()
     {
@@ -44,11 +49,40 @@ class ReturnReport extends Component
         $this->resetPage();
     }
 
-    public function render()
+    public function showDetail($id)
     {
-        $query = WarrantyClaim::with([
+        $this->selectedClaimId = $id;
+        $this->showDetailPanel = true;
+    }
+
+    public function closeDetail()
+    {
+        $this->showDetailPanel = false;
+        $this->selectedClaimId = null;
+    }
+
+    public function getSelectedClaimProperty()
+    {
+        if (!$this->selectedClaimId) return null;
+        
+        return WarrantyClaim::with([
             'customer.profile', 
-            'warranty.orderItem.variant'
+            'warranty.orderItem.variant',
+            'warranty.orderItem.order',
+            'claimedBy',
+            'approvedBy',
+            'deviceInspection',
+            'receivingInspection'
+        ])->find($this->selectedClaimId);
+    }
+
+    private function buildQuery()
+    {
+        return WarrantyClaim::with([
+            'customer.profile', 
+            'warranty.orderItem.variant',
+            'warranty.orderItem.order',
+            'warranty.orderItem.promos'
         ])
         ->when($this->startDate && $this->endDate, function ($q) {
             $start = Carbon::parse($this->startDate)->startOfDay();
@@ -75,8 +109,24 @@ class ReturnReport extends Component
             });
         })
         ->orderBy('created_at', 'desc');
+    }
 
-        $claims = $query->paginate(20);
+    public function exportExcel()
+    {
+        $claims = $this->buildQuery()->get();
+
+        if ($claims->isEmpty()) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Tidak ada data untuk diexport sesuai filter yang dipilih.', type: 'warning');
+            return null;
+        }
+
+        $filename = 'Laporan-Retur-' . now()->format('Ymd-His') . '.xlsx';
+        return Excel::download(new ReturnReportExport($claims), $filename);
+    }
+
+    public function render()
+    {
+        $claims = $this->buildQuery()->paginate(20);
 
         return view('livewire.zoffline.reporting.return-report', [
             'claims' => $claims

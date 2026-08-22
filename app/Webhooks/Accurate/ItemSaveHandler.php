@@ -52,6 +52,12 @@ class ItemSaveHandler implements WebhookHandlerInterface
             $hasSnAccurate = ($accurateItem['serialNumberType'] === 'UNIQUE');
         }
 
+        // Mapping charField1 dari Accurate: "Ya" = add-on
+        $isAddon = isset($accurateItem['charField1']) && strtolower(trim($accurateItem['charField1'])) === 'ya';
+
+        // Tangkap charField2 untuk field proyek
+        $proyek = $accurateItem['charField2'] ?? null;
+
         $idBrand = $accurateItem['itemBrand']['id'] ?? null;
         $brandName = $accurateItem['itemBrand']['name'] ?? null;
         $idCategory = $accurateItem['itemCategory']['id'] ?? null;
@@ -79,6 +85,8 @@ class ItemSaveHandler implements WebhookHandlerInterface
                     'id_category_accurate' => $idCategory,
                     'categoryName' => $categoryName,
                     'itemType' => $accurateItem['itemType'] ?? null,
+                    'is_addon' => $isAddon,
+                    'proyek' => $proyek,
                     'raw_data' => json_encode($accurateItem),
                 ]
             );

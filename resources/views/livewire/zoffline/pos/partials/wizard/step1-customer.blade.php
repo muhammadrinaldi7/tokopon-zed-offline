@@ -490,18 +490,37 @@
     @if ($showSoModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
             <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
-                <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-blue-50/50">
-                    <div>
-                        <h3 class="text-xl font-black text-gray-800">Daftar Pesanan (SO)</h3>
-                        <p class="text-sm text-gray-500 mt-1">Pilih pesanan SO untuk dilunasi / input IMEI</p>
+                <div class="p-6 border-b border-gray-100 flex flex-col gap-4 bg-blue-50/50">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-xl font-black text-gray-800">Daftar Pesanan (SO)</h3>
+                            <p class="text-sm text-gray-500 mt-1">Pilih pesanan SO untuk dilunasi / input IMEI</p>
+                        </div>
+                        <button wire:click="$set('showSoModal', false)"
+                            class="text-gray-400 hover:text-gray-600 focus:outline-none p-2 rounded-xl hover:bg-white transition-colors">
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
-                    <button wire:click="$set('showSoModal', false)"
-                        class="text-gray-400 hover:text-gray-600 focus:outline-none p-2 rounded-xl hover:bg-white transition-colors">
-                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <!-- Search Input -->
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <input type="text" wire:model.live.debounce.300ms="searchSoKeyword"
+                            class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-colors"
+                            placeholder="Cari berdasarkan No Pesanan SO atau Nama Pelanggan...">
+                        <div wire:loading wire:target="searchSoKeyword" class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-blue-500">
+                            <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </div>
+                    </div>
                 </div>
                 <div class="p-6 overflow-y-auto">
                     @if (count($soOrders) > 0)

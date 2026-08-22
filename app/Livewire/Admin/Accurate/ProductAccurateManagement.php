@@ -96,6 +96,8 @@ class ProductAccurateManagement extends Component
                     'id_category_accurate' => $item['itemCategory']['id'] ?? null,
                     'categoryName' => $item['itemCategory']['name'] ?? null,
                     'itemType' => $item['itemType'] ?? null,
+                    'is_addon' => isset($item['charField1']) && strtolower(trim($item['charField1'])) === 'ya',
+                    'proyek' => $item['charField2'] ?? null,
                     'raw_data'        => json_encode($item),
                     'created_at'      => now(),
                     'updated_at'      => now(),
@@ -105,7 +107,7 @@ class ProductAccurateManagement extends Component
                 ProductAccurate::upsert(
                     $importData,
                     ['accurate_id', 'database_source'],
-                    ['item_no', 'name', 'base_price', 'stock', 'has_sn', 'business_unit_id', 'id_brand_accurate', 'itemType', 'brandName', 'id_category_accurate', 'categoryName', 'raw_data', 'base_cost', 'updated_at']
+                    ['item_no', 'name', 'base_price', 'stock', 'has_sn', 'business_unit_id', 'id_brand_accurate', 'itemType', 'brandName', 'id_category_accurate', 'categoryName', 'is_addon', 'proyek', 'raw_data', 'base_cost', 'updated_at']
                 );
 
                 // Sync harga ke ProductVariant / SecondProductVariant lokal
@@ -207,6 +209,8 @@ class ProductAccurateManagement extends Component
                         'brandName' => $item['itemBrand']['name'] ?? null,
                         'id_category_accurate' => $item['itemCategory']['id'] ?? null,
                         'categoryName' => $item['itemCategory']['name'] ?? null,
+                        'is_addon' => isset($item['charField1']) && strtolower(trim($item['charField1'])) === 'ya',
+                        'proyek' => $item['charField2'] ?? null,
                         // raw_data harus di-json_encode jika kolomnya berjenis text/json di MySQL
                         'raw_data'        => json_encode($item),
 
@@ -250,6 +254,8 @@ class ProductAccurateManagement extends Component
                                 'brandName',
                                 'id_category_accurate',
                                 'categoryName',
+                                'is_addon',
+                                'proyek',
                                 'raw_data',
                                 'updated_at'
                             ]

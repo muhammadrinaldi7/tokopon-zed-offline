@@ -496,7 +496,7 @@ class RiwayatPenjualan extends Component
             // Kembalikan deposit SO (yang berasal dari DP SO ini) ke AVAILABLE
             \App\Models\CustomerDeposit::where('origin_order_id', $order->id)
                 ->where('status', 'USED')
-                ->update(['status' => 'AVAILABLE', 'order_id' => null]);
+                ->update(['status' => 'AVAILABLE']);
 
             // 4. Hapus semua payment terkait order ini
             $order->payments()->delete();
@@ -541,7 +541,7 @@ class RiwayatPenjualan extends Component
             $requiredLevel = 1; // Default fallback if no rules defined
         }
 
-        $order->approvalRequests()->create([
+        $request = $order->approvalRequests()->create([
             'request_type' => 'ORDER_CANCELLATION',
             'requested_by' => Auth::id(),
             'reason' => $this->cancelReason,
@@ -549,6 +549,8 @@ class RiwayatPenjualan extends Component
             'required_level' => $requiredLevel,
             'current_level' => 0
         ]);
+
+        \App\Http\Controllers\ApprovalController::sendTelegramNotification($request);
 
         $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan pembatalan berhasil dikirim ke Admin/Pusat.', type: 'success');
         $this->closeCancelModal();

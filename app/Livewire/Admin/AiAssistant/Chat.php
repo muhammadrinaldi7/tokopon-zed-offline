@@ -37,13 +37,14 @@ class Chat extends Component
         // Putus ingatan AI dengan membuat ID sesi baru
         $this->chatSessionId = (string) Str::uuid();
 
-        // (Opsional) Anda juga bisa menghapus history lama di database jika mau
-        // AiChatHistory::where('admin_id', Auth::id())->delete();
+        // Hapus history lama di database agar layar benar-benar bersih
+        AiChatHistory::where('admin_id', Auth::id())->delete();
 
         $this->histories = AiChatHistory::where('admin_id', Auth::id())
             ->orderBy('created_at', 'asc')
             ->get();
     }
+
     public function sendMessage()
     {
         $this->validate([
@@ -51,11 +52,10 @@ class Chat extends Component
         ]);
 
         $adminId = Auth::id();
-        // $sessionId = request()->session()->getId();
         $sessionId = $this->chatSessionId;
         $userMessage = $this->message;
 
-        // Kosongkan input
+        // Kosongkan input segera
         $this->message = '';
 
         // 1. Simpan pesan user
@@ -66,11 +66,39 @@ class Chat extends Component
             'message' => $userMessage,
         ]);
 
+        // Refresh UI untuk memunculkan bubble user seketika
+        $this->histories = AiChatHistory::where('admin_id', Auth::id())
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        // 2. Perintahkan browser untuk memanggil fungsi fetchAiResponse
+        $this->dispatch('callFetchAi');
+        $this->dispatch('messageSent');
+    }
+
+    public function fetchAiResponse()
+    {
+        $adminId = Auth::id();
+        $sessionId = $this->chatSessionId;
+
+        // Ambil pesan user terakhir untuk dikirim ke n8n
+        $lastUserMessage = AiChatHistory::where('admin_id', $adminId)
+            ->where('session_id', $sessionId)
+            ->where('role', 'user')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if (!$lastUserMessage) {
+            return;
+        }
+
+        $userMessage = $lastUserMessage->message;
+
         try {
             // 2. Ambil URL Webhook n8n dari tabel ai_settings
-            // Asumsi: provider diset ke 'n8n' dan url disimpan di kolom api_key
             $setting = AiSetting::where('provider', 'n8n')->first();
             $webhookUrl = $setting ? $setting->api_key : null;
+            $webhookToken = $setting ? $setting->model : env('N8N_AGENT_TOKEN', 'zedpos-2026-banjarbaru');
 
             if (!$webhookUrl) {
                 throw new \Exception('URL Webhook n8n belum dikonfigurasi di pengaturan AI.');
@@ -85,7 +113,7 @@ class Chat extends Component
 
             // 3. Lakukan HTTP POST Request ke n8n dengan timeout 60 detik
             $response = Http::withHeaders([
-                'X-Zedpos-Agent-Token' => 'zedpos-2026-banjarbaru',
+                'X-Zedpos-Agent-Token' => $webhookToken,
             ])->timeout(60)->post($webhookUrl, $payload);
 
             // Cek jika status HTTP 500 atau error lainnya
@@ -97,17 +125,14 @@ class Chat extends Component
             $responseData = $response->json();
 
             if (!isset($responseData['jawaban_ai'])) {
-                // Fallback jika format JSON dari n8n tidak memiliki key jawaban_ai
                 Log::warning('Format response n8n tidak sesuai:', ['response' => $responseData]);
-                throw new \Exception('Format balasan dari n8n tidak memiliki properti "jawaban_ai". Pastikan node terakhir di n8n mengeluarkan output JSON dengan key tersebut.');
+                throw new \Exception('Format balasan dari n8n tidak memiliki properti "jawaban_ai".');
             }
 
             $replyMessage = $responseData['jawaban_ai'];
 
             // 1. Deteksi apakah AI meminta pembuatan file
             if (strpos($replyMessage, '[GENERATE_FILE]') !== false) {
-
-                // 2. Ekstrak Tipe File dan Query menggunakan Regex sederhana
                 preg_match('/Tipe:\s*(.*)/', $replyMessage, $matchType);
                 preg_match('/Query:\s*(.*)/', $replyMessage, $matchQuery);
                 preg_match('/Pesan:\s*(.*)/', $replyMessage, $matchPesan);
@@ -116,19 +141,16 @@ class Chat extends Component
                 $sqlQuery = isset($matchQuery[1]) ? trim($matchQuery[1]) : '';
                 $pesanAi  = isset($matchPesan[1]) ? trim($matchPesan[1]) : 'File Anda sedang disiapkan...';
 
-                // Bersihkan tag dari pesan yang akan ditampilkan ke user
                 $replyMessage = $pesanAi . ' ⏳ (Memproses unduhan...)';
 
-                // 3. Simpan data ke session sementara untuk di-download
-                // (Karena Livewire memproses ini via AJAX, file download harus dipicu via event/route terpisah)
                 session()->put('ai_export_data', [
                     'query' => $sqlQuery,
                     'type'  => $fileType
                 ]);
 
-                // 4. Perintahkan frontend/browser untuk membuka URL download
                 $this->dispatch('triggerDownload', url: route('ai.export.report'));
             }
+            
             if (trim($replyMessage) === '') {
                 $replyMessage = '⚠️ (n8n membalas dengan teks kosong. Silakan cek pemetaan output di workflow n8n Anda.)';
             }
@@ -141,7 +163,6 @@ class Chat extends Component
                 'message' => $replyMessage,
             ]);
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            // Penanganan error timeout
             Log::error('n8n Webhook Timeout/Connection Error: ' . $e->getMessage());
             AiChatHistory::create([
                 'admin_id' => $adminId,
@@ -150,7 +171,6 @@ class Chat extends Component
                 'message' => '⚠️ Mohon maaf, AI sedang sibuk atau mengalami timeout (melebihi 60 detik). Silakan coba lagi nanti.',
             ]);
         } catch (\Exception $e) {
-            // 7. Penanganan error umum (ramah untuk UI)
             Log::error('n8n Webhook Error: ' . $e->getMessage());
             AiChatHistory::create([
                 'admin_id' => $adminId,

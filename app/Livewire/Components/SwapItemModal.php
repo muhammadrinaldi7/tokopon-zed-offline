@@ -19,6 +19,7 @@ class SwapItemModal extends Component
     public $swappingItemId = null;
     public $searchQuery = '';
     public $searchResults = [];
+    public $selectedCandidate = null;
 
     #[On('openSwapModal')]
     public function openModal($orderId)
@@ -34,6 +35,7 @@ class SwapItemModal extends Component
         $this->swappingItemId = null;
         $this->searchQuery = '';
         $this->searchResults = [];
+        $this->selectedCandidate = null;
     }
 
     public function closeModal()
@@ -54,6 +56,23 @@ class SwapItemModal extends Component
     public function cancelSwap()
     {
         $this->resetSwapState();
+    }
+
+    public function selectCandidate($id, $type, $price, $name, $sku, $stock)
+    {
+        $this->selectedCandidate = [
+            'id' => $id,
+            'type' => $type,
+            'price' => $price,
+            'name' => $name,
+            'sku' => $sku,
+            'stock' => $stock
+        ];
+    }
+
+    public function clearCandidate()
+    {
+        $this->selectedCandidate = null;
     }
 
     public function updatedSearchQuery()
@@ -88,10 +107,17 @@ class SwapItemModal extends Component
         $this->searchResults = $results->toArray();
     }
 
-    public function executeSwap($newVariantId, $newVariantType, $newPrice)
+    public function executeSwap()
     {
+        if (!$this->selectedCandidate) return;
+
+        $newVariantId = $this->selectedCandidate['id'];
+        $newVariantType = $this->selectedCandidate['type'];
+
         $oldItem = OrderItem::find($this->swappingItemId);
         if (!$oldItem || !$this->order) return;
+
+        $newPrice = $this->selectedCandidate['price'];
 
         DB::beginTransaction();
         try {
@@ -109,12 +135,22 @@ class SwapItemModal extends Component
             $oldItem->product_variant_type = $newVariantType;
             $oldItem->price_at_checkout = $newPrice;
             $oldItem->subtotal = $newPrice * $oldItem->qty;
-            $oldItem->serial_number = null; // Reset SN karena item berubah
+            // Reset SN karena item berubah
+            $oldItem->serial_number = null; 
+            
+            // Reset diskon karena item diganti (tidak boleh mewarisi diskon barang lama)
+            $oldItem->discount_amount = 0;
+            $oldItem->promo_discount_amount = 0;
+
+            // Recalculate Order Global Discount
+            $newOrderDiscount = $this->order->items()
+                ->where('id', '!=', $oldItem->id)
+                ->sum(DB::raw('discount_amount + promo_discount_amount'));
 
             // Validasi: Grand Total baru tidak boleh lebih kecil dari DP yang sudah dibayar
             $newGrandTotal = $this->order->items()
                 ->where('id', '!=', $oldItem->id)
-                ->sum('subtotal') + ($newPrice * $oldItem->qty) - $this->order->discount_amount;
+                ->sum('subtotal') + ($newPrice * $oldItem->qty) - $newOrderDiscount;
             $totalDp = $this->order->payments()->where('status', 'PAID')->sum('amount');
             if ($newGrandTotal < $totalDp) {
                 throw new \Exception(
@@ -128,6 +164,7 @@ class SwapItemModal extends Component
 
             // Recalculate Order Totals
             $this->order->total_amount = $this->order->items()->sum('subtotal');
+            $this->order->discount_amount = $newOrderDiscount;
             $this->order->grand_total = $this->order->total_amount - $this->order->discount_amount;
 
             // Catat history swap di notes (sementara tanpa approval)
@@ -141,13 +178,12 @@ class SwapItemModal extends Component
             $this->syncSwapToAccurate();
 
             DB::commit();
-            $this->dispatch('toast', title: 'Berhasil', message: 'Item berhasil ditukar!', type: 'success');
             $this->closeModal();
             $this->dispatch('refreshOrderDetails');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Gagal melakukan Swap Item: " . $e->getMessage());
-            $this->dispatch('toast', title: 'Gagal', message: 'Terjadi kesalahan sistem.', type: 'error');
+            $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
         }
     }
 
@@ -157,8 +193,19 @@ class SwapItemModal extends Component
         $soDoc = $this->order->accurateDocs()->where('doc_type', 'SALES_ORDER')->where('status', 'SUCCESS')->first();
         if (!$soDoc || !$soDoc->accurate_id) return;
 
+        $dbSource = strtolower($this->order->businessUnit->code ?? 'syihab');
+        $accurateService = app(\App\Services\AccurateService::class);
+
+        // Fetch existing SO details from Accurate to get detailItem IDs
+        // Ini wajib dilakukan agar saat dikirim ulang, Accurate akan UPDATE (menimpa) baris yang sudah ada, BUKAN menambah baris baru.
+        $existingSo = $accurateService->getSalesOrderDetail($soDoc->accurate_id, $dbSource);
+        $existingDetailItems = $existingSo['detailItem'] ?? [];
+
         // 2. Re-build the entire detailItem payload for the SO based on the new items
         $detailItem = [];
+        $hasExistingId = false;
+        $localItemNos = []; // Simpan semua itemNo yang ada di SO lokal
+        
         foreach ($this->order->items as $item) {
             // Fetch Accurate Item No
             $variant = $item->variant;
@@ -169,17 +216,72 @@ class SwapItemModal extends Component
                 $itemNo = $variant->accurate_item_no ?? $variant->sku ?? $variant->item_no;
             }
 
-            $detailItem[] = [
+            $dItem = [
                 'itemNo' => $itemNo,
                 'unitPrice' => (float)$item->price_at_checkout,
                 'quantity' => (float)$item->qty,
+                'detailName' => $item->product_name ?? ($variant->name ?? 'Unknown'),
+                'itemCashDiscount' => (float)($item->discount_amount + $item->promo_discount_amount),
             ];
+
+            // 2A. Tambahkan Serial Number (jika ada)
+            if (!empty($item->serial_number)) {
+                $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                if (count($sns) > 0) {
+                    $detailSNs = [];
+                    foreach ($sns as $sn) {
+                        $detailSNs[] = ['serialNumberNo' => $sn, 'quantity' => 1];
+                    }
+                    $dItem['detailSerialNumber'] = $detailSNs;
+                }
+            }
+
+            // 2B. Tambahkan Salesman (jika ada)
+            $salesIds = $item->sales_ids;
+            if (is_string($salesIds)) {
+                $salesIds = json_decode($salesIds, true);
+            }
+            if (!empty($salesIds) && is_array($salesIds)) {
+                $employeeNos = \App\Models\Employe::whereIn('id', $salesIds)
+                    ->pluck('employee_no')
+                    ->filter()
+                    ->values()
+                    ->toArray();
+                    
+                if (!empty($employeeNos)) {
+                    $dItem['salesmanListNumber'] = $employeeNos;
+                }
+            }
+
+            // Cari ID baris lama yang cocok berdasarkan itemNo
+            foreach ($existingDetailItems as $exItem) {
+                $exItemNo = $exItem['itemNo'] ?? ($exItem['item']['no'] ?? '');
+                if ($exItemNo === $dItem['itemNo']) {
+                    $dItem['id'] = $exItem['id'];
+                    $hasExistingId = true;
+                    break;
+                }
+            }
+
+            $detailItem[] = $dItem;
+            $localItemNos[] = $dItem['itemNo'];
         }
 
-        $dbSource = strtolower($this->order->businessUnit->code ?? 'syihab');
+        // 2C. HAPUS barang lama di Accurate yang sudah tidak ada di SO lokal
+        // Memanfaatkan parameter `_status => 'delete'` dari API Accurate
+        foreach ($existingDetailItems as $exItem) {
+            $exItemNo = $exItem['itemNo'] ?? ($exItem['item']['no'] ?? '');
+            $exId = $exItem['id'] ?? null;
+            
+            if ($exId && !in_array($exItemNo, $localItemNos)) {
+                $detailItem[] = [
+                    'id' => $exId,
+                    '_status' => 'delete'
+                ];
+            }
+        }
 
         $branchName = $this->order->branch->name ?? (\Illuminate\Support\Facades\Auth::user()->branch->name ?? 'Banjarbaru');
-
 
         $payload = [
             'id' => $soDoc->accurate_id,
@@ -188,10 +290,10 @@ class SwapItemModal extends Component
         ];
 
         // 3. Send update to Accurate
-        $accurateService = app(\App\Services\AccurateService::class);
-
         try {
             $accurateService->postSalesOrder($payload, $dbSource);
+
+            $this->dispatch('toast', title: 'Berhasil', message: 'Item berhasil diswap dan sinkron dengan Accurate.', type: 'success');
         } catch (\Exception $e) {
             Log::warning("Gagal sync Swap Item ke Accurate SO: " . $e->getMessage());
             throw $e;

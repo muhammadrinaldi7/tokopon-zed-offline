@@ -153,7 +153,29 @@ class Index extends Component
                     'extension_days' => $this->extensionDays
                 ]);
                 
-                $msg = $request->request_type === 'ORDER_CANCELLATION' 
+                // --- KIRIM NOTIFIKASI GRUP TELEGRAM ---
+                $kasirName = $request->requestedBy->name ?? 'Kasir';
+                $tipe = str_replace('_', ' ', $request->request_type) . " (Level {$request->required_level})";
+                $orderInfo = '-';
+                if ($request->approvable_type === \App\Models\Order::class && $request->approvable) {
+                    $orderInfo = $request->approvable->order_number;
+                }
+                $cabang = $request->requestedBy->branch->name ?? '-';
+                $waktu = $request->created_at->format('d M Y H:i');
+                $alasan = $request->reason ?? '-';
+
+                $teksGrup = "✅ *APPROVAL SUKSES*\n\n"
+                            . "Pengajuan: {$tipe} untuk {$orderInfo}\n"
+                            . "Kasir: {$kasirName}\n"
+                            . "Waktu: {$waktu}\n"
+                            . "Cabang: {$cabang}\n"
+                            . "Keterangan: \"{$alasan}\"\n\n"
+                            . "Telah disetujui sepenuhnya oleh *{$user->name}* (via Web).";
+                            
+                \App\Http\Controllers\ApprovalController::sendGroupNotification($teksGrup);
+                // ----------------------------------------
+                
+                $msg = $request->request_type === 'ORDER_CANCELLATION'  
                     ? 'Persetujuan berhasil dan transaksi dibatalkan di Accurate.'
                     : 'Persetujuan berhasil dieksekusi.';
                     
@@ -163,6 +185,10 @@ class Index extends Component
             }
         } else {
             $request->save();
+            
+            // Trigger notifikasi untuk level selanjutnya
+            \App\Http\Controllers\ApprovalController::sendTelegramNotification($request);
+            
             $this->dispatch('toast', title: 'Berhasil', message: 'Disetujui. Menunggu persetujuan level selanjutnya.', type: 'success');
         }
     }

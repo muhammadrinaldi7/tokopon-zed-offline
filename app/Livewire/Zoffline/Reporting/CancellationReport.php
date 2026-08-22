@@ -17,6 +17,7 @@ class CancellationReport extends Component
 
     public $dateFrom;
     public $dateTo;
+    public $search = '';
 
     public function mount()
     {
@@ -26,7 +27,7 @@ class CancellationReport extends Component
 
     public function updated($propertyName)
     {
-        if (in_array($propertyName, ['dateFrom', 'dateTo'])) {
+        if (in_array($propertyName, ['dateFrom', 'dateTo', 'search'])) {
             $this->resetPage();
         }
     }
@@ -41,7 +42,23 @@ class CancellationReport extends Component
                 Carbon::parse($this->dateTo)->endOfDay(),
             ]);
 
-        $requests = (clone $baseQuery)->latest()->paginate(20);
+        $requestsQuery = (clone $baseQuery);
+
+        if ($this->search) {
+            $requestsQuery->where(function ($q) {
+                $q->where('reason', 'like', '%' . $this->search . '%')
+                    ->orWhereHas('requestedBy', function ($uq) {
+                        $uq->where('name', 'like', '%' . $this->search . '%');
+                    })
+                    ->orWhereHasMorph('approvable', [\App\Models\Order::class], function ($oq) {
+                        $oq->where('order_number', 'like', '%' . $this->search . '%')
+                            ->orWhere('accurate_so_number', 'like', '%' . $this->search . '%')
+                            ->orWhere('accurate_invoice_no', 'like', '%' . $this->search . '%');
+                    });
+            });
+        }
+
+        $requests = $requestsQuery->latest()->paginate(20);
 
         // Calculate Metrics
         $totalCancellations = (clone $baseQuery)->count();
@@ -72,14 +89,28 @@ class CancellationReport extends Component
 
     public function exportExcel()
     {
-        $baseQuery = ApprovalRequest::with(['requestedBy', 'histories.actedBy', 'approvable'])
+        $baseQueryBuilder = ApprovalRequest::with(['requestedBy', 'histories.actedBy', 'approvable'])
             ->where('request_type', 'ORDER_CANCELLATION')
             ->whereBetween('created_at', [
                 Carbon::parse($this->dateFrom)->startOfDay(),
                 Carbon::parse($this->dateTo)->endOfDay(),
-            ])
-            ->latest()
-            ->get();
+            ]);
+
+        if ($this->search) {
+            $baseQueryBuilder->where(function ($q) {
+                $q->where('reason', 'like', '%' . $this->search . '%')
+                    ->orWhereHas('requestedBy', function ($uq) {
+                        $uq->where('name', 'like', '%' . $this->search . '%');
+                    })
+                    ->orWhereHasMorph('approvable', [\App\Models\Order::class], function ($oq) {
+                        $oq->where('order_number', 'like', '%' . $this->search . '%')
+                            ->orWhere('accurate_so_number', 'like', '%' . $this->search . '%')
+                            ->orWhere('accurate_invoice_no', 'like', '%' . $this->search . '%');
+                    });
+            });
+        }
+
+        $baseQuery = $baseQueryBuilder->latest()->get();
 
         $headers = [
             "Content-type"        => "text/csv",

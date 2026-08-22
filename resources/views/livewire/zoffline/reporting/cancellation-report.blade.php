@@ -72,8 +72,17 @@
 
         <!-- Data Table -->
         <div class="bg-white rounded-2xl shadow-sm border border-neutral-100 overflow-hidden">
-            <div class="p-4 border-b border-neutral-100 bg-neutral-50/50 flex justify-between items-center">
+            <div class="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h2 class="text-lg font-bold text-neutral-800">Riwayat Pengajuan Pembatalan</h2>
+                <div class="relative w-full sm:w-80">
+                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari kasir, no order, accurate, alasan..."
+                        class="w-full pl-9 pr-4 py-2 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors placeholder:text-neutral-400">
+                    <div class="absolute left-3 top-2.5 text-neutral-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-neutral-200">

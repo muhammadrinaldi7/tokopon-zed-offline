@@ -208,6 +208,13 @@
                                     </select>
                                 </div>
                             </div>
+
+                            <div class="mt-3">
+                                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Telegram Chat ID (Opsional)</label>
+                                <input type="text" wire:model="createTelegramChatId" placeholder="Contoh: 123456789"
+                                    class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all">
+                                <p class="text-[10px] text-gray-500 mt-1">Dapatkan ID ini dari bot @userinfobot di Telegram.</p>
+                            </div>
                         </div>
 
                         <div class="space-y-1 border-t border-gray-100 pt-4">
@@ -364,6 +371,13 @@
                                         </select>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <label class="block text-sm font-semibold text-gray-700 mb-1.5">Telegram Chat ID (Opsional)</label>
+                                <input type="text" wire:model="createTelegramChatId" placeholder="Contoh: 123456789"
+                                    class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all">
+                                <p class="text-[10px] text-gray-500 mt-1">Dapatkan ID ini dari bot @userinfobot di Telegram.</p>
                             </div>
                         </div>
 

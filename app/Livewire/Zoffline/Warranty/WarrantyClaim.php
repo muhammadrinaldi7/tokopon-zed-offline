@@ -147,7 +147,7 @@ class WarrantyClaim extends Component
             return;
         }
 
-        \App\Models\ApprovalRequest::create([
+        $request = \App\Models\ApprovalRequest::create([
             'requested_by' => $user->id,
             'approvable_type' => Warranty::class,
             'approvable_id' => $warranty->id,
@@ -157,6 +157,8 @@ class WarrantyClaim extends Component
             'current_level' => 0,
             'status' => 'PENDING',
         ]);
+
+        \App\Http\Controllers\ApprovalController::sendTelegramNotification($request);
 
         $this->checkPendingRequest();
         $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan perpanjangan garansi telah dikirim ke Manajer.', type: 'success');

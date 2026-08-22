@@ -64,6 +64,14 @@
                     </div>
                 @endif
                 <div class="relative">
+                    <select wire:model.live="filterBrand" class="border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] py-2 px-3 bg-white" title="Filter Merek">
+                        <option value="">Semua Merek</option>
+                        @foreach($availableBrands as $brand)
+                            <option value="{{ $brand }}">{{ $brand }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="relative">
                     <select wire:model.live="filterCategory" class="border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] py-2 px-3 bg-white" title="Filter Kategori">
                         <option value="">Semua Kategori</option>
                         @foreach($availableCategories as $cat)
@@ -102,6 +110,12 @@
                         <th class="px-5 py-4 font-bold cursor-pointer hover:bg-gray-50" wire:click="sortBy('name')">
                             Nama Produk
                             @if($sortField === 'name')
+                                <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
+                            @endif
+                        </th>
+                        <th class="px-5 py-4 font-bold cursor-pointer hover:bg-gray-50" wire:click="sortBy('brand')">
+                            Merek
+                            @if($sortField === 'brand')
                                 <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
                             @endif
                         </th>
@@ -153,6 +167,11 @@
                                 @endif
                             </td>
                             <td class="px-5 py-3">
+                                <span class="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold">
+                                    {{ $item['brand'] && $item['brand'] !== '-' ? $item['brand'] : '-' }}
+                                </span>
+                            </td>
+                            <td class="px-5 py-3">
                                 <p class="text-sm font-black {{ $item['stock'] > 0 ? 'text-green-600' : 'text-red-500' }}">{{ $item['stock'] }} Pcs</p>
                                 <p class="text-[11px] font-bold text-gray-500 mt-0.5 truncate">
                                     <span class="inline-block w-2 h-2 rounded-full bg-[#1c69d4] mr-1"></span>
@@ -174,7 +193,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-5 py-8 text-center text-gray-400 text-sm">
+                            <td colspan="7" class="px-5 py-8 text-center text-gray-400 text-sm">
                                 Tidak ada data stok yang ditemukan.
                             </td>
                         </tr>

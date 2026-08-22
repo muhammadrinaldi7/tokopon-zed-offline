@@ -43,6 +43,11 @@ class Reporting extends Component
         return $this->redirectRoute('reporting.income-statement', navigate: true);
     }
 
+    public function navigateToProfitReport()
+    {
+        return $this->redirectRoute('reporting.profit', navigate: true);
+    }
+
     public function navigateToClosingKasir()
     {
         return $this->redirectRoute('reporting.closing-kasir', navigate: true);
@@ -71,6 +76,11 @@ class Reporting extends Component
     public function navigateToReturnReport()
     {
         return $this->redirectRoute('reporting.return-report', navigate: true);
+    }
+
+    public function navigateToOrderIssues()
+    {
+        return $this->redirectRoute('reporting.order-issues', navigate: true);
     }
 
     public function render()

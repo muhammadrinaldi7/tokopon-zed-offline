@@ -199,11 +199,11 @@ trait WithCart
 
     public function processScan()
     {
-        if ($this->loadedSoOrderId) {
-            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Tidak dapat menambah produk baru pada mode pelunasan SO. Silakan input SN pada item yang sudah ada.', type: 'error');
-            $this->scanned_sn = '';
-            return;
-        }
+        // if ($this->loadedSoOrderId) {
+        //     $this->dispatch('toast', title: 'Akses Ditolak', message: 'Tidak dapat menambah produk baru pada mode pelunasan SO. Silakan input SN pada item yang sudah ada.', type: 'error');
+        //     $this->scanned_sn = '';
+        //     return;
+        // }
 
         $sn = trim($this->scanned_sn);
 
@@ -542,7 +542,7 @@ trait WithCart
 
     public function removeFromCart($index)
     {
-        if ($this->loadedSoOrderId) {
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) {
             $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak dapat menghapus barang pada pesanan SO yang sedang ditarik.', type: 'error');
             return;
         }
@@ -578,7 +578,7 @@ trait WithCart
             }
         }
         $this->pendingCustomCashbacks = $newPendingCashbacks;
-        
+
         if (!empty($this->selectedPromos)) {
             $this->applyPromosToCart();
         }
@@ -587,7 +587,7 @@ trait WithCart
 
     public function validateCartItemQty($index, $newQty)
     {
-        if ($this->loadedSoOrderId) {
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) {
             return;
         }
 
@@ -633,7 +633,7 @@ trait WithCart
                 array_pop($this->cart[$index]['serial_numbers']);
             }
         }
-        
+
         if (!empty($this->selectedPromos)) {
             $this->applyPromosToCart();
         }
@@ -641,7 +641,7 @@ trait WithCart
 
     public function incrementCartItem($index)
     {
-        if ($this->loadedSoOrderId) return;
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) return;
 
         if (isset($this->cart[$index])) {
             $this->validateCartItemQty($index, $this->cart[$index]['qty'] + 1);
@@ -651,7 +651,7 @@ trait WithCart
 
     public function decrementCartItem($index)
     {
-        if ($this->loadedSoOrderId) return;
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) return;
 
         if (isset($this->cart[$index]) && $this->cart[$index]['qty'] > 1) {
             $this->validateCartItemQty($index, $this->cart[$index]['qty'] - 1);
@@ -867,11 +867,11 @@ trait WithCart
                 // Set diskon (hanya salah satu yang terpilih)
                 $this->cart[$cartIndex]['discount_amount'] = (int) $amount;
             }
-            
+
             if (!empty($this->selectedPromos)) {
                 $this->applyPromosToCart();
             }
-            
+
             $this->syncSinglePaymentAmount();
         }
         $this->closeManualDiscountModal();
@@ -887,7 +887,7 @@ trait WithCart
     {
         // Tutup modal diskon preset jika terbuka
         $this->closeManualDiscountModal();
-        
+
         $this->customCashbackCartIndex = $index;
         $this->customCashbackAmount = 0;
         $this->showCustomCashbackModal = true;
@@ -940,6 +940,8 @@ trait WithCart
             ]
         ]);
 
+        \App\Http\Controllers\ApprovalController::sendTelegramNotification($request);
+
         // Batalkan request yang masih pending untuk item ini jika ada
         if (isset($this->pendingCustomCashbacks[$this->customCashbackCartIndex])) {
             $oldRequest = \App\Models\ApprovalRequest::find($this->pendingCustomCashbacks[$this->customCashbackCartIndex]);
@@ -973,7 +975,7 @@ trait WithCart
 
                 if (isset($this->cart[$cartIndex])) {
                     $this->cart[$cartIndex]['discount_amount'] = (int) $amount;
-                    
+
                     if (!empty($this->selectedPromos)) {
                         $this->applyPromosToCart();
                     }
@@ -985,7 +987,6 @@ trait WithCart
                 // Mark as completed
                 $request->update(['status' => 'COMPLETED']);
                 unset($this->pendingCustomCashbacks[$cartIndex]);
-                
             } elseif ($request->status === 'REJECTED') {
                 unset($this->pendingCustomCashbacks[$cartIndex]);
                 $this->dispatch('toast', title: 'ACC Ditolak', message: 'Pengajuan Cashback Kustom ditolak oleh Admin.', type: 'error');
@@ -1035,18 +1036,18 @@ trait WithCart
             }
 
             $this->cart[$this->editPriceCartIndex]['price'] = $newPrice;
-            
-            if ($oldPrice != $newPrice) {
-                $user = \Illuminate\Support\Facades\Auth::user()->name ?? 'System';
-                $itemName = $item['name'] ?? 'Unknown Item';
-                $priceLog = "\n[" . now()->format('Y-m-d H:i') . "] $user mengubah harga '$itemName' dari Rp " . number_format($oldPrice, 0, ',', '.') . " menjadi Rp " . number_format($newPrice, 0, ',', '.');
-                $this->notes = ($this->notes ?? '') . $priceLog;
-            }
+
+            // if ($oldPrice != $newPrice) {
+            //     $user = \Illuminate\Support\Facades\Auth::user()->name ?? 'System';
+            //     $itemName = $item['name'] ?? 'Unknown Item';
+            //     $priceLog = "\n[" . now()->format('Y-m-d H:i') . "] $user mengubah harga '$itemName' dari Rp " . number_format($oldPrice, 0, ',', '.') . " menjadi Rp " . number_format($newPrice, 0, ',', '.');
+            //     $this->notes = ($this->notes ?? '') . $priceLog;
+            // }
 
             if (!empty($this->selectedPromos)) {
                 $this->applyPromosToCart();
             }
-            
+
             $this->syncSinglePaymentAmount();
             $this->dispatch('toast', title: 'Berhasil', message: 'Harga satuan berhasil diubah.', type: 'success');
             $this->closeEditPriceModal();

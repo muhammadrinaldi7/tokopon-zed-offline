@@ -277,7 +277,7 @@ trait WithPaymentAndPromo
                     return false;
                 }
             }
-            if ($p['category'] === 'NON-TUNAI' && $p['bank_name'] === 'FINANCE') {
+            if ($p['category'] === 'NON-TUNAI' && strtoupper($p['bank_name'] ?? '') === 'FINANCE') {
                 if (empty($p['no_kontrak'])) {
                     return false;
                 }

@@ -61,7 +61,7 @@ class ApprovalRequest extends Model
             // Kembalikan deposit SO (yang berasal dari DP SO ini) ke AVAILABLE
             \App\Models\CustomerDeposit::where('origin_order_id', $order->id)
                 ->where('status', 'USED')
-                ->update(['status' => 'AVAILABLE', 'order_id' => null]);
+                ->update(['status' => 'AVAILABLE']);
 
             $this->update(['status' => 'COMPLETED']);
             

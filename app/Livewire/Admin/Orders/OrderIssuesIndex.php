@@ -160,7 +160,6 @@ class OrderIssuesIndex extends Component
         return Excel::download(new OrderIssuesExport($issues), $filename);
     }
 
-    #[Layout('layouts.admin', ['title' => 'Kendala & Kesalahan Pesanan'])]
     public function render()
     {
         $totalIssues = OrderIssue::count();
@@ -181,6 +180,8 @@ class OrderIssuesIndex extends Component
 
         $issues = $this->getFilteredQuery()->paginate(15);
 
+        $layout = request()->routeIs('reporting.*') || request()->routeIs('zoffline.*') ? 'layouts.z' : 'layouts.admin';
+
         return view('livewire.admin.orders.order-issues-index', [
             'issues' => $issues,
             'totalIssues' => $totalIssues,
@@ -189,6 +190,6 @@ class OrderIssuesIndex extends Component
             'topCategory' => $topCategory ? ($categoryLabels[$topCategory->category] ?? $topCategory->category) : '-',
             'topCategoryCount' => $topCategory ? $topCategory->total : 0,
             'categoryLabels' => $categoryLabels,
-        ]);
+        ])->layout($layout, ['title' => 'Kendala & Kesalahan Pesanan']);
     }
 }

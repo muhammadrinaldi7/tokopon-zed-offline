@@ -2,6 +2,7 @@
 
 use App\Ai\Agents\DatabaseAnalyzerAgent;
 use App\Http\Controllers\AiReportController;
+use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\WarrantyReportPdfController;
 use App\Livewire\Admin\Accurate\AccurateInvoiceExport;
 use App\Livewire\Admin\Employe\EmployeManage;
@@ -63,6 +64,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/laporan-stok', \App\Livewire\Zoffline\Reporting\LaporanStok::class)->name('laporan-stok');
         Route::get('/staff', \App\Livewire\Zoffline\Reporting\StaffReport::class)->name('staff');
         Route::get('/laba-rugi', \App\Livewire\Zoffline\Reporting\IncomeStatement::class)->name('income-statement');
+        Route::get('/profit', \App\Livewire\Zoffline\Reporting\ProfitReport::class)->name('profit');
         Route::get('/closing-kasir', \App\Livewire\Zoffline\Reporting\ClosingKasirReport::class)->name('closing-kasir');
         Route::get('/pembatalan', \App\Livewire\Zoffline\Reporting\CancellationReport::class)->name('pembatalan');
         Route::get('/sales-order', \App\Livewire\Zoffline\Reporting\SalesOrderReport::class)->name('sales-order');
@@ -71,6 +73,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/return-report', \App\Livewire\Zoffline\Reporting\ReturnReport::class)->name('return-report');
         Route::get('/dashboard', \App\Livewire\Zoffline\Reporting\Dashboard::class)->name('dashboard-bm');
         Route::get('/laporan-pembayaran', \App\Livewire\Zoffline\Reporting\InvoiceReport::class)->name('pembayaran');
+        Route::get('/order-issues', \App\Livewire\Admin\Orders\OrderIssuesIndex::class)->name('order-issues');
     });
 });
 
@@ -138,6 +141,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {});
 
     // Settings
+    Route::get('/settings/system-reset', \App\Livewire\Admin\Settings\SystemReset::class)->name('settings.system-reset')->middleware('can:manage-settings');
+    Route::get('/settings/system-reset/export', [\App\Http\Controllers\SystemResetExportController::class, 'exportSo'])->name('settings.system-reset.export-so')->middleware('can:manage-settings');
+    Route::get('/settings/telegram', \App\Livewire\Admin\Settings\TelegramConnection::class)->name('settings.telegram')->middleware('can:manage-settings');
     Route::get('/settings/business-units', \App\Livewire\Admin\Settings\BusinessUnitIndex::class)->name('settings.business-units')->middleware('can:manage-settings');
     Route::get('/settings/payment-methods', \App\Livewire\Admin\Settings\PaymentMethodIndex::class)->name('settings.payment-methods')->middleware('can:manage-settings');
     Route::get('/settings/shipping', \App\Livewire\Admin\Settings\ShippingSettings::class)->name('settings.shipping')->middleware('can:manage-settings');
@@ -221,30 +227,32 @@ Route::post('/web_service/import_produk_json/new.json', [\App\Http\Controllers\A
 Route::post('/web_service/import_produk_json/new', [\App\Http\Controllers\Api\ErzapProductController::class, 'store']);
 Route::post('/web_service/sinkronisasi_stok/new', [\App\Http\Controllers\Api\ErzapProductController::class, 'syncStock']);
 
-Route::get('/ai-test', function () {
-    $response = \Laravel\Ai\agent(instructions: 'Anda adalah asisten AI untuk Chatbot Tokopon')
-        ->prompt('Buatkan pantun 2 baris tentang tokopon');
+Route::middleware(['auth', 'admin'])->group(function () {
+    Route::get('/ai-test', function () {
+        $response = \Laravel\Ai\agent(instructions: 'Anda adalah asisten AI untuk Chatbot Tokopon')
+            ->prompt('Buatkan pantun 2 baris tentang tokopon');
 
-    return $response;
-});
-
-Route::get('/ai-analyze-db', function () {
-    $agent = new DatabaseAnalyzerAgent();
-
-    try {
-        $response = $agent->prompt('Tolong hitung ada berapa jumlah data di dalam tabel users.');
         return $response;
-    } catch (ProviderOverloadedException $e) {
-        // Tangkap error jika server Gemini kepenuhan
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Maaf, server AI sedang sibuk memproses terlalu banyak permintaan. Silakan coba beberapa detik lagi.'
-        ], 503);
-    } catch (\Exception $e) {
-        // Tangkap error umum lainnya
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
-        ], 500);
-    }
+    });
+
+    Route::get('/ai-analyze-db', function () {
+        $agent = new DatabaseAnalyzerAgent();
+
+        try {
+            $response = $agent->prompt('Tolong hitung ada berapa jumlah data di dalam tabel users.');
+            return $response;
+        } catch (ProviderOverloadedException $e) {
+            // Tangkap error jika server Gemini kepenuhan
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Maaf, server AI sedang sibuk memproses terlalu banyak permintaan. Silakan coba beberapa detik lagi.'
+            ], 503);
+        } catch (\Exception $e) {
+            // Tangkap error umum lainnya
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
+            ], 500);
+        }
+    });
 });

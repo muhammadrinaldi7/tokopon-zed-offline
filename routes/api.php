@@ -18,6 +18,9 @@ Route::get('/accurate/import-items', [\App\Http\Controllers\Api\AccurateImportCo
 Route::post('/webhooks/accurate', [\App\Http\Controllers\Api\AccurateWebhookController::class, 'handle'])
     ->name('api.webhooks.accurate');
 
+// Webhook untuk Approval Telegram Callback (n8n)
+Route::post('/webhooks/approval', [\App\Http\Controllers\ApprovalController::class, 'apiProcess'])
+    ->name('api.webhooks.approval');
 
 // ============================================
 // API UNTUK QZ PRINT SIGNATURE (Self-Signed)
