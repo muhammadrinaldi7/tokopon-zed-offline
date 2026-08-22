@@ -3,7 +3,7 @@ name: Deploy Laravel to Stagging Server
 on:
   push:
     branches:
-      - stagging-prod
+      - stagging_prod
 
 jobs:
   test:
