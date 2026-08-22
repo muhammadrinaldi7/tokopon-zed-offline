@@ -19,6 +19,7 @@ class StockReport extends Component
     public $filterBU = '';
     public $filterWarehouse = '';
     public $filterCategory = '';
+    public $filterBrand = '';
     public $isAdmin = false;
     public $businessUnits = [];
     public $csvSeparator = ';';
@@ -48,6 +49,11 @@ class StockReport extends Component
     }
 
     public function updatingFilterCategory()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterBrand()
     {
         $this->resetPage();
     }
@@ -84,6 +90,7 @@ class StockReport extends Component
         $columns = [
             'SKU',
             'NAMA PRODUK',
+            'MEREK',
             'KATEGORI',
             'GUDANG',
             'STOK GUDANG',
@@ -103,6 +110,7 @@ class StockReport extends Component
                 fputcsv($file, [
                     $item['sku'],
                     $item['name'],
+                    $item['brand'],
                     $item['category'],
                     $item['warehouse_name'],
                     $item['stock'],
@@ -121,7 +129,7 @@ class StockReport extends Component
 
     private function getStockData()
     {
-        $query = ProductAccurate::select('id', 'item_no', 'name', 'categoryName', 'base_cost', 'base_price', 'created_at', 'updated_at', 'stock', 'business_unit_id')
+        $query = ProductAccurate::select('id', 'item_no', 'name', 'categoryName', 'brandName', 'vendor_name', 'base_cost', 'base_price', 'created_at', 'updated_at', 'stock', 'business_unit_id')
             ->with([
                 'warehouseStocks.warehouse:id,name',
                 'businessUnit:id,name',
@@ -141,13 +149,19 @@ class StockReport extends Component
             $searchTerm = '%' . $this->search . '%';
             $query->where(function($q) use ($searchTerm) {
                 $q->where('item_no', 'like', $searchTerm)
-                  ->orWhere('name', 'like', $searchTerm);
+                  ->orWhere('name', 'like', $searchTerm)
+                  ->orWhere('brandName', 'like', $searchTerm);
             });
         }
 
         // DB Level Filter: Category
         if (!empty($this->filterCategory)) {
             $query->where('categoryName', $this->filterCategory);
+        }
+
+        // DB Level Filter: Brand
+        if (!empty($this->filterBrand)) {
+            $query->where('brandName', $this->filterBrand);
         }
 
         // DB Level Filter: Warehouse
@@ -168,6 +182,8 @@ class StockReport extends Component
                     'id' => 'a_' . $variant->id,
                     'sku' => $variant->item_no ?? '-',
                     'name' => $variant->name ?? 'Unknown',
+                    'brand' => $variant->brandName ?? '-',
+                    'vendor_name' => $variant->vendor_name ?? '-',
                     'category' => $variant->categoryName ?? 'Lainnya',
                     'base_cost' => $variant->base_cost ?? 0,
                     'base_price' => $variant->base_price ?? 0,
@@ -216,15 +232,18 @@ class StockReport extends Component
     public function render()
     {
         // Ambil opsi filter dari DB secara efisien
+        $brandQuery = ProductAccurate::query();
         $catQuery = ProductAccurate::query();
         $whQuery = \App\Models\Warehouse::query();
         
         if (!empty($this->filterBU)) {
+            $brandQuery->where('business_unit_id', $this->filterBU);
             $catQuery->where('business_unit_id', $this->filterBU);
             $whQuery->where('business_unit_id', $this->filterBU);
         }
         
-        $availableCategories = $catQuery->distinct()->pluck('categoryName')->filter()->sort()->values();
+        $availableBrands = $brandQuery->whereNotNull('brandName')->where('brandName', '!=', '')->distinct()->pluck('brandName')->filter()->sort()->values();
+        $availableCategories = $catQuery->whereNotNull('categoryName')->where('categoryName', '!=', '')->distinct()->pluck('categoryName')->filter()->sort()->values();
         $availableWarehouses = $whQuery->pluck('name')->sort()->values();
 
         $allData = $this->getStockData();
@@ -245,6 +264,7 @@ class StockReport extends Component
             'stocks' => $paginatedData,
             'availableWarehouses' => $availableWarehouses,
             'availableCategories' => $availableCategories,
+            'availableBrands' => $availableBrands,
             'summary' => [
                 'total_items' => $allData->sum('stock'),
                 'total_cost' => $allData->sum(fn($item) => $item['base_cost'] * $item['stock']),
