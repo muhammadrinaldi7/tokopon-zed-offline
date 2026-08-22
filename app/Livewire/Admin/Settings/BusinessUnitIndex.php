@@ -16,6 +16,7 @@ class BusinessUnitIndex extends Component
     public $customer_prefix;
     public $order_prefix;
     public $draft_prefix;
+    public $prefix;
     public $store_title;
     public $receipt_show_discount = false;
     public $accurate_host;
@@ -48,6 +49,7 @@ class BusinessUnitIndex extends Component
         $this->customer_prefix = '';
         $this->order_prefix = '';
         $this->draft_prefix = '';
+        $this->prefix = '';
         $this->store_title = '';
         $this->receipt_show_discount = false;
         $this->accurate_host = '';
@@ -82,6 +84,7 @@ class BusinessUnitIndex extends Component
         $this->customer_prefix = $unit->customer_prefix;
         $this->order_prefix = $unit->order_prefix;
         $this->draft_prefix = $unit->draft_prefix;
+        $this->prefix = $unit->prefix;
         $this->store_title = $unit->store_title;
         $this->receipt_show_discount = (bool)$unit->receipt_show_discount;
         $this->accurate_host = $unit->accurate_host;
@@ -104,6 +107,7 @@ class BusinessUnitIndex extends Component
             'customer_prefix' => 'nullable|string|max:10',
             'order_prefix' => 'nullable|string|max:20',
             'draft_prefix' => 'nullable|string|max:20',
+            'prefix' => 'nullable|string|max:20',
             'store_title' => 'nullable|string|max:100',
             'receipt_show_discount' => 'boolean',
         ]);
@@ -116,6 +120,7 @@ class BusinessUnitIndex extends Component
                 'customer_prefix' => $this->customer_prefix ? strtoupper($this->customer_prefix) : null,
                 'order_prefix' => $this->order_prefix ? strtoupper($this->order_prefix) : null,
                 'draft_prefix' => $this->draft_prefix ? strtoupper($this->draft_prefix) : null,
+                'prefix' => $this->prefix ? strtoupper($this->prefix) : null,
                 'store_title' => $this->store_title ? strtoupper($this->store_title) : null,
                 'receipt_show_discount' => $this->receipt_show_discount,
                 'accurate_host' => $this->accurate_host,
