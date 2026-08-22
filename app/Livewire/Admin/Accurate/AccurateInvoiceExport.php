@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Maatwebsite\Excel\Facades\Excel;
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 
 class AccurateInvoiceExport extends Component
 {
@@ -62,53 +65,240 @@ class AccurateInvoiceExport extends Component
             '351234567890124'
         ];
 
-        return response()->streamDownload(function () use ($columns, $exampleRow1, $exampleRow2) {
-            $file = fopen('php://output', 'w');
-            fputcsv($file, $columns);
-            fputcsv($file, $exampleRow1);
-            fputcsv($file, $exampleRow2);
-            fclose($file);
-        }, $fileName, ['Content-Type' => 'text/csv']);
+        $export = new class($exampleRow1, $exampleRow2, $columns) implements FromArray, WithHeadings {
+            private $row1, $row2, $headers;
+            public function __construct($row1, $row2, $headers)
+            {
+                $this->row1 = $row1;
+                $this->row2 = $row2;
+                $this->headers = $headers;
+            }
+            public function array(): array
+            {
+                return [$this->row1, $this->row2];
+            }
+            public function headings(): array
+            {
+                return $this->headers;
+            }
+        };
+
+        $fileName = 'template_import_internal.xlsx';
+        return Excel::download($export, $fileName);
+    }
+
+    // 1b. Export Master Product
+    public function downloadMasterProduct()
+    {
+        $fileName = 'master_produk_accurate.xlsx';
+        $columns = ['item_no', 'name', 'categoryName', 'brandName'];
+
+        $export = new class($columns) implements FromArray, WithHeadings {
+            private $headers;
+            public function __construct($headers)
+            {
+                $this->headers = $headers;
+            }
+            public function array(): array
+            {
+                $data = [];
+                \App\Models\ProductAccurate::chunk(500, function ($products) use (&$data) {
+                    foreach ($products as $product) {
+                        $data[] = [
+                            $product->item_no,
+                            $product->name,
+                            $product->categoryName ?? '-',
+                            $product->brandName ?? '-'
+                        ];
+                    }
+                });
+                return $data;
+            }
+            public function headings(): array
+            {
+                return $this->headers;
+            }
+        };
+
+        return Excel::download($export, $fileName);
+    }
+
+    // 1c. Export Master Vendor
+    public function downloadMasterVendor()
+    {
+        $fileName = 'master_vendor_accurate.xlsx';
+        $columns = ['vendor_no', 'vendor_name', 'email', 'phone'];
+
+        $export = new class($columns) implements FromArray, WithHeadings {
+            private $headers;
+            public function __construct($headers)
+            {
+                $this->headers = $headers;
+            }
+            public function array(): array
+            {
+                $data = [];
+                \App\Models\Vendor::chunk(500, function ($vendors) use (&$data) {
+                    foreach ($vendors as $vendor) {
+                        $data[] = [
+                            $vendor->vendor_no,
+                            $vendor->vendor_name,
+                            $vendor->email ?? '-',
+                            $vendor->phone ?? '-'
+                        ];
+                    }
+                });
+                return $data;
+            }
+            public function headings(): array
+            {
+                return $this->headers;
+            }
+        };
+
+        return Excel::download($export, $fileName);
+    }
+
+    // 1d. Clear Drafts
+    public function clearDrafts()
+    {
+        try {
+            DB::beginTransaction();
+            $invoices = MigrationInvoice::where('is_exported', false)->get();
+            foreach ($invoices as $inv) {
+                $inv->items()->delete();
+                $inv->delete();
+            }
+            DB::commit();
+            session()->flash('success', 'Semua data draft berhasil dikosongkan.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            session()->flash('error', 'Gagal mengosongkan draft: ' . $e->getMessage());
+        }
     }
 
     // 2. Fungsi Import CSV dari User
     public function importData()
     {
         $this->validate([
-            'file' => 'required|mimes:csv,txt|max:10240',
+            'file' => 'required|mimes:xlsx,xls,csv|max:10240',
         ]);
 
         $filePath = $this->file->getRealPath();
-        $fileHandle = fopen($filePath, 'r');
-        $header = fgetcsv($fileHandle);
 
         DB::beginTransaction();
         try {
-            $invoicesData = [];
+            // Excel::toArray mengembalikan array dari sheet. Kita ambil sheet pertama (index 0).
+            $sheets = Excel::toArray(new class {}, $filePath);
+            if (empty($sheets) || empty($sheets[0])) {
+                throw new \Exception("File kosong atau format tidak didukung.");
+            }
 
-            while ($row = fgetcsv($fileHandle)) {
-                $data = array_combine($header, $row);
-                $invoiceNo = trim($data['invoice_no']);
+            $rows = $sheets[0];
+            $header = array_shift($rows); // Ambil baris pertama sebagai header
+
+            // Format header agar lowercase dan menghilangkan spasi berlebih
+            $header = array_map(function ($val) {
+                return strtolower(trim((string)$val));
+            }, $header);
+
+            $invoicesData = [];
+            $errors = [];
+            $rowNumber = 1;
+
+            // Untuk bulk validation
+            $itemCodesToCheck = [];
+            $vendorIdsToCheck = [];
+
+            foreach ($rows as $row) {
+                $rowNumber++;
+                // Skip baris kosong
+                if (empty(array_filter($row))) continue;
+
+                // Pastikan jumlah elemen row sama dengan header untuk fungsi array_combine
+                $paddedRow = array_pad($row, count($header), null);
+                // Batasi array row maksimal sebesar header jika kepanjangan
+                $paddedRow = array_slice($paddedRow, 0, count($header));
+
+                $data = array_combine($header, $paddedRow);
+
+                // Cek kemungkinan perbedaan key header jika ada spasi, 
+                // tapi karena template kita baku, kita anggap sesuai nama kolom database
+                $invoiceNo = trim((string)($data['invoice_no'] ?? ''));
+
+                if (empty($invoiceNo)) {
+                    $errors[] = "Baris $rowNumber: Kolom invoice_no tidak boleh kosong.";
+                    continue;
+                }
+
+                $itemCode = trim((string)($data['item_code'] ?? ''));
+                $vendorId = trim((string)($data['vendor_id'] ?? ''));
+                $qty = (int) trim((string)($data['quantity'] ?? '1'));
+                $snRaw = trim((string)($data['serial_numbers'] ?? ''));
+
+                $itemCodesToCheck[] = $itemCode;
+                $vendorIdsToCheck[] = $vendorId;
+
+                // Validasi Kuantitas vs SN
+                if (!empty($snRaw)) {
+                    $cleanSn = trim($snRaw, " \t\n\r\0\x0B;");
+                    $snArray = array_filter(explode(';', $cleanSn), 'strlen');
+                    $snCount = count($snArray);
+                    if ($snCount != $qty) {
+                        $errors[] = "Baris $rowNumber: Barang '$itemCode' Kuantitas $qty tapi terdapat $snCount Serial Number (IMEI).";
+                    }
+                }
 
                 if (!isset($invoicesData[$invoiceNo])) {
+                    // Excel menyimpan tanggal dalam format aneh jika tipe cell Date. 
+                    // Jika data excel berupa teks, akan aman. Jika number, parse excel date.
+                    $rawDate = (string)($data['invoice_date'] ?? '');
+                    if (is_numeric($rawDate)) {
+                        $rawDate = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($rawDate)->format('d/m/Y');
+                    }
+
                     $invoicesData[$invoiceNo] = [
-                        'invoice_date' => trim($data['invoice_date']),
-                        'vendor_id' => trim($data['vendor_id']),
-                        'branch_name' => trim($data['branch_name'] ?? ''),
-                        'description' => trim($data['description'] ?? ''),
+                        'invoice_date' => trim($rawDate),
+                        'vendor_id' => $vendorId,
+                        'branch_name' => trim((string)($data['branch_name'] ?? '')),
+                        'description' => trim((string)($data['description'] ?? '')),
                         'items' => []
                     ];
                 }
 
                 $invoicesData[$invoiceNo]['items'][] = [
-                    'item_code' => trim($data['item_code']),
-                    'quantity' => trim($data['quantity']),
-                    'unit_price' => trim($data['unit_price']),
-                    'warehouse_name' => trim($data['warehouse_name'] ?? ''),
-                    'serial_numbers' => trim($data['serial_numbers'] ?? ''), // Tangkap IMEI
+                    'item_code' => $itemCode,
+                    'quantity' => $qty,
+                    'unit_price' => trim((string)($data['unit_price'] ?? '0')),
+                    'warehouse_name' => trim((string)($data['warehouse_name'] ?? '')),
+                    'serial_numbers' => $snRaw,
                 ];
             }
-            fclose($fileHandle);
+
+            // Bulk Validation Database (Lebih cepat daripada query per baris)
+            $validItemCodes = \App\Models\ProductAccurate::whereIn('item_no', array_unique($itemCodesToCheck))->pluck('item_no')->toArray();
+            $validVendorIds = \App\Models\Vendor::whereIn('vendor_no', array_unique($vendorIdsToCheck))->pluck('vendor_no')->toArray();
+
+            $invalidItemCodes = array_diff(array_unique($itemCodesToCheck), $validItemCodes);
+            if (!empty($invalidItemCodes)) {
+                foreach ($invalidItemCodes as $invalidCode) {
+                    $errors[] = "Kode Barang '$invalidCode' tidak ditemukan di master data (product_accurates).";
+                }
+            }
+
+            $invalidVendorIds = array_diff(array_unique($vendorIdsToCheck), $validVendorIds);
+            if (!empty($invalidVendorIds)) {
+                foreach ($invalidVendorIds as $invalidVendor) {
+                    $errors[] = "No Pemasok '$invalidVendor' tidak ditemukan di master data (vendors).";
+                }
+            }
+
+            // Jika ada error, batalkan proses dan tampilkan semua pesan
+            if (count($errors) > 0) {
+                DB::rollBack();
+                session()->flash('error', implode('<br>', $errors));
+                return;
+            }
 
             foreach ($invoicesData as $invNo => $invData) {
                 // Perbaikan format tanggal agar tidak error "Unexpected character"
@@ -144,12 +334,9 @@ class AccurateInvoiceExport extends Component
 
             DB::commit();
             $this->reset('file');
-            session()->flash('success', 'Data CSV berhasil diimpor ke database draft!');
+            session()->flash('success', 'Data CSV berhasil divalidasi dan diimpor ke database draft!');
         } catch (\Exception $e) {
             DB::rollBack();
-            if (is_resource($fileHandle)) {
-                fclose($fileHandle);
-            }
             session()->flash('error', 'Gagal memproses file. Error: ' . $e->getMessage());
         }
     }
@@ -200,13 +387,6 @@ class AccurateInvoiceExport extends Component
 
                         // Pecah IMEI berdasarkan titik koma
                         $snArray = explode(';', $cleanSn);
-                        $snCount = count($snArray);
-
-                        // Pastikan jumlah IMEI harus SAMA PERSIS dengan Kuantitas
-                        if ($snCount != $item->quantity) {
-                            session()->flash('error', "GAGAL EXPORT! Pada Faktur {$inv->invoice_no}: Barang {$item->item_code} memiliki kuantitas {$item->quantity}, tetapi Anda memasukkan {$snCount} Nomor Seri. Periksa kembali Excel Anda.");
-                            return; // Hentikan proses download
-                        }
 
                         // Buat 1 baris per Serial Number dengan Kuantitas = 1
                         foreach ($snArray as $sn) {
@@ -243,83 +423,22 @@ class AccurateInvoiceExport extends Component
 
     public function pushToAccurateApi()
     {
-        // Ambil maksimal 10 faktur per eksekusi
-        $invoices = MigrationInvoice::with('items')
-            ->where('is_exported', false)
-            ->take(10)
-            ->get();
+        $invoices = MigrationInvoice::where('is_exported', false)->get();
 
         if ($invoices->isEmpty()) {
             session()->flash('error', 'Semua faktur sudah berhasil disinkronisasi ke Accurate.');
             return;
         }
 
-        // Panggil service Accurate Anda
-        $accurateService = app(\App\Services\AccurateService::class);
-
-        $successCount = 0;
-        $errorCount = 0;
+        $databaseSource = Auth::user()->businessUnit->code;
+        $jobCount = 0;
 
         foreach ($invoices as $invoice) {
-            $detailItemArray = [];
-
-            foreach ($invoice->items as $item) {
-                $itemData = [
-                    'itemNo'        => $item->item_code,
-                    'warehouseName' => $item->warehouse_name,
-                    'unitPrice'     => (float) $item->unit_price,
-                    'quantity'      => (float) $item->quantity,
-                ];
-
-                // Proses IMEI menjadi Array
-                if (!empty(trim($item->serial_numbers))) {
-                    $snList = explode(';', trim($item->serial_numbers));
-                    $detailSerialNumber = [];
-
-                    foreach ($snList as $sn) {
-                        $cleanSn = trim($sn);
-                        if (!empty($cleanSn)) {
-                            $detailSerialNumber[] = ['serialNumberNo' => $cleanSn, 'quantity' => 1];
-                        }
-                    }
-
-                    if (count($detailSerialNumber) > 0) {
-                        $itemData['detailSerialNumber'] = $detailSerialNumber;
-                    }
-                }
-
-                $detailItemArray[] = $itemData;
-            }
-
-            // Susun Payload Akhir
-            $payload = [
-                'transDate'  => $invoice->invoice_date->format('d/m/Y'),
-                'billNumber' => $invoice->invoice_no,
-                'vendorNo'   => $invoice->vendor_id,
-                'branchName' => $invoice->branch_name,
-                'detailItem' => $detailItemArray,
-                'taxable' => false,
-                'inclusiveTax' => false,
-            ];
-
-            try {
-                // Tentukan Database Source (misal 'second', 'syihab', dll)
-                // Jika unit usaha ini dinamis, Anda bisa mengambil nilainya dari mapping branch_name
-                // atau menyimpan 'database_source' di tabel migration_invoices saat import.
-                $databaseSource = Auth::user()->businessUnit->code;
-                // Tembak API menggunakan Service
-                $accurateService->savePurchaseInvoiceDo($payload, $databaseSource);
-
-                // Jika tidak ada Exception, berarti sukses
-                $invoice->update(['is_exported' => true]);
-                $successCount++;
-            } catch (\Exception $e) {
-                Log::error("Gagal push Faktur {$invoice->invoice_no}: " . $e->getMessage());
-                $errorCount++;
-            }
+            \App\Jobs\PushInvoiceToAccurateJob::dispatch($invoice, $databaseSource);
+            $jobCount++;
         }
 
-        session()->flash('success', "Proses Selesai: {$successCount} Faktur berhasil dikirim, {$errorCount} gagal (cek file log laravel.log).");
+        session()->flash('success', "Memulai sinkronisasi! $jobCount faktur sedang diproses di latar belakang (Background Job).");
     }
     #[Layout('layouts.admin')]
     public function render()

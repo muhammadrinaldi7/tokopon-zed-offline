@@ -20,8 +20,8 @@ class SystemResetExportController extends Controller
         );
 
         $orders = DB::table('orders')
-            ->leftJoin('user_accurate_customers', 'orders.customer_id', '=', 'user_accurate_customers.user_id')
-            ->leftJoin('users', 'orders.customer_id', '=', 'users.id')
+            ->leftJoin('user_accurate_customers', 'orders.user_id', '=', 'user_accurate_customers.user_id')
+            ->leftJoin('users', 'orders.user_id', '=', 'users.id')
             ->whereIn('orders.order_status', ['down_payment', 'pending', 'paid'])
             ->where('orders.order_channel', 'SO')
             ->select(
@@ -68,10 +68,10 @@ class SystemResetExportController extends Controller
                                 $order->order_number,
                                 $order->customer_name,
                                 $order->created_at,
-                                $item->product_name,
-                                $item->qty,
-                                $item->price,
-                                $item->product_serial_number ?? '-',
+                                $item->product_name ?? '-',
+                                $item->qty ?? 0,
+                                $item->price_at_checkout ?? 0,
+                                $item->serial_number ?? '-',
                                 $order->grand_total,
                                 $payments,
                                 $remaining
@@ -79,10 +79,10 @@ class SystemResetExportController extends Controller
                         } else {
                             fputcsv($file, [
                                 '', '', '', // Empty for Order Number, Customer, Date
-                                $item->product_name,
-                                $item->qty,
-                                $item->price,
-                                $item->product_serial_number ?? '-',
+                                $item->product_name ?? '-',
+                                $item->qty ?? 0,
+                                $item->price_at_checkout ?? 0,
+                                $item->serial_number ?? '-',
                                 '', '', ''  // Empty for totals
                             ]);
                         }
