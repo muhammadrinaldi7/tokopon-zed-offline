@@ -344,7 +344,7 @@ class ResetToDraft extends Component
 
                     $detailSalesman = [];
                     if ($order->sales_id) {
-                        $sales = \App\Models\Sales::find($order->sales_id);
+                        $sales = \App\Models\Employee::find($order->sales_id);
                         if ($sales && $sales->employee_no) {
                             $detailSalesman[] = (string) $sales->employee_no;
                         }
