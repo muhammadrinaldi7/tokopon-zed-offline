@@ -365,7 +365,11 @@ trait WithCart
                 'database_source' => $productAccurate->database_source,
                 'brand_id' => null, // Accurate doesn't map brand directly this way
                 // 'condition' => '',
-                'project_number' => $productAccurate->proyek ?? '',
+                'project_number' => match(trim(strtoupper($productAccurate->proyek ?? ''))) {
+                    'SJU' => 'P.00003',
+                    'SAB' => 'P.00004',
+                    default => $productAccurate->proyek ?? ''
+                },
             ];
 
             $this->dispatch('toast', title: 'Sukses', message: "Berhasil menambahkan {$productAccurate->name} ke keranjang.", type: 'success');
