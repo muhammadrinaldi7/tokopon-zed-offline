@@ -434,7 +434,7 @@ class ResetToDraft extends Component
                     $pct = 0;
                     if ($payment->payment_method_rate_id) {
                         $rate = \App\Models\PaymentMethodRate::find($payment->payment_method_rate_id);
-                        if ($rate) $pct = (float) $rate->percentage;
+                        if ($rate) $pct = (float) $rate->mdr_percentage;
                     } elseif ($pm) {
                         $pct = (float) $pm->mdr_percentage;
                     }
