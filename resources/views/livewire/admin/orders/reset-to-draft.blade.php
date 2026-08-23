@@ -190,6 +190,18 @@
                                             Ganti Kasir
                                         </button>
 
+                                        {{-- Retry Accurate Push Button --}}
+                                        @if ($order->order_status === 'COMPLETED' && empty($order->accurate_invoice_no) && empty($order->accurate_receipt_no))
+                                            <button wire:click="retryAccuratePush({{ $order->id }})" wire:loading.attr="disabled"
+                                                class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold transition border border-blue-200 shadow-sm disabled:opacity-50"
+                                                title="Coba sinkronkan ulang ke Accurate tanpa mereset pesanan">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                                Ulangi Sinkronisasi
+                                            </button>
+                                        @endif
+
                                         {{-- Ke Draft Button --}}
                                         @if (!in_array($order->order_status, ['DRAFT', 'DRAFT_LOADED', 'CANCELLED', 'DELETED']))
                                             <button wire:click="requestDirectCancellation({{ $order->id }})"
