@@ -315,7 +315,7 @@ trait WithCheckoutAndReceipt
                     ->where('status', 'AVAILABLE')
                     ->lockForUpdate()
                     ->get();
-                
+
                 if ($lockedDeposits->count() !== count($this->availableCustomerDeposits)) {
                     \Illuminate\Support\Facades\DB::rollBack();
                     $this->dispatch('toast', title: 'Error', message: 'Beberapa deposit sudah tidak tersedia. Silakan muat ulang customer dan coba lagi.', type: 'error');
@@ -538,7 +538,7 @@ trait WithCheckoutAndReceipt
             // Hitung validDpInvoices dan potong deposit secara lokal
             $validDpInvoices = [];
             $remainingGrandTotalForDp = (float)($this->subtotal() - $this->totalDiscount());
-            
+
             if ($this->useCustomerDeposit && !empty($lockedDeposits)) {
                 foreach ($lockedDeposits as $deposit) {
                     if (!empty($deposit->accurate_invoice_no) && $remainingGrandTotalForDp > 0) {
@@ -547,7 +547,7 @@ trait WithCheckoutAndReceipt
                             'invoiceNumber' => $deposit->accurate_invoice_no,
                             'paymentAmount' => $useAmount,
                         ];
-                        
+
                         \App\Models\CustomerDepositUsage::create([
                             'customer_deposit_id' => $deposit->id,
                             'order_id' => $order->id,
@@ -567,7 +567,7 @@ trait WithCheckoutAndReceipt
                             $deposit->status = 'USED';
                         }
                         $deposit->save();
-                        
+
                         $remainingGrandTotalForDp -= $useAmount;
                     }
                 }
@@ -639,6 +639,7 @@ trait WithCheckoutAndReceipt
                             'quantity' => $item['qty'],
                             'itemCashDiscount' => ((int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1)) + (int)($item['promo_discount'] ?? 0),
                             'salesmanListNumber' => $detailSalesman,
+                            'projectNo' => $item['project_number'] ?? ''
                         ];
 
                         $condition = $item['condition'] ?? '';
@@ -677,7 +678,7 @@ trait WithCheckoutAndReceipt
                     ];
 
 
-                    
+
                     if (count($validDpInvoices) > 0) {
                         $siData['detailDownPayment'] = $validDpInvoices;
                     }
@@ -1728,7 +1729,7 @@ trait WithCheckoutAndReceipt
                     ->where('status', 'AVAILABLE')
                     ->lockForUpdate()
                     ->get();
-                
+
                 if ($lockedDeposits->count() !== count($this->availableCustomerDeposits)) {
                     \Illuminate\Support\Facades\DB::rollBack();
                     $this->dispatch('toast', title: 'Error', message: 'Beberapa deposit sudah tidak tersedia. Silakan muat ulang customer dan coba lagi.', type: 'error');
@@ -1835,7 +1836,7 @@ trait WithCheckoutAndReceipt
                             'invoiceNumber' => $deposit->accurate_invoice_no,
                             'paymentAmount' => $useAmount,
                         ];
-                        
+
                         \App\Models\CustomerDepositUsage::create([
                             'customer_deposit_id' => $deposit->id,
                             'order_id' => $order->id,
@@ -1855,12 +1856,12 @@ trait WithCheckoutAndReceipt
                             $deposit->status = 'USED';
                         }
                         $deposit->save();
-                        
+
                         $remainingGrandTotalForDp -= $useAmount;
                     }
                 }
             }
-            
+
             // Tandai deposit yang berasal dari SO ini (DP SO) menjadi USED
             \App\Models\CustomerDeposit::where('origin_order_id', $order->id)
                 ->update([
@@ -1879,10 +1880,10 @@ trait WithCheckoutAndReceipt
                         break;
                     }
                 }
-                
+
                 $isFinance = $financePayment ? true : false;
-                $invoiceCustomerNo = $financePayment 
-                    ? $financePayment->accurate_customer_no 
+                $invoiceCustomerNo = $financePayment
+                    ? $financePayment->accurate_customer_no
                     : $order->user->getAccurateCustomerNo($dbSource);
                 // ------------------------------------------
 
@@ -1948,7 +1949,7 @@ trait WithCheckoutAndReceipt
                         'description' => 'DO Otomatis dari Pelunasan POS' . (!empty($this->notes) ? ' - ' . $this->notes : ''),
                         'detailItem' => $doDetailItems
                     ];
-                    
+
                     if (!$isFinance) {
                         $doData['salesOrderNumber'] = $order->accurate_so_number;
                     }

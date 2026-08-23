@@ -365,6 +365,7 @@ trait WithCart
                 'database_source' => $productAccurate->database_source,
                 'brand_id' => null, // Accurate doesn't map brand directly this way
                 // 'condition' => '',
+                'project_number' => $productAccurate->proyek ?? '',
             ];
 
             $this->dispatch('toast', title: 'Sukses', message: "Berhasil menambahkan {$productAccurate->name} ke keranjang.", type: 'success');
@@ -830,7 +831,7 @@ trait WithCart
     // ─── Manual Discount Presets ───────────────────────────────
     public function getActiveManualDiscountPresets()
     {
-        return \App\Models\ManualDiscountPreset::where('is_active', true)->get();
+        return \App\Models\ManualDiscountPreset::where('is_active', true)->orderBy('amount', 'asc')->get();
     }
 
     public $showManualDiscountModal = false;
