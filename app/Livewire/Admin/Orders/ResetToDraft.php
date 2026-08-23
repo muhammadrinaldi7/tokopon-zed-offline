@@ -266,6 +266,222 @@ class ResetToDraft extends Component
         $this->selectedLog = null;
     }
 
+    // ─── Manual Accurate Retry ───
+    public function retryAccuratePush($orderId)
+    {
+        $order = Order::with(['items', 'payments.paymentMethod', 'user', 'branch', 'handledBy.warehouse', 'handledBy.branch'])->find($orderId);
+        
+        if (!$order || $order->order_status !== 'COMPLETED') {
+            $this->dispatch('toast', title: 'Error', message: 'Hanya transaksi COMPLETED yang dapat disinkronkan ulang.', type: 'error');
+            return;
+        }
+        
+        if ($order->accurate_invoice_no && $order->accurate_receipt_no) {
+            $this->dispatch('toast', title: 'Info', message: 'Transaksi ini sudah tersinkronisasi sepenuhnya ke Accurate.', type: 'warning');
+            return;
+        }
+
+        try {
+            $accurateService = app(\App\Services\AccurateService::class);
+            $bu = \App\Models\BusinessUnit::find($order->business_unit_id);
+            $dbSource = $bu ? $bu->code : 'syihab';
+
+            $customerUser = $order->user;
+            if ($customerUser) {
+                $accurateService->syncCustomer($customerUser, $dbSource);
+                $customerUser->refresh();
+            }
+
+            $financePayment = null;
+            foreach ($order->payments as $payment) {
+                if ($payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no)) {
+                    $financePayment = $payment->paymentMethod;
+                    break;
+                }
+            }
+            $invoiceCustomerNo = $financePayment ? $financePayment->accurate_customer_no : ($customerUser ? $customerUser->getAccurateCustomerNo($dbSource) : null);
+
+            if (!$invoiceCustomerNo) {
+                throw new \Exception("Pelanggan belum sinkron atau tidak memiliki nomor Accurate.");
+            }
+
+            $accurateBranchName = $order->branch->name ?? 'Banjarbaru';
+            $accurateWarehouseName = $order->handledBy->warehouse->name ?? 'Head Office';
+
+            // 1. SALES INVOICE
+            if (!$order->accurate_invoice_no) {
+                $detailItems = [];
+                foreach ($order->items as $item) {
+                    $sku = 'ITEM-UNKNOWN';
+                    $projectNo = '';
+                    $condition = '';
+                    
+                    if ($item->product_variant_type == \App\Models\ProductAccurate::class) {
+                        $product = \App\Models\ProductAccurate::find($item->product_variant_id);
+                        if ($product) {
+                            $sku = $product->item_no;
+                            $projectNo = match(trim(strtoupper($product->proyek ?? ''))) {
+                                'SJU' => 'P.00003',
+                                'SAB' => 'P.00004',
+                                default => $product->proyek ?? ''
+                            };
+                        }
+                    } else if ($item->product_variant_type == \App\Models\SecondProduct::class) {
+                        $product = \App\Models\SecondProduct::find($item->product_variant_id);
+                        if ($product) {
+                            $sku = $product->sku;
+                            $condition = $product->condition ?? '';
+                        }
+                    }
+
+                    $rawSns = array_values(array_filter(array_map('trim', explode(',', $item->serial_number ?? ''))));
+                    $detailSN = [];
+                    foreach ($rawSns as $sn) {
+                        if (!empty($sn)) {
+                            $detailSN[] = ['serialNumberNo' => $sn, 'quantity' => 1];
+                        }
+                    }
+
+                    $detailSalesman = [];
+                    if ($order->sales_id) {
+                        $sales = \App\Models\Sales::find($order->sales_id);
+                        if ($sales && $sales->employee_no) {
+                            $detailSalesman[] = (string) $sales->employee_no;
+                        }
+                    }
+
+                    $itemData = [
+                        'itemNo' => $sku,
+                        'warehouseName' => $accurateWarehouseName,
+                        'unitPrice' => (float) $item->price_at_checkout,
+                        'quantity' => (float) $item->qty,
+                        'itemCashDiscount' => (float) $item->discount_amount + (float) $item->promo_discount_amount,
+                        'salesmanListNumber' => $detailSalesman,
+                        'projectNo' => $projectNo
+                    ];
+
+                    if (in_array($condition, ['Inter', 'Resmi'])) {
+                        $city = trim(str_replace(['GSK -', 'GSK '], '', $accurateWarehouseName));
+                        $departmentPrefix = ($condition === 'Inter') ? 'Distri' : 'Retail';
+                        $itemData['departmentName'] = $departmentPrefix . ' ' . $city;
+                    }
+
+                    if (!empty($detailSN)) {
+                        $itemData['detailSerialNumber'] = $detailSN;
+                    }
+                    
+                    $detailItems[] = $itemData;
+                }
+
+                $isTaxable = $bu ? (bool) $bu->is_taxable : false;
+
+                $siData = [
+                    'customerNo' => $invoiceCustomerNo,
+                    'branchName' => $accurateBranchName,
+                    'detailItem' => $detailItems,
+                    'transDate' => \Carbon\Carbon::parse($order->order_date)->format('d/m/Y'),
+                    'inclusiveTax' => $isTaxable,
+                    'taxable' => $isTaxable,
+                    'useTax1' => $isTaxable,
+                    'description' => $order->notes
+                ];
+                
+                $validDpInvoices = [];
+                $usages = \App\Models\CustomerDepositUsage::with('customerDeposit')->where('order_id', $order->id)->get();
+                foreach ($usages as $usage) {
+                    if ($usage->customerDeposit && $usage->customerDeposit->accurate_invoice_no) {
+                        $validDpInvoices[] = [
+                            'invoiceNumber' => $usage->customerDeposit->accurate_invoice_no,
+                            'paymentAmount' => (float) $usage->amount_used,
+                        ];
+                    }
+                }
+                if (count($validDpInvoices) > 0) {
+                    $siData['detailDownPayment'] = $validDpInvoices;
+                }
+
+                $mdrExpenses = $order->getMdrExpenseDetails();
+                if (!empty($mdrExpenses)) {
+                    $siData['detailExpense'] = $mdrExpenses;
+                }
+
+                Log::info("Admin Retry Accurate SI Payload: " . json_encode($siData));
+                $siResult = $accurateService->postSalesInvoice($siData, $dbSource);
+                if (isset($siResult['r']['number'])) {
+                    $order->update(['accurate_invoice_no' => $siResult['r']['number']]);
+                    \App\Models\OrderAccurateDoc::create([
+                        'order_id' => $order->id,
+                        'doc_type' => 'SALES_INVOICE',
+                        'doc_number' => $siResult['r']['number'],
+                        'accurate_id' => $siResult['r']['id'] ?? null,
+                        'amount' => $order->grand_total,
+                        'status' => 'SUCCESS',
+                    ]);
+                }
+            }
+
+            // 2. SALES RECEIPT
+            if (!$order->accurate_receipt_no && $order->accurate_invoice_no) {
+                $srNumbers = [];
+                foreach ($order->payments as $payment) {
+                    $rowTotal = (float)$payment->amount;
+                    if ($rowTotal <= 0) continue;
+
+                    $pm = $payment->paymentMethod;
+                    if (!$pm || !empty($pm->accurate_customer_no)) continue;
+
+                    $pct = 0;
+                    if ($payment->payment_method_rate_id) {
+                        $rate = \App\Models\PaymentMethodRate::find($payment->payment_method_rate_id);
+                        if ($rate) $pct = (float) $rate->percentage;
+                    }
+                    $rowMdr = $pct > 0 ? round($rowTotal * $pct / 100, 0) : 0;
+                    $netReceiptAmount = $rowTotal - $rowMdr;
+
+                    $srData = [
+                        'customerNo' => $invoiceCustomerNo,
+                        'branchName' => $accurateBranchName,
+                        'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
+                        'receiptAmount' => (float) $netReceiptAmount,
+                        'chequeAmount' => (float) $netReceiptAmount,
+                        'transDate' => \Carbon\Carbon::parse($order->order_date)->format('d/m/Y'),
+                        'detailInvoice' => [
+                            [
+                                'invoiceNo' => $order->accurate_invoice_no,
+                                'paymentAmount' => $netReceiptAmount,
+                            ]
+                        ],
+                        'description' => $order->notes
+                    ];
+                    
+                    Log::info("Admin Retry Accurate SR Payload: " . json_encode($srData));
+                    $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+                    if (isset($srResult['r']['number'])) {
+                        $srNumbers[] = $srResult['r']['number'];
+                        \App\Models\OrderAccurateDoc::create([
+                            'order_id' => $order->id,
+                            'doc_type' => 'SALES_RECEIPT',
+                            'doc_number' => $srResult['r']['number'],
+                            'accurate_id' => $srResult['r']['id'] ?? null,
+                            'amount' => $netReceiptAmount,
+                            'status' => 'SUCCESS',
+                        ]);
+                    }
+                }
+
+                if (!empty($srNumbers)) {
+                    $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
+                }
+            }
+            
+            $this->dispatch('toast', title: 'Berhasil', message: 'Tugas sinkronisasi ulang berhasil diproses.', type: 'success');
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Admin Retry Sync Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Sinkronisasi gagal: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
     public function render()
     {
         $user = Auth::user();
