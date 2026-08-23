@@ -8,6 +8,7 @@ use Livewire\Attributes\Layout;
 use App\Models\Order;
 use App\Models\OrderResetLog;
 use App\Models\Branch;
+use App\Models\Employe;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -270,12 +271,12 @@ class ResetToDraft extends Component
     public function retryAccuratePush($orderId)
     {
         $order = Order::with(['items', 'payments.paymentMethod', 'user', 'branch', 'handledBy.warehouse', 'handledBy.branch'])->find($orderId);
-        
+
         if (!$order || $order->order_status !== 'COMPLETED') {
             $this->dispatch('toast', title: 'Error', message: 'Hanya transaksi COMPLETED yang dapat disinkronkan ulang.', type: 'error');
             return;
         }
-        
+
         if ($order->accurate_invoice_no && $order->accurate_receipt_no) {
             $this->dispatch('toast', title: 'Info', message: 'Transaksi ini sudah tersinkronisasi sepenuhnya ke Accurate.', type: 'warning');
             return;
@@ -315,12 +316,12 @@ class ResetToDraft extends Component
                     $sku = 'ITEM-UNKNOWN';
                     $projectNo = '';
                     $condition = '';
-                    
+
                     if ($item->product_variant_type == \App\Models\ProductAccurate::class) {
                         $product = \App\Models\ProductAccurate::find($item->product_variant_id);
                         if ($product) {
                             $sku = $product->item_no;
-                            $projectNo = match(trim(strtoupper($product->proyek ?? ''))) {
+                            $projectNo = match (trim(strtoupper($product->proyek ?? ''))) {
                                 'SJU' => 'P.00003',
                                 'SAB' => 'P.00004',
                                 default => $product->proyek ?? ''
@@ -344,7 +345,7 @@ class ResetToDraft extends Component
 
                     $detailSalesman = [];
                     if ($order->sales_id) {
-                        $sales = \App\Models\Employee::find($order->sales_id);
+                        $sales = Employe::find($order->sales_id);
                         if ($sales && $sales->employee_no) {
                             $detailSalesman[] = (string) $sales->employee_no;
                         }
@@ -369,7 +370,7 @@ class ResetToDraft extends Component
                     if (!empty($detailSN)) {
                         $itemData['detailSerialNumber'] = $detailSN;
                     }
-                    
+
                     $detailItems[] = $itemData;
                 }
 
@@ -385,7 +386,7 @@ class ResetToDraft extends Component
                     'useTax1' => $isTaxable,
                     'description' => $order->notes
                 ];
-                
+
                 $validDpInvoices = [];
                 $usages = \App\Models\CustomerDepositUsage::with('customerDeposit')->where('order_id', $order->id)->get();
                 foreach ($usages as $usage) {
@@ -434,6 +435,8 @@ class ResetToDraft extends Component
                     if ($payment->payment_method_rate_id) {
                         $rate = \App\Models\PaymentMethodRate::find($payment->payment_method_rate_id);
                         if ($rate) $pct = (float) $rate->percentage;
+                    } elseif ($pm) {
+                        $pct = (float) $pm->mdr_percentage;
                     }
                     $rowMdr = $pct > 0 ? round($rowTotal * $pct / 100, 0) : 0;
                     $netReceiptAmount = $rowTotal - $rowMdr;
@@ -453,7 +456,7 @@ class ResetToDraft extends Component
                         ],
                         'description' => $order->notes
                     ];
-                    
+
                     Log::info("Admin Retry Accurate SR Payload: " . json_encode($srData));
                     $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
                     if (isset($srResult['r']['number'])) {
@@ -473,9 +476,8 @@ class ResetToDraft extends Component
                     $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
                 }
             }
-            
-            $this->dispatch('toast', title: 'Berhasil', message: 'Tugas sinkronisasi ulang berhasil diproses.', type: 'success');
 
+            $this->dispatch('toast', title: 'Berhasil', message: 'Tugas sinkronisasi ulang berhasil diproses.', type: 'success');
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Admin Retry Sync Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Sinkronisasi gagal: ' . $e->getMessage(), type: 'error');
