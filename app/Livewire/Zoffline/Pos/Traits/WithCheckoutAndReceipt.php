@@ -1906,6 +1906,7 @@ trait WithCheckoutAndReceipt
                     }
 
                     $sku = $cartItem['sku'] ?: 'ITEM-UNKNOWN';
+                    $projectNo = $cartItem['project_number'] ?? '';
 
                     // For DO
                     $doItem = [
@@ -1913,6 +1914,9 @@ trait WithCheckoutAndReceipt
                         'quantity' => (float)$cartItem['qty'],
                         'warehouseName' => $warehouseName,
                     ];
+                    if (!empty($projectNo)) {
+                        $doItem['projectNo'] = $projectNo;
+                    }
                     if (!empty($cartItem['item_id']) && !$isFinance) {
                         $doItem['salesOrderNumber'] = $order->accurate_so_number;
                     }
@@ -1929,6 +1933,9 @@ trait WithCheckoutAndReceipt
                         'detailName' => $cartItem['name'],
                         'itemCashDiscount' => ((float)($cartItem['discount_amount'] ?? 0) * (float)$cartItem['qty']) + (float)($cartItem['promo_discount'] ?? 0),
                     ];
+                    if (!empty($projectNo)) {
+                        $siItem['projectNo'] = $projectNo;
+                    }
                     if (!empty($detailSalesman)) {
                         $siItem['salesmanListNumber'] = $detailSalesman;
                     }
