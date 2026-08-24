@@ -8,14 +8,27 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {{-- Kolom Kiri: Pencarian Produk --}}
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <svg class="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                    stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                Pencarian Produk
-            </h3>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+                <h3 class="font-bold text-gray-800 flex items-center gap-2 mb-0">
+                    <svg class="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Pencarian Produk
+                </h3>
+
+                @if(count($listProyek) > 0)
+                <div class="w-full sm:w-auto">
+                    <select wire:model.live="filterProyek" class="w-full sm:w-48 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm transition text-gray-700">
+                        <option value="">Semua Proyek</option>
+                        @foreach($listProyek as $proyek)
+                            <option value="{{ $proyek }}">{{ $proyek }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
+            </div>
 
             <div class="relative mb-4">
                 <input type="text" wire:model.live.debounce.300ms="searchQuery"

@@ -12,6 +12,8 @@ use Livewire\Attributes\Layout;
 class CekStock extends Component
 {
     public $searchQuery = '';
+    public $filterProyek = '';
+    public $listProyek = [];
     public $searchResults = [];
     public $stockData = [];
     public $selectedProduct = '';
@@ -21,6 +23,18 @@ class CekStock extends Component
     public $showSnModal = false;
     public $modalWarehouseName = '';
     public $modalSns = [];
+
+    public function mount()
+    {
+        $activeBuId = Auth::user()->getActiveBusinessUnitId();
+        $this->listProyek = \App\Models\ProductAccurate::where('business_unit_id', $activeBuId)
+            ->whereNotNull('proyek')
+            ->where('proyek', '!=', '')
+            ->distinct()
+            ->pluck('proyek')
+            ->toArray();
+    }
+
     // Tambahkan fungsi ini untuk membuka modal dan mengoper data SN
     public function openSnModal($warehouseName, $sns)
     {
@@ -36,6 +50,11 @@ class CekStock extends Component
         $this->modalWarehouseName = '';
         $this->modalSns = [];
     }
+    public function updatedFilterProyek()
+    {
+        $this->updatedSearchQuery();
+    }
+
     public function updatedSearchQuery()
     {
         if (strlen($this->searchQuery) < 2) {
@@ -62,6 +81,9 @@ class CekStock extends Component
 
         $products = \App\Models\ProductAccurate::with('businessUnit')
             ->where('business_unit_id', $activeBuId)
+            ->when($this->filterProyek, function ($query) {
+                $query->where('proyek', $this->filterProyek);
+            })
             ->where(function ($query) use ($term, $snSkus) {
                 $query->where('item_no', 'like', $term)
                     ->orWhere('name', 'like', $term);
