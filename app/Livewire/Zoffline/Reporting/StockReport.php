@@ -20,6 +20,7 @@ class StockReport extends Component
     public $filterWarehouse = '';
     public $filterCategory = '';
     public $filterBrand = '';
+    public $filterProyek = '';
     public $isAdmin = false;
     public $businessUnits = [];
     public $csvSeparator = ';';
@@ -54,6 +55,11 @@ class StockReport extends Component
     }
 
     public function updatingFilterBrand()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterProyek()
     {
         $this->resetPage();
     }
@@ -164,6 +170,11 @@ class StockReport extends Component
             $query->where('brandName', $this->filterBrand);
         }
 
+        // DB Level Filter: Proyek
+        if (!empty($this->filterProyek)) {
+            $query->where('proyek', $this->filterProyek);
+        }
+
         // DB Level Filter: Warehouse
         if (!empty($this->filterWarehouse)) {
             if ($this->filterWarehouse === 'Belum Dialokasikan') {
@@ -234,16 +245,19 @@ class StockReport extends Component
         // Ambil opsi filter dari DB secara efisien
         $brandQuery = ProductAccurate::query();
         $catQuery = ProductAccurate::query();
+        $proyekQuery = ProductAccurate::query();
         $whQuery = \App\Models\Warehouse::query();
         
         if (!empty($this->filterBU)) {
             $brandQuery->where('business_unit_id', $this->filterBU);
             $catQuery->where('business_unit_id', $this->filterBU);
+            $proyekQuery->where('business_unit_id', $this->filterBU);
             $whQuery->where('business_unit_id', $this->filterBU);
         }
         
         $availableBrands = $brandQuery->whereNotNull('brandName')->where('brandName', '!=', '')->distinct()->pluck('brandName')->filter()->sort()->values();
         $availableCategories = $catQuery->whereNotNull('categoryName')->where('categoryName', '!=', '')->distinct()->pluck('categoryName')->filter()->sort()->values();
+        $availableProyeks = $proyekQuery->whereNotNull('proyek')->where('proyek', '!=', '')->distinct()->pluck('proyek')->filter()->sort()->values();
         $availableWarehouses = $whQuery->pluck('name')->sort()->values();
 
         $allData = $this->getStockData();
@@ -265,6 +279,7 @@ class StockReport extends Component
             'availableWarehouses' => $availableWarehouses,
             'availableCategories' => $availableCategories,
             'availableBrands' => $availableBrands,
+            'availableProyeks' => $availableProyeks,
             'summary' => [
                 'total_items' => $allData->sum('stock'),
                 'total_cost' => $allData->sum(fn($item) => $item['base_cost'] * $item['stock']),

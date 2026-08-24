@@ -72,6 +72,14 @@
                     </select>
                 </div>
                 <div class="relative">
+                    <select wire:model.live="filterProyek" class="border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] py-2 px-3 bg-white" title="Filter Proyek">
+                        <option value="">Semua Proyek</option>
+                        @foreach($availableProyeks as $proyek)
+                            <option value="{{ $proyek }}">{{ $proyek }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="relative">
                     <select wire:model.live="filterCategory" class="border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] py-2 px-3 bg-white" title="Filter Kategori">
                         <option value="">Semua Kategori</option>
                         @foreach($availableCategories as $cat)
