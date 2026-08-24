@@ -29,6 +29,10 @@ class Index extends Component
     public $selectedCustomerName = '';
     public $payment_date;
     public $contract_number;
+    
+    public $isLocalOnly = false;
+    public $manual_invoice_no = '';
+    public $manual_receipt_no = '';
 
     protected $listeners = ['refreshDeposits' => '$refresh'];
 
@@ -95,7 +99,7 @@ class Index extends Component
 
     public function openCreateModal()
     {
-        $this->reset(['customer_id', 'searchCustomer', 'selectedCustomerName', 'notes', 'contract_number']);
+        $this->reset(['customer_id', 'searchCustomer', 'selectedCustomerName', 'notes', 'contract_number', 'isLocalOnly', 'manual_invoice_no', 'manual_receipt_no']);
         $this->payment_date = date('Y-m-d');
         $this->setPaymentMode('tunai');
         $this->payments[0]['amount'] = 0;
@@ -139,6 +143,11 @@ class Index extends Component
     {
         $this->validate([
             'customer_id' => 'required|exists:users,id',
+            'manual_invoice_no' => 'required_if:isLocalOnly,true',
+            'manual_receipt_no' => 'required_if:isLocalOnly,true',
+        ], [
+            'manual_invoice_no.required_if' => 'Nomor Faktur Accurate wajib diisi jika Rekam Lokal.',
+            'manual_receipt_no.required_if' => 'Nomor Penerimaan Accurate wajib diisi jika Rekam Lokal.',
         ]);
 
         $paymentData = $this->payments[0] ?? null;
@@ -199,55 +208,63 @@ class Index extends Component
                 ];
             }
 
-            // STEP 1: DP Invoice without SO
-            $dpInvData = [
-                'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
-                'branchName' => $accurateBranchName,
-                'dpAmount'   => (float)$paymentData['amount'],
-                'transDate'  => \Carbon\Carbon::parse($this->payment_date)->format('d/m/Y'),
-                'inclusiveTax' => false,
-                'isTaxable' => false,
-                'description' => 'Deposit Pelanggan: ' . $this->notes,
-            ];
+            if ($this->isLocalOnly) {
+                // HANYA REKAM LOKAL - Bypass API Accurate
+                $deposit->update([
+                    'accurate_invoice_no' => $this->manual_invoice_no,
+                    'accurate_receipt_no' => $this->manual_receipt_no,
+                ]);
+            } else {
+                // STEP 1: DP Invoice without SO (Via API)
+                $dpInvData = [
+                    'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
+                    'branchName' => $accurateBranchName,
+                    'dpAmount'   => (float)$paymentData['amount'],
+                    'transDate'  => \Carbon\Carbon::parse($this->payment_date)->format('d/m/Y'),
+                    'inclusiveTax' => false,
+                    'isTaxable' => false,
+                    'description' => 'Deposit Pelanggan: ' . $this->notes,
+                ];
 
-            if (!empty($paymentData['no_kontrak'])) {
-                $dpInvData['poNumber'] = $paymentData['no_kontrak'];
-            }
+                if (!empty($paymentData['no_kontrak'])) {
+                    $dpInvData['poNumber'] = $paymentData['no_kontrak'];
+                }
 
-            $dpInvResult = $accurateService->postDownPaymentInvoice($dpInvData, $dbSource);
+                $dpInvResult = $accurateService->postDownPaymentInvoice($dpInvData, $dbSource);
 
-            if (!isset($dpInvResult['r']['number'])) {
-                throw new \Exception('Gagal mendapatkan nomor Faktur Uang Muka dari Accurate.');
-            }
+                if (!isset($dpInvResult['r']['number'])) {
+                    throw new \Exception('Gagal mendapatkan nomor Faktur Uang Muka dari Accurate.');
+                }
 
-            $dpInvoiceNo = $dpInvResult['r']['number'];
-            $deposit->update(['accurate_invoice_no' => $dpInvoiceNo]);
+                $dpInvoiceNo = $dpInvResult['r']['number'];
+                $deposit->update(['accurate_invoice_no' => $dpInvoiceNo]);
 
-            // STEP 2: Sales Receipt
-            $srData = [
-                'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
-                'branchName' => $accurateBranchName,
-                'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
-                'transDate' => \Carbon\Carbon::parse($this->payment_date)->format('d/m/Y'),
-                'receiptAmount' => (float)$netReceiptAmount,
-                'chequeAmount' => (float)$netReceiptAmount,
-                'description' => 'Penerimaan Deposit: ' . $this->notes,
-                'detailInvoice' => [
-                    [
-                        'invoiceNo' => $dpInvoiceNo,
-                        'paymentAmount' => (float)$paymentData['amount'],
+                // STEP 2: Sales Receipt
+                $srData = [
+                    'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
+                    'branchName' => $accurateBranchName,
+                    'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
+                    'transDate' => \Carbon\Carbon::parse($this->payment_date)->format('d/m/Y'),
+                    'receiptAmount' => (float)$netReceiptAmount,
+                    'chequeAmount' => (float)$netReceiptAmount,
+                    'description' => 'Penerimaan Deposit: ' . $this->notes,
+                    'detailInvoice' => [
+                        [
+                            'invoiceNo' => $dpInvoiceNo,
+                            'paymentAmount' => (float)$paymentData['amount'],
+                        ]
                     ]
-                ]
-            ];
+                ];
 
-            if (!empty($detailDiscounts)) {
-                $srData['detailInvoice'][0]['detailDiscount'] = $detailDiscounts;
-            }
+                if (!empty($detailDiscounts)) {
+                    $srData['detailInvoice'][0]['detailDiscount'] = $detailDiscounts;
+                }
 
-            $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+                $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
 
-            if (isset($srResult['r']['number'])) {
-                $deposit->update(['accurate_receipt_no' => $srResult['r']['number']]);
+                if (isset($srResult['r']['number'])) {
+                    $deposit->update(['accurate_receipt_no' => $srResult['r']['number']]);
+                }
             }
 
             DB::commit();

@@ -260,17 +260,39 @@
                                             </div>
                                         </div>
 
-                                        {{-- <div class="mt-4">
-                                            <label class="block text-sm font-bold text-gray-700 mb-2">Catatan
-                                                Tambahan</label>
-                                            <textarea wire:model="notes" rows="2"
-                                                class="block w-full pl-4 pr-4 py-3 text-sm font-medium bg-gray-50 border-2 border-gray-200 rounded-2xl focus:ring-0 focus:border-[#1c69d4] focus:bg-white transition-all placeholder-gray-400"
-                                                placeholder="Keterangan deposit (Opsional)"></textarea>
-                                            @error('notes')
-                                                <span
-                                                    class="text-red-500 text-xs mt-1 font-medium">{{ $message }}</span>
-                                            @enderror
-                                        </div> --}}
+                                        <div class="mt-4 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+                                            <label class="flex items-center space-x-3 cursor-pointer">
+                                                <input type="checkbox" wire:model.live="isLocalOnly"
+                                                    class="form-checkbox h-5 w-5 text-yellow-600 border-yellow-300 rounded focus:ring-yellow-500">
+                                                <span class="text-sm font-bold text-yellow-800">
+                                                    Hanya Rekam Lokal (Sudah Ada di Accurate)
+                                                </span>
+                                            </label>
+                                            <p class="mt-1 ml-8 text-xs text-yellow-700">
+                                                Centang jika Uang Muka sudah diinput secara manual oleh Tim Finance di Accurate.
+                                            </p>
+                                            
+                                            @if($isLocalOnly)
+                                                <div class="mt-4 ml-8 space-y-3">
+                                                    <div>
+                                                        <label class="block text-xs font-bold text-gray-700 mb-1">No. Faktur Accurate <span class="text-red-500">*</span></label>
+                                                        <input type="text" wire:model="manual_invoice_no" placeholder="Contoh: SI.2024.123"
+                                                            class="block w-full pl-3 pr-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:ring-yellow-500 focus:border-yellow-500">
+                                                        @error('manual_invoice_no')
+                                                            <span class="text-red-500 text-xs mt-1 font-medium">{{ $message }}</span>
+                                                        @enderror
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-xs font-bold text-gray-700 mb-1">No. Penerimaan Accurate <span class="text-red-500">*</span></label>
+                                                        <input type="text" wire:model="manual_receipt_no" placeholder="Contoh: CR.2024.456"
+                                                            class="block w-full pl-3 pr-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:ring-yellow-500 focus:border-yellow-500">
+                                                        @error('manual_receipt_no')
+                                                            <span class="text-red-500 text-xs mt-1 font-medium">{{ $message }}</span>
+                                                        @enderror
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        </div>
                                     </div>
                                     <div class="space-y-5">
                                         @include('livewire.zoffline.pos.partials.wizard.step4-payment', [
