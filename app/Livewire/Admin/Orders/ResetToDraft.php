@@ -26,6 +26,8 @@ class ResetToDraft extends Component
     public $filterCashier = '';
     public $filterStartDate = '';
     public $filterEndDate = '';
+    public $filterSyncStatus = '';
+    public $filterPaymentMethod = '';
 
     // Direct cancellation modal
     public $showDirectCancelModal = false;
@@ -59,6 +61,16 @@ class ResetToDraft extends Component
         $this->resetPage();
     }
 
+    public function updatedFilterSyncStatus()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterPaymentMethod()
+    {
+        $this->resetPage();
+    }
+
     public function updatedFilterStartDate()
     {
         $this->resetPage();
@@ -77,7 +89,7 @@ class ResetToDraft extends Component
 
     public function clearFilters()
     {
-        $this->reset(['search', 'filterBranch', 'filterCashier', 'filterStartDate', 'filterEndDate']);
+        $this->reset(['search', 'filterBranch', 'filterCashier', 'filterStartDate', 'filterEndDate', 'filterSyncStatus', 'filterPaymentMethod']);
         $this->resetPage();
     }
 
@@ -537,6 +549,15 @@ class ResetToDraft extends Component
                 ->when($this->filterEndDate, function ($query) {
                     $query->whereDate('created_at', '<=', $this->filterEndDate);
                 })
+                ->when($this->filterSyncStatus === 'unsynced', function ($query) {
+                    $query->whereNull('accurate_invoice_no')
+                          ->whereNull('accurate_receipt_no');
+                })
+                ->when($this->filterPaymentMethod, function ($query) {
+                    $query->whereHas('payments', function ($q) {
+                        $q->where('payment_method_id', $this->filterPaymentMethod);
+                    });
+                })
                 ->orderBy('created_at', 'desc')
                 ->paginate(15);
         } else {
@@ -582,11 +603,14 @@ class ResetToDraft extends Component
                 ->paginate(15);
         }
 
+        $paymentMethods = \App\Models\PaymentMethod::where('is_active', true)->orderBy('name')->get();
+
         return view('livewire.admin.orders.reset-to-draft', [
             'orders' => $orders,
             'logs' => $logs,
             'branches' => $branches,
             'cashiers' => $cashiers,
+            'paymentMethods' => $paymentMethods,
         ]);
     }
 }

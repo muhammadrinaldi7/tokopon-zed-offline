@@ -70,6 +70,22 @@
                 @endforeach
             </select>
         </div>
+        <div class="w-full md:w-44 shrink-0">
+            <select wire:model.live="filterSyncStatus"
+                class="w-full px-3 py-2.5 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-amber-500/20 focus:border-amber-500">
+                <option value="">Semua Status Sync</option>
+                <option value="unsynced">Belum Sinkron Accurate</option>
+            </select>
+        </div>
+        <div class="w-full md:w-44 shrink-0">
+            <select wire:model.live="filterPaymentMethod"
+                class="w-full px-3 py-2.5 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-amber-500/20 focus:border-amber-500">
+                <option value="">Semua Metode Bayar</option>
+                @foreach ($paymentMethods as $pm)
+                    <option value="{{ $pm->id }}">{{ $pm->name }}</option>
+                @endforeach
+            </select>
+        </div>
         <div class="w-full md:w-36 shrink-0">
             <input type="date" wire:model.live="filterStartDate"
                 class="w-full px-3 py-2.5 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-amber-500/20 focus:border-amber-500"
@@ -80,7 +96,7 @@
                 class="w-full px-3 py-2.5 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-amber-500/20 focus:border-amber-500"
                 title="Tanggal Akhir">
         </div>
-        @if ($search || $filterBranch || $filterCashier || $filterStartDate || $filterEndDate)
+        @if ($search || $filterBranch || $filterCashier || $filterStartDate || $filterEndDate || $filterSyncStatus || $filterPaymentMethod)
             <button wire:click="clearFilters"
                 class="px-4 py-2.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium whitespace-nowrap">
                 Reset Filter
