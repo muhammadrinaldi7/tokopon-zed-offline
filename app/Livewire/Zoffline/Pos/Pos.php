@@ -316,6 +316,15 @@ class Pos extends Component
                 $promoDiscounts[$promo->id] = ($promoDiscounts[$promo->id] ?? 0) + $promo->pivot->discount_amount;
             }
 
+            $projectNo = '';
+            if ($variant instanceof \App\Models\ProductAccurate) {
+                $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                    'SJU' => 'P.00003',
+                    'SAB' => 'P.00004',
+                    default => $variant->proyek ?? ''
+                };
+            }
+
             $this->cart[] = [
                 'variant_id' => $item->product_variant_id,
                 'variant_type' => $item->product_variant_type,
@@ -334,6 +343,7 @@ class Pos extends Component
                 'database_source' => $variant->database_source ?? 'syihab',
                 'promo_discounts' => $promoDiscounts,
                 'item_id' => $item->id, // Important for updating SN later
+                'project_number' => $projectNo,
             ];
         }
 
@@ -457,6 +467,15 @@ class Pos extends Component
                 $promoDiscounts[$promo->id] = ($promoDiscounts[$promo->id] ?? 0) + $promo->pivot->discount_amount;
             }
 
+            $projectNo = '';
+            if ($variant instanceof \App\Models\ProductAccurate) {
+                $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                    'SJU' => 'P.00003',
+                    'SAB' => 'P.00004',
+                    default => $variant->proyek ?? ''
+                };
+            }
+
             $this->cart[] = [
                 'variant_id' => $item->product_variant_id,
                 'variant_type' => $item->product_variant_type,
@@ -474,6 +493,7 @@ class Pos extends Component
                 'has_sn' => (bool) ($variant->has_sn ?? true),
                 'database_source' => $variant->database_source ?? 'syihab',
                 'promo_discounts' => $promoDiscounts,
+                'project_number' => $projectNo,
             ];
         }
 
@@ -537,6 +557,15 @@ class Pos extends Component
                 $promoDiscounts[$promo->id] = ($promoDiscounts[$promo->id] ?? 0) + $promo->pivot->discount_amount;
             }
 
+            $projectNo = '';
+            if ($variant instanceof \App\Models\ProductAccurate) {
+                $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                    'SJU' => 'P.00003',
+                    'SAB' => 'P.00004',
+                    default => $variant->proyek ?? ''
+                };
+            }
+
             $this->cart[] = [
                 'variant_id' => $item->product_variant_id,
                 'variant_type' => $item->product_variant_type,
@@ -554,6 +583,7 @@ class Pos extends Component
                 'has_sn' => (bool) ($variant->has_sn ?? true),
                 'database_source' => $variant->database_source ?? 'syihab',
                 'promo_discounts' => $promoDiscounts,
+                'project_number' => $projectNo,
             ];
         }
 
