@@ -216,6 +216,15 @@ class SwapItemModal extends Component
                 $itemNo = $variant->accurate_item_no ?? $variant->sku ?? $variant->item_no;
             }
 
+            $projectNo = '';
+            if ($variant instanceof \App\Models\ProductAccurate) {
+                $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                    'SJU' => 'P.00003',
+                    'SAB' => 'P.00004',
+                    default => $variant->proyek ?? ''
+                };
+            }
+
             $dItem = [
                 'itemNo' => $itemNo,
                 'unitPrice' => (float)$item->price_at_checkout,
@@ -223,6 +232,10 @@ class SwapItemModal extends Component
                 'detailName' => $item->product_name ?? ($variant->name ?? 'Unknown'),
                 'itemCashDiscount' => (float)($item->discount_amount + $item->promo_discount_amount),
             ];
+            
+            if (!empty($projectNo)) {
+                $dItem['projectNo'] = $projectNo;
+            }
 
             // 2A. Tambahkan Serial Number (jika ada)
             if (!empty($item->serial_number)) {

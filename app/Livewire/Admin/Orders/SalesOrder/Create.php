@@ -610,6 +610,12 @@ class Create extends Component
                     $variant = \App\Models\ProductAccurate::find($item['variant_id']);
                     $itemName = $variant->name ?? 'Unknown';
 
+                    $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                        'SJU' => 'P.00003',
+                        'SAB' => 'P.00004',
+                        default => $variant->proyek ?? ''
+                    };
+
                     $detailData = [
                         'itemNo' => $variant->item_no ?? 'ITEM-UNKNOWN',
                         'unitPrice' => (float)$item['unit_price'],
@@ -617,6 +623,7 @@ class Create extends Component
                         'detailName' => $itemName,
                         'useTax1'   => false,
                         'itemCashDiscount' => (float)$item['discount'],
+                        'projectNo' => $projectNo
                     ];
 
                     // Map sales_ids to Accurate employee numbers

@@ -290,6 +290,12 @@ class ImportDraft extends Component
                     $detailSN[] = ['serialNumberNo' => '-', 'quantity' => 1];
                 }
 
+                $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                    'SJU' => 'P.00003',
+                    'SAB' => 'P.00004',
+                    default => $variant->proyek ?? ''
+                };
+
                 $accurateDetailItems[] = [
                     'itemNo' => $itemData['sku'],
                     'warehouseName' => $warehouseName,
@@ -297,6 +303,7 @@ class ImportDraft extends Component
                     'quantity' => $itemData['qty'],
                     'itemCashDiscount' => $itemData['discount'],
                     'detailSerialNumber' => $detailSN, // SN is included in SO for draft imported via Excel
+                    'projectNo' => $projectNo
                 ];
             }
 
