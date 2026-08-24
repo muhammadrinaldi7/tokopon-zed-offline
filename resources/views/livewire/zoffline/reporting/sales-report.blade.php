@@ -5,7 +5,7 @@
             <p class="text-sm text-gray-500 mt-1">Rekapitulasi transaksi dan performa penjualan per vendor untuk seluruh cabang</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 w-full">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3 w-full">
             {{-- Separator CSV --}}
             <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center justify-between">
                 <span class="text-xs text-gray-500 mr-2 font-medium">Separator:</span>
@@ -122,6 +122,17 @@
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {{-- Filter Proyek --}}
+            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
+                <select wire:model.live="proyekFilter"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 cursor-pointer w-full truncate">
+                    <option value="">Semua Proyek</option>
+                    @foreach ($availableProjects as $proyek)
+                        <option value="{{ $proyek }}">{{ $proyek }}</option>
+                    @endforeach
+                </select>
             </div>
 
             {{-- Filter Rentang Tanggal (Default: Bulan Ini) --}}
@@ -293,6 +304,7 @@
                             <th class="px-5 py-4 font-bold">Tanggal & Nota</th>
                             <th class="px-5 py-4 font-bold">Pelanggan & Sales</th>
                             <th class="px-5 py-4 font-bold">Cabang</th>
+                            <th class="px-5 py-4 font-bold">Proyek</th>
                             <th class="px-5 py-4 font-bold">Pembayaran</th>
                             <th class="px-5 py-4 font-bold text-right">Gross</th>
                             <th class="px-5 py-4 font-bold text-right">Potongan</th>
@@ -332,6 +344,16 @@
                                 <td class="px-5 py-3">
                                     <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-[11px] font-medium">
                                         {{ $order->shipping_address_snapshot['store'] ?? 'Unknown' }}
+                                    </span>
+                                </td>
+                                <td class="px-5 py-3">
+                                    @php
+                                        $projects = collect($order->items)->map(function ($item) {
+                                            return $item->variant?->proyek;
+                                        })->filter()->unique()->implode(', ');
+                                    @endphp
+                                    <span class="text-[11px] font-medium text-gray-700">
+                                        {{ empty($projects) ? '-' : $projects }}
                                     </span>
                                 </td>
                                 <td class="px-5 py-3 text-xs font-medium text-gray-700">

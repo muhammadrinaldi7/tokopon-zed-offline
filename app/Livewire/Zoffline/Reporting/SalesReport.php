@@ -22,6 +22,7 @@ class SalesReport extends Component
     public $search = '';
     public $branchFilter = '';
     public $vendorFilter = '';
+    public $proyekFilter = '';
     public $csvSeparator = ';';
 
     public function mount()
@@ -35,6 +36,11 @@ class SalesReport extends Component
     }
 
     public function updatedVendorFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedProyekFilter()
     {
         $this->resetPage();
     }
@@ -149,6 +155,13 @@ class SalesReport extends Component
                         });
                     }
                 }
+            })
+            ->when($this->proyekFilter, function ($query) {
+                $query->whereHas('items', function ($iq) {
+                    $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) {
+                        $vq->where('proyek', $this->proyekFilter);
+                    });
+                });
             })
             ->where('orders.business_unit_id', Auth::user()->getActiveBusinessUnitId())
             ->latest('orders.order_date');
@@ -284,6 +297,7 @@ class SalesReport extends Component
                     $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
                     $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];
                     $penjualanBersih = round($actualItemSubtotal / 1.11);
+                    $proyek = $variant?->proyek ?? '-';
 
                     $rowData = [
                         $order->order_date ? $order->order_date->format('Y-m-d') : $order->created_at->format('Y-m-d'),
@@ -295,6 +309,7 @@ class SalesReport extends Component
                         $order->user ? $order->user->name : 'Walk-in',
                         $order->user && $order->user->profile ? ($order->user->profile->phone_number ?? '-') : '-',
                         $branch,
+                        $proyek,
                         $sku,
                         $name,
                         $merk,
@@ -793,6 +808,13 @@ class SalesReport extends Component
             ->unique()
             ->values();
 
+        $availableProjects = \App\Models\ProductAccurate::whereNotNull('proyek')
+            ->where('proyek', '!=', '')
+            ->orderBy('proyek')
+            ->pluck('proyek')
+            ->unique()
+            ->values();
+
         $totalGross = $this->ordersQuery->sum('total_amount');
         $netQuery = clone $this->ordersQuery;
         $totalNet = $netQuery->get()->sum(function ($order) {
@@ -804,6 +826,7 @@ class SalesReport extends Component
             'vendorSummary' => $this->vendorSummary,
             'availableBranches' => $availableBranches,
             'availableVendors' => $availableVendors,
+            'availableProjects' => $availableProjects,
             'summary' => [
                 'count' => $orders->total(),
                 'gross' => $totalGross,

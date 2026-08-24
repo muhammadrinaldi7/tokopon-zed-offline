@@ -35,6 +35,7 @@ class SalesReportExport implements FromArray, WithHeadings, ShouldAutoSize, With
             'PELANGGAN',
             'TELEPON',
             'CABANG',
+            'PROYEK',
             'SKU',
             'NAMA PRODUK',
             'MERK PRODUK',
