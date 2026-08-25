@@ -296,11 +296,11 @@ class SalesReport extends Component
 
                     $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
                     $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];
-                    $penjualanBersih = round($actualItemSubtotal / 1.11);
+                    $penjualanBersih = round($actualItemSubtotal);
                     $proyek = $variant?->proyek ?? '-';
 
                     $rowData = [
-                        $order->order_date ? $order->order_date->format('Y-m-d') : $order->created_at->format('Y-m-d'),
+                        $order->order_date ? $order->order_date->format('d-m-Y') : $order->created_at->format('d-m-Y'),
                         $order->order_number,
                         $order->accurate_invoice_no ?? '-',
                         $order->accurate_so_number ?? '-',
@@ -315,8 +315,8 @@ class SalesReport extends Component
                         $merk,
                         $category,
                         $vendor,
-                        $variant?->color ?? '-',
-                        ($variant?->ram ? $variant->ram . ' ' : '') . ($variant?->storage ? $variant->storage : '') ?: '-',
+                        // $variant?->color ?? '-',
+                        // ($variant?->ram ? $variant->ram . ' ' : '') . ($variant?->storage ? $variant->storage : '') ?: '-',
                         $item->serial_number ?? '-',
                         str_replace(["\n", "\r", "\t"], ' ', $order->notes ?? ''),
                         $item->qty,
@@ -324,7 +324,7 @@ class SalesReport extends Component
                         $item->discount_amount ?? 0,
                         $promoNamesStr,
                         $itemPromosTotal,
-                        $actualItemSubtotal,
+                        $item->subtotal,
                         $penjualanBersih,
                     ];
 
@@ -389,8 +389,8 @@ class SalesReport extends Component
                     '-',
                     '-',
                     '-',
-                    '-',
-                    '-',
+                    // '-',
+                    // '-',
                     '-',
                     str_replace(["\n", "\r", "\t"], ' ', $order->notes ?? ''),
                     0,
@@ -455,13 +455,14 @@ class SalesReport extends Component
                 'PELANGGAN',
                 'TELEPON',
                 'CABANG',
+                'PROYEK',
                 'SKU',
                 'NAMA PRODUK',
                 'MERK PRODUK',
                 'CATEGORY',
                 'VENDOR',
-                'WARNA',
-                'STORAGE',
+                // 'WARNA',
+                // 'STORAGE',
                 'SN (SerialNumber)',
                 'CATATAN',
                 'QTY',

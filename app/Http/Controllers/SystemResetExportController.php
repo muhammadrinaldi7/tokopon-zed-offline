@@ -10,7 +10,7 @@ class SystemResetExportController extends Controller
     public function exportSo()
     {
         $fileName = 'outstanding_so_backup_' . date('Y-m-d_His') . '.csv';
-        
+
         $headers = array(
             "Content-type"        => "text/csv",
             "Content-Disposition" => "attachment; filename=$fileName",
@@ -35,7 +35,7 @@ class SystemResetExportController extends Controller
 
         $columns = ['Order Number', 'Customer Name', 'Date', 'Item Name', 'Qty', 'Price', 'Serial Number', 'Grand Total', 'Total Paid', 'Remaining Balance'];
 
-        $callback = function() use($orders, $columns) {
+        $callback = function () use ($orders, $columns) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
 
@@ -45,7 +45,7 @@ class SystemResetExportController extends Controller
                 $remaining = $order->grand_total - $payments;
 
                 // Get items
-                $items = DB::table('order_items')->where('order_id', $order->id)->get();
+                $items = \App\Models\OrderItem::with('variant')->where('order_id', $order->id)->get();
 
                 if ($items->isEmpty()) {
                     fputcsv($file, [
@@ -62,28 +62,44 @@ class SystemResetExportController extends Controller
                     ]);
                 } else {
                     foreach ($items as $index => $item) {
+                        $sku = '-';
+                        if ($item->variant) {
+                            if (get_class($item->variant) === \App\Models\ProductAccurate::class) {
+                                $sku = $item->variant->item_no;
+                            } else {
+                                $sku = $item->variant->accurateData->item_no ?? ($item->variant->item_no ?? '-');
+                            }
+                        }
+                        $name = $item->variant->name ?? '-';
+                        $price = $item->price_at_checkout;
+                        $sn = $item->serial_number ?? '-';
+
                         // First row for the order includes the totals, subsequent rows for items just show item info
                         if ($index === 0) {
                             fputcsv($file, [
                                 $order->order_number,
                                 $order->customer_name,
                                 $order->created_at,
-                                $item->product_name ?? '-',
-                                $item->qty ?? 0,
-                                $item->price_at_checkout ?? 0,
-                                $item->serial_number ?? '-',
+                                $sku . ' - ' . $name,
+                                $item->qty,
+                                $price,
+                                $sn,
                                 $order->grand_total,
                                 $payments,
                                 $remaining
                             ]);
                         } else {
                             fputcsv($file, [
-                                '', '', '', // Empty for Order Number, Customer, Date
-                                $item->product_name ?? '-',
-                                $item->qty ?? 0,
-                                $item->price_at_checkout ?? 0,
-                                $item->serial_number ?? '-',
-                                '', '', ''  // Empty for totals
+                                '',
+                                '',
+                                '', // Empty for Order Number, Customer, Date
+                                $sku . ' - ' . $name,
+                                $item->qty,
+                                $price,
+                                $sn,
+                                '',
+                                '',
+                                ''  // Empty for totals
                             ]);
                         }
                     }
