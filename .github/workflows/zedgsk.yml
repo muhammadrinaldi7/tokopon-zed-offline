@@ -1,0 +1,135 @@
+name: Deploy Laravel to Stagging Server
+
+on:
+  push:
+    branches:
+      - zedposgsk
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer Dependencies (with dev)
+        run: composer install --no-interaction --optimize-autoloader
+
+      - name: Copy .env.example to .env
+        run: cp .env.example .env
+
+      - name: Generate APP_KEY
+        run: php artisan key:generate
+
+    #   - name: Run PHPUnit tests
+    #     run: vendor/bin/phpunit
+  deploy_gsk:
+    needs: test # Menunggu deploy staging web hosting selesai
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚚 Mengambil kode terbaru dari GitHub
+        uses: actions/checkout@v4
+
+      # (Opsional) Tambahkan proses build di sini jika diperlukan
+      # Contoh: npm install && npm run build
+      # 2. Setup PHP
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+
+      # 2.5 Cache Composer Dependencies
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      # 3. Install Laravel Dependencies
+      - name: Install Composer Dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      # 3.5 Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+
+      # 3.6 Cache NPM dependencies
+      - name: Cache NPM dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+
+      # 3.7 Install Node dependencies
+      - name: Install Node dependencies
+        run: npm install
+
+      # 3.8 Build assets for production
+      - name: Build assets
+        run: npm run build
+
+      # 4. ZIP File sebelum di-transfer (PENTING untuk Laravel)
+      # Mengecualikan folder node_modules dan .git karena tidak dibutuhkan di server production
+      - name: Compress files
+        run: zip -q -r deploy.zip . -x "node_modules/*" ".git/*" "tests/*"
+
+      - name: 📂 Mentransfer file ke CloudPanel (via SCP)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME_GSK }}
+          key: ${{ secrets.VPS_SSH_KEY_GSK }}
+          port: ${{ secrets.VPS_PORT }}
+          # Path sumber (semua file di repository)
+          source: "deploy.zip"
+          # Path tujuan di CloudPanel (SESUAIKAN DENGAN NAMA DOMAINMU!)
+          target: "/home/${{ secrets.VPS_USERNAME_GSK }}/htdocs/zedposgsk.zedgroup.tech/"
+          # Mencegah folder root tambahan ikut ter-copy
+
+      - name: ⚙️ Menjalankan perintah post-deploy di server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME_GSK }}
+          key: ${{ secrets.VPS_SSH_KEY_GSK }}
+          port: ${{ secrets.VPS_PORT }}
+          # Jalankan perintah tambahan (misal restart layanan atau clear cache)
+          script: |
+
+            #Jaga-jaga jika folder terhapus, perintah ini akan otomatis membuat foldernya kembali
+            mkdir -p /home/${{ secrets.VPS_USERNAME_GSK }}/htdocs/zedposgsk.zedgroup.tech/
+            
+            # Pindah ke folder project
+           
+            cd /home/${{ secrets.VPS_USERNAME_GSK }}/htdocs/zedposgsk.zedgroup.tech/
+            unzip -q -o deploy.zip
+            rm deploy.zip
+            
+            # Hubungkan folder storage
+            # php artisan storage:link
+            
+            # Bersihkan cache lama (termasuk view dari Livewire SFC jika ada pembaruan)
+            php artisan optimize:clear
+            
+            # Buat cache baru untuk production
+            php artisan config:cache
+            php artisan event:cache
+            php artisan route:cache
+            php artisan view:cache
