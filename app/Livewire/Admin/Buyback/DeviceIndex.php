@@ -125,7 +125,6 @@ class DeviceIndex extends Component
 
         if ($this->syncTargetBuId) {
             $query->where('business_unit_id', $this->syncTargetBuId);
-            $query->where('categoryName', 'HP SECOND');
         }
 
         if (!empty($this->syncKeyword)) {
@@ -332,9 +331,9 @@ class DeviceIndex extends Component
 
         if (!empty($this->search)) {
             $query->where('model_name', 'like', '%' . $this->search . '%')
-                  ->orWhere('ram', 'like', '%' . $this->search . '%')
-                  ->orWhere('storage', 'like', '%' . $this->search . '%')
-                  ->orWhere('color', 'like', '%' . $this->search . '%');
+                ->orWhere('ram', 'like', '%' . $this->search . '%')
+                ->orWhere('storage', 'like', '%' . $this->search . '%')
+                ->orWhere('color', 'like', '%' . $this->search . '%');
         }
 
         if (!empty($this->filterBrand)) {
