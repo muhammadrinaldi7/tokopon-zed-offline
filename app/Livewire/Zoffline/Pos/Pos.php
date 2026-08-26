@@ -139,13 +139,13 @@ class Pos extends Component
                 ->where('status', 'AVAILABLE')
                 ->where('balance', '>', 0)
                 ->where('business_unit_id', \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId())
-                ->where(function($q) use ($orderId) {
+                ->where(function ($q) use ($orderId) {
                     $q->whereNull('origin_order_id')
-                      ->orWhere('origin_order_id', '!=', $orderId);
+                        ->orWhere('origin_order_id', '!=', $orderId);
                 })
                 ->get()
                 ->toArray();
-            
+
             $this->availableCustomerDepositTotal = collect($this->availableCustomerDeposits)->sum('balance');
             if ($this->availableCustomerDepositTotal <= 0) {
                 $this->useCustomerDeposit = false;
@@ -262,12 +262,12 @@ class Pos extends Component
 
         if (!empty($this->searchSoKeyword)) {
             $keyword = $this->searchSoKeyword;
-            $query->where(function($q) use ($keyword) {
+            $query->where(function ($q) use ($keyword) {
                 $q->where('order_number', 'like', '%' . $keyword . '%')
-                  ->orWhere('accurate_so_number', 'like', '%' . $keyword . '%')
-                  ->orWhereHas('user', function($q2) use ($keyword) {
-                      $q2->where('name', 'like', '%' . $keyword . '%');
-                  });
+                    ->orWhere('accurate_so_number', 'like', '%' . $keyword . '%')
+                    ->orWhereHas('user', function ($q2) use ($keyword) {
+                        $q2->where('name', 'like', '%' . $keyword . '%');
+                    });
             });
         }
 
@@ -318,9 +318,10 @@ class Pos extends Component
 
             $projectNo = '';
             if ($variant instanceof \App\Models\ProductAccurate) {
-                $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                $projectNo = match (trim(strtoupper($variant->proyek ?? ''))) {
                     'SJU' => 'P.00003',
                     'SAB' => 'P.00004',
+                    'RESMI' => 'P.00008',
                     default => $variant->proyek ?? ''
                 };
             }
@@ -469,9 +470,10 @@ class Pos extends Component
 
             $projectNo = '';
             if ($variant instanceof \App\Models\ProductAccurate) {
-                $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                $projectNo = match (trim(strtoupper($variant->proyek ?? ''))) {
                     'SJU' => 'P.00003',
                     'SAB' => 'P.00004',
+                    'RESMI' => 'P.00008',
                     default => $variant->proyek ?? ''
                 };
             }
@@ -559,9 +561,10 @@ class Pos extends Component
 
             $projectNo = '';
             if ($variant instanceof \App\Models\ProductAccurate) {
-                $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                $projectNo = match (trim(strtoupper($variant->proyek ?? ''))) {
                     'SJU' => 'P.00003',
                     'SAB' => 'P.00004',
+                    'RESMI' => 'P.00008',
                     default => $variant->proyek ?? ''
                 };
             }

@@ -228,6 +228,11 @@ class ApprovalController extends Controller
             ]);
 
             $approval->update(['status' => 'REJECTED']);
+            try {
+                $approval->executeRejectedAction();
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Failed to execute rejected action via Telegram for Request ID {$approval->id}: " . $e->getMessage());
+            }
             $pesan = "❌ Pengajuan telah DITOLAK.";
             $teksGrup = "❌ *APPROVAL DITOLAK*\nPengajuan {$approval->request_type} (ID: {$approval->id}) telah DITOLAK oleh {$user->name}.";
             self::sendGroupNotification($teksGrup);

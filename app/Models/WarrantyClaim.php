@@ -79,6 +79,11 @@ class WarrantyClaim extends Model
                 'bg' => 'bg-purple-100 text-purple-700',
                 'dot' => 'bg-purple-500'
             ],
+            'waiting_payment' => [
+                'label' => 'Menunggu Pelunasan',
+                'bg' => 'bg-yellow-100 text-yellow-700',
+                'dot' => 'bg-yellow-500'
+            ],
             'waiting_refund' => [
                 'label' => 'Menunggu Refund',
                 'bg' => 'bg-orange-100 text-orange-700',

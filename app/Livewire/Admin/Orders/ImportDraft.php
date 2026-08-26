@@ -290,9 +290,10 @@ class ImportDraft extends Component
                     $detailSN[] = ['serialNumberNo' => '-', 'quantity' => 1];
                 }
 
-                $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                $projectNo = match (trim(strtoupper($variant->proyek ?? ''))) {
                     'SJU' => 'P.00003',
                     'SAB' => 'P.00004',
+                    'RESMI' => 'P.00008',
                     default => $variant->proyek ?? ''
                 };
 

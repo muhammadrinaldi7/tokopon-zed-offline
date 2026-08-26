@@ -223,11 +223,20 @@ class ClaimManagement extends Component
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
             // 1. Update Database Lokal (Tahap 1: Validasi DB & Status Claim)
-            $claim->status = $priceDifference < 0 ? 'waiting_refund' : 'completed'; // Jika downgrade, tunggu kasir proses refund
             if ($priceDifference < 0) {
+                $claim->status = 'waiting_refund'; // Downgrade: tunggu kasir proses refund
                 $claim->refund_amount = abs($priceDifference);
+            } elseif ($priceDifference > 0) {
+                $claim->status = 'waiting_payment'; // Upgrade: tunggu Finance konfirmasi pelunasan
+                $claim->refund_amount = null;
+            } else {
+                $claim->status = 'completed'; // 1:1 sama persis
+                $claim->refund_amount = null;
             }
-            $claim->resolved_at = Carbon::now();
+
+            if ($claim->status === 'completed') {
+                $claim->resolved_at = Carbon::now();
+            }
             $claim->resolution = 'replaced';
             $noteType = $this->replacement_type === 'same' ? 'Ganti Unit' : ($priceDifference > 0 ? 'Upgrade Unit' : 'Downgrade Unit');
             $claim->resolution_notes = "{$noteType} ke IMEI: {$this->replacement_imei}" .
@@ -417,6 +426,26 @@ class ClaimManagement extends Component
     public function closeRefundForm()
     {
         $this->showRefundForm = false;
+    }
+
+    public function confirmPaymentReceived($claimId)
+    {
+        $claim = WarrantyClaim::findOrFail($claimId);
+        
+        if ($claim->status !== 'waiting_payment') {
+            $this->dispatch('alert', type: 'error', message: 'Status klaim tidak valid untuk pelunasan.');
+            return;
+        }
+
+        $claim->status = 'completed';
+        $claim->resolved_at = Carbon::now();
+        $claim->save();
+
+        $this->dispatch('alert', type: 'success', message: 'Pelunasan berhasil dikonfirmasi. Klaim selesai.');
+        
+        if ($this->selectedClaimId == $claimId) {
+            $this->selectedClaimObj = $claim->fresh();
+        }
     }
 
     public function openReplacementForm()

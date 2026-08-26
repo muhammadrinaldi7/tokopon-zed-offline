@@ -154,6 +154,16 @@
             @endcan --}}
         @endcanany
 
+        <a href="/admin/device-passport" wire:navigate
+            class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors {{ request()->is('admin/device-passport') ? $activeClass : $inactiveClass }} group relative">
+            <svg class="w-5 h-5 flex-shrink-0 {{ request()->is('admin/device-passport') ? $activeIconClass : $inactiveIconClass }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
+            </svg>
+            <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Device Passport</span><span
+                class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                x-show="sidebarCollapsed" style="display:none;" x-cloak>Device Passport</span>
+        </a>
+
         @can('view-catalog-menu')
             <div x-data="{ openProducts: {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? 'true' : 'false' }} }">
                 <button @click="openProducts = !openProducts" type="button"

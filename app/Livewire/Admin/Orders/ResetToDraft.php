@@ -336,6 +336,7 @@ class ResetToDraft extends Component
                             $projectNo = match (trim(strtoupper($product->proyek ?? ''))) {
                                 'SJU' => 'P.00003',
                                 'SAB' => 'P.00004',
+                                'RESMI' => 'P.00008',
                                 default => $product->proyek ?? ''
                             };
                         }
@@ -551,7 +552,7 @@ class ResetToDraft extends Component
                 })
                 ->when($this->filterSyncStatus === 'unsynced', function ($query) {
                     $query->whereNull('accurate_invoice_no')
-                          ->whereNull('accurate_receipt_no');
+                        ->whereNull('accurate_receipt_no');
                 })
                 ->when($this->filterPaymentMethod, function ($query) {
                     $query->whereHas('payments', function ($q) {

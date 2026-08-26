@@ -38,6 +38,7 @@
                 <option value="OFFERED">Penawaran Dikirim</option>
                 <option value="WAITING_FOR_DEVICE">Menunggu Unit Dikirim</option>
                 <option value="INSPECTING">Inspeksi Fisik</option>
+                <option value="PENDING_APPROVAL">Menunggu Approval</option>
                 <option value="PAYING">Menunggu Pencairan</option>
                 <option value="COMPLETED">Selesai</option>
                 <option value="CANCELLED">Dibatalkan</option>
@@ -115,6 +116,7 @@
                                         'OFFERED' => 'bg-sky-100 text-sky-800 border-sky-200',
                                         'WAITING_FOR_DEVICE' => 'bg-purple-100 text-purple-800 border-purple-200',
                                         'INSPECTING' => 'bg-indigo-100 text-indigo-800 border-indigo-200',
+                                        'PENDING_APPROVAL' => 'bg-yellow-100 text-yellow-800 border-yellow-200',
                                         'PAYING' => 'bg-teal-100 text-teal-800 border-teal-200',
                                         'COMPLETED' => 'bg-emerald-100 text-emerald-800 border-emerald-200',
                                         'CANCELLED' => 'bg-rose-100 text-rose-800 border-rose-200',

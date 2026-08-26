@@ -69,35 +69,49 @@ class WarrantyActivation extends Component
 
         $items = OrderItem::with(['order.user', 'order.businessUnit', 'variant'])
             ->where('serial_number', 'LIKE', '%' . $this->searchQuery . '%')
+            ->orderByDesc('id') // Prioritaskan transaksi terbaru
             ->get();
 
         $search = strtolower(trim($this->searchQuery));
+        
+        // Cari OrderItem yang BELUM punya inspeksi (prioritas utama)
         $item = $items->first(function ($i) use ($search) {
             $sns = array_map(function($s) {
                 return strtolower(trim($s));
             }, explode(',', $i->serial_number));
-            return in_array($search, $sns);
+            
+            if (!in_array($search, $sns)) {
+                return false;
+            }
+
+            // Cek apakah OrderItem ini BELUM diinspeksi
+            $hasInspection = \App\Models\DeviceInspection::where('imei', $search)
+                ->where('inspectable_type', get_class($i))
+                ->where('inspectable_id', $i->id)
+                ->exists();
+                
+            return !$hasInspection; // Hanya ambil yang belum diinspeksi
         });
 
         if (!$item) {
-            $this->errorMessage = 'Barang dengan Serial Number tersebut tidak ditemukan di sistem.';
+            // Fallback: jika semua sudah diinspeksi, tampilkan pesan yang informatif
+            $anyMatch = $items->first(function ($i) use ($search) {
+                $sns = array_map(function($s) {
+                    return strtolower(trim($s));
+                }, explode(',', $i->serial_number));
+                return in_array($search, $sns);
+            });
+            
+            if ($anyMatch) {
+                $this->errorMessage = 'Semua transaksi untuk IMEI ini sudah pernah diaktivasi garansinya (Sudah ada Inspeksi).';
+            } else {
+                $this->errorMessage = 'Barang dengan Serial Number tersebut tidak ditemukan di sistem.';
+            }
             return;
         }
 
         if ($item->order->business_unit_id != $activeUnitId) {
             $this->errorMessage = 'Barang ini dibeli dari cabang lain. Anda hanya dapat melakukan aktivasi garansi untuk transaksi dari cabang Anda.';
-            return;
-        }
-
-        // Pastikan pengecekan inspeksi hanya untuk transaksi (OrderItem) ini saja,
-        // karena HP bekas mungkin sudah punya riwayat inspeksi buyback sebelumnya.
-        $hasInspection = \App\Models\DeviceInspection::where('imei', $this->searchQuery)
-            ->where('inspectable_type', get_class($item))
-            ->where('inspectable_id', $item->id)
-            ->exists();
-            
-        if ($hasInspection) {
-            $this->errorMessage = 'Barang pada transaksi ini sudah pernah diinspeksi (Aktivasi Garansi Selesai).';
             return;
         }
 

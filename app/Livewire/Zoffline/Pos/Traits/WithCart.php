@@ -365,9 +365,10 @@ trait WithCart
                 'database_source' => $productAccurate->database_source,
                 'brand_id' => null, // Accurate doesn't map brand directly this way
                 // 'condition' => '',
-                'project_number' => match(trim(strtoupper($productAccurate->proyek ?? ''))) {
+                'project_number' => match (trim(strtoupper($productAccurate->proyek ?? ''))) {
                     'SJU' => 'P.00003',
                     'SAB' => 'P.00004',
+                    'RESMI' => 'P.00008',
                     default => $productAccurate->proyek ?? ''
                 },
             ];

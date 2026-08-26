@@ -928,9 +928,24 @@
                                         </button>
                                     @endif
 
+                                    @if ($selectedClaim->status === 'waiting_payment')
+                                        <button wire:click="confirmPaymentReceived({{ $selectedClaim->id }})"
+                                            class="px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl text-sm transition-colors shadow-sm shadow-yellow-500/20 flex items-center gap-2 ring-2 ring-yellow-300 ring-offset-2 hover:ring-yellow-400">
+                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Konfirmasi Pelunasan Diterima
+                                            @if($selectedClaim->refund_amount)
+                                                (Rp {{ number_format($selectedClaim->refund_amount, 0, ',', '.') }})
+                                            @endif
+                                        </button>
+                                    @endif
+
                                     @if ($selectedClaim->status === 'waiting_refund')
                                         <button wire:click="openRefundForm"
-                                            class="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition-colors shadow-sm shadow-orange-500/20 flex items-center gap-2 animate-pulse">
+                                            class="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition-colors shadow-sm shadow-orange-500/20 flex items-center gap-2 ring-2 ring-orange-300 ring-offset-2 hover:ring-orange-400">
                                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
                                                 stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round"

@@ -265,6 +265,13 @@ class Index extends Component
         ]);
 
         $request->update(['status' => 'REJECTED']);
+        
+        try {
+            $request->executeRejectedAction();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to execute rejected action for Request ID {$request->id}: " . $e->getMessage());
+        }
+
         $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan telah ditolak.', type: 'info');
     }
 

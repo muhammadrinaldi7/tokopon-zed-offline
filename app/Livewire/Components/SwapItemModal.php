@@ -136,8 +136,8 @@ class SwapItemModal extends Component
             $oldItem->price_at_checkout = $newPrice;
             $oldItem->subtotal = $newPrice * $oldItem->qty;
             // Reset SN karena item berubah
-            $oldItem->serial_number = null; 
-            
+            $oldItem->serial_number = null;
+
             // Reset diskon karena item diganti (tidak boleh mewarisi diskon barang lama)
             $oldItem->discount_amount = 0;
             $oldItem->promo_discount_amount = 0;
@@ -154,9 +154,9 @@ class SwapItemModal extends Component
             $totalDp = $this->order->payments()->where('status', 'PAID')->sum('amount');
             if ($newGrandTotal < $totalDp) {
                 throw new \Exception(
-                    'Grand Total baru (Rp ' . number_format($newGrandTotal, 0, ',', '.') . 
-                    ') tidak boleh lebih kecil dari DP yang sudah dibayar (Rp ' . 
-                    number_format($totalDp, 0, ',', '.') . ').'
+                    'Grand Total baru (Rp ' . number_format($newGrandTotal, 0, ',', '.') .
+                        ') tidak boleh lebih kecil dari DP yang sudah dibayar (Rp ' .
+                        number_format($totalDp, 0, ',', '.') . ').'
                 );
             }
 
@@ -205,7 +205,7 @@ class SwapItemModal extends Component
         $detailItem = [];
         $hasExistingId = false;
         $localItemNos = []; // Simpan semua itemNo yang ada di SO lokal
-        
+
         foreach ($this->order->items as $item) {
             // Fetch Accurate Item No
             $variant = $item->variant;
@@ -218,9 +218,10 @@ class SwapItemModal extends Component
 
             $projectNo = '';
             if ($variant instanceof \App\Models\ProductAccurate) {
-                $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                $projectNo = match (trim(strtoupper($variant->proyek ?? ''))) {
                     'SJU' => 'P.00003',
                     'SAB' => 'P.00004',
+                    'RESMI' => 'P.00008',
                     default => $variant->proyek ?? ''
                 };
             }
@@ -232,7 +233,7 @@ class SwapItemModal extends Component
                 'detailName' => $item->product_name ?? ($variant->name ?? 'Unknown'),
                 'itemCashDiscount' => (float)($item->discount_amount + $item->promo_discount_amount),
             ];
-            
+
             if (!empty($projectNo)) {
                 $dItem['projectNo'] = $projectNo;
             }
@@ -260,7 +261,7 @@ class SwapItemModal extends Component
                     ->filter()
                     ->values()
                     ->toArray();
-                    
+
                 if (!empty($employeeNos)) {
                     $dItem['salesmanListNumber'] = $employeeNos;
                 }
@@ -285,7 +286,7 @@ class SwapItemModal extends Component
         foreach ($existingDetailItems as $exItem) {
             $exItemNo = $exItem['itemNo'] ?? ($exItem['item']['no'] ?? '');
             $exId = $exItem['id'] ?? null;
-            
+
             if ($exId && !in_array($exItemNo, $localItemNos)) {
                 $detailItem[] = [
                     'id' => $exId,

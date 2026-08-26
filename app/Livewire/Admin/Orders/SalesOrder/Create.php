@@ -177,7 +177,7 @@ class Create extends Component
             if ($field === 'qty') {
                 $item = $this->items[$index];
                 $newQty = max(1, (int)$value);
-                
+
                 $currentSns = $item['serial_numbers'] ?? [];
                 if (count($currentSns) > $newQty) {
                     // Potong SN yang berlebih
@@ -610,9 +610,10 @@ class Create extends Component
                     $variant = \App\Models\ProductAccurate::find($item['variant_id']);
                     $itemName = $variant->name ?? 'Unknown';
 
-                    $projectNo = match(trim(strtoupper($variant->proyek ?? ''))) {
+                    $projectNo = match (trim(strtoupper($variant->proyek ?? ''))) {
                         'SJU' => 'P.00003',
                         'SAB' => 'P.00004',
+                        'RESMI' => 'P.00008',
                         default => $variant->proyek ?? ''
                     };
 
@@ -633,7 +634,7 @@ class Create extends Component
                             ->filter()
                             ->values()
                             ->toArray();
-                            
+
                         if (!empty($employeeNos)) {
                             $detailData['salesmanListNumber'] = $employeeNos;
                         }
