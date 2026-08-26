@@ -47,6 +47,8 @@ class ApprovalController extends Controller
         $orderInfo = '-';
         if ($approval->approvable_type === \App\Models\Order::class && $approval->approvable) {
             $orderInfo = $approval->approvable->order_number;
+        } elseif ($approval->approvable_type === \App\Models\SellPhone::class && $approval->approvable) {
+            $orderInfo = $approval->approvable->phone_brand . ' ' . $approval->approvable->phone_model;
         }
 
         $successCount = 0;
@@ -189,6 +191,8 @@ class ApprovalController extends Controller
                     $orderInfo = '-';
                     if ($approval->approvable_type === \App\Models\Order::class && $approval->approvable) {
                         $orderInfo = $approval->approvable->order_number;
+                    } elseif ($approval->approvable_type === \App\Models\SellPhone::class && $approval->approvable) {
+                        $orderInfo = $approval->approvable->phone_brand . ' ' . $approval->approvable->phone_model;
                     }
                     $cabang = $approval->requestedBy->branch->name ?? '-';
                     $waktu = $approval->created_at->format('d M Y H:i');

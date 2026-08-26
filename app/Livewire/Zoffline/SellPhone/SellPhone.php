@@ -53,6 +53,9 @@ class SellPhone extends Component
     public $photo_belakang;
     public $photo_kiri;
     public $photo_kanan;
+    public $photo_atas;
+    public $photo_bawah;
+    public $photo_box;
     public $photo_kelengkapan;
 
     // Temporary properties for UI dropdowns
@@ -158,7 +161,7 @@ class SellPhone extends Component
 
         // Load QC Template untuk Buyback (berdasarkan brand dan kategori)
         $this->qc_template = \App\Models\QcTemplate::findForBrandAndCategory($brandId, $deviceCategory);
-        
+
         if ($this->qc_template) {
             $this->qc_max_weight_threshold = $this->qc_template->max_weight_threshold ?? 3;
 
@@ -257,14 +260,14 @@ class SellPhone extends Component
             $this->device_rules = $this->buyback_device ? $this->buyback_device->getFlatRules() : [];
             $this->selected_rules = [];
             $this->calculatePrice();
-            
+
             // Reload QC template now that we might have a specific device category
             $this->loadQcTemplate();
         } else {
             $this->buyback_device = null;
             $this->device_rules = [];
             $this->final_price = 0;
-            
+
             // Reload without specific device
             $this->loadQcTemplate();
         }
@@ -316,11 +319,11 @@ class SellPhone extends Component
 
                     // CEK DISINI: Jika key mengandung kata 'kelengkapan', maka ditambah (+)
                     // Selain itu (seperti layar/fisik), maka dikurangi (-)
-                    if (str_contains($ruleId, 'kelengkapan')) {
-                        $price += $adjustment;
-                    } else {
-                        $price -= $adjustment;
-                    }
+                    // if (str_contains($ruleId, 'kelengkapan')) {
+                    //     $price += $adjustment;
+                    // } else {
+                    $price -= $adjustment;
+                    // }
                 }
             }
         }
@@ -351,6 +354,9 @@ class SellPhone extends Component
             'photo_belakang'            => 'required|image|max:5120',
             'photo_kiri'                => 'required|image|max:5120',
             'photo_kanan'               => 'required|image|max:5120',
+            'photo_atas'                => 'required|image|max:5120',
+            'photo_bawah'               => 'required|image|max:5120',
+            'photo_box'                 => 'required|image|max:5120',
             'photo_kelengkapan'         => 'required|image|max:5120',
 
             'old_phone_additional_note' => 'nullable|string|max:1000',
@@ -404,6 +410,18 @@ class SellPhone extends Component
         'photo_kanan.required'          => 'Foto samping kanan wajib diunggah.',
         'photo_kanan.image'             => 'File foto samping kanan harus berupa gambar.',
         'photo_kanan.max'               => 'Ukuran foto samping kanan maksimal 5MB.',
+
+        'photo_atas.required'           => 'Foto tampak atas wajib diunggah.',
+        'photo_atas.image'              => 'File foto tampak atas harus berupa gambar.',
+        'photo_atas.max'                => 'Ukuran foto tampak atas maksimal 5MB.',
+
+        'photo_bawah.required'          => 'Foto tampak bawah wajib diunggah.',
+        'photo_bawah.image'             => 'File foto tampak bawah harus berupa gambar.',
+        'photo_bawah.max'               => 'Ukuran foto tampak bawah maksimal 5MB.',
+
+        'photo_box.required'            => 'Foto box wajib diunggah.',
+        'photo_box.image'               => 'File foto box harus berupa gambar.',
+        'photo_box.max'                 => 'Ukuran foto box maksimal 5MB.',
 
         'photo_kelengkapan.required'    => 'Foto kelengkapan wajib diunggah.',
         'photo_kelengkapan.image'       => 'File foto kelengkapan harus berupa gambar.',
@@ -555,6 +573,15 @@ class SellPhone extends Component
             \Illuminate\Support\Facades\Log::error('Failed to sync vendor to Accurate: ' . $e->getMessage());
         }
 
+        $finalStatus = $this->qc_verdict === 'fail' ? 'CANCELLED' : 'PAYING';
+        $requiredLevel = \App\Models\ApprovalRule::where('module', 'SELL_PHONE_APPROVAL')->max('level') ?? 0;
+        $needsApproval = false;
+        
+        if ($finalStatus === 'PAYING' && $requiredLevel > 0) {
+            $finalStatus = 'PENDING_APPROVAL';
+            $needsApproval = true;
+        }
+
         // Simpan ke Database
         $sellPhone = \App\Models\SellPhone::create([
             'user_id'           => $userIdToSave,
@@ -567,7 +594,7 @@ class SellPhone extends Component
             'minus_desc'        => $minusDesc,
             'appraised_value'   => $this->final_price,
             'is_price_adjusted' => $this->is_price_adjusted,
-            'status'            => $this->qc_verdict === 'fail' ? 'CANCELLED' : 'PAYING',
+            'status'            => $finalStatus,
             'handled_by'        => $currentUser->id,
             'business_unit_id'  => $currentUser->getActiveBusinessUnitId(),
             'branch_id'         => Auth::user()->branch_id,
@@ -596,7 +623,10 @@ class SellPhone extends Component
             'photo_belakang' => 'Tampak Belakang',
             'photo_kiri' => 'Samping Kiri',
             'photo_kanan' => 'Samping Kanan',
-            'photo_kelengkapan' => 'Kelengkapan',
+            'photo_atas' => 'Tampak Atas',
+            'photo_bawah' => 'Tampak Bawah',
+            'photo_box' => 'Box Belakang',
+            'photo_kelengkapan' => 'Kelengkapan / Box',
         ];
 
         // 2. Loop tiap slot dan upload jika filenya ada
@@ -617,7 +647,21 @@ class SellPhone extends Component
             }
         }
 
-        $this->dispatch('toast', title: 'Transaksi berhasil diproses!', message: 'Data berhasil disimpan.', type: 'success');
+        if ($needsApproval) {
+            $requestApproval = $sellPhone->approvalRequests()->create([
+                'request_type' => 'SELL_PHONE_APPROVAL',
+                'requested_by' => Auth::id(),
+                'reason' => 'Pengajuan pembelian HP: ' . $sellPhone->phone_brand . ' ' . $sellPhone->phone_model . ' (Rp ' . number_format($sellPhone->appraised_value, 0, ',', '.') . ')',
+                'status' => 'PENDING',
+                'required_level' => $requiredLevel,
+                'current_level' => 0
+            ]);
+
+            \App\Http\Controllers\ApprovalController::sendTelegramNotification($requestApproval);
+            $this->dispatch('toast', title: 'Menunggu Persetujuan', message: 'Transaksi berhasil disimpan dan sedang menunggu approval Pusat.', type: 'info');
+        } else {
+            $this->dispatch('toast', title: 'Transaksi berhasil diproses!', message: 'Data berhasil disimpan.', type: 'success');
+        }
 
         // Reset semua form input termasuk input data user FL
         $this->reset([
@@ -649,6 +693,9 @@ class SellPhone extends Component
             'photo_belakang',
             'photo_kiri',
             'photo_kanan',
+            'photo_atas',
+            'photo_bawah',
+            'photo_box',
             'photo_kelengkapan',
             'available_models',
             'available_storages',

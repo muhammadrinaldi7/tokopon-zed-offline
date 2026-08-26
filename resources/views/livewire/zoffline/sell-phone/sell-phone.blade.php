@@ -301,6 +301,9 @@
                                 'belakang' => 'Tampak Belakang',
                                 'kiri' => 'Samping Kiri',
                                 'kanan' => 'Samping Kanan',
+                                'atas' => 'Tampak Atas',
+                                'bawah' => 'Tampak Bawah',
+                                'box' => 'Box Belakang',
                                 'kelengkapan' => 'Kelengkapan / Box',
                             ];
                         @endphp

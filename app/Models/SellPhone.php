@@ -78,4 +78,9 @@ class SellPhone extends Model implements HasMedia
     {
         return $this->inspections()->where('verdict', 'pass')->exists();
     }
+
+    public function approvalRequests()
+    {
+        return $this->morphMany(ApprovalRequest::class, 'approvable');
+    }
 }

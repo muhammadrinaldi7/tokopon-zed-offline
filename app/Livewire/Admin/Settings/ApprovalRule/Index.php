@@ -17,6 +17,7 @@ class Index extends Component
         'WARRANTY_EXTENSION' => 'Perpanjangan Garansi',
         'purchase_order' => 'Persetujuan Pembelian (PO)',
         'CUSTOM_CASHBACK' => 'Persetujuan cashback (PC)',
+        'SELL_PHONE_APPROVAL' => 'Pembelian Handphone',
     ];
 
     public function mount()

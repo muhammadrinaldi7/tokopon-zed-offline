@@ -97,6 +97,20 @@ class ApprovalRequest extends Model
             return true;
         }
 
+        // Handle Sell Phone Approval
+        if ($this->approvable_type === \App\Models\SellPhone::class && $this->request_type === 'SELL_PHONE_APPROVAL') {
+            $sellPhone = $this->approvable;
+            if (!$sellPhone) {
+                throw new \Exception("SellPhone not found.");
+            }
+
+            $sellPhone->update(['status' => 'PAYING']);
+
+            $this->update(['status' => 'COMPLETED']);
+            
+            return true;
+        }
+
         throw new \Exception("Execution logic for {$this->request_type} on {$this->approvable_type} is not defined.");
     }
 }
