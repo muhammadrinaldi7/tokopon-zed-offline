@@ -651,18 +651,18 @@ class SellPhone extends Component
             $qcList = [];
             foreach ($this->qc_results as $qc) {
                 if ($qc['type'] === 'boolean') {
-                    $status = ($qc['value'] === '1' || $qc['value'] === true || $qc['value'] === 1) ? 'Normal' : 'Bermasalah';
+                    $status = ($qc['value'] === '1' || $qc['value'] === true || $qc['value'] === 1) ? '✅ Normal' : '❌ Bermasalah';
                 } else {
                     $status = $qc['value'] ? $qc['value'] : '-';
                 }
-                $qcList[] = $qc['name'] . ' (' . $status . ')';
+                $qcList[] = "- " . $qc['name'] . ': ' . $status;
             }
-            $qcListText = implode(", ", $qcList);
+            $qcListText = implode("\n", $qcList);
 
             $reasonText = 'Pembelian: ' . $sellPhone->phone_brand . ' ' . $sellPhone->phone_model . " (Rp " . number_format($sellPhone->appraised_value, 0, ',', '.') . ")\n\n" .
-                          "IMEI: " . $sellPhone->imei . "\n" .
-                          "List QC: " . $qcListText . "\n\n" .
-                          "Minus: " . $sellPhone->minus_desc;
+                          "IMEI: " . $sellPhone->imei . "\n\n" .
+                          "List QC:\n" . $qcListText . "\n\n" .
+                          "Minus:\n" . str_replace(" | ", "\n", $sellPhone->minus_desc);
 
             $requestApproval = $sellPhone->approvalRequests()->create([
                 'request_type' => 'SELL_PHONE_APPROVAL',
