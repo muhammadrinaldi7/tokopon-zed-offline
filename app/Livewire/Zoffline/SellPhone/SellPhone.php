@@ -37,8 +37,9 @@ class SellPhone extends Component
     // END KEPERLUAN DATA USER DI FL
 
     public $selected_brand_id;
+    public $selected_categoryName;
+    public $selected_proyek;
     public $selected_model_name;
-    public $buyback_device_id;
 
     // For calculation
     public $device_rules = [];
@@ -60,10 +61,11 @@ class SellPhone extends Component
     public $photo_kelengkapan;
 
     // Temporary properties for UI dropdowns
+    public $available_categories = [];
+    public $available_proyek = [];
     public $available_models = [];
-    public $available_storages = [];
-    public $buyback_device = null;
     public $brands = []; // Cache brands agar tidak query ulang di render()
+    public $base_price = 0;
 
     // QC Kelayakan (Step 2 Baru)
     public $imei = '';
@@ -76,10 +78,17 @@ class SellPhone extends Component
     public function mount()
     {
         // Cache brands sekali saja saat halaman pertama kali dimuat
-        $this->brands = \App\Models\Brand::whereIn(
-            'id',
-            \App\Models\BuybackDevice::where('is_active', true)->select('brand_id')->distinct()
-        )->orderBy('name')->get();
+        $accurateBrands = \App\Models\ProductAccurate::where('business_unit_id', 2)
+            ->whereNotNull('brandName')
+            ->where('brandName', '!=', '')
+            ->select('brandName')
+            ->distinct()
+            ->orderBy('brandName')
+            ->pluck('brandName');
+
+        $this->brands = $accurateBrands->map(function ($name) {
+            return (object) ['id' => $name, 'name' => $name];
+        });
     }
 
     #[Computed]
@@ -120,10 +129,14 @@ class SellPhone extends Component
 
     public function updatedSelectedBrandId()
     {
+        $this->selected_categoryName = null;
+        $this->selected_proyek = null;
         $this->selected_model_name = null;
-        $this->buyback_device_id = null;
-        $this->available_storages = [];
-        $this->buyback_device = null;
+
+        $this->available_categories = [];
+        $this->available_proyek = [];
+        $this->available_models = [];
+        $this->base_price = 0;
 
         $this->imei = '';
         $this->qc_template = null;
@@ -131,16 +144,64 @@ class SellPhone extends Component
         $this->qc_notes = '';
         $this->qc_max_weight_threshold = 3;
 
-        if ($this->selected_brand_id) {
-            $this->available_models = \App\Models\BuybackDevice::where('brand_id', $this->selected_brand_id)
-                ->where('is_active', true)
-                ->select('model_name')
-                ->distinct()
-                ->pluck('model_name')
-                ->toArray();
+        $this->device_rules = [];
+        $this->selected_rules = [];
+        $this->final_price = 0;
 
-            $this->loadQcTemplate();
-        } else {
+        if ($this->selected_brand_id) {
+            $this->available_categories = \App\Models\ProductAccurate::where('business_unit_id', 2)
+                ->where('brandName', $this->selected_brand_id)
+                ->whereNotNull('categoryName')
+                ->where('categoryName', '!=', '')
+                ->select('categoryName')
+                ->distinct()
+                ->orderBy('categoryName')
+                ->pluck('categoryName')
+                ->toArray();
+        }
+    }
+
+    public function updatedSelectedCategoryName()
+    {
+        $this->selected_proyek = null;
+        $this->selected_model_name = null;
+
+        $this->available_proyek = [];
+        $this->available_models = [];
+        $this->base_price = 0;
+
+        if ($this->selected_brand_id && $this->selected_categoryName) {
+            $this->available_proyek = \App\Models\ProductAccurate::where('business_unit_id', 2)
+                ->where('brandName', $this->selected_brand_id)
+                ->where('categoryName', $this->selected_categoryName)
+                ->whereNotNull('proyek')
+                ->where('proyek', '!=', '')
+                ->select('proyek')
+                ->distinct()
+                ->orderBy('proyek')
+                ->pluck('proyek')
+                ->toArray();
+        }
+    }
+
+    public function updatedSelectedProyek()
+    {
+        $this->selected_model_name = null;
+
+        $this->available_models = [];
+        $this->base_price = 0;
+
+        if ($this->selected_brand_id && $this->selected_categoryName && $this->selected_proyek) {
+            $this->available_models = \App\Models\ProductAccurate::where('business_unit_id', 2)
+                ->where('brandName', $this->selected_brand_id)
+                ->where('categoryName', $this->selected_categoryName)
+                ->where('proyek', $this->selected_proyek)
+                ->whereNotNull('name')
+                ->select('name')
+                ->distinct()
+                ->orderBy('name')
+                ->pluck('name')
+                ->toArray();
         }
     }
 
@@ -150,18 +211,21 @@ class SellPhone extends Component
         $this->qc_notes = '';
         $this->qc_max_weight_threshold = 3;
 
-        $brandId = $this->selected_brand_id;
+        $brandId = $this->selected_brand_id; // Ini sekarang string brandName
         $deviceCategory = null;
 
-        if ($this->buyback_device && $this->buyback_device->productAccurate) {
-            $deviceCategory = \App\Models\QcTemplate::normalizeDeviceCategory($this->buyback_device->productAccurate->categoryName);
+        if ($this->selected_categoryName) {
+            $deviceCategory = \App\Models\QcTemplate::normalizeDeviceCategory($this->selected_categoryName);
         }
 
-        $brand = \App\Models\Brand::find($brandId);
+        $brand = \App\Models\Brand::where('name', $brandId)->first();
+        $realBrandId = $brand ? $brand->id : null;
         $isApple = $brand && strtolower($brand->name) === 'apple';
 
-        // Load QC Template untuk Buyback (berdasarkan brand dan kategori)
-        $this->qc_template = \App\Models\QcTemplate::findForBrandAndCategory($brandId, $deviceCategory);
+        // Load QC Template untuk Buyback (berdasarkan brand asli dan kategori)
+        if ($realBrandId) {
+            $this->qc_template = \App\Models\QcTemplate::findForBrandAndCategory($realBrandId, $deviceCategory);
+        }
 
         if ($this->qc_template) {
             $this->qc_max_weight_threshold = $this->qc_template->max_weight_threshold ?? 3;
@@ -236,40 +300,46 @@ class SellPhone extends Component
 
     public function updatedSelectedModelName()
     {
-        $this->buyback_device_id = null;
-        $this->buyback_device = null;
+        $this->base_price = 0;
+        $this->device_rules = [];
+        $this->selected_rules = [];
+        $this->final_price = 0;
 
-        if ($this->selected_brand_id && $this->selected_model_name) {
-            $this->available_storages = \App\Models\BuybackDevice::where('brand_id', $this->selected_brand_id)
-                ->where('model_name', $this->selected_model_name)
-                ->where('is_active', true)
-                ->get();
-        } else {
-            $this->available_storages = [];
-        }
-    }
+        $this->imei = '';
+        $this->qc_template = null;
+        $this->qc_results = [];
+        $this->qc_notes = '';
+        $this->qc_max_weight_threshold = 3;
 
-    public function updatedImei()
-    {
-        $this->validateOnly('imei');
-    }
+        if ($this->selected_model_name) {
+            $productAccurate = \App\Models\ProductAccurate::where('business_unit_id', 2)
+                ->where('name', $this->selected_model_name)
+                ->first();
 
-    public function updatedBuybackDeviceId()
-    {
-        if ($this->buyback_device_id) {
-            $this->buyback_device = \App\Models\BuybackDevice::with(['tier', 'productAccurate'])->find($this->buyback_device_id);
-            $this->device_rules = $this->buyback_device ? $this->buyback_device->getFlatRules() : [];
-            $this->selected_rules = [];
+            if ($productAccurate) {
+                $this->base_price = $productAccurate->buy_price ?? 0;
+
+                // Cari tier berdasarkan harga
+                $tier = \App\Models\BuybackTier::findByPrice((float) $this->base_price);
+
+                if ($tier) {
+                    $flat = [];
+                    foreach ($tier->getRulesByCategory() as $category => $items) {
+                        foreach ($items as $idx => $item) {
+                            $flat[] = [
+                                'key'      => \Illuminate\Support\Str::slug($category) . '_' . $idx,
+                                'category' => $category,
+                                'name'     => $item['name'],
+                                'type'     => $item['type'],
+                                'value'    => (float) $item['value'],
+                            ];
+                        }
+                    }
+                    $this->device_rules = $flat;
+                }
+            }
+
             $this->calculatePrice();
-
-            // Reload QC template now that we might have a specific device category
-            $this->loadQcTemplate();
-        } else {
-            $this->buyback_device = null;
-            $this->device_rules = [];
-            $this->final_price = 0;
-
-            // Reload without specific device
             $this->loadQcTemplate();
         }
     }
@@ -289,9 +359,8 @@ class SellPhone extends Component
     public function calculatePrice()
     {
         if ($this->is_price_adjusted) return;
-        if (!$this->buyback_device) return;
 
-        $price = $this->buyback_device->base_price;
+        $price = $this->base_price;
 
         // Convert flat rules array to key-based collection for easy lookup
         $rulesByKey = collect($this->device_rules)->keyBy('key');
@@ -316,7 +385,7 @@ class SellPhone extends Component
                     // Hitung nominal perubahan (fixed atau persentase)
                     $adjustment = ($type == 'fixed')
                         ? $val
-                        : ($this->buyback_device->base_price * ($val / 100));
+                        : ($this->base_price * ($val / 100));
 
                     // CEK DISINI: Jika key mengandung kata 'kelengkapan', maka ditambah (+)
                     // Selain itu (seperti layar/fisik), maka dikurangi (-)
@@ -328,7 +397,7 @@ class SellPhone extends Component
                 }
             }
         }
-        if ($price < 0) {
+        if ($price <= 0) {
             $price = 0;
         }
 
@@ -339,7 +408,10 @@ class SellPhone extends Component
     protected function rules()
     {
         $rules = [
-            'buyback_device_id'         => 'required|exists:buyback_devices,id',
+            'selected_brand_id'         => 'required',
+            'selected_categoryName'     => 'required',
+            'selected_proyek'           => 'required',
+            'selected_model_name'       => 'required',
             'imei' => [
                 'required',
                 'string',
@@ -394,8 +466,7 @@ class SellPhone extends Component
     }
 
     protected $messages = [
-        'buyback_device_id.required'    => 'Silakan pilih model dan kapasitas penyimpanan terlebih dahulu.',
-        'buyback_device_id.exists'      => 'Perangkat tidak ditemukan.',
+        'selected_model_name.required'  => 'Silakan pilih model perangkat terlebih dahulu.',
         'imei.required'                 => 'IMEI perangkat wajib diisi saat proses QC.',
         'selected_rules.required'       => 'Silakan pilih kondisi perangkat Anda.',
         'selected_rules.min'            => 'Setidaknya satu kondisi harus dipilih.',
@@ -513,9 +584,11 @@ class SellPhone extends Component
         // PROSES INSERT DATA DEVICE & TRANSMISI KE ACCURATE
         // -------------------------------------------------------------
 
-        $device = \App\Models\BuybackDevice::with('brand')->find($this->buyback_device_id);
+        $productAccurate = \App\Models\ProductAccurate::where('business_unit_id', 2)
+            ->where('name', $this->selected_model_name)
+            ->first();
 
-        if (!$device) {
+        if (!$productAccurate) {
             $this->dispatch('toast', title: 'Gagal', message: 'Data perangkat tidak valid.', type: 'error');
             return;
         }
@@ -581,7 +654,7 @@ class SellPhone extends Component
         $finalStatus = $this->qc_verdict === 'fail' ? 'CANCELLED' : 'PAYING';
         $requiredLevel = \App\Models\ApprovalRule::where('module', 'SELL_PHONE_APPROVAL')->max('level') ?? 0;
         $needsApproval = false;
-        
+
         if ($finalStatus === 'PAYING' && $requiredLevel > 0) {
             $finalStatus = 'PENDING_APPROVAL';
             $needsApproval = true;
@@ -590,11 +663,11 @@ class SellPhone extends Component
         // Simpan ke Database
         $sellPhone = \App\Models\SellPhone::create([
             'user_id'           => $userIdToSave,
-            'buyback_device_id' => $device->id,
-            'phone_brand'       => $device->brand->name,
-            'phone_model'       => $device->model_name,
-            'phone_ram'         => $device->ram,
-            'phone_storage'     => $device->storage,
+            'buyback_device_id' => null,
+            'phone_brand'       => $productAccurate->brandName,
+            'phone_model'       => $productAccurate->name,
+            'phone_ram'         => null,
+            'phone_storage'     => null,
             'imei'              => $this->imei,
             'minus_desc'        => $minusDesc,
             'appraised_value'   => $this->final_price,
@@ -666,9 +739,9 @@ class SellPhone extends Component
             $qcListText = implode("\n", $qcList);
 
             $reasonText = 'Pembelian: ' . $sellPhone->phone_brand . ' ' . $sellPhone->phone_model . " (Rp " . number_format($sellPhone->appraised_value, 0, ',', '.') . ")\n\n" .
-                          "IMEI: " . $sellPhone->imei . "\n\n" .
-                          "List QC:\n" . $qcListText . "\n\n" .
-                          "Minus:\n" . str_replace(" | ", "\n", $sellPhone->minus_desc);
+                "IMEI: " . $sellPhone->imei . "\n\n" .
+                "List QC:\n" . $qcListText . "\n\n" .
+                "Minus:\n" . str_replace(" | ", "\n", $sellPhone->minus_desc);
 
             $requestApproval = $sellPhone->approvalRequests()->create([
                 'request_type' => 'SELL_PHONE_APPROVAL',
@@ -700,8 +773,9 @@ class SellPhone extends Component
             'searchCustomer',
             'selectedCustomerId',
             'selected_brand_id',
+            'selected_categoryName',
+            'selected_proyek',
             'selected_model_name',
-            'buyback_device_id',
             'imei',
             'qc_template',
             'qc_results',
@@ -709,6 +783,7 @@ class SellPhone extends Component
             'qc_verdict',
             'selected_rules',
             'final_price',
+            'base_price',
             'old_phone_additional_note',
             // Bersihkan state file upload per slot di memory
             'photo_depan',
@@ -719,9 +794,9 @@ class SellPhone extends Component
             'photo_bawah',
             'photo_box',
             'photo_kelengkapan',
-            'available_models',
-            'available_storages',
-            'buyback_device'
+            'available_categories',
+            'available_proyek',
+            'available_models'
         ]);
 
         return $this->redirect(route('zoffline.sell-phone-history'), navigate: true);
