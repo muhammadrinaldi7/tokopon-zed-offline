@@ -44,6 +44,7 @@ class SellPhone extends Component
     public $device_rules = [];
     public $selected_rules = [];
     public $final_price = 0;
+    public $calculated_price = 0;
     public $is_price_adjusted = false;
 
     // Fallback notes
@@ -327,8 +328,12 @@ class SellPhone extends Component
                 }
             }
         }
+        if ($price < 0) {
+            $price = 0;
+        }
 
-        $this->final_price = max(0, $price); // Pastikan harga tidak minus
+        $this->calculated_price = $price;
+        $this->final_price = $price;
     }
 
     protected function rules()
@@ -593,6 +598,7 @@ class SellPhone extends Component
             'imei'              => $this->imei,
             'minus_desc'        => $minusDesc,
             'appraised_value'   => $this->final_price,
+            'original_appraised_value' => $this->calculated_price,
             'is_price_adjusted' => $this->is_price_adjusted,
             'status'            => $finalStatus,
             'handled_by'        => $currentUser->id,

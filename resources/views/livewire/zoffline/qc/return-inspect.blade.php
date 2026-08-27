@@ -64,7 +64,7 @@
                 <livewire:admin.qc.inspection-form 
                     :inspectableType="App\Models\WarrantyClaim::class"
                     :inspectableId="$claim->id"
-                    :secondProductVariantId="$claim->warranty->orderItem->variant->id ?? null"
+                    :secondProductVariantId="null"
                     :imei="$claim->warranty->serial_number"
                     label="QC Barang Retur"
                     :hideHeader="true"

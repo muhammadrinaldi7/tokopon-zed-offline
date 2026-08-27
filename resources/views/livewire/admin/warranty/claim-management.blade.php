@@ -458,7 +458,8 @@
     @endif
 @endif
 
-<!-- Modal Form Service (Perbaikan Biasa) -->
+<!-- Modal Service Center -->
+<div>
 @if ($showServiceForm && $selectedClaimId)
     @php
         $selectedClaim = $selectedClaimObj;
@@ -542,6 +543,7 @@
         </div>
     @endif
 @endif
+</div>
 
 <!-- Modal Form Tolak Klaim -->
 @if ($showRejectForm && $selectedClaimId)
@@ -1188,6 +1190,7 @@
 @endif
 
 <!-- Modal Proses Refund -->
+<div>
 @if ($showRefundForm && $selectedClaimId)
 @php
     $selectedClaim = $selectedClaimObj;
@@ -1253,8 +1256,10 @@
     </div>
 @endif
 @endif
+</div>
 
 <!-- Modal Konfirmasi Retur Accurate -->
+<div>
 @if ($showReplacementConfirmModal && $selectedClaimId)
 @php
     $selectedClaim =

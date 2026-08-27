@@ -442,10 +442,6 @@ class ClaimManagement extends Component
         $claim->save();
 
         $this->dispatch('alert', type: 'success', message: 'Pelunasan berhasil dikonfirmasi. Klaim selesai.');
-        
-        if ($this->selectedClaimId == $claimId) {
-            $this->selectedClaimObj = $claim->fresh();
-        }
     }
 
     public function openReplacementForm()
