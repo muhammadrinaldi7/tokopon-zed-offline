@@ -10,6 +10,8 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
+use App\Exports\WarrantyReportExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class WarrantyReport extends Component
 {
@@ -95,8 +97,6 @@ class WarrantyReport extends Component
             ->whereHas('orderItem.order', function ($q) use ($start, $end) {
                 $q->whereBetween('created_at', [$start, $end]);
             })
-            // Filter hanya barang yang berpotensi memiliki garansi (misal Handphone)
-            // Bisa disesuaikan jika kategori di Variant bisa diakses, untuk saat ini asumsikan semua serial number
             ->when($this->activationStatus === 'activated', function($q) {
                 $q->whereHas('warranty');
             })
@@ -125,12 +125,70 @@ class WarrantyReport extends Component
             ->latest('id');
     }
 
-    public function exportCsv()
+    protected function getWarrantyRows(): array
     {
         $warranties = $this->warrantiesQuery->get();
+        $rows = [];
+
+        foreach ($warranties as $w) {
+            $orderDate = $w->orderItem->order->order_date ? $w->orderItem->order->order_date->format('Y-m-d') : ($w->orderItem->order->created_at ? $w->orderItem->order->created_at->format('Y-m-d') : '-');
+            $category = $w->orderItem->variant->categoryName ?? '-';
+            $productName = $w->orderItem->variant->name ?? '-';
+            
+            $orderNumber = $w->orderItem->order->order_number ?? '-';
+            $branch = $w->orderItem->order->branch->name ?? '-';
+            $customerName = $w->orderItem->order->user->name ?? '-';
+            $policyName = $w->warranty->policy->name ?? '-';
+            $inspector = $w->warranty->deviceInspection->inspector->name ?? '-';
+            $promotor = $w->orderItem->order->salesBy->name ?? '-';
+
+            $activatedAt = $w->warranty && $w->warranty->activated_at ? $w->warranty->activated_at->format('Y-m-d H:i:s') : '-';
+            $status = $w->warranty ? $w->warranty->status : 'BELUM AKTIVASI';
+
+            $rows[] = [
+                'order_date' => $orderDate,
+                'activated_at' => $activatedAt,
+                'order_number' => $orderNumber,
+                'branch' => $branch,
+                'serial_number' => $w->serial_number,
+                'category' => $category,
+                'product_name' => $productName,
+                'customer_name' => $customerName,
+                'policy_name' => $policyName,
+                'inspector' => $inspector,
+                'promotor' => $promotor,
+                'status' => $status,
+            ];
+        }
+
+        return $rows;
+    }
+
+    public function exportExcel()
+    {
+        $rows = $this->getWarrantyRows();
+
+        if (empty($rows)) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Tidak ada data garansi untuk diexport sesuai filter yang dipilih.', type: 'warning');
+            return;
+        }
+
+        $filename = 'laporan_aktivasi_garansi_' . $this->startDate . '_sd_' . $this->endDate . '.xlsx';
+        return Excel::download(new WarrantyReportExport($rows), $filename);
+    }
+
+    public function exportCsv()
+    {
+        $rows = $this->getWarrantyRows();
+
+        if (empty($rows)) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Tidak ada data garansi untuk diexport sesuai filter yang dipilih.', type: 'warning');
+            return;
+        }
+
         $csvFileName = 'laporan_aktivasi_garansi_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
 
-        return response()->streamDownload(function () use ($warranties) {
+        return response()->streamDownload(function () use ($rows) {
             $file = fopen('php://output', 'w');
 
             // Output UTF-8 BOM
@@ -153,34 +211,20 @@ class WarrantyReport extends Component
 
             fputcsv($file, $headers, $this->csvSeparator);
 
-            foreach ($warranties as $w) {
-                $orderDate = $w->orderItem->order->order_date ? $w->orderItem->order->order_date->format('Y-m-d') : ($w->orderItem->order->created_at ? $w->orderItem->order->created_at->format('Y-m-d') : '-');
-                $category = $w->orderItem->variant->categoryName ?? '-';
-                $productName = $w->orderItem->variant->name ?? '-';
-                
-                $orderNumber = $w->orderItem->order->order_number ?? '-';
-                $branch = $w->orderItem->order->branch->name ?? '-';
-                $customerName = $w->orderItem->order->user->name ?? '-';
-                $policyName = $w->warranty->policy->name ?? '-';
-                $inspector = $w->warranty->deviceInspection->inspector->name ?? '-';
-                $promotor = $w->orderItem->order->salesBy->name ?? '-';
-
-                $activatedAt = $w->warranty && $w->warranty->activated_at ? $w->warranty->activated_at->format('Y-m-d H:i:s') : '-';
-                $status = $w->warranty ? $w->warranty->status : 'BELUM AKTIVASI';
-
+            foreach ($rows as $row) {
                 fputcsv($file, [
-                    $orderDate,
-                    $activatedAt,
-                    $orderNumber,
-                    $branch,
-                    $w->serial_number,
-                    $category,
-                    $productName,
-                    $customerName,
-                    $policyName,
-                    $inspector,
-                    $promotor,
-                    $status
+                    $row['order_date'],
+                    $row['activated_at'],
+                    $row['order_number'],
+                    $row['branch'],
+                    $row['serial_number'],
+                    $row['category'],
+                    $row['product_name'],
+                    $row['customer_name'],
+                    $row['policy_name'],
+                    $row['inspector'],
+                    $row['promotor'],
+                    $row['status']
                 ], $this->csvSeparator);
             }
 

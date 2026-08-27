@@ -63,14 +63,34 @@
                         </select>
                     </div>
 
-                    <button wire:click="exportCsv" wire:loading.attr="disabled"
-                        class="flex items-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-75 disabled:cursor-wait text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button wire:click="exportExcel" wire:loading.attr="disabled"
+                        class="flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-75 disabled:cursor-wait text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
+                        <svg wire:loading.remove wire:target="exportExcel" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
                             </path>
                         </svg>
-                        Export CSV
+                        <svg wire:loading wire:target="exportExcel" class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span wire:loading.remove wire:target="exportExcel">Export Excel</span>
+                        <span wire:loading wire:target="exportExcel">Memproses...</span>
+                    </button>
+
+                    <button wire:click="exportCsv" wire:loading.attr="disabled"
+                        class="flex items-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-75 disabled:cursor-wait text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
+                        <svg wire:loading.remove wire:target="exportCsv" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                            </path>
+                        </svg>
+                        <svg wire:loading wire:target="exportCsv" class="animate-spin w-4 h-4 text-emerald-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span wire:loading.remove wire:target="exportCsv">Export CSV</span>
+                        <span wire:loading wire:target="exportCsv">Memproses...</span>
                     </button>
                     <button type="button"
                         x-data="{ isDownloading: false }"
