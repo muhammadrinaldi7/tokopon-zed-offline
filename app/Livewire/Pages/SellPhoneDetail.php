@@ -11,6 +11,7 @@ use Livewire\Component;
 use App\Services\AccurateService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
 class SellPhoneDetail extends Component
 {
@@ -64,6 +65,96 @@ class SellPhoneDetail extends Component
             'status' => 'INSPECTING'
         ]);
         return $this->redirect(route('sell-phone-history'));
+    }
+
+    public function sendPaymentReceiptToQontak()
+    {
+        if (!$this->sellPhone->payment_receipt_path) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Bukti pembayaran belum diupload oleh finance.', type: 'warning');
+            return;
+        }
+
+        $phone = $this->sellPhone->user->profile->phone_number ?? null;
+
+        if (!$phone) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Nomor HP customer tidak ditemukan.', type: 'warning');
+            return;
+        }
+
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+        if (str_starts_with($phone, '0')) {
+            $phone = '62' . substr($phone, 1);
+        } elseif (str_starts_with($phone, '8')) {
+            $phone = '62' . $phone;
+        }
+
+        $fullUrl = config('services.qontak.api_url');
+        if (empty($fullUrl)) {
+            $this->dispatch('toast', title: 'Gagal', message: 'URL Qontak tidak ditemukan di konfigurasi (.env).', type: 'error');
+            return;
+        }
+        if (!preg_match("~^(?:f|ht)tps?://~i", $fullUrl)) {
+            $fullUrl = "https://" . $fullUrl;
+        }
+
+        $method = 'POST';
+        $parsedUrl = parse_url($fullUrl);
+        $endpoint = $parsedUrl['path'] ?? '';
+        $clientId = config('services.qontak.client_id');
+        $clientSecret = config('services.qontak.client_secret');
+
+        $dateString = gmdate('D, d M Y H:i:s') . ' GMT';
+        $requestLine = "{$method} {$endpoint} HTTP/1.1";
+        $stringToSign = "date: {$dateString}\n{$requestLine}";
+        $digest = hash_hmac('sha256', $stringToSign, $clientSecret, true);
+        $signature = base64_encode($digest);
+        $hmacHeader = "hmac username=\"{$clientId}\", algorithm=\"hmac-sha256\", headers=\"date request-line\", signature=\"{$signature}\"";
+        $idempotencyKey = (string) \Illuminate\Support\Str::uuid();
+
+        $imageUrl = asset('storage/' . $this->sellPhone->payment_receipt_path);
+        // Get file extension from path
+        $extension = pathinfo($this->sellPhone->payment_receipt_path, PATHINFO_EXTENSION);
+        $filename = 'Bukti_Transfer_' . $this->sellPhone->id . '.' . ($extension ?: 'jpg');
+
+        $payload = [
+            'to_name' => $this->sellPhone->user->name ?? 'Customer',
+            'to_number' => $phone,
+            'channel_integration_id' =>  config('services.qontak.integration_id'),
+            'message_template_id' => config('services.qontak.template_id'),
+            'language' => ['code' => 'id'],
+            'parameters' => [
+                'header' => [
+                    'format' => 'DOCUMENT',
+                    'params' => [
+                        ['key' => 'url', 'value' => $imageUrl],
+                        ['key' => 'filename', 'value' => $filename]
+                    ]
+                ],
+                'body' => [
+                    ['key' => '1', 'value' => 'nama', 'value_text' => $this->sellPhone->user->name ?? 'Customer'],
+                    ['key' => '2', 'value' => 'no_invoice', 'value_text' => 'SPL-' . $this->sellPhone->id],
+                    ['key' => '3', 'value' => 'total_tagihan', 'value_text' => 'Rp ' . number_format($this->sellPhone->appraised_value, 0, ',', '.')]
+                ]
+            ]
+        ];
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization'     => $hmacHeader,
+                'Date'              => $dateString,
+                'X-Idempotency-Key' => $idempotencyKey,
+                'Content-Type'      => 'application/json',
+                'Accept'            => 'application/json',
+            ])->post($fullUrl, $payload);
+
+            if ($response->successful()) {
+                $this->dispatch('toast', title: 'Berhasil', message: 'Bukti pembayaran berhasil dikirim via WA!', type: 'success');
+            } else {
+                $this->dispatch('toast', title: 'Gagal API', message: 'Mekari: Code ' . $response->status(), type: 'error');
+            }
+        } catch (\Exception $e) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
+        }
     }
 
     public function saveBankInfo()
