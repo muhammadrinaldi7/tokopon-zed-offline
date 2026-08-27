@@ -28,7 +28,7 @@
             <p class="text-sm text-gray-500 mt-1">Kelola peran (Roles) dan akses (Permissions) untuk semua akun
                 terdaftar.</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
             <select wire:model.live="filterBusinessUnitId"
                 class="w-full md:w-auto bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all appearance-none cursor-pointer">
                 <option value="">Semua Unit Usaha</option>
@@ -38,6 +38,18 @@
             </select>
             <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari nama atau email..."
                 class="w-full md:w-72 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4E44DB]/20 focus:border-[#4E44DB] transition-all">
+            <button wire:click="exportExcel" wire:loading.attr="disabled"
+                class="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/20 shrink-0 disabled:opacity-50 cursor-pointer">
+                <svg wire:loading.remove wire:target="exportExcel" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <svg wire:loading wire:target="exportExcel" class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+                <span wire:loading.remove wire:target="exportExcel">Export Excel</span>
+                <span wire:loading wire:target="exportExcel">Mengunduh...</span>
+            </button>
             <button wire:click="openCreateModal"
                 class="flex items-center gap-2 bg-[#4E44DB] text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-[#3c34af] transition-all shadow-md shadow-[#4E44DB]/20 shrink-0">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -118,7 +130,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-16 text-center text-gray-400">
+                            <td colspan="6" class="px-6 py-16 text-center text-gray-400">
                                 <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"

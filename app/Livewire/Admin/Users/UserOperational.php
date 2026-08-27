@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Users;
 
+use App\Exports\UserOperationalExport;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -9,6 +10,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Role;
 
 #[Layout('layouts.admin', ['title' => 'Kelola Pengguna Operasional - TokoPun'])]
@@ -45,29 +47,45 @@ class UserOperational extends Component
         }
     }
 
+    public function getFilteredUsersQuery()
+    {
+        return User::with(['roles', 'branch', 'warehouse', 'businessUnit'])
+            // 1. Filter Role: Ambil yang BUKAN customer atau user
+            ->whereHas('roles', function ($q) {
+                $q->whereNotIn('name', ['customer', 'user']);
+            })
+            // 2. Filter Unit Usaha
+            ->when($this->filterBusinessUnitId, function ($q) {
+                $q->where('business_unit_id', $this->filterBusinessUnitId);
+            })
+            // 3. Pencarian: Bungkus di dalam closure agar operator OR tidak bocor
+            ->when($this->search, function ($q) {
+                $q->where(function ($query) {
+                    $query->where('name', 'like', '%' . $this->search . '%')
+                        ->orWhere('email', 'like', '%' . $this->search . '%');
+                });
+            })
+            // 4. Pengurutan
+            ->orderByDesc('id');
+    }
+
+    public function exportExcel()
+    {
+        $users = $this->getFilteredUsersQuery()->get();
+
+        if ($users->isEmpty()) {
+            $this->dispatch('admin-alert', type: 'error', message: 'Tidak ada data pengguna yang sesuai filter untuk diexport.');
+            return;
+        }
+
+        $filename = 'Data_Karyawan_Operasional_' . now()->format('Y-m-d_His') . '.xlsx';
+        return Excel::download(new UserOperationalExport($users), $filename);
+    }
+
     public function with()
     {
         return [
-            'users' => User::with(['roles', 'branch', 'warehouse', 'businessUnit'])
-                // 1. Filter Role: Ambil yang BUKAN customer atau user
-                ->whereHas('roles', function ($q) {
-                    $q->whereNotIn('name', ['customer', 'user']);
-                })
-                // 2. Filter Unit Usaha
-                ->when($this->filterBusinessUnitId, function ($q) {
-                    $q->where('business_unit_id', $this->filterBusinessUnitId);
-                })
-                // 3. Pencarian: Bungkus di dalam closure agar operator OR tidak bocor
-                ->when($this->search, function ($q) {
-                    $q->where(function ($query) {
-                        $query->where('name', 'like', '%' . $this->search . '%')
-                            ->orWhere('email', 'like', '%' . $this->search . '%');
-                    });
-                })
-                // 4. Pengurutan dan Paginasi
-                ->orderByDesc('id')
-                ->paginate(15),
-
+            'users' => $this->getFilteredUsersQuery()->paginate(15),
             'availableRoles' => Role::whereNotIn('name', ['customer', 'user'])->get(),
             'businessUnits' => \App\Models\BusinessUnit::where('is_active', true)->get(),
             'branches' => $this->getBranches(),
