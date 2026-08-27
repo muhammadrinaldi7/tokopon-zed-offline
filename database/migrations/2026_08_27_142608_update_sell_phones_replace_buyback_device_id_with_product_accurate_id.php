@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sell_phones', function (Blueprint $table) {
+            $table->dropForeign(['buyback_device_id']);
             $table->dropColumn('buyback_device_id');
             
             // Add new column
