@@ -99,6 +99,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Route::get('/pos', \App\Livewire\Admin\Pos\PointOfSale::class)->name('pos')->middleware('can:view-pos');
     Route::livewire('/dashboard', 'pages::admin.dashboard')->name('dashboard')->middleware('can:view_dashboard');
     Route::get('/device-passport', \App\Livewire\Admin\DevicePassport::class)->name('device-passport');
+    
+    // QC & Inspeksi
+    Route::get('/qc-returns', \App\Livewire\Admin\Qc\ReturnIndex::class)->name('qc.returns');
+    Route::get('/qc-returns/{claim}/inspect', \App\Livewire\Admin\Qc\ReturnInspect::class)->name('qc.returns.inspect');
     Route::get('/purchase-invoice-export', AccurateInvoiceExport::class)->name('purchase.invoice.export');
 
     // Administrator

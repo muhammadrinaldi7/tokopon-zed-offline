@@ -36,9 +36,9 @@ class WarrantyClaim extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-    public function deviceInspection()
+    public function inspection()
     {
-        return $this->belongsTo(DeviceInspection::class);
+        return $this->morphOne(DeviceInspection::class, 'inspectable');
     }
 
     public function claimsHistory()

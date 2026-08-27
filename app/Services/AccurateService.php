@@ -1442,6 +1442,38 @@ class AccurateService
         }
     }
     /**
+     * Hit API Accurate Penyesuaian Persediaan (Single)
+     * @param array $payload
+     * @param string $databaseSource
+     * @return array
+     * @throws \Exception
+     */
+    public function postItemAdjustment(array $payload, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->post($config['host'] . '/item-adjustment/save.do', $payload);
+
+        Log::info("API Accurate Item Adjustment ({$databaseSource}) Payload: " . json_encode($payload));
+        Log::info("API Accurate Item Adjustment ({$databaseSource}) Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Item Adjustment Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
      * Hit API Bulk Save Penyesuaian Persediaan (Max 100 data)
      * * @param array $chunkData
      * @return array
