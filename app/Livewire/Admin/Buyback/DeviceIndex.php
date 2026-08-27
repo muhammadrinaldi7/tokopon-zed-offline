@@ -2,8 +2,7 @@
 
 namespace App\Livewire\Admin\Buyback;
 
-use App\Models\BuybackDevice;
-use App\Models\Brand;
+use App\Models\ProductAccurate;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\WithFileUploads;
@@ -15,31 +14,35 @@ class DeviceIndex extends Component
     use WithFileUploads, WithPagination;
 
     public $search = '';
-    public $filterBrand = '';
+    public $filterBrandName = '';
+    public $filterCategoryName = '';
+    public $filterProyek = '';
 
     public $showEditModal = false;
     public $editingDeviceId = null;
-    public $editModelName = '';
-    public $editBasePrice = 0;
-    public $editRam = '';
-    public $editStorage = '';
-    public $editColor = '';
-    public $editIsActive = true;
+    public $editItemNo = '';
+    public $editName = '';
+    public $editBuyPrice = 0;
 
     public function updatingSearch()
     {
         $this->resetPage();
     }
 
-    public function updatingFilterBrand()
+    public function updatingFilterBrandName()
     {
         $this->resetPage();
     }
 
-    // Sync Master Data
-    public $showSyncAccurateModal = false;
-    public $syncTargetBuId = null;
-    public $syncKeyword = '';
+    public function updatingFilterCategoryName()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterProyek()
+    {
+        $this->resetPage();
+    }
 
     // CSV Import/Export
     public $showImportModal = false;
@@ -47,15 +50,12 @@ class DeviceIndex extends Component
 
     public function editDevice($id)
     {
-        $device = BuybackDevice::find($id);
+        $device = ProductAccurate::where('business_unit_id', 2)->find($id);
         if ($device) {
             $this->editingDeviceId = $id;
-            $this->editModelName = $device->model_name;
-            $this->editRam = $device->ram ?? '';
-            $this->editStorage = $device->storage ?? '';
-            $this->editColor = $device->color ?? '';
-            $this->editBasePrice = $device->base_price;
-            $this->editIsActive = $device->is_active;
+            $this->editItemNo = $device->item_no;
+            $this->editName = $device->name;
+            $this->editBuyPrice = $device->buy_price ?? 0;
             $this->showEditModal = true;
         }
     }
@@ -63,30 +63,18 @@ class DeviceIndex extends Component
     public function updateDevice()
     {
         $this->validate([
-            'editModelName' => 'required|string|max:255',
-            'editBasePrice' => 'required|numeric|min:0',
-            'editRam' => 'nullable|string|max:255',
-            'editStorage' => 'nullable|string|max:255',
-            'editColor' => 'nullable|string|max:255',
+            'editBuyPrice' => 'required|numeric|min:0',
         ]);
 
-        $device = BuybackDevice::find($this->editingDeviceId);
+        $device = ProductAccurate::where('business_unit_id', 2)->find($this->editingDeviceId);
         if ($device) {
             $device->update([
-                'model_name' => $this->editModelName,
-                'ram' => $this->editRam,
-                'storage' => $this->editStorage,
-                'color' => $this->editColor,
-                'base_price' => $this->editBasePrice,
-                'is_active' => $this->editIsActive,
+                'buy_price' => $this->editBuyPrice,
             ]);
-
-            // Auto re-assign tier berdasarkan harga baru
-            $device->assignTierByPrice();
         }
 
         $this->showEditModal = false;
-        $this->dispatch('toast', title: 'Berhasil', message: 'Data perangkat berhasil diperbarui.', type: 'success');
+        $this->dispatch('toast', title: 'Berhasil', message: 'Harga beli (Buy Price) berhasil diperbarui.', type: 'success');
     }
 
     public function closeEditModal()
@@ -94,112 +82,33 @@ class DeviceIndex extends Component
         $this->showEditModal = false;
         $this->editingDeviceId = null;
     }
-    public function syncTierDevice()
-    {
-        $devices = BuybackDevice::whereNotNull('base_price')->get();
-
-        $count = 0;
-        foreach ($devices as $device) {
-            $device->assignTierByPrice();
-            $count++;
-        }
-
-        $this->dispatch(
-            'toast',
-            title: 'Berhasil Disinkronisasi',
-            message: "Berhasil meng-assign tier untuk {$count} perangkat berdasarkan harganya.",
-            type: 'success'
-        );
-    }
-
-    public function openSyncAccurateModal()
-    {
-        $this->syncTargetBuId = \App\Models\BusinessUnit::first()->id ?? null;
-        $this->syncKeyword = '';
-        $this->showSyncAccurateModal = true;
-    }
-
-    public function processSyncAccurate()
-    {
-        $query = \App\Models\ProductAccurate::query();
-
-        if ($this->syncTargetBuId) {
-            $query->where('business_unit_id', $this->syncTargetBuId);
-        }
-
-        if (!empty($this->syncKeyword)) {
-            $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->syncKeyword . '%')
-                    ->orWhere('item_no', 'like', '%' . $this->syncKeyword . '%');
-            });
-        }
-
-        $products = $query->get();
-        $count = 0;
-
-        foreach ($products as $prod) {
-            // Jangan sinkronisasi jika sudah ada
-            $existing = BuybackDevice::where('product_accurate_id', $prod->id)
-                ->orWhere('model_name', $prod->name)
-                ->first();
-
-            if (!$existing) {
-                // Coba cocokan Brand atau buat baru
-                $brandId = null;
-                $brandName = trim($prod->brandName);
-
-                if (empty($brandName)) {
-                    $brandName = 'Lainnya'; // Fallback jika kosong
-                }
-
-                // Cari brand atau buat baru jika belum ada berdasarkan slug
-                $slug = \Illuminate\Support\Str::slug($brandName);
-                $brand = \App\Models\Brand::firstOrCreate(
-                    ['slug' => $slug],
-                    ['name' => ucwords(strtolower($brandName))]
-                );
-                $brandId = $brand->id;
-
-                BuybackDevice::create([
-                    'brand_id'            => $brandId,
-                    'product_accurate_id' => $prod->id,
-                    'model_name'          => $prod->name,
-                    'ram'                 => null,
-                    'storage'             => '-', // Default
-                    'color'               => '-', // Default
-                    'base_price'          => $prod->base_price ?? 0,
-                    'is_active'           => false,
-                ]);
-
-                $count++;
-            }
-        }
-
-        // Auto assign tier untuk semua data
-        $this->syncTierDeviceSilently();
-
-        $this->showSyncAccurateModal = false;
-
-        $this->dispatch(
-            'toast',
-            title: 'Sinkronisasi Selesai',
-            message: "Berhasil menambahkan {$count} perangkat baru dari Master Data Accurate.",
-            type: 'success'
-        );
-    }
-
-    public function syncTierDeviceSilently()
-    {
-        $devices = BuybackDevice::whereNotNull('base_price')->where('base_price', '>', 0)->get();
-        foreach ($devices as $device) {
-            $device->assignTierByPrice();
-        }
-    }
 
     public function exportCsv()
     {
-        $devices = BuybackDevice::with('brand')->get();
-        $csvFileName = 'buyback_devices_' . date('Ymd_His') . '.csv';
+        $query = ProductAccurate::where('business_unit_id', 2);
+
+        if (!empty($this->search)) {
+            $query->where(function($q) {
+                $q->where('name', 'like', '%' . $this->search . '%')
+                  ->orWhere('item_no', 'like', '%' . $this->search . '%');
+            });
+        }
+
+        if (!empty($this->filterBrandName)) {
+            $query->where('brandName', $this->filterBrandName);
+        }
+
+        if (!empty($this->filterCategoryName)) {
+            $query->where('categoryName', $this->filterCategoryName);
+        }
+
+        if (!empty($this->filterProyek)) {
+            $query->where('proyek', $this->filterProyek);
+        }
+
+        $devices = $query->orderBy('name')->get();
+        
+        $csvFileName = 'product_accurates_' . date('Ymd_His') . '.csv';
         $headers = [
             "Content-type"        => "text/csv",
             "Content-Disposition" => "attachment; filename=$csvFileName",
@@ -208,7 +117,7 @@ class DeviceIndex extends Component
             "Expires"             => "0"
         ];
 
-        $columns = ['ID', 'Brand', 'Model Name', 'RAM', 'Storage', 'Color', 'Base Price', 'Is Active'];
+        $columns = ['ID', 'SKU', 'Nama Barang', 'Buy Price'];
 
         $callback = function () use ($devices, $columns) {
             $file = fopen('php://output', 'w');
@@ -221,13 +130,9 @@ class DeviceIndex extends Component
             foreach ($devices as $device) {
                 fputcsv($file, [
                     $device->id,
-                    $device->brand ? $device->brand->name : '',
-                    $device->model_name,
-                    $device->ram,
-                    $device->storage,
-                    $device->color,
-                    $device->base_price,
-                    $device->is_active ? '1' : '0',
+                    $device->item_no,
+                    $device->name,
+                    $device->buy_price ?? 0,
                 ], ';');
             }
 
@@ -266,8 +171,8 @@ class DeviceIndex extends Component
         // Peta index kolom (lowercase)
         $headerMap = array_flip(array_map('strtolower', array_map('trim', $header)));
 
-        if (!isset($headerMap['id']) || !isset($headerMap['model name']) || !isset($headerMap['base price'])) {
-            $this->addError('csvFile', 'Kolom CSV harus mengandung ID, Model Name, dan Base Price.');
+        if (!isset($headerMap['id']) || !isset($headerMap['buy price'])) {
+            $this->addError('csvFile', 'Kolom CSV harus mengandung ID dan Buy Price.');
             return;
         }
 
@@ -276,39 +181,23 @@ class DeviceIndex extends Component
 
         try {
             while (($row = fgetcsv($file, 1000, $delimiter)) !== false) {
-                if (count($row) < 3) continue;
+                if (count($row) < 2) continue;
 
                 $id = isset($headerMap['id']) ? trim($row[$headerMap['id']] ?? '') : '';
-                $modelName = isset($headerMap['model name']) ? trim($row[$headerMap['model name']] ?? '') : '';
-                $ram = isset($headerMap['ram']) ? trim($row[$headerMap['ram']] ?? '') : '';
-                $storage = isset($headerMap['storage']) ? trim($row[$headerMap['storage']] ?? '') : '';
-                $color = isset($headerMap['color']) ? trim($row[$headerMap['color']] ?? '') : '';
-                $basePrice = isset($headerMap['base price']) ? trim($row[$headerMap['base price']] ?? '0') : '0';
-                $isActiveCsv = isset($headerMap['is active']) ? trim($row[$headerMap['is active']] ?? '') : null;
+                $buyPrice = isset($headerMap['buy price']) ? trim($row[$headerMap['buy price']] ?? '0') : '0';
 
-                if (empty($id) || empty($modelName)) continue;
+                if (empty($id)) continue;
 
                 // Hapus format ribuan jika ada (misal 10.000 atau 10,000)
-                $basePrice = str_replace([',', '.', 'Rp', 'rp', ' '], '', $basePrice);
+                $buyPrice = str_replace([',', '.', 'Rp', 'rp', ' '], '', $buyPrice);
 
-                $device = BuybackDevice::find($id);
+                $device = ProductAccurate::where('business_unit_id', 2)->find($id);
                 if ($device) {
                     $updateData = [
-                        'model_name' => $modelName,
-                        'ram'        => $ram ?: null,
-                        'storage'    => $storage ?: '-',
-                        'color'      => $color ?: '-',
-                        'base_price' => is_numeric($basePrice) ? $basePrice : 0,
+                        'buy_price' => is_numeric($buyPrice) ? $buyPrice : 0,
                     ];
 
-                    // Jika ada kolom Is Active di CSV, update statusnya (1=Aktif, 0=Nonaktif)
-                    if ($isActiveCsv !== null && $isActiveCsv !== '') {
-                        // Terjemahkan 1, true, y, yes menjadi Aktif
-                        $updateData['is_active'] = filter_var($isActiveCsv, FILTER_VALIDATE_BOOLEAN);
-                    }
-
                     $device->update($updateData);
-                    $device->assignTierByPrice();
                     $count++;
                 }
             }
@@ -325,27 +214,40 @@ class DeviceIndex extends Component
 
         fclose($file);
     }
+    
     public function render()
     {
-        $query = BuybackDevice::with(['brand', 'tier']);
+        $baseQuery = ProductAccurate::where('business_unit_id', 2);
+
+        // Ambil data untuk dropdown filters
+        $availableBrands = (clone $baseQuery)->whereNotNull('brandName')->where('brandName', '!=', '')->distinct()->pluck('brandName')->sort()->values();
+        $availableCategories = (clone $baseQuery)->whereNotNull('categoryName')->where('categoryName', '!=', '')->distinct()->pluck('categoryName')->sort()->values();
+        $availableProyeks = (clone $baseQuery)->whereNotNull('proyek')->where('proyek', '!=', '')->distinct()->pluck('proyek')->sort()->values();
+
+        $query = clone $baseQuery;
 
         if (!empty($this->search)) {
-            $query->where('model_name', 'like', '%' . $this->search . '%')
-                ->orWhere('ram', 'like', '%' . $this->search . '%')
-                ->orWhere('storage', 'like', '%' . $this->search . '%')
-                ->orWhere('color', 'like', '%' . $this->search . '%');
+            $query->where(function($q) {
+                $q->where('name', 'like', '%' . $this->search . '%')
+                  ->orWhere('item_no', 'like', '%' . $this->search . '%');
+            });
         }
 
-        if (!empty($this->filterBrand)) {
-            $query->where('brand_id', $this->filterBrand);
+        if (!empty($this->filterBrandName)) {
+            $query->where('brandName', $this->filterBrandName);
         }
 
-        $devices = $query->orderBy('brand_id')
-            ->orderBy('model_name')
+        if (!empty($this->filterCategoryName)) {
+            $query->where('categoryName', $this->filterCategoryName);
+        }
+
+        if (!empty($this->filterProyek)) {
+            $query->where('proyek', $this->filterProyek);
+        }
+
+        $devices = $query->orderBy('name')
             ->paginate(15);
 
-        $brands = Brand::orderBy('name')->get();
-
-        return view('livewire.admin.buyback.device-index', compact('devices', 'brands'));
+        return view('livewire.admin.buyback.device-index', compact('devices', 'availableBrands', 'availableCategories', 'availableProyeks'));
     }
 }
