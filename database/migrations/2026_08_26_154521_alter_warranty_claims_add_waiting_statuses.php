@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         if (DB::getDriverName() !== 'sqlite') {
-            DB::statement("ALTER TABLE warranty_claims MODIFY COLUMN status ENUM('pending', 'approved', 'rejected', 'in_repair', 'waiting_payment', 'waiting_refund', 'completed') DEFAULT 'pending'");
+            DB::statement("ALTER TABLE warranty_claims MODIFY COLUMN status VARCHAR(255) DEFAULT 'pending'");
         }
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         if (DB::getDriverName() !== 'sqlite') {
-            DB::statement("ALTER TABLE warranty_claims MODIFY COLUMN status ENUM('pending', 'approved', 'rejected', 'in_repair', 'completed') DEFAULT 'pending'");
+            DB::statement("ALTER TABLE warranty_claims MODIFY COLUMN status VARCHAR(255) DEFAULT 'pending'");
         }
     }
 };

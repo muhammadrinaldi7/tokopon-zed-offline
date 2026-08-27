@@ -62,6 +62,16 @@ class SellPhone extends Model implements HasMedia
         $this->addMediaCollection('photos');
     }
 
+    public function buybackDevice()
+    {
+        return $this->belongsTo(BuybackDevice::class, 'buyback_device_id');
+    }
+
+    public function inventoryStatus()
+    {
+        return $this->hasOne(\App\Models\ProductSerialNumber::class, 'serial_number', 'imei');
+    }
+
     public function handledBy()
     {
         return $this->belongsTo(User::class, 'handled_by');

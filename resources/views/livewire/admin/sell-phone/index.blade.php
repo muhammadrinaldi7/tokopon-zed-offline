@@ -62,6 +62,7 @@
                         <th class="px-6 py-5 border-b border-slate-100">Pelanggan</th>
                         <th class="px-6 py-5 border-b border-slate-100">HP Ditawarkan</th>
                         <th class="px-6 py-5 border-b border-slate-100">Status & Taksiran</th>
+                        <th class="px-6 py-5 border-b border-slate-100">Status Inventaris</th>
                         <th class="px-6 py-5 border-b border-slate-100 text-right">Aksi</th>
                     </tr>
                 </thead>

@@ -29,7 +29,7 @@ class Index extends Component
     {
         $activeUnitId = \App\Models\User::findOrFail(\Illuminate\Support\Facades\Auth::id())->getActiveBusinessUnitId();
 
-        $query = SellPhone::with(['user', 'handledBy', 'businessUnit', 'inspections'])
+        $query = SellPhone::with(['user', 'handledBy', 'businessUnit', 'inspections', 'inventoryStatus'])
             ->where('business_unit_id', $activeUnitId)
             ->latest();
 
