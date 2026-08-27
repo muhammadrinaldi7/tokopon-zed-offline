@@ -13,6 +13,7 @@ class CekStock extends Component
 {
     public $searchQuery = '';
     public $filterProyek = '';
+    public $filterStock = 'in_stock';
     public $listProyek = [];
     public $searchResults = [];
     public $stockData = [];
@@ -55,6 +56,11 @@ class CekStock extends Component
         $this->updatedSearchQuery();
     }
 
+    public function updatedFilterStock()
+    {
+        $this->updatedSearchQuery();
+    }
+
     public function updatedSearchQuery()
     {
         if (strlen($this->searchQuery) < 2) {
@@ -84,6 +90,15 @@ class CekStock extends Component
             ->when($this->filterProyek, function ($query) {
                 $query->where('proyek', $this->filterProyek);
             })
+            ->when($this->filterStock === 'in_stock', function ($query) {
+                $query->where('stock', '>=', 1);
+            })
+            ->when($this->filterStock === 'empty', function ($query) {
+                $query->where('stock', 0);
+            })
+            ->when($this->filterStock === 'minus', function ($query) {
+                $query->where('stock', '<', 0);
+            })
             ->where(function ($query) use ($term, $snSkus) {
                 $query->where('item_no', 'like', $term)
                     ->orWhere('name', 'like', $term);
@@ -91,7 +106,10 @@ class CekStock extends Component
                 if (!empty($snSkus)) {
                     $query->orWhereIn('item_no', $snSkus);
                 }
-            })->take(20)->get();
+            })
+            ->orderBy('stock', 'desc')
+            ->take(20)
+            ->get();
 
         $results = [];
 

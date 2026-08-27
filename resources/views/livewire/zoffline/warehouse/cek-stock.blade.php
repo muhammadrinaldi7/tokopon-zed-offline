@@ -18,16 +18,28 @@
                     Pencarian Produk
                 </h3>
 
-                @if(count($listProyek) > 0)
-                <div class="w-full sm:w-auto">
-                    <select wire:model.live="filterProyek" class="w-full sm:w-48 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm transition text-gray-700">
-                        <option value="">Semua Proyek</option>
-                        @foreach($listProyek as $proyek)
-                            <option value="{{ $proyek }}">{{ $proyek }}</option>
-                        @endforeach
-                    </select>
+                <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                    {{-- Dropdown Filter Stok --}}
+                    <div class="w-full sm:w-auto">
+                        <select wire:model.live="filterStock" class="w-full sm:w-40 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-xs transition text-gray-700 font-semibold">
+                            <option value="in_stock">Stok Ada (&#8805; 1)</option>
+                            <option value="all">Semua Stok</option>
+                            <option value="empty">Stok Habis (= 0)</option>
+                            <option value="minus">Stok Minus (&lt; 0)</option>
+                        </select>
+                    </div>
+
+                    @if(count($listProyek) > 0)
+                    <div class="w-full sm:w-auto">
+                        <select wire:model.live="filterProyek" class="w-full sm:w-44 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-xs transition text-gray-700 font-medium">
+                            <option value="">Semua Proyek</option>
+                            @foreach($listProyek as $proyek)
+                                <option value="{{ $proyek }}">{{ $proyek }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
                 </div>
-                @endif
             </div>
 
             <div class="relative mb-4">
@@ -63,10 +75,19 @@
                                             {{ $result['business_unit_name'] ?? 'Unknown' }}
                                         </span>
                                     </h4>
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        {{ !empty($result['ram']) ? $result['ram'] . ' / ' . $result['storage'] : $result['storage'] }}
-                                        - {{ $result['color'] }} {{ $result['price'] }} Stock Jual :
-                                        {{ $result['allStock'] }}
+                                    <p class="text-xs text-gray-500 mt-1 flex flex-wrap items-center gap-1.5">
+                                        @if(!empty($result['ram']) || !empty($result['storage']))
+                                            <span>{{ !empty($result['ram']) ? $result['ram'] . ' / ' . $result['storage'] : $result['storage'] }}</span>
+                                            <span>•</span>
+                                        @endif
+                                        @if(!empty($result['color']))
+                                            <span>{{ $result['color'] }}</span>
+                                            <span>•</span>
+                                        @endif
+                                        <span class="font-semibold text-gray-700">{{ $result['price'] }}</span>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold {{ $result['allStock'] > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : ($result['allStock'] < 0 ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-gray-100 text-gray-600 border border-gray-200') }}">
+                                            Stok Jual: {{ $result['allStock'] }}
+                                        </span>
                                     </p>
                                 </div>
                                 <div class="text-right">
