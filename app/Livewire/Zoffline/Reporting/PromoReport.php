@@ -6,6 +6,8 @@ use App\Models\Order;
 use Carbon\Carbon;
 use Livewire\Component;
 use Livewire\WithPagination;
+use App\Exports\PromoReportExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PromoReport extends Component
 {
@@ -126,15 +128,80 @@ class PromoReport extends Component
             ->latest();
     }
 
-    public function exportCsvClaim()
+    protected function getClaimRows(): array
     {
         $orders = $this->ordersQuery->get();
+        $rows = [];
+
+        foreach ($orders as $order) {
+            $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
+            $orderDate = $order->created_at->format('Y-m-d H:i');
+            $orderNo = $order->order_number;
+            $invNo = $order->accurate_invoice_no ?? '-';
+
+            foreach ($order->items as $item) {
+                $variant = $item->variant;
+                $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
+                $merk = $variant?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
+
+                foreach ($item->promos as $promo) {
+                    $promoName = $promo->name;
+                    $discountAmount = $promo->pivot->discount_amount;
+                    $sn = $promo->pivot->serial_number ?? '-';
+                    $vendorName = $promo->pivot->vendor_name ?? $merk;
+
+                    if ($this->brandFilter && $merk !== $this->brandFilter) {
+                        continue;
+                    }
+
+                    if ($discountAmount > 0) {
+                        $rows[] = [
+                            'tanggal' => $orderDate,
+                            'order_no' => $orderNo,
+                            'inv_no' => $invNo,
+                            'cabang' => $branch,
+                            'merk' => $merk,
+                            'vendor' => $vendorName,
+                            'nama_produk' => $name,
+                            'sn' => $sn,
+                            'nama_promo' => $promoName,
+                            'nilai_klaim' => (float) $discountAmount,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $rows;
+    }
+
+    public function exportExcelClaim()
+    {
+        $rows = $this->getClaimRows();
+
+        if (empty($rows)) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Tidak ada data klaim promo untuk diexport pada rentang tanggal ini.', type: 'warning');
+            return;
+        }
+
+        $excelFileName = 'laporan_klaim_promo_' . $this->startDate . '_sd_' . $this->endDate . '.xlsx';
+        return Excel::download(new PromoReportExport($rows), $excelFileName);
+    }
+
+    public function exportCsvClaim()
+    {
+        $rows = $this->getClaimRows();
+
+        if (empty($rows)) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Tidak ada data klaim promo untuk diexport pada rentang tanggal ini.', type: 'warning');
+            return;
+        }
+
         $csvFileName = 'laporan_klaim_promo_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
 
-        return response()->streamDownload(function () use ($orders) {
+        return response()->streamDownload(function () use ($rows) {
             $file = fopen('php://output', 'w');
 
-            // Header
             fputcsv($file, [
                 'TANGGAL',
                 'NO. ORDER',
@@ -148,54 +215,10 @@ class PromoReport extends Component
                 'NILAI KLAIM PROMO (Rp)'
             ]);
 
-            foreach ($orders as $order) {
-                $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
-                $orderDate = $order->created_at->format('Y-m-d H:i');
-                $orderNo = $order->order_number;
-                $invNo = $order->accurate_invoice_no ?? '-';
-
-                $baseRow = [
-                    $orderDate,
-                    $orderNo,
-                    $invNo,
-                    $branch
-                ];
-
-                // Loop setiap item di order ini
-                foreach ($order->items as $item) {
-                    $variant = $item->variant;
-                    $name = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
-                    $merk = $variant?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
-                    
-                    // Loop setiap promo di item ini (dari order_item_promos pivot)
-                    foreach ($item->promos as $promo) {
-                        $promoName = $promo->name;
-                        $discountAmount = $promo->pivot->discount_amount;
-                        $sn = $promo->pivot->serial_number ?? '-';
-                        
-                        // Vendor name fallback
-                        $vendorName = $promo->pivot->vendor_name ?? $merk;
-
-                        // Filter by brand jika ada
-                        if ($this->brandFilter && $merk !== $this->brandFilter) {
-                            continue;
-                        }
-
-                        // Catat ke CSV
-                        if ($discountAmount > 0) {
-                            $row = array_merge($baseRow, [
-                                $merk,
-                                $vendorName,
-                                $name,
-                                $sn,
-                                $promoName,
-                                $discountAmount
-                            ]);
-                            fputcsv($file, $row);
-                        }
-                    }
-                }
+            foreach ($rows as $row) {
+                fputcsv($file, array_values($row));
             }
+
             fclose($file);
         }, $csvFileName);
     }
