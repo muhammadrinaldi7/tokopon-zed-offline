@@ -8,6 +8,8 @@ use Livewire\WithPagination;
 use App\Models\ProductAccurate;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
+use App\Exports\StockReportExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class StockReport extends Component
 {
@@ -77,6 +79,19 @@ class StockReport extends Component
             $this->sortDirection = 'asc';
             $this->sortField = $field;
         }
+    }
+
+    public function exportExcel()
+    {
+        $data = $this->getStockData();
+
+        if ($data->isEmpty()) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Tidak ada data stok untuk diexport sesuai filter yang dipilih.', type: 'warning');
+            return;
+        }
+
+        $filename = "laporan_stok_" . date('Ymd_His') . ".xlsx";
+        return Excel::download(new StockReportExport($data->toArray()), $filename);
     }
 
     public function exportCsv()
