@@ -46,6 +46,9 @@ class TradeIn extends Component
     public $photo_belakang;
     public $photo_kiri;
     public $photo_kanan;
+    public $photo_atas;
+    public $photo_bawah;
+    public $photo_box;
     public $photo_kelengkapan;
     public $name;
     public $mobilePhone;
@@ -217,6 +220,9 @@ class TradeIn extends Component
             'photo_belakang'            => 'required|image|max:5120',
             'photo_kiri'                => 'required|image|max:5120',
             'photo_kanan'               => 'required|image|max:5120',
+            'photo_atas'                => 'required|image|max:5120',
+            'photo_bawah'               => 'required|image|max:5120',
+            'photo_box'                 => 'required|image|max:5120',
             'photo_kelengkapan'         => 'required|image|max:5120',
             'old_phone_additional_note' => 'nullable|string|max:1000',
             'selectedProductId' => 'required',
@@ -252,11 +258,20 @@ class TradeIn extends Component
         'photo_belakang.image'          => 'File foto belakang harus berupa gambar.',
         'photo_belakang.max'            => 'Ukuran foto belakang maksimal 5MB.',
         'photo_kiri.required'           => 'Foto samping kiri wajib diunggah.',
-        'photo_kiri.image'              => 'File foto samping kiri harus berupa gambar.',
-        'photo_kiri.max'                => 'Ukuran foto samping kiri maksimal 5MB.',
+        'photo_kiri.image'              => 'File foto kiri harus berupa gambar.',
+        'photo_kiri.max'                => 'Ukuran foto kiri maksimal 5MB.',
         'photo_kanan.required'          => 'Foto samping kanan wajib diunggah.',
-        'photo_kanan.image'             => 'File foto samping kanan harus berupa gambar.',
-        'photo_kanan.max'               => 'Ukuran foto samping kanan maksimal 5MB.',
+        'photo_kanan.image'             => 'File foto kanan harus berupa gambar.',
+        'photo_kanan.max'               => 'Ukuran foto kanan maksimal 5MB.',
+        'photo_atas.required'           => 'Foto tampak atas wajib diunggah.',
+        'photo_atas.image'              => 'File foto atas harus berupa gambar.',
+        'photo_atas.max'                => 'Ukuran foto atas maksimal 5MB.',
+        'photo_bawah.required'          => 'Foto tampak bawah wajib diunggah.',
+        'photo_bawah.image'             => 'File foto bawah harus berupa gambar.',
+        'photo_bawah.max'               => 'Ukuran foto bawah maksimal 5MB.',
+        'photo_box.required'            => 'Foto box belakang wajib diunggah.',
+        'photo_box.image'               => 'File foto box harus berupa gambar.',
+        'photo_box.max'                 => 'Ukuran foto box maksimal 5MB.',
         'photo_kelengkapan.required'    => 'Foto kelengkapan wajib diunggah.',
         'photo_kelengkapan.image'       => 'File foto kelengkapan harus berupa gambar.',
         'photo_kelengkapan.max'         => 'Ukuran foto kelengkapan maksimal 5MB.',
@@ -361,6 +376,9 @@ class TradeIn extends Component
                 'photo_belakang' => $this->photo_belakang,
                 'photo_kiri' => $this->photo_kiri,
                 'photo_kanan' => $this->photo_kanan,
+                'photo_atas' => $this->photo_atas,
+                'photo_bawah' => $this->photo_bawah,
+                'photo_box' => $this->photo_box,
                 'photo_kelengkapan' => $this->photo_kelengkapan,
             ]);
 

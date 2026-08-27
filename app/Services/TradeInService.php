@@ -131,6 +131,9 @@ class TradeInService
                 'photo_belakang' => 'Tampak Belakang',
                 'photo_kiri' => 'Samping Kiri',
                 'photo_kanan' => 'Samping Kanan',
+                'photo_atas' => 'Tampak Atas',
+                'photo_bawah' => 'Tampak Bawah',
+                'photo_box' => 'Box Belakang',
                 'photo_kelengkapan' => 'Kelengkapan',
             ];
 

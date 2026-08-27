@@ -263,6 +263,9 @@
                                     'belakang' => 'Tampak Belakang',
                                     'kiri' => 'Samping Kiri',
                                     'kanan' => 'Samping Kanan',
+                                    'atas' => 'Tampak Atas',
+                                    'bawah' => 'Tampak Bawah',
+                                    'box' => 'Box Belakang',
                                     'kelengkapan' => 'Kelengkapan / Box',
                                 ];
                             @endphp
@@ -523,6 +526,9 @@
                             !empty($photo_belakang) &&
                             !empty($photo_kiri) &&
                             !empty($photo_kanan) &&
+                            !empty($photo_atas) &&
+                            !empty($photo_bawah) &&
+                            !empty($photo_box) &&
                             !empty($photo_kelengkapan);
                     @endphp
                     <div class="flex flex-col md:flex-row justify-between items-center mt-8 pt-4 border-t border-neutral-100 gap-4"

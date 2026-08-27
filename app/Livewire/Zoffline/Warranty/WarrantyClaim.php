@@ -51,6 +51,9 @@ class WarrantyClaim extends Component
     public $photo_belakang;
     public $photo_kiri;
     public $photo_kanan;
+    public $photo_atas;
+    public $photo_bawah;
+    public $photo_box;
     public $photo_kelengkapan;
     
     public $qc_results = [];
@@ -276,6 +279,9 @@ class WarrantyClaim extends Component
             'photo_belakang' => $this->photo_belakang,
             'photo_kiri' => $this->photo_kiri,
             'photo_kanan' => $this->photo_kanan,
+            'photo_atas' => $this->photo_atas,
+            'photo_bawah' => $this->photo_bawah,
+            'photo_box' => $this->photo_box,
             'photo_kelengkapan' => $this->photo_kelengkapan,
         ];
 
@@ -301,6 +307,9 @@ class WarrantyClaim extends Component
             'photo_belakang' => 'required|image|max:5120',
             'photo_kiri' => 'required|image|max:5120',
             'photo_kanan' => 'required|image|max:5120',
+            'photo_atas' => 'required|image|max:5120',
+            'photo_bawah' => 'required|image|max:5120',
+            'photo_box' => 'required|image|max:5120',
             'photo_kelengkapan' => 'required|image|max:5120',
         ]);
 
@@ -437,6 +446,9 @@ class WarrantyClaim extends Component
         $this->photo_belakang = null;
         $this->photo_kiri = null;
         $this->photo_kanan = null;
+        $this->photo_atas = null;
+        $this->photo_bawah = null;
+        $this->photo_box = null;
         $this->photo_kelengkapan = null;
         $this->qc_results = [];
         $this->qc_notes = '';
@@ -446,7 +458,7 @@ class WarrantyClaim extends Component
     {
         if ($this->isInspecting) {
             $this->isInspecting = false;
-            $this->reset(['photo_depan', 'photo_belakang', 'photo_kiri', 'photo_kanan', 'photo_kelengkapan', 'qc_results', 'qc_notes']);
+            $this->reset(['photo_depan', 'photo_belakang', 'photo_kiri', 'photo_kanan', 'photo_atas', 'photo_bawah', 'photo_box', 'photo_kelengkapan', 'qc_results', 'qc_notes']);
         } else {
             return $this->redirectRoute('zoffline', navigate: true);
         }

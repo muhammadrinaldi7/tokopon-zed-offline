@@ -94,16 +94,38 @@ class DevicePassport extends Component
                 ];
             }
 
+            $checklist = is_string($inspection->checklist_results) ? json_decode($inspection->checklist_results, true) : $inspection->checklist_results;
+            $passed = 0;
+            $failed = 0;
+            $checklistDetails = [];
+            
+            if (is_array($checklist)) {
+                foreach ($checklist as $chk) {
+                    if (isset($chk['type']) && $chk['type'] === 'boolean') {
+                        if (isset($chk['value']) && ($chk['value'] == 1 || $chk['value'] == '1' || $chk['value'] === true)) {
+                            $passed++;
+                        } else {
+                            $failed++;
+                        }
+                    }
+                    $checklistDetails[] = $chk;
+                }
+            }
+
             $timeline[] = [
                 'date' => $inspection->created_at,
                 'type' => $typeLabel,
                 'icon' => 'clipboard-document-check',
-                'color' => $inspection->verdict === 'pass' ? 'bg-emerald-500' : 'bg-red-500',
+                'color' => $inspection->verdict === 'pass' ? 'bg-emerald-500' : 'bg-rose-500',
                 'description' => $desc,
-                'status' => 'Inspected',
+                'status' => $inspection->verdict === 'pass' ? 'LULUS QC' : 'TIDAK LULUS',
+                'checklist' => $checklistDetails,
+                'passed_points' => $passed,
+                'failed_points' => $failed,
+                'total_points' => $passed + $failed,
                 'meta' => [
                     'Skor' => $inspection->score . '/100',
-                    'Catatan' => $inspection->notes
+                    'Catatan' => $inspection->notes ?: '-'
                 ]
             ];
         }
@@ -183,5 +205,10 @@ class DevicePassport extends Component
     public function render()
     {
         return view('livewire.zoffline.device-passport')->layout('layouts.z');
+    }
+
+    public function goBack()
+    {
+        return $this->redirect(route('zoffline.home'), navigate: true);
     }
 }

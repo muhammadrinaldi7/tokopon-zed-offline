@@ -295,7 +295,10 @@
                         'belakang' => 'Tampak Belakang',
                         'kiri' => 'Samping Kiri',
                         'kanan' => 'Samping Kanan',
-                        'kelengkapan' => 'Kelengkapan / Box / Charger',
+                        'atas' => 'Tampak Atas',
+                        'bawah' => 'Tampak Bawah',
+                        'box' => 'Box Belakang',
+                        'kelengkapan' => 'Kelengkapan / Box',
                     ];
                 @endphp
 
@@ -445,6 +448,9 @@
                     !empty($photo_belakang) &&
                     !empty($photo_kiri) &&
                     !empty($photo_kanan) &&
+                    !empty($photo_atas) &&
+                    !empty($photo_bawah) &&
+                    !empty($photo_box) &&
                     !empty($photo_kelengkapan);
 
                 // 2. Validasi Inputan Radio/Kondisi

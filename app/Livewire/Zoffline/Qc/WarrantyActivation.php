@@ -32,6 +32,9 @@ class WarrantyActivation extends Component
     public $photo_belakang;
     public $photo_kiri;
     public $photo_kanan;
+    public $photo_atas;
+    public $photo_bawah;
+    public $photo_box;
     public $photo_kelengkapan;
 
     // QC State
@@ -182,6 +185,9 @@ class WarrantyActivation extends Component
             'photo_belakang' => 'required|image|max:5120',
             'photo_kiri' => 'required|image|max:5120',
             'photo_kanan' => 'required|image|max:5120',
+            'photo_atas' => 'required|image|max:5120',
+            'photo_bawah' => 'required|image|max:5120',
+            'photo_box' => 'required|image|max:5120',
             'photo_kelengkapan' => 'required|image|max:5120',
         ]);
 
@@ -207,6 +213,9 @@ class WarrantyActivation extends Component
             'photo_belakang' => $this->photo_belakang,
             'photo_kiri' => $this->photo_kiri,
             'photo_kanan' => $this->photo_kanan,
+            'photo_atas' => $this->photo_atas,
+            'photo_bawah' => $this->photo_bawah,
+            'photo_box' => $this->photo_box,
             'photo_kelengkapan' => $this->photo_kelengkapan,
         ];
 
