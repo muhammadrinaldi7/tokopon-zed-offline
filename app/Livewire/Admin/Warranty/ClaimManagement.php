@@ -46,8 +46,7 @@ class ClaimManagement extends Component
     public $bank_no = '10.02.103';
     public $manual_note = '';
 
-    public $showEditReplacementPriceModal = false;
-    public $temp_replacement_price = 0;
+    public $is_editing_replacement_price = false;
 
     public $search_imei_query = '';
     public $imei_results = [];
@@ -203,6 +202,12 @@ class ClaimManagement extends Component
     public function cancelReplacementConfirm()
     {
         $this->showReplacementConfirmModal = false;
+        $this->resetValidation(['replacement_imei']);
+    }
+
+    public function toggleEditReplacementPrice()
+    {
+        $this->is_editing_replacement_price = !$this->is_editing_replacement_price;
     }
 
     public function approveReplacement()
@@ -473,29 +478,6 @@ class ClaimManagement extends Component
         $this->manual_note = '';
         $this->cancelReplacementProduct();
         $this->resetValidation(['replacement_imei']);
-    }
-
-    public function openEditPriceModal()
-    {
-        $this->temp_replacement_price = $this->replacement_price;
-        $this->showEditReplacementPriceModal = true;
-    }
-
-    public function closeEditPriceModal()
-    {
-        $this->showEditReplacementPriceModal = false;
-        $this->temp_replacement_price = 0;
-    }
-
-    public function saveEditedPrice()
-    {
-        $this->validate([
-            'temp_replacement_price' => 'required|numeric|min:0'
-        ]);
-
-        $this->replacement_price = $this->temp_replacement_price;
-        $this->closeEditPriceModal();
-        $this->dispatch('toast', title: 'Berhasil', message: 'Harga baru berhasil diubah', type: 'success');
     }
 
     public function openServiceForm()

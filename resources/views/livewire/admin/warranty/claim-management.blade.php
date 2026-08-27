@@ -300,16 +300,61 @@
                                                 <div class="flex items-center justify-between mb-1">
                                                     <p class="text-[10px] uppercase font-bold text-amber-700">
                                                         Harga Baru</p>
-                                                    <button type="button" wire:click="openEditPriceModal" class="text-amber-600 hover:text-amber-800 transition p-0.5 rounded focus:ring-2 focus:ring-amber-500">
-                                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                        </svg>
-                                                    </button>
+                                                    @if ($is_editing_replacement_price)
+                                                        <button type="button" wire:click.prevent="toggleEditReplacementPrice" class="text-emerald-600 hover:text-emerald-800 transition p-0.5 rounded focus:ring-2 focus:ring-emerald-500" title="Simpan Harga">
+                                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        </button>
+                                                    @else
+                                                        <button type="button" wire:click.prevent="toggleEditReplacementPrice" class="text-amber-600 hover:text-amber-800 transition p-0.5 rounded focus:ring-2 focus:ring-amber-500" title="Edit Harga">
+                                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                            </svg>
+                                                        </button>
+                                                    @endif
                                                 </div>
-                                                <div class="bg-white border border-amber-100 rounded-lg px-3 py-2">
-                                                    <p class="font-bold text-amber-900 text-sm">Rp
-                                                        {{ number_format($newPrice, 0, ',', '.') }}</p>
-                                                </div>
+                                                @if ($is_editing_replacement_price)
+                                                    <div class="relative"
+                                                        x-data="{
+                                                            price: @entangle('replacement_price').live,
+                                                            formattedPrice: '',
+                                                            formatNumber(value) {
+                                                                if (!value) return '0';
+                                                                let val = value.toString().replace(/\D/g, '');
+                                                                return new Intl.NumberFormat('id-ID').format(val);
+                                                            },
+                                                            updatePrice(value) {
+                                                                let numericValue = value.replace(/\D/g, '');
+                                                                this.price = numericValue;
+                                                                this.formattedPrice = this.formatNumber(numericValue);
+                                                            },
+                                                            init() {
+                                                                this.formattedPrice = this.formatNumber(this.price);
+                                                                $watch('price', value => {
+                                                                    if (document.activeElement !== this.$refs.priceInput) {
+                                                                        this.formattedPrice = this.formatNumber(value);
+                                                                    }
+                                                                });
+                                                            }
+                                                        }">
+                                                        <div
+                                                            class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                                                            <span class="text-sm text-amber-700 font-bold">Rp</span>
+                                                        </div>
+                                                        <input type="text"
+                                                            x-ref="priceInput"
+                                                            :value="formattedPrice"
+                                                            @input="updatePrice($event.target.value)"
+                                                            class="w-full bg-white border border-amber-200 rounded-lg pl-8 pr-2 py-2 text-sm font-bold text-amber-900 focus:ring-amber-500 focus:border-amber-500 shadow-sm"
+                                                            title="Edit harga jual kustom untuk barang pengganti ini">
+                                                    </div>
+                                                @else
+                                                    <div class="bg-white border border-amber-100 rounded-lg px-3 py-2">
+                                                        <p class="font-bold text-amber-900 text-sm">Rp
+                                                            {{ number_format($newPrice, 0, ',', '.') }}</p>
+                                                    </div>
+                                                @endif
                                             </div>
                                             <div class="border-l-2 border-amber-200 pl-4 flex-1">
                                                 <p class="text-[10px] uppercase font-bold text-amber-700 mb-1">
@@ -1433,74 +1478,4 @@
     </div>
 @endif
 
-<!-- MODAL EDIT HARGA PENGGANTI -->
-@if ($showEditReplacementPriceModal)
-    <div wire:key="modal-edit-price" class="fixed inset-0 flex items-center justify-center p-4" style="z-index: 200;">
-        <!-- Backdrop -->
-        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-            wire:click="closeEditPriceModal"></div>
-
-        <!-- Modal Content -->
-        <div class="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-200"
-            x-data x-trap.noscroll="true"
-            x-transition:enter="ease-out duration-300"
-            x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-            x-transition:leave="ease-in duration-200"
-            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
-
-            <!-- Header -->
-            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    Edit Harga Baru
-                </h3>
-                <button wire:click="closeEditPriceModal"
-                    class="text-gray-400 hover:text-gray-500 hover:bg-gray-100 p-1 rounded-lg transition-colors">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-
-            <!-- Body -->
-            <div class="px-6 py-5">
-                <p class="text-sm text-gray-500 mb-4">
-                    Masukkan harga jual kustom untuk barang pengganti ini: <br>
-                    <span class="font-bold text-gray-800">{{ $replacement_product_name }}</span>
-                </p>
-
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span class="text-gray-500 font-medium">Rp</span>
-                    </div>
-                    <input type="number" wire:model.defer="temp_replacement_price"
-                        class="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-shadow text-gray-900 font-bold"
-                        placeholder="Contoh: 5000000" autofocus>
-                </div>
-                @error('temp_replacement_price')
-                    <p class="mt-2 text-xs text-rose-500 font-medium">{{ $message }}</p>
-                @enderror
-            </div>
-
-            <!-- Footer -->
-            <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-                <button wire:click="closeEditPriceModal" type="button"
-                    class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors shadow-sm">
-                    Batal
-                </button>
-                <button wire:click="saveEditedPrice" type="button"
-                    class="px-5 py-2.5 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-xl transition-colors shadow-sm flex items-center gap-2"
-                    wire:loading.attr="disabled" wire:target="saveEditedPrice">
-                    <span wire:loading.remove wire:target="saveEditedPrice">Simpan Harga</span>
-                    <span wire:loading wire:target="saveEditedPrice">Menyimpan...</span>
-                </button>
-            </div>
-        </div>
-    </div>
-@endif
 </div>
