@@ -44,6 +44,10 @@ class ClaimManagement extends Component
     public $search_product_query = '';
     public $product_results = [];
     public $bank_no = '10.02.103';
+    public $manual_note = '';
+
+    public $showEditReplacementPriceModal = false;
+    public $temp_replacement_price = 0;
 
     public $search_imei_query = '';
     public $imei_results = [];
@@ -238,9 +242,15 @@ class ClaimManagement extends Component
             }
             $claim->resolution = 'replaced';
             $noteType = $this->replacement_type === 'same' ? 'Ganti Unit' : ($priceDifference > 0 ? 'Upgrade Unit' : 'Downgrade Unit');
-            $claim->resolution_notes = "{$noteType} ke IMEI: {$this->replacement_imei}" .
-                ($newItemNo ? " (Barang Baru: {$this->replacement_product_name})" : "") .
-                " | {$this->resolution_notes}";
+            
+            $finalNotes = "{$noteType} ke IMEI: {$this->replacement_imei}" .
+                ($newItemNo ? " (Barang Baru: {$this->replacement_product_name})" : "");
+                
+            if (!empty($this->manual_note)) {
+                $finalNotes .= "\nCatatan Tambahan: {$this->manual_note}";
+            }
+                
+            $claim->resolution_notes = $finalNotes . " | {$this->resolution_notes}";
             $claim->approved_by = Auth::id();
             $claim->save();
 
@@ -384,7 +394,7 @@ class ClaimManagement extends Component
         $this->closeReplacementForm();
         $this->closeModal(); // Pastikan modal utama juga tertutup agar state bersih
         $this->dispatch('toast', title: 'Berhasil', message: 'Unit berhasil diganti' . ($claim->status === 'waiting_refund' ? '. Sisa saldo menunggu proses refund.' : '!'), type: 'success');
-        $this->reset(['replacement_imei', 'search_imei_query', 'imei_results', 'replacement_type', 'replacement_item_no', 'replacement_price', 'replacement_product_name', 'search_product_query', 'product_results']);
+        $this->reset(['replacement_imei', 'search_imei_query', 'imei_results', 'replacement_type', 'replacement_item_no', 'replacement_price', 'replacement_product_name', 'search_product_query', 'product_results', 'manual_note']);
     }
 
     public function processRefundCash($claimId)
@@ -460,8 +470,32 @@ class ClaimManagement extends Component
         $this->search_imei_query = '';
         $this->imei_results = [];
         $this->replacement_type = 'same';
+        $this->manual_note = '';
         $this->cancelReplacementProduct();
         $this->resetValidation(['replacement_imei']);
+    }
+
+    public function openEditPriceModal()
+    {
+        $this->temp_replacement_price = $this->replacement_price;
+        $this->showEditReplacementPriceModal = true;
+    }
+
+    public function closeEditPriceModal()
+    {
+        $this->showEditReplacementPriceModal = false;
+        $this->temp_replacement_price = 0;
+    }
+
+    public function saveEditedPrice()
+    {
+        $this->validate([
+            'temp_replacement_price' => 'required|numeric|min:0'
+        ]);
+
+        $this->replacement_price = $this->temp_replacement_price;
+        $this->closeEditPriceModal();
+        $this->dispatch('toast', title: 'Berhasil', message: 'Harga baru berhasil diubah', type: 'success');
     }
 
     public function openServiceForm()

@@ -1769,9 +1769,13 @@ class AccurateService
         $businessUnit = $claim->warranty->policy->businessUnit ?? null;
         $isTaxable = $businessUnit?->is_taxable ?? false;
 
-        // Gudang Retur idealnya diambil dari settingan Business Unit,
-        $warehouseReturnName = $claim->warranty->policy?->businessUnit?->accurate_return_warehouse_name ?? 'GSK - Return';
         $warehouseMainName = Auth::user()->warehouse->name ?? 'Gudang Utama';
+
+        // Gudang Retur diambil dari settingan Business Unit. Jika kosong, fallback ke gudang pemroses (User).
+        $warehouseReturnName = $claim->warranty->policy?->businessUnit?->accurate_return_warehouse_name;
+        if (empty(trim($warehouseReturnName))) {
+            $warehouseReturnName = $warehouseMainName;
+        }
 
         // --- PROSES 1: SALES RETURN (MENARIK IMEI LAMA) ---
         Log::info("Mempersiapkan Sales Return ke Accurate untuk IMEI Lama: " . $claim->serial_number);
