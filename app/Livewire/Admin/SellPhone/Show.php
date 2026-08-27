@@ -170,24 +170,46 @@ class Show extends Component
                 return;
             }
 
+            // Tentukan nomor proyek berdasarkan Business Unit & jenis proyek produk
+            $projectNo = null;
+            if ($this->sellPhone->business_unit_id == 2) {
+                $namaProyek = strtoupper($phoneData->productAccurate->proyek ?? '');
+                switch ($namaProyek) {
+                    case 'RESMI':
+                        $projectNo = 'P.00008';
+                        break;
+                    case 'BEACUKAI':
+                        $projectNo = 'P.00009';
+                        break;
+                    case 'INTER':
+                        $projectNo = 'P.00010';
+                        break;
+                }
+            }
+
             // 1. Susun Array untuk detailItem terlebih dahulu agar lebih rapi
-            $detailItem = [
-                [
-                    // Gunakan itemNo dari ProductAccurate yang terkait
-                    'itemNo' => $itemNo,
-                    'warehouseName' => $accurateWarehouseName,
-                    'unitPrice' => (int) $this->sellPhone->appraised_value, // Harga yang disepakati
-                    'quantity' => 1,
-                    'useTax1' => false,
-                    // Array di dalam array untuk serial number
-                    'detailSerialNumber' => [
-                        [
-                            'serialNumberNo' => $this->sellPhone->imei ?? 'NO-IMEI-' . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT), // Kolom IMEI/SN HP
-                            'quantity' => 1
-                        ]
+            $itemDetail = [
+                // Gunakan itemNo dari ProductAccurate yang terkait
+                'itemNo' => $itemNo,
+                'warehouseName' => $accurateWarehouseName,
+                'unitPrice' => (int) $this->sellPhone->appraised_value, // Harga yang disepakati
+                'quantity' => 1,
+                'useTax1' => false,
+                // Array di dalam array untuk serial number
+                'detailSerialNumber' => [
+                    [
+                        'serialNumberNo' => $this->sellPhone->imei ?? 'NO-IMEI-' . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT), // Kolom IMEI/SN HP
+                        'quantity' => 1
                     ]
                 ]
             ];
+
+            // Tambahkan projectNo jika ada
+            if ($projectNo) {
+                $itemDetail['projectNo'] = $projectNo;
+            }
+
+            $detailItem = [$itemDetail];
 
             // Tentukan database source dari Business Unit kasir/admin
             $dbSource = $flUser && $flUser->businessUnit ? strtolower($flUser->businessUnit->code) : 'gsk';
