@@ -208,6 +208,32 @@
                                 </div>
                                 <span class="block text-xs sm:text-sm text-center leading-tight">Klaim Garansi</span>
                             </button>
+                            
+                            <a href="{{ route('zoffline.qc-returns') }}" wire:navigate @click="openGaransiModal = false"
+                                class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
+                                <div
+                                    class="w-12 h-12 rounded-xl bg-red-100/50 flex items-center justify-center text-red-500 group-hover:scale-110 transition-transform">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                    </svg>
+                                </div>
+                                <span class="block text-xs sm:text-sm text-center leading-tight">QC Retur</span>
+                            </a>
+
+                            <a href="{{ route('zoffline.device-passport') }}" wire:navigate @click="openGaransiModal = false"
+                                class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
+                                <div
+                                    class="w-12 h-12 rounded-xl bg-purple-100/50 flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
+                                    </svg>
+                                </div>
+                                <span class="block text-xs sm:text-sm text-center leading-tight">Device Passport</span>
+                            </a>
 
                             <button wire:click="navigateToClaimManagement" @click="openGaransiModal = false"
                                 class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">

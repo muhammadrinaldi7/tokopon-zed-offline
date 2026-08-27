@@ -1,10 +1,12 @@
 <?php
 
-namespace App\Livewire\Admin\Qc;
+namespace App\Livewire\Zoffline\Qc;
 
 use Livewire\Component;
 use App\Models\WarrantyClaim;
+use Livewire\Attributes\Layout;
 
+#[Layout('layouts.z')]
 class ReturnIndex extends Component
 {
     public function render()
@@ -12,7 +14,7 @@ class ReturnIndex extends Component
         // Cari klaim garansi yang sudah selesai, statusnya 'replaced', 
         // dan belum ada DeviceInspection untuknya.
         // Asumsi: barang lama (yang rusak) butuh di-QC.
-        
+
         $claims = WarrantyClaim::with(['warranty.orderItem.variant', 'customer'])
             ->where('status', 'completed')
             ->where('resolution', 'replaced')
@@ -20,7 +22,7 @@ class ReturnIndex extends Component
             ->orderBy('updated_at', 'desc')
             ->get();
 
-        return view('livewire.admin.qc.return-index', [
+        return view('livewire.zoffline.qc.return-index', [
             'claims' => $claims
         ]);
     }

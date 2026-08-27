@@ -51,6 +51,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/check-serial-number/history', SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
     Route::get('/zoffline/qc/list-activation', ActivationList::class)->name('zoffline.qc.list-activation');
 
+    Route::get('/zoffline/qc-returns', \App\Livewire\Zoffline\Qc\ReturnIndex::class)->name('zoffline.qc-returns');
+    Route::get('/zoffline/qc-returns/{claim}/inspect', \App\Livewire\Zoffline\Qc\ReturnInspect::class)->name('zoffline.qc-returns.inspect');
+    Route::get('/zoffline/device-passport', \App\Livewire\Zoffline\DevicePassport::class)->name('zoffline.device-passport');
+    
     // Zoffline Approvals & Settings
     Route::get('/zoffline/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('zoffline.approvals.index');
     Route::get('/zoffline/approval-rules', \App\Livewire\Admin\Settings\ApprovalRule\Index::class)->name('zoffline.approval-rules.index')->middleware('can:manage-settings');
@@ -98,11 +102,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     // Route::get('/pos', \App\Livewire\Admin\Pos\PointOfSale::class)->name('pos')->middleware('can:view-pos');
     Route::livewire('/dashboard', 'pages::admin.dashboard')->name('dashboard')->middleware('can:view_dashboard');
-    Route::get('/device-passport', \App\Livewire\Admin\DevicePassport::class)->name('device-passport');
-    
     // QC & Inspeksi
-    Route::get('/qc-returns', \App\Livewire\Admin\Qc\ReturnIndex::class)->name('qc.returns');
-    Route::get('/qc-returns/{claim}/inspect', \App\Livewire\Admin\Qc\ReturnInspect::class)->name('qc.returns.inspect');
     Route::get('/purchase-invoice-export', AccurateInvoiceExport::class)->name('purchase.invoice.export');
 
     // Administrator

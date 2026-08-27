@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Admin;
+namespace App\Livewire\Zoffline;
 
 use Livewire\Component;
 use App\Models\OrderItem;
@@ -30,17 +30,20 @@ class DevicePassport extends Component
         $deviceModel = 'Unknown Device';
         $deviceSpecs = '';
 
-        // 1. Cari di Penjualan (OrderItem)
-        $orderItems = OrderItem::with(['order.user', 'order.businessUnit', 'variant', 'warranty'])
+        // 1. Cari di Penjualan (OrderItem melalui OrderItemSerialNumber)
+        $orderItemSns = \App\Models\OrderItemSerialNumber::with(['orderItem.order.user', 'orderItem.order.businessUnit', 'orderItem.variant', 'warranty'])
             ->where('serial_number', 'LIKE', '%' . $imei . '%')
             ->get();
 
-        foreach ($orderItems as $item) {
+        foreach ($orderItemSns as $snRecord) {
+            $item = $snRecord->orderItem;
+            if (!$item) continue;
+
             $deviceModel = $item->product_name;
             $deviceSpecs = $item->variant ? $item->variant->name : '';
             
             $status = 'Terjual';
-            if ($item->warranty && $item->warranty->status === 'voided') {
+            if ($snRecord->warranty && $snRecord->warranty->status === 'voided') {
                 $status = 'Terjual (Garansi Void)';
             }
 
@@ -49,10 +52,11 @@ class DevicePassport extends Component
                 'type' => 'Penjualan (Sales)',
                 'icon' => 'shopping-cart',
                 'color' => 'bg-green-500',
-                'description' => "Barang terjual kepada " . ($item->order->user ? $item->order->user->name : 'Customer') . " di " . ($item->order->businessUnit ? $item->order->businessUnit->name : 'Unknown Branch') . ".",
+                'description' => "Perangkat dijual pada order #" . ($item->order->order_number ?? '-'),
                 'status' => $status,
                 'meta' => [
-                    'Order ID' => $item->order->order_number,
+                    'Customer' => $item->order->user->name ?? 'Tamu',
+                    'Cabang' => $item->order->businessUnit->name ?? '-',
                     'Harga' => 'Rp ' . number_format($item->price, 0, ',', '.')
                 ]
             ];
@@ -127,9 +131,12 @@ class DevicePassport extends Component
             ];
         }
 
-        // Cari klaim dimana IMEI ini adalah IMEI Pengganti
-        $claimsAsNew = WarrantyClaim::where('replacement_imei', 'LIKE', '%' . $imei . '%')->get();
-        foreach ($claimsAsNew as $claim) {
+        // Cari klaim dimana IMEI ini adalah IMEI Pengganti (lewat tabel WarrantyReplacement)
+        $replacementsAsNew = \App\Models\WarrantyReplacement::with('claim')->where('new_imei', 'LIKE', '%' . $imei . '%')->get();
+        foreach ($replacementsAsNew as $replacement) {
+            $claim = $replacement->claim;
+            if (!$claim) continue;
+            
             $timeline[] = [
                 'date' => $claim->resolved_at ?: $claim->updated_at,
                 'type' => 'Klaim Garansi (Keluar sbg Pengganti)',
@@ -139,7 +146,8 @@ class DevicePassport extends Component
                 'status' => 'Terjual (Replacement)',
                 'meta' => [
                     'Klaim ID' => 'CLM-' . $claim->id,
-                    'Catatan' => $claim->resolution_notes
+                    'Catatan' => $claim->resolution_notes,
+                    'IMEI Rusak Lama' => $replacement->old_imei
                 ]
             ];
         }
@@ -174,6 +182,6 @@ class DevicePassport extends Component
 
     public function render()
     {
-        return view('livewire.admin.device-passport');
+        return view('livewire.zoffline.device-passport')->layout('layouts.z');
     }
 }

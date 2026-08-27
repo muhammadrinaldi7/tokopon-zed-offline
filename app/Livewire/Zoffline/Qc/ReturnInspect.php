@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Livewire\Admin\Qc;
+namespace App\Livewire\Zoffline\Qc;
 
 use Livewire\Component;
 use App\Models\WarrantyClaim;
 use Livewire\Attributes\On;
 use App\Services\AccurateService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class ReturnInspect extends Component
@@ -15,11 +16,11 @@ class ReturnInspect extends Component
     public function mount(WarrantyClaim $claim)
     {
         $this->claim = $claim->load(['warranty.orderItem.variant', 'customer']);
-        
+
         // Cek jika sudah di-QC
         if ($this->claim->inspection()->exists()) {
             session()->flash('error', 'Barang retur ini sudah melalui proses QC.');
-            return redirect()->route('admin.qc.returns');
+            return redirect()->route('zoffline.qc-returns');
         }
     }
 
@@ -28,15 +29,15 @@ class ReturnInspect extends Component
     {
         try {
             Log::info("QC Return tersimpan untuk klaim ID: {$this->claim->id} dengan hasil: {$verdict}");
-            
+
             // 1. Dapatkan Business Unit Code
             $businessUnitCode = $this->claim->warranty->policy->businessUnit->code ?? 'syihab';
-            
+
             // 2. Tentukan SKU Asli dan SKU Tujuan (berdasarkan verdict / manual)
             // Asumsi: SKU lama bisa didapat dari $this->claim->warranty->orderItem->variant->accurateData->item_no
             // Untuk SKU tujuan (Grade B/C), butuh logic lebih lanjut. Sebagai MVP, kita gunakan SKU original tapi dipindah Gudang.
             // Atau cukup buat API hit (Item Adjustment out dari gudang retur, in ke gudang cabang)
-            
+
             $variant = $this->claim->warranty->orderItem->variant ?? null;
             $originalItemNo = 'UNKNOWN-SKU';
             if ($variant) {
@@ -48,7 +49,7 @@ class ReturnInspect extends Component
             }
 
             $warehouseReturn = $this->claim->warranty->policy->businessUnit->accurate_return_warehouse_name ?? 'GSK - Return';
-            $warehouseBranch = auth()->user()->warehouse->name ?? 'Gudang Utama';
+            $warehouseBranch = Auth::user()->warehouse->name ?? 'Gudang Utama';
 
             $accurateService = app(AccurateService::class);
 
@@ -84,7 +85,7 @@ class ReturnInspect extends Component
             ];
 
             Log::info("Mencoba melakukan Item Adjustment di Accurate:", $payload);
-            
+
             $accurateResponse = $accurateService->postItemAdjustment($payload, $businessUnitCode);
             Log::info("Respon Item Adjustment:", (array)$accurateResponse);
 
@@ -94,12 +95,12 @@ class ReturnInspect extends Component
             session()->flash('error', 'Inspeksi tersimpan, namun gagal menyesuaikan stok di Accurate: ' . $e->getMessage());
         }
 
-        return redirect()->route('admin.qc.returns');
+        return redirect()->route('zoffline.qc-returns');
     }
 
     public function render()
     {
-        return view('livewire.admin.qc.return-inspect')
-            ->layout('layouts.app'); // Sesuaikan layout admin jika perlu, misal 'components.layouts.app'
+        return view('livewire.zoffline.qc.return-inspect')
+            ->layout('layouts.z'); // Sesuaikan layout admin jika perlu, misal 'components.layouts.app'
     }
 }
