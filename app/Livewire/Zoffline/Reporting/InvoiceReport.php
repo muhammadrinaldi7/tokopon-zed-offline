@@ -7,6 +7,8 @@ use Carbon\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
+use App\Exports\InvoiceReportExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class InvoiceReport extends Component
 {
@@ -105,17 +107,97 @@ class InvoiceReport extends Component
             ->latest('orders.created_at');
     }
 
+    protected function getPaymentRows(): array
+    {
+        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate'])->get();
+        $rows = [];
+
+        foreach ($orders as $order) {
+            $namaToko = $order->shipping_address_snapshot['store'] ?? null;
+            $invoiceNo = $order->accurate_invoice_no ?? $order->accurate_so_number ?? null;
+            $orderNo = $order->order_number;
+
+            if ($order->payments && $order->payments->count() > 0) {
+                foreach ($order->payments as $payment) {
+                    $paymentDate = $payment->paid_at ?? $payment->created_at;
+                    $createdAt = $paymentDate ? $paymentDate->format('Y-m-d') : null;
+                    $bankName = $payment->paymentMethod->bank_name ?? null;
+                    $paymentType = $this->getPaymentType($payment);
+                    $pmName = $payment->paymentMethod->name ?? null;
+                    $pmrName = $payment->paymentMethodRate->name ?? null;
+                    $mdrPct = $payment->paymentMethodRate->mdr_percentage ?? 0;
+                    $amount = $payment->amount ?? 0;
+                    $jamBayar = $payment ? $payment->created_at->format('H:i:s') : null;
+                    $mdr = round(($amount * $mdrPct) / 100);
+
+                    $rows[] = [
+                        'created_at' => $createdAt,
+                        'nama_kasir' => $order->handledBy->name ?? '-',
+                        'jam' => $jamBayar,
+                        'nama_toko' => $namaToko,
+                        'accurate_invoice_no' => $invoiceNo,
+                        'order_number' => $orderNo,
+                        'catatan' => $order->notes,
+                        'no_kontrak' => $payment->no_kontrak,
+                        'tipe_pembayaran' => $paymentType,
+                        'bankName' => $bankName,
+                        'paymentMethod' => $pmName,
+                        'variantMethod' => $pmrName,
+                        'amount' => $amount,
+                        'mdr' => $mdr,
+                    ];
+                }
+            } else {
+                $rows[] = [
+                    'created_at' => $order->created_at ? $order->created_at->format('Y-m-d') : null,
+                    'nama_kasir' => $order->handledBy->name ?? '-',
+                    'jam' => $order->created_at ? $order->created_at->format('H:i:s') : '-',
+                    'nama_toko' => $namaToko,
+                    'accurate_invoice_no' => $invoiceNo,
+                    'order_number' => $orderNo,
+                    'catatan' => $order->notes,
+                    'no_kontrak' => null,
+                    'tipe_pembayaran' => null,
+                    'bankName' => null,
+                    'paymentMethod' => null,
+                    'variantMethod' => null,
+                    'amount' => null,
+                    'mdr' => null,
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    public function exportExcelOrderPayments()
+    {
+        $rows = $this->getPaymentRows();
+
+        if (empty($rows)) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Tidak ada data pembayaran untuk diexport sesuai filter yang dipilih.', type: 'warning');
+            return;
+        }
+
+        $filename = 'laporan_pembayaran_' . $this->startDate . '_sd_' . $this->endDate . '.xlsx';
+        return Excel::download(new InvoiceReportExport($rows), $filename);
+    }
+
     public function exportCsvOrderPayments()
     {
-        // Eager load relasi yang dibutuhkan untuk menyimulasikan LEFT JOIN di SQL
-        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate'])->get();
+        $rows = $this->getPaymentRows();
+
+        if (empty($rows)) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Tidak ada data pembayaran untuk diexport sesuai filter yang dipilih.', type: 'warning');
+            return;
+        }
+
         $csvFileName = 'laporan_pembayaran_' . $this->startDate . '_sd_' . $this->endDate . '.csv';
         $separator = $this->csvSeparator;
 
-        return response()->streamDownload(function () use ($orders, $separator) {
+        return response()->streamDownload(function () use ($rows, $separator) {
             $file = fopen('php://output', 'w');
 
-            // 1. Susun Header sesuai dengan kolom SELECT pada SQL
             $headers = [
                 'created_at',
                 'nama_kasir',
@@ -135,68 +217,8 @@ class InvoiceReport extends Component
 
             fputcsv($file, $headers, $separator);
 
-            // 2. Loop data order dan payment
-            foreach ($orders as $order) {
-                // Sama dengan JSON_VALUE(o.shipping_address_snapshot,'$.store')
-                $namaToko = $order->shipping_address_snapshot['store'] ?? null;
-
-                $invoiceNo = $order->accurate_invoice_no ?? $order->accurate_so_number ?? null;
-                $orderNo = $order->order_number;
-
-                // Simulasi: LEFT JOIN order_payments op ON o.id = op.order_id
-                if ($order->payments && $order->payments->count() > 0) {
-                    foreach ($order->payments as $payment) {
-                        $paymentDate = $payment->paid_at ?? $payment->created_at;
-                        $createdAt = $paymentDate ? $paymentDate->format('Y-m-d') : null;
-
-                        // Ekstrak data dari relasi (LEFT JOIN payment_methods & payment_method_rates)
-                        $bankName = $payment->paymentMethod->bank_name ?? null;
-                        $paymentType = $this->getPaymentType($payment);
-                        $pmName = $payment->paymentMethod->name ?? null;
-                        $pmrName = $payment->paymentMethodRate->name ?? null;
-                        $mdrPct = $payment->paymentMethodRate->mdr_percentage ?? 0;
-                        $amount = $payment->amount ?? 0;
-
-                        $jamBayar = $payment ? $payment->created_at->format('H:i:s') : null;
-
-                        // round(op.amount * pmr.mdr_percentage /100) as mdr
-                        $mdr = round(($amount * $mdrPct) / 100);
-
-                        fputcsv($file, [
-                            $createdAt,
-                            $order->handledBy->name,
-                            $jamBayar,
-                            $namaToko,
-                            $invoiceNo,
-                            $orderNo,
-                            $order->notes,
-                            $payment->no_kontrak,
-                            $paymentType,
-                            $bankName,
-                            $pmName,
-                            $pmrName,
-                            $amount,
-                            $mdr
-                        ], $separator);
-                    }
-                } else {
-                    // Sifat LEFT JOIN: Jika order tidak memiliki payment, baris tetap dirender dengan value payment kosong (null)
-                    fputcsv($file, [
-                        $createdAt,
-                        $order->handledBy->name,
-                        $jamBayar ?? '-',
-                        $namaToko,
-                        $invoiceNo,
-                        $orderNo,
-                        null, // catatan
-                        null, // no_kontrak
-                        null, // tipe_pembayaran
-                        null, // paymentMethod
-                        null, // variantMethod
-                        null, // amount
-                        null  // mdr
-                    ], $separator);
-                }
+            foreach ($rows as $row) {
+                fputcsv($file, array_values($row), $separator);
             }
 
             fclose($file);
@@ -267,10 +289,9 @@ class InvoiceReport extends Component
             ->sum(\Illuminate\Support\Facades\DB::raw('(order_payments.amount * COALESCE(payment_method_rates.mdr_percentage, 0)) / 100'));
 
         $totalNet = $totalGrandTotal - $totalMdr;
-        // dd($this->ordersQuery);
+        
         return view('livewire.zoffline.reporting.invoice-report', [
             'orders' => $orders,
-            // 'payment' => $orders->accurateDocs->where('doc_type', 'SALES_RECEIPT')->get(),
             'availableBranches' => $availableBranches,
             'summary' => [
                 'count' => $orders->total(),
