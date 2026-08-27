@@ -12,6 +12,8 @@ use App\Services\AccurateService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Storage;
 
 class SellPhoneDetail extends Component
 {
@@ -111,10 +113,35 @@ class SellPhoneDetail extends Component
         $hmacHeader = "hmac username=\"{$clientId}\", algorithm=\"hmac-sha256\", headers=\"date request-line\", signature=\"{$signature}\"";
         $idempotencyKey = (string) \Illuminate\Support\Str::uuid();
 
-        $imageUrl = asset('storage/' . $this->sellPhone->payment_receipt_path);
-        // Get file extension from path
         $extension = pathinfo($this->sellPhone->payment_receipt_path, PATHINFO_EXTENSION);
-        $filename = 'Bukti_Transfer_' . $this->sellPhone->id . '.' . ($extension ?: 'jpg');
+        
+        // Qontak expects a DOCUMENT (e.g., pdf) because of the template header.
+        // We will wrap the uploaded image into a PDF file on the fly.
+        $imagePath = storage_path('app/public/' . $this->sellPhone->payment_receipt_path);
+        if (file_exists($imagePath)) {
+            $imageData = base64_encode(file_get_contents($imagePath));
+            $mimeType = mime_content_type($imagePath) ?: 'image/jpeg';
+            $src = 'data:' . $mimeType . ';base64,' . $imageData;
+            
+            $html = '
+            <html>
+            <body style="margin: 0; padding: 20px; text-align: center;">
+                <h3>Bukti Pembayaran Sell Phone</h3>
+                <img src="' . $src . '" style="max-width: 100%; height: auto;">
+            </body>
+            </html>';
+            
+            $pdf = Pdf::loadHTML($html);
+            $pdfPath = 'payment_receipts/pdf_bukti_' . $this->sellPhone->id . '.pdf';
+            Storage::disk('public')->put($pdfPath, $pdf->output());
+            
+            $documentUrl = asset('storage/' . $pdfPath);
+            $filename = 'Bukti_Transfer_SPL' . $this->sellPhone->id . '.pdf';
+        } else {
+            // Fallback if file doesn't exist locally for some reason
+            $documentUrl = asset('storage/' . $this->sellPhone->payment_receipt_path);
+            $filename = 'Bukti_Transfer_SPL' . $this->sellPhone->id . '.' . ($extension ?: 'jpg');
+        }
 
         $payload = [
             'to_name' => $this->sellPhone->user->name ?? 'Customer',
@@ -126,7 +153,7 @@ class SellPhoneDetail extends Component
                 'header' => [
                     'format' => 'DOCUMENT',
                     'params' => [
-                        ['key' => 'url', 'value' => $imageUrl],
+                        ['key' => 'url', 'value' => $documentUrl],
                         ['key' => 'filename', 'value' => $filename]
                     ]
                 ],
@@ -150,9 +177,11 @@ class SellPhoneDetail extends Component
             if ($response->successful()) {
                 $this->dispatch('toast', title: 'Berhasil', message: 'Bukti pembayaran berhasil dikirim via WA!', type: 'success');
             } else {
+                Log::error('Mekari API Error: ' . $response->status() . ' - ' . $response->body());
                 $this->dispatch('toast', title: 'Gagal API', message: 'Mekari: Code ' . $response->status(), type: 'error');
             }
         } catch (\Exception $e) {
+            Log::error('Mekari API Exception: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
         }
     }

@@ -141,7 +141,7 @@ class Show extends Component
         }
 
         $this->showQcWarningModal = false; // Hide if open
-        
+
         $billNumber = 'TPD-' . date('dmY') . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT);
 
         if ($this->sellPhone->status === 'COMPLETED' || $this->sellPhone->status === 'CANCELLED') return;
@@ -164,7 +164,7 @@ class Show extends Component
             $accurateBranchName = $flUser && $flUser->branch ? $flUser->branch->name : 'Banjarbaru';
             $accurateWarehouseName = $flUser && $flUser->warehouse ? $flUser->warehouse->name : 'Head Office';
 
-            $itemNo = $phoneData->buybackDevice->productAccurate->item_no ?? null;
+            $itemNo = $phoneData->productAccurate->item_no ?? null;
             if (!$itemNo || $itemNo === 'TES-001') {
                 $this->dispatch('toast', ['type' => 'error', 'title' => 'Gagal', 'message' => 'Barang (Master HP Bekas) belum disinkronkan dari Accurate. Item No tidak valid.']);
                 return;

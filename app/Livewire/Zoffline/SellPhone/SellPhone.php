@@ -743,6 +743,51 @@ class SellPhone extends Component
                 "List QC:\n" . $qcListText . "\n\n" .
                 "Minus:\n" . str_replace(" | ", "\n", $sellPhone->minus_desc);
 
+            // 1. Peringatan Edit Harga
+            if ($sellPhone->is_price_adjusted) {
+                $difference = $sellPhone->appraised_value - $sellPhone->original_appraised_value;
+                $diffText = "Rp " . number_format(abs($difference), 0, ',', '.');
+                $originalPriceText = "Rp " . number_format($sellPhone->original_appraised_value, 0, ',', '.');
+                
+                $reasonText .= "\n\n⚠️ *Peringatan Nego Harga!*\n";
+                if ($difference > 0) {
+                    $reasonText .= "Harga dinaikkan sebesar *$diffText* dari taksiran sistem ($originalPriceText).";
+                } else {
+                    $reasonText .= "Harga diturunkan sebesar *$diffText* dari taksiran sistem ($originalPriceText).";
+                }
+            }
+
+            // 2. Analisa Pasar Historis
+            $historyStats = \App\Models\SellPhone::where('phone_brand', $sellPhone->phone_brand)
+                ->where('phone_model', $sellPhone->phone_model)
+                ->where('phone_storage', $sellPhone->phone_storage)
+                ->whereIn('status', ['COMPLETED', 'PAYING'])
+                ->selectRaw('AVG(appraised_value) as average_price, COUNT(id) as total_count')
+                ->first();
+            
+            if ($historyStats && $historyStats->total_count > 0) {
+                $averagePrice = $historyStats->average_price;
+                $historyCount = $historyStats->total_count;
+                
+                $avgDiff = $sellPhone->appraised_value - $averagePrice;
+                $avgDiffText = "Rp " . number_format(abs($avgDiff), 0, ',', '.');
+                $avgPriceText = "Rp " . number_format($averagePrice, 0, ',', '.');
+
+                $reasonText .= "\n\n📊 *Analisa Pasar (Data Historis ZED):*\n";
+                $reasonText .= "Rata-rata beli: *$avgPriceText*\n";
+                if ($avgDiff > 0) {
+                    $reasonText .= "Pengajuan kali ini *LEBIH MAHAL $avgDiffText* dari rata-rata historis.\n";
+                } elseif ($avgDiff < 0) {
+                    $reasonText .= "Pengajuan kali ini *LEBIH MURAH $avgDiffText* dari rata-rata historis.\n";
+                } else {
+                    $reasonText .= "Pengajuan kali ini *SAMA* dengan rata-rata historis.\n";
+                }
+                $reasonText .= "*(Dari total $historyCount transaksi sebelumnya)*";
+            } else {
+                $reasonText .= "\n\n📊 *Analisa Pasar (Data Historis ZED):*\n";
+                $reasonText .= "Belum ada riwayat transaksi sukses untuk tipe HP ini.";
+            }
+
             $requestApproval = $sellPhone->approvalRequests()->create([
                 'request_type' => 'SELL_PHONE_APPROVAL',
                 'requested_by' => Auth::id(),
