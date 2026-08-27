@@ -78,6 +78,11 @@ class Home extends Component
         return $this->redirectRoute('zoffline.reporting', navigate: true);
     }
 
+    public function navigateToCheckPrice()
+    {
+        return $this->redirectRoute('zoffline.reporting.cek-harga', navigate: true);
+    }
+
     public function navigateToZPos()
     {
         return $this->redirectRoute('zoffline.pos', navigate: true);

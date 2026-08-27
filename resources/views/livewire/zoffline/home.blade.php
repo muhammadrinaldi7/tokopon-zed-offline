@@ -437,6 +437,19 @@
                                 <span class="block text-xs sm:text-sm text-center leading-tight">Tarik Laporan</span>
                             </button>
 
+                            <button wire:click="navigateToCheckPrice" @click="openReportModal = false"
+                                class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
+                                <div
+                                    class="w-12 h-12 rounded-xl bg-teal-100/50 flex items-center justify-center text-teal-600 group-hover:scale-110 transition-transform">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                    </svg>
+                                </div>
+                                <span class="block text-xs sm:text-sm text-center leading-tight">Cek Harga</span>
+                            </button>
+
                             <button wire:click="navigateToSellManagement" @click="openReportModal = false"
                                 class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
                                 <div

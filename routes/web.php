@@ -47,6 +47,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/warranty-claim', WarrantyClaim::class)->name('zoffline.warranty-claim')->middleware('can:warranty-activation');
     Route::get('/zoffline/cek-stock', CekStock::class)->name('zoffline.cek-stock')->middleware('can:view-stock');
     Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view-reporting');
+    Route::get('/zoffline/reporting/cek-harga', \App\Livewire\Zoffline\Reporting\CheckPrice::class)->name('zoffline.reporting.cek-harga')->middleware('can:view-reporting');
+    Route::get('/zoffline/reporting/pembelian', \App\Livewire\Zoffline\Reporting\LaporanPembelian::class)->name('zoffline.reporting.pembelian')->middleware('can:view-reporting');
     Route::get('/zoffline/check-serial-number', CheckSerialNumber::class)->name('zoffline.check-serial-number')->middleware('can:view-warehouse-stocks');
     Route::get('/zoffline/check-serial-number/history', SerialNumberHistory::class)->name('zoffline.warehouse.sn-history')->middleware('can:view-warehouse-stocks');
     Route::get('/zoffline/qc/list-activation', ActivationList::class)->name('zoffline.qc.list-activation');

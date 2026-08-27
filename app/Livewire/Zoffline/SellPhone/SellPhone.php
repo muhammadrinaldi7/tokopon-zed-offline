@@ -663,7 +663,7 @@ class SellPhone extends Component
         // Simpan ke Database
         $sellPhone = \App\Models\SellPhone::create([
             'user_id'           => $userIdToSave,
-            'buyback_device_id' => null,
+            'product_accurate_id' => $productAccurate->id,
             'phone_brand'       => $productAccurate->brandName,
             'phone_model'       => $productAccurate->name,
             'phone_ram'         => null,

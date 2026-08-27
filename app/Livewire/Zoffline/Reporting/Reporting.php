@@ -23,6 +23,11 @@ class Reporting extends Component
         return $this->redirectRoute('reporting.promo', navigate: true);
     }
 
+    public function navigateToLaporanPembelian()
+    {
+        return $this->redirectRoute('zoffline.reporting.pembelian', navigate: true);
+    }
+
     public function navigateToProducts()
     {
         return $this->redirectRoute('reporting.products', navigate: true);

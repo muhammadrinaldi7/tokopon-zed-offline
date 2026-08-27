@@ -53,6 +53,22 @@
             </div>
         </div>
 
+        <!-- Card: Laporan Pembelian -->
+        <div wire:click="navigateToLaporanPembelian"
+            class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+            <div class="rounded-full w-16 h-16 bg-emerald-50 flex items-center justify-center text-emerald-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Laporan Pembelian</h2>
+                <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Data pembelian barang dari pelanggan (Tukar Tambah & Jual HP).</p>
+            </div>
+        </div>
+
         <!-- Card 4: Kinerja Produk -->
         <div wire:click="navigateToProducts"
             class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
