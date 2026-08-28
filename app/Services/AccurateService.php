@@ -29,6 +29,38 @@ class AccurateService
         ];
     }
 
+    /**
+     * Fetch Project List from Accurate
+     * 
+     * @param string $databaseSource
+     * @return array
+     * @throws \Exception
+     */
+    public function projectListDo($databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->get($config['host'] . '/project/list.do');
+
+        Log::info("API Accurate Project List ({$databaseSource}): " . $response->body());
+        
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                $result = $data['d'];
+                return $result;
+            }
+            return [];
+        } else {
+            Log::error("API Accurate Project List Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
 
     /**
      * Fetch Item Detail from Accurate

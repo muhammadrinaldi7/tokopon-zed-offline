@@ -34,4 +34,9 @@ class BusinessUnit extends Model
     {
         return $this->hasMany(Warehouse::class);
     }
+
+    public function businessUnitProjects()
+    {
+        return $this->hasMany(BusinessUnitProject::class);
+    }
 }

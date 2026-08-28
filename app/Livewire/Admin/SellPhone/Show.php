@@ -171,21 +171,15 @@ class Show extends Component
             }
 
             // Tentukan nomor proyek berdasarkan Business Unit & jenis proyek produk
-            $projectNo = null;
-            if ($this->sellPhone->business_unit_id == 2) {
-                $namaProyek = strtoupper($phoneData->productAccurate->proyek ?? '');
-                switch ($namaProyek) {
-                    case 'RESMI':
-                        $projectNo = 'P.00008';
-                        break;
-                    case 'BEACUKAI':
-                        $projectNo = 'P.00009';
-                        break;
-                    case 'INTER':
-                        $projectNo = 'P.00010';
-                        break;
-                }
-            }
+            $namaProyek = trim(strtoupper($phoneData->productAccurate->proyek ?? ''));
+            
+            // Mengambil secara dinamis dari tabel business_unit_projects
+            // Jika tidak ditemukan, fallback ke nama aslinya (jika kosong jadi null agar tidak dikirim ke accurate)
+            $projectNo = \App\Models\BusinessUnitProject::getProjectNoByBusinessUnit(
+                $this->sellPhone->business_unit_id,
+                $namaProyek,
+                $namaProyek ?: null
+            );
 
             // 1. Susun Array untuk detailItem terlebih dahulu agar lebih rapi
             $itemDetail = [
