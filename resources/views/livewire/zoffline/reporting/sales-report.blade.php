@@ -124,15 +124,83 @@
                 </div>
             </div>
 
-            {{-- Filter Proyek --}}
-            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
-                <select wire:model.live="proyekFilter"
-                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 cursor-pointer w-full truncate">
-                    <option value="">Semua Proyek</option>
-                    @foreach ($availableProjects as $proyek)
-                        <option value="{{ $proyek }}">{{ $proyek }}</option>
-                    @endforeach
-                </select>
+            {{-- Filter Proyek (Multi Select) --}}
+            <div x-data="{
+                open: false,
+                search: '',
+                selected: @entangle('proyekFilter').live,
+                projects: {{ json_encode($availableProjects) }},
+                get filteredProjects() {
+                    if (!this.search) return this.projects;
+                    return this.projects.filter(p => p.toLowerCase().includes(this.search.toLowerCase()));
+                },
+                get displayLabel() {
+                    if (!this.selected || this.selected.length === 0) return 'Semua Proyek';
+                    if (this.selected.length === 1) return this.selected[0];
+                    return this.selected.length + ' Proyek Terpilih';
+                },
+                clearSelection() {
+                    this.selected = [];
+                }
+            }" 
+            @click.outside="open = false" 
+            class="relative bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
+                <!-- Trigger Button -->
+                <div @click="open = !open" class="w-full flex items-center justify-between cursor-pointer select-none">
+                    <span class="text-sm font-medium text-gray-700 truncate" x-text="displayLabel">Semua Proyek</span>
+                    <div class="flex items-center gap-1 shrink-0 ml-1">
+                        <button type="button" x-show="selected && selected.length > 0" @click.stop="clearSelection()" class="text-gray-400 hover:text-gray-600 p-0.5" title="Reset filter proyek">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="{'rotate-180': open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Dropdown Search Panel -->
+                <div x-show="open" 
+                     x-transition:enter="transition ease-out duration-100"
+                     x-transition:enter-start="transform opacity-0 scale-95"
+                     x-transition:enter-end="transform opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-75"
+                     x-transition:leave-start="transform opacity-100 scale-100"
+                     x-transition:leave-end="transform opacity-0 scale-95"
+                     class="absolute left-0 top-full mt-1.5 w-64 max-h-72 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50 flex flex-col"
+                     style="display: none;">
+                    
+                    <!-- Search Input -->
+                    <div class="px-2 pb-2 border-b border-gray-100">
+                        <div class="relative">
+                            <input x-model="search" 
+                                   x-ref="projectSearchInput"
+                                   @keydown.escape="open = false"
+                                   type="text" 
+                                   placeholder="Ketik cari proyek..." 
+                                   class="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1c69d4] focus:border-[#1c69d4]"
+                                   x-init="$watch('open', value => { if (value) setTimeout(() => $refs.projectSearchInput.focus(), 50) })">
+                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- Project List -->
+                    <div class="overflow-y-auto flex-1 max-h-56 divide-y divide-gray-50 text-xs">
+                        <template x-for="p in filteredProjects" :key="p">
+                            <label class="px-3 py-2 cursor-pointer hover:bg-blue-50 flex items-center gap-2 transition-colors">
+                                <input type="checkbox" :value="p" x-model="selected" class="rounded text-[#1c69d4] focus:ring-[#1c69d4] w-3.5 h-3.5 border-gray-300">
+                                <span x-text="p" class="truncate pr-2" :class="{'font-bold text-[#1c69d4]': selected && selected.includes(p), 'text-gray-700': !(selected && selected.includes(p))}"></span>
+                            </label>
+                        </template>
+
+                        <div x-show="filteredProjects.length === 0 && search" class="px-3 py-4 text-center text-gray-400 italic">
+                            Proyek tidak ditemukan
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {{-- Filter Rentang Tanggal (Default: Bulan Ini) --}}

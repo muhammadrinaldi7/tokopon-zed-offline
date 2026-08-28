@@ -22,7 +22,7 @@ class SalesReport extends Component
     public $search = '';
     public $branchFilter = '';
     public $vendorFilter = '';
-    public $proyekFilter = '';
+    public $proyekFilter = [];
     public $csvSeparator = ';';
 
     public function mount()
@@ -156,10 +156,10 @@ class SalesReport extends Component
                     }
                 }
             })
-            ->when($this->proyekFilter, function ($query) {
+            ->when(!empty($this->proyekFilter), function ($query) {
                 $query->whereHas('items', function ($iq) {
                     $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) {
-                        $vq->where('proyek', $this->proyekFilter);
+                        $vq->whereIn('proyek', $this->proyekFilter);
                     });
                 });
             })
