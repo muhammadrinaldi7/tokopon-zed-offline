@@ -23,6 +23,8 @@ class BusinessUnit extends Model
         'accurate_return_warehouse_name',
         'is_taxable',
         'is_active',
+        'telegram_approval_webhook',
+        'telegram_log_webhook',
     ];
 
     public function branches()

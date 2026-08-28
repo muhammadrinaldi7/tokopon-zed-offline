@@ -16,6 +16,14 @@ class ApprovalController extends Controller
     public static function sendTelegramNotification(ApprovalRequest $approval)
     {
         $n8nWebhookUrl = 'https://n8n.zedgroup.tech/webhook/approval-telegram-zedpos';
+        $businessUnitId = $approval->requestedBy->business_unit_id ?? null;
+
+        if ($businessUnitId) {
+            $bu = \App\Models\BusinessUnit::find($businessUnitId);
+            if ($bu && $bu->telegram_approval_webhook) {
+                $n8nWebhookUrl = $bu->telegram_approval_webhook;
+            }
+        }
 
         $nextLevel = $approval->current_level + 1;
         $rule = \App\Models\ApprovalRule::with('role')->where('module', $approval->request_type)->where('level', $nextLevel)->first();
@@ -23,13 +31,21 @@ class ApprovalController extends Controller
 
         $cabangId = $approval->requestedBy->branch_id ?? null;
 
-        $localRoles = ['bm', 'supervisor', 'admin'];
-        // Role global misalnya manageroperasional, superadmin, dsb.
+        $globalRoles = ['admin', 'direktur', 'superadmin'];
+        // Role tingkat cabang (difilter berdasarkan BU dan Cabang)
+        $localRoles = ['manager', 'bm', 'supervisor'];
 
         $query = \App\Models\User::role($targetRole)
             ->whereNotNull('telegram_chat_id')
             ->where('telegram_chat_id', '!=', '');
 
+        // Jika bukan role global (seperti admin/direktur/superadmin), filter berdasarkan Business Unit
+        // Ini berlaku untuk manager, bm, supervisor, manageroperasional, dll.
+        if (!in_array($targetRole, $globalRoles) && $businessUnitId) {
+            $query->where('business_unit_id', $businessUnitId);
+        }
+
+        // Jika role tingkat cabang, filter lagi secara spesifik berdasarkan cabang
         if (in_array($targetRole, $localRoles) && $cabangId) {
             $query->where('branch_id', $cabangId);
         }
@@ -88,7 +104,7 @@ class ApprovalController extends Controller
                   . "Keterangan: \"{$alasan}\"\n\n"
                   . "⏳ _Menunggu persetujuan dari divisi terkait._";
                   
-        self::sendGroupNotification($teksGrup);
+        self::sendGroupNotification($teksGrup, $businessUnitId);
         // -------------------------------------
 
         return $successCount > 0;
@@ -96,10 +112,17 @@ class ApprovalController extends Controller
     /**
      * Helper khusus untuk mengirim pesan log ke Grup Telegram
      */
-    public static function sendGroupNotification($pesan_teks)
+    public static function sendGroupNotification($pesan_teks, $businessUnitId = null)
     {
         // Ganti dengan URL Webhook Workflow 3 Anda yang baru
         $n8nGroupWebhook = 'https://n8n.zedgroup.tech/webhook/approval-group-log';
+
+        if ($businessUnitId) {
+            $bu = \App\Models\BusinessUnit::find($businessUnitId);
+            if ($bu && $bu->telegram_log_webhook) {
+                $n8nGroupWebhook = $bu->telegram_log_webhook;
+            }
+        }
 
         try {
             Http::timeout(5)->post($n8nGroupWebhook, [
@@ -206,7 +229,8 @@ class ApprovalController extends Controller
                               . "Keterangan: \"{$alasan}\"\n\n"
                               . "Telah disetujui sepenuhnya oleh *{$user->name}*.";
                               
-                    self::sendGroupNotification($teksGrup);
+                    $buId = $approval->requestedBy->business_unit_id ?? null;
+                    self::sendGroupNotification($teksGrup, $buId);
                 } catch (\Exception $e) {
                     $pesan = "⚠️ Disetujui, tapi gagal eksekusi aksi: " . $e->getMessage();
                 }
@@ -235,7 +259,9 @@ class ApprovalController extends Controller
             }
             $pesan = "❌ Pengajuan telah DITOLAK.";
             $teksGrup = "❌ *APPROVAL DITOLAK*\nPengajuan {$approval->request_type} (ID: {$approval->id}) telah DITOLAK oleh {$user->name}.";
-            self::sendGroupNotification($teksGrup);
+            
+            $buId = $approval->requestedBy->business_unit_id ?? null;
+            self::sendGroupNotification($teksGrup, $buId);
         } else {
             return response()->json(['success' => false, 'message' => 'Action tidak dikenali.']);
         }

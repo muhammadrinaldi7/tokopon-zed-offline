@@ -23,6 +23,8 @@ class BusinessUnitIndex extends Component
     public $accurate_token;
     public $accurate_secret_key;
     public $accurate_webhook_token;
+    public $telegram_approval_webhook;
+    public $telegram_log_webhook;
     public $accurate_database_id;
     public $accurate_return_warehouse_id;
     public $accurate_return_warehouse_name;
@@ -56,6 +58,8 @@ class BusinessUnitIndex extends Component
         $this->accurate_token = '';
         $this->accurate_secret_key = '';
         $this->accurate_webhook_token = '';
+        $this->telegram_approval_webhook = '';
+        $this->telegram_log_webhook = '';
         $this->accurate_database_id = '';
         $this->accurate_return_warehouse_id = '';
         $this->accurate_return_warehouse_name = '';
@@ -91,6 +95,8 @@ class BusinessUnitIndex extends Component
         $this->accurate_token = $unit->accurate_token;
         $this->accurate_secret_key = $unit->accurate_secret_key;
         $this->accurate_webhook_token = $unit->accurate_webhook_token;
+        $this->telegram_approval_webhook = $unit->telegram_approval_webhook;
+        $this->telegram_log_webhook = $unit->telegram_log_webhook;
         $this->accurate_database_id = $unit->accurate_database_id;
         $this->accurate_return_warehouse_id = $unit->accurate_return_warehouse_id;
         $this->accurate_return_warehouse_name = $unit->accurate_return_warehouse_name;
@@ -110,6 +116,8 @@ class BusinessUnitIndex extends Component
             'prefix' => 'nullable|string|max:20',
             'store_title' => 'nullable|string|max:100',
             'receipt_show_discount' => 'boolean',
+            'telegram_approval_webhook' => 'nullable|url',
+            'telegram_log_webhook' => 'nullable|url',
         ]);
 
         BusinessUnit::updateOrCreate(
@@ -127,6 +135,8 @@ class BusinessUnitIndex extends Component
                 'accurate_token' => $this->accurate_token,
                 'accurate_secret_key' => $this->accurate_secret_key,
                 'accurate_webhook_token' => $this->accurate_webhook_token,
+                'telegram_approval_webhook' => $this->telegram_approval_webhook,
+                'telegram_log_webhook' => $this->telegram_log_webhook,
                 'accurate_database_id' => $this->accurate_database_id,
                 'accurate_return_warehouse_id' => $this->accurate_return_warehouse_id,
                 'accurate_return_warehouse_name' => $this->accurate_return_warehouse_name,
