@@ -300,6 +300,39 @@
             </a>
         @endcan
 
+        @can('manage-orders')
+            <div x-data="{ openFinance: {{ request()->routeIs('zoffline.sell-phone', 'admin.finance.*') ? 'true' : 'false' }} }">
+                <button @click="openFinance = !openFinance" type="button"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.sell-phone', 'admin.finance.*') ? $activeClass : $inactiveClass }}">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 {{ request()->routeIs('zoffline.sell-phone', 'admin.finance.*') ? $activeIconClass : $inactiveIconClass }}"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Finance Dashboard</span><span
+                            class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                            x-show="sidebarCollapsed" style="display:none;" x-cloak>Finance Dashboard</span>
+                    </div>
+                    <svg x-show="!sidebarCollapsed" :class="{ 'rotate-180': openFinance }"
+                        class="w-4 h-4 transition-transform duration-200" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+
+                <div x-show="openFinance && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
+                    <a href="{{ route('zoffline.sell-phone') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('zoffline.sell-phone') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Proses Pembelian
+                    </a>
+                    <a href="{{ route('admin.finance.warranty-return') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.finance.warranty-return') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Proses Garansi/Retur
+                    </a>
+                </div>
+            </div>
+        @endcan
+
         @can('view-reporting')
             <div x-data="{ openReporting: {{ request()->routeIs('admin.reporting.*') ? 'true' : 'false' }} }">
                 <button @click="openReporting = !openReporting" type="button"

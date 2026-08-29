@@ -137,6 +137,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Customer Deposits
     Route::get('/customer-deposits', \App\Livewire\Admin\Finance\CustomerDeposit\Index::class)->name('customer-deposits.index')->middleware('can:manage-orders');
 
+    // Finance Dashboard
+    Route::prefix('finance')->name('finance.')->group(function () {
+        Route::get('/warranty-return', \App\Livewire\Admin\Finance\WarrantyReturn::class)->name('warranty-return');
+    });
+
     // Sales Order (Mini Accurate)
     Route::prefix('sales-orders')->name('sales-orders.')->middleware('can:manage-orders')->group(function () {
         Route::get('/', \App\Livewire\Admin\Orders\SalesOrder\Index::class)->name('index');
