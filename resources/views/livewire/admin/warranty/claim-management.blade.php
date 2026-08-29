@@ -989,95 +989,15 @@
                                         </button>
                                     @endif
 
-                                    @if ($selectedClaim->status === 'waiting_payment')
-                                        <button wire:click="confirmPaymentReceived({{ $selectedClaim->id }})"
-                                            class="px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl text-sm transition-colors shadow-sm shadow-yellow-500/20 flex items-center gap-2 ring-2 ring-yellow-300 ring-offset-2 hover:ring-yellow-400">
-                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    @if (in_array($selectedClaim->status, ['waiting_payment', 'waiting_refund']))
+                                        <div class="px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 font-bold rounded-xl text-sm flex items-center gap-2 shadow-sm">
+                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
-                                            Konfirmasi Pelunasan Diterima
-                                            @if ($selectedClaim->refund_amount)
-                                                (Rp
-                                                {{ number_format($selectedClaim->refund_amount, 0, ',', '.') }})
-                                            @endif
-                                        </button>
+                                            Menunggu Proses Keuangan (Silakan cek di Finance Dashboard)
+                                        </div>
                                     @endif
-
-                                    @if ($selectedClaim->status === 'waiting_refund')
-                                        <button wire:click="openRefundForm"
-                                            class="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition-colors shadow-sm shadow-orange-500/20 flex items-center gap-2 ring-2 ring-orange-300 ring-offset-2 hover:ring-orange-400">
-                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                            </svg>
-                                            Proses Pencairan Refund Tunai
-                                        </button>
-
-                                        <!-- Modal Proses Refund -->
-                                        @if ($showRefundForm)
-                                            <div wire:key="modal-refund" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
-                                                <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"></div>
-                                                <div
-                                                    class="relative bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
-                                                    <div
-                                                        class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-yellow-50">
-                                                        <div>
-                                                            <h3 class="font-bold text-xl text-yellow-900">Proses Refund Tunai</h3>
-                                                            <p class="text-xs text-yellow-700 mt-0.5">Cairkan sisa saldo ke Kas/Bank</p>
-                                                        </div>
-                                                        <button wire:click="closeRefundForm"
-                                                            class="text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-100 rounded-full p-2 transition-colors shadow-sm">
-                                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                                                                    d="M6 18L18 6M6 6l12 12" />
-                                                            </svg>
-                                                        </button>
-                                                    </div>
-
-                                                    <div class="p-6 overflow-y-auto flex-1">
-                                                        <div class="bg-gray-50 rounded-xl p-4 mb-5 text-center border border-gray-200 shadow-inner">
-                                                            <p class="text-sm text-gray-500 mb-1">Nominal Refund (Kelebihan Bayar)</p>
-                                                            <p class="text-3xl font-black text-rose-600">Rp
-                                                                {{ number_format($selectedClaim->refund_amount ?? 0, 0, ',', '.') }}</p>
-                                                        </div>
-
-                                                        <div class="space-y-4">
-                                                            <div>
-                                                                <label class="block text-sm font-bold text-gray-700 mb-2" for="bank_no">
-                                                                    Sumber Kas/Bank (Uang Keluar) <span class="text-rose-500">*</span>
-                                                                </label>
-                                                                <select id="bank_no" wire:model="bank_no"
-                                                                    class="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 block p-3 transition-colors">
-                                                                    <option value="10.02.103">Kas Retur</option>
-                                                                    @foreach ($banks as $account)
-                                                                        <option value="{{ $account->account_no }}">{{ $account->account_no }} -
-                                                                            {{ $account->name }}</option>
-                                                                    @endforeach
-                                                                </select>
-                                                                @error('bank_no')
-                                                                    <p class="mt-1.5 text-xs text-rose-500 font-medium">{{ $message }}</p>
-                                                                @enderror
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
-                                                        <button wire:click="closeRefundForm" type="button"
-                                                            class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors shadow-sm">
-                                                            Batal
-                                                        </button>
-                                                        <button wire:click="processRefundCash({{ $selectedClaim->id }})" type="button"
-                                                            class="px-5 py-2.5 text-sm font-bold text-white bg-yellow-600 hover:bg-yellow-700 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2">
-                                                            Cairkan Uang Sekarang
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endif
-                                    @endif
+                                </div>
 
                                     @if (in_array($selectedClaim->status, ['completed', 'rejected']))
                                         <div

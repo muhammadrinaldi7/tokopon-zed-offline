@@ -9,6 +9,9 @@ use App\Models\WarrantyClaim;
 class WarrantyReturn extends Component
 {
     public $activeTab = 'waiting_refund'; // waiting_refund (Uang Keluar) atau waiting_payment (Uang Masuk)
+    public $showResolveModal = false;
+    public $selectedClaimId = null;
+    public $selectedBankNo = '';
 
     public function setTab($tab)
     {
@@ -27,23 +30,46 @@ class WarrantyReturn extends Component
         $summary = [
             'waiting_refund' => WarrantyClaim::where('status', 'waiting_refund')->count(),
             'waiting_payment' => WarrantyClaim::where('status', 'waiting_payment')->count(),
-            'resolved' => WarrantyClaim::where('status', 'resolved')->count(),
+            'resolved' => WarrantyClaim::where('status', 'completed')->count(),
         ];
+
+        $banks = \App\Models\AccurateGlAccount::where('account_type', 'CASH_BANK')->get();
 
         return view('livewire.admin.finance.warranty-return', [
             'claims' => $claims,
-            'summary' => $summary
+            'summary' => $summary,
+            'banks' => $banks
         ]);
     }
 
-    // Dummy method for resolving a claim (to be implemented with Accurate logic later)
-    public function resolveClaim($claimId)
+    public function openResolveModal($claimId)
     {
-        $claim = WarrantyClaim::find($claimId);
+        $this->selectedClaimId = $claimId;
+        $this->selectedBankNo = '';
+        $this->showResolveModal = true;
+    }
+
+    public function closeResolveModal()
+    {
+        $this->showResolveModal = false;
+        $this->selectedClaimId = null;
+        $this->selectedBankNo = '';
+    }
+
+    public function confirmResolve()
+    {
+        $this->validate([
+            'selectedBankNo' => 'required'
+        ]);
+
+        $claim = WarrantyClaim::find($this->selectedClaimId);
         if ($claim) {
-            $claim->status = 'resolved';
+            $claim->status = 'completed';
+            $claim->resolved_at = \Carbon\Carbon::now();
             $claim->save();
             $this->dispatch('toast', title: 'Berhasil', message: 'Klaim garansi berhasil diproses.', type: 'success');
         }
+
+        $this->closeResolveModal();
     }
 }

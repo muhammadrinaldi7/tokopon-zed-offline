@@ -237,7 +237,7 @@ class ClaimManagement extends Component
                 $claim->refund_amount = abs($priceDifference);
             } elseif ($priceDifference > 0) {
                 $claim->status = 'waiting_payment'; // Upgrade: tunggu Finance konfirmasi pelunasan
-                $claim->refund_amount = null;
+                $claim->refund_amount = abs($priceDifference);
             } else {
                 $claim->status = 'completed'; // 1:1 sama persis
                 $claim->refund_amount = null;
