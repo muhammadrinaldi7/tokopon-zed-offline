@@ -1,4 +1,4 @@
-<div class="min-h-screen flex flex-col items-center justify-center p-6">
+<div x-data="{ openFinanceModal: false }" class="min-h-screen flex flex-col items-center justify-center p-6">
 
     {{-- Cards Container --}}
     <div class="grid grid-cols-1 md:grid-cols-4 max-w-7xl gap-6  w-full">
@@ -472,7 +472,7 @@
                                 <span class="block text-xs sm:text-sm text-center leading-tight">Cek Harga</span>
                             </button>
 
-                            <button wire:click="navigateToSellManagement" @click="openReportModal = false"
+                            <button @click="openReportModal = false; setTimeout(() => openFinanceModal = true, 100)"
                                 class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
                                 <div
                                     class="w-12 h-12 rounded-xl bg-[#FFD9B7]/30 flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform">
@@ -482,7 +482,7 @@
                                             d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                                     </svg>
                                 </div>
-                                <span class="block text-xs sm:text-sm text-center leading-tight">Manajemen Pembelian</span>
+                                <span class="block text-xs sm:text-sm text-center leading-tight">Finance Dashboard</span>
                             </button>
                             @can('view-dashboard-bm')
                                 <button wire:click="navigateToDashboardBM" @click="openReportModal = false"
@@ -505,6 +505,56 @@
                         </div>
 
                         <button @click="openReportModal = false"
+                            class="mt-8 w-full py-3 text-red-500 font-semibold hover:bg-red-50/50 rounded-xl transition-colors">
+                            Batal
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Modal Finance Dashboard Glassmorphism --}}
+                <div x-show="openFinanceModal" style="display: none;"
+                    class="fixed inset-0 z-100 flex items-center justify-center px-4">
+
+                    {{-- Backdrop --}}
+                    <div class="absolute inset-0 bg-black/20" @click="openFinanceModal = false"></div>
+
+                    {{-- Modal Content --}}
+                    <div
+                        class="relative w-full max-w-md bg-white/70 backdrop-blur-2xl border border-white/60 shadow-2xl rounded-[2.5rem] p-6 text-center transform">
+
+                        <div class="w-12 h-1.5 bg-gray-400/40 rounded-full mx-auto mb-6"></div>
+
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">Finance Dashboard</h3>
+                        <p class="text-sm text-gray-600 mb-8">Pilih menu proses keuangan</p>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <button wire:click="navigateToSellManagement" @click="openFinanceModal = false"
+                                class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
+                                <div
+                                    class="w-12 h-12 rounded-xl bg-[#FFD9B7]/30 flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                </div>
+                                <span class="block text-sm text-center leading-tight">Proses <br> Pembelian</span>
+                            </button>
+
+                            <button wire:click="navigateToFinanceWarrantyReturn" @click="openFinanceModal = false"
+                                class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
+                                <div
+                                    class="w-12 h-12 rounded-xl bg-purple-100/50 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <span class="block text-sm text-center leading-tight">Klaim <br> Garansi/Retur</span>
+                            </button>
+                        </div>
+
+                        <button @click="openFinanceModal = false"
                             class="mt-8 w-full py-3 text-red-500 font-semibold hover:bg-red-50/50 rounded-xl transition-colors">
                             Batal
                         </button>

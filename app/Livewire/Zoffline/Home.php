@@ -63,6 +63,10 @@ class Home extends Component
     {
         return $this->redirectRoute('admin.sell-phones.index', navigate: true);
     }
+    public function navigateToFinanceWarrantyReturn()
+    {
+        return $this->redirectRoute('admin.finance.warranty-return', navigate: true);
+    }
     public function navigateToRiwayatPenjualan()
     {
         return $this->redirectRoute('zoffline.pos.riwayat', navigate: true);
