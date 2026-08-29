@@ -19,7 +19,7 @@ class WarrantyReturn extends Component
     public function render()
     {
         // Ambil klaim garansi yang butuh tindak lanjut finance
-        $claims = WarrantyClaim::with(['warranty.orderItem.variant.secondProduct', 'customer'])
+        $claims = WarrantyClaim::with(['warranty.orderItem.variant', 'customer'])
             ->where('status', $this->activeTab)
             ->orderBy('updated_at', 'desc')
             ->get();

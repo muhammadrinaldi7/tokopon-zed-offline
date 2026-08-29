@@ -98,9 +98,18 @@
                                     <td class="px-6 py-4">
                                         @php
                                             $variant = $claim->warranty->orderItem->variant ?? null;
-                                            $productName = $variant ? ($variant->secondProduct->name ?? '') . ' ' . $variant->storage : '-';
+                                            $productName = '-';
+                                            if ($variant) {
+                                                if (isset($variant->secondProduct)) {
+                                                    $productName = ($variant->secondProduct->name ?? '') . ' ' . ($variant->storage ?? '');
+                                                } elseif (isset($variant->product)) {
+                                                    $productName = ($variant->product->name ?? '') . ' ' . ($variant->variant_name ?? '');
+                                                } else {
+                                                    $productName = $variant->name ?? '-';
+                                                }
+                                            }
                                         @endphp
-                                        <div class="font-bold text-neutral-700 text-sm">{{ $productName }}</div>
+                                        <div class="font-bold text-neutral-700 text-sm">{{ trim($productName) }}</div>
                                         <div class="text-[11px] font-black text-neutral-400 uppercase tracking-wider mt-0.5">{{ $claim->resolution_type === 'replacement_different' ? 'Upgrade/Downgrade' : 'Sama' }}</div>
                                     </td>
                                     <td class="px-6 py-4 text-right">
