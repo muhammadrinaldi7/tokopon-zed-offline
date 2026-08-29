@@ -485,7 +485,13 @@ class ClaimManagement extends Component
         $this->replacement_type = 'same';
 
         $claim = WarrantyClaim::with('warranty.orderItem')->find($this->selectedClaimId);
-        $this->original_price = $claim->warranty->orderItem->price_at_checkout ?? 0;
+        
+        if ($claim->warranty && $claim->warranty->orderItem) {
+            $item = $claim->warranty->orderItem;
+            $this->original_price = $item->price_at_checkout - ($item->discount_amount ?? 0) - ($item->promo_discount_amount ?? 0);
+        } else {
+            $this->original_price = 0;
+        }
 
         $this->cancelReplacementProduct();
     }
