@@ -133,6 +133,7 @@ class ClaimManagement extends Component
         $this->originalInspection = null;
         $this->claimInspection = null;
         $this->viewingQcDetails = null;
+        $this->showRefundForm = false;
     }
 
     public function viewQcDetails($type)

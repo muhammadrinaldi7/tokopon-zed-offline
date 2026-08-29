@@ -88,10 +88,15 @@
                             </div>
                             <div class="text-xs text-gray-500 mt-1">SKU: <span class="font-mono font-bold">{{ $item->item_no }}</span> &bull; Rp {{ number_format($item->unit_price, 0, ',', '.') }}</div>
                         </div>
-                        <div class="text-right">
+                        <div class="text-right flex items-center gap-4">
                             <div class="text-2xl font-bold {{ $isDone ? 'text-green-600' : 'text-blue-600' }}">
                                 {{ $item->quantity_received }} <span class="text-sm text-gray-500 font-normal">/ {{ $item->quantity_ordered }}</span>
                             </div>
+                            @if(!$isDone)
+                                <button wire:click="setActiveItem('{{ $item->item_no }}')" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition text-sm font-bold shadow-sm">
+                                    Pilih
+                                </button>
+                            @endif
                         </div>
                     </div>
                     

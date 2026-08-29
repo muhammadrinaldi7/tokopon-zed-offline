@@ -32,6 +32,37 @@ class Scan extends Component
         $this->po = $po->load('items.inspections');
     }
 
+    public function setActiveItem($itemNo)
+    {
+        $this->errorMessage = '';
+        $this->successMessage = '';
+        
+        $item = $this->po->items->where('item_no', $itemNo)->first();
+        if (!$item) return;
+
+        if ($item->quantity_received >= $item->quantity_ordered) {
+            $this->errorMessage = "Item {$item->item_name} sudah mencapai kuantitas pesanan.";
+            return;
+        }
+
+        // Cek apakah produk ini membutuhkan SN
+        $productAccurate = \App\Models\ProductAccurate::where('item_no', $itemNo)
+            ->where('database_source', $this->po->database_source)
+            ->first();
+
+        $hasSn = $productAccurate ? $productAccurate->has_sn : true; // Default true jika tidak ada data
+
+        if (!$hasSn) {
+            $item->increment('quantity_received');
+            $this->po->refresh();
+            $this->successMessage = "1 {$item->item_name} berhasil ditambahkan.";
+            return;
+        }
+
+        $this->activeItemNo = $itemNo;
+        $this->barcodeInput = '';
+    }
+
     public function processScan()
     {
         $this->errorMessage = '';
@@ -42,29 +73,7 @@ class Scan extends Component
         // 1. Cek apakah ini barcode SKU (Item No)
         $item = $this->po->items->where('item_no', $barcode)->first();
         if ($item) {
-            if ($item->quantity_received >= $item->quantity_ordered) {
-                $this->errorMessage = "Item {$item->item_name} sudah mencapai kuantitas pesanan.";
-                $this->barcodeInput = '';
-                return;
-            }
-
-            // Cek apakah produk ini membutuhkan SN
-            $productAccurate = \App\Models\ProductAccurate::where('item_no', $barcode)
-                ->where('database_source', $this->po->database_source)
-                ->first();
-
-            $hasSn = $productAccurate ? $productAccurate->has_sn : true; // Default true jika tidak ada data
-
-            if (!$hasSn) {
-                $item->increment('quantity_received');
-                $this->po->refresh();
-                $this->barcodeInput = '';
-                $this->successMessage = "1 {$item->item_name} berhasil ditambahkan.";
-                return;
-            }
-
-            $this->activeItemNo = $barcode;
-            $this->barcodeInput = '';
+            $this->setActiveItem($barcode);
             return;
         }
 
