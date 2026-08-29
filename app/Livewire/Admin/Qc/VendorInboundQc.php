@@ -47,7 +47,7 @@ class VendorInboundQc extends Component
         $this->resetPage();
     }
 
-    #[Layout('layouts.admin')]
+    #[Layout('layouts.z')]
     public function render()
     {
         // Ambil semua sku dari SecondProductVariant

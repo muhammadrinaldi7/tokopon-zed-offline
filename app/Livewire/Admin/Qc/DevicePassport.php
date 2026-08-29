@@ -7,27 +7,17 @@ use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 
-#[Layout('layouts.admin', ['title' => 'Device Passport'])]
+#[Layout('layouts.z', ['title' => 'Device Passport'])]
 class DevicePassport extends Component
 {
     public $imei;
 
-    // Untuk comparison view
-    public $selectedQc1Id = null;
-    public $selectedQc2Id = null;
+    public $selectedQcId = null;
+    public $showDetailModal = false;
 
     public function mount($imei)
     {
         $this->imei = $imei;
-
-        $inspections = $this->inspections;
-        if ($inspections->count() >= 2) {
-            // By default, compare the last two inspections
-            $this->selectedQc1Id = $inspections->last()->id; // Older
-            $this->selectedQc2Id = $inspections->first()->id; // Newer
-        } elseif ($inspections->count() == 1) {
-            $this->selectedQc1Id = $inspections->first()->id;
-        }
     }
 
     // Modal state for new QC
@@ -56,6 +46,18 @@ class DevicePassport extends Component
         unset($this->inspections); // clear computed cache
     }
 
+    public function viewQcDetail($id)
+    {
+        $this->selectedQcId = $id;
+        $this->showDetailModal = true;
+    }
+
+    public function closeQcDetail()
+    {
+        $this->showDetailModal = false;
+        $this->selectedQcId = null;
+    }
+
     #[Computed]
     public function inspections()
     {
@@ -67,15 +69,9 @@ class DevicePassport extends Component
     }
 
     #[Computed]
-    public function qc1()
+    public function selectedQc()
     {
-        return $this->selectedQc1Id ? DeviceInspection::with('media')->find($this->selectedQc1Id) : null;
-    }
-
-    #[Computed]
-    public function qc2()
-    {
-        return $this->selectedQc2Id ? DeviceInspection::with('media')->find($this->selectedQc2Id) : null;
+        return $this->selectedQcId ? DeviceInspection::with('media')->find($this->selectedQcId) : null;
     }
 
     public function render()

@@ -5,7 +5,7 @@ namespace App\Livewire\Admin\Qc;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
-#[Layout('layouts.admin', ['title' => 'Cari Device'])]
+#[Layout('layouts.z', ['title' => 'Cari Device'])]
 class DeviceSearch extends Component
 {
     public $imei = '';

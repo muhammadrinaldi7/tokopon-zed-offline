@@ -71,7 +71,7 @@ class ReturnReport extends Component
             'warranty.orderItem.order',
             'claimedBy',
             'approvedBy',
-            'deviceInspection',
+            'inspection',
             'receivingInspection'
         ])->find($this->selectedClaimId);
     }

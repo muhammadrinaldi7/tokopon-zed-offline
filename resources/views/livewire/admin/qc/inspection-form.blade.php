@@ -134,16 +134,93 @@
                             </div>
                         </div>
 
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Upload Foto Bukti (4-6 Foto)</label>
-                            <input type="file" wire:model="photos" multiple accept="image/*"
-                                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100 transition-colors">
-                            @if ($photos)
-                                <div class="flex flex-wrap gap-3 mt-4">
-                                    @foreach ($photos as $photo)
-                                        <img src="{{ $photo->temporaryUrl() }}" class="h-20 w-20 object-cover rounded-lg border border-gray-200 shadow-sm">
-                                    @endforeach
-                                </div>
+                        <div class="mb-4" x-data="{ activeSlot: null }">
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-3">Upload Foto Bukti Fisik</label>
+                            
+                            @php
+                                $photoSlots = [
+                                    '1' => 'Tampak Depan',
+                                    '2' => 'Tampak Belakang',
+                                    '3' => 'Sisi Kiri',
+                                    '4' => 'Sisi Kanan',
+                                    '5' => 'Sisi Atas',
+                                    '6' => 'Sisi Bawah',
+                                    '7' => 'Menyala / Sistem',
+                                    '8' => 'Kelengkapan',
+                                ];
+                            @endphp
+
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                @foreach($photoSlots as $key => $label)
+                                    @php
+                                        $propertyName = 'photo_' . $key;
+                                        $photoFile = $this->{$propertyName};
+                                        $hasError = $errors->has($propertyName);
+                                    @endphp
+
+                                    <div x-data="{ localPreview: null }" class="relative aspect-square rounded-3xl overflow-hidden transition-all duration-300 group
+                                     {{ $photoFile ? 'border border-neutral-100 shadow-sm' : 'border-2 border-dashed bg-neutral-50/50 hover:bg-neutral-50/100 cursor-pointer' }}
+                                    {{ $hasError ? 'border-rose-300 bg-rose-50/20' : 'border-neutral-200 hover:border-neutral-300' }}">
+
+                                        {{-- 1. Display JS Local Preview OR Uploaded File --}}
+                                        <template x-if="localPreview">
+                                            <img :src="localPreview" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                                        </template>
+
+                                        @if ($photoFile)
+                                            <img x-show="!localPreview" src="{{ $photoFile->temporaryUrl() }}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                                        @endif
+
+                                        <template x-if="localPreview || {{ $photoFile ? 'true' : 'false' }}">
+                                            <div>
+                                                <div class="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-xs py-2 px-3 text-center pointer-events-none z-10">
+                                                    <span class="text-[11px] font-bold text-white tracking-wide block truncate">
+                                                        {{ $label }}
+                                                    </span>
+                                                </div>
+
+                                                <button type="button" @click.stop="localPreview = null; $wire.set('{{ $propertyName }}', null)"
+                                                    class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-10 flex items-center justify-center">
+                                                    <svg class="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-16v1M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </template>
+
+                                        {{-- 2. Empty State (Click to open camera) --}}
+                                        <label x-show="!localPreview && !{{ $photoFile ? 'true' : 'false' }}" class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center cursor-pointer select-none">
+                                            <input type="file" accept="image/*" capture="environment" class="hidden"
+                                                @change="if($event.target.files.length > 0) { localPreview = URL.createObjectURL($event.target.files[0]); } customCompressHandler($event, '{{ $propertyName }}')">
+                                            
+                                            <div class="w-9 h-9 {{ $hasError ? 'bg-rose-100 text-rose-600' : 'bg-neutral-100 text-neutral-500' }} rounded-xl flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                                                </svg>
+                                            </div>
+                                            <h4 class="font-bold text-xs tracking-tight {{ $hasError ? 'text-rose-700' : 'text-neutral-700' }}">
+                                                {{ $label }}
+                                            </h4>
+                                            <p class="text-[10px] text-neutral-400 mt-0.5">Ketuk untuk foto</p>
+                                        </label>
+
+                                        {{-- Indikator Loading Layer --}}
+                                        <div wire:loading.flex wire:target="{{ $propertyName }}" class="absolute inset-0 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center gap-1 z-10">
+                                            <span class="animate-spin inline-block w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full"></span>
+                                            <span class="text-[9px] font-black text-violet-600 uppercase tracking-widest">Uploading</span>
+                                        </div>
+
+                                        @error('photo_' . $key)
+                                            <div class="absolute inset-x-0 bottom-0 bg-rose-500 text-white p-2 text-center z-10 flex flex-col items-center justify-center h-12 transition-all duration-300">
+                                                <span class="text-[9px] font-bold uppercase tracking-wider leading-none">Gagal Upload</span>
+                                                <span class="text-[10px] font-medium block truncate w-full px-1 mt-0.5 leading-tight">{{ $message }}</span>
+                                            </div>
+                                        @enderror
+                                    </div>
+                                @endforeach
+                            </div>
+                            @if($errors->has('photo_1') || $errors->has('photo_2') || $errors->has('photo_3') || $errors->has('photo_4') || $errors->has('photo_5') || $errors->has('photo_6') || $errors->has('photo_7') || $errors->has('photo_8'))
+                                <span class="text-xs font-bold text-rose-500 mt-3 block bg-rose-50 p-2 rounded-lg border border-rose-100"><i class="fas fa-exclamation-triangle mr-1"></i> Terdapat kesalahan pada foto yang diunggah. Pastikan ukuran file tidak terlalu besar.</span>
                             @endif
                         </div>
                     </div>
@@ -193,10 +270,23 @@
                         </div>
                     @endif
 
+                    @php
+                        // Validasi Foto (Semua 8 slot wajib diisi)
+                        $isPhotosValid = 
+                            !empty($photo_1) && !empty($photo_2) && 
+                            !empty($photo_3) && !empty($photo_4) && 
+                            !empty($photo_5) && !empty($photo_6) && 
+                            !empty($photo_7) && !empty($photo_8);
+                    @endphp
+
                     <div class="mt-8 flex justify-between items-center pt-4 border-t border-gray-100">
                         <button type="button" @click="qcStep--" class="px-6 py-3 border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition">Kembali</button>
-                        <button type="submit" class="px-8 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:shadow-lg hover:shadow-violet-200 transition-all flex items-center gap-2">
-                            <i class="fas fa-save"></i> Simpan Hasil QC
+                        <button type="submit" 
+                            {{ $isPhotosValid ? '' : 'disabled' }}
+                            class="px-8 py-3 rounded-xl font-bold text-white transition-all flex items-center gap-2
+                            {{ $isPhotosValid ? 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:shadow-lg hover:shadow-violet-200' : 'bg-neutral-300 text-neutral-500 cursor-not-allowed' }}">
+                            <i class="fas fa-save"></i> 
+                            {{ $isPhotosValid ? 'Simpan Hasil QC' : 'Lengkapi Foto Dahulu' }}
                         </button>
                     </div>
                 </div>

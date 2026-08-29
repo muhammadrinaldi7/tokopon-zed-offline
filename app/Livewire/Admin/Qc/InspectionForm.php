@@ -22,7 +22,14 @@ class InspectionForm extends Component
     public $label = 'QC Inbound';
     public $inspectorNotes = '';
     public $verdict = 'pass';
-    public $photos = [];
+    public $photo_1 = null;
+    public $photo_2 = null;
+    public $photo_3 = null;
+    public $photo_4 = null;
+    public $photo_5 = null;
+    public $photo_6 = null;
+    public $photo_7 = null;
+    public $photo_8 = null;
 
     // State
     public $template;
@@ -208,7 +215,14 @@ class InspectionForm extends Component
         $this->validate([
             'imei' => 'required|string|max:255',
             'verdict' => 'required|in:pass,fail,conditional',
-            'photos.*' => 'image|max:5120', // max 5MB
+            'photo_1' => 'required|image|max:5120',
+            'photo_2' => 'required|image|max:5120',
+            'photo_3' => 'required|image|max:5120',
+            'photo_4' => 'required|image|max:5120',
+            'photo_5' => 'required|image|max:5120',
+            'photo_6' => 'required|image|max:5120',
+            'photo_7' => 'required|image|max:5120',
+            'photo_8' => 'required|image|max:5120',
         ]);
 
         $inspection = new DeviceInspection([
@@ -237,11 +251,14 @@ class InspectionForm extends Component
         }
 
         // Save photos
-        foreach ($this->photos as $photo) {
-            $inspection->addMedia($photo->getRealPath())
-                ->usingName($photo->getClientOriginalName())
-                ->usingFileName($photo->getClientOriginalName())
-                ->toMediaCollection('qc_photos');
+        $photoProps = ['photo_1', 'photo_2', 'photo_3', 'photo_4', 'photo_5', 'photo_6', 'photo_7', 'photo_8'];
+        foreach ($photoProps as $prop) {
+            if ($this->$prop) {
+                $inspection->addMedia($this->$prop->getRealPath())
+                    ->usingName($this->$prop->getClientOriginalName())
+                    ->usingFileName($this->$prop->getClientOriginalName())
+                    ->toMediaCollection('qc_photos');
+            }
         }
 
         $this->isSaved = true;
@@ -252,6 +269,6 @@ class InspectionForm extends Component
 
     public function render()
     {
-        return view('livewire.admin.qc.inspection-form')->layout('layouts.app');
+        return view('livewire.admin.qc.inspection-form')->layout('layouts.z');
     }
 }
