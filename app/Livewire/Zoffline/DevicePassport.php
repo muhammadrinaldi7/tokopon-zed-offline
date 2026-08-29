@@ -15,6 +15,21 @@ class DevicePassport extends Component
     public $deviceInfo = null;
     public $searched = false;
 
+    public $selectedQcId = null;
+    public $showDetailModal = false;
+
+    public function viewQcDetail($id)
+    {
+        $this->selectedQcId = $id;
+        $this->showDetailModal = true;
+    }
+
+    public function closeQcDetail()
+    {
+        $this->showDetailModal = false;
+        $this->selectedQcId = null;
+    }
+
     public function search()
     {
         $this->validate([
@@ -119,6 +134,7 @@ class DevicePassport extends Component
                 'color' => $inspection->verdict === 'pass' ? 'bg-emerald-500' : 'bg-rose-500',
                 'description' => $desc,
                 'status' => $inspection->verdict === 'pass' ? 'LULUS QC' : 'TIDAK LULUS',
+                'inspection_id' => $inspection->id,
                 'checklist' => $checklistDetails,
                 'passed_points' => $passed,
                 'failed_points' => $failed,
@@ -212,6 +228,12 @@ class DevicePassport extends Component
 
     public function goBack()
     {
-        return $this->redirect(route('zoffline.home'), navigate: true);
+        return $this->redirect(route('zoffline'), navigate: true);
+    }
+
+    #[Livewire\Attributes\Computed]
+    public function selectedQc()
+    {
+        return $this->selectedQcId ? DeviceInspection::with('media')->find($this->selectedQcId) : null;
     }
 }

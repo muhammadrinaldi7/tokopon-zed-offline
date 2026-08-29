@@ -2,7 +2,7 @@
     {{-- Header --}}
     <div class="px-5 py-6 bg-white shadow-sm border-b border-gray-100 flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <a href="{{ route('zoffline.home') }}" wire:navigate class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition">
+            <a href="{{ route('zoffline') }}" wire:navigate class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                 </svg>

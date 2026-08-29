@@ -230,71 +230,15 @@
                                             </div>
                                         </div>
 
-                                        @if (str_contains($event['type'], 'Inspeksi') && isset($event['checklist']) && count($event['checklist']) > 0)
-                                            {{-- Inspection Checklist Section --}}
-                                            <div
-                                                class="bg-emerald-50/50 rounded-xl border border-emerald-100/50 p-5 mb-5">
-                                                <div
-                                                    class="flex justify-between items-center mb-4 border-b border-emerald-100 pb-3">
-                                                    <h4
-                                                        class="font-bold text-emerald-800 text-sm flex items-center gap-2">
-                                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
-                                                            stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                                stroke-width="2"
-                                                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
-                                                        Ringkasan Inspeksi
-                                                    </h4>
-                                                    <div
-                                                        class="text-sm font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded-lg">
-                                                        {{ $event['passed_points'] ?? 0 }} /
-                                                        {{ $event['total_points'] ?? 0 }} LULUS
-                                                    </div>
-                                                </div>
-
-                                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6">
-                                                    @foreach (array_slice($event['checklist'], 0, 8) as $chk)
-                                                        @if (isset($chk['type']) && $chk['type'] === 'boolean')
-                                                            <div class="flex items-center gap-3">
-                                                                @if (isset($chk['value']) && ($chk['value'] == 1 || $chk['value'] === true || $chk['value'] === '1'))
-                                                                    <div
-                                                                        class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
-                                                                        <svg class="w-3.5 h-3.5" fill="none"
-                                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                                            <path stroke-linecap="round"
-                                                                                stroke-linejoin="round"
-                                                                                stroke-width="3" d="M5 13l4 4L19 7" />
-                                                                        </svg>
-                                                                    </div>
-                                                                    <span
-                                                                        class="text-sm font-medium text-neutral-700">{{ $chk['name'] }}</span>
-                                                                @else
-                                                                    <div
-                                                                        class="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0">
-                                                                        <svg class="w-3.5 h-3.5" fill="none"
-                                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                                            <path stroke-linecap="round"
-                                                                                stroke-linejoin="round"
-                                                                                stroke-width="3"
-                                                                                d="M6 18L18 6M6 6l12 12" />
-                                                                        </svg>
-                                                                    </div>
-                                                                    <span
-                                                                        class="text-sm font-medium text-neutral-500 line-through">{{ $chk['name'] }}</span>
-                                                                @endif
-                                                            </div>
-                                                        @endif
-                                                    @endforeach
-                                                </div>
-                                                @if (count($event['checklist']) > 8)
-                                                    <div
-                                                        class="mt-3 text-xs text-emerald-600 font-bold bg-emerald-100/50 inline-block px-2 py-1 rounded">
-                                                        + {{ count($event['checklist']) - 8 }} poin pengecekan
-                                                        lainnya...
-                                                    </div>
-                                                @endif
-                                            </div>
+                                        @if (str_contains($event['type'], 'Inspeksi') && isset($event['inspection_id']))
+                                            <button wire:click="viewQcDetail({{ $event['inspection_id'] }})"
+                                                class="w-full mb-5 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-xl border border-emerald-200 transition flex items-center justify-center gap-2">
+                                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                Lihat Hasil QC
+                                            </button>
                                         @endif
 
                                         <p class="text-neutral-600 text-sm leading-relaxed mb-4">
@@ -340,4 +284,102 @@
             @endif
         @endif
     </div>
+
+    {{-- Detail Modal QC --}}
+    @if ($showDetailModal && $this->selectedQc)
+        <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden transform transition-all" @click.away="$wire.closeQcDetail()">
+                <div class="p-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-800 text-lg">Detail Hasil QC</h3>
+                    <button wire:click="closeQcDetail" class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 hover:bg-rose-100 hover:text-rose-600 transition">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="p-5 overflow-y-auto flex-1 space-y-6">
+                    {{-- Status Banner --}}
+                    <div class="flex items-center justify-between p-4 rounded-2xl border {{ $this->selectedQc->verdict === 'pass' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700' }}">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Keputusan</p>
+                            <h4 class="text-xl font-black">{{ $this->selectedQc->verdict === 'pass' ? 'LULUS QC' : 'TIDAK LULUS' }}</h4>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Skor</p>
+                            <h4 class="text-xl font-black">{{ $this->selectedQc->score }}/100</h4>
+                        </div>
+                    </div>
+
+                    {{-- Catatan --}}
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            Catatan Inspektor
+                        </h4>
+                        <div class="p-4 bg-gray-50 rounded-2xl text-sm text-gray-700 border border-gray-100 whitespace-pre-line font-medium leading-relaxed">
+                            {{ $this->selectedQc->notes ?? $this->selectedQc->inspector_notes ?? 'Tidak ada catatan khusus.' }}
+                        </div>
+                    </div>
+
+                    {{-- Checklist --}}
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                            Hasil Pengecekan
+                        </h4>
+                        <div class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                            @if(is_array($this->selectedQc->checklist_results) || is_string($this->selectedQc->checklist_results))
+                                @php
+                                    $checklist = is_string($this->selectedQc->checklist_results) ? json_decode($this->selectedQc->checklist_results, true) : $this->selectedQc->checklist_results;
+                                @endphp
+                                @if(is_array($checklist))
+                                    @foreach($checklist as $item)
+                                        <div class="flex justify-between items-center p-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition">
+                                            <span class="text-sm font-medium text-gray-700">{{ $item['name'] ?? 'Item' }}</span>
+                                            @if(isset($item['type']) && $item['type'] === 'boolean')
+                                                @if(isset($item['value']) && ($item['value'] == 1 || $item['value'] === true || $item['value'] === '1'))
+                                                    <div class="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center">
+                                                        <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                                    </div>
+                                                @else
+                                                    <div class="w-6 h-6 bg-rose-100 rounded-full flex items-center justify-center">
+                                                        <svg class="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    </div>
+                                                @endif
+                                            @else
+                                                <span class="text-sm font-bold text-gray-800 bg-gray-100 px-2 py-1 rounded-lg">{{ $item['value'] ?? '-' }}</span>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                @endif
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Foto --}}
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                            Foto Fisik & Kelengkapan
+                        </h4>
+                        @if ($this->selectedQc->hasMedia('qc_photos') || $this->selectedQc->hasMedia('photos'))
+                            <div class="grid grid-cols-2 gap-3">
+                                @php
+                                    $mediaList = $this->selectedQc->hasMedia('qc_photos') ? $this->selectedQc->getMedia('qc_photos') : $this->selectedQc->getMedia('photos');
+                                @endphp
+                                @foreach ($mediaList as $media)
+                                    <a href="{{ $media->getUrl() }}" target="_blank" class="block aspect-square rounded-2xl overflow-hidden border border-gray-200 hover:border-emerald-500 hover:shadow-md transition relative group">
+                                        <img src="{{ $media->getUrl() }}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+                                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
+                                    </a>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="p-6 bg-gray-50 border border-gray-100 border-dashed rounded-2xl text-center text-xs text-gray-400 font-medium">
+                                Tidak ada foto terlampir
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
