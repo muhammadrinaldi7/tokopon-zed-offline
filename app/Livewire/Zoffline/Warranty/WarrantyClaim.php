@@ -70,10 +70,7 @@ class WarrantyClaim extends Component
         ]);
 
         $this->foundWarranties = Warranty::with(['policy', 'orderItem.order.user', 'orderItem.variant'])
-            ->where(function ($query) {
-                $query->where('serial_number', $this->searchQuery)
-                      ->orWhere('original_serial_number', $this->searchQuery);
-            })
+            ->where('serial_number', $this->searchQuery)
             ->where('status', '!=', 'voided')
             ->get();
 
