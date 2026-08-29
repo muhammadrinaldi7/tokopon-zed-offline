@@ -894,6 +894,7 @@ trait WithCart
     // ─── Custom Cashback (Admin ACC) ───────────────────────────
     public $showCustomCashbackModal = false;
     public $customCashbackAmount = 0;
+    public $customCashbackReason = '';
     public $customCashbackCartIndex = null;
     public $pendingCustomCashbacks = []; // format: [cartIndex => requestId]
 
@@ -904,6 +905,7 @@ trait WithCart
 
         $this->customCashbackCartIndex = $index;
         $this->customCashbackAmount = 0;
+        $this->customCashbackReason = '';
         $this->showCustomCashbackModal = true;
     }
 
@@ -912,6 +914,7 @@ trait WithCart
         $this->showCustomCashbackModal = false;
         $this->customCashbackCartIndex = null;
         $this->customCashbackAmount = 0;
+        $this->customCashbackReason = '';
     }
 
     public function requestCustomCashback($passedAmount = null)
@@ -937,13 +940,19 @@ trait WithCart
 
         $user = Auth::user();
 
+        $reasonText = trim($this->customCashbackReason);
+        if (empty($reasonText)) {
+            $this->dispatch('toast', title: 'Error', message: 'Alasan pengajuan wajib diisi.', type: 'error');
+            return;
+        }
+
         // Buat ApprovalRequest
         $request = \App\Models\ApprovalRequest::create([
             'approvable_type' => \App\Models\User::class,
             'approvable_id' => $user->id,
             'request_type' => 'CUSTOM_CASHBACK',
             'requested_by' => $user->id,
-            'reason' => "Permintaan cashback kustom sebesar Rp " . number_format($amount, 0, ',', '.') . " untuk item: {$item['name']}",
+            'reason' => $reasonText,
             'status' => 'PENDING',
             'required_level' => $requiredLevel,
             'current_level' => 0,

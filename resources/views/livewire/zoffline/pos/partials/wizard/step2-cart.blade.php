@@ -524,6 +524,14 @@
                         class="pl-10 block w-full rounded-xl border-gray-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-lg font-bold py-3"
                         placeholder="0" autofocus>
                 </div>
+                
+                <div class="mt-4">
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Alasan Pengajuan <span class="text-xs font-normal text-rose-500">*wajib diisi</span></label>
+                    <textarea wire:model.defer="customCashbackReason" rows="2"
+                        class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm py-2 px-3"
+                        placeholder="Tuliskan alasan pengajuan diskon (wajib diisi)..."
+                    ></textarea>
+                </div>
             </div>
             <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
                 <button type="button" wire:click="closeCustomCashbackModal"
