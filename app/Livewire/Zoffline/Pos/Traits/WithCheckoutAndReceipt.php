@@ -250,7 +250,8 @@ trait WithCheckoutAndReceipt
                 foreach ($promos as $promo) {
                     if ($promo->paymentMethods->count() > 0) {
                         $requiredPmIds = $promo->paymentMethods->pluck('id')->toArray();
-                        $hasValidPm = count(array_intersect($usedPaymentMethodIds, $requiredPmIds)) > 0;
+                        $unsupportedUsedIds = array_diff($usedPaymentMethodIds, $requiredPmIds);
+                        $hasValidPm = count($unsupportedUsedIds) === 0;
                         if (!$hasValidPm) {
                             $pmNames = $promo->paymentMethods->pluck('name')->implode(', ');
                             $this->dispatch('toast', title: 'Promo Tidak Berlaku', message: "Promo {$promo->name} hanya berlaku untuk pembayaran menggunakan: {$pmNames}.", type: 'error');

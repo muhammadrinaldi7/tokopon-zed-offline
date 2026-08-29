@@ -700,6 +700,9 @@ class Pos extends Component
             $index = $parts[0];
             $this->payments[$index]['payment_method_rate_id'] = '';
         }
+        
+        $this->checkPromoPaymentMethodCompatibility();
+        
         $this->syncSinglePaymentAmount();
     }
 

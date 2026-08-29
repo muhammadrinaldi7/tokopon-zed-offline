@@ -326,6 +326,14 @@ trait WithCart
         $variantType = \App\Models\ProductAccurate::class;
         $variantId = $productAccurate->id;
 
+        $brandId = null;
+        if (!empty($productAccurate->brandName)) {
+            $brand = \App\Models\Brand::whereRaw('LOWER(name) = ?', [strtolower(trim($productAccurate->brandName))])->first();
+            if ($brand) {
+                $brandId = $brand->id;
+            }
+        }
+
         $existingIndex = collect($this->cart)->search(
             fn($item) => $item['variant_id'] == $variantId && $item['variant_type'] == $variantType
         );
@@ -363,7 +371,7 @@ trait WithCart
                 'has_sn' => (bool) $productAccurate->has_sn,
                 // 'is_second' => false,
                 'database_source' => $productAccurate->database_source,
-                'brand_id' => null, // Accurate doesn't map brand directly this way
+                'brand_id' => $brandId,
                 // 'condition' => '',
                 'project_number' => match (trim(strtoupper($productAccurate->proyek ?? ''))) {
                     'SJU' => 'P.00003',

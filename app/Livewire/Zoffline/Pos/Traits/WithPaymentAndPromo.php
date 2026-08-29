@@ -146,6 +146,9 @@ trait WithPaymentAndPromo
     {
         $this->payments[$this->activePaymentIndex]['payment_method_id'] = $methodId;
         $this->payments[$this->activePaymentIndex]['payment_method_rate_id'] = ''; // reset rate
+        
+        $this->checkPromoPaymentMethodCompatibility();
+        
         $this->paymentWizardStep = 3;
     }
 
@@ -411,5 +414,35 @@ trait WithPaymentAndPromo
             ->unique()
             ->values()
             ->toArray();
+    }
+    public function checkPromoPaymentMethodCompatibility()
+    {
+        if (empty($this->selectedPromos)) return;
+        
+        $promos = \App\Models\Promo::with('paymentMethods')->whereIn('id', $this->selectedPromos)->get();
+        $usedPaymentMethodIds = collect($this->payments)->pluck('payment_method_id')->filter()->unique()->toArray();
+        
+        if (empty($usedPaymentMethodIds)) return; 
+        
+        $invalidPromos = [];
+        foreach ($promos as $promo) {
+            if ($promo->paymentMethods->count() > 0) {
+                $requiredPmIds = $promo->paymentMethods->pluck('id')->toArray();
+                $unsupportedUsedIds = array_diff($usedPaymentMethodIds, $requiredPmIds);
+                $hasValidPm = count($unsupportedUsedIds) === 0;
+                
+                if (!$hasValidPm) {
+                    $invalidPromos[] = $promo->id;
+                    $pmNames = $promo->paymentMethods->pluck('name')->implode(', ');
+                    $this->dispatch('toast', title: 'Promo Dilepas', message: "Promo {$promo->name} dilepas karena hanya berlaku untuk pembayaran menggunakan: {$pmNames}.", type: 'warning');
+                }
+            }
+        }
+        
+        if (!empty($invalidPromos)) {
+            $this->selectedPromos = array_values(array_diff($this->selectedPromos, $invalidPromos));
+            $this->applyPromosToCart();
+            $this->syncSinglePaymentAmount();
+        }
     }
 }
