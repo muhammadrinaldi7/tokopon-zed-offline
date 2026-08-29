@@ -286,7 +286,7 @@
     </div>
 
     {{-- Detail Modal QC --}}
-    @if ($showDetailModal && $this->selectedQc)
+    @if ($showDetailModal && $this->getSelectedQc())
         <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden transform transition-all" @click.away="$wire.closeQcDetail()">
                 <div class="p-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
@@ -297,14 +297,14 @@
                 </div>
                 <div class="p-5 overflow-y-auto flex-1 space-y-6">
                     {{-- Status Banner --}}
-                    <div class="flex items-center justify-between p-4 rounded-2xl border {{ $this->selectedQc->verdict === 'pass' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700' }}">
+                    <div class="flex items-center justify-between p-4 rounded-2xl border {{ $this->getSelectedQc()->verdict === 'pass' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700' }}">
                         <div>
                             <p class="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Keputusan</p>
-                            <h4 class="text-xl font-black">{{ $this->selectedQc->verdict === 'pass' ? 'LULUS QC' : 'TIDAK LULUS' }}</h4>
+                            <h4 class="text-xl font-black">{{ $this->getSelectedQc()->verdict === 'pass' ? 'LULUS QC' : 'TIDAK LULUS' }}</h4>
                         </div>
                         <div class="text-right">
                             <p class="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Skor</p>
-                            <h4 class="text-xl font-black">{{ $this->selectedQc->score }}/100</h4>
+                            <h4 class="text-xl font-black">{{ $this->getSelectedQc()->score }}/100</h4>
                         </div>
                     </div>
 
@@ -315,7 +315,7 @@
                             Catatan Inspektor
                         </h4>
                         <div class="p-4 bg-gray-50 rounded-2xl text-sm text-gray-700 border border-gray-100 whitespace-pre-line font-medium leading-relaxed">
-                            {{ $this->selectedQc->notes ?? $this->selectedQc->inspector_notes ?? 'Tidak ada catatan khusus.' }}
+                            {{ $this->getSelectedQc()->notes ?? $this->getSelectedQc()->inspector_notes ?? 'Tidak ada catatan khusus.' }}
                         </div>
                     </div>
 
@@ -326,9 +326,9 @@
                             Hasil Pengecekan
                         </h4>
                         <div class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-                            @if(is_array($this->selectedQc->checklist_results) || is_string($this->selectedQc->checklist_results))
+                            @if(is_array($this->getSelectedQc()->checklist_results) || is_string($this->getSelectedQc()->checklist_results))
                                 @php
-                                    $checklist = is_string($this->selectedQc->checklist_results) ? json_decode($this->selectedQc->checklist_results, true) : $this->selectedQc->checklist_results;
+                                    $checklist = is_string($this->getSelectedQc()->checklist_results) ? json_decode($this->getSelectedQc()->checklist_results, true) : $this->getSelectedQc()->checklist_results;
                                 @endphp
                                 @if(is_array($checklist))
                                     @foreach($checklist as $item)
@@ -360,10 +360,10 @@
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                             Foto Fisik & Kelengkapan
                         </h4>
-                        @if ($this->selectedQc->hasMedia('qc_photos') || $this->selectedQc->hasMedia('photos'))
+                        @if ($this->getSelectedQc()->hasMedia('qc_photos') || $this->getSelectedQc()->hasMedia('photos'))
                             <div class="grid grid-cols-2 gap-3">
                                 @php
-                                    $mediaList = $this->selectedQc->hasMedia('qc_photos') ? $this->selectedQc->getMedia('qc_photos') : $this->selectedQc->getMedia('photos');
+                                    $mediaList = $this->getSelectedQc()->hasMedia('qc_photos') ? $this->getSelectedQc()->getMedia('qc_photos') : $this->getSelectedQc()->getMedia('photos');
                                 @endphp
                                 @foreach ($mediaList as $media)
                                     <a href="{{ $media->getUrl() }}" target="_blank" class="block aspect-square rounded-2xl overflow-hidden border border-gray-200 hover:border-emerald-500 hover:shadow-md transition relative group">

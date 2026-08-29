@@ -12,12 +12,21 @@ class DevicePassport extends Component
 {
     public $imei;
 
-    public $selectedQcId = null;
-    public $showDetailModal = false;
+    public $selectedQc1Id = null;
+    public $selectedQc2Id = null;
 
     public function mount($imei)
     {
         $this->imei = $imei;
+
+        $inspections = $this->inspections;
+        if ($inspections->count() >= 2) {
+            // Default: Compare the last two inspections
+            $this->selectedQc1Id = $inspections->last()->id; // Older
+            $this->selectedQc2Id = $inspections->first()->id; // Newer
+        } elseif ($inspections->count() == 1) {
+            $this->selectedQc1Id = $inspections->first()->id;
+        }
     }
 
     // Modal state for new QC
@@ -44,18 +53,13 @@ class DevicePassport extends Component
         $this->showQcModal = false;
         $this->dispatch('toast', title: 'Berhasil', message: 'Inspeksi baru berhasil ditambahkan.', type: 'success');
         unset($this->inspections); // clear computed cache
-    }
-
-    public function viewQcDetail($id)
-    {
-        $this->selectedQcId = $id;
-        $this->showDetailModal = true;
-    }
-
-    public function closeQcDetail()
-    {
-        $this->showDetailModal = false;
-        $this->selectedQcId = null;
+        
+        // Update comparison to include the new one
+        if ($this->inspections->count() >= 2) {
+            $this->selectedQc2Id = $this->inspections->first()->id;
+        } elseif ($this->inspections->count() == 1) {
+            $this->selectedQc1Id = $this->inspections->first()->id;
+        }
     }
 
     #[Computed]
@@ -69,9 +73,15 @@ class DevicePassport extends Component
     }
 
     #[Computed]
-    public function selectedQc()
+    public function qc1()
     {
-        return $this->selectedQcId ? DeviceInspection::with('media')->find($this->selectedQcId) : null;
+        return $this->selectedQc1Id ? DeviceInspection::with('media')->find($this->selectedQc1Id) : null;
+    }
+
+    #[Computed]
+    public function qc2()
+    {
+        return $this->selectedQc2Id ? DeviceInspection::with('media')->find($this->selectedQc2Id) : null;
     }
 
     public function render()

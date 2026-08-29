@@ -7,6 +7,7 @@ use App\Models\OrderItem;
 use App\Models\SellPhone;
 use App\Models\WarrantyClaim;
 use App\Models\DeviceInspection;
+use Livewire\Attributes\Computed;
 
 class DevicePassport extends Component
 {
@@ -56,7 +57,7 @@ class DevicePassport extends Component
 
             $deviceModel = $item->product_name;
             $deviceSpecs = $item->variant ? $item->variant->name : '';
-            
+
             $status = 'Terjual';
             if ($snRecord->warranty && $snRecord->warranty->status === 'voided') {
                 $status = 'Terjual (Garansi Void)';
@@ -85,15 +86,15 @@ class DevicePassport extends Component
         foreach ($inspections as $inspection) {
             $typeLabel = 'Inspeksi QC';
             $desc = "Diinspeksi oleh " . ($inspection->inspector ? $inspection->inspector->name : 'Sistem') . ". Hasil: " . strtoupper($inspection->verdict) . ".";
-            
+
             if ($inspection->inspectable_type === SellPhone::class && $inspection->inspectable) {
                 $typeLabel = 'Inspeksi Buyback';
                 $sellPhone = $inspection->inspectable;
                 $deviceModel = $sellPhone->phone_brand . ' ' . $sellPhone->phone_model;
                 $deviceSpecs = $sellPhone->phone_ram . ' RAM / ' . $sellPhone->phone_storage;
-                
+
                 $desc .= " Dari pelanggan " . ($sellPhone->user ? $sellPhone->user->name : 'Unknown') . ".";
-                
+
                 // Tambahkan event SellPhone dibuat (sebagai event masuk barang)
                 $timeline[] = [
                     'date' => $sellPhone->created_at,
@@ -113,7 +114,7 @@ class DevicePassport extends Component
             $passed = 0;
             $failed = 0;
             $checklistDetails = [];
-            
+
             if (is_array($checklist)) {
                 foreach ($checklist as $chk) {
                     if (isset($chk['type']) && $chk['type'] === 'boolean') {
@@ -152,7 +153,7 @@ class DevicePassport extends Component
             ->whereHas('warranty', function ($q) use ($imei) {
                 $q->where('serial_number', 'LIKE', '%' . $imei . '%');
             })->get();
-            
+
         foreach ($claimsAsOld as $claim) {
             $timeline[] = [
                 'date' => $claim->created_at,
@@ -177,7 +178,7 @@ class DevicePassport extends Component
 
         foreach ($snLogs as $log) {
             $typeDesc = $log->old_serial_number === $imei ? 'Ganti Unit (Lama Masuk)' : 'Ganti Unit (Baru Keluar)';
-            
+
             $timeline[] = [
                 'date' => $log->created_at,
                 'type' => $typeDesc,
@@ -194,7 +195,7 @@ class DevicePassport extends Component
         }
 
         // Sorting timeline
-        usort($timeline, function($a, $b) {
+        usort($timeline, function ($a, $b) {
             return strtotime($a['date']) - strtotime($b['date']); // Ascending (Lama ke Baru)
         });
 
@@ -217,7 +218,7 @@ class DevicePassport extends Component
             'specs' => $deviceSpecs,
             'latest_status' => $latestStatus
         ];
-        
+
         $this->searched = true;
     }
 
@@ -231,8 +232,7 @@ class DevicePassport extends Component
         return $this->redirect(route('zoffline'), navigate: true);
     }
 
-    #[Livewire\Attributes\Computed]
-    public function selectedQc()
+    public function getSelectedQc()
     {
         return $this->selectedQcId ? DeviceInspection::with('media')->find($this->selectedQcId) : null;
     }
