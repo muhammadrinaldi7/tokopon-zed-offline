@@ -474,84 +474,83 @@
                 </div>
             </div>
         </div>
-</div>
-@endif
+    @endif
 
-{{-- Modal Custom Cashback --}}
-@if ($showCustomCashbackModal)
-    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-        x-data="{
-            rawAmount: @entangle('customCashbackAmount').defer,
-            formattedAmount: '',
-            init() {
-                this.formattedAmount = this.formatNumber(this.rawAmount);
-                $watch('rawAmount', value => {
-                    if (document.activeElement !== this.$refs.amountInput) {
-                        this.formattedAmount = this.formatNumber(value);
-                    }
-                });
-            },
-            formatNumber(val) {
-                if (!val) return '';
-                let num = parseInt(String(val).replace(/\D/g, ''), 10);
-                return isNaN(num) ? '' : num.toLocaleString('id-ID');
-            },
-            updateAmount(e) {
-                let val = e.target.value;
-                let num = parseInt(val.replace(/\D/g, ''), 10);
-                if (isNaN(num)) num = 0;
-                this.formattedAmount = this.formatNumber(num);
-                this.rawAmount = num;
-            }
-        }">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                <h3 class="font-bold text-gray-800">Ajukan Cashback Kustom</h3>
-                <button wire:click="closeCustomCashbackModal"
-                    class="text-gray-400 hover:text-rose-500 font-bold">&times;</button>
-            </div>
-            <div class="p-6">
-                <p class="text-sm text-gray-500 mb-4">
-                    Masukkan nominal cashback yang ingin diajukan. Pengajuan ini memerlukan ACC (Persetujuan) dari
-                    Supervisor/Admin melalui dashboard sebelum dapat memotong total belanja.
-                </p>
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span class="text-gray-500 sm:text-sm font-semibold">Rp</span>
+    {{-- Modal Custom Cashback --}}
+    @if ($showCustomCashbackModal)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            x-data="{
+                rawAmount: @entangle('customCashbackAmount').defer,
+                formattedAmount: '',
+                init() {
+                    this.formattedAmount = this.formatNumber(this.rawAmount);
+                    $watch('rawAmount', value => {
+                        if (document.activeElement !== this.$refs.amountInput) {
+                            this.formattedAmount = this.formatNumber(value);
+                        }
+                    });
+                },
+                formatNumber(val) {
+                    if (!val) return '';
+                    let num = parseInt(String(val).replace(/\D/g, ''), 10);
+                    return isNaN(num) ? '' : num.toLocaleString('id-ID');
+                },
+                updateAmount(e) {
+                    let val = e.target.value;
+                    let num = parseInt(val.replace(/\D/g, ''), 10);
+                    if (isNaN(num)) num = 0;
+                    this.formattedAmount = this.formatNumber(num);
+                    this.rawAmount = num;
+                }
+            }">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+                <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-800">Ajukan Cashback Kustom</h3>
+                    <button wire:click="closeCustomCashbackModal"
+                        class="text-gray-400 hover:text-rose-500 font-bold">&times;</button>
+                </div>
+                <div class="p-6">
+                    <p class="text-sm text-gray-500 mb-4">
+                        Masukkan nominal cashback yang ingin diajukan. Pengajuan ini memerlukan ACC (Persetujuan) dari
+                        Supervisor/Admin melalui dashboard sebelum dapat memotong total belanja.
+                    </p>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm font-semibold">Rp</span>
+                        </div>
+                        <input type="text" x-ref="amountInput" x-model="formattedAmount"
+                            @input="updateAmount($event)" @keydown.enter="$wire.requestCustomCashback(rawAmount)"
+                            class="pl-10 block w-full rounded-xl border-gray-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-lg font-bold py-3"
+                            placeholder="0" autofocus>
                     </div>
-                    <input type="text" x-ref="amountInput" x-model="formattedAmount"
-                        @input="updateAmount($event)" @keydown.enter="$wire.requestCustomCashback(rawAmount)"
-                        class="pl-10 block w-full rounded-xl border-gray-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-lg font-bold py-3"
-                        placeholder="0" autofocus>
+
+                    <div class="mt-4">
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Alasan Pengajuan <span
+                                class="text-xs font-normal text-rose-500">*wajib diisi</span></label>
+                        <textarea wire:model.defer="customCashbackReason" rows="2"
+                            class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm py-2 px-3"
+                            placeholder="Tuliskan alasan pengajuan diskon (wajib diisi)..."></textarea>
+                    </div>
                 </div>
-                
-                <div class="mt-4">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">Alasan Pengajuan <span class="text-xs font-normal text-rose-500">*wajib diisi</span></label>
-                    <textarea wire:model.defer="customCashbackReason" rows="2"
-                        class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm py-2 px-3"
-                        placeholder="Tuliskan alasan pengajuan diskon (wajib diisi)..."
-                    ></textarea>
+                <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                    <button type="button" wire:click="closeCustomCashbackModal"
+                        class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+                        Batal
+                    </button>
+                    <button type="button" @click="$wire.requestCustomCashback(rawAmount)"
+                        class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2">
+                        <svg wire:loading wire:target="requestCustomCashback" class="animate-spin h-4 w-4 text-white"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        Ajukan ACC
+                    </button>
                 </div>
-            </div>
-            <div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-                <button type="button" wire:click="closeCustomCashbackModal"
-                    class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
-                    Batal
-                </button>
-                <button type="button" @click="$wire.requestCustomCashback(rawAmount)"
-                    class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2">
-                    <svg wire:loading wire:target="requestCustomCashback" class="animate-spin h-4 w-4 text-white"
-                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                            stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                        </path>
-                    </svg>
-                    Ajukan ACC
-                </button>
             </div>
         </div>
-    </div>
-@endif
+    @endif
 </div>
