@@ -2190,8 +2190,20 @@ class AccurateService
         $businessUnitCode = $claim->warranty->policy?->businessUnit?->code ?? 'syihab';
 
         $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
-        $order = $claim->warranty->orderItem->order ?? null;
-        $originalInvoiceNo = $order->accurate_invoice_no ?? $order->order_number ?? 'INV-UNKNOWN';
+        // Karena warranty->orderItem sudah menunjuk ke barang pengganti (faktur baru),
+        // kita harus mencari faktur lama berdasarkan IMEI yang diretur pada klaim ini.
+        $oldOrderItem = \App\Models\OrderItem::with('order')
+            ->where('serial_number', $claim->serial_number)
+            ->latest()
+            ->first();
+
+        if ($oldOrderItem && $oldOrderItem->order) {
+            $originalInvoiceNo = $oldOrderItem->order->accurate_invoice_no ?? $oldOrderItem->order->order_number ?? 'INV-UNKNOWN';
+        } else {
+            // Fallback (seharusnya tidak pernah terjadi jika data valid)
+            $order = $claim->warranty->orderItem->order ?? null;
+            $originalInvoiceNo = $order->accurate_invoice_no ?? $order->order_number ?? 'INV-UNKNOWN';
+        }
 
         $branchName = Auth::user()->branch->name ?? 'Cabang Utama';
 

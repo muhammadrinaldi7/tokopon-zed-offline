@@ -1069,7 +1069,7 @@
                                                             class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors shadow-sm">
                                                             Batal
                                                         </button>
-                                                        <button wire:click="processRefund" type="button"
+                                                        <button wire:click="processRefundCash({{ $selectedClaim->id }})" type="button"
                                                             class="px-5 py-2.5 text-sm font-bold text-white bg-yellow-600 hover:bg-yellow-700 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center gap-2">
                                                             Cairkan Uang Sekarang
                                                         </button>
