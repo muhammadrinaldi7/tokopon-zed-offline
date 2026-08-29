@@ -267,6 +267,7 @@ class Show extends Component
                         'paymentDate' => date('d/m/Y'),
                         'chequeAmount' => (int) $this->sellPhone->appraised_value,
                         'branchName' => Auth::user()->branch->name,
+                        'charField1' => $namaProyek ?: 'UMUM',
                         'detailInvoice' => [
                             [
                                 'invoiceNo' => $this->sellPhone->invoice_number,

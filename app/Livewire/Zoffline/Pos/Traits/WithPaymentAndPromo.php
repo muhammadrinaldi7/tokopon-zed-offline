@@ -6,6 +6,11 @@ use App\Models\Promo;
 use Livewire\Attributes\Computed;
 use Illuminate\Support\Facades\Auth;
 
+/**
+ * @method void applyPromosToCart()
+ * @method int subtotal()
+ * @method int totalDiscount()
+ */
 trait WithPaymentAndPromo
 {
     // ─── Payment ───────────────────────────────────────────────
