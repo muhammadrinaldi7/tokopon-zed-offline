@@ -259,38 +259,59 @@ class ClaimManagement extends Component
             $claim->approved_by = Auth::id();
             $claim->save();
 
-            // Nonaktifkan Garansi Lama (FIX ENUM BUG: 'replaced' diganti 'voided' atau 'claimed_out')
-            $oldWarranty = $claim->warranty;
-            $oldWarranty->status = 'voided';
-            $oldWarranty->save();
+            $warranty = $claim->warranty;
+            $oldSn = $warranty->serial_number;
 
-            // Buat Garansi Baru untuk IMEI Baru
-            $newWarranty = $oldWarranty->replicate();
-            $newWarranty->serial_number = $this->replacement_imei;
-            $newWarranty->status = 'active';
-            $newWarranty->device_inspection_id = null; // Butuh QC baru nanti
+            // Simpan original SN jika belum ada
+            if (!$warranty->original_serial_number) {
+                $warranty->original_serial_number = $oldSn;
+            }
+
+            // Catat log perpindahan SN
+            $reason = $this->replacement_type === 'same' 
+                ? 'replacement_same' 
+                : ($priceDifference > 0 ? 'replacement_upgrade' : 'replacement_downgrade');
+                
+            \App\Models\WarrantySerialLog::create([
+                'warranty_id' => $warranty->id,
+                'warranty_claim_id' => $claim->id,
+                'old_serial_number' => $oldSn,
+                'new_serial_number' => $this->replacement_imei,
+                'reason' => $reason,
+                'changed_by' => Auth::id(),
+                'notes' => $finalNotes,
+            ]);
+
+            \App\Models\WarrantyReplacement::create([
+                'warranty_claim_id' => $claim->id,
+                'old_imei' => $oldSn,
+                'new_imei' => $this->replacement_imei,
+                'processed_by' => Auth::id(),
+                'system_notes' => $finalNotes,
+            ]);
+
+            // Update SN langsung
+            $warranty->serial_number = $this->replacement_imei;
+            $warranty->claims_used = ($warranty->claims_used ?? 0) + 1;
+            $warranty->replacement_count = ($warranty->replacement_count ?? 0) + 1;
+            $warranty->device_inspection_id = null; // Butuh QC ulang
+            $warranty->status = 'active';
+
+            // Atur masa aktif berdasarkan kebijakan
+            $policy = $warranty->policy;
+            if ($policy && $policy->replacement_type === 'reset') {
+                $warranty->activated_at = Carbon::now();
+                $warranty->expires_at = Carbon::now()->addDays($policy->duration_days);
+            }
 
             // Simpan sementara agar terpicu query-nya dan mendeteksi error jika ada sebelum ke Accurate
-            $newWarranty->save();
+            $warranty->save();
 
             // 2. Integrasi API Accurate (Dijalankan di DALAM try-catch transaksi DB)
             $accurateService = app(AccurateService::class);
             $accurateResult = $accurateService->processWarrantyReplacement($claim, $this->replacement_imei, $newItemNo, $newPrice, $priceDifference, $this->replacement_type, $this->bank_no, $originalPrice);
 
-            // Increment claims used
-            $newWarranty->claims_used = ($oldWarranty->claims_used ?? 0) + 1;
-
-            // Atur masa aktif berdasarkan kebijakan
-            $policy = $oldWarranty->policy;
-            if ($policy && $policy->replacement_type === 'reset') {
-                $newWarranty->activated_at = Carbon::now();
-                $newWarranty->expires_at = Carbon::now()->addDays($policy->duration_days);
-            } else {
-                // Meneruskan masa aktif yang lama (default)
-                // tidak perlu ubah activated_at & expires_at karena sudah di-replicate
-            }
-
-            // Update data varian jika berbeda
+            // Update data varian jika berbeda (tidak perlu ubah claims_used atau expires_at lagi)
             if ($this->replacement_type === 'different' && $newItemNo) {
                 $newVariant = \App\Models\ProductVariant::whereHas('accurateData', function ($q) use ($newItemNo) {
                     $q->where('item_no', $newItemNo);
@@ -306,7 +327,7 @@ class ClaimManagement extends Component
                 // Cukup biarkan order_item_id menunjuk ke order asli.
             }
 
-            $newWarranty->save();
+            $warranty->save();
 
             // 3. Buat Rekaman Order POS agar Nota/Receipt bisa dicetak
             $newInvoiceNo = $accurateResult['sales_invoice']['number'] ?? null;
@@ -383,9 +404,9 @@ class ClaimManagement extends Component
                 'subtotal' => $newPrice,
             ]);
 
-            // Tautkan garansi baru ke OrderItem baru agar datanya rapi
-            $newWarranty->order_item_id = $orderItem->id;
-            $newWarranty->save();
+            // Tautkan garansi ke OrderItem baru agar datanya rapi
+            $warranty->order_item_id = $orderItem->id;
+            $warranty->save();
 
             \Illuminate\Support\Facades\DB::commit();
         } catch (\Exception $e) {

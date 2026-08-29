@@ -66,6 +66,7 @@
                         <h3 class="text-sm font-black text-gray-400 uppercase tracking-wider mb-4">Pilih Garansi yang
                             Ingin Diklaim</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
                             @foreach ($foundWarranties as $warranty)
                                 @php
                                     $isExpired =
@@ -162,27 +163,54 @@
                                 <div
                                     class="mb-6 {{ $isSelectedExpired ? ($hasPendingExtensionRequest ? 'bg-amber-50 border-amber-100' : 'bg-rose-50 border-rose-100') : 'bg-blue-50 border-blue-100' }} rounded-lg p-4 border">
                                     @if ($isSelectedExpired)
-                                        @if($hasPendingExtensionRequest)
+                                        @if ($hasPendingExtensionRequest)
                                             <div class="flex items-start gap-3">
-                                                <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                                                    <svg class="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                <div
+                                                    class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                                                    <svg class="w-5 h-5 text-amber-600" fill="none"
+                                                        viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
                                                 </div>
                                                 <div>
-                                                    <p class="text-sm font-bold text-amber-800 mb-1">Menunggu Persetujuan Manajer</p>
-                                                    <p class="text-xs text-amber-600 mb-0">Pengajuan Toleransi Perpanjangan Garansi sedang menunggu persetujuan. Mohon tunggu informasi lebih lanjut.</p>
+                                                    <p class="text-sm font-bold text-amber-800 mb-1">Menunggu
+                                                        Persetujuan Manajer</p>
+                                                    <p class="text-xs text-amber-600 mb-0">Pengajuan Toleransi
+                                                        Perpanjangan Garansi sedang menunggu persetujuan. Mohon tunggu
+                                                        informasi lebih lanjut.</p>
                                                 </div>
                                             </div>
                                         @else
-                                            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                                            <div
+                                                class="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                                                 <div>
-                                                    <p class="text-sm font-bold text-rose-800 mb-1">Peringatan: Garansi ini sudah Habis.</p>
-                                                    <p class="text-xs text-rose-600 mb-0">Perbaikan akan diproses sebagai Servis Berbayar (Service Center).</p>
+                                                    <p class="text-sm font-bold text-rose-800 mb-1">Peringatan: Garansi
+                                                        ini sudah Habis.</p>
+                                                    <p class="text-xs text-rose-600 mb-0">Perbaikan akan diproses
+                                                        sebagai Servis Berbayar (Service Center).</p>
                                                 </div>
-                                                <button type="button" wire:click="requestWarrantyExtension" wire:loading.attr="disabled" class="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold rounded-lg transition-colors">
-                                                    <svg wire:loading.remove wire:target="requestWarrantyExtension" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                                    <svg wire:loading wire:target="requestWarrantyExtension" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                <button type="button" wire:click="requestWarrantyExtension"
+                                                    wire:loading.attr="disabled"
+                                                    class="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold rounded-lg transition-colors">
+                                                    <svg wire:loading.remove wire:target="requestWarrantyExtension"
+                                                        class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                        stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                    </svg>
+                                                    <svg wire:loading wire:target="requestWarrantyExtension"
+                                                        class="animate-spin h-4 w-4"
+                                                        xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                        viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12"
+                                                            r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                        </path>
+                                                    </svg>
                                                     Ajukan Toleransi Perpanjangan
                                                 </button>
                                             </div>
@@ -286,15 +314,17 @@
                                         {{-- PREVIEW MURNI DARI BROWSER (ALPINE JS) --}}
                                         <template x-if="localPreview || '{{ $photoFile ? 'true' : '' }}'">
                                             <div class="absolute inset-0 z-20">
-                                                <img :src="localPreview || '{{ $photoFile ? (method_exists($photoFile, 'temporaryUrl') ? $photoFile->temporaryUrl() : '') : '' }}'"
+                                                <img :src="localPreview ||
+                                                    '{{ $photoFile ? (method_exists($photoFile, 'temporaryUrl') ? $photoFile->temporaryUrl() : '') : '' }}'"
                                                     class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
-                                                
+
                                                 <div
                                                     class="absolute inset-x-0 bottom-0 bg-black/40 backdrop-blur-xs py-2 px-3 text-center pointer-events-none z-10">
                                                     <span
                                                         class="text-[11px] font-bold text-white tracking-wide block truncate">{{ $label }}</span>
                                                 </div>
-                                                <button type="button" @click="localPreview = null; $wire.set('{{ $propertyName }}', null)"
+                                                <button type="button"
+                                                    @click="localPreview = null; $wire.set('{{ $propertyName }}', null)"
                                                     class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-10 flex items-center justify-center">
                                                     <svg class="w-3.5 h-3.5 text-rose-500" fill="none"
                                                         stroke="currentColor" viewBox="0 0 24 24">
@@ -307,7 +337,8 @@
                                                 {{-- Loading Overlay (Saat upload ke Livewire berlangsung) --}}
                                                 <div wire:loading.flex wire:target="{{ $propertyName }}"
                                                     class="absolute inset-0 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center gap-1 z-50">
-                                                    <span class="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></span>
+                                                    <span
+                                                        class="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full"></span>
                                                 </div>
                                             </div>
                                         </template>
@@ -599,20 +630,27 @@
                 <div class="p-6 overflow-y-auto flex-1">
                     <form wire:submit="submitServiceCenter">
                         @php
-                            $svcWarranty = $foundWarranties ? $foundWarranties->firstWhere('id', $selectedWarrantyId) : null;
+                            $svcWarranty = $foundWarranties
+                                ? $foundWarranties->firstWhere('id', $selectedWarrantyId)
+                                : null;
                         @endphp
-                        
-                        @if($svcWarranty)
+
+                        @if ($svcWarranty)
                             <div class="bg-white border border-gray-200 shadow-sm rounded-xl p-4 mb-5">
-                                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">Informasi Perangkat</h4>
+                                <h4
+                                    class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
+                                    Informasi Perangkat</h4>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <p class="text-[11px] text-gray-500 mb-0.5">Nama Produk</p>
-                                        <p class="font-bold text-gray-800 text-sm line-clamp-1">{{ $svcWarranty->orderItem->product_name ?? ($svcWarranty->orderItem->variant->name ?? 'Unknown Product') }}</p>
+                                        <p class="font-bold text-gray-800 text-sm line-clamp-1">
+                                            {{ $svcWarranty->orderItem->product_name ?? ($svcWarranty->orderItem->variant->name ?? 'Unknown Product') }}
+                                        </p>
                                     </div>
                                     <div>
                                         <p class="text-[11px] text-gray-500 mb-0.5">IMEI / Serial Number</p>
-                                        <p class="font-bold font-mono text-gray-900 text-sm">{{ $svcWarranty->serial_number }}</p>
+                                        <p class="font-bold font-mono text-gray-900 text-sm">
+                                            {{ $svcWarranty->serial_number }}</p>
                                     </div>
                                     <div class="md:col-span-2">
                                         <p class="text-[11px] text-gray-500 mb-0.5">No Faktur / Transaksi Pelanggan</p>

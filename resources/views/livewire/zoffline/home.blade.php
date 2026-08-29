@@ -208,7 +208,7 @@
                                 </div>
                                 <span class="block text-xs sm:text-sm text-center leading-tight">Klaim Garansi</span>
                             </button>
-                            
+
                             <a href="{{ route('zoffline.qc-returns') }}" wire:navigate @click="openGaransiModal = false"
                                 class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
                                 <div
@@ -222,7 +222,9 @@
                                 <span class="block text-xs sm:text-sm text-center leading-tight">QC Retur</span>
                             </a>
 
-                            <a href="{{ route('zoffline.device-passport') }}" wire:navigate @click="openGaransiModal = false"
+
+                            <a href="{{ route('zoffline.device-passport') }}" wire:navigate
+                                @click="openGaransiModal = false"
                                 class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
                                 <div
                                     class="w-12 h-12 rounded-xl bg-purple-100/50 flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform">

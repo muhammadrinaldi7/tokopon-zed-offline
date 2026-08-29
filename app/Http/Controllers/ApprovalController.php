@@ -33,7 +33,7 @@ class ApprovalController extends Controller
 
         $globalRoles = ['admin', 'direktur', 'superadmin'];
         // Role tingkat cabang (difilter berdasarkan BU dan Cabang)
-        $localRoles = ['manager', 'bm', 'supervisor'];
+        $localRoles = ['manager', 'bm', 'supervisor', 'manager_operasional'];
 
         $query = \App\Models\User::role($targetRole)
             ->whereNotNull('telegram_chat_id')
@@ -95,15 +95,15 @@ class ApprovalController extends Controller
         $alasan = $approval->reason ?? '-';
         $cabang = $approval->requestedBy->branch->name ?? '-';
         $waktuFormat = $approval->created_at->format('d M Y H:i');
-        
+
         $teksGrup = "🔔 *PENGAJUAN BARU*\n\n"
-                  . "Pengajuan: {$tipe} untuk {$orderInfo}\n"
-                  . "Kasir: {$kasirName}\n"
-                  . "Waktu: {$waktuFormat}\n"
-                  . "Cabang: {$cabang}\n"
-                  . "Keterangan: \"{$alasan}\"\n\n"
-                  . "⏳ _Menunggu persetujuan dari divisi terkait._";
-                  
+            . "Pengajuan: {$tipe} untuk {$orderInfo}\n"
+            . "Kasir: {$kasirName}\n"
+            . "Waktu: {$waktuFormat}\n"
+            . "Cabang: {$cabang}\n"
+            . "Keterangan: \"{$alasan}\"\n\n"
+            . "⏳ _Menunggu persetujuan dari divisi terkait._";
+
         self::sendGroupNotification($teksGrup, $businessUnitId);
         // -------------------------------------
 
@@ -208,7 +208,7 @@ class ApprovalController extends Controller
                 try {
                     $approval->executeAction(['extension_days' => 7]);
                     $pesan = "✅ Pengajuan telah DISETUJUI sepenuhnya.";
-                    
+
                     $kasirName = $approval->requestedBy->name ?? 'Kasir';
                     $tipe = str_replace('_', ' ', $approval->request_type) . " (Level {$approval->required_level})";
                     $orderInfo = '-';
@@ -222,13 +222,13 @@ class ApprovalController extends Controller
                     $alasan = $approval->reason ?? '-';
 
                     $teksGrup = "✅ *APPROVAL SUKSES*\n\n"
-                              . "Pengajuan: {$tipe} untuk {$orderInfo}\n"
-                              . "Kasir: {$kasirName}\n"
-                              . "Waktu: {$waktu}\n"
-                              . "Cabang: {$cabang}\n"
-                              . "Keterangan: \"{$alasan}\"\n\n"
-                              . "Telah disetujui sepenuhnya oleh *{$user->name}*.";
-                              
+                        . "Pengajuan: {$tipe} untuk {$orderInfo}\n"
+                        . "Kasir: {$kasirName}\n"
+                        . "Waktu: {$waktu}\n"
+                        . "Cabang: {$cabang}\n"
+                        . "Keterangan: \"{$alasan}\"\n\n"
+                        . "Telah disetujui sepenuhnya oleh *{$user->name}*.";
+
                     $buId = $approval->requestedBy->business_unit_id ?? null;
                     self::sendGroupNotification($teksGrup, $buId);
                 } catch (\Exception $e) {
@@ -259,7 +259,7 @@ class ApprovalController extends Controller
             }
             $pesan = "❌ Pengajuan telah DITOLAK.";
             $teksGrup = "❌ *APPROVAL DITOLAK*\nPengajuan {$approval->request_type} (ID: {$approval->id}) telah DITOLAK oleh {$user->name}.";
-            
+
             $buId = $approval->requestedBy->business_unit_id ?? null;
             self::sendGroupNotification($teksGrup, $buId);
         } else {

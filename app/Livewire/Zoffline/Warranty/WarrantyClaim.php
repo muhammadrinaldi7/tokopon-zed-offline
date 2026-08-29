@@ -55,7 +55,7 @@ class WarrantyClaim extends Component
     public $photo_bawah;
     public $photo_box;
     public $photo_kelengkapan;
-    
+
     public $qc_results = [];
     public $qc_notes = '';
     public $template;
@@ -70,7 +70,11 @@ class WarrantyClaim extends Component
         ]);
 
         $this->foundWarranties = Warranty::with(['policy', 'orderItem.order.user', 'orderItem.variant'])
-            ->where('serial_number', $this->searchQuery)
+            ->where(function ($query) {
+                $query->where('serial_number', $this->searchQuery)
+                      ->orWhere('original_serial_number', $this->searchQuery);
+            })
+            ->where('status', '!=', 'voided')
             ->get();
 
         $this->selectedWarrantyId = null;
@@ -140,10 +144,10 @@ class WarrantyClaim extends Component
 
         // Check if there is already a pending request
         $existing = \App\Models\ApprovalRequest::where('approvable_type', Warranty::class)
-                ->where('approvable_id', $warranty->id)
-                ->where('request_type', 'WARRANTY_EXTENSION')
-                ->where('status', 'PENDING')
-                ->first();
+            ->where('approvable_id', $warranty->id)
+            ->where('request_type', 'WARRANTY_EXTENSION')
+            ->where('status', 'PENDING')
+            ->first();
 
         if ($existing) {
             $this->dispatch('toast', title: 'Info', message: 'Sudah ada pengajuan perpanjangan garansi yang menunggu persetujuan.', type: 'info');
@@ -192,7 +196,7 @@ class WarrantyClaim extends Component
         $this->validate([
             'selectedWarrantyId' => 'required|exists:warranties,id',
         ]);
-        
+
         $this->isInspecting = true;
         $this->loadTemplate();
     }
@@ -203,7 +207,7 @@ class WarrantyClaim extends Component
         $brandId = null;
         $deviceCategory = null;
         $variant = $this->warranty->orderItem->variant ?? null;
-        
+
         // Cek brand_name dari ProductAccurate
         if ($variant) {
             $brandName = null;
@@ -220,7 +224,7 @@ class WarrantyClaim extends Component
                 $brandId = $brand->id ?? null;
             }
         }
-        
+
         // Fallback
         if (!$brandId && isset($variant->product->brand_id)) {
             $brandId = $variant->product->brand_id;
@@ -264,7 +268,7 @@ class WarrantyClaim extends Component
         ]);
 
         $inspection->calculateCounts();
-        
+
         // If there are failed boolean checks, verdict is fail
         $failedCount = collect($this->qc_results)->where('type', 'boolean')->where('value', 0)->count();
         if ($failedCount > 0) {
@@ -327,7 +331,7 @@ class WarrantyClaim extends Component
         // Cek batas maksimal klaim
         $maxClaims = $warranty->policy->max_claims ?? 1;
         $claimsUsed = $warranty->claims_used ?? 0;
-        
+
         if ($claimsUsed >= $maxClaims) {
             $this->showServiceCenterForm = true;
             $this->dispatch('toast', title: 'Batas Klaim Terlampaui', message: "Garansi ini sudah diklaim maksimal ({$maxClaims} kali). Silakan gunakan form Service Center berbayar.", type: 'warning');
@@ -409,7 +413,7 @@ class WarrantyClaim extends Component
 
         // Create Service Center Ticket
         $deviceName = $warranty->orderItem->product_name ?? 'Unknown Device';
-        
+
         \App\Models\ServiceCenterTicket::create([
             'warranty_claim_id' => $claim->id,
             'customer_name' => $this->customer_name,

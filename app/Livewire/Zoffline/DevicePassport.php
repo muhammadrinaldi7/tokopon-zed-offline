@@ -153,23 +153,26 @@ class DevicePassport extends Component
             ];
         }
 
-        // Cari klaim dimana IMEI ini adalah IMEI Pengganti (lewat tabel WarrantyReplacement)
-        $replacementsAsNew = \App\Models\WarrantyReplacement::with('claim')->where('new_imei', 'LIKE', '%' . $imei . '%')->get();
-        foreach ($replacementsAsNew as $replacement) {
-            $claim = $replacement->claim;
-            if (!$claim) continue;
+        // Cari klaim dimana IMEI ini adalah IMEI Pengganti (lewat tabel WarrantySerialLog)
+        $snLogs = \App\Models\WarrantySerialLog::with(['warranty', 'claim', 'changedBy'])
+            ->where('old_serial_number', 'LIKE', '%' . $imei . '%')
+            ->orWhere('new_serial_number', 'LIKE', '%' . $imei . '%')
+            ->get();
+
+        foreach ($snLogs as $log) {
+            $typeDesc = $log->old_serial_number === $imei ? 'Ganti Unit (Lama Masuk)' : 'Ganti Unit (Baru Keluar)';
             
             $timeline[] = [
-                'date' => $claim->resolved_at ?: $claim->updated_at,
-                'type' => 'Klaim Garansi (Keluar sbg Pengganti)',
+                'date' => $log->created_at,
+                'type' => $typeDesc,
                 'icon' => 'arrows-right-left',
                 'color' => 'bg-purple-500',
-                'description' => "Perangkat ini diberikan kepada pelanggan sebagai unit pengganti (Replacement).",
-                'status' => 'Terjual (Replacement)',
+                'description' => "Pergantian unit dari {$log->old_serial_number} menjadi {$log->new_serial_number}.",
+                'status' => 'Selesai',
                 'meta' => [
-                    'Klaim ID' => 'CLM-' . $claim->id,
-                    'Catatan' => $claim->resolution_notes,
-                    'IMEI Rusak Lama' => $replacement->old_imei
+                    'Klaim ID' => $log->claim ? 'CLM-' . $log->claim->id : '-',
+                    'Alasan' => $log->reason,
+                    'Diproses oleh' => $log->changedBy?->name ?? '-',
                 ]
             ];
         }
