@@ -10,8 +10,10 @@ class WarrantyReturn extends Component
 {
     public $activeTab = 'waiting_refund'; // waiting_refund (Uang Keluar) atau waiting_payment (Uang Masuk)
     public $showResolveModal = false;
+    public $showDetailsModal = false;
     public $selectedClaimId = null;
     public $selectedBankNo = '';
+    public $selectedDetails = null;
 
     public function setTab($tab)
     {
@@ -71,5 +73,17 @@ class WarrantyReturn extends Component
         }
 
         $this->closeResolveModal();
+    }
+
+    public function viewDetails($id)
+    {
+        $this->selectedDetails = WarrantyClaim::with(['warranty.orderItem.variant', 'customer'])->find($id);
+        $this->showDetailsModal = true;
+    }
+
+    public function closeDetails()
+    {
+        $this->showDetailsModal = false;
+        $this->selectedDetails = null;
     }
 }

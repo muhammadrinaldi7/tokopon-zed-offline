@@ -118,17 +118,22 @@
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 text-center">
-                                        @if($activeTab === 'waiting_refund')
-                                            <button wire:click="openResolveModal({{ $claim->id }})" class="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white font-bold text-xs rounded-xl transition shadow-sm">
-                                                Konfirmasi Refund
+                                        <div class="flex items-center justify-center gap-2">
+                                            <button wire:click="viewDetails({{ $claim->id }})" title="Lihat Detail" class="p-2 bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white rounded-xl transition shadow-sm">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                             </button>
-                                        @elseif($activeTab === 'waiting_payment')
-                                            <button wire:click="openResolveModal({{ $claim->id }})" class="px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white font-bold text-xs rounded-xl transition shadow-sm">
-                                                Konfirmasi Transfer
-                                            </button>
-                                        @else
-                                            <span class="px-3 py-1 bg-neutral-100 text-neutral-500 font-bold text-[10px] uppercase rounded-lg">Selesai</span>
-                                        @endif
+                                            @if($activeTab === 'waiting_refund')
+                                                <button wire:click="openResolveModal({{ $claim->id }})" class="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white font-bold text-xs rounded-xl transition shadow-sm">
+                                                    Konfirmasi Refund
+                                                </button>
+                                            @elseif($activeTab === 'waiting_payment')
+                                                <button wire:click="openResolveModal({{ $claim->id }})" class="px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white font-bold text-xs rounded-xl transition shadow-sm">
+                                                    Konfirmasi Transfer
+                                                </button>
+                                            @else
+                                                <span class="px-3 py-1 bg-neutral-100 text-neutral-500 font-bold text-[10px] uppercase rounded-lg">Selesai</span>
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach
@@ -189,6 +194,61 @@
                     <button wire:click="confirmResolve" type="button"
                         class="px-5 py-2.5 text-sm font-bold text-white {{ $activeTab === 'waiting_refund' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700' }} rounded-xl transition-all shadow-md flex items-center gap-2">
                         Simpan & Selesai
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Modal Detail Klaim -->
+    @if ($showDetailsModal && $selectedDetails)
+        <div wire:key="modal-details" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" wire:click="closeDetails"></div>
+            <div class="relative bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
+                
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-blue-50">
+                    <div>
+                        <h3 class="font-bold text-xl text-blue-900">Detail Klaim Garansi</h3>
+                        <p class="text-xs text-blue-700 mt-0.5">#{{ $selectedDetails->claim_number }}</p>
+                    </div>
+                    <button wire:click="closeDetails"
+                        class="text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-100 rounded-full p-2 transition-colors shadow-sm">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="p-6 overflow-y-auto flex-1 space-y-6">
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Informasi Pelanggan</h4>
+                        <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                            <p class="font-bold text-gray-800">{{ $selectedDetails->customer->name ?? '-' }}</p>
+                            <p class="text-sm text-gray-500 mt-1">{{ $selectedDetails->customer->email ?? '-' }}</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Keluhan / Deskripsi Masalah</h4>
+                        <div class="bg-rose-50 text-rose-800 p-4 rounded-xl border border-rose-100 text-sm font-medium">
+                            {{ $selectedDetails->issue_description ?? 'Tidak ada keluhan tertulis' }}
+                        </div>
+                    </div>
+
+                    @if($selectedDetails->resolution_notes)
+                        <div>
+                            <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Catatan Resolusi (Dari CS)</h4>
+                            <div class="bg-emerald-50 text-emerald-800 p-4 rounded-xl border border-emerald-100 text-sm font-medium whitespace-pre-wrap">
+                                {{ $selectedDetails->resolution_notes }}
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end shrink-0">
+                    <button wire:click="closeDetails" type="button"
+                        class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-colors shadow-sm">
+                        Tutup
                     </button>
                 </div>
             </div>
