@@ -263,202 +263,53 @@ class ClaimManagement extends Component
 
         $claim = WarrantyClaim::with(['warranty.orderItem.order', 'warranty.orderItem.variant'])->findOrFail($this->selectedClaimId);
 
-        $originalPrice = $this->original_price;
-        $newItemNo = $this->replacement_type === 'different' ? $this->replacement_item_no : null;
-        $newPrice = $this->replacement_type === 'different' ? $this->replacement_price : $originalPrice;
-        $priceDifference = $newPrice - $originalPrice;
+        // Cek apakah sudah ada request approval yang pending
+        $existing = \App\Models\ApprovalRequest::where('approvable_type', WarrantyClaim::class)
+            ->where('approvable_id', $claim->id)
+            ->where('request_type', 'WARRANTY_REPLACEMENT')
+            ->where('status', 'PENDING')
+            ->first();
+
+        if ($existing) {
+            $this->addError('replacement_imei', 'Klaim ini sedang menunggu persetujuan (Approval PENDING).');
+            return;
+        }
+
+        $payload = [
+            'replacement_imei' => $this->replacement_imei,
+            'replacement_type' => $this->replacement_type,
+            'replacement_item_no' => $this->replacement_item_no,
+            'replacement_price' => $this->replacement_price,
+            'bank_no' => $this->bank_no,
+            'original_price' => $this->original_price,
+            'selected_sales_id' => $this->selected_sales_id,
+            'manual_note' => $this->manual_note,
+            'resolution_notes' => $this->resolution_notes,
+            'replacement_product_name' => $this->replacement_product_name,
+            'branch_id' => Auth::user()->branch_id,
+            'business_unit_id' => Auth::user()->getActiveBusinessUnitId() ?? 1,
+            'branch_name' => Auth::user()->branch->name ?? 'Toko'
+        ];
 
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
-            if ($priceDifference < 0) {
-                $claim->status = 'waiting_refund';
-                $claim->refund_amount = abs($priceDifference);
-            } elseif ($priceDifference > 0) {
-                $claim->status = 'waiting_payment';
-                $claim->refund_amount = abs($priceDifference);
-            } else {
-                $claim->status = 'completed';
-                $claim->refund_amount = null;
-            }
-
-            if ($claim->status === 'completed') {
-                $claim->resolved_at = Carbon::now();
-            }
-            $claim->resolution = 'replaced';
-            $noteType = $this->replacement_type === 'same' ? 'Ganti Unit' : ($priceDifference > 0 ? 'Upgrade Unit' : 'Downgrade Unit');
-
-            $finalNotes = "{$noteType} ke IMEI: {$this->replacement_imei}" .
-                ($newItemNo ? " (Barang Baru: {$this->replacement_product_name})" : "");
-
-            if (!empty($this->manual_note)) {
-                $finalNotes .= "\nCatatan Tambahan: {$this->manual_note}";
-            }
-
-            $claim->resolution_notes = $finalNotes . " | {$this->resolution_notes}";
-            $claim->approved_by = Auth::id();
-            $claim->save();
-
-            $warranty = $claim->warranty;
-            $oldSn = $warranty->serial_number;
-
-            if (!$warranty->original_serial_number) {
-                $warranty->original_serial_number = $oldSn;
-            }
-
-            $reason = $this->replacement_type === 'same'
-                ? 'replacement_same'
-                : ($priceDifference > 0 ? 'replacement_upgrade' : 'replacement_downgrade');
-
-            \App\Models\WarrantySerialLog::create([
-                'warranty_id' => $warranty->id,
-                'warranty_claim_id' => $claim->id,
-                'old_serial_number' => $oldSn,
-                'new_serial_number' => $this->replacement_imei,
-                'reason' => $reason,
-                'changed_by' => Auth::id(),
-                'notes' => $finalNotes,
+            $approval = \App\Models\ApprovalRequest::create([
+                'request_type' => 'WARRANTY_REPLACEMENT',
+                'approvable_type' => WarrantyClaim::class,
+                'approvable_id' => $claim->id,
+                'requested_by' => Auth::id(),
+                'payload' => $payload,
+                'reason' => "Pengajuan Ganti Unit Garansi ke IMEI: {$this->replacement_imei}",
+                'status' => 'PENDING',
+                'current_level' => 0
             ]);
 
-            \App\Models\WarrantyReplacement::create([
-                'warranty_claim_id' => $claim->id,
-                'old_imei' => $oldSn,
-                'new_imei' => $this->replacement_imei,
-                'processed_by' => Auth::id(),
-                'system_notes' => $finalNotes,
-            ]);
-
-            $warranty->serial_number = $this->replacement_imei;
-            $warranty->claims_used = ($warranty->claims_used ?? 0) + 1;
-            $warranty->replacement_count = ($warranty->replacement_count ?? 0) + 1;
-            $warranty->device_inspection_id = null;
-            $warranty->status = 'active';
-
-            $policy = $warranty->policy;
-            if ($policy && $policy->replacement_type === 'reset') {
-                $warranty->activated_at = Carbon::now();
-                $warranty->expires_at = Carbon::now()->addDays($policy->duration_days);
-            }
-
-            $originalPriceForAccurate = $this->original_price > 0 ? $this->original_price : ($warranty->orderItem->price_at_checkout ?? 0);
-
-            $salesmanNo = null;
-            if ($this->selected_sales_id) {
-                $salesmanNo = \App\Models\Employe::find($this->selected_sales_id)?->employee_no;
-            }
-
-            $accurateService = app(AccurateService::class);
-            $accurateResult = $accurateService->processWarrantyReplacement(
-                $claim,
-                $this->replacement_imei,
-                $newItemNo,
-                $newPrice,
-                $priceDifference,
-                $this->replacement_type,
-                $this->bank_no,
-                $originalPriceForAccurate,
-                $salesmanNo
-            );
-
-            if ($this->replacement_type === 'different' && $newItemNo) {
-                $newVariant = \App\Models\ProductVariant::whereHas('accurateData', function ($q) use ($newItemNo) {
-                    $q->where('item_no', $newItemNo);
-                })->first();
-
-                if (!$newVariant) {
-                    $newVariant = \App\Models\SecondProductVariant::whereHas('accurateData', function ($q) use ($newItemNo) {
-                        $q->where('item_no', $newItemNo);
-                    })->first();
-                }
-
-                // Catatan: Model Warranty bawaan tidak memiliki product_variant_id. 
-                // Cukup biarkan order_item_id menunjuk ke order asli.
-            }
-
-            $warranty->save();
-
-            // 3. Buat Rekaman Order POS agar Nota/Receipt bisa dicetak
-            $newInvoiceNo = $accurateResult['sales_invoice']['number'] ?? null;
-
-            $newOrderNumber = 'WR-' . $claim->claim_number;
-            $order = Order::create([
-                'business_unit_id' => $claim->warranty->policy?->business_unit_id ?? (Auth::user()->getActiveBusinessUnitId() ?? 1),
-                'user_id' => $claim->customer_user_id,
-                'order_number' => $newOrderNumber,
-                'accurate_invoice_no' => $newInvoiceNo,
-                'order_date' => Carbon::now()->format('Y-m-d'),
-                'total_amount' => $newPrice,
-                'shipping_cost' => 0,
-                'discount_amount' => 0,
-                'mdr_percentage' => 0,
-                'mdr_amount' => 0,
-                'grand_total' => $newPrice, // Total nilai barang
-                'order_status' => 'COMPLETED',
-                'order_channel' => 'POS',
-                'handled_by' => Auth::id(),
-                'sales_id' => $this->selected_sales_id ?? ($claim->warranty->orderItem->order->sales_id ?? Auth::id()),
-                'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko', 'is_warranty_replacement' => true],
-                'notes' => "Ganti Unit Klaim Garansi #{$claim->claim_number}. Pengganti untuk IMEI: {$claim->serial_number}",
-                'branch_id' => Auth::user()->branch_id,
-            ]);
-
-            // Simpan referensi Accurate Documents
-            if (isset($accurateResult['sales_return']) && $accurateResult['sales_return']['id']) {
-                \App\Models\OrderAccurateDoc::create([
-                    'order_id' => $order->id,
-                    'doc_type' => 'SALES_RETURN',
-                    'accurate_id' => $accurateResult['sales_return']['id'],
-                    'doc_number' => $accurateResult['sales_return']['number'],
-                    'status' => 'SUCCESS'
-                ]);
-            }
-            if (isset($accurateResult['sales_invoice']) && $accurateResult['sales_invoice']['id']) {
-                \App\Models\OrderAccurateDoc::create([
-                    'order_id' => $order->id,
-                    'doc_type' => 'SALES_INVOICE',
-                    'accurate_id' => $accurateResult['sales_invoice']['id'],
-                    'doc_number' => $accurateResult['sales_invoice']['number'],
-                    'status' => 'SUCCESS'
-                ]);
-            }
-            if (isset($accurateResult['sales_receipt']) && $accurateResult['sales_receipt']['id']) {
-                \App\Models\OrderAccurateDoc::create([
-                    'order_id' => $order->id,
-                    'doc_type' => 'SALES_RECEIPT',
-                    'accurate_id' => $accurateResult['sales_receipt']['id'],
-                    'doc_number' => $accurateResult['sales_receipt']['number'],
-                    'status' => 'SUCCESS'
-                ]);
-            }
-
-            $orderItem = OrderItem::create([
-                'order_id' => $order->id,
-                'product_id' => $claim->warranty->orderItem->product_id, // Asumsi id produk sama, atau beda jika downgrade
-                'product_variant_type' => $this->replacement_type === 'different' && $newItemNo ?
-                    get_class($newVariant ?? $claim->warranty->orderItem->variant) :
-                    $claim->warranty->orderItem->product_variant_type,
-                'product_variant_id' => $this->replacement_type === 'different' && $newItemNo ?
-                    ($newVariant->id ?? $claim->warranty->orderItem->product_variant_id) :
-                    $claim->warranty->orderItem->product_variant_id,
-                'product_name' => $this->replacement_type === 'different' && $this->replacement_product_name ?
-                    $this->replacement_product_name :
-                    $claim->warranty->orderItem->product_name,
-                'serial_number' => $this->replacement_imei,
-                'qty' => 1,
-                'price_at_checkout' => $newPrice,
-                'vendor_name_snapshot' => $claim->warranty->orderItem->vendor_name_snapshot,
-                'discount_amount' => 0,
-                'promo_discount_amount' => 0,
-                'subtotal' => $newPrice,
-            ]);
-
-            // Tautkan garansi ke OrderItem baru agar datanya rapi
-            $warranty->order_item_id = $orderItem->id;
-            $warranty->save();
+            \App\Http\Controllers\ApprovalController::sendTelegramNotification($approval);
 
             \Illuminate\Support\Facades\DB::commit();
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
-            $this->addError('replacement_imei', 'Gagal menyimpan data ke database lokal: ' . $e->getMessage());
+            $this->addError('replacement_imei', 'Gagal mengajukan approval: ' . $e->getMessage());
             $this->showReplacementConfirmModal = false;
             return;
         }
@@ -466,7 +317,7 @@ class ClaimManagement extends Component
         $this->showReplacementConfirmModal = false;
         $this->closeReplacementForm();
         $this->closeModal(); // Pastikan modal utama juga tertutup agar state bersih
-        $this->dispatch('toast', title: 'Berhasil', message: 'Unit berhasil diganti' . ($claim->status === 'waiting_refund' ? '. Sisa saldo menunggu proses refund.' : '!'), type: 'success');
+        $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan Ganti Unit berhasil dikirim ke Admin untuk di-approve.', type: 'success');
         $this->reset(['replacement_imei', 'search_imei_query', 'imei_results', 'replacement_type', 'replacement_item_no', 'replacement_price', 'replacement_product_name', 'search_product_query', 'product_results', 'manual_note']);
     }
 

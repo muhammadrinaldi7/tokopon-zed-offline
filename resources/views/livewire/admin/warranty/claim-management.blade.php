@@ -162,8 +162,26 @@
                         </div>
                     </div>
 
-                    <!-- Form Input -->
-                    <div class="space-y-4">
+                    @php
+                        $hasPendingApproval = $selectedClaim->approvalRequests()
+                            ->where('request_type', 'WARRANTY_REPLACEMENT')
+                            ->where('status', 'PENDING')
+                            ->exists();
+                    @endphp
+
+                    @if($hasPendingApproval)
+                        <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
+                            <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-amber-50">
+                                <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <h4 class="text-lg font-bold text-amber-900 mb-2">Menunggu Persetujuan</h4>
+                            <p class="text-sm text-amber-700">Pengajuan ganti unit sedang dalam antrean <b>Approval</b>. Eksekusi pemotongan stok dan faktur Accurate akan otomatis berjalan setelah Admin menyetujui pengajuan ini.</p>
+                        </div>
+                    @else
+                        <!-- Form Input -->
+                        <div class="space-y-4">
                         <!-- Tipe Ganti Unit -->
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-2">Pilih Jenis Penggantian <span
@@ -564,16 +582,21 @@
                         </div>
                     </div>
 
+                        </div>
+                    @endif
+
                     <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100">
                         <button type="button" wire:click="closeReplacementForm"
-                            class="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">Batal</button>
+                            class="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">Tutup</button>
+                        
+                        @if(!$hasPendingApproval)
                         <button type="button" wire:click="approveReplacement"
                             class="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2"
                             wire:loading.attr="disabled" wire:target="approveReplacement">
-                            <span wire:loading.remove wire:target="approveReplacement">Eksekusi Retur
-                                Accurate</span>
-                            <span wire:loading wire:target="approveReplacement">Sedang Menembak API...</span>
+                            <span wire:loading.remove wire:target="approveReplacement">Ajukan Ganti Unit</span>
+                            <span wire:loading wire:target="approveReplacement">Sedang Menyimpan...</span>
                         </button>
+                        @endif
                     </div>
                 </div>
             </div>

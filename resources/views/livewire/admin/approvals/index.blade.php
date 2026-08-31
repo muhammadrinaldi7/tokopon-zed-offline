@@ -147,6 +147,18 @@
                 <p class="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
                     Anda akan menyetujui permintaan cashback kustom ini. Diskon akan langsung diterapkan di perangkat Kasir secara otomatis.
                 </p>
+                @elseif($confirmingRequestType === 'WARRANTY_REPLACEMENT')
+                <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4 border-4 border-blue-50">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                </div>
+                
+                <h3 class="mb-2 text-xl font-bold text-gray-900">Konfirmasi Eksekusi Ganti Unit</h3>
+                <p class="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
+                    Menyetujui pengajuan ini akan otomatis mengeksekusi retur dan penggantian unit di Accurate (membuat <b>Sales Return</b>, <b>Sales Invoice</b>, dan <b>Sales Receipt</b>).
+                    <br><br>Apakah Anda yakin ingin melanjutkan?
+                </p>
                 @else
                 <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 border-4 border-red-50">
                     <svg class="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -172,6 +184,10 @@
                     @elseif($confirmingRequestType === 'CUSTOM_CASHBACK')
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-300 transition-colors shadow-md shadow-emerald-500/20">
                         Setujui Cashback
+                    </button>
+                    @elseif($confirmingRequestType === 'WARRANTY_REPLACEMENT')
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20">
+                        Setujui Ganti Unit
                     </button>
                     @else
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-300 transition-colors shadow-md shadow-red-500/20">

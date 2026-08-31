@@ -46,6 +46,11 @@ class WarrantyClaim extends Model
         return $this->hasMany(WarrantyClaimHistory::class, 'claim_id');
     }
 
+    public function approvalRequests()
+    {
+        return $this->morphMany(ApprovalRequest::class, 'approvable');
+    }
+
     public function receivingInspection()
     {
         return $this->belongsTo(DeviceInspection::class, 'receiving_inspection_id');
