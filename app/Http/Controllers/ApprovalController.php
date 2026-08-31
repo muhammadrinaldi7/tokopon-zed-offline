@@ -67,6 +67,15 @@ class ApprovalController extends Controller
             $orderInfo = $approval->approvable->phone_brand . ' ' . $approval->approvable->phone_model;
         }
 
+        $keterangan = $approval->reason ?? '-';
+
+        if ($approval->request_type === 'CUSTOM_CASHBACK' && is_array($approval->payload)) {
+            $orderInfo = $approval->payload['product_name'] ?? '-';
+            $amount = $approval->payload['amount'] ?? 0;
+            $price = $approval->payload['item_price'] ?? 0;
+            $keterangan .= "\n\nHarga Jual: Rp " . number_format($price, 0, ',', '.') . "\nNominal Cashback: Rp " . number_format($amount, 0, ',', '.');
+        }
+
         $successCount = 0;
 
         foreach ($targetUsers as $user) {
@@ -77,7 +86,7 @@ class ApprovalController extends Controller
                     'kasir'            => $kasirName,
                     'branch'           => $approval->requestedBy->branch->name,
                     'waktu'            => $approval->created_at->format('d M Y H:i'),
-                    'keterangan'       => $approval->reason ?? '-',
+                    'keterangan'       => $keterangan,
                     'action'           => 'PENDING',
                     'approval_id'      => $approval->id,
                     'req_level'        => $nextLevel,
@@ -92,7 +101,7 @@ class ApprovalController extends Controller
         }
 
         // --- KIRIM NOTIFIKASI KE GRUP JUGA ---
-        $alasan = $approval->reason ?? '-';
+        $alasan = $keterangan;
         $cabang = $approval->requestedBy->branch->name ?? '-';
         $waktuFormat = $approval->created_at->format('d M Y H:i');
 

@@ -381,7 +381,7 @@
                             </div>
                         @endif
 
-                        <div class="relative">
+                        <div class="relative z-[60]">
                             <label class="block text-sm font-bold text-gray-700 mb-1">IMEI / Serial Number Baru
                                 <span class="text-amber-500">*</span></label>
 

@@ -395,7 +395,7 @@ class ClaimManagement extends Component
                 'order_status' => 'COMPLETED',
                 'order_channel' => 'POS',
                 'handled_by' => Auth::id(),
-                'sales_id' => $claim->warranty->orderItem->order->sales_id ?? Auth::id(),
+                'sales_id' => $this->selected_sales_id ?? ($claim->warranty->orderItem->order->sales_id ?? Auth::id()),
                 'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko', 'is_warranty_replacement' => true],
                 'notes' => "Ganti Unit Klaim Garansi #{$claim->claim_number}. Pengganti untuk IMEI: {$claim->serial_number}",
                 'branch_id' => Auth::user()->branch_id,

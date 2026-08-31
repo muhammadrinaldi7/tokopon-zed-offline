@@ -959,7 +959,8 @@ trait WithCart
             'payload' => [
                 'cart_index' => $this->customCashbackCartIndex,
                 'amount' => $amount,
-                'product_name' => $item['name']
+                'product_name' => $item['name'],
+                'item_price' => $item['price']
             ]
         ]);
 
