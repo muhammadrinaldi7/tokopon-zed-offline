@@ -60,6 +60,12 @@
             console.log(`• Nama File   : ${file.name}`);
             console.log(`• Ukuran Asli : ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
 
+            // Fix for iOS Safari: Generate unique filename to prevent Livewire upload conflicts
+            const ext = file.name.split('.').pop() || 'jpg';
+            const randomStr = Math.random().toString(36).substring(2, 8);
+            const uniqueName = `${wirePropertyName}_${Date.now()}_${randomStr}.${ext}`;
+            const uniqueFile = new File([file], uniqueName, { type: file.type });
+
             // JIKA DI BAWAH 5MB (Langsung Upload Asli)
             if (file.size <= maxSize) {
                 console.log('%c[Info] Ukuran file aman (<= 5MB). Langsung mengunggah file asli...',
@@ -68,8 +74,8 @@
                 component.set(wirePropertyName, null);
 
                 // Memanggil fungsi upload dinamis melalui instance component yang ditemukan
-                component.upload(wirePropertyName, file,
-                    (uploadedName) => console.log(`%c[Upload Success] File asli "${file.name}" terunggah!`,
+                component.upload(wirePropertyName, uniqueFile,
+                    (uploadedName) => console.log(`%c[Upload Success] File asli "${uniqueName}" terunggah!`,
                         'color: #16a34a; font-weight: bold;'),
                     () => console.error(`[Upload Error] Gagal mengunggah file asli pada: ${wirePropertyName}`),
                     (progressEvent) => {}
@@ -111,7 +117,7 @@
                     ctx.drawImage(img, 0, 0, width, height);
 
                     canvas.toBlob(function(blob) {
-                        const compressedFile = new File([blob], file.name, {
+                        const compressedFile = new File([blob], uniqueName, {
                             type: 'image/jpeg',
                             lastModified: Date.now()
                         });

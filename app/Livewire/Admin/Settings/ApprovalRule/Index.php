@@ -15,6 +15,7 @@ class Index extends Component
     public $availableModules = [
         'ORDER_CANCELLATION' => 'Pembatalan Transaksi POS',
         'WARRANTY_EXTENSION' => 'Perpanjangan Garansi',
+        'WARRANTY_REPLACEMENT' => 'Ganti Unit Garansi',
         'purchase_order' => 'Persetujuan Pembelian (PO)',
         'CUSTOM_CASHBACK' => 'Persetujuan cashback (PC)',
         'SELL_PHONE_APPROVAL' => 'Pembelian Handphone',

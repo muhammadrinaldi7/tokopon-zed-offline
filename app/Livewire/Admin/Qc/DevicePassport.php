@@ -63,10 +63,34 @@ class DevicePassport extends Component
     }
 
     #[Computed]
+    public function productName()
+    {
+        // Prioritaskan dari ProductSerialNumber yang sudah mengarah ke ProductAccurate
+        $sn = \App\Models\ProductSerialNumber::with('productAccurate')->where('serial_number', $this->imei)->first();
+        if ($sn && $sn->product_accurate_id) {
+            return $sn->productAccurate->name ?? 'Unknown Product';
+        }
+
+        // Fallback: Jika IMEI ada di SellPhone
+        $sellPhone = \App\Models\SellPhone::with('secondProductVariant.accurateData')->where('imei', $this->imei)->first();
+        if ($sellPhone && $sellPhone->secondProductVariant) {
+            return $sellPhone->secondProductVariant->accurateData->name ?? 'Unknown Product';
+        }
+
+        // Fallback: Jika ada inspeksi yang menyimpan second_product_variant_id lama
+        $first = $this->inspections->first();
+        if ($first && $first->variant && $first->variant->accurateData) {
+            return $first->variant->accurateData->name ?? 'Unknown Product';
+        }
+
+        return 'Unknown Product';
+    }
+
+    #[Computed]
     public function inspections()
     {
         // Descending order, newest first
-        return DeviceInspection::with(['inspector', 'variant.secondProduct'])
+        return DeviceInspection::with(['inspector', 'variant.accurateData'])
             ->where('imei', $this->imei)
             ->orderBy('inspected_at', 'desc')
             ->get();
