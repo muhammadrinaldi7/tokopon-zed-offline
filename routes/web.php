@@ -57,6 +57,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/qc-returns/{claim}/inspect', \App\Livewire\Zoffline\Qc\ReturnInspect::class)->name('zoffline.qc-returns.inspect');
     Route::get('/zoffline/device-passport', \App\Livewire\Zoffline\DevicePassport::class)->name('zoffline.device-passport');
     
+    // Zoffline Inbound PO
+    Route::middleware('can:manage-inbound')->group(function () {
+        Route::get('/zoffline/inbound', \App\Livewire\Zoffline\Inbound\Index::class)->name('zoffline.inbound.index');
+        Route::get('/zoffline/inbound/{po}/scan', \App\Livewire\Zoffline\Inbound\Scan::class)->name('zoffline.inbound.scan');
+    });
+    
     // Zoffline Approvals & Settings
     Route::get('/zoffline/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('zoffline.approvals.index');
     Route::get('/zoffline/approval-rules', \App\Livewire\Admin\Settings\ApprovalRule\Index::class)->name('zoffline.approval-rules.index')->middleware('can:manage-settings');
@@ -196,12 +202,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::prefix('warranty')->name('warranty.')->group(function () {
         Route::get('/policies', \App\Livewire\Admin\Warranty\PolicyManagement::class)->name('policies');
         Route::get('/claims', \App\Livewire\Admin\Warranty\ClaimManagement::class)->name('claims');
-    });
-
-    // Inbound PO
-    Route::middleware('can:manage-inbound')->group(function () {
-        Route::get('/inbound', \App\Livewire\Admin\Inbound\Index::class)->name('inbound.index');
-        Route::get('/inbound/{po}/scan', \App\Livewire\Admin\Inbound\Scan::class)->name('inbound.scan');
     });
 
     Route::prefix('qc')->name('qc.')->group(function () {

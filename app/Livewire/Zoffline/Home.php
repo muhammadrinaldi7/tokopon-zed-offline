@@ -22,6 +22,11 @@ class Home extends Component
         return $this->redirectRoute('zoffline.check-serial-number', navigate: true);
     }
 
+    public function navigateToInbound()
+    {
+        return $this->redirectRoute('zoffline.inbound.index', navigate: true);
+    }
+
     public function navigateToShift()
     {
         return $this->redirectRoute('zoffline.riwayat-kasir', navigate: true);

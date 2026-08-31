@@ -223,15 +223,18 @@
                             </a>
 
 
-                            {{-- <a href="{{ route('admin.qc.inbound') }}" wire:navigate @click="openGaransiModal = false"
+                            <div wire:click="navigateToInbound" wire:navigate @click="openGaransiModal = false"
                                 class="w-full aspect-square p-3 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
-                                <div class="w-12 h-12 rounded-xl bg-teal-100/50 flex items-center justify-center text-teal-500 group-hover:scale-110 transition-transform">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+                                <div
+                                    class="w-12 h-12 rounded-xl bg-teal-100/50 flex items-center justify-center text-teal-500 group-hover:scale-110 transition-transform">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
                                     </svg>
                                 </div>
                                 <span class="block text-xs sm:text-sm text-center leading-tight">QC Inbound</span>
-                            </a> --}}
+                            </div>
 
                             <a href="{{ route('admin.qc.device-search') }}" wire:navigate
                                 @click="openGaransiModal = false"
@@ -363,6 +366,27 @@
                 </div>
             </div>
         @endcan
+
+        {{-- Card: Inbound PO --}}
+        {{-- @can('manage-inbound')
+            <div wire:click="navigateToInbound"
+                class="md:nth-[3n+1]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+
+                <div class="rounded-full w-20 h-20 bg-[#E0F2FE] flex items-center justify-center text-sky-600">
+                    <svg class="w-10 h-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4">
+                        </path>
+                    </svg>
+                </div>
+
+                <div>
+                    <h1 class="text-2xl ">Penerimaan <br> Barang (PO)</h1>
+                    <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Pindai dan terima barang dari Accurate</p>
+                </div>
+            </div>
+        @endcan --}}
+
         @can('view-riwayat-kasir')
             {{-- Card 5: shift --}}
             <div wire:click="navigateToClosingKasir"
