@@ -66,6 +66,16 @@ class WarrantyReturn extends Component
 
         $claim = WarrantyClaim::find($this->selectedClaimId);
         if ($claim) {
+            if ($claim->status === 'waiting_refund') {
+                try {
+                    $accurateService = app(\App\Services\AccurateService::class);
+                    $accurateService->processDowngradeRefund($claim, $this->selectedBankNo, $claim->refund_amount);
+                } catch (\Exception $e) {
+                    $this->addError('selectedBankNo', 'Gagal memproses refund ke Accurate: ' . $e->getMessage());
+                    return;
+                }
+            }
+
             $claim->status = 'completed';
             $claim->resolved_at = \Carbon\Carbon::now();
             $claim->save();

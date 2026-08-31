@@ -240,7 +240,25 @@ class WarrantyActivation extends Component
         $now = \Carbon\Carbon::now();
         $this->generatedWarranties = [];
 
-        // 1. Calculate Warranties using Service (Returns Collection of WarrantyPolicy)
+        // 1. Cek apakah ada garansi yang sudah ada untuk SN ini dari proses Ganti Unit (replacement)
+        //    Ini terjadi ketika unit pengganti sudah memiliki garansi yang di-transfer dari unit lama.
+        $existingWarranties = \App\Models\Warranty::where('serial_number', $this->searchQuery)
+            ->where('order_item_id', $this->foundItem->id)
+            ->whereNull('device_inspection_id') // Belum pernah di-QC aktivasi
+            ->where('status', 'active')
+            ->get();
+
+        if ($existingWarranties->isNotEmpty()) {
+            // Garansi dari replacement sudah ada, cukup tautkan inspeksi QC saja
+            foreach ($existingWarranties as $warranty) {
+                $warranty->device_inspection_id = $inspection->id;
+                $warranty->save();
+                $this->generatedWarranties[] = $warranty;
+            }
+            return; // Jangan buat garansi baru
+        }
+
+        // 2. Calculate Warranties using Service (Returns Collection of WarrantyPolicy)
         $calculator = new \App\Services\WarrantyCalculatorService();
         $policies = $calculator->calculateWarranties($order, $this->foundItem);
 

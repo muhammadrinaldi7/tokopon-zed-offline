@@ -202,7 +202,7 @@
 
                         <!-- Pilih Produk Pengganti (Jika Beda) -->
                         @if ($replacement_type === 'different')
-                            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
+                            <div class="relative z-50 bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4">
                                 @if (!$replacement_item_no)
                                     <div class="relative">
                                         <label class="block text-sm font-bold text-gray-700 mb-1">Cari Produk
@@ -381,7 +381,7 @@
                             </div>
                         @endif
 
-                        <div class="relative z-[60]">
+                        <div class="relative z-40">
                             <label class="block text-sm font-bold text-gray-700 mb-1">IMEI / Serial Number Baru
                                 <span class="text-amber-500">*</span></label>
 
@@ -450,7 +450,7 @@
                         </div>
 
                         <!-- Pilih Sales (Tenaga Penjual) -->
-                        <div class="mt-4 mb-4 relative z-50">
+                        <div class="mt-4 mb-4 relative z-30">
                             <label class="block text-sm font-bold text-gray-700 mb-1">
                                 Pilih Sales Pengganti <span class="text-amber-500">*</span>
                             </label>
