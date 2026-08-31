@@ -96,4 +96,14 @@ class SellPhone extends Model implements HasMedia
     {
         return $this->morphMany(ApprovalRequest::class, 'approvable');
     }
+
+    public function issues()
+    {
+        return $this->hasMany(SellPhoneIssue::class)->latest();
+    }
+
+    public function openIssues()
+    {
+        return $this->hasMany(SellPhoneIssue::class)->where('status', 'OPEN');
+    }
 }

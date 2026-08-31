@@ -11,6 +11,21 @@
                 Finance Dashboard: SellPhone</h1>
             <p class="text-sm text-slate-500 mt-2 font-medium">Monitoring dan proses pencairan dana pembelian HP bekas ke pelanggan.</p>
         </div>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('admin.sell-phones.issues') }}" wire:navigate
+                class="relative px-4 py-2.5 bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 rounded-xl transition text-xs font-bold flex items-center gap-2 shadow-sm">
+                <svg class="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>Laporan Kendala</span>
+                @if (($summary['open_issues_count'] ?? 0) > 0)
+                    <span class="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-extrabold animate-pulse">
+                        {{ $summary['open_issues_count'] }}
+                    </span>
+                @endif
+            </a>
+        </div>
     </div>
 
     {{-- Summary Cards (KPI) --}}
@@ -171,10 +186,16 @@
                         
                         <tr class="transition-colors duration-200 group {{ $isPaying ? 'bg-amber-50/40' : '' }} {{ $isCompleted ? 'opacity-70' : '' }}">
                             <td class="px-6 py-5 whitespace-nowrap {{ $isPaying ? 'border-l-4 border-l-rose-500' : 'border-l-4 border-l-transparent' }}">
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 flex-wrap">
                                     <span class="font-black text-slate-900 bg-slate-100/80 px-2.5 py-1 rounded-md text-xs tracking-wide group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors">#SPL-{{ $item->id }}</span>
                                     @if($isNew && !$isCompleted)
                                         <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-600 border border-rose-200 animate-pulse">Baru</span>
+                                    @endif
+                                    @if($item->openIssues->count() > 0)
+                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200 flex items-center gap-1" title="Terdapat {{ $item->openIssues->count() }} kendala belum selesai">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                                            {{ $item->openIssues->count() }} Kendala
+                                        </span>
                                     @endif
                                 </div>
                                 <div class="text-xs text-slate-500 mt-2 font-medium flex items-center gap-1.5">

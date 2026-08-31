@@ -42,7 +42,7 @@ class Index extends Component
     {
         $activeUnitId = \App\Models\User::findOrFail(\Illuminate\Support\Facades\Auth::id())->getActiveBusinessUnitId();
 
-        $baseQuery = SellPhone::with(['user', 'handledBy', 'businessUnit', 'inspections'])
+        $baseQuery = SellPhone::with(['user', 'handledBy', 'businessUnit', 'inspections', 'openIssues'])
             ->where('business_unit_id', $activeUnitId);
 
         // Kumpulkan data untuk Summary Cards
@@ -60,6 +60,11 @@ class Index extends Component
             ->selectRaw('COUNT(id) as count, SUM(appraised_value) as total')
             ->first();
 
+        $openIssuesCount = \App\Models\SellPhoneIssue::where('status', 'OPEN')
+            ->whereHas('sellPhone', function ($q) use ($activeUnitId) {
+                $q->where('business_unit_id', $activeUnitId);
+            })->count();
+
         $summary = [
             'paying_count' => $payingSummary->count ?? 0,
             'paying_total' => $payingSummary->total ?? 0,
@@ -67,6 +72,7 @@ class Index extends Component
             'pending_approval_count' => $pendingApprovalCount,
             'completed_count' => $completedSummary->count ?? 0,
             'completed_total' => $completedSummary->total ?? 0,
+            'open_issues_count' => $openIssuesCount,
         ];
 
         // Terapkan filter pada query utama

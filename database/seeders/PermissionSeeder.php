@@ -54,6 +54,8 @@ class PermissionSeeder extends Seeder
 
             // Pendukung Lainnya
             'manage-trade-in',
+            'manage-sell-phone-issues',
+            'correct-sell-phone-bank',
             'manage-buyback',
             'manage-users',
             'manage-settings',
@@ -113,6 +115,8 @@ class PermissionSeeder extends Seeder
             'closing-kasir-report',
             'laporan-cancel-order',
             'manage-trade-in',
+            'manage-sell-phone-issues',
+            'correct-sell-phone-bank',
             'manage-buyback',
             'view_dashboard'
         ]);
@@ -133,7 +137,9 @@ class PermissionSeeder extends Seeder
             'manage-orders',
             'sell-phone',
             'trade-in',
-            'warranty-activation'
+            'warranty-activation',
+            'manage-sell-phone-issues',
+            'correct-sell-phone-bank'
         ]);
 
         $this->command->info('Base permissions seeded and assigned to roles successfully.');

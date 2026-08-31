@@ -217,30 +217,262 @@
 
             {{-- Info Pelanggan & Rekening --}}
             <div class="bg-white/70 backdrop-blur-xl rounded-2xl shadow-sm border border-white/50 p-6">
-                <h3 class="font-bold text-lg text-gray-900 border-b border-gray-100 pb-3 mb-4">Informasi Pelanggan &
-                    Pembayaran</h3>
+                <div class="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                    <h3 class="font-bold text-lg text-gray-900">Informasi Pelanggan & Pembayaran</h3>
+                    @canany(['correct-sell-phone-bank', 'manage-trade-in'])
+                    <button type="button" wire:click="openEditBank"
+                        class="text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200/60 transition flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                        <span>Koreksi Rekening</span>
+                    </button>
+                    @endcanany
+                </div>
+
+                @php
+                    $userBank = $sellPhone->user?->bankAccounts?->first();
+                    $displayBank = $sellPhone->bank_name ?: ($userBank?->bank_name ?? null);
+                    $displayAccNo = $sellPhone->bank_account_number ?: ($userBank?->account_number ?? null);
+                    $displayAccName = $sellPhone->bank_account_name ?: ($userBank?->account_name ?? null);
+                @endphp
+
+                @if ($isEditingBank)
+                    {{-- Form Koreksi Rekening --}}
+                    <div class="p-4 bg-blue-50/70 rounded-xl border border-blue-200 mb-4 animate-in fade-in duration-200">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-blue-900 mb-3 flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Koreksi Data Rekening Tujuan Transfer
+                        </h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-700 mb-1">Nama Bank / e-Wallet <span class="text-rose-500">*</span></label>
+                                <input type="text" wire:model="editBankName" placeholder="Contoh: BCA / BRI / Mandiri"
+                                    class="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
+                                @error('editBankName') <span class="text-[10px] text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-700 mb-1">Nomor Rekening <span class="text-rose-500">*</span></label>
+                                <input type="text" wire:model="editBankAccountNumber" placeholder="Nomor rekening valid"
+                                    class="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
+                                @error('editBankAccountNumber') <span class="text-[10px] text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-700 mb-1">Atas Nama Rekening <span class="text-rose-500">*</span></label>
+                                <input type="text" wire:model="editBankAccountName" placeholder="Nama pemilik sesuai buku tabungan"
+                                    class="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
+                                @error('editBankAccountName') <span class="text-[10px] text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-end gap-2">
+                            <button type="button" wire:click="$set('isEditingBank', false)"
+                                class="px-3.5 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-50 transition">
+                                Batal
+                            </button>
+                            <button type="button" wire:click="saveBankInfo"
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm transition">
+                                Simpan Perubahan
+                            </button>
+                        </div>
+                    </div>
+                @endif
+
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Pelanggan</p>
-                        <p class="font-medium text-gray-900">{{ $sellPhone->user->name }}</p>
-                        <p class="text-sm text-gray-500">{{ $sellPhone->user->email }}</p>
+                        <p class="font-medium text-gray-900">{{ $sellPhone->user->name ?? 'Customer' }}</p>
+                        <p class="text-sm text-gray-500">{{ $sellPhone->user->email ?? '-' }}</p>
+                        <p class="text-xs text-gray-500 font-mono mt-0.5">{{ $sellPhone->user->profile->phone_number ?? '-' }}</p>
                     </div>
                     <div>
                         <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Tujuan Transfer</p>
-                        @if ($sellPhone->user->bankAccounts->first())
-                            <p class="font-bold text-emerald-600">
-                                {{ $sellPhone->user->bankAccounts->first()->bank_name }}</p>
-                            <p class="font-medium text-gray-900">
-                                {{ $sellPhone->user->bankAccounts->first()->account_number }}
+                        @if ($displayBank && $displayAccNo)
+                            <p class="font-bold text-emerald-600 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                </svg>
+                                {{ $displayBank }}
                             </p>
-                            <p class="text-sm text-gray-500">A.N:
-                                {{ $sellPhone->user->bankAccounts->first()->account_name }}
-                            </p>
+                            <p class="font-mono font-bold text-gray-900">{{ $displayAccNo }}</p>
+                            <p class="text-sm text-gray-500">A.N: <span class="font-medium text-gray-800">{{ $displayAccName ?: '-' }}</span></p>
                         @else
-                            <p class="text-sm text-gray-500 italic">Belum diisi pelanggan.</p>
+                            <p class="text-sm text-gray-500 italic">Belum diisi pelanggan / rekening belum ada.</p>
                         @endif
                     </div>
                 </div>
+            </div>
+
+            {{-- Section: Catatan & Kendala Transaksi --}}
+            <div class="bg-white/70 backdrop-blur-xl rounded-2xl shadow-sm border border-white/50 p-6">
+                <div class="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-bold text-lg text-gray-900">Kendala & Catatan Transaksi</h3>
+                        @if ($sellPhone->openIssues->count() > 0)
+                            <span class="px-2 py-0.5 text-[10px] font-black uppercase rounded-full bg-rose-100 text-rose-700 border border-rose-200 animate-pulse">
+                                {{ $sellPhone->openIssues->count() }} Perlu Diselesaikan
+                            </span>
+                        @endif
+                    </div>
+
+                    @canany(['manage-sell-phone-issues', 'manage-trade-in'])
+                    <button type="button" wire:click="$toggle('showIssueForm')"
+                        class="text-xs font-bold {{ $showIssueForm ? 'bg-gray-100 text-gray-700' : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' }} px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            @if ($showIssueForm)
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            @else
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                            @endif
+                        </svg>
+                        <span>{{ $showIssueForm ? 'Tutup Form' : 'Catat Kendala' }}</span>
+                    </button>
+                    @endcanany
+                </div>
+
+                {{-- Form Tambah Kendala --}}
+                @if ($showIssueForm)
+                    <form wire:submit="addIssue" class="p-4 bg-amber-50/60 rounded-xl border border-amber-200 mb-5 animate-in fade-in duration-200 space-y-3">
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-amber-900">Tambah Catatan Kendala Baru</h4>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="sm:col-span-1">
+                                <label class="block text-[11px] font-bold text-amber-900 mb-1">Kategori Kendala <span class="text-rose-500">*</span></label>
+                                <select wire:model="issueCategory"
+                                    class="w-full p-2.5 bg-white border border-amber-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none">
+                                    <option value="SALAH_NOREK">Salah No. Rekening / Bank</option>
+                                    <option value="SALAH_NOMINAL">Salah Nominal / Taksiran</option>
+                                    <option value="SALAH_QC">Salah Hasil QC / Grade</option>
+                                    <option value="SALAH_IMEI">Salah Input IMEI / SN</option>
+                                    <option value="GAGAL_TRANSFER">Gagal Transfer / Rekening Pasif</option>
+                                    <option value="LAINNYA">Kendala Lainnya</option>
+                                </select>
+                                @error('issueCategory') <span class="text-[10px] text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label class="block text-[11px] font-bold text-amber-900 mb-1">Keterangan / Rincian Kendala <span class="text-rose-500">*</span></label>
+                                <textarea wire:model="issueComment" rows="2" placeholder="Jelaskan detail kendala atau kesalahan yang terjadi..."
+                                    class="w-full p-2.5 bg-white border border-amber-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"></textarea>
+                                @error('issueComment') <span class="text-[10px] text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end gap-2 pt-1">
+                            <button type="button" wire:click="$set('showIssueForm', false)"
+                                class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-50 transition">
+                                Batal
+                            </button>
+                            <button type="submit"
+                                class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-sm transition">
+                                Simpan Kendala
+                            </button>
+                        </div>
+                    </form>
+                @endif
+
+                {{-- List Kendala --}}
+                @if ($sellPhone->issues->isEmpty())
+                    <div class="p-6 text-center border-2 border-dashed border-gray-100 rounded-xl bg-gray-50/50">
+                        <svg class="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p class="text-xs text-gray-500 font-medium">Belum ada catatan kendala pada transaksi ini.</p>
+                    </div>
+                @else
+                    <div class="space-y-3">
+                        @php
+                            $categoryLabels = [
+                                'SALAH_NOREK' => ['label' => 'Salah No. Rekening / Bank', 'class' => 'bg-rose-50 text-rose-700 border-rose-200'],
+                                'SALAH_NOMINAL' => ['label' => 'Salah Nominal / Taksiran', 'class' => 'bg-amber-50 text-amber-700 border-amber-200'],
+                                'SALAH_QC' => ['label' => 'Salah QC / Grade', 'class' => 'bg-indigo-50 text-indigo-700 border-indigo-200'],
+                                'SALAH_IMEI' => ['label' => 'Salah IMEI / SN', 'class' => 'bg-cyan-50 text-cyan-700 border-cyan-200'],
+                                'GAGAL_TRANSFER' => ['label' => 'Gagal Transfer', 'class' => 'bg-red-50 text-red-700 border-red-200'],
+                                'LAINNYA' => ['label' => 'Lainnya', 'class' => 'bg-gray-100 text-gray-700 border-gray-200'],
+                            ];
+                        @endphp
+
+                        @foreach ($sellPhone->issues as $issue)
+                            @php
+                                $isResolved = $issue->status === 'RESOLVED';
+                                $catInfo = $categoryLabels[$issue->category] ?? ['label' => $issue->category, 'class' => 'bg-gray-100 text-gray-700 border-gray-200'];
+                            @endphp
+                            <div class="p-4 rounded-xl border {{ $isResolved ? 'bg-gray-50/70 border-gray-200 opacity-90' : 'bg-amber-50/30 border-amber-100' }} transition-all">
+                                <div class="flex items-start justify-between gap-3 mb-2">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-md border {{ $catInfo['class'] }}">
+                                            {{ $catInfo['label'] }}
+                                        </span>
+                                        <span class="text-xs font-semibold text-gray-700">
+                                            {{ $issue->user->name ?? 'User' }}
+                                        </span>
+                                        <span class="text-[11px] text-gray-400">
+                                            • {{ $issue->created_at->diffForHumans() }} ({{ $issue->created_at->format('d/m/Y H:i') }})
+                                        </span>
+                                    </div>
+
+                                    @canany(['manage-sell-phone-issues', 'manage-trade-in'])
+                                    <div class="flex items-center gap-2">
+                                        @if ($isResolved)
+                                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                SELESAI
+                                            </span>
+                                            <button type="button" wire:click="toggleIssueStatus({{ $issue->id }})"
+                                                class="text-[11px] font-bold text-gray-500 hover:text-gray-800 underline transition"
+                                                title="Buka kembali kendala ini">
+                                                Buka Kembali
+                                            </button>
+                                        @else
+                                            <button type="button" wire:click="toggleIssueStatus({{ $issue->id }})"
+                                                class="px-2.5 py-1 text-[11px] font-bold rounded-md bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition flex items-center gap-1">
+                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                Tandai Selesai
+                                            </button>
+                                        @endif
+
+                                        <button type="button" wire:click="deleteIssue({{ $issue->id }})"
+                                            wire:confirm="Hapus catatan kendala ini?"
+                                            class="p-1 text-gray-400 hover:text-rose-600 transition"
+                                            title="Hapus kendala">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    @endcanany
+                                </div>
+                                <p class="text-xs text-gray-700 whitespace-pre-line leading-relaxed font-medium bg-white/80 p-2.5 rounded-lg border border-gray-100">
+                                    {{ $issue->comment }}
+                                </p>
+
+                                {{-- Detail Penyelesaian (Jika Resolved) --}}
+                                @if ($isResolved && ($issue->resolution_notes || $issue->resolvedBy))
+                                    <div class="mt-2 text-[11px] text-emerald-800 bg-emerald-50/80 p-2.5 rounded-lg border border-emerald-200 flex items-start gap-2">
+                                        <svg class="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div class="flex-1">
+                                            <span class="font-bold text-emerald-900">Solusi / Penyelesaian:</span>
+                                            <span class="block mt-0.5 text-emerald-700 font-medium">{{ $issue->resolution_notes ?: 'Ditandai selesai.' }}</span>
+                                            @if ($issue->resolvedBy)
+                                                <span class="text-emerald-600 block text-[10px] mt-1 font-semibold">
+                                                    Diselesaikan oleh: {{ $issue->resolvedBy->name }} {{ $issue->resolved_at ? '(' . $issue->resolved_at->format('d/m/Y H:i') . ')' : '' }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </div>
 

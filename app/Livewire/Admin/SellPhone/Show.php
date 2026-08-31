@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\SellPhone;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SellPhone;
+use App\Models\SellPhoneIssue;
 use App\Services\AccurateService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -48,15 +49,31 @@ class Show extends Component
     public $isRejecting = false;
     public $rejectReason = '';
 
+    // Issue / Kendala Form
+    public string $issueCategory = 'SALAH_NOREK';
+    public string $issueComment = '';
+    public bool $showIssueForm = false;
+
+    // Bank Correction Form
+    public bool $isEditingBank = false;
+    public string $editBankName = '';
+    public string $editBankAccountNumber = '';
+    public string $editBankAccountName = '';
+
     public $showQcWarningModal = false;
     public $forceProcessQc = false;
     public $latestQcVerdict = '';
 
     public function mount(SellPhone $sellPhone)
     {
-        $this->sellPhone = $sellPhone->load(['user.bankAccounts', 'buybackDevice.tier', 'businessUnit']);
+        $this->sellPhone = $sellPhone->load(['user.bankAccounts', 'user.profile', 'buybackDevice.tier', 'businessUnit', 'issues.user']);
         $this->appraisedValue = $this->sellPhone->appraised_value ?? 0;
         $this->qcPassed = $this->sellPhone->hasPassedQc();
+
+        $userBank = $this->sellPhone->user?->bankAccounts?->first();
+        $this->editBankName = $this->sellPhone->bank_name ?: ($userBank?->bank_name ?? '');
+        $this->editBankAccountNumber = $this->sellPhone->bank_account_number ?: ($userBank?->account_number ?? '');
+        $this->editBankAccountName = $this->sellPhone->bank_account_name ?: ($userBank?->account_name ?? '');
 
         $dbSource = $this->sellPhone->businessUnit ? strtolower($this->sellPhone->businessUnit->code) : 'gsk';
 
@@ -343,6 +360,170 @@ class Show extends Component
 
         $this->isRejecting = false;
         $this->dispatch('toast', ['title' => 'Ditolak', 'message' => 'Pembelian dibatalkan secara sepihak.', 'type' => 'info']);
+    }
+
+    public function addIssue(): void
+    {
+        if (!Auth::user()->can('manage-sell-phone-issues') && !Auth::user()->can('manage-trade-in')) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki izin mencatat kendala.', type: 'error');
+            return;
+        }
+
+        $this->validate([
+            'issueCategory' => 'required|string|max:50',
+            'issueComment' => 'required|string|min:3',
+        ], [
+            'issueCategory.required' => 'Kategori kendala wajib dipilih.',
+            'issueComment.required' => 'Catatan kendala wajib diisi.',
+            'issueComment.min' => 'Catatan kendala minimal 3 karakter.',
+        ]);
+
+        SellPhoneIssue::create([
+            'sell_phone_id' => $this->sellPhone->id,
+            'user_id' => Auth::id(),
+            'category' => $this->issueCategory,
+            'comment' => trim($this->issueComment),
+            'status' => 'OPEN',
+        ]);
+
+        $this->issueComment = '';
+        $this->issueCategory = 'SALAH_NOREK';
+        $this->showIssueForm = false;
+        $this->sellPhone->refresh();
+        $this->sellPhone->load(['issues.user', 'issues.resolvedBy']);
+
+        $this->dispatch('toast', title: 'Berhasil', message: 'Catatan kendala berhasil ditambahkan.', type: 'success');
+    }
+
+    public function toggleIssueStatus(int $issueId, ?string $notes = null): void
+    {
+        if (!Auth::user()->can('manage-sell-phone-issues') && !Auth::user()->can('manage-trade-in')) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki izin mengubah status kendala.', type: 'error');
+            return;
+        }
+
+        $issue = SellPhoneIssue::find($issueId);
+        if ($issue && $issue->sell_phone_id === $this->sellPhone->id) {
+            if ($issue->status === 'OPEN') {
+                $issue->update([
+                    'status' => 'RESOLVED',
+                    'resolved_by' => Auth::id(),
+                    'resolved_at' => now(),
+                    'resolution_notes' => $notes ? trim($notes) : 'Ditandai selesai oleh ' . (Auth::user()->name ?? 'Admin'),
+                ]);
+                $message = 'Kendala berhasil diselesaikan.';
+            } else {
+                $issue->update([
+                    'status' => 'OPEN',
+                    'resolved_by' => null,
+                    'resolved_at' => null,
+                    'resolution_notes' => null,
+                ]);
+                $message = 'Kendala dibuka kembali.';
+            }
+
+            $this->sellPhone->refresh();
+            $this->sellPhone->load(['issues.user', 'issues.resolvedBy']);
+
+            $this->dispatch('toast', title: 'Berhasil', message: $message, type: 'info');
+        }
+    }
+
+    public function deleteIssue(int $issueId): void
+    {
+        if (!Auth::user()->can('manage-sell-phone-issues') && !Auth::user()->can('manage-trade-in')) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki izin menghapus kendala.', type: 'error');
+            return;
+        }
+
+        $issue = SellPhoneIssue::find($issueId);
+        if ($issue && $issue->sell_phone_id === $this->sellPhone->id) {
+            $issue->delete();
+            $this->sellPhone->refresh();
+            $this->sellPhone->load(['issues.user', 'issues.resolvedBy']);
+            $this->dispatch('toast', title: 'Berhasil', message: 'Catatan kendala dihapus.', type: 'success');
+        }
+    }
+
+    public function openEditBank(): void
+    {
+        if (!Auth::user()->can('correct-sell-phone-bank') && !Auth::user()->can('manage-trade-in')) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki izin koreksi rekening.', type: 'error');
+            return;
+        }
+
+        $userBank = $this->sellPhone->user?->bankAccounts?->first();
+        $this->editBankName = $this->sellPhone->bank_name ?: ($userBank?->bank_name ?? '');
+        $this->editBankAccountNumber = $this->sellPhone->bank_account_number ?: ($userBank?->account_number ?? '');
+        $this->editBankAccountName = $this->sellPhone->bank_account_name ?: ($userBank?->account_name ?? '');
+        $this->isEditingBank = true;
+    }
+
+    public function saveBankInfo(): void
+    {
+        if (!Auth::user()->can('correct-sell-phone-bank') && !Auth::user()->can('manage-trade-in')) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki izin koreksi rekening.', type: 'error');
+            return;
+        }
+
+        $this->validate([
+            'editBankName' => 'required|string|max:100',
+            'editBankAccountNumber' => 'required|string|max:50',
+            'editBankAccountName' => 'required|string|max:100',
+        ], [
+            'editBankName.required' => 'Nama Bank wajib diisi.',
+            'editBankAccountNumber.required' => 'Nomor Rekening wajib diisi.',
+            'editBankAccountName.required' => 'Atas Nama Rekening wajib diisi.',
+        ]);
+
+        $bankName = trim($this->editBankName);
+        $bankAccNo = trim($this->editBankAccountNumber);
+        $bankAccName = trim($this->editBankAccountName);
+
+        $this->sellPhone->update([
+            'bank_name' => $bankName,
+            'bank_account_number' => $bankAccNo,
+            'bank_account_name' => $bankAccName,
+        ]);
+
+        if ($this->sellPhone->user) {
+            $primaryBank = $this->sellPhone->user->bankAccounts()->where('is_primary', true)->first()
+                ?: $this->sellPhone->user->bankAccounts()->first();
+
+            if ($primaryBank) {
+                $primaryBank->update([
+                    'bank_name' => $bankName,
+                    'account_number' => $bankAccNo,
+                    'account_name' => $bankAccName,
+                ]);
+            }
+        }
+
+        // Otomatis Selesaikan (RESOLVE) kendala SALAH_NOREK atau GAGAL_TRANSFER yang masih OPEN
+        $openBankIssues = $this->sellPhone->issues()
+            ->where('status', 'OPEN')
+            ->whereIn('category', ['SALAH_NOREK', 'GAGAL_TRANSFER'])
+            ->get();
+
+        foreach ($openBankIssues as $openIssue) {
+            $openIssue->update([
+                'status' => 'RESOLVED',
+                'resolved_by' => Auth::id(),
+                'resolved_at' => now(),
+                'resolution_notes' => "Rekening berhasil dikoreksi menjadi {$bankName} - {$bankAccNo} a.n {$bankAccName} oleh " . (Auth::user()->name ?? 'Admin'),
+            ]);
+        }
+
+        $this->isEditingBank = false;
+        $this->sellPhone->refresh();
+        $this->sellPhone->load(['issues.user', 'issues.resolvedBy']);
+        
+        $resolvedCount = $openBankIssues->count();
+        $msg = $resolvedCount > 0 
+            ? "Data rekening berhasil diperbarui & {$resolvedCount} kendala rekening ditandai Selesai."
+            : "Data rekening bank tujuan berhasil diperbarui.";
+
+        $this->dispatch('toast', title: 'Berhasil', message: $msg, type: 'success');
     }
 
     // convertToProduct telah dihapus karena manajemen inventaris kini terpusat pada Accurate

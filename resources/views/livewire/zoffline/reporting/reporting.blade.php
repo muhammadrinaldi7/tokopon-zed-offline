@@ -253,8 +253,24 @@
                     </svg>
                 </div>
                 <div>
-                    <h2 class="text-xl font-bold text-gray-800">Laporan Kendala</h2>
-                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau, tindak lanjuti, dan rekap seluruh catatan kendala transaksi pelanggan.</p>
+                    <h2 class="text-xl font-bold text-gray-800">Laporan Kendala Pesanan</h2>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau, tindak lanjuti, dan rekap seluruh catatan kendala transaksi pesanan pelanggan.</p>
+                </div>
+            </div>
+        @endcan
+
+        @can('manage-trade-in')
+            <div wire:click="navigateToSellPhoneIssues"
+                class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+                <div class="rounded-full w-16 h-16 bg-amber-50 flex items-center justify-center text-amber-600">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Kendala Penjualan HP</h2>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau dan tindak lanjuti catatan kendala penjualan HP bekas (salah norek, nominal, QC, dll).</p>
                 </div>
             </div>
         @endcan

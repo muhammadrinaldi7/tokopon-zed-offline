@@ -86,6 +86,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/dashboard', \App\Livewire\Zoffline\Reporting\Dashboard::class)->name('dashboard-bm');
         Route::get('/laporan-pembayaran', \App\Livewire\Zoffline\Reporting\InvoiceReport::class)->name('pembayaran');
         Route::get('/order-issues', \App\Livewire\Admin\Orders\OrderIssuesIndex::class)->name('order-issues');
+        Route::get('/sell-phone-issues', \App\Livewire\Admin\SellPhone\SellPhoneIssuesIndex::class)->name('sell-phone-issues');
     });
 });
 
@@ -191,6 +192,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/trade-ins/{tradeIn}', App\Livewire\Admin\TradeIn\Show::class)->name('trade-ins.show')->middleware('can:manage-trade-in');
 
     Route::get('/sell-phones', App\Livewire\Admin\SellPhone\Index::class)->name('sell-phones.index')->middleware('can:manage-trade-in');
+    Route::get('/sell-phones/issues', App\Livewire\Admin\SellPhone\SellPhoneIssuesIndex::class)->name('sell-phones.issues')->middleware('can:manage-trade-in');
     Route::get('/sell-phones/{sellPhone}', App\Livewire\Admin\SellPhone\Show::class)->name('sell-phones.show')->middleware('can:manage-trade-in');
 
     Route::prefix('buyback')->name('buyback.')->middleware('can:manage-buyback')->group(function () {
