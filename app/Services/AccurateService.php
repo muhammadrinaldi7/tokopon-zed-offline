@@ -1748,13 +1748,27 @@ class AccurateService
         $businessUnitCode = $claim->warranty->policy?->businessUnit?->code ?? 'syihab';
         // dd($claim->customer, $claim->customer->getAccurateCustomerNo($businessUnitCode));
 
-        // 1. Ambil Data Referensi dari Database
-        // Ambil No Pelanggan yang TEPAT sesuai dengan Business Unit tempat garansi ini diterbitkan
-        $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
-        $customerName = $claim->customer->name ?? 'Pelanggan Garansi';
-
         // Simulasi mendapatkan nomor invoice lama dan item lama dari order system
         $order = $claim->warranty->orderItem->order ?? null;
+
+        // 1. Ambil Data Referensi dari Database
+        // Cek apakah invoice asli menggunakan pembayaran Finance
+        $financePayment = null;
+        if ($order) {
+            $financePayment = $order->payments()->with('paymentMethod')->get()->first(function ($payment) {
+                return $payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no);
+            });
+        }
+
+        // Jika ada finance payment, pakai customer no dari finance. Jika tidak, pakai milik customer
+        if ($financePayment) {
+            $customerNo = $financePayment->paymentMethod->accurate_customer_no;
+            $customerName = $financePayment->paymentMethod->name ?? 'Finance Customer';
+        } else {
+            // Ambil No Pelanggan yang TEPAT sesuai dengan Business Unit tempat garansi ini diterbitkan
+            $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
+            $customerName = $claim->customer->name ?? 'Pelanggan Garansi';
+        }
         $originalInvoiceNo = $order->accurate_invoice_no ?? null;
 
         if (!$originalInvoiceNo && $order) {
@@ -2212,7 +2226,31 @@ class AccurateService
     {
         $businessUnitCode = $claim->warranty->policy?->businessUnit?->code ?? 'syihab';
 
-        $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
+        // Cek apakah invoice asli menggunakan pembayaran Finance
+        $orderItem = clone ($claim->warranty->orderItem);
+        $order = $orderItem->order ?? null;
+        if (!$order) {
+            $oldOrderItem = \App\Models\OrderItem::with('order')
+                ->where('serial_number', $claim->serial_number)
+                ->latest()
+                ->first();
+            $order = $oldOrderItem ? $oldOrderItem->order : null;
+        }
+
+        $financePayment = null;
+        if ($order) {
+            $financePayment = $order->payments()->with('paymentMethod')->get()->first(function ($payment) {
+                return $payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no);
+            });
+        }
+
+        // Jika ada finance payment, pakai customer no dari finance. Jika tidak, pakai milik customer
+        if ($financePayment) {
+            $customerNo = $financePayment->paymentMethod->accurate_customer_no;
+        } else {
+            $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
+        }
+
         // Karena warranty->orderItem sudah menunjuk ke barang pengganti (faktur baru),
         // kita harus mencari faktur lama berdasarkan IMEI yang diretur pada klaim ini.
         $oldOrderItem = \App\Models\OrderItem::with('order')

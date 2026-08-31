@@ -147,6 +147,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Finance Dashboard
     Route::prefix('finance')->name('finance.')->group(function () {
         Route::get('/warranty-return', \App\Livewire\Admin\Finance\WarrantyReturn::class)->name('warranty-return');
+        Route::get('/warranty-return/{claim}', \App\Livewire\Admin\Finance\WarrantyReturnShow::class)->name('warranty-return.show');
     });
 
     // Sales Order (Mini Accurate)

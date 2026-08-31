@@ -33,7 +33,7 @@ class ApprovalController extends Controller
 
         $globalRoles = ['admin', 'direktur', 'superadmin'];
         // Role tingkat cabang (difilter berdasarkan BU dan Cabang)
-        $localRoles = ['manager', 'bm', 'supervisor', 'manager_operasional'];
+        $localRoles = ['manager', 'bm', 'supervisor'];
 
         $query = \App\Models\User::role($targetRole)
             ->whereNotNull('telegram_chat_id')
