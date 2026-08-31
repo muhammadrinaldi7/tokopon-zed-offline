@@ -1743,7 +1743,7 @@ class AccurateService
      * Memanggil API Accurate untuk Sales Return (menarik stok rusak) 
      * dan Sales Invoice (mengeluarkan stok baru).
      */
-    public function processWarrantyReplacement(\App\Models\WarrantyClaim $claim, $newImei, $newItemNo = null, $newPrice = 0, $priceDifference = 0, $replacementType = 'same', $bankNo = null, $originalPriceFromUI = null)
+    public function processWarrantyReplacement(\App\Models\WarrantyClaim $claim, $newImei, $newItemNo = null, $newPrice = 0, $priceDifference = 0, $replacementType = 'same', $bankNo = null, $originalPriceFromUI = null, $salesmanNo = null)
     {
         $businessUnitCode = $claim->warranty->policy?->businessUnit?->code ?? 'syihab';
         // dd($claim->customer, $claim->customer->getAccurateCustomerNo($businessUnitCode));
@@ -1789,6 +1789,20 @@ class AccurateService
             }
         }
 
+        // Ambil Project No
+        $businessUnitId = $claim->warranty->policy?->business_unit_id ?? (Auth::user()->getActiveBusinessUnitId() ?? 1);
+        $projectName = '';
+        if ($variant) {
+            if (isset($variant->proyek)) {
+                $projectName = trim(strtoupper($variant->proyek));
+            } elseif (isset($variant->accurateData->proyek)) {
+                $projectName = trim(strtoupper($variant->accurateData->proyek));
+            } elseif (method_exists($variant, 'accurateData') && $variant->accurateData()->first()) {
+                $projectName = trim(strtoupper($variant->accurateData()->first()->proyek ?? ''));
+            }
+        }
+        $projectNo = \App\Models\BusinessUnitProject::getProjectNoByBusinessUnit($businessUnitId, $projectName, $projectName ?: null);
+
         $targetItemNo = $newItemNo ?? $originalItemNo;
         $originalPrice = $originalPriceFromUI ?? ($claim->warranty->orderItem->price_at_checkout ?? 0);
         $targetPrice = $newPrice > 0 ? $newPrice : $originalPrice;
@@ -1812,6 +1826,20 @@ class AccurateService
         // --- PROSES 1: SALES RETURN (MENARIK IMEI LAMA) ---
         Log::info("Mempersiapkan Sales Return ke Accurate untuk IMEI Lama: " . $claim->serial_number);
 
+        $itemDetailSR = [
+            'itemNo' => $originalItemNo,
+            'quantity' => 1,
+            'unitPrice' => $originalPrice, // WAJIB ADA agar menjadi deposit walau invoice tak ketemu
+            'itemDiscount' => 0, // Hindari diskon bawaan
+            'warehouseName' => $warehouseReturnName,
+            'detailSerialNumber' => [
+                ['serialNumberNo' => $claim->serial_number, 'quantity' => 1]
+            ]
+        ];
+        if ($projectNo) {
+            $itemDetailSR['projectNo'] = $projectNo;
+        }
+
         // Payload standar retur industri (Terhubung ke faktur lama agar memotong piutang/jadi overpayment)
         $returnPayload = [
             'customerNo' => $customerNo,
@@ -1821,18 +1849,7 @@ class AccurateService
             'taxable' => $isTaxable,
             'inclusiveTax' => $isTaxable,
             'description' => "Retur Klaim Garansi Ganti Unit. Referensi Faktur: {$originalInvoiceNo}. SN Rusak: {$claim->serial_number}",
-            'detailItem' => [
-                [
-                    'itemNo' => $originalItemNo,
-                    'quantity' => 1,
-                    'unitPrice' => $originalPrice, // WAJIB ADA agar menjadi deposit walau invoice tak ketemu
-                    'itemDiscount' => 0, // Hindari diskon bawaan
-                    'warehouseName' => $warehouseReturnName,
-                    'detailSerialNumber' => [
-                        ['serialNumberNo' => $claim->serial_number, 'quantity' => 1]
-                    ]
-                ]
-            ]
+            'detailItem' => [$itemDetailSR]
         ];
 
         Log::info("Payload Sales Return:", $returnPayload);
@@ -1846,6 +1863,23 @@ class AccurateService
         // --- PROSES 2: SALES INVOICE (MENGELUARKAN IMEI BARU) ---
         Log::info("Mempersiapkan Sales Invoice ke Accurate untuk IMEI Baru: " . $newImei);
 
+        $itemDetailSI = [
+            'itemNo' => $targetItemNo,
+            'quantity' => 1,
+            'unitPrice' => $targetPrice, // Harga menggunakan harga asli/baru
+            'itemDiscount' => 0, // Hindari diskon bawaan
+            'warehouseName' => $warehouseMainName,
+            'detailSerialNumber' => [
+                ['serialNumberNo' => $newImei, 'quantity' => 1]
+            ]
+        ];
+        if ($projectNo) {
+            $itemDetailSI['projectNo'] = $projectNo;
+        }
+        if ($salesmanNo) {
+            $itemDetailSI['salesmanListNumber'] = [(string) $salesmanNo];
+        }
+
         // Payload standar pengeluaran barang pengganti
         $invoicePayload = [
             'customerNo' => $customerNo,
@@ -1854,18 +1888,7 @@ class AccurateService
             'taxable' => $isTaxable,
             'inclusiveTax' => $isTaxable,
             'description' => "Penggantian Unit Klaim Garansi untuk Faktur: {$originalInvoiceNo}. SN Pengganti: {$newImei}",
-            'detailItem' => [
-                [
-                    'itemNo' => $targetItemNo,
-                    'quantity' => 1,
-                    'unitPrice' => $targetPrice, // Harga menggunakan harga asli/baru
-                    'itemDiscount' => 0, // Hindari diskon bawaan
-                    'warehouseName' => $warehouseMainName,
-                    'detailSerialNumber' => [
-                        ['serialNumberNo' => $newImei, 'quantity' => 1]
-                    ]
-                ]
-            ]
+            'detailItem' => [$itemDetailSI]
         ];
 
         Log::info("Payload Sales Invoice:", $invoicePayload);

@@ -68,7 +68,7 @@ class ReturnInspect extends Component
                         'typeAdjust' => 'REDUCTION',
                         'warehouseName' => $warehouseReturn,
                         'detailSerialNumber' => [
-                            ['serialNumberNo' => $this->claim->warranty->serial_number, 'quantity' => 1]
+                            ['serialNumberNo' => $this->claim->serial_number, 'quantity' => 1]
                         ]
                     ],
                     // Masukkan ke Gudang Cabang
@@ -78,7 +78,7 @@ class ReturnInspect extends Component
                         'typeAdjust' => 'ADDITION',
                         'warehouseName' => $warehouseBranch,
                         'detailSerialNumber' => [
-                            ['serialNumberNo' => $this->claim->warranty->serial_number, 'quantity' => 1]
+                            ['serialNumberNo' => $this->claim->serial_number, 'quantity' => 1]
                         ]
                     ]
                 ]

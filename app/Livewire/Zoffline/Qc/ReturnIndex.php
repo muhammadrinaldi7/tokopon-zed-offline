@@ -16,7 +16,7 @@ class ReturnIndex extends Component
         // Asumsi: barang lama (yang rusak) butuh di-QC.
 
         $claims = WarrantyClaim::with(['warranty.orderItem.variant', 'customer'])
-            ->where('status', 'completed')
+            ->whereIn('status', ['completed', 'waiting_refund', 'waiting_payment'])
             ->where('resolution', 'replaced')
             ->whereDoesntHave('inspection')
             ->orderBy('updated_at', 'desc')

@@ -33,7 +33,7 @@
                                     {{ $claim->warranty->orderItem->product_name ?? 'Unknown Device' }}
                                 </div>
                                 <div class="text-xs text-slate-500 font-mono mt-0.5">
-                                    SN: {{ $claim->warranty->serial_number ?? 'N/A' }}
+                                    SN: {{ $claim->serial_number ?? 'N/A' }}
                                 </div>
                             </td>
                             <td class="px-6 py-4">

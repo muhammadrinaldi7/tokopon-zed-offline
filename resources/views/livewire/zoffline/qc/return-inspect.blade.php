@@ -22,7 +22,7 @@
                     <div>
                         <div class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Perangkat (Barang Rusak)</div>
                         <div class="font-semibold text-slate-800">{{ $claim->warranty->orderItem->product_name ?? 'Unknown' }}</div>
-                        <div class="text-sm text-slate-500 font-mono mt-0.5">IMEI: {{ $claim->warranty->serial_number ?? '-' }}</div>
+                        <div class="text-sm text-slate-500 font-mono mt-0.5">IMEI: {{ $claim->serial_number ?? '-' }}</div>
                     </div>
 
                     <hr class="border-slate-100">
@@ -65,7 +65,7 @@
                     :inspectableType="App\Models\WarrantyClaim::class"
                     :inspectableId="$claim->id"
                     :secondProductVariantId="null"
-                    :imei="$claim->warranty->serial_number"
+                    :imei="$claim->serial_number"
                     label="QC Barang Retur"
                     :hideHeader="true"
                     :wire:key="'qc-form-'.$claim->id"

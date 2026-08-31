@@ -449,6 +449,74 @@
                             @enderror
                         </div>
 
+                        <!-- Pilih Sales (Tenaga Penjual) -->
+                        <div class="mt-4 mb-4 relative z-50">
+                            <label class="block text-sm font-bold text-gray-700 mb-1">
+                                Pilih Sales Pengganti <span class="text-amber-500">*</span>
+                            </label>
+                            
+                            @if($selected_sales_id)
+                                <div class="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-xl mb-2">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-bold text-blue-900">{{ $search_sales_query }}</div>
+                                            <div class="text-xs text-blue-700">Sales Terpilih</div>
+                                        </div>
+                                    </div>
+                                    <button type="button" wire:click="selectSales(null)" class="text-rose-500 hover:bg-rose-100 p-1.5 rounded-lg transition-colors">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            @else
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 left-0 pl-3 pt-6 flex items-center pointer-events-none">
+                                        <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                    </div>
+                                    <input type="text"
+                                        wire:model.live.debounce.300ms="search_sales_query"
+                                        placeholder="Ketik nama sales..."
+                                        class="w-full bg-white border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-amber-500 focus:border-amber-500 transition-colors">
+
+                                    @if(strlen($search_sales_query) >= 2)
+                                        <div class="absolute z-[60] w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                            @forelse($this->salesResults as $sales)
+                                                <button type="button"
+                                                    wire:click="selectSales({{ $sales->id }})"
+                                                    class="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-gray-100 last:border-0">
+                                                    <div class="font-bold text-gray-800 text-sm">{{ $sales->name }}</div>
+                                                    <div class="text-xs text-gray-500 mt-0.5">
+                                                        No Karyawan: {{ $sales->employee_no ?? '-' }}
+                                                    </div>
+                                                </button>
+                                            @empty
+                                                <div class="px-4 py-3 text-center text-sm text-gray-500">
+                                                    Sales tidak ditemukan.
+                                                </div>
+                                            @endforelse
+                                        </div>
+                                    @endif
+                                </div>
+                                <p class="mt-1.5 text-xs text-gray-500">
+                                    Salesperson akan dicatat pada faktur pengganti (Sales Invoice Baru) untuk KPI Sales.
+                                </p>
+                            @endif
+
+                            @error('selected_sales_id')
+                                <div class="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs font-medium">
+                                    {{ $message }}
+                                </div>
+                            @enderror
+                        </div>
+
                         <!-- Catatan Tambahan -->
                         <div class="mt-4 mb-4">
                             <label class="block text-sm font-bold text-gray-700 mb-1">

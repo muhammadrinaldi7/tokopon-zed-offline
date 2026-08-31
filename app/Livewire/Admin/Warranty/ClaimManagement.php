@@ -11,6 +11,7 @@ use App\Models\DeviceInspection;
 use App\Services\AccurateService;
 use App\Models\Order;
 use App\Models\OrderItem;
+use Livewire\Attributes\Computed;
 
 class ClaimManagement extends Component
 {
@@ -45,6 +46,8 @@ class ClaimManagement extends Component
     public $product_results = [];
     public $bank_no = '10.02.103';
     public $manual_note = '';
+    public $selected_sales_id = null;
+    public $search_sales_query = '';
 
     public $is_editing_replacement_price = false;
 
@@ -56,6 +59,32 @@ class ClaimManagement extends Component
     public function updatingSearch()
     {
         $this->resetPage();
+    }
+
+    #[Computed]
+    public function salesResults()
+    {
+        if (strlen($this->search_sales_query) < 2) return [];
+
+        $user = Auth::user();
+        $businessUnitId = $user->getActiveBusinessUnitId() ?? 1;
+
+        return \App\Models\Employe::active()
+            ->where('business_unit_id', $businessUnitId)
+            ->with('branch')
+            ->where(function ($q) {
+                $q->where('branch_id', Auth::user()->branch_id)
+                    ->orWhereNull('branch_id');
+            })
+            ->where('name', 'like', '%' . $this->search_sales_query . '%')
+            ->take(10)
+            ->get();
+    }
+
+    public function selectSales($salesId)
+    {
+        $this->selected_sales_id = $salesId;
+        $this->search_sales_query = \App\Models\Employe::find($salesId)->name ?? '';
     }
 
     public function updatingStatusFilter()
@@ -134,6 +163,9 @@ class ClaimManagement extends Component
         $this->claimInspection = null;
         $this->viewingQcDetails = null;
         $this->showRefundForm = false;
+        $this->is_editing_replacement_price = false;
+        $this->selected_sales_id = null;
+        $this->search_sales_query = '';
     }
 
     public function viewQcDetails($type)
@@ -183,11 +215,15 @@ class ClaimManagement extends Component
             'bank_no' => $this->bank_no,
             'original_price' => $this->original_price,
             'replacement_type' => $this->replacement_type,
+            'selected_sales_id' => $this->selected_sales_id
         ], [
             'replacement_imei' => 'required|string|min:3',
             'replacement_item_no' => 'required_if:replacement_type,different',
             'bank_no' => 'required',
-            'original_price' => 'required|numeric|min:0'
+            'original_price' => 'required|numeric|min:0',
+            'selected_sales_id' => 'required'
+        ], [
+            'selected_sales_id.required' => 'Mohon pilih Salesperson untuk unit pengganti.'
         ]);
 
         if ($validator->fails()) {
@@ -213,12 +249,16 @@ class ClaimManagement extends Component
 
     public function approveReplacement()
     {
-        // Tetap ada validasi untuk berjaga-jaga
         $this->validate([
-            'replacement_imei' => 'required|string|min:3',
+            'replacement_imei' => 'required|min:3',
+            'replacement_type' => 'required|in:same,different',
             'replacement_item_no' => 'required_if:replacement_type,different',
+            'replacement_price' => 'required_if:replacement_type,different|numeric|min:0',
             'bank_no' => 'required',
-            'original_price' => 'required|numeric|min:0'
+            'original_price' => 'required|numeric|min:0',
+            'selected_sales_id' => 'required'
+        ], [
+            'selected_sales_id.required' => 'Mohon pilih Salesperson untuk unit pengganti.'
         ]);
 
         $claim = WarrantyClaim::with(['warranty.orderItem.order', 'warranty.orderItem.variant'])->findOrFail($this->selectedClaimId);
@@ -226,20 +266,18 @@ class ClaimManagement extends Component
         $originalPrice = $this->original_price;
         $newItemNo = $this->replacement_type === 'different' ? $this->replacement_item_no : null;
         $newPrice = $this->replacement_type === 'different' ? $this->replacement_price : $originalPrice;
-        $priceDifference = $newPrice - $originalPrice; // Positive if upgrade, negative if downgrade
+        $priceDifference = $newPrice - $originalPrice;
 
-        // Memulai Transaksi Database Lokal DULUAN agar jika ada error sintaks/enum (seperti Error 1265), Accurate TIDAK terlanjur tereksekusi.
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
-            // 1. Update Database Lokal (Tahap 1: Validasi DB & Status Claim)
             if ($priceDifference < 0) {
-                $claim->status = 'waiting_refund'; // Downgrade: tunggu kasir proses refund
+                $claim->status = 'waiting_refund';
                 $claim->refund_amount = abs($priceDifference);
             } elseif ($priceDifference > 0) {
-                $claim->status = 'waiting_payment'; // Upgrade: tunggu Finance konfirmasi pelunasan
+                $claim->status = 'waiting_payment';
                 $claim->refund_amount = abs($priceDifference);
             } else {
-                $claim->status = 'completed'; // 1:1 sama persis
+                $claim->status = 'completed';
                 $claim->refund_amount = null;
             }
 
@@ -248,14 +286,14 @@ class ClaimManagement extends Component
             }
             $claim->resolution = 'replaced';
             $noteType = $this->replacement_type === 'same' ? 'Ganti Unit' : ($priceDifference > 0 ? 'Upgrade Unit' : 'Downgrade Unit');
-            
+
             $finalNotes = "{$noteType} ke IMEI: {$this->replacement_imei}" .
                 ($newItemNo ? " (Barang Baru: {$this->replacement_product_name})" : "");
-                
+
             if (!empty($this->manual_note)) {
                 $finalNotes .= "\nCatatan Tambahan: {$this->manual_note}";
             }
-                
+
             $claim->resolution_notes = $finalNotes . " | {$this->resolution_notes}";
             $claim->approved_by = Auth::id();
             $claim->save();
@@ -263,16 +301,14 @@ class ClaimManagement extends Component
             $warranty = $claim->warranty;
             $oldSn = $warranty->serial_number;
 
-            // Simpan original SN jika belum ada
             if (!$warranty->original_serial_number) {
                 $warranty->original_serial_number = $oldSn;
             }
 
-            // Catat log perpindahan SN
-            $reason = $this->replacement_type === 'same' 
-                ? 'replacement_same' 
+            $reason = $this->replacement_type === 'same'
+                ? 'replacement_same'
                 : ($priceDifference > 0 ? 'replacement_upgrade' : 'replacement_downgrade');
-                
+
             \App\Models\WarrantySerialLog::create([
                 'warranty_id' => $warranty->id,
                 'warranty_claim_id' => $claim->id,
@@ -291,28 +327,38 @@ class ClaimManagement extends Component
                 'system_notes' => $finalNotes,
             ]);
 
-            // Update SN langsung
             $warranty->serial_number = $this->replacement_imei;
             $warranty->claims_used = ($warranty->claims_used ?? 0) + 1;
             $warranty->replacement_count = ($warranty->replacement_count ?? 0) + 1;
-            $warranty->device_inspection_id = null; // Butuh QC ulang
+            $warranty->device_inspection_id = null;
             $warranty->status = 'active';
 
-            // Atur masa aktif berdasarkan kebijakan
             $policy = $warranty->policy;
             if ($policy && $policy->replacement_type === 'reset') {
                 $warranty->activated_at = Carbon::now();
                 $warranty->expires_at = Carbon::now()->addDays($policy->duration_days);
             }
 
-            // Simpan sementara agar terpicu query-nya dan mendeteksi error jika ada sebelum ke Accurate
-            $warranty->save();
+            $originalPriceForAccurate = $this->original_price > 0 ? $this->original_price : ($warranty->orderItem->price_at_checkout ?? 0);
 
-            // 2. Integrasi API Accurate (Dijalankan di DALAM try-catch transaksi DB)
+            $salesmanNo = null;
+            if ($this->selected_sales_id) {
+                $salesmanNo = \App\Models\Employe::find($this->selected_sales_id)?->employee_no;
+            }
+
             $accurateService = app(AccurateService::class);
-            $accurateResult = $accurateService->processWarrantyReplacement($claim, $this->replacement_imei, $newItemNo, $newPrice, $priceDifference, $this->replacement_type, $this->bank_no, $originalPrice);
+            $accurateResult = $accurateService->processWarrantyReplacement(
+                $claim,
+                $this->replacement_imei,
+                $newItemNo,
+                $newPrice,
+                $priceDifference,
+                $this->replacement_type,
+                $this->bank_no,
+                $originalPriceForAccurate,
+                $salesmanNo
+            );
 
-            // Update data varian jika berbeda (tidak perlu ubah claims_used atau expires_at lagi)
             if ($this->replacement_type === 'different' && $newItemNo) {
                 $newVariant = \App\Models\ProductVariant::whereHas('accurateData', function ($q) use ($newItemNo) {
                     $q->where('item_no', $newItemNo);
@@ -485,7 +531,7 @@ class ClaimManagement extends Component
         $this->replacement_type = 'same';
 
         $claim = WarrantyClaim::with('warranty.orderItem')->find($this->selectedClaimId);
-        
+
         if ($claim->warranty && $claim->warranty->orderItem) {
             $item = $claim->warranty->orderItem;
             $this->original_price = $item->price_at_checkout - ($item->discount_amount ?? 0) - ($item->promo_discount_amount ?? 0);
