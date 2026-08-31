@@ -1743,7 +1743,7 @@ class AccurateService
      * Memanggil API Accurate untuk Sales Return (menarik stok rusak) 
      * dan Sales Invoice (mengeluarkan stok baru).
      */
-    public function processWarrantyReplacement(\App\Models\WarrantyClaim $claim, $newImei, $newItemNo = null, $newPrice = 0, $priceDifference = 0, $replacementType = 'same', $bankNo = null, $originalPriceFromUI = null, $salesmanNo = null)
+    public function processWarrantyReplacement(\App\Models\WarrantyClaim $claim, $newImei, $newItemNo = null, $newPrice = 0, $priceDifference = 0, $replacementType = 'same', $bankNo = null, $originalPriceFromUI = null, $salesmanNo = null, $branchName = null)
     {
         $businessUnitCode = $claim->warranty->policy?->businessUnit?->code ?? 'syihab';
         // dd($claim->customer, $claim->customer->getAccurateCustomerNo($businessUnitCode));
@@ -1808,8 +1808,8 @@ class AccurateService
         $targetPrice = $newPrice > 0 ? $newPrice : $originalPrice;
         $chequeAmount = $priceDifference;
 
-        // Ambil Nama Cabang berdasarkan User yang login
-        $branchName = Auth::user()->branch->name ?? 'Cabang Utama';
+        // Ambil Nama Cabang berdasarkan parameter, atau fallback ke User yang login
+        $branchName = $branchName ?? Auth::user()->branch->name ?? 'Cabang Utama';
 
         // Ambil konfigurasi pajak dari Business Unit
         $businessUnit = $claim->warranty->policy->businessUnit ?? null;

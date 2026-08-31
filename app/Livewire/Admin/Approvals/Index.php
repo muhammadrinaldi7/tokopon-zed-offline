@@ -277,7 +277,22 @@ class Index extends Component
 
     public function render()
     {
+        $user = Auth::user();
+        $isGlobal = $user->hasAnyRole(['admin', 'direktur', 'superadmin']);
+
         $requests = ApprovalRequest::with(['approvable', 'requestedBy.branch', 'histories.actedBy'])
+            ->when(!$isGlobal, function ($q) use ($user) {
+                $q->whereHas('requestedBy', function ($uq) use ($user) {
+                    // Filter berdasarkan Business Unit
+                    if ($user->business_unit_id) {
+                        $uq->where('business_unit_id', $user->business_unit_id);
+                    }
+                    // Filter lebih spesifik ke Cabang jika role-nya ada di level cabang
+                    if ($user->branch_id && $user->hasAnyRole(['bm', 'supervisor', 'manager_operasional', 'kasir'])) {
+                        $uq->where('branch_id', $user->branch_id);
+                    }
+                });
+            })
             ->when($this->search, function ($q) {
                 $q->whereHas('requestedBy', function ($uq) {
                     $uq->where('name', 'like', '%' . $this->search . '%');

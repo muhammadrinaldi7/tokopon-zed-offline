@@ -231,7 +231,8 @@ class ApprovalRequest extends Model
                     $replacement_type,
                     $bank_no,
                     $originalPriceForAccurate,
-                    $salesmanNo
+                    $salesmanNo,
+                    $branch_name
                 );
 
                 if ($replacement_type === 'different' && $newItemNo) {

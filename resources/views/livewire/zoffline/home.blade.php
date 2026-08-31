@@ -277,7 +277,7 @@
                                     </svg>
 
                                 </div>
-                                <span class="block text-xs sm:text-sm text-center leading-tight">Klaim Manajemen</span>
+                                <span class="block text-xs sm:text-sm text-center leading-tight">Manajemen Retur</span>
                             </button>
 
                         </div>
