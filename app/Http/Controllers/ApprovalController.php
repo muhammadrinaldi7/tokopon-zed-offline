@@ -47,7 +47,10 @@ class ApprovalController extends Controller
 
         // Jika role tingkat cabang, filter lagi secara spesifik berdasarkan cabang
         if (in_array($targetRole, $localRoles) && $cabangId) {
-            $query->where('branch_id', $cabangId);
+            $query->where(function ($q) use ($cabangId) {
+                $q->where('branch_id', $cabangId)
+                  ->orWhereNull('branch_id');
+            });
         }
 
         $targetUsers = $query->get();
