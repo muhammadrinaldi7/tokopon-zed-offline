@@ -98,6 +98,7 @@ class ProductAccurateManagement extends Component
                     'itemType' => $item['itemType'] ?? null,
                     'is_addon' => isset($item['charField1']) && strtolower(trim($item['charField1'])) === 'ya',
                     'proyek' => $item['charField2'] ?? null,
+                    'os' => $item['charField3'] ?? null,
                     'raw_data'        => json_encode($item),
                     'created_at'      => now(),
                     'updated_at'      => now(),
@@ -107,7 +108,7 @@ class ProductAccurateManagement extends Component
                 ProductAccurate::upsert(
                     $importData,
                     ['accurate_id', 'database_source'],
-                    ['item_no', 'name', 'base_price', 'stock', 'has_sn', 'business_unit_id', 'id_brand_accurate', 'itemType', 'brandName', 'id_category_accurate', 'categoryName', 'is_addon', 'proyek', 'raw_data', 'base_cost', 'updated_at']
+                    ['item_no', 'name', 'base_price', 'stock', 'has_sn', 'business_unit_id', 'id_brand_accurate', 'itemType', 'brandName', 'id_category_accurate', 'categoryName', 'is_addon', 'proyek', 'os', 'raw_data', 'base_cost', 'updated_at']
                 );
 
                 // Sync harga ke ProductVariant / SecondProductVariant lokal
@@ -211,6 +212,7 @@ class ProductAccurateManagement extends Component
                         'categoryName' => $item['itemCategory']['name'] ?? null,
                         'is_addon' => isset($item['charField1']) && strtolower(trim($item['charField1'])) === 'ya',
                         'proyek' => $item['charField2'] ?? null,
+                        'os' => $item['charField3'] ?? null,
                         // raw_data harus di-json_encode jika kolomnya berjenis text/json di MySQL
                         'raw_data'        => json_encode($item),
 
@@ -256,6 +258,7 @@ class ProductAccurateManagement extends Component
                                 'categoryName',
                                 'is_addon',
                                 'proyek',
+                                'os',
                                 'raw_data',
                                 'updated_at'
                             ]

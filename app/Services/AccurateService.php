@@ -44,7 +44,7 @@ class AccurateService
             ->get($config['host'] . '/project/list.do');
 
         Log::info("API Accurate Project List ({$databaseSource}): " . $response->body());
-        
+
         if ($response->successful()) {
             $data = $response->json();
             if (isset($data['s']) && $data['s'] === false) {
@@ -379,7 +379,7 @@ class AccurateService
         $param = [
             "sp.page"     => $page,
             "sp.pageSize" => $pageSize,
-            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory,manageSN,itemType,charField1,charField2",
+            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory,manageSN,itemType,charField1,charField2,charField3",
         ];
 
         $response = Http::timeout(30)->retry(2, 500)->withHeaders([
@@ -717,7 +717,7 @@ class AccurateService
         ])->post($host . '/sales-order/manual-close-order.do', $payload);
 
         Log::info('API Accurate Close SO Success: ' . $response->body());
-        
+
         if ($response->successful()) {
             $data = $response->json();
             if (isset($data['s']) && $data['s'] === false) {
@@ -1855,7 +1855,7 @@ class AccurateService
         Log::info("Payload Sales Return:", $returnPayload);
         $returnResponse = $this->postSalesReturn($returnPayload, $businessUnitCode);
         $newReturnNo = $returnResponse['r']['number'] ?? null;
-        
+
         if (!$newReturnNo) {
             throw new \Exception("Gagal mendapatkan nomor Sales Return dari respon Accurate.");
         }
@@ -2100,7 +2100,7 @@ class AccurateService
 
         // 2. DELETE DOCUMENTS (Kecuali DP)
         $orderedTypes = ['SALES_RECEIPT', 'receipt', 'SALES_INVOICE', 'invoice', 'DELIVERY_ORDER'];
-        
+
         // Accurate tidak mengizinkan penghapusan SALES_ORDER jika ada DP_INVOICE yang terikat.
         // Jika tidak ada DP, kita hapus SO nya sekalian.
         if (!$hasDP) {

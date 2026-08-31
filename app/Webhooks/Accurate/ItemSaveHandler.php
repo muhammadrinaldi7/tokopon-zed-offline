@@ -58,6 +58,9 @@ class ItemSaveHandler implements WebhookHandlerInterface
         // Tangkap charField2 untuk field proyek
         $proyek = $accurateItem['charField2'] ?? null;
 
+        // Tangkap data OS dari charField3 (Sesuai konfirmasi)
+        $os = $accurateItem['charField3'] ?? null;
+
         $idBrand = $accurateItem['itemBrand']['id'] ?? null;
         $brandName = $accurateItem['itemBrand']['name'] ?? null;
         $idCategory = $accurateItem['itemCategory']['id'] ?? null;
@@ -87,6 +90,7 @@ class ItemSaveHandler implements WebhookHandlerInterface
                     'itemType' => $accurateItem['itemType'] ?? null,
                     'is_addon' => $isAddon,
                     'proyek' => $proyek,
+                    'os' => $os,
                     'raw_data' => json_encode($accurateItem),
                 ]
             );
