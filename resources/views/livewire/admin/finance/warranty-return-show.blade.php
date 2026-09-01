@@ -77,7 +77,7 @@
                                 $productName = $variant->name ?? '-';
                             }
                         }
-                        
+
                         // Jika ada barang pengganti (upgrade/downgrade), gunakan nama produk pengganti
                         if ($claim->resolution_type === 'replacement_different' && $claim->replacement_product_name) {
                             $productName = $claim->replacement_product_name;
@@ -94,8 +94,9 @@
                         <div>
                             <p class="font-black text-blue-900 text-lg">
                                 {{ $productName }}
-                                @if($claim->resolution_type === 'replacement_different' && $claim->replacement_item_no)
-                                    <span class="text-xs font-bold text-white bg-blue-500 px-2 py-1 rounded ml-2">{{ $claim->replacement_item_no }}</span>
+                                @if ($claim->resolution_type === 'replacement_different' && $claim->replacement_item_no)
+                                    <span
+                                        class="text-xs font-bold text-white bg-blue-500 px-2 py-1 rounded ml-2">{{ $claim->replacement_item_no }}</span>
                                 @endif
                             </p>
                             <p class="text-sm font-medium text-blue-700 mt-0.5">Tipe Resolusi:
@@ -117,11 +118,127 @@
                         </div>
                     </div>
                 </div>
+                {{-- Info Pelanggan & Rekening --}}
+                <div class="bg-white rounded-3xl p-6 md:p-8 shadow-xl shadow-neutral-200/40 border border-neutral-100">
+                    <div class="flex items-center justify-between border-b border-neutral-100 pb-4 mb-6">
+                        <h2 class="text-xl font-black text-neutral-800">Informasi Pelanggan & Pembayaran</h2>
+                        <button type="button" wire:click="openEditBank"
+                            class="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-4 py-2 rounded-xl border border-emerald-200/60 transition flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                            <span>Koreksi Rekening</span>
+                        </button>
+                    </div>
 
+                    @php
+                        $userBank = $claim->customer?->bankAccounts?->first();
+                        $displayBank = $userBank?->bank_name ?? null;
+                        $displayAccNo = $userBank?->account_number ?? null;
+                        $displayAccName = $userBank?->account_name ?? null;
+                    @endphp
+
+                    @if ($isEditingBank)
+                        {{-- Form Koreksi Rekening --}}
+                        <div
+                            class="p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 mb-6 animate-in fade-in duration-200">
+                            <h4
+                                class="text-xs font-bold uppercase tracking-wider text-emerald-800 mb-4 flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Koreksi Data Rekening Tujuan Transfer
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-neutral-700 mb-1.5">Nama Bank / e-Wallet
+                                        <span class="text-rose-500">*</span></label>
+                                    <input type="text" wire:model="editBankName"
+                                        placeholder="Contoh: BCA / BRI / Mandiri"
+                                        class="w-full p-3 bg-white border border-neutral-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all">
+                                    @error('editBankName')
+                                        <span
+                                            class="text-xs text-rose-500 font-bold block mt-1.5">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-neutral-700 mb-1.5">Nomor Rekening <span
+                                            class="text-rose-500">*</span></label>
+                                    <input type="text" wire:model="editBankAccountNumber"
+                                        placeholder="Nomor rekening valid"
+                                        class="w-full p-3 bg-white border border-neutral-200 rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all">
+                                    @error('editBankAccountNumber')
+                                        <span
+                                            class="text-xs text-rose-500 font-bold block mt-1.5">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-neutral-700 mb-1.5">Atas Nama Rekening
+                                        <span class="text-rose-500">*</span></label>
+                                    <input type="text" wire:model="editBankAccountName"
+                                        placeholder="Nama pemilik sesuai buku tabungan"
+                                        class="w-full p-3 bg-white border border-neutral-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all">
+                                    @error('editBankAccountName')
+                                        <span
+                                            class="text-xs text-rose-500 font-bold block mt-1.5">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-end gap-3">
+                                <button type="button" wire:click="$set('isEditingBank', false)"
+                                    class="px-4 py-2.5 bg-white border border-neutral-200 text-neutral-600 rounded-xl text-sm font-bold hover:bg-neutral-50 hover:text-neutral-900 transition-colors">
+                                    Batal
+                                </button>
+                                <button type="button" wire:click="saveBankInfo"
+                                    class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-emerald-200 transition-colors">
+                                    Simpan Perubahan
+                                </button>
+                            </div>
+                        </div>
+                    @endif
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-1">Pelanggan</p>
+                            <p class="font-black text-neutral-800 text-lg">{{ $claim->customer->name ?? 'Customer' }}
+                            </p>
+                            <p class="text-sm font-medium text-neutral-500">{{ $claim->customer->email ?? '-' }}</p>
+                            <p class="text-xs font-mono font-bold text-neutral-500 mt-0.5">
+                                {{ $claim->customer->profile->phone_number ?? '-' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-1">Tujuan
+                                Transfer</p>
+                            @if ($displayBank && $displayAccNo)
+                                <p class="font-black text-emerald-600 text-lg flex items-center gap-1.5">
+                                    <svg class="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                    </svg>
+                                    {{ $displayBank }}
+                                </p>
+                                <p class="font-mono font-bold text-neutral-800 text-base mt-0.5">{{ $displayAccNo }}
+                                </p>
+                                <p class="text-sm font-medium text-neutral-500 mt-1">A.N: <span
+                                        class="font-bold text-neutral-700">{{ $displayAccName ?: '-' }}</span></p>
+                            @else
+                                <p class="text-sm font-medium text-neutral-500 italic mt-2">Belum diisi pelanggan /
+                                    rekening belum ada.</p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {{-- Kolom Kanan: Form Transaksi --}}
             <div class="space-y-6">
+
+
 
                 {{-- Summary Nominal --}}
                 <div
@@ -156,7 +273,8 @@
                         @endif
 
                         @error('general')
-                            <div class="p-4 bg-rose-50 text-rose-700 rounded-xl text-sm font-medium border border-rose-100">
+                            <div
+                                class="p-4 bg-rose-50 text-rose-700 rounded-xl text-sm font-medium border border-rose-100">
                                 {{ $message }}
                             </div>
                         @enderror
@@ -280,7 +398,8 @@
                                                         type="file" class="sr-only" accept="image/*">
                                                 </label>
                                             </div>
-                                            <p class="text-xs text-neutral-400 font-medium">PNG, JPG, GIF up to 5MB</p>
+                                            <p class="text-xs text-neutral-400 font-medium">PNG, JPG, GIF up to 5MB
+                                            </p>
                                         @endif
                                     </div>
 

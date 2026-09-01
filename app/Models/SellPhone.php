@@ -57,6 +57,11 @@ class SellPhone extends Model implements HasMedia
         return $this->hasMany(ProductVariant::class);
     }
 
+    public function secondProductVariant()
+    {
+        return $this->hasOne(SecondProductVariant::class);
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('photos');

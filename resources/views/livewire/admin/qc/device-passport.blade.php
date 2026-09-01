@@ -212,8 +212,8 @@
                                     isset($item['value']) &&
                                     ($item['value'] == 1 || $item['value'] === true || $item['value'] === '1');
                                 return $val
-                                    ? '<div class="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center mx-auto"><svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>'
-                                    : '<div class="w-6 h-6 bg-rose-100 rounded-full flex items-center justify-center mx-auto"><svg class="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></div>';
+                                    ? '<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold mx-auto"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Berfungsi</div>'
+                                    : '<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold mx-auto"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg> Tidak Berfungsi</div>';
                             }
                             return '<span class="text-sm font-bold text-neutral-800 bg-neutral-100 px-3 py-1 rounded-lg">' .
                                 htmlspecialchars($item['value'] ?? '-') .
@@ -297,13 +297,27 @@
                                         class="px-6 py-5 font-black text-neutral-500 uppercase tracking-widest text-xs align-top">
                                         Foto Fisik</td>
                                     <td class="px-6 py-5 border-l border-neutral-100 align-top">
-                                        @if ($this->qc1 && ($this->qc1->hasMedia('qc_photos') || $this->qc1->hasMedia('photos')))
+                                        @php
+                                            $hasMedia1 = false;
+                                            $mediaList1 = [];
+                                            if ($this->qc1) {
+                                                if ($this->qc1->hasMedia('qc_photos')) {
+                                                    $hasMedia1 = true;
+                                                    $mediaList1 = $this->qc1->getMedia('qc_photos');
+                                                } elseif ($this->qc1->hasMedia('photos')) {
+                                                    $hasMedia1 = true;
+                                                    $mediaList1 = $this->qc1->getMedia('photos');
+                                                } elseif (
+                                                    $this->qc1->inspectable &&
+                                                    $this->qc1->inspectable->hasMedia('photos')
+                                                ) {
+                                                    $hasMedia1 = true;
+                                                    $mediaList1 = $this->qc1->inspectable->getMedia('photos');
+                                                }
+                                            }
+                                        @endphp
+                                        @if ($hasMedia1)
                                             <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                                                @php
-                                                    $mediaList1 = $this->qc1->hasMedia('qc_photos')
-                                                        ? $this->qc1->getMedia('qc_photos')
-                                                        : $this->qc1->getMedia('photos');
-                                                @endphp
                                                 @foreach ($mediaList1 as $media)
                                                     <a href="{{ $media->getUrl() }}" target="_blank"
                                                         class="block aspect-square rounded-xl overflow-hidden border border-neutral-200 hover:border-rose-400 hover:shadow-md transition relative group">
@@ -322,13 +336,27 @@
                                         @endif
                                     </td>
                                     <td class="px-6 py-5 border-l border-neutral-100 align-top">
-                                        @if ($this->qc2 && ($this->qc2->hasMedia('qc_photos') || $this->qc2->hasMedia('photos')))
+                                        @php
+                                            $hasMedia2 = false;
+                                            $mediaList2 = [];
+                                            if ($this->qc2) {
+                                                if ($this->qc2->hasMedia('qc_photos')) {
+                                                    $hasMedia2 = true;
+                                                    $mediaList2 = $this->qc2->getMedia('qc_photos');
+                                                } elseif ($this->qc2->hasMedia('photos')) {
+                                                    $hasMedia2 = true;
+                                                    $mediaList2 = $this->qc2->getMedia('photos');
+                                                } elseif (
+                                                    $this->qc2->inspectable &&
+                                                    $this->qc2->inspectable->hasMedia('photos')
+                                                ) {
+                                                    $hasMedia2 = true;
+                                                    $mediaList2 = $this->qc2->inspectable->getMedia('photos');
+                                                }
+                                            }
+                                        @endphp
+                                        @if ($hasMedia2)
                                             <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                                                @php
-                                                    $mediaList2 = $this->qc2->hasMedia('qc_photos')
-                                                        ? $this->qc2->getMedia('qc_photos')
-                                                        : $this->qc2->getMedia('photos');
-                                                @endphp
                                                 @foreach ($mediaList2 as $media)
                                                     <a href="{{ $media->getUrl() }}" target="_blank"
                                                         class="block aspect-square rounded-xl overflow-hidden border border-neutral-200 hover:border-emerald-400 hover:shadow-md transition relative group">

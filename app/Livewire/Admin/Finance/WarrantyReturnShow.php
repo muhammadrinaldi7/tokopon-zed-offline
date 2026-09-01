@@ -21,12 +21,17 @@ class WarrantyReturnShow extends Component
     public $selectedBankNo = '';
     public $paymentReceipt; // Untuk file upload
 
+    public $isEditingBank = false;
+    public $editBankName = '';
+    public $editBankAccountNumber = '';
+    public $editBankAccountName = '';
+
     public $isDowngrade = false;
     public $refundAmount = 0;
 
     public function mount(WarrantyClaim $claim)
     {
-        $this->claim = $claim->load(['warranty.orderItem.variant', 'customer.profile', 'warranty.policy.businessUnit', 'claimedBy.branch']);
+        $this->claim = $claim->load(['warranty.orderItem.variant', 'customer.profile', 'customer.bankAccounts', 'warranty.policy.businessUnit', 'claimedBy.branch']);
 
         $this->isDowngrade = $this->claim->status === 'waiting_refund';
         $this->refundAmount = $this->claim->refund_amount ?? 0;
@@ -49,6 +54,57 @@ class WarrantyReturnShow extends Component
     {
         return view('livewire.admin.finance.warranty-return-show');
     }
+
+    public function openEditBank()
+    {
+        $userBank = $this->claim->customer?->bankAccounts?->first();
+        $this->editBankName = $userBank?->bank_name ?? '';
+        $this->editBankAccountNumber = $userBank?->account_number ?? '';
+        $this->editBankAccountName = $userBank?->account_name ?? '';
+        $this->isEditingBank = true;
+    }
+
+    public function saveBankInfo()
+    {
+        $this->validate([
+            'editBankName' => 'required|string|max:100',
+            'editBankAccountNumber' => 'required|string|max:50',
+            'editBankAccountName' => 'required|string|max:100',
+        ], [
+            'editBankName.required' => 'Nama Bank wajib diisi.',
+            'editBankAccountNumber.required' => 'Nomor Rekening wajib diisi.',
+            'editBankAccountName.required' => 'Atas Nama Rekening wajib diisi.',
+        ]);
+
+        $bankName = trim($this->editBankName);
+        $bankAccNo = trim($this->editBankAccountNumber);
+        $bankAccName = trim($this->editBankAccountName);
+
+        if ($this->claim->customer) {
+            $primaryBank = $this->claim->customer->bankAccounts()->where('is_primary', true)->first()
+                ?: $this->claim->customer->bankAccounts()->first();
+
+            if ($primaryBank) {
+                $primaryBank->update([
+                    'bank_name' => $bankName,
+                    'account_number' => $bankAccNo,
+                    'account_name' => $bankAccName,
+                ]);
+            } else {
+                $this->claim->customer->bankAccounts()->create([
+                    'bank_name' => $bankName,
+                    'account_number' => $bankAccNo,
+                    'account_name' => $bankAccName,
+                    'is_primary' => true,
+                ]);
+            }
+        }
+
+        $this->isEditingBank = false;
+        $this->claim->refresh(); // Refresh relationship
+        $this->dispatch('toast', title: 'Sukses', message: 'Data rekening pelanggan berhasil diperbarui.', type: 'success');
+    }
+
 
     public function processTransaction(AccurateService $accurateService)
     {

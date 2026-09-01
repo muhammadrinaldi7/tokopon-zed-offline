@@ -293,6 +293,8 @@ class ClaimManagement extends Component
 
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
+            $requiredLevel = \App\Models\ApprovalRule::where('module', 'WARRANTY_REPLACEMENT')->max('level') ?? 1;
+
             $approval = \App\Models\ApprovalRequest::create([
                 'request_type' => 'WARRANTY_REPLACEMENT',
                 'approvable_type' => WarrantyClaim::class,
@@ -301,6 +303,7 @@ class ClaimManagement extends Component
                 'payload' => $payload,
                 'reason' => "Pengajuan Ganti Unit Garansi ke IMEI: {$this->replacement_imei}",
                 'status' => 'PENDING',
+                'required_level' => $requiredLevel,
                 'current_level' => 0
             ]);
 

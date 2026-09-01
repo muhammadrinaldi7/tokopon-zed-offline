@@ -151,13 +151,15 @@ class WarrantyClaim extends Component
             return;
         }
 
+        $requiredLevel = \App\Models\ApprovalRule::where('module', 'WARRANTY_EXTENSION')->max('level') ?? 1;
+
         $request = \App\Models\ApprovalRequest::create([
             'requested_by' => $user->id,
             'approvable_type' => Warranty::class,
             'approvable_id' => $warranty->id,
             'request_type' => 'WARRANTY_EXTENSION',
             'reason' => 'Pengajuan toleransi perpanjangan garansi (otomatis).',
-            'required_level' => 1,
+            'required_level' => $requiredLevel,
             'current_level' => 0,
             'status' => 'PENDING',
         ]);

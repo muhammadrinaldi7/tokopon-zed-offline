@@ -53,7 +53,7 @@ class DevicePassport extends Component
         $this->showQcModal = false;
         $this->dispatch('toast', title: 'Berhasil', message: 'Inspeksi baru berhasil ditambahkan.', type: 'success');
         unset($this->inspections); // clear computed cache
-        
+
         // Update comparison to include the new one
         if ($this->inspections->count() >= 2) {
             $this->selectedQc2Id = $this->inspections->first()->id;
@@ -72,9 +72,9 @@ class DevicePassport extends Component
         }
 
         // Fallback: Jika IMEI ada di SellPhone
-        $sellPhone = \App\Models\SellPhone::with('secondProductVariant.accurateData')->where('imei', $this->imei)->first();
-        if ($sellPhone && $sellPhone->secondProductVariant) {
-            return $sellPhone->secondProductVariant->accurateData->name ?? 'Unknown Product';
+        $sellPhone = \App\Models\SellPhone::with('productAccurate')->where('imei', $this->imei)->first();
+        if ($sellPhone && $sellPhone->productAccurate) {
+            return $sellPhone->productAccurate->name ?? 'Unknown Product';
         }
 
         // Fallback: Jika ada inspeksi yang menyimpan second_product_variant_id lama

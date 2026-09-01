@@ -16,7 +16,7 @@ class Index extends Component
 
     public $search = '';
     public $filterStatus = 'PENDING';
-    
+
     // Final Level Confirmations
     public $confirmingApprovalId = null;
     public $confirmingRequestType = null;
@@ -152,7 +152,7 @@ class Index extends Component
                 $request->executeAction([
                     'extension_days' => $this->extensionDays
                 ]);
-                
+
                 // --- KIRIM NOTIFIKASI GRUP TELEGRAM ---
                 $kasirName = $request->requestedBy->name ?? 'Kasir';
                 $tipe = str_replace('_', ' ', $request->request_type) . " (Level {$request->required_level})";
@@ -165,30 +165,30 @@ class Index extends Component
                 $alasan = $request->reason ?? '-';
 
                 $teksGrup = "✅ *APPROVAL SUKSES*\n\n"
-                            . "Pengajuan: {$tipe} untuk {$orderInfo}\n"
-                            . "Kasir: {$kasirName}\n"
-                            . "Waktu: {$waktu}\n"
-                            . "Cabang: {$cabang}\n"
-                            . "Keterangan: \"{$alasan}\"\n\n"
-                            . "Telah disetujui sepenuhnya oleh *{$user->name}* (via Web).";
-                            
+                    . "Pengajuan: {$tipe} untuk {$orderInfo}\n"
+                    . "Kasir: {$kasirName}\n"
+                    . "Waktu: {$waktu}\n"
+                    . "Cabang: {$cabang}\n"
+                    . "Keterangan: \"{$alasan}\"\n\n"
+                    . "Telah disetujui sepenuhnya oleh *{$user->name}* (via Web).";
+
                 \App\Http\Controllers\ApprovalController::sendGroupNotification($teksGrup);
                 // ----------------------------------------
-                
-                $msg = $request->request_type === 'ORDER_CANCELLATION'  
+
+                $msg = $request->request_type === 'ORDER_CANCELLATION'
                     ? 'Persetujuan berhasil dan transaksi dibatalkan di Accurate.'
                     : 'Persetujuan berhasil dieksekusi.';
-                    
+
                 $this->dispatch('toast', title: 'Berhasil', message: $msg, type: 'success');
             } catch (\Exception $e) {
                 $this->dispatch('toast', title: 'Error Eksekusi', message: 'Gagal mengeksekusi persetujuan: ' . $e->getMessage(), type: 'error');
             }
         } else {
             $request->save();
-            
+
             // Trigger notifikasi untuk level selanjutnya
             \App\Http\Controllers\ApprovalController::sendTelegramNotification($request);
-            
+
             $this->dispatch('toast', title: 'Berhasil', message: 'Disetujui. Menunggu persetujuan level selanjutnya.', type: 'success');
         }
     }
@@ -265,7 +265,7 @@ class Index extends Component
         ]);
 
         $request->update(['status' => 'REJECTED']);
-        
+
         try {
             $request->executeRejectedAction();
         } catch (\Exception $e) {
@@ -278,7 +278,7 @@ class Index extends Component
     public function render()
     {
         $user = Auth::user();
-        $isGlobal = $user->hasAnyRole(['admin', 'direktur', 'superadmin']);
+        $isGlobal = $user->hasAnyRole(['admin', 'direktur', 'superadmin', 'manager_operasional']);
 
         $requests = ApprovalRequest::with(['approvable', 'requestedBy.branch', 'histories.actedBy'])
             ->when(!$isGlobal, function ($q) use ($user) {
@@ -288,7 +288,7 @@ class Index extends Component
                         $uq->where('business_unit_id', $user->business_unit_id);
                     }
                     // Filter lebih spesifik ke Cabang jika role-nya ada di level cabang
-                    if ($user->branch_id && $user->hasAnyRole(['bm', 'supervisor', 'manager_operasional', 'kasir'])) {
+                    if ($user->branch_id && $user->hasAnyRole(['bm', 'supervisor', 'kasir'])) {
                         $uq->where('branch_id', $user->branch_id);
                     }
                 });
