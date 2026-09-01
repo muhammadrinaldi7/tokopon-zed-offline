@@ -66,6 +66,13 @@
                             </p>
                         </div>
                         <div>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Cabang</p>
+                            <p
+                                class="font-mono text-gray-900 bg-gray-100 px-3 py-1.5 rounded-lg inline-block font-bold">
+                                {{ $sellPhone->branch->name ?? 'N/A' }}
+                            </p>
+                        </div>
+                        <div>
                             <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Ditangani Oleh
                                 (Frontliner)</p>
                             <p
@@ -568,7 +575,8 @@
                 @if ($sellPhone->appraised_value)
                     <div class="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-lg text-center"
                         x-data="{ editingPrice: false }">
-                        <p class="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">Nilai Disepakati</p>
+                        <p class="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-1">Nilai Disepakati
+                        </p>
 
                         <div x-show="!editingPrice">
                             <p class="text-2xl font-black text-emerald-700">Rp
@@ -694,8 +702,7 @@
                                         value: @entangle('storeBankNo').live,
                                         options: [
                                             @foreach ($accurateGlAccounts as $gl)
-                                                { id: '{{ $gl['account_no'] }}', label: '{{ $gl['account_no'] }} - {{ addslashes($gl['name']) }}' },
-                                            @endforeach
+                                                { id: '{{ $gl['account_no'] }}', label: '{{ $gl['account_no'] }} - {{ addslashes($gl['name']) }}' }, @endforeach
                                         ],
                                         get filteredOptions() {
                                             if (this.search === '') return this.options;
@@ -707,39 +714,56 @@
                                         }
                                     }" class="relative w-full" @click.away="open = false">
                                         <!-- Trigger -->
-                                        <button type="button" @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())" 
+                                        <button type="button"
+                                            @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())"
                                             class="flex items-center justify-between w-full p-2.5 text-sm font-mono text-left bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1c69d4] transition-all"
-                                            :class="open ? 'border-[#1c69d4] ring-2 ring-blue-100' : 'border-blue-200 hover:border-blue-300'">
-                                            <span x-text="selectedLabel" :class="!value ? 'text-gray-400' : 'text-gray-900 font-semibold'" class="truncate pr-4"></span>
-                                            <svg class="w-4 h-4 text-gray-400 transition-transform shrink-0" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                            :class="open ? 'border-[#1c69d4] ring-2 ring-blue-100' :
+                                                'border-blue-200 hover:border-blue-300'">
+                                            <span x-text="selectedLabel"
+                                                :class="!value ? 'text-gray-400' : 'text-gray-900 font-semibold'"
+                                                class="truncate pr-4"></span>
+                                            <svg class="w-4 h-4 text-gray-400 transition-transform shrink-0"
+                                                :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 9l-7 7-7-7"></path>
+                                            </svg>
                                         </button>
 
                                         <!-- Dropdown -->
-                                        <div x-show="open" x-transition.opacity 
+                                        <div x-show="open" x-transition.opacity
                                             class="absolute z-50 w-full mt-1.5 bg-white border border-blue-100 rounded-lg shadow-xl"
                                             style="display: none;">
                                             <div class="p-2 border-b border-gray-100 bg-gray-50/50 rounded-t-lg">
                                                 <div class="relative">
-                                                    <svg class="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                                    <input type="text" x-model="search" placeholder="Cari nama atau nomor akun..." 
+                                                    <svg class="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400"
+                                                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                                    </svg>
+                                                    <input type="text" x-model="search"
+                                                        placeholder="Cari nama atau nomor akun..."
                                                         class="w-full pl-9 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#1c69d4] focus:border-[#1c69d4] transition-colors"
-                                                        @keydown.escape="open = false"
-                                                        x-ref="searchInput">
+                                                        @keydown.escape="open = false" x-ref="searchInput">
                                                 </div>
                                             </div>
                                             <ul class="max-h-56 overflow-y-auto py-1">
-                                                <li @click="value = ''; open = false; search = ''" 
+                                                <li @click="value = ''; open = false; search = ''"
                                                     class="px-4 py-2.5 text-sm text-gray-500 cursor-pointer hover:bg-gray-50 transition-colors">
                                                     -- Pilih Akun GL Accurate --
                                                 </li>
                                                 <template x-for="option in filteredOptions" :key="option.id">
-                                                    <li @click="value = option.id; open = false; search = ''" 
+                                                    <li @click="value = option.id; open = false; search = ''"
                                                         class="px-4 py-2.5 text-sm font-mono cursor-pointer hover:bg-blue-50 transition-colors border-l-2 border-transparent"
-                                                        :class="value == option.id ? 'bg-blue-50 text-[#1c69d4] font-bold border-[#1c69d4]' : 'text-gray-700 hover:border-blue-300'">
+                                                        :class="value == option.id ?
+                                                            'bg-blue-50 text-[#1c69d4] font-bold border-[#1c69d4]' :
+                                                            'text-gray-700 hover:border-blue-300'">
                                                         <span x-text="option.label"></span>
                                                     </li>
                                                 </template>
-                                                <li x-show="filteredOptions.length === 0" class="px-4 py-3 text-sm text-gray-400 text-center italic bg-gray-50/50">
+                                                <li x-show="filteredOptions.length === 0"
+                                                    class="px-4 py-3 text-sm text-gray-400 text-center italic bg-gray-50/50">
                                                     Akun tidak ditemukan
                                                 </li>
                                             </ul>

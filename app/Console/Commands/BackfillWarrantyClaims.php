@@ -54,10 +54,6 @@ class BackfillWarrantyClaims extends Command
                 $claim->resolution_type = $replacement_type === 'same' ? 'replacement_same' : 'replacement_different';
                 $updated = true;
             }
-            if (empty($claim->replacement_serial_number) && $replacement_imei) {
-                $claim->replacement_serial_number = $replacement_imei;
-                $updated = true;
-            }
             if (empty($claim->replacement_item_no) && $newItemNo) {
                 $claim->replacement_item_no = $newItemNo;
                 $updated = true;
@@ -70,7 +66,7 @@ class BackfillWarrantyClaims extends Command
             if ($updated) {
                 $claim->save();
                 $count++;
-                $this->line("Updated Claim ID {$claim->id}: type={$claim->resolution_type}, IMEI={$claim->replacement_serial_number}, ItemNo={$claim->replacement_item_no}");
+                $this->line("Updated Claim ID {$claim->id}: type={$claim->resolution_type}, ItemNo={$claim->replacement_item_no}");
             }
         }
 

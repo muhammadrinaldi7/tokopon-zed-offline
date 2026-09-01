@@ -160,7 +160,6 @@ class ApprovalRequest extends Model
                 }
                 $claim->resolution = 'replaced';
                 $claim->resolution_type = $replacement_type === 'same' ? 'replacement_same' : 'replacement_different';
-                $claim->replacement_serial_number = $replacement_imei;
                 $claim->replacement_item_no = $newItemNo;
                 $claim->replacement_product_name = $replacement_product_name;
                 $noteType = $replacement_type === 'same' ? 'Ganti Unit' : ($priceDifference > 0 ? 'Upgrade Unit' : 'Downgrade Unit');
@@ -272,7 +271,7 @@ class ApprovalRequest extends Model
                     'order_status' => 'COMPLETED',
                     'order_channel' => 'POS',
                     'handled_by' => $this->requested_by,
-                    'sales_id' => $selected_sales_id ?? ($claim->warranty->orderItem->order->sales_id ?? $this->requested_by),
+                    'sales_id' => $claim->warranty->orderItem->order->sales_id ?? $this->requested_by,
                     'shipping_address_snapshot' => ['type' => 'POS', 'store' => $branch_name, 'is_warranty_return' => true],
                     'notes' => "Pengembalian Unit Retur Garansi #{$claim->claim_number}. IMEI Lama: {$oldSn}",
                     'branch_id' => $branch_id,
