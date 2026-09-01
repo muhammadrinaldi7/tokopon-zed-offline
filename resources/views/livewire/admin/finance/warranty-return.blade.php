@@ -133,9 +133,6 @@
                                                 </button>
                                             @endif
                                         </div>
-                                                <span class="px-3 py-1 bg-neutral-100 text-neutral-500 font-bold text-[10px] uppercase rounded-lg">Selesai</span>
-                                            @endif
-                                        </div>
                                     </td>
                                 </tr>
                             @endforeach

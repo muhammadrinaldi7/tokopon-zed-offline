@@ -206,7 +206,7 @@ class SellPhoneIssuesIndex extends Component
 
         $issues = $this->getFilteredQuery()->paginate(15);
 
-        $layout = request()->routeIs('reporting.*') || request()->routeIs('zoffline.*') ? 'layouts.z' : 'layouts.admin';
+
 
         return view('livewire.admin.sell-phone.sell-phone-issues-index', [
             'issues' => $issues,
@@ -216,6 +216,6 @@ class SellPhoneIssuesIndex extends Component
             'topCategory' => $topCategory ? ($categoryLabels[$topCategory->category] ?? $topCategory->category) : '-',
             'topCategoryCount' => $topCategory ? $topCategory->total : 0,
             'categoryLabels' => $categoryLabels,
-        ])->layout($layout, ['title' => 'Kendala & Kesalahan Pembelian HP']);
+        ])->layout('layouts.z', ['title' => 'Kendala & Kesalahan Pembelian HP']);
     }
 }

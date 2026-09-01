@@ -244,10 +244,14 @@
                                         'COMPLETED' => 'bg-emerald-100 text-emerald-800 border-emerald-200',
                                         'CANCELLED' => 'bg-slate-100 text-slate-600 border-slate-200',
                                     ];
+                                    
+                                    $statusLabels = [
+                                        'PAYING' => 'MENUNGGU DIBAYAR',
+                                    ];
                                 @endphp
                                 <div class="mt-2 flex flex-col items-end gap-1">
                                     <span class="px-2 py-1 text-[9px] font-black uppercase rounded border tracking-wider {{ $statusColors[$item->status] ?? 'bg-slate-100 text-slate-800 border-slate-200' }} shadow-sm">
-                                        {{ str_replace('_', ' ', $item->status) }}
+                                        {{ $statusLabels[$item->status] ?? str_replace('_', ' ', $item->status) }}
                                     </span>
                                 </div>
                             </td>

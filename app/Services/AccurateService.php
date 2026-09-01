@@ -1822,14 +1822,18 @@ class AccurateService
         $targetPrice = $newPrice > 0 ? $newPrice : $originalPrice;
         $chequeAmount = $priceDifference;
 
-        // Ambil Nama Cabang berdasarkan parameter, atau fallback ke User yang login
-        $branchName = $branchName ?? Auth::user()->branch->name ?? 'Cabang Utama';
+        // Gunakan user pembuat klaim (CS/Kasir) sebagai acuan cabang & gudang,
+        // KARENA transaksi fisik terjadi di cabang mereka, bukan di cabang Manager/Approver.
+        $actionUser = $claim->claimedBy ?? Auth::user();
+
+        // Ambil Nama Cabang berdasarkan parameter, atau fallback ke actionUser
+        $branchName = $branchName ?? $actionUser?->branch?->name ?? 'Cabang Utama';
 
         // Ambil konfigurasi pajak dari Business Unit
         $businessUnit = $claim->warranty->policy->businessUnit ?? null;
         $isTaxable = $businessUnit?->is_taxable ?? false;
 
-        $warehouseMainName = Auth::user()->warehouse->name ?? 'Gudang Utama';
+        $warehouseMainName = $actionUser?->warehouse?->name ?? 'Gudang Utama';
 
         // Gudang Retur diambil dari settingan Business Unit. Jika kosong, fallback ke gudang pemroses (User).
         $warehouseReturnName = $claim->warranty->policy?->businessUnit?->accurate_return_warehouse_name;
@@ -2266,7 +2270,9 @@ class AccurateService
             $originalInvoiceNo = $order->accurate_invoice_no ?? $order->order_number ?? 'INV-UNKNOWN';
         }
 
-        $branchName = Auth::user()->branch->name ?? 'Cabang Utama';
+        // Gunakan user pembuat klaim (CS/Kasir) sebagai acuan cabang
+        $actionUser = $claim->claimedBy ?? Auth::user();
+        $branchName = $actionUser?->branch?->name ?? 'Cabang Utama';
 
         // Payload Penerimaan Penjualan (Uang Keluar)
         $receiptPayload = [

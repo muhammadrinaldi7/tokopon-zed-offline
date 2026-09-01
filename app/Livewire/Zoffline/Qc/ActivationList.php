@@ -80,7 +80,8 @@ class ActivationList extends Component
             ->where('serial_number', '!=', '')
             ->whereHas('order', function($q) use ($activeUnitId) {
                 $q->where('business_unit_id', $activeUnitId)
-                  ->where('order_status', 'COMPLETED');
+                  ->where('order_status', 'COMPLETED')
+                  ->where('order_number', 'NOT LIKE', 'RET-CLM-%');
                 
                 if ($this->dateStart && $this->dateEnd) {
                     $q->whereBetween('created_at', [

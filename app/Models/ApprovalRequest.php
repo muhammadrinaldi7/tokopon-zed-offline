@@ -159,6 +159,10 @@ class ApprovalRequest extends Model
                     $claim->resolved_at = \Carbon\Carbon::now();
                 }
                 $claim->resolution = 'replaced';
+                $claim->resolution_type = $replacement_type === 'same' ? 'replacement_same' : 'replacement_different';
+                $claim->replacement_serial_number = $replacement_imei;
+                $claim->replacement_item_no = $newItemNo;
+                $claim->replacement_product_name = $replacement_product_name;
                 $noteType = $replacement_type === 'same' ? 'Ganti Unit' : ($priceDifference > 0 ? 'Upgrade Unit' : 'Downgrade Unit');
 
                 $finalNotes = "{$noteType} ke IMEI: {$replacement_imei}" .
