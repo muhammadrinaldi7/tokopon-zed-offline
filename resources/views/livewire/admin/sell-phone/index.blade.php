@@ -8,7 +8,7 @@
         <div>
             <h1
                 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-700 tracking-tight">
-                Finance Dashboard: SellPhone</h1>
+                Finance Dashboard: Pembelian Handphone</h1>
             <p class="text-sm text-slate-500 mt-2 font-medium">Monitoring dan proses pencairan dana pembelian HP bekas ke
                 pelanggan.</p>
         </div>
