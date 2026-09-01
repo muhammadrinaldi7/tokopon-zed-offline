@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Zoffline\SellPhone;
 
+use App\Models\Branch;
 use App\Models\SellPhone;
 use Livewire\Component;
+use Livewire\WithPagination;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -12,12 +14,59 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\SellPhoneReceiptMail;
 
-
-#[Layout('layouts.z', ['title' => 'History Sell Phone'])]
+#[Layout('layouts.z', ['title' => 'Riwayat Jual HP'])]
 class History extends Component
 {
-    public $showReceiptModal = false;
-    public $selectedSell = null;
+    use WithPagination;
+
+    public string $search = '';
+    public string $filterPayment = '';
+    public string $filterStartDate = '';
+    public string $filterEndDate = '';
+    public string $filterBranchId = '';
+
+    public bool $showReceiptModal = false;
+    public ?SellPhone $selectedSell = null;
+
+    public bool $showProofModal = false;
+    public string $proofImageUrl = '';
+
+    public function updatingSearch()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterPayment()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterStartDate()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterEndDate()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterBranchId()
+    {
+        $this->resetPage();
+    }
+
+    public function clearFilters()
+    {
+        $this->reset(['search', 'filterPayment', 'filterStartDate', 'filterEndDate', 'filterBranchId']);
+        $this->resetPage();
+    }
+
+    public function setPaymentFilter(string $status)
+    {
+        $this->filterPayment = $status;
+        $this->resetPage();
+    }
 
     public function showReceipt(SellPhone $sellPhone)
     {
@@ -31,15 +80,24 @@ class History extends Component
         $this->selectedSell = null;
     }
 
+    public function previewProof(string $url)
+    {
+        $this->proofImageUrl = $url;
+        $this->showProofModal = true;
+    }
+
+    public function closeProofModal()
+    {
+        $this->showProofModal = false;
+        $this->proofImageUrl = '';
+    }
+
     private function generateReceiptPdf(SellPhone $sellPhone)
     {
-        // 1. Inisialisasi DOMPDF dengan config
         $pdf = Pdf::loadView('pdf.sell-phone-receipt', ['sellPhone' => $sellPhone]);
 
-        // 2. Set ukuran custom (Thermal Printer width 80mm)
-        // 80mm width. Tinggi dibiarkan panjang agar tidak terpotong (misal 500mm), 
-        // thermal printer biasanya akan memotong otomatis setelah teks habis.
-        $customPaper = array(0, 0, 226.77, 1000); 
+        // 80mm thermal printer width
+        $customPaper = array(0, 0, 226.77, 1000);
         $pdf->setPaper($customPaper, 'portrait');
 
         return $pdf;
@@ -189,14 +247,109 @@ class History extends Component
 
     public function render()
     {
-        $branch = Auth::user()->branch->id;
-        if (Auth::user()) {
-            // Tampilkan history yang kolom 'handled_by'-nya adalah ID FL yang sedang login
-            $sells = SellPhone::with(['media', 'handledBy', 'branch'])
-                ->where('branch_id', Auth::user()->branch_id)
-                ->latest()
-                ->get();
+        $user = Auth::user();
+        $buId = $user ? $user->getActiveBusinessUnitId() : 1;
+        $isAdmin = $user && ($user->hasRole('admin') || $user->hasRole('superadmin') || $user->can('manage-trade-in'));
+
+        $availableBranches = Branch::where('business_unit_id', $buId)->orderBy('name')->get();
+
+        $baseQuery = SellPhone::with(['media', 'handledBy', 'branch', 'user.profile', 'user.bankAccounts', 'businessUnit'])
+            ->where('business_unit_id', $buId);
+
+        // Branch filtering
+        if (!$isAdmin && $user && $user->branch_id) {
+            $baseQuery->where('branch_id', $user->branch_id);
+        } elseif (!empty($this->filterBranchId)) {
+            $baseQuery->where('branch_id', $this->filterBranchId);
         }
-        return view('livewire.zoffline.sell-phone.history', compact('sells'));
+
+        // Summary calculations
+        $totalCount = (clone $baseQuery)->count();
+        $completedQuery = (clone $baseQuery)->where('status', 'COMPLETED');
+        $completedCount = $completedQuery->count();
+        $completedTotal = (float) $completedQuery->sum('appraised_value');
+
+        $payingQuery = (clone $baseQuery)->where('status', 'PAYING');
+        $payingCount = $payingQuery->count();
+        $payingTotal = (float) $payingQuery->sum('appraised_value');
+
+        $inProgressCount = (clone $baseQuery)->whereIn('status', [
+            'PENDING', 'OFFERED', 'WAITING_FOR_DEVICE', 'INSPECTING', 'REVISED_OFFER', 'PENDING_APPROVAL'
+        ])->count();
+
+        $cancelledCount = (clone $baseQuery)->whereIn('status', ['CANCELLED', 'REJECTED'])->count();
+
+        $summary = [
+            'total_count' => $totalCount,
+            'completed_count' => $completedCount,
+            'completed_total' => $completedTotal,
+            'paying_count' => $payingCount,
+            'paying_total' => $payingTotal,
+            'in_progress_count' => $inProgressCount,
+            'cancelled_count' => $cancelledCount,
+        ];
+
+        // Apply filters on the query
+        $query = clone $baseQuery;
+
+        if (!empty(trim($this->search))) {
+            $term = '%' . trim($this->search) . '%';
+            $cleanId = str_ireplace(['SPL-', 'SPL', '#'], '', trim($this->search));
+
+            $query->where(function ($q) use ($term, $cleanId) {
+                $q->where('invoice_number', 'like', $term)
+                    ->orWhere('phone_brand', 'like', $term)
+                    ->orWhere('phone_model', 'like', $term)
+                    ->orWhere('imei', 'like', $term)
+                    ->orWhere('bank_account_name', 'like', $term)
+                    ->orWhere('bank_account_number', 'like', $term)
+                    ->orWhere('bank_name', 'like', $term)
+                    ->orWhereHas('user', function ($uq) use ($term) {
+                        $uq->where('name', 'like', $term)
+                            ->orWhere('email', 'like', $term)
+                            ->orWhere('identity', 'like', $term)
+                            ->orWhereHas('profile', function ($pq) use ($term) {
+                                $pq->where('full_name', 'like', $term)
+                                    ->orWhere('phone_number', 'like', $term);
+                            });
+                    })
+                    ->orWhereHas('handledBy', function ($hq) use ($term) {
+                        $hq->where('name', 'like', $term);
+                    });
+
+                if (is_numeric($cleanId)) {
+                    $q->orWhere('id', (int) $cleanId);
+                }
+            });
+        }
+
+        // Apply Payment Filter
+        if (!empty($this->filterPayment)) {
+            if ($this->filterPayment === 'PAID') {
+                $query->where('status', 'COMPLETED');
+            } elseif ($this->filterPayment === 'PAYING') {
+                $query->where('status', 'PAYING');
+            } elseif ($this->filterPayment === 'IN_PROGRESS') {
+                $query->whereIn('status', [
+                    'PENDING', 'OFFERED', 'WAITING_FOR_DEVICE', 'INSPECTING', 'REVISED_OFFER', 'PENDING_APPROVAL'
+                ]);
+            } elseif ($this->filterPayment === 'CANCELLED') {
+                $query->whereIn('status', ['CANCELLED', 'REJECTED']);
+            } else {
+                $query->where('status', $this->filterPayment);
+            }
+        }
+
+        // Apply Date Filters
+        if (!empty($this->filterStartDate)) {
+            $query->whereDate('created_at', '>=', $this->filterStartDate);
+        }
+        if (!empty($this->filterEndDate)) {
+            $query->whereDate('created_at', '<=', $this->filterEndDate);
+        }
+
+        $sells = $query->latest()->paginate(10);
+
+        return view('livewire.zoffline.sell-phone.history', compact('sells', 'summary', 'availableBranches', 'isAdmin'));
     }
 }
