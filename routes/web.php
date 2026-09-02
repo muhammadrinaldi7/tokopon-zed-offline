@@ -195,6 +195,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::prefix('buyback')->name('buyback.')->middleware('can:manage-buyback')->group(function () {
         Route::get('/devices', App\Livewire\Admin\Buyback\DeviceIndex::class)->name('index');
+        Route::get('/mapped-devices', App\Livewire\Admin\Buyback\MappedDeviceIndex::class)->name('mapped-devices');
+        Route::get('/mapped-devices/{tier_id}', App\Livewire\Admin\Buyback\MappedDeviceShow::class)->name('mapped-devices.show');
         Route::get('/devices/create', App\Livewire\Admin\Buyback\DeviceForm::class)->name('create');
         Route::get('/tiers', App\Livewire\Admin\Buyback\TierIndex::class)->name('tiers');
     });

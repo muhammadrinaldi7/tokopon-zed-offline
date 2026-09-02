@@ -4,7 +4,7 @@
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Kategori Tier Buyback</h1>
             <p class="text-sm text-gray-500 mt-1">
-                Kelola kategori tier harga buyback. HP akan otomatis masuk ke tier berdasarkan rentang harga dasar.
+                Kelola kategori tier potongan buyback berdasarkan model HP.
             </p>
         </div>
         <button wire:click="create"
@@ -46,16 +46,6 @@
                             </svg>
                             {{ $tier->devices_count }} HP
                         </div>
-                    </div>
-                    <div
-                        class="mt-4 flex items-center gap-2 text-sm text-gray-600 bg-white p-3 rounded-lg border border-gray-100 shadow-sm relative z-10">
-                        <div class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                        <span class="font-bold tracking-wide">{{ $tier->price_range_label }}</span>
                     </div>
                 </div>
 
@@ -141,8 +131,7 @@
                     </svg>
                 </div>
                 <h3 class="text-xl font-black text-gray-900">Belum Ada Tier Dibuat</h3>
-                <p class="text-gray-500 mt-2 max-w-md mx-auto">Mulai dengan membuat tier harga untuk mengelompokkan HP
-                    dan aturan potongannya.</p>
+                <p class="text-gray-500 mt-2 max-w-md mx-auto">Mulai dengan membuat tier untuk mengelompokkan HP dan aturan potongannya.</p>
                 <button wire:click="create"
                     class="mt-6 bg-[#1c69d4] text-white px-6 py-3 rounded-lg font-bold hover:shadow-sm hover:shadow-[#1c69d4]/40 transition inline-flex items-center gap-2">
                     Buat Tier Pertama
@@ -190,30 +179,12 @@
                             </svg>
                             Informasi Tier
                         </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                            <div class="md:col-span-1">
+                        <div class="grid grid-cols-1 gap-5">
+                            <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Nama Tier</label>
-                                <input type="text" wire:model="name" placeholder="cth: Flagship High"
+                                <input type="text" wire:model="name" placeholder="cth: IPHONE 17 PRO"
                                     class="w-full bg-gray-50 border-transparent rounded-lg py-3 px-4 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all font-semibold text-gray-900">
                                 @error('name')
-                                    <span class="text-xs font-bold text-rose-500 mt-1.5 block">{{ $message }}</span>
-                                @enderror
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Harga Min
-                                    (Rp)</label>
-                                <input type="number" wire:model="min_price" placeholder="0"
-                                    class="w-full bg-gray-50 border-transparent rounded-lg py-3 px-4 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all font-semibold text-gray-900">
-                                @error('min_price')
-                                    <span class="text-xs font-bold text-rose-500 mt-1.5 block">{{ $message }}</span>
-                                @enderror
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Harga Max
-                                    (Rp)</label>
-                                <input type="number" wire:model="max_price" placeholder="0"
-                                    class="w-full bg-gray-50 border-transparent rounded-lg py-3 px-4 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all font-semibold text-gray-900">
-                                @error('max_price')
                                     <span class="text-xs font-bold text-rose-500 mt-1.5 block">{{ $message }}</span>
                                 @enderror
                             </div>

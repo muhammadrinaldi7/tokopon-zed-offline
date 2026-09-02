@@ -11,60 +11,41 @@ use Livewire\Attributes\Layout;
 #[Layout('layouts.admin', ['title' => 'Tambah Perangkat Buyback'])]
 class DeviceForm extends Component
 {
-    // Data HP
-    public $brand_id;
-    public $model_name;
-    public $ram;
-    public $storage;
-    public $base_price;
+    // Status
     public $is_active = true;
-    
+    public $selected_tier_id = null;
+
+    // Data HP
+    public $selectedProducts = []; // Array of product_accurate_id => product_name
+
     // Pencarian Product Accurate
     public $searchProduct = '';
     public $product_accurate_id = null;
     public $productsAccurateList = [];
-    public $target_business_unit_id = null;
+    public $target_business_unit_id = 2;
 
     public function mount()
     {
-        // Default ke BU pertama
-        $this->target_business_unit_id = \App\Models\BusinessUnit::first()->id ?? null;
-    }
+        $this->target_business_unit_id = config('settings.target_business_unit_id');
 
-    // Tier yang ter-detect dari base_price (read-only preview)
-    public ?int $detected_tier_id    = null;
-    public string $detected_tier_name = '';
-
-    // ──────────────────────────────────────────────
-    // Auto-detect tier saat base_price berubah
-    // ──────────────────────────────────────────────
-
-    public function updatedBasePrice($value)
-    {
-        $this->detected_tier_id   = null;
-        $this->detected_tier_name = '';
-
-        if (is_numeric($value) && $value > 0) {
-            $tier = BuybackTier::findByPrice((float) $value);
-            if ($tier) {
-                $this->detected_tier_id   = $tier->id;
-                $this->detected_tier_name = $tier->name;
-            }
+        if (request()->has('tier_id')) {
+            $this->selected_tier_id = request()->query('tier_id');
         }
     }
+
+
 
     public function updatedSearchProduct()
     {
         if (strlen($this->searchProduct) >= 2) {
-            $query = \App\Models\ProductAccurate::where(function($q) {
+            $query = \App\Models\ProductAccurate::where(function ($q) {
                 $q->where('name', 'like', '%' . $this->searchProduct . '%')
-                  ->orWhere('item_no', 'like', '%' . $this->searchProduct . '%');
+                    ->orWhere('item_no', 'like', '%' . $this->searchProduct . '%');
+            })->whereNotIn('id', function ($query) {
+                $query->select('product_accurate_id')->from('buyback_devices');
             });
+            $query->where('business_unit_id', 2);
 
-            // Batasi hanya untuk Business Unit yang dipilih dari UI
-            if ($this->target_business_unit_id) {
-                $query->where('business_unit_id', $this->target_business_unit_id);
-            }
 
             $this->productsAccurateList = $query->limit(20)->get();
         } else {
@@ -75,75 +56,66 @@ class DeviceForm extends Component
     public function selectProduct($id)
     {
         $product = \App\Models\ProductAccurate::find($id);
-        if ($product) {
-            $this->product_accurate_id = $product->id;
-            $this->model_name = $product->name;
-            $this->searchProduct = $product->name . ' (' . $product->item_no . ')';
-            $this->productsAccurateList = [];
-            
-            // Auto-assign brand based on brandName if exists
-            if ($product->brandName) {
-                $brand = Brand::where('name', 'like', '%' . $product->brandName . '%')->first();
-                if ($brand) {
-                    $this->brand_id = $brand->id;
-                }
-            }
-            
-            // You can also assign base_price if you want (Optional)
-            if (empty($this->base_price) && $product->base_price > 0) {
-                $this->base_price = $product->base_price;
-                $this->updatedBasePrice($this->base_price);
-            }
+        if ($product && !isset($this->selectedProducts[$product->id])) {
+            $this->selectedProducts[$product->id] = $product->name . ' (' . $product->item_no . ')';
         }
+
+        $this->searchProduct = '';
+        $this->productsAccurateList = [];
+    }
+
+    public function removeProduct($id)
+    {
+        unset($this->selectedProducts[$id]);
     }
 
     public function save()
     {
         $this->validate([
-            'brand_id'            => 'required|exists:brands,id',
-            'product_accurate_id' => 'required|exists:product_accurates,id',
-            'model_name'          => 'required|string|max:255',
-            'storage'             => 'required|string',
-            'base_price'          => 'required|numeric|min:0',
+            'selectedProducts' => 'required|array|min:1',
+            'selected_tier_id' => 'required|exists:buyback_tiers,id',
+        ], [
+            'selectedProducts.required' => 'Pilih minimal satu perangkat.',
+            'selectedProducts.min'      => 'Pilih minimal satu perangkat.',
         ]);
 
-        // Cari tier yang sesuai dengan harga
-        $tier = BuybackTier::findByPrice((float) $this->base_price);
+        foreach ($this->selectedProducts as $productId => $productName) {
+            // Cek apakah sudah ter-mapping di tier yang sama
+            $exists = BuybackDevice::where('product_accurate_id', $productId)->exists();
+            if (!$exists) {
+                BuybackDevice::create([
+                    'product_accurate_id' => $productId,
+                    'buyback_tier_id'     => $this->selected_tier_id,
+                    'is_active'           => $this->is_active,
+                ]);
+            } else {
+                // Update mapping jika sudah ada
+                BuybackDevice::where('product_accurate_id', $productId)->update([
+                    'buyback_tier_id' => $this->selected_tier_id,
+                    'is_active'       => $this->is_active,
+                ]);
+            }
+        }
 
-        $device = BuybackDevice::create([
-            'brand_id'            => $this->brand_id,
-            'product_accurate_id' => $this->product_accurate_id,
-            'buyback_tier_id'     => $tier?->id,
-            'model_name'          => $this->model_name,
-            'ram'                 => $this->ram,
-            'storage'             => $this->storage,
-            'base_price'          => $this->base_price,
-            'is_active'           => $this->is_active,
-        ]);
+        $tier = BuybackTier::find($this->selected_tier_id);
+        $count = count($this->selectedProducts);
 
-        $tierMsg = $tier
-            ? "Tier \"<strong>{$tier->name}</strong>\" berhasil di-assign otomatis."
-            : 'Tidak ada tier yang cocok dengan harga ini. Harap cek konfigurasi tier.';
+        $tierMsg = "Sebanyak {$count} perangkat berhasil di-mapping ke Tier \"<strong>{$tier->name}</strong>\".";
 
-        $this->dispatch('toast',
-            title:   'Perangkat Tersimpan',
+        $this->dispatch(
+            'toast',
+            title: 'Mapping Berhasil',
             message: $tierMsg,
-            type:    $tier ? 'success' : 'warning'
+            type: 'success'
         );
 
-        return $this->redirect(route('admin.buyback.index'), navigate: true);
+        return $this->redirect(route('admin.buyback.mapped-devices.show', $tier->id), navigate: true);
     }
 
     public function render()
     {
-        $detectedTier = $this->detected_tier_id
-            ? BuybackTier::find($this->detected_tier_id)
-            : null;
-
         return view('livewire.admin.buyback.device-form', [
-            'brands'       => Brand::orderBy('name')->get(),
-            'allTiers'     => BuybackTier::orderBy('min_price')->get(),
-            'detectedTier' => $detectedTier,
+            'allTiers'     => BuybackTier::orderBy('name')->get(),
         ]);
     }
 }

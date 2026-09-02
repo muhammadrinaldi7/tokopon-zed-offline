@@ -457,8 +457,12 @@
 
                 <div x-show="openBuyback && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
                     <a href="{{ route('admin.buyback.index') }}" wire:navigate
-                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.index', 'admin.buyback.create') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Daftar Perangkat
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.index') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Daftar SKU / Base Price
+                    </a>
+                    <a href="{{ route('admin.buyback.mapped-devices') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.mapped-devices', 'admin.buyback.create') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Perangkat Ter-mapping
                     </a>
                     <a href="{{ route('admin.buyback.tiers') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.tiers') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">

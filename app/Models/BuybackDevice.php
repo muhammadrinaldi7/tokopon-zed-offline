@@ -11,14 +11,8 @@ class BuybackDevice extends Model
     protected $casts = [
         'is_active'           => 'boolean',
         'product_accurate_id' => 'integer',
-        'base_price'          => 'decimal:2',
     ];
 
-    // Relasi ke Brand
-    public function brand()
-    {
-        return $this->belongsTo(Brand::class);
-    }
 
     // Relasi ke Tier (tier otomatis ter-assign berdasarkan base_price)
     public function tier()
@@ -26,11 +20,6 @@ class BuybackDevice extends Model
         return $this->belongsTo(BuybackTier::class, 'buyback_tier_id');
     }
 
-    // Relasi ke Second Product Variant untuk data integrasi Accurate dan Master Bekas
-    public function secondProductVariant()
-    {
-        return $this->belongsTo(SecondProductVariant::class, 'second_product_variant_id');
-    }
 
     public function productAccurate()
     {
@@ -38,14 +27,13 @@ class BuybackDevice extends Model
     }
 
     /**
-     * Auto-assign tier berdasarkan base_price.
-     * Dipanggil setelah device dibuat/diupdate.
+     * Cari mapping BuybackDevice berdasarkan SKU (ProductAccurate ID).
      */
-    public function assignTierByPrice(): void
+    public static function findByProductAccurate(int $productAccurateId): ?self
     {
-        $tier = BuybackTier::findByPrice((float) $this->base_price);
-        $this->buyback_tier_id = $tier?->id;
-        $this->saveQuietly();
+        return self::where('product_accurate_id', $productAccurateId)
+                   ->where('is_active', true)
+                   ->first();
     }
 
     /**

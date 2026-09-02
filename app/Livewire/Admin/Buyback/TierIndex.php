@@ -17,8 +17,6 @@ class TierIndex extends Component
 
     // Form fields
     public $name      = '';
-    public $min_price = '';
-    public $max_price = '';
 
     // JSON rules editor
     // Struktur: [['category' => 'Kondisi Fisik', 'items' => [['name'=>'', 'type'=>'fixed', 'value'=>0]]]]
@@ -54,8 +52,6 @@ class TierIndex extends Component
         $tier            = BuybackTier::findOrFail($id);
         $this->tierId    = $tier->id;
         $this->name      = $tier->name;
-        $this->min_price = $tier->min_price;
-        $this->max_price = $tier->max_price;
 
         // Konversi JSON rules ke format array untuk editor
         $rulesJson = $tier->rules ?? [];
@@ -77,8 +73,6 @@ class TierIndex extends Component
     {
         $this->validate([
             'name'      => 'required|string|max:255',
-            'min_price' => 'nullable|numeric|min:0',
-            'max_price' => 'nullable|numeric|min:0|gte:min_price',
         ]);
 
         // Konversi array editor ke JSON rules
@@ -88,8 +82,6 @@ class TierIndex extends Component
             ['id' => $this->tierId],
             [
                 'name'      => $this->name,
-                'min_price' => $this->min_price ?: null,
-                'max_price' => $this->max_price ?: null,
                 'rules'     => $rulesJson,
             ]
         );
@@ -214,8 +206,6 @@ class TierIndex extends Component
     {
         $this->tierId          = null;
         $this->name            = '';
-        $this->min_price       = '';
-        $this->max_price       = '';
         $this->ruleCategories  = [];
     }
 
