@@ -594,22 +594,24 @@
         @endcan
         <!-- Additional Cards for System Administration -->
         @if (auth()->user()->getActiveBusinessUnitId() == 2)
-            {{-- Card: Monitoring Kasir --}}
-            <div wire:click="navigateToMonitoringKasir"
-                class="md:nth-[3n+1]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
-                
-                <div class="rounded-full w-20 h-20 bg-indigo-50 flex items-center justify-center text-indigo-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                </div>
+            @can('monitoring-kasir')
+                {{-- Card: Monitoring Kasir --}}
+                <div wire:click="navigateToMonitoringKasir"
+                    class="md:nth-[3n+1]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+                    
+                    <div class="rounded-full w-20 h-20 bg-indigo-50 flex items-center justify-center text-indigo-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
 
-                <div>
-                    <h1 class="text-2xl ">Monitoring <br> Kasir</h1>
-                    <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Rekapitulasi penjualan per kasir
-                    </p>
+                    <div>
+                        <h1 class="text-2xl ">Monitoring <br> Kasir</h1>
+                        <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Rekapitulasi penjualan per kasir
+                        </p>
+                    </div>
                 </div>
-            </div>
+            @endcan
         @endif
 
         @can('manage-settings')
