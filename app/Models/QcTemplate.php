@@ -62,10 +62,20 @@ class QcTemplate extends Model
         }
 
         $findWithBU = function ($buId) use ($brandId, $deviceCategory) {
+            $applyBu = function ($query) use ($buId) {
+                if ($buId === null) {
+                    $query->where(function ($q) {
+                        $q->whereNull('business_unit_id')->orWhere('business_unit_id', '');
+                    });
+                } else {
+                    $query->where('business_unit_id', $buId);
+                }
+            };
+
             // 1. Brand + Category (paling spesifik)
             if ($brandId && $deviceCategory) {
                 $specific = self::active()
-                    ->where('business_unit_id', $buId)
+                    ->where(function($q) use ($applyBu) { $applyBu($q); })
                     ->where('brand_id', $brandId)
                     ->where('device_category', $deviceCategory)
                     ->first();
@@ -75,7 +85,7 @@ class QcTemplate extends Model
             // 2. Kategori saja (Tanpa Brand)
             if ($deviceCategory) {
                 $categoryOnly = self::active()
-                    ->where('business_unit_id', $buId)
+                    ->where(function($q) use ($applyBu) { $applyBu($q); })
                     ->whereNull('brand_id')
                     ->where('device_category', $deviceCategory)
                     ->first();
@@ -85,7 +95,7 @@ class QcTemplate extends Model
             // 3. Brand saja (tanpa kategori)
             if ($brandId) {
                 $brandOnly = self::active()
-                    ->where('business_unit_id', $buId)
+                    ->where(function($q) use ($applyBu) { $applyBu($q); })
                     ->where('brand_id', $brandId)
                     ->whereNull('device_category')
                     ->first();
@@ -94,7 +104,7 @@ class QcTemplate extends Model
 
             // 4. Generic template (tanpa brand & tanpa kategori)
             $genericTemplate = self::active()
-                ->where('business_unit_id', $buId)
+                ->where(function($q) use ($applyBu) { $applyBu($q); })
                 ->whereNull('brand_id')
                 ->whereNull('device_category');
 

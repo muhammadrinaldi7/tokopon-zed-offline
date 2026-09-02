@@ -55,11 +55,12 @@ class BuybackDevice extends Model
                 $flat[] = [
                     // Menggunakan slug dan underscore untuk menghindari masalah array bersarang di Livewire 
                     // akibat penamaan key dengan titik (.) seperti wire:model="selected_rules.Fisik.0"
-                    'key'      => \Illuminate\Support\Str::slug($category) . '_' . $idx,
-                    'category' => $category,
-                    'name'     => $item['name'],
-                    'type'     => $item['type'],
-                    'value'    => (float) $item['value'],
+                    'key'         => \Illuminate\Support\Str::slug($category) . '_' . $idx,
+                    'category'    => $category,
+                    'name'        => $item['name'],
+                    'type'        => $item['type'],
+                    'value'       => (float) $item['value'],
+                    'description' => $item['description'] ?? '',
                 ];
             }
         }

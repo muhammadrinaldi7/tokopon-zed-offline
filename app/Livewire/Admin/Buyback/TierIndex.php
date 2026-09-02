@@ -82,6 +82,11 @@ class TierIndex extends Component
         // Konversi JSON rules ke format array untuk editor
         $rulesJson = $tier->rules ?? [];
         foreach ($rulesJson as $category => $items) {
+            foreach($items as &$item) {
+                if (!isset($item['description'])) {
+                    $item['description'] = '';
+                }
+            }
             $this->ruleCategories[] = [
                 'category' => $category,
                 'items'    => array_values($items),
@@ -220,27 +225,27 @@ class TierIndex extends Component
         $this->ruleCategories[] = [
             'category' => 'Layar',
             'items'    => [
-                ['name' => '', 'type' => 'fixed', 'value' => 0],
+                ['name' => '', 'type' => 'fixed', 'value' => 0, 'description' => ''],
             ],
         ];
         $this->ruleCategories[] = [
             'category' => 'Fisik',
             'items'    => [
-                ['name' => '', 'type' => 'fixed', 'value' => 0],
+                ['name' => '', 'type' => 'fixed', 'value' => 0, 'description' => ''],
             ],
         ];
         $this->ruleCategories[] = [
             'category' => 'Kelengkapan',
             'items'    => [
-                ['name' => '', 'type' => 'fixed', 'value' => 0],
+                ['name' => '', 'type' => 'fixed', 'value' => 0, 'description' => ''],
             ],
         ];
         $this->ruleCategories[] = [
             'category' => 'Baterai Health',
             'items'    => [
-                ['name' => '95%+', 'type' => 'fixed', 'value' => 0],
-                ['name' => '85-94%', 'type' => 'fixed', 'value' => 0],
-                ['name' => '<85%', 'type' => 'fixed', 'value' => 0],
+                ['name' => '95%+', 'type' => 'fixed', 'value' => 0, 'description' => ''],
+                ['name' => '85-94%', 'type' => 'fixed', 'value' => 0, 'description' => ''],
+                ['name' => '<85%', 'type' => 'fixed', 'value' => 0, 'description' => ''],
             ],
         ];
     }
@@ -249,7 +254,7 @@ class TierIndex extends Component
         $this->ruleCategories[] = [
             'category' => '',
             'items'    => [
-                ['name' => '', 'type' => 'fixed', 'value' => 0],
+                ['name' => '', 'type' => 'fixed', 'value' => 0, 'description' => ''],
             ],
         ];
     }
@@ -266,6 +271,7 @@ class TierIndex extends Component
             'name'  => '',
             'type'  => 'fixed',
             'value' => 0,
+            'description' => '',
         ];
     }
 
@@ -286,9 +292,10 @@ class TierIndex extends Component
             foreach ($catData['items'] as $item) {
                 if (empty(trim($item['name']))) continue;
                 $items[] = [
-                    'name'  => trim($item['name']),
-                    'type'  => $item['type'],
-                    'value' => (float) $item['value'],
+                    'name'        => trim($item['name']),
+                    'type'        => $item['type'],
+                    'value'       => (float) $item['value'],
+                    'description' => isset($item['description']) ? trim($item['description']) : '',
                 ];
             }
 

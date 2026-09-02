@@ -263,28 +263,69 @@
 
                                 <div class="flex flex-wrap gap-3">
                                     @foreach ($rules as $rule)
-                                        <label class="cursor-pointer block ">
+                                        <label class="cursor-pointer block group">
                                             {{-- LOGIKA PEMISAHAN: Jika kategori 'kelengkapan' pakai checkbox, jika tidak pakai radio --}}
                                             @if (str_contains(strtolower($category), 'kelengkapan'))
                                                 <input type="checkbox"
                                                     wire:model.live="selected_rules.{{ $rule['key'] }}"
-                                                    class="peer hidden">
+                                                    class="hidden">
                                             @else
                                                 {{-- Untuk Radio, wire:model harus diarahkan ke property yang sama per kategori --}}
                                                 {{-- Contoh: selected_rules.layar atau selected_rules.fisik --}}
                                                 <input type="radio" name="{{ $category }}"
                                                     value="{{ $rule['key'] }}"
                                                     wire:model.live="selected_rules.{{ $category }}"
-                                                    class="peer hidden">
+                                                    class="hidden">
                                             @endif
 
                                             <div
-                                                class="py-2 px-4 bg-white shadow-sm border-2 border-transparent rounded-xl text-center text-sm font-bold text-neutral-600 transition-all peer-checked:border-violet-600 peer-checked:bg-violet-50 peer-checked:text-violet-700 hover:border-violet-200 flex items-center justify-center ">
-                                                {{ $rule['name'] }}
+                                                class="py-2 px-4 bg-white shadow-sm border-2 border-transparent rounded-xl flex flex-col items-center justify-center transition-all group-has-[:checked]:border-violet-600 group-has-[:checked]:bg-violet-50 hover:border-violet-200">
+                                                
+                                                <span class="text-sm font-bold text-neutral-600 group-has-[:checked]:text-violet-700 transition-colors">
+                                                    {{ $rule['name'] }}
+                                                </span>
                                             </div>
                                         </label>
                                     @endforeach
                                 </div>
+
+                                @php
+                                    $selectedDesc = null;
+                                    $selectedTitle = null;
+                                    if (str_contains(strtolower($category), 'kelengkapan')) {
+                                        $descs = [];
+                                        foreach($rules as $rule) {
+                                            if (!empty($selected_rules[$rule['key']]) && !empty($rule['description'])) {
+                                                $descs[] = "<strong>{$rule['name']}</strong>: {$rule['description']}";
+                                            }
+                                        }
+                                        if (count($descs) > 0) {
+                                            $selectedDesc = implode('<br>', $descs);
+                                            $selectedTitle = 'Catatan ' . $category;
+                                        }
+                                    } else {
+                                        if (isset($selected_rules[$category])) {
+                                            $selectedKey = $selected_rules[$category];
+                                            $selectedRule = collect($rules)->firstWhere('key', $selectedKey);
+                                            if ($selectedRule && !empty($selectedRule['description'])) {
+                                                $selectedDesc = $selectedRule['description'];
+                                                $selectedTitle = 'Info ' . $selectedRule['name'];
+                                            }
+                                        }
+                                    }
+                                @endphp
+
+                                @if($selectedDesc)
+                                    <div class="mt-3 p-3 bg-violet-50 border border-violet-200 rounded-xl flex items-start gap-3 transition-all duration-300 ease-out">
+                                        <div class="mt-0.5 text-violet-500">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-bold text-violet-900 mb-0.5">{{ $selectedTitle }}</p>
+                                            <p class="text-xs text-violet-800/80 leading-relaxed">{!! $selectedDesc !!}</p>
+                                        </div>
+                                    </div>
+                                @endif
                             </div>
                         @endforeach
                     @else
@@ -551,21 +592,41 @@
                                 </p>
 
                                 @if ($selectedCustomerId)
-                                    @php $selectedUser = \App\Models\User::find($selectedCustomerId); @endphp
+                                    @php 
+                                        $selectedUser = \App\Models\User::find($selectedCustomerId); 
+                                        $firstBank = $selectedUser ? $selectedUser->bankAccounts()->first() : null;
+                                    @endphp
                                     <div
-                                        class="p-4 bg-violet-50 border border-violet-100 rounded-2xl flex items-center justify-between">
-                                        <div>
-                                            <p
-                                                class="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-1">
-                                                Pelanggan Terpilih</p>
-                                            <h3 class="font-bold text-neutral-800">{{ $selectedUser->name }}</h3>
-                                            <p class="text-xs text-neutral-500">{{ $selectedUser->email }} •
-                                                {{ $selectedUser->profile->phone_number ?? '-' }}</p>
+                                        class="p-4 bg-violet-50 border border-violet-200 rounded-2xl flex flex-col gap-4">
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <p class="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-1">
+                                                    Pelanggan Terpilih</p>
+                                                <h3 class="font-bold text-neutral-800">{{ $selectedUser->name }}</h3>
+                                                <p class="text-xs text-neutral-500">{{ $selectedUser->email }} •
+                                                    {{ $selectedUser->profile->phone_number ?? '-' }}</p>
+                                            </div>
+                                            <button type="button" wire:click="clearSelectedCustomer"
+                                                class="text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-colors font-bold text-sm">
+                                                Batal
+                                            </button>
                                         </div>
-                                        <button type="button" wire:click="clearSelectedCustomer"
-                                            class="text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-colors font-bold text-sm">
-                                            Batal
-                                        </button>
+
+                                        @if($firstBank && !$needsBankInfo)
+                                        <div class="pt-3 border-t border-violet-200/60">
+                                            <p class="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-2">
+                                                Data Rekening Tersimpan</p>
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-bold text-violet-700 text-xs border border-violet-200 shadow-sm uppercase">
+                                                    {{ substr($firstBank->bank_name, 0, 3) }}
+                                                </div>
+                                                <div>
+                                                    <p class="text-sm font-bold text-neutral-800">{{ $firstBank->account_number }}</p>
+                                                    <p class="text-xs text-neutral-600 font-medium">a.n {{ $firstBank->account_name }} <span class="text-neutral-400">•</span> {{ $firstBank->bank_name }}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        @endif
                                     </div>
                                     <input type="hidden" wire:model="selectedCustomerId"
                                         value="{{ $selectedCustomerId }}">
@@ -657,77 +718,15 @@
                                         @enderror
                                     </div>
 
-                                    {{-- Input NIK --}}
+                                    {{-- Input Domisili --}}
                                     <div class="flex flex-col gap-1">
-                                        <label for="nik"
-                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">NIK
-                                            (KTP)</label>
-                                        <input type="text" id="nik" wire:model="nik" required maxlength="16"
-                                            class="w-full px-4 py-3 text-sm bg-white border @error('nik') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
-                                            placeholder="16 digit nomor NIK">
-                                        @error('nik')
+                                        <label for="domisili"
+                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Domisili (Alamat Singkat)</label>
+                                        <input type="text" id="domisili" wire:model="domisili" required
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('domisili') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            placeholder="Contoh: Jakarta Selatan">
+                                        @error('domisili')
                                             <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
-                                        @enderror
-                                    </div>
-
-                                    {{-- Input NPWP --}}
-                                    <div class="flex flex-col gap-1 md:col-span-2">
-                                        <label for="npwp"
-                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">NPWP
-                                            (Opsional)</label>
-                                        <input type="text" id="npwp" wire:model="npwp"
-                                            class="w-full px-4 py-3 text-sm bg-white border @error('npwp') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
-                                            placeholder="Masukkan nomor NPWP">
-                                        @error('npwp')
-                                            <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
-                                        @enderror
-                                    </div>
-
-                                    {{-- Upload Foto KTP --}}
-                                    <div class="flex flex-col gap-1 md:col-span-2">
-                                        <label class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Upload
-                                            Foto KTP</label>
-                                        <div class="relative flex items-center justify-center w-full">
-                                            <label for="foto_ktp"
-                                                class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer bg-white hover:bg-neutral-50 transition-colors @error('foto_ktp') border-red-400 @else border-neutral-200 @enderror">
-                                                <div class="flex flex-col items-center justify-center pt-5 pb-6">
-
-                                                    {{-- Indikator Loading upload file --}}
-                                                    <div wire:loading wire:target="foto_ktp"
-                                                        class="text-xs text-violet-600 font-bold mb-2 animate-pulse">
-                                                        Memproses foto KTP...
-                                                    </div>
-
-                                                    <div wire:loading.remove wire:target="foto_ktp"
-                                                        class="flex flex-col items-center justify-center">
-                                                        @if ($foto_ktp)
-                                                            <p
-                                                                class="mb-1 text-xs text-emerald-600 font-bold flex items-center gap-1">
-                                                                ✓ KTP Berhasil Dimuat
-                                                            </p>
-                                                            <p class="text-[10px] text-neutral-500">
-                                                                {{ $foto_ktp->getClientOriginalName() }}</p>
-                                                        @else
-                                                            <svg class="w-8 h-8 mb-2 text-neutral-400" aria-hidden="true"
-                                                                xmlns="http://www.w3.org/2000/svg" fill="none"
-                                                                viewBox="0 0 20 16">
-                                                                <path stroke="currentColor" stroke-linecap="round"
-                                                                    stroke-linejoin="round" stroke-width="2"
-                                                                    d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
-                                                            </svg>
-                                                            <p class="mb-1 text-xs text-neutral-500 font-medium">Klik untuk
-                                                                upload foto KTP</p>
-                                                            <p class="text-[10px] text-neutral-400 uppercase">PNG, JPG, JPEG
-                                                                (Max. 2MB)</p>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <input id="foto_ktp" wire:model="foto_ktp" type="file" accept="image/*"
-                                                    required class="hidden" />
-                                            </label>
-                                        </div>
-                                        @error('foto_ktp')
-                                            <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
                                         @enderror
                                     </div>
                                 </div>

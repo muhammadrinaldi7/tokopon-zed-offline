@@ -19,9 +19,7 @@ class SellPhone extends Component
     public $name;
     public $mobilePhone;
     public $email;
-    public $nik;
-    public $npwp;
-    public $foto_ktp;
+    public $domisili;
 
     public $account_number;
     public $account_name;
@@ -218,14 +216,12 @@ class SellPhone extends Component
             $deviceCategory = \App\Models\QcTemplate::normalizeDeviceCategory($this->selected_categoryName);
         }
 
-        $brand = \App\Models\Brand::where('name', $brandId)->first();
+        $brand = \App\Models\Brand::whereRaw('LOWER(name) = ?', [strtolower($brandId)])->first();
         $realBrandId = $brand ? $brand->id : null;
         $isApple = $brand && strtolower($brand->name) === 'apple';
 
         // Load QC Template untuk Buyback (berdasarkan brand asli dan kategori)
-        if ($realBrandId) {
-            $this->qc_template = \App\Models\QcTemplate::findForBrandAndCategory($realBrandId, $deviceCategory);
-        }
+        $this->qc_template = \App\Models\QcTemplate::findForBrandAndCategory($realBrandId, $deviceCategory);
 
         if ($this->qc_template) {
             $this->qc_max_weight_threshold = $this->qc_template->max_weight_threshold ?? 3;
@@ -244,6 +240,10 @@ class SellPhone extends Component
                     'category' => $item['category'] ?? 'Lainnya'
                 ];
             }
+        } else {
+            // Jika tidak ada template QC sama sekali
+            $this->qc_verdict = 'pass';
+            $this->qc_notes = 'Tidak ada form QC yang dikonfigurasi untuk perangkat ini.';
         }
     }
 
@@ -328,11 +328,12 @@ class SellPhone extends Component
                     foreach ($tier->getRulesByCategory() as $category => $items) {
                         foreach ($items as $idx => $item) {
                             $flat[] = [
-                                'key'      => \Illuminate\Support\Str::slug($category) . '_' . $idx,
-                                'category' => $category,
-                                'name'     => $item['name'],
-                                'type'     => $item['type'],
-                                'value'    => (float) $item['value'],
+                                'key'         => \Illuminate\Support\Str::slug($category) . '_' . $idx,
+                                'category'    => $category,
+                                'name'        => $item['name'],
+                                'type'        => $item['type'],
+                                'value'       => (float) $item['value'],
+                                'description' => $item['description'] ?? '',
                             ];
                         }
                     }
@@ -448,9 +449,7 @@ class SellPhone extends Component
                 $rules['name']        = 'required|string|max:255';
                 $rules['mobilePhone'] = 'required|string|max:15';
                 $rules['email']       = 'required|email|unique:users,email';
-                $rules['nik']         = 'required|numeric|digits:16|unique:users,identity';
-                $rules['npwp']        = 'nullable|string|max:16';
-                $rules['foto_ktp']    = 'required|image|max:5120'; // Max 5MB (auto-compressed oleh JS)
+                $rules['domisili']    = 'required|string|max:500';
                 $rules['account_number'] = 'required|string|max:20';
                 $rules['account_name'] = 'required|string|max:20';
                 $rules['bank_name'] = 'required|string|max:20';
@@ -510,10 +509,7 @@ class SellPhone extends Component
         'mobilePhone.required' => 'Nomor HP wajib diisi.',
         'email.required'      => 'Email wajib diisi.',
         'email.unique'        => 'Email sudah terdaftar di sistem.',
-        'nik.required'        => 'NIK wajib diisi.',
-        'nik.digits'          => 'NIK harus tepat 16 digit.',
-        'nik.unique'          => 'NIK sudah terdaftar di sistem.',
-        'foto_ktp.required'   => 'Foto KTP wajib diunggah oleh FL.',
+        'domisili.required'   => 'Domisili wajib diisi.',
         'account_number.required' => 'Nomor Rekening wajib diisi.',
         'account_name.required' => 'Nama Pemilik Rekening wajib diisi.',
         'bank_name.required' => 'Nama Bank wajib diisi.',
@@ -538,9 +534,9 @@ class SellPhone extends Component
             $customer = User::create([
                 'name'         => $this->name,
                 'email'        => $this->email,
-                'identity'     => $this->nik,
-                'npwp'         => $this->npwp,
-                'password'     => \Illuminate\Support\Facades\Hash::make($this->nik),
+                'identity'     => null, // NIK
+                'npwp'         => null,
+                'password'     => \Illuminate\Support\Facades\Hash::make($this->mobilePhone),
             ]);
             if ($customer) {
                 $customer->assignRole('user');
@@ -548,6 +544,7 @@ class SellPhone extends Component
                     'user_id'      => $customer->id,
                     'full_name'    => $this->name,
                     'phone_number' => $this->mobilePhone,
+                    'domisili'     => $this->domisili,
                 ]);
 
                 $customer->bankAccounts()->create([
@@ -557,12 +554,6 @@ class SellPhone extends Component
                 ]);
             }
             event(new Registered($customer));
-
-            if ($this->foto_ktp) {
-                $customer->addMedia($this->foto_ktp->getRealPath())
-                    ->usingFileName($this->foto_ktp->getClientOriginalName())
-                    ->toMediaCollection('ktp_photo');
-            }
 
             $userIdToSave = $customer->id;
             $userForAccurate = $customer;
@@ -809,9 +800,7 @@ class SellPhone extends Component
             'name',
             'mobilePhone',
             'email',
-            'nik',
-            'npwp',
-            'foto_ktp',
+            'domisili',
             'account_number',
             'account_name',
             'bank_name',

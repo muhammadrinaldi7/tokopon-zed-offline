@@ -102,22 +102,23 @@
                                     <div class="grid grid-cols-1 gap-2">
                                         @foreach ($items as $item)
                                             <div
-                                                class="flex items-center justify-between p-3 bg-gray-50/50 hover:bg-gray-50 border border-gray-100 rounded-lg transition-colors">
-                                                <span
-                                                    class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                                    <div
-                                                        class="w-1.5 h-1.5 rounded-full {{ $item['type'] === 'fixed' ? 'bg-amber-400' : 'bg-indigo-400' }}">
-                                                    </div>
-                                                    {{ $item['name'] }}
-                                                </span>
-                                                <span
-                                                    class="font-black px-2.5 py-1 rounded-lg text-xs {{ $item['type'] === 'fixed' ? 'bg-amber-50 text-amber-700' : 'bg-[#eff6ff] text-indigo-700' }}">
-                                                    @if ($item['type'] === 'fixed')
-                                                        - Rp {{ number_format($item['value'], 0, ',', '.') }}
-                                                    @else
-                                                        - {{ $item['value'] }}%
-                                                    @endif
-                                                </span>
+                                                class="flex flex-col p-3 bg-gray-50/50 hover:bg-gray-50 border border-gray-100 rounded-lg transition-colors gap-1">
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                                        <div class="w-1.5 h-1.5 rounded-full {{ $item['type'] === 'fixed' ? 'bg-amber-400' : 'bg-indigo-400' }}"></div>
+                                                        {{ $item['name'] }}
+                                                    </span>
+                                                    <span class="font-black px-2.5 py-1 rounded-lg text-xs {{ $item['type'] === 'fixed' ? 'bg-amber-50 text-amber-700' : 'bg-[#eff6ff] text-indigo-700' }}">
+                                                        @if ($item['type'] === 'fixed')
+                                                            - Rp {{ number_format($item['value'], 0, ',', '.') }}
+                                                        @else
+                                                            - {{ $item['value'] }}%
+                                                        @endif
+                                                    </span>
+                                                </div>
+                                                @if (!empty($item['description']))
+                                                    <p class="text-xs text-gray-500 pl-3.5">{{ $item['description'] }}</p>
+                                                @endif
                                             </div>
                                         @endforeach
                                     </div>
@@ -372,42 +373,51 @@
                                     {{-- Items --}}
                                     <div class="p-5 space-y-3 bg-white">
                                         @foreach ($catData['items'] as $itemIndex => $item)
-                                            <div
-                                                class="flex items-start md:items-center gap-3 flex-col md:flex-row group/item">
-                                                {{-- Nama kondisi --}}
-                                                <div class="flex-1 w-full relative">
-                                                    <input type="text"
-                                                        wire:model="ruleCategories.{{ $catIndex }}.items.{{ $itemIndex }}.name"
-                                                        placeholder="Nama Kondisi Minus (cth: Retak Rambut)"
-                                                        class="w-full bg-gray-50 border-transparent rounded-lg py-2.5 px-4 text-sm font-semibold focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all">
-                                                </div>
-
-                                                {{-- Tipe & Nilai potongan --}}
-                                                <div class="flex items-center gap-2 w-full md:w-auto">
-                                                    <select
-                                                        wire:model="ruleCategories.{{ $catIndex }}.items.{{ $itemIndex }}.type"
-                                                        class="bg-gray-50 border-transparent rounded-lg py-2.5 px-3 text-sm font-semibold focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all w-32 shrink-0">
-                                                        <option value="fixed">Nominal (Rp)</option>
-                                                        <option value="percentage">Persen (%)</option>
-                                                    </select>
-
-                                                    <div class="relative w-36 shrink-0">
-                                                        <input type="number"
-                                                            wire:model="ruleCategories.{{ $catIndex }}.items.{{ $itemIndex }}.value"
-                                                            placeholder="0"
-                                                            class="w-full bg-amber-50/50 border-transparent text-amber-900 rounded-lg py-2.5 px-4 font-bold focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm">
+                                            <div class="flex flex-col gap-2 group/item p-3 border border-gray-100 rounded-xl bg-white shadow-sm">
+                                                {{-- Baris Atas --}}
+                                                <div class="flex items-start md:items-center gap-3 flex-col md:flex-row w-full relative">
+                                                    {{-- Nama kondisi --}}
+                                                    <div class="flex-1 w-full relative">
+                                                        <input type="text"
+                                                            wire:model="ruleCategories.{{ $catIndex }}.items.{{ $itemIndex }}.name"
+                                                            placeholder="Nama Kondisi Minus (cth: Retak Rambut)"
+                                                            class="w-full bg-gray-50 border-transparent rounded-lg py-2.5 px-4 text-sm font-semibold focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all">
                                                     </div>
 
-                                                    <button type="button"
-                                                        wire:click="removeItem({{ $catIndex }}, {{ $itemIndex }})"
-                                                        class="w-10 h-10 flex items-center justify-center text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition md:opacity-0 group-hover/item:opacity-100"
-                                                        title="Hapus Kondisi">
-                                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
-                                                            stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                                stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                                        </svg>
-                                                    </button>
+                                                    {{-- Tipe & Nilai potongan --}}
+                                                    <div class="flex items-center gap-2 w-full md:w-auto">
+                                                        <select
+                                                            wire:model="ruleCategories.{{ $catIndex }}.items.{{ $itemIndex }}.type"
+                                                            class="bg-gray-50 border-transparent rounded-lg py-2.5 px-3 text-sm font-semibold focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all w-32 shrink-0">
+                                                            <option value="fixed">Nominal (Rp)</option>
+                                                            <option value="percentage">Persen (%)</option>
+                                                        </select>
+
+                                                        <div class="relative w-36 shrink-0">
+                                                            <input type="number"
+                                                                wire:model="ruleCategories.{{ $catIndex }}.items.{{ $itemIndex }}.value"
+                                                                placeholder="0"
+                                                                class="w-full bg-amber-50/50 border-transparent text-amber-900 rounded-lg py-2.5 px-4 font-bold focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all text-sm">
+                                                        </div>
+
+                                                        <button type="button"
+                                                            wire:click="removeItem({{ $catIndex }}, {{ $itemIndex }})"
+                                                            class="w-10 h-10 flex items-center justify-center text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                                            title="Hapus Kondisi">
+                                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                                                stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                                    stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {{-- Baris Bawah: Deskripsi --}}
+                                                <div class="w-full pr-0 md:pr-12">
+                                                    <textarea wire:model="ruleCategories.{{ $catIndex }}.items.{{ $itemIndex }}.description"
+                                                        placeholder="Deskripsi / panduan untuk QC (opsional)..." rows="2"
+                                                        class="w-full bg-gray-50 border-transparent rounded-lg py-2.5 px-4 text-xs font-medium text-gray-600 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all resize-none"></textarea>
                                                 </div>
                                             </div>
                                         @endforeach

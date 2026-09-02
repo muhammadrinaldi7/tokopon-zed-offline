@@ -20,10 +20,7 @@ class SellPhone extends Component
     public $name;
     public $mobilePhone;
     public $email;
-    public $nik;
-    public $npwp;
-    public $foto_ktp;
-
+    public $domisili;
     public $account_number;
     public $account_name;
 
@@ -208,9 +205,7 @@ class SellPhone extends Component
                 $rules['name']        = 'required|string|max:255';
                 $rules['mobilePhone'] = 'required|string|max:15';
                 $rules['email']       = 'required|email|unique:users,email';
-                $rules['nik']         = 'required|numeric|digits:16|unique:users,nik'; // Sesuaikan field NIK di table user Anda
-                $rules['npwp']        = 'nullable|string|max:20';
-                $rules['foto_ktp']    = 'required|image|max:2048'; // Max 2MB
+                $rules['domisili']    = 'required|string|max:500';
                 $rules['account_number'] = 'required|string|max:20';
                 $rules['account_name'] = 'required|string|max:20';
                 $rules['bank_name'] = 'required|string|max:20';
@@ -253,10 +248,7 @@ class SellPhone extends Component
         'mobilePhone.required' => 'Nomor HP wajib diisi.',
         'email.required'      => 'Email wajib diisi.',
         'email.unique'        => 'Email sudah terdaftar di sistem.',
-        'nik.required'        => 'NIK wajib diisi.',
-        'nik.digits'          => 'NIK harus tepat 16 digit.',
-        'nik.unique'          => 'NIK sudah terdaftar di sistem.',
-        'foto_ktp.required'   => 'Foto KTP wajib diunggah oleh FL.',
+        'domisili.required'   => 'Domisili wajib diisi.',
         'account_number.required' => 'Nomor Rekening wajib diisi.',
         'account_name.required' => 'Nama Pemilik Rekening wajib diisi.',
         'bank_name.required' => 'Nama Bank wajib diisi.',
@@ -282,11 +274,10 @@ class SellPhone extends Component
                 // 2. Buat User Baru untuk Customer Offline
                 $customer = User::create([
                     'name'         => $this->name,
-                    // 'mobile_phone' => $this->mobilePhone, // Sesuaikan nama kolom table users Anda
                     'email'        => $this->email,
-                    'nik'          => $this->nik,
-                    'npwp'         => $this->npwp,
-                    'password'     => \Illuminate\Support\Facades\Hash::make($this->nik), // Hash otomatis dari NIK
+                    'identity'     => null,
+                    'npwp'         => null,
+                    'password'     => \Illuminate\Support\Facades\Hash::make($this->mobilePhone), 
                 ]);
                 if ($customer) {
                     $customer->assignRole('user');
@@ -294,6 +285,7 @@ class SellPhone extends Component
                         'user_id'      => $customer->id,
                         'full_name'    => $this->name,
                         'phone_number' => $this->mobilePhone,
+                        'domisili'     => $this->domisili,
                     ]);
 
                     $customer->bankAccounts()->create([
@@ -303,13 +295,6 @@ class SellPhone extends Component
                     ]);
                 }
                 event(new Registered($customer));
-                // 3. Upload Foto KTP Customer Baru menggunakan Spatie Media Library / Storage biasa
-                // Jika User model menggunakan Spatie Media Library:
-                if ($this->foto_ktp) {
-                    $customer->addMedia($this->foto_ktp->getRealPath())
-                        ->usingFileName($this->foto_ktp->getClientOriginalName())
-                        ->toMediaCollection('ktp_photo'); // Sesuaikan nama collection Anda
-                }
 
                 // Alihkan ID user yang akan disimpan di SellPhone ke ID customer baru ini
                 $userIdToSave = $customer->id;
@@ -453,9 +438,7 @@ class SellPhone extends Component
             'name',
             'mobilePhone',
             'email',
-            'nik',
-            'npwp',
-            'foto_ktp',
+            'domisili',
             'account_number',
             'account_name',
             'bank_name',
