@@ -22,6 +22,11 @@ class TierIndex extends Component
     // Struktur: [['category' => 'Kondisi Fisik', 'items' => [['name'=>'', 'type'=>'fixed', 'value'=>0]]]]
     public $ruleCategories = [];
 
+    // Mapping Perangkat
+    public $selectedProducts = [];
+    public $searchProduct = '';
+    public $productsAccurateList = [];
+
     public $search = '';
 
     public function mount()
@@ -62,9 +67,17 @@ class TierIndex extends Component
         $this->resetForm();
         $this->isEditMode = true;
 
-        $tier            = BuybackTier::findOrFail($id);
+        $tier            = BuybackTier::with('devices.productAccurate')->findOrFail($id);
         $this->tierId    = $tier->id;
         $this->name      = $tier->name;
+
+        // Load existing mapped devices
+        $this->selectedProducts = [];
+        foreach ($tier->devices as $device) {
+            if ($device->productAccurate) {
+                $this->selectedProducts[$device->product_accurate_id] = $device->productAccurate->name . ' (' . $device->productAccurate->item_no . ')';
+            }
+        }
 
         // Konversi JSON rules ke format array untuk editor
         $rulesJson = $tier->rules ?? [];
@@ -91,13 +104,37 @@ class TierIndex extends Component
         // Konversi array editor ke JSON rules
         $rulesJson = $this->buildRulesJson();
 
-        BuybackTier::updateOrCreate(
+        $tier = BuybackTier::updateOrCreate(
             ['id' => $this->tierId],
             [
                 'name'      => $this->name,
                 'rules'     => $rulesJson,
             ]
         );
+
+        // --- Sinkronisasi Pemetaan Perangkat ---
+        $existingDeviceIds = \App\Models\BuybackDevice::where('buyback_tier_id', $tier->id)->pluck('product_accurate_id')->toArray();
+        $newDeviceIds = array_keys($this->selectedProducts);
+        
+        // Items to delete
+        $toDelete = array_diff($existingDeviceIds, $newDeviceIds);
+        if (!empty($toDelete)) {
+            \App\Models\BuybackDevice::where('buyback_tier_id', $tier->id)
+                ->whereIn('product_accurate_id', $toDelete)
+                ->delete();
+        }
+        
+        // Items to add/update
+        foreach ($newDeviceIds as $productId) {
+            \App\Models\BuybackDevice::updateOrCreate(
+                ['product_accurate_id' => $productId],
+                [
+                    'buyback_tier_id' => $tier->id,
+                    'is_active' => true,
+                ]
+            );
+        }
+        // ----------------------------------------
 
         $this->dispatch(
             'toast',
@@ -126,6 +163,52 @@ class TierIndex extends Component
         ]);
         $this->dispatch('toast', title: 'Berhasil', message: 'Tier berhasil diduplikat.', type: 'success');
         $this->loadTiers();
+    }
+
+    // ──────────────────────────────────────────────
+    // Pemetaan Perangkat Helpers
+    // ──────────────────────────────────────────────
+
+    public function updatedSearchProduct()
+    {
+        if (strlen($this->searchProduct) >= 2) {
+            $query = \App\Models\ProductAccurate::where(function ($q) {
+                $q->where('name', 'like', '%' . $this->searchProduct . '%')
+                    ->orWhere('item_no', 'like', '%' . $this->searchProduct . '%');
+            });
+            
+            $query->whereNotIn('id', function ($subQuery) {
+                $subQuery->select('product_accurate_id')->from('buyback_devices');
+                if ($this->tierId) {
+                    $subQuery->where('buyback_tier_id', '!=', $this->tierId);
+                }
+            });
+
+            if (!empty($this->selectedProducts)) {
+                $query->whereNotIn('id', array_keys($this->selectedProducts));
+            }
+            
+            $query->where('business_unit_id', 2);
+
+            $this->productsAccurateList = $query->limit(20)->get();
+        } else {
+            $this->productsAccurateList = [];
+        }
+    }
+
+    public function selectProduct($id)
+    {
+        $product = \App\Models\ProductAccurate::find($id);
+        if ($product && !isset($this->selectedProducts[$product->id])) {
+            $this->selectedProducts[$product->id] = $product->name . ' (' . $product->item_no . ')';
+        }
+        $this->searchProduct = '';
+        $this->productsAccurateList = [];
+    }
+
+    public function removeProduct($id)
+    {
+        unset($this->selectedProducts[$id]);
     }
 
     // ──────────────────────────────────────────────
@@ -231,6 +314,9 @@ class TierIndex extends Component
         $this->tierId          = null;
         $this->name            = '';
         $this->ruleCategories  = [];
+        $this->selectedProducts = [];
+        $this->searchProduct   = '';
+        $this->productsAccurateList = [];
     }
 
     public function render()

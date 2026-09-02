@@ -11,7 +11,8 @@
             <div class="relative w-full md:w-64">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                 </div>
                 <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari nama tier..."
@@ -31,7 +32,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         @forelse ($tiers as $tier)
             <div
-                class="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-sm hover:shadow-indigo-900/5 transition-all duration-300 overflow-hidden flex flex-col group">
+                class="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-sm hover:shadow-indigo-900/5 transition-all duration-300 overflow-hidden grid grid-rows-[1fr_auto_auto] h-full group">
 
                 {{-- Card Header --}}
                 <div class="bg-gray-50/50 p-6 border-b border-gray-100 relative overflow-hidden">
@@ -61,54 +62,83 @@
                 </div>
 
                 {{-- Rules Preview --}}
-                <div class="p-6 flex-1 space-y-5 bg-white">
-                    @if (!empty($tier->rules))
-                        @foreach ($tier->rules as $category => $items)
-                            <div class="space-y-2">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-8 h-[1px] bg-gray-200"></div>
-                                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                        {{ $category }}
-                                    </p>
-                                    <div class="flex-1 h-[1px] bg-gray-100"></div>
+                <div class="py-3 px-6 bg-white border-t border-gray-50 flex flex-col" x-data="{ showRules: false }">
+                    <div class="flex items-center justify-between">
+                        {{-- <div class="text-sm font-bold text-gray-500">
+                            {{ count($tier->rules ?? []) }} Kategori Potongan
+                        </div> --}}
+                        <button @click="showRules = !showRules" type="button"
+                            class="text-[#1c69d4] w-full hover:bg-[#1c69d4]/10 px-3 py-1.5 rounded-lg transition flex items-center gap-2 text-xs font-bold"
+                            title="Lihat Aturan">
+                            <span x-show="!showRules">Lihat Aturan</span>
+                            <span x-show="showRules" style="display: none;">Sembunyikan</span>
+                            <svg x-show="!showRules" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            <svg x-show="showRules" style="display: none;" class="w-4 h-4" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div x-show="showRules" x-transition.opacity.duration.200ms class="space-y-5 mt-5"
+                        style="display: none;">
+                        @if (!empty($tier->rules))
+                            @foreach ($tier->rules as $category => $items)
+                                <div class="space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-8 h-[1px] bg-gray-200"></div>
+                                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                            {{ $category }}
+                                        </p>
+                                        <div class="flex-1 h-[1px] bg-gray-100"></div>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-2">
+                                        @foreach ($items as $item)
+                                            <div
+                                                class="flex items-center justify-between p-3 bg-gray-50/50 hover:bg-gray-50 border border-gray-100 rounded-lg transition-colors">
+                                                <span
+                                                    class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                                    <div
+                                                        class="w-1.5 h-1.5 rounded-full {{ $item['type'] === 'fixed' ? 'bg-amber-400' : 'bg-indigo-400' }}">
+                                                    </div>
+                                                    {{ $item['name'] }}
+                                                </span>
+                                                <span
+                                                    class="font-black px-2.5 py-1 rounded-lg text-xs {{ $item['type'] === 'fixed' ? 'bg-amber-50 text-amber-700' : 'bg-[#eff6ff] text-indigo-700' }}">
+                                                    @if ($item['type'] === 'fixed')
+                                                        - Rp {{ number_format($item['value'], 0, ',', '.') }}
+                                                    @else
+                                                        - {{ $item['value'] }}%
+                                                    @endif
+                                                </span>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </div>
-                                <div class="grid grid-cols-1 gap-2">
-                                    @foreach ($items as $item)
-                                        <div
-                                            class="flex items-center justify-between p-3 bg-gray-50/50 hover:bg-gray-50 border border-gray-100 rounded-lg transition-colors">
-                                            <span class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                                <div
-                                                    class="w-1.5 h-1.5 rounded-full {{ $item['type'] === 'fixed' ? 'bg-amber-400' : 'bg-indigo-400' }}">
-                                                </div>
-                                                {{ $item['name'] }}
-                                            </span>
-                                            <span
-                                                class="font-black px-2.5 py-1 rounded-lg text-xs {{ $item['type'] === 'fixed' ? 'bg-amber-50 text-amber-700' : 'bg-[#eff6ff] text-indigo-700' }}">
-                                                @if ($item['type'] === 'fixed')
-                                                    - Rp {{ number_format($item['value'], 0, ',', '.') }}
-                                                @else
-                                                    - {{ $item['value'] }}%
-                                                @endif
-                                            </span>
-                                        </div>
-                                    @endforeach
+                            @endforeach
+                        @else
+                            <div
+                                class="flex flex-col items-center justify-center py-8 text-gray-400 h-full border-2 border-dashed border-gray-100 rounded-lg">
+                                <div class="w-12 h-12 bg-gray-50 rounded-lg flex items-center justify-center mb-3">
+                                    <svg class="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24"
+                                        stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    </svg>
                                 </div>
+                                <p class="text-sm font-bold text-gray-500">Belum Ada Aturan Minus</p>
+                                <p class="text-xs text-center mt-1 w-2/3">Tambahkan aturan potongan harga pada tier ini.
+                                </p>
                             </div>
-                        @endforeach
-                    @else
-                        <div
-                            class="flex flex-col items-center justify-center py-8 text-gray-400 h-full border-2 border-dashed border-gray-100 rounded-lg">
-                            <div class="w-12 h-12 bg-gray-50 rounded-lg flex items-center justify-center mb-3">
-                                <svg class="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                            </div>
-                            <p class="text-sm font-bold text-gray-500">Belum Ada Aturan Minus</p>
-                            <p class="text-xs text-center mt-1 w-2/3">Tambahkan aturan potongan harga pada tier ini.</p>
-                        </div>
-                    @endif
+                        @endif
+                    </div>
                 </div>
 
                 {{-- Card Footer Actions --}}
@@ -127,7 +157,8 @@
                             class="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
                             title="Duplikasi Tier">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
                             </svg>
                         </button>
                     </div>
@@ -210,6 +241,78 @@
                                     <span class="text-xs font-bold text-rose-500 mt-1.5 block">{{ $message }}</span>
                                 @enderror
                             </div>
+                        </div>
+                    </div>
+
+                    {{-- Pemetaan Perangkat (Opsional) --}}
+                    <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                        <h3
+                            class="text-sm font-black text-gray-900 uppercase tracking-wide mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-[#1c69d4]" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            Pemetaan Perangkat (Opsional)
+                        </h3>
+
+                        <div>
+                            <div class="relative">
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Cari Produk (SKU
+                                    / Nama)</label>
+                                <input type="text" wire:model.live.debounce.300ms="searchProduct"
+                                    placeholder="Ketik nama atau SKU produk..."
+                                    class="w-full bg-gray-50 border-transparent rounded-lg py-3 px-4 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all font-semibold text-gray-900">
+
+                                @if (strlen($searchProduct) >= 2)
+                                    <div
+                                        class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                        @if (count($productsAccurateList) > 0)
+                                            <ul class="py-1">
+                                                @foreach ($productsAccurateList as $product)
+                                                    <li>
+                                                        <button type="button"
+                                                            wire:click.prevent="selectProduct({{ $product->id }})"
+                                                            class="w-full text-left px-4 py-2 hover:bg-blue-50 text-sm">
+                                                            <div class="font-bold text-gray-900">{{ $product->name }}
+                                                            </div>
+                                                            <div class="text-xs text-gray-500">{{ $product->item_no }}
+                                                            </div>
+                                                        </button>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        @else
+                                            <div class="px-4 py-3 text-sm text-gray-500">Tidak ada produk ditemukan.
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endif
+                            </div>
+
+                            @if (count($selectedProducts) > 0)
+                                <div class="mt-4">
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Produk Terpilih
+                                        ({{ count($selectedProducts) }})</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        @foreach ($selectedProducts as $id => $name)
+                                            <span
+                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg text-xs font-semibold">
+                                                {{ $name }}
+                                                <button type="button"
+                                                    wire:click.prevent="removeProduct({{ $id }})"
+                                                    class="hover:text-rose-500 transition-colors">
+                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                        stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     </div>
 
