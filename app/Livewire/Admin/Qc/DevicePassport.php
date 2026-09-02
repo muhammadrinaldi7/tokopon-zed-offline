@@ -92,6 +92,12 @@ class DevicePassport extends Component
         // Descending order, newest first
         return DeviceInspection::with(['inspector', 'variant.accurateData'])
             ->where('imei', $this->imei)
+            ->whereIn('label', [
+                'QC Kelayakan Buyback',
+                'QC Inbound - Beli HP Bekas',
+                'QC Inbound PO Grosir',
+                'Aktivasi Garansi / Unboxing'
+            ])
             ->orderBy('inspected_at', 'desc')
             ->get();
     }
