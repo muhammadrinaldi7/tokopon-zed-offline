@@ -254,8 +254,147 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                             </svg>
-                            Pemetaan Perangkat (Opsional)
+                            Pemetaan Hierarkis & Produk (Opsional)
                         </h3>
+
+                        {{-- Mapping Kategori, OS, Brand --}}
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 pb-6 border-b border-gray-100">
+                            <div x-data="{
+                                open: false,
+                                search: '',
+                                options: @js($listOs),
+                                selected: @entangle('mapping_os'),
+                                get filteredOptions() {
+                                    if (this.search === '') return this.options.filter(i => i);
+                                    return this.options.filter(i => i && i.toLowerCase().includes(this.search.toLowerCase()));
+                                }
+                            }" @click.away="open = false" class="relative">
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">OS (Sistem Operasi)</label>
+                                
+                                <div @click="open = !open" 
+                                     class="w-full bg-gray-50 border-transparent rounded-lg py-3 px-4 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all font-semibold cursor-pointer flex justify-between items-center"
+                                     :class="selected ? 'text-gray-900' : 'text-gray-500'">
+                                    <span x-text="selected ? selected : '-- Semua OS --'"></span>
+                                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </div>
+                            
+                                <div x-show="open" x-transition x-cloak
+                                     class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl flex flex-col overflow-hidden">
+                                     <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                         <input type="text" x-model="search" placeholder="Cari OS..." 
+                                             class="w-full bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all outline-none">
+                                     </div>
+                                     <div class="p-1">
+                                         <ul class="max-h-52 overflow-y-auto space-y-1">
+                                             <li @click="selected = ''; open = false; search = ''" 
+                                                 class="px-3 py-2 text-sm rounded-lg cursor-pointer hover:bg-gray-100 font-medium text-gray-600">
+                                                 -- Semua OS --
+                                             </li>
+                                             <template x-for="item in filteredOptions" :key="item">
+                                                 <li @click="selected = item; open = false; search = ''" 
+                                                     class="px-3 py-2 text-sm rounded-lg cursor-pointer hover:bg-blue-50 font-semibold text-gray-800"
+                                                     :class="{'bg-blue-50 text-[#1c69d4]': selected === item}">
+                                                     <span x-text="item"></span>
+                                                 </li>
+                                             </template>
+                                             <li x-show="filteredOptions.length === 0" class="px-3 py-4 text-sm text-center text-gray-400">
+                                                 Tidak ditemukan
+                                             </li>
+                                         </ul>
+                                     </div>
+                                </div>
+                            </div>
+                            <div x-data="{
+                                open: false,
+                                search: '',
+                                options: @js($listCategories),
+                                selected: @entangle('mapping_category'),
+                                get filteredOptions() {
+                                    if (this.search === '') return this.options.filter(i => i);
+                                    return this.options.filter(i => i && i.toLowerCase().includes(this.search.toLowerCase()));
+                                }
+                            }" @click.away="open = false" class="relative">
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Kategori Produk</label>
+                                
+                                <div @click="open = !open" 
+                                     class="w-full bg-gray-50 border-transparent rounded-lg py-3 px-4 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all font-semibold cursor-pointer flex justify-between items-center"
+                                     :class="selected ? 'text-gray-900' : 'text-gray-500'">
+                                    <span x-text="selected ? selected : '-- Semua Kategori --'"></span>
+                                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </div>
+                            
+                                <div x-show="open" x-transition x-cloak
+                                     class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl flex flex-col overflow-hidden">
+                                     <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                         <input type="text" x-model="search" placeholder="Cari Kategori..." 
+                                             class="w-full bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all outline-none">
+                                     </div>
+                                     <div class="p-1">
+                                         <ul class="max-h-52 overflow-y-auto space-y-1">
+                                             <li @click="selected = ''; open = false; search = ''" 
+                                                 class="px-3 py-2 text-sm rounded-lg cursor-pointer hover:bg-gray-100 font-medium text-gray-600">
+                                                 -- Semua Kategori --
+                                             </li>
+                                             <template x-for="item in filteredOptions" :key="item">
+                                                 <li @click="selected = item; open = false; search = ''" 
+                                                     class="px-3 py-2 text-sm rounded-lg cursor-pointer hover:bg-blue-50 font-semibold text-gray-800"
+                                                     :class="{'bg-blue-50 text-[#1c69d4]': selected === item}">
+                                                     <span x-text="item"></span>
+                                                 </li>
+                                             </template>
+                                             <li x-show="filteredOptions.length === 0" class="px-3 py-4 text-sm text-center text-gray-400">
+                                                 Tidak ditemukan
+                                             </li>
+                                         </ul>
+                                     </div>
+                                </div>
+                            </div>
+                            <div x-data="{
+                                open: false,
+                                search: '',
+                                options: @js($listBrands),
+                                selected: @entangle('mapping_brand'),
+                                get filteredOptions() {
+                                    if (this.search === '') return this.options.filter(i => i);
+                                    return this.options.filter(i => i && i.toLowerCase().includes(this.search.toLowerCase()));
+                                }
+                            }" @click.away="open = false" class="relative">
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Brand / Merk</label>
+                                
+                                <div @click="open = !open" 
+                                     class="w-full bg-gray-50 border-transparent rounded-lg py-3 px-4 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all font-semibold cursor-pointer flex justify-between items-center"
+                                     :class="selected ? 'text-gray-900' : 'text-gray-500'">
+                                    <span x-text="selected ? selected : '-- Semua Brand --'"></span>
+                                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </div>
+                            
+                                <div x-show="open" x-transition x-cloak
+                                     class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl flex flex-col overflow-hidden">
+                                     <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                         <input type="text" x-model="search" placeholder="Cari Brand..." 
+                                             class="w-full bg-white border border-gray-200 rounded-lg py-2 px-3 text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] transition-all outline-none">
+                                     </div>
+                                     <div class="p-1">
+                                         <ul class="max-h-52 overflow-y-auto space-y-1">
+                                             <li @click="selected = ''; open = false; search = ''" 
+                                                 class="px-3 py-2 text-sm rounded-lg cursor-pointer hover:bg-gray-100 font-medium text-gray-600">
+                                                 -- Semua Brand --
+                                             </li>
+                                             <template x-for="item in filteredOptions" :key="item">
+                                                 <li @click="selected = item; open = false; search = ''" 
+                                                     class="px-3 py-2 text-sm rounded-lg cursor-pointer hover:bg-blue-50 font-semibold text-gray-800"
+                                                     :class="{'bg-blue-50 text-[#1c69d4]': selected === item}">
+                                                     <span x-text="item"></span>
+                                                 </li>
+                                             </template>
+                                             <li x-show="filteredOptions.length === 0" class="px-3 py-4 text-sm text-center text-gray-400">
+                                                 Tidak ditemukan
+                                             </li>
+                                         </ul>
+                                     </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <div>
                             <div class="relative">

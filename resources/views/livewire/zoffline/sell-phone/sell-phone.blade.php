@@ -1,4 +1,4 @@
-<div class="max-w-7xl mx-auto p-2  md:p-6 min-h-screen" x-data="{ step: 1 }" x-cloak>
+<div class="max-w-7xl mx-auto p-2 md:p-6 min-h-screen" x-data="{ step: 1 }" x-cloak>
     {{-- Header Navigation --}}
     <div class="flex gap-2">
         <a href="/"
@@ -177,30 +177,127 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="space-y-2 md:col-span-1">
-                        <label
-                            class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Kategori</label>
-                        <select wire:model.live="selected_categoryName"
-                            class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all font-bold text-neutral-700 appearance-none cursor-pointer">
-                            <option value="">Pilih Kategori</option>
-                            @foreach ($available_categories as $cat)
-                                <option value="{{ $cat }}">{{ $cat }}</option>
-                            @endforeach
-                        </select>
+                        <div x-data="{
+                            open: false,
+                            search: '',
+                            selected: @entangle('selected_categoryName').live,
+                            get filteredOptions() {
+                                let opts = $wire.available_categories || [];
+                                if (this.search === '') return opts;
+                                return opts.filter(i => i && i.toLowerCase().includes(this.search.toLowerCase()));
+                            }
+                        }" @click.away="open = false" class="relative">
+                            <label
+                                class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block mb-2">Kategori</label>
+
+                            <div @click="open = !open"
+                                class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all font-bold cursor-pointer flex justify-between items-center"
+                                :class="selected ? 'text-neutral-700' : 'text-neutral-400'">
+                                <span x-text="selected ? selected : 'Pilih Kategori'"></span>
+                                <svg class="w-5 h-5 transition-transform"
+                                    :class="open ? 'rotate-180 text-amber-500' : 'text-neutral-400'" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+
+                            <div x-show="open" x-transition x-cloak
+                                class="absolute z-50 w-full mt-2 bg-white border border-neutral-100 rounded-2xl shadow-xl shadow-neutral-200/50 flex flex-col overflow-hidden">
+                                <div class="p-3 border-b border-neutral-100 bg-neutral-50/50">
+                                    <input type="text" x-model="search" placeholder="Cari Kategori..."
+                                        class="w-full bg-white border border-neutral-200 rounded-xl py-2.5 px-4 text-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all outline-none font-medium">
+                                </div>
+                                <div class="p-2">
+                                    <ul class="max-h-52 overflow-y-auto space-y-1">
+                                        <li @click="selected = ''; open = false; search = ''"
+                                            class="px-4 py-3 text-sm rounded-xl cursor-pointer hover:bg-neutral-100 font-medium text-neutral-500 transition-colors">
+                                            Pilih Kategori
+                                        </li>
+                                        <template x-for="item in filteredOptions" :key="item">
+                                            <li @click="selected = item; open = false; search = ''"
+                                                class="px-4 py-3 text-sm rounded-xl cursor-pointer hover:bg-amber-50 transition-colors font-bold text-neutral-700 flex items-center justify-between"
+                                                :class="{ 'bg-amber-50 text-amber-600': selected === item }">
+                                                <span x-text="item"></span>
+                                                <svg x-show="selected === item" class="w-4 h-4 text-amber-500"
+                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="3" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </li>
+                                        </template>
+                                        <li x-show="filteredOptions.length === 0"
+                                            class="px-4 py-4 text-sm text-center text-neutral-400 font-medium">
+                                            Tidak ditemukan
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                         @error('selected_categoryName')
                             <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span>
                         @enderror
                     </div>
 
                     <div x-show="$wire.selected_categoryName" x-cloak class="space-y-2 md:col-span-1">
-                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Status
-                            Perangkat</label>
-                        <select wire:model.live="selected_proyek"
-                            class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all font-bold text-neutral-700 appearance-none cursor-pointer">
-                            <option value="">Pilih Status Perangkat</option>
-                            @foreach ($available_proyek as $proyek)
-                                <option value="{{ $proyek }}">{{ $proyek }}</option>
-                            @endforeach
-                        </select>
+                        <div x-data="{
+                            open: false,
+                            search: '',
+                            selected: @entangle('selected_proyek').live,
+                            get filteredOptions() {
+                                let opts = $wire.available_proyek || [];
+                                if (this.search === '') return opts;
+                                return opts.filter(i => i && i.toLowerCase().includes(this.search.toLowerCase()));
+                            }
+                        }" @click.away="open = false" class="relative">
+                            <label
+                                class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block mb-2">Status
+                                Perangkat</label>
+
+                            <div @click="open = !open"
+                                class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all font-bold cursor-pointer flex justify-between items-center"
+                                :class="selected ? 'text-neutral-700' : 'text-neutral-400'">
+                                <span x-text="selected ? selected : 'Pilih Status Perangkat'"></span>
+                                <svg class="w-5 h-5 transition-transform"
+                                    :class="open ? 'rotate-180 text-amber-500' : 'text-neutral-400'" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+
+                            <div x-show="open" x-transition x-cloak
+                                class="absolute z-50 w-full mt-2 bg-white border border-neutral-100 rounded-2xl shadow-xl shadow-neutral-200/50 flex flex-col overflow-hidden">
+                                <div class="p-3 border-b border-neutral-100 bg-neutral-50/50">
+                                    <input type="text" x-model="search" placeholder="Cari Status..."
+                                        class="w-full bg-white border border-neutral-200 rounded-xl py-2.5 px-4 text-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all outline-none font-medium">
+                                </div>
+                                <div class="p-2">
+                                    <ul class="max-h-52 overflow-y-auto space-y-1">
+                                        <li @click="selected = ''; open = false; search = ''"
+                                            class="px-4 py-3 text-sm rounded-xl cursor-pointer hover:bg-neutral-100 font-medium text-neutral-500 transition-colors">
+                                            Pilih Status Perangkat
+                                        </li>
+                                        <template x-for="item in filteredOptions" :key="item">
+                                            <li @click="selected = item; open = false; search = ''"
+                                                class="px-4 py-3 text-sm rounded-xl cursor-pointer hover:bg-amber-50 transition-colors font-bold text-neutral-700 flex items-center justify-between"
+                                                :class="{ 'bg-amber-50 text-amber-600': selected === item }">
+                                                <span x-text="item"></span>
+                                                <svg x-show="selected === item" class="w-4 h-4 text-amber-500"
+                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="3" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </li>
+                                        </template>
+                                        <li x-show="filteredOptions.length === 0"
+                                            class="px-4 py-4 text-sm text-center text-neutral-400 font-medium">
+                                            Tidak ditemukan
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                         @error('selected_proyek')
                             <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span>
                         @enderror

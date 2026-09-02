@@ -319,8 +319,8 @@ class SellPhone extends Component
             if ($productAccurate) {
                 $this->base_price = $productAccurate->buy_price ?? 0;
 
-                // Cari tier berdasarkan SKU (melalui BuybackDevice mapping)
-                $buybackDevice = \App\Models\BuybackDevice::findByProductAccurate($productAccurate->id);
+                // Cari tier menggunakan hierarki BuybackDevice
+                $buybackDevice = \App\Models\BuybackDevice::findByProductAccurate($productAccurate);
                 $tier = $buybackDevice?->tier;
 
                 if ($tier) {

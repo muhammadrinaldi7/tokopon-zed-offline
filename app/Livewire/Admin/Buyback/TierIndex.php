@@ -27,11 +27,28 @@ class TierIndex extends Component
     public $searchProduct = '';
     public $productsAccurateList = [];
 
+    // Mapping Kategori / Brand / OS
+    public $mapping_os = '';
+    public $mapping_category = '';
+    public $mapping_brand = '';
+
+    public $listOs = [];
+    public $listCategories = [];
+    public $listBrands = [];
+
     public $search = '';
 
     public function mount()
     {
         $this->loadTiers();
+        $this->loadDropdowns();
+    }
+
+    public function loadDropdowns()
+    {
+        $this->listOs = \App\Models\ProductAccurate::whereNotNull('os')->select('os')->distinct()->pluck('os')->toArray();
+        $this->listCategories = \App\Models\ProductAccurate::whereNotNull('categoryName')->select('categoryName')->distinct()->pluck('categoryName')->toArray();
+        $this->listBrands = \App\Models\ProductAccurate::whereNotNull('brandName')->select('brandName')->distinct()->pluck('brandName')->toArray();
     }
 
     public function updatedSearch()
@@ -71,12 +88,23 @@ class TierIndex extends Component
         $this->tierId    = $tier->id;
         $this->name      = $tier->name;
 
-        // Load existing mapped devices
+        // Load existing mapped devices (Specific SKU)
         $this->selectedProducts = [];
         foreach ($tier->devices as $device) {
             if ($device->productAccurate) {
                 $this->selectedProducts[$device->product_accurate_id] = $device->productAccurate->name . ' (' . $device->productAccurate->item_no . ')';
             }
+        }
+
+        // Load generic mapping (if any)
+        $genericMapping = \App\Models\BuybackDevice::where('buyback_tier_id', $tier->id)
+            ->whereNull('product_accurate_id')
+            ->first();
+            
+        if ($genericMapping) {
+            $this->mapping_os = $genericMapping->os_name ?? '';
+            $this->mapping_category = $genericMapping->category_name ?? '';
+            $this->mapping_brand = $genericMapping->brand_name ?? '';
         }
 
         // Konversi JSON rules ke format array untuk editor
@@ -138,6 +166,26 @@ class TierIndex extends Component
                     'is_active' => true,
                 ]
             );
+        }
+        
+        // --- Sinkronisasi Generic Mapping ---
+        if (!empty($this->mapping_os) || !empty($this->mapping_category) || !empty($this->mapping_brand)) {
+            \App\Models\BuybackDevice::updateOrCreate(
+                [
+                    'buyback_tier_id' => $tier->id,
+                    'product_accurate_id' => null
+                ],
+                [
+                    'os_name' => $this->mapping_os ?: null,
+                    'category_name' => $this->mapping_category ?: null,
+                    'brand_name' => $this->mapping_brand ?: null,
+                    'is_active' => true,
+                ]
+            );
+        } else {
+            \App\Models\BuybackDevice::where('buyback_tier_id', $tier->id)
+                ->whereNull('product_accurate_id')
+                ->delete();
         }
         // ----------------------------------------
 
@@ -320,10 +368,14 @@ class TierIndex extends Component
     {
         $this->tierId          = null;
         $this->name            = '';
-        $this->ruleCategories  = [];
+        $this->ruleCategories = [];
         $this->selectedProducts = [];
-        $this->searchProduct   = '';
+        $this->searchProduct = '';
         $this->productsAccurateList = [];
+        
+        $this->mapping_os = '';
+        $this->mapping_category = '';
+        $this->mapping_brand = '';
     }
 
     public function render()

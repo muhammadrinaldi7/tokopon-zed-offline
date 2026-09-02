@@ -27,13 +27,89 @@ class BuybackDevice extends Model
     }
 
     /**
-     * Cari mapping BuybackDevice berdasarkan SKU (ProductAccurate ID).
+     * Cari mapping BuybackDevice berdasarkan SKU (ProductAccurate).
+     * Menggunakan hierarki:
+     * 1. SKU (product_accurate_id)
+     * 2. OS + Category + Brand
+     * 3. Category + Brand
+     * 4. OS + Category
+     * 5. Category
+     * 6. Brand
+     * 7. Default Global (semua null)
      */
-    public static function findByProductAccurate(int $productAccurateId): ?self
+    public static function findByProductAccurate(ProductAccurate $productAccurate): ?self
     {
-        return self::where('product_accurate_id', $productAccurateId)
+        // Level 1: Spesifik SKU
+        $mapping = self::where('product_accurate_id', $productAccurate->id)
                    ->where('is_active', true)
                    ->first();
+        if ($mapping) return $mapping;
+
+        $os = $productAccurate->os;
+        $category = $productAccurate->categoryName;
+        $brand = $productAccurate->brandName;
+
+        // Base query builder
+        $query = function() {
+            return self::where('is_active', true)->whereNull('product_accurate_id');
+        };
+
+        // Level 2: OS + Kategori + Brand
+        if ($os && $category && $brand) {
+            $mapping = $query()
+                ->where('os_name', $os)
+                ->where('category_name', $category)
+                ->where('brand_name', $brand)
+                ->first();
+            if ($mapping) return $mapping;
+        }
+
+        // Level 3: Kategori + Brand
+        if ($category && $brand) {
+            $mapping = $query()
+                ->whereNull('os_name')
+                ->where('category_name', $category)
+                ->where('brand_name', $brand)
+                ->first();
+            if ($mapping) return $mapping;
+        }
+
+        // Level 4: OS + Kategori
+        if ($os && $category) {
+            $mapping = $query()
+                ->where('os_name', $os)
+                ->where('category_name', $category)
+                ->whereNull('brand_name')
+                ->first();
+            if ($mapping) return $mapping;
+        }
+
+        // Level 5: Kategori Saja
+        if ($category) {
+            $mapping = $query()
+                ->whereNull('os_name')
+                ->where('category_name', $category)
+                ->whereNull('brand_name')
+                ->first();
+            if ($mapping) return $mapping;
+        }
+
+        // Level 6: Brand Saja
+        if ($brand) {
+            $mapping = $query()
+                ->whereNull('os_name')
+                ->whereNull('category_name')
+                ->where('brand_name', $brand)
+                ->first();
+            if ($mapping) return $mapping;
+        }
+
+        // Level 7: Default Global
+        return $query()
+            ->whereNull('os_name')
+            ->whereNull('category_name')
+            ->whereNull('brand_name')
+            ->first();
     }
 
     /**
