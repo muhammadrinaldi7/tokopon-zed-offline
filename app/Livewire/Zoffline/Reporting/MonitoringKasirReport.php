@@ -42,13 +42,13 @@ class MonitoringKasirReport extends Component
         $this->dateRange = 'custom';
         $this->resetPage();
     }
-    
+
     public function updatedEndDate()
     {
         $this->dateRange = 'custom';
         $this->resetPage();
     }
-    
+
     public function updatedSearch()
     {
         $this->resetPage();
@@ -59,7 +59,7 @@ class MonitoringKasirReport extends Component
         $this->branchFilter = '';
         $this->resetPage();
     }
-    
+
     public function updatedBranchFilter()
     {
         $this->resetPage();
@@ -199,7 +199,7 @@ class MonitoringKasirReport extends Component
         ];
 
         return \Maatwebsite\Excel\Facades\Excel::download(
-            new \App\Exports\MonitoringKasirExport($filters), 
+            new \App\Exports\MonitoringKasirExport($filters),
             'Laporan_Monitoring_Kasir_' . date('Y-m-d_H-i') . '.xlsx'
         );
     }
