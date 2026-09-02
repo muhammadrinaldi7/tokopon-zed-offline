@@ -16,6 +16,7 @@ use App\Livewire\Pages\TradeIn;
 use App\Livewire\Pages\UserProfile;
 use App\Livewire\Zoffline\Qc\ActivationList;
 use App\Livewire\Zoffline\Reporting\WarrantyReport;
+use App\Livewire\Zoffline\Reporting\MonitoringKasir;
 use App\Livewire\Zoffline\Warehouse\CekStock;
 use App\Livewire\Zoffline\Warehouse\CheckSerialNumber;
 use App\Livewire\Zoffline\Warehouse\SerialNumberHistory;
@@ -35,6 +36,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::get('/', \App\Livewire\Zoffline\Home::class)->name('zoffline');
+    Route::get('/zoffline/monitoring-kasir', MonitoringKasir::class)->name('zoffline.monitoring-kasir');
     Route::get('/zoffline/pos', \App\Livewire\Zoffline\Pos\Pos::class)->name('zoffline.pos')->middleware('can:view-pos');
     Route::get('/zoffline/pos/open-shift', \App\Livewire\Zoffline\Pos\OpenShift::class)->name('zoffline.pos.open-shift')->middleware('can:view-pos');
     Route::get('/zoffline/pos/closing-kasir', \App\Livewire\Zoffline\Pos\ClosingKasir::class)->name('zoffline.pos.closing-kasir')->middleware('can:view-pos');

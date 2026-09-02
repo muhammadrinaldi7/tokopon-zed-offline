@@ -104,6 +104,11 @@ class Order extends Model
         return $this->hasOne(OrderShipping::class);
     }
 
+    public function cashSettlement()
+    {
+        return $this->hasOne(OrderCashSettlement::class);
+    }
+
     public function handledBy()
     {
         return $this->belongsTo(User::class, 'handled_by');

@@ -8,6 +8,11 @@ use Livewire\Attributes\Layout;
 #[Layout('layouts.z')]
 class Home extends Component
 {
+    public function navigateToMonitoringKasir()
+    {
+        return $this->redirectRoute('zoffline.monitoring-kasir', navigate: true);
+    }
+
     public function navigateToTradeIn()
     {
         return $this->redirectRoute('zoffline.trade-in', navigate: true);
