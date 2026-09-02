@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\SellPhoneReceiptMail;
+use Mike42\Escpos\PrintConnectors\DummyPrintConnector;
+use Mike42\Escpos\Printer;
 
 #[Layout('layouts.z', ['title' => 'Riwayat Jual HP'])]
 class History extends Component
@@ -70,7 +72,7 @@ class History extends Component
 
     public function showReceipt(SellPhone $sellPhone)
     {
-        $this->selectedSell = $sellPhone->load(['handledBy', 'user.profile', 'user.bankAccounts', 'businessUnit']);
+        $this->selectedSell = $sellPhone->load(['handledBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch']);
         $this->showReceiptModal = true;
     }
 
@@ -90,6 +92,137 @@ class History extends Component
     {
         $this->showProofModal = false;
         $this->proofImageUrl = '';
+    }
+
+    public function printReceipt($sellPhoneId = null)
+    {
+        $sellPhone = $sellPhoneId
+            ? SellPhone::with(['handledBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch'])->find($sellPhoneId)
+            : ($this->selectedSell ? $this->selectedSell->loadMissing(['handledBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch']) : null);
+
+        if (!$sellPhone) {
+            $this->dispatch('toast', title: 'Error', message: 'Transaksi tidak ditemukan untuk dicetak.', type: 'error');
+            return;
+        }
+
+        try {
+            $connector = new DummyPrintConnector();
+            $printer = new Printer($connector);
+            $printer->initialize();
+
+            $this->generateEscposContent($printer, $sellPhone);
+            $printer->feed(1);
+            $printer->cut();
+
+            $data = $connector->getData();
+            $base64 = base64_encode($data);
+
+            $printer->close();
+
+            $orderNumber = 'SPL-' . $sellPhone->id;
+            $this->dispatch('print-receipt', base64Data: $base64, orderNumber: $orderNumber);
+        } catch (\Exception $e) {
+            Log::error('ESCPOS SellPhone Base64 Generation Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    private function generateEscposContent($printer, SellPhone $sellPhone)
+    {
+        $maxColumns = 40;
+        $separator = str_repeat("-", $maxColumns) . "\n";
+
+        // Store Title (Center, Large)
+        $printer->setJustification(Printer::JUSTIFY_CENTER);
+        $printer->selectPrintMode(
+            Printer::MODE_FONT_B |
+            Printer::MODE_DOUBLE_WIDTH |
+            Printer::MODE_DOUBLE_HEIGHT
+        );
+        $storeTitle = optional($sellPhone->businessUnit)->store_title ?? 'Z-POS STORE';
+        $printer->text($storeTitle . "\n");
+
+        // Normal Font B
+        $printer->selectPrintMode(Printer::MODE_FONT_B);
+        $storeAddress = optional($sellPhone->businessUnit)->address ?? ($sellPhone->branch->name ?? 'Toko');
+        $printer->text($storeAddress . "\n");
+        $printer->text($sellPhone->created_at->format('d/m/Y H:i') . "\n");
+        $printer->text($separator);
+
+        // Transaction Info (Left)
+        $printer->setJustification(Printer::JUSTIFY_LEFT);
+        $printer->text($this->formatLine("No. Transaksi", "SPL-" . $sellPhone->id, $maxColumns) . "\n");
+        if (!empty($sellPhone->invoice_number)) {
+            $printer->text($this->formatLine("No. Invoice", $sellPhone->invoice_number, $maxColumns) . "\n");
+        }
+        $printer->text($this->formatLine("Frontliner", optional($sellPhone->handledBy)->name ?? '-', $maxColumns) . "\n");
+        $printer->text($this->formatLine("Pelanggan", optional($sellPhone->user)->name ?? '-', $maxColumns) . "\n");
+        $printer->text($this->formatLine("No. HP", optional(optional($sellPhone->user)->profile)->phone_number ?? '-', $maxColumns) . "\n");
+        $printer->text($separator);
+
+        // Device Data Section
+        $printer->setJustification(Printer::JUSTIFY_CENTER);
+        $printer->setEmphasis(true);
+        $printer->text("DATA PERANGKAT\n");
+        $printer->setEmphasis(false);
+        $printer->setJustification(Printer::JUSTIFY_LEFT);
+
+        $brandModel = trim(($sellPhone->phone_model ?? ''));
+        $printer->text($this->formatLine($brandModel ?: '-', $maxColumns) . "\n");
+
+        //$ramStorage = trim(($sellPhone->phone_ram ?? '-') . ' / ' . ($sellPhone->phone_storage ?? '-'));
+        //$printer->text($this->formatLine("Kapasitas", $ramStorage, $maxColumns) . "\n");
+
+        $imei = $sellPhone->imei ?? '-';
+        $printer->text($this->formatLine("IMEI/SN", $imei, $maxColumns) . "\n");
+        $printer->text($separator);
+
+        // Transaction Value & Status
+        $printer->setEmphasis(true);
+        $printer->text($this->formatLine("NILAI KESEPAKATAN", "Rp " . number_format($sellPhone->appraised_value ?? 0, 0, ',', '.'), $maxColumns) . "\n");
+        $printer->setEmphasis(false);
+        $printer->text($this->formatLine("STATUS TRANSAKSI", strtoupper(str_replace('_', ' ', $sellPhone->status ?? '')), $maxColumns) . "\n");
+        $printer->text($separator);
+
+        // Guarantee & Bank Info (Center)
+        $printer->setJustification(Printer::JUSTIFY_CENTER);
+        $printer->setEmphasis(true);
+        $printer->text("** JAMINAN PENYERAHAN UNIT **\n");
+        $printer->setEmphasis(false);
+        $printer->text("Struk ini adalah bukti sah\n");
+        $printer->text("penyerahan perangkat ke toko.\n");
+        $printer->text("Pembayaran akan ditransfer ke rekening:\n");
+
+        $userBankName = $sellPhone->bank_name ?: ($sellPhone->user && $sellPhone->user->bankAccounts->first() ? $sellPhone->user->bankAccounts->first()->bank_name : null);
+        $userBankNumber = $sellPhone->bank_account_number ?: ($sellPhone->user && $sellPhone->user->bankAccounts->first() ? $sellPhone->user->bankAccounts->first()->account_number : null);
+        $userBankAccountName = $sellPhone->bank_account_name ?: ($sellPhone->user && $sellPhone->user->bankAccounts->first() ? $sellPhone->user->bankAccounts->first()->account_name : null);
+
+        if ($userBankName || $userBankNumber) {
+            $printer->setEmphasis(true);
+            $printer->text(($userBankName ?? '-') . " - " . ($userBankNumber ?? '-') . "\n");
+            $printer->text("A/N: " . ($userBankAccountName ?? '-') . "\n");
+            $printer->setEmphasis(false);
+        } else {
+            $printer->setEmphasis(true);
+            $printer->text("Rekening Belum Diinput\n");
+            $printer->setEmphasis(false);
+        }
+
+        $printer->text("Simpan struk ini sampai dana berhasil masuk.\n");
+        $printer->text("Terima kasih telah menjual HP Anda di\n");
+        $printer->text($storeTitle . ".\n");
+        $printer->text($separator);
+        $printer->text("*** TANDA TERIMA ***\n");
+        $printer->text("\n\n\n\n\n");
+    }
+
+    private function formatLine($left, $right, $width = 40)
+    {
+        $leftWidth = strlen($left);
+        $rightWidth = strlen($right);
+        $spaces = $width - $leftWidth - $rightWidth;
+        if ($spaces < 1) $spaces = 1;
+        return $left . str_repeat(' ', $spaces) . $right;
     }
 
     private function generateReceiptPdf(SellPhone $sellPhone)

@@ -10,8 +10,7 @@
                     clip-rule="evenodd" />
             </svg>
         </a>
-        <div class="w-full flex gap-4 items-center bg-violet-600 py-3 px-6 rounded-md shadow-sm">
-            <img src="{{ asset('assets/png/sell.png') }}" class="w-5 md:w-10 h-auto" alt="">
+        <div class="w-full flex items-center bg-linear-to-r from-amber-600 to-amber-700 py-3 px-6 rounded-md shadow-sm">
             <h1 class="text-white text-xl md:text-4xl font-bold">Transaksi Pembelian</h1>
         </div>
     </div>
@@ -28,7 +27,7 @@
         </div>
     </div> --}}
 
-    {{-- Stepper Indicator (Visual Progress) - Violet Version --}}
+    {{-- Stepper Indicator (Visual Progress) - Amber Version --}}
     <div class="mb-14 w-full max-w-7xl mx-auto  mt-4">
         <div class="flex justify-between items-start relative">
             <!-- Progress Line Background -->
@@ -38,20 +37,20 @@
             </div>
 
             <!-- Progress Line Active -->
-            <div class="absolute left-0 top-[20px] transform -translate-y-1/2 h-1 bg-violet-600 rounded-full z-0 transition-all duration-500 ease-in-out"
+            <div class="absolute left-0 top-[20px] transform -translate-y-1/2 h-1 bg-amber-600 rounded-full z-0 transition-all duration-500 ease-in-out"
                 :style="'width: ' + ((step - 1) * 33.33) + '%'"></div>
 
             <!-- Step 1 Dot -->
             <div class="relative z-10 flex flex-col items-center cursor-pointer group" @click="step = 1">
                 <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 shrink-0"
-                    :class="step >= 1 ? 'bg-violet-600 text-white shadow-lg shadow-violet-200 ring-4 ring-violet-50' :
+                    :class="step >= 1 ? 'bg-amber-600 text-white shadow-lg shadow-amber-200 ring-4 ring-amber-50' :
                         'bg-white text-neutral-400 border-2 border-neutral-200'">
                     1
                 </div>
                 {{-- Teks sekarang fleksibel dan wrap otomatis --}}
                 <span
                     class="mt-3 text-[10px] md:text-xs font-bold text-center leading-tight transition-colors duration-300 w-auto"
-                    :class="step >= 1 ? 'text-violet-700' : 'text-neutral-400'">
+                    :class="step >= 1 ? 'text-amber-700' : 'text-neutral-400'">
                     Spesifikasi
                 </span>
             </div>
@@ -59,13 +58,13 @@
             <!-- Step 2 Dot -->
             <div class="relative z-10 flex flex-col items-center cursor-pointer group" @click="if(step > 2) step = 2">
                 <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 shrink-0"
-                    :class="step >= 2 ? 'bg-violet-600 text-white shadow-lg shadow-violet-200 ring-4 ring-violet-50' :
+                    :class="step >= 2 ? 'bg-amber-600 text-white shadow-lg shadow-amber-200 ring-4 ring-amber-50' :
                         'bg-white text-neutral-400 border-2 border-neutral-200'">
                     2
                 </div>
                 <span
                     class="mt-3 text-[10px] md:text-xs font-bold text-center leading-tight transition-colors duration-300 w-auto"
-                    :class="step >= 2 ? 'text-violet-700' : 'text-neutral-400'">
+                    :class="step >= 2 ? 'text-amber-700' : 'text-neutral-400'">
                     QC Fisik
                 </span>
             </div>
@@ -73,13 +72,13 @@
             <!-- Step 3 Dot -->
             <div class="relative z-10 flex flex-col items-center cursor-pointer group" @click="if(step > 3) step = 3">
                 <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 shrink-0"
-                    :class="step >= 3 ? 'bg-violet-600 text-white shadow-lg shadow-violet-200 ring-4 ring-violet-50' :
+                    :class="step >= 3 ? 'bg-amber-600 text-white shadow-lg shadow-amber-200 ring-4 ring-amber-50' :
                         'bg-white text-neutral-400 border-2 border-neutral-200'">
                     3
                 </div>
                 <span
                     class="mt-3 text-[10px] md:text-xs font-bold text-center leading-tight transition-colors duration-300 w-sauto"
-                    :class="step >= 3 ? 'text-violet-700' : 'text-neutral-400'">
+                    :class="step >= 3 ? 'text-amber-700' : 'text-neutral-400'">
                     Kondisi
                 </span>
             </div>
@@ -87,13 +86,13 @@
             <!-- Step 4 Dot -->
             <div class="relative z-10 flex flex-col items-center group">
                 <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 shrink-0"
-                    :class="step >= 4 ? 'bg-violet-600 text-white shadow-lg shadow-violet-200 ring-4 ring-violet-50' :
+                    :class="step >= 4 ? 'bg-amber-600 text-white shadow-lg shadow-amber-200 ring-4 ring-amber-50' :
                         'bg-white text-neutral-400 border-2 border-neutral-200'">
                     4
                 </div>
                 <span
                     class="mt-3 text-[10px] md:text-xs font-bold text-center leading-tight transition-colors duration-300 w-sauto"
-                    :class="step >= 4 ? 'text-violet-700' : 'text-neutral-400'">
+                    :class="step >= 4 ? 'text-amber-700' : 'text-neutral-400'">
                     Ringkasan
                 </span>
             </div>
@@ -108,33 +107,52 @@
             x-transition:enter-start="opacity-0 translate-x-4" x-transition:enter-end="opacity-100 translate-x-0"
             class="space-y-8">
 
-            {{-- Brand Selection Cards (with Logo) --}}
+            {{-- Brand Selection Cards (Classy Typographic Design - No Logo - Large Premium Size) --}}
             <div>
-                <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider mb-4 block">Pilih Merk
-                    Perangkat</h1>
-                {{-- Menggunakan grid 3 kolom di mobile, dan 4/5 kolom di layar besar agar card logonya pas --}}
-                {{-- 1. x-data dipindah ke pembungkus utama agar animasinya barengan --}}
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4" x-data="{ show: false }"
-                    x-init="setTimeout(() => show = true, 100)">
+                <div class="flex items-center justify-between mb-5">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-2.5 h-6 bg-amber-600 rounded-full inline-block"></span>
+                        <h2 class="text-sm md:text-base font-black text-neutral-800 uppercase tracking-widest">
+                            Pilih Merk Perangkat
+                        </h2>
+                    </div>
+                    @if(!empty($brands) && count($brands) > 0)
+                        <span class="text-xs font-bold text-neutral-500 bg-neutral-100 px-3 py-1.5 rounded-full border border-neutral-200/60">
+                            {{ count($brands) }} Pilihan Brand
+                        </span>
+                    @endif
+                </div>
 
-                    @foreach ($brands as $brand)
-                        <label wire:key="brand-{{ $brand->id }}" class="relative cursor-pointer group">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                    @foreach ($brands ?? [] as $brand)
+                        <label wire:key="brand-{{ $brand->id }}" class="relative cursor-pointer group select-none">
                             <input type="radio" wire:model.live="selected_brand_id" value="{{ $brand->id }}"
                                 class="peer hidden">
                             <div
-                                class="bg-white h-auto overflow-hidden rounded-lg text-center transition-all peer-checked:bg-violet-100 hover:shadow-lg shadow-md flex items-center justify-center">
+                                class="relative overflow-hidden rounded-3xl md:rounded-[2rem] p-6 md:p-8 transition-all duration-300 bg-white border-2 border-neutral-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:border-amber-300 hover:shadow-[0_12px_32px_-6px_rgba(78,68,219,0.18)] hover:-translate-y-1 peer-checked:border-amber-600 peer-checked:bg-gradient-to-br peer-checked:from-amber-600 peer-checked:via-amber-600 peer-checked:to-amber-700 peer-checked:shadow-xl peer-checked:shadow-amber-600/35 peer-checked:scale-[1.02] peer-checked:[&_.brand-name]:text-white peer-checked:[&_.brand-tag]:text-amber-200 peer-checked:[&_.check-badge]:border-white peer-checked:[&_.check-badge]:bg-white peer-checked:[&_.check-icon]:opacity-100 peer-checked:[&_.watermark]:text-white/10 flex flex-col justify-between min-h-[140px] md:min-h-[165px]">
 
-                                @php
-                                    $imageName = strtolower($brand->name);
-                                @endphp
+                                {{-- Monogram Watermark --}}
+                                <span class="watermark absolute -right-2 -bottom-4 text-8xl md:text-9xl font-black tracking-tighter text-neutral-900/[0.04] select-none pointer-events-none group-hover:scale-110 group-hover:text-neutral-900/[0.06] transition-all duration-300 uppercase">
+                                    {{ substr($brand->name, 0, 1) }}
+                                </span>
 
-                                <div class="flex items-center justify-center p-4 w-full h-full">
-                                    <img x-show="show" x-cloak
-                                        x-transition:enter="transition transform ease-out duration-1000 delay-500"
-                                        x-transition:enter-start="opacity-0 translate-y-full"
-                                        x-transition:enter-end="opacity-100 "
-                                        src="{{ asset('assets/logobrand/' . $imageName . '.png') }}"
-                                        alt="{{ $brand->name }}" class="object-contain h-12 md:h-16 lg:h-20 w-auto">
+                                {{-- Top Row: Tag & Check Indicator --}}
+                                <div class="flex items-center justify-between z-10">
+                                    <span class="brand-tag text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-400 group-hover:text-amber-600 transition-colors">
+                                        BRAND PERANGKAT
+                                    </span>
+                                    <div class="check-badge w-6 h-6 md:w-7 md:h-7 rounded-full border-2 border-neutral-200 group-hover:border-amber-400 flex items-center justify-center transition-all duration-200">
+                                        <svg class="check-icon w-3.5 h-3.5 md:w-4 md:h-4 text-amber-600 opacity-0 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                {{-- Brand Name --}}
+                                <div class="z-10 mt-4">
+                                    <h3 class="brand-name text-xl md:text-2xl lg:text-3xl font-black tracking-wider uppercase text-neutral-800 group-hover:text-amber-700 transition-colors truncate" title="{{ $brand->name }}">
+                                        {{ $brand->name }}
+                                    </h3>
                                 </div>
 
                             </div>
@@ -142,7 +160,7 @@
                     @endforeach
                 </div>
                 @error('selected_brand_id')
-                    <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span>
+                    <span class="text-xs text-rose-500 font-bold block mt-3">{{ $message }}</span>
                 @enderror
             </div>
 
@@ -156,7 +174,7 @@
                         <label
                             class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Kategori</label>
                         <select wire:model.live="selected_categoryName"
-                            class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all font-bold text-neutral-700 appearance-none cursor-pointer">
+                            class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all font-bold text-neutral-700 appearance-none cursor-pointer">
                             <option value="">Pilih Kategori</option>
                             @foreach ($available_categories as $cat)
                                 <option value="{{ $cat }}">{{ $cat }}</option>
@@ -168,10 +186,10 @@
                     </div>
 
                     <div x-show="$wire.selected_categoryName" x-cloak class="space-y-2 md:col-span-1">
-                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Proyek</label>
+                        <label class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider">Status Perangkat</label>
                         <select wire:model.live="selected_proyek"
-                            class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all font-bold text-neutral-700 appearance-none cursor-pointer">
-                            <option value="">Pilih Proyek</option>
+                            class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all font-bold text-neutral-700 appearance-none cursor-pointer">
+                            <option value="">Pilih Status Perangkat</option>
                             @foreach ($available_proyek as $proyek)
                                 <option value="{{ $proyek }}">{{ $proyek }}</option>
                             @endforeach
@@ -206,7 +224,7 @@
                             <div class="relative w-full">
                                 <input type="text" x-model="search" @focus="open = true" @click="open = true"
                                     placeholder="Ketik atau pilih Model HP..." autocomplete="off"
-                                    class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all font-bold text-neutral-700 cursor-text pr-12">
+                                    class="w-full p-4 bg-white shadow-sm border-2 border-transparent rounded-2xl focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all font-bold text-neutral-700 cursor-text pr-12">
 
                                 <!-- Ikon Panah (Agar terlihat persis seperti select dropdown) -->
                                 <div class="absolute inset-y-0 right-4 flex items-center pointer-events-none">
@@ -227,7 +245,7 @@
                                     <button @mousedown="selectModel(model)" @click="selectModel(model)"
                                         type="button"
                                         class="w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-colors"
-                                        :class="model === search ? 'bg-violet-100 text-violet-700' :
+                                        :class="model === search ? 'bg-amber-100 text-amber-800' :
                                             'text-neutral-600 hover:bg-neutral-100'">
                                         <span x-text="model"></span>
                                     </button>
@@ -248,7 +266,7 @@
             <div class="flex justify-end pt-4 pb-10">
                 <button type="button" @click="step = 2" :disabled="!$wire.selected_model_name"
                     class="px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-2 shadow-lg active:scale-95"
-                    :class="$wire.selected_model_name ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-violet-900/20' :
+                    :class="$wire.selected_model_name ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-900/20' :
                         'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none'">
                     Lanjut QC Kelayakan
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -280,7 +298,7 @@
                 {{-- Progress Bar QC --}}
                 <div class="mb-6 relative">
                     <div class="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                        <div class="h-full bg-violet-500 transition-all duration-300"
+                        <div class="h-full bg-amber-600 transition-all duration-300"
                             :style="'width: ' + ((qcStep / {{ $maxQcStep }}) * 100) + '%'"></div>
                     </div>
                     <div class="mt-2 text-xs font-bold text-neutral-500 text-right">Tahap <span
@@ -295,7 +313,7 @@
                             <span class="text-rose-500">*</span></label>
                         <input type="text" wire:model.live.debounce.500ms="imei"
                             placeholder="Scan atau ketik IMEI..."
-                            class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all font-bold text-neutral-700">
+                            class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all font-bold text-neutral-700">
                         @error('imei')
                             <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span>
                         @enderror
@@ -362,7 +380,7 @@
                                             {{-- Loading Overlay (Saat proses upload ke Livewire berlangsung) --}}
                                             <div wire:loading.flex wire:target="{{ $propertyName }}"
                                                 class="absolute inset-0 bg-white/60 backdrop-blur-[2px] flex items-center justify-center z-30">
-                                                <svg class="animate-spin w-8 h-8 text-violet-600" fill="none"
+                                                <svg class="animate-spin w-8 h-8 text-amber-600" fill="none"
                                                     viewBox="0 0 24 24">
                                                     <circle class="opacity-25" cx="12" cy="12" r="10"
                                                         stroke="currentColor" stroke-width="4"></circle>
@@ -412,7 +430,7 @@
                     <div x-show="qcStep === {{ $index + 1 }}" x-transition.opacity style="display: none;"
                         class="space-y-6">
                         <h4
-                            class="text-lg font-black text-violet-700 uppercase tracking-wider border-b border-neutral-100 pb-2">
+                            class="text-lg font-black text-amber-800 uppercase tracking-wider border-b border-amber-100 pb-2">
                             Pengecekan {{ $categoryName }}
                         </h4>
 
@@ -462,7 +480,7 @@
                                             @else
                                                 <input type="text"
                                                     wire:model.lazy="qc_results.{{ $i }}.value"
-                                                    class="p-2 text-sm border border-gray-200 rounded-lg focus:ring-violet-500 focus:border-violet-500 bg-white"
+                                                    class="p-2 text-sm border border-gray-200 rounded-lg focus:ring-amber-500 focus:border-amber-500 bg-white"
                                                     placeholder="Isi data...">
                                             @endif
                                         </div>
@@ -477,7 +495,7 @@
                 <div x-show="qcStep === {{ $maxQcStep }}" x-transition.opacity style="display: none;"
                     class="space-y-6">
                     <h4
-                        class="text-lg font-black text-violet-700 uppercase tracking-wider border-b border-neutral-100 pb-2">
+                        class="text-lg font-black text-amber-800 uppercase tracking-wider border-b border-amber-100 pb-2">
                         Kesimpulan Sistem (Auto-Verdict)</h4>
                     <p class="text-sm text-neutral-500">Berdasarkan data inspeksi yang Anda masukkan, sistem menentukan
                         bahwa perangkat ini:</p>
@@ -533,7 +551,7 @@
                         <div x-show="!$wire.qc_verdict"
                             class="p-10 border-2 border-dashed border-neutral-200 bg-neutral-50 rounded-2xl flex flex-col items-center justify-center text-center">
                             <span
-                                class="animate-spin w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full mb-4"></span>
+                                class="animate-spin w-8 h-8 border-4 border-amber-600 border-t-transparent rounded-full mb-4"></span>
                             <p class="text-sm text-neutral-500 font-bold">Sistem sedang menganalisa data inspeksi...
                             </p>
                         </div>
@@ -544,7 +562,7 @@
                             Catatan Manual (Opsional)</label>
                         <textarea wire:model.live.debounce.1000ms="old_phone_additional_note" rows="3"
                             placeholder="Ketik catatan tambahan di luar analisa sistem jika ada..."
-                            class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all text-sm font-medium text-neutral-700"></textarea>
+                            class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all text-sm font-medium text-neutral-700"></textarea>
                     </div>
                 </div>
 
@@ -584,7 +602,7 @@
                         <button x-show="qcStep === 0" type="button" @click="qcStep++"
                             {{ $isStep0Valid ? '' : 'disabled' }}
                             class="px-6 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 w-full md:w-auto
-                            {{ $isStep0Valid ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed' }}">
+                            {{ $isStep0Valid ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-200' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed' }}">
                             Mulai Ceklis
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -597,8 +615,8 @@
                             @click="if (qcStep === {{ $maxQcStep - 1 }}) { isCalculating = true; $wire.calculateAutoVerdict().then(() => { qcStep++; isCalculating = false; }) } else { qcStep++ }"
                             :disabled="isCalculating"
                             class="px-6 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 w-full md:w-auto"
-                            :class="isCalculating ? 'bg-violet-400 text-white cursor-not-allowed' :
-                                'bg-violet-600 hover:bg-violet-700 text-white shadow-md shadow-violet-200'">
+                            :class="isCalculating ? 'bg-amber-400 text-white cursor-not-allowed' :
+                                'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-200'">
 
                             <span x-show="!isCalculating" class="flex items-center gap-2">
                                 Lanjut
@@ -627,7 +645,7 @@
                             class="px-6 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 w-full md:w-auto"
                             :class="!$wire.qc_verdict ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed' : ($wire
                                 .qc_verdict === 'fail' ? 'bg-rose-600 hover:bg-rose-700 text-white' :
-                                'bg-violet-600 hover:bg-violet-700 text-white')">
+                                'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-200')">
                             <span
                                 x-text="$wire.qc_verdict === 'fail' ? 'Batalkan Transaksi' : 'Lanjut Kondisi Harga'"></span>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -656,8 +674,8 @@
 
             <div class="space-y-8 bg-white p-6 rounded-2xl shadow-sm border border-neutral-100">
                 @if ($base_price > 0 && count($device_rules) > 0)
-                    <div class="p-4 bg-blue-50 border border-blue-200 rounded-xl mb-6">
-                        <p class="text-sm font-bold text-blue-900 mb-2">Harga Dasar (Mulus 100%): Rp
+                    <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-6">
+                        <p class="text-sm font-bold text-amber-900 mb-2">Harga Dasar (Mulus 100%): Rp
                             {{ number_format($base_price, 0, ',', '.') }}</p>
                     </div>
 
@@ -686,7 +704,7 @@
                                         @endif
 
                                         <div
-                                            class="py-2 px-4 bg-white shadow-sm border-2 border-transparent rounded-xl text-center text-sm font-bold text-neutral-600 transition-all peer-checked:border-violet-600 peer-checked:bg-violet-50 peer-checked:text-violet-700 hover:border-violet-200 flex items-center justify-center ">
+                                            class="py-2.5 px-4 bg-white shadow-sm border-2 border-transparent rounded-xl text-center text-sm font-bold text-neutral-600 transition-all peer-checked:border-amber-600 peer-checked:bg-amber-50 peer-checked:text-amber-800 hover:border-amber-300 flex items-center justify-center">
                                             {{ $rule['name'] }}
                                         </div>
                                     </label>
@@ -706,7 +724,7 @@
                         Tambahan Minus Harga</h1>
                     <textarea wire:model.lazy="old_phone_additional_note" rows="3"
                         placeholder="Jelaskan kondisi detail jika ada minus..."
-                        class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-violet-500 outline-none transition-all font-medium text-neutral-700"></textarea>
+                        class="w-full p-4 bg-gray-50 shadow-sm border-2 border-transparent rounded-2xl focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all font-medium text-neutral-700"></textarea>
                 </div>
             </div>
 
@@ -741,7 +759,7 @@
                 </button>
                 <button type="button" @click="step = 4" {{ $rulesValid ? '' : 'disabled' }}
                     class="px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-2 shadow-lg active:scale-95
-                {{ $rulesValid ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-violet-900/20' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none' }}">
+                {{ $rulesValid ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-900/20' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none' }}">
                     Cek Ringkasan
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -758,9 +776,9 @@
             <div
                 class="bg-white text-neutral-900 rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-neutral-100 relative overflow-hidden">
                 <h4
-                    class="text-violet-500 font-bold uppercase tracking-widest text-xs mb-6 relative z-10 flex items-center gap-2">
+                    class="text-amber-800 font-bold uppercase tracking-widest text-xs mb-6 relative z-10 flex items-center gap-2">
                     Ringkasan Unit Anda
-                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <span class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
                 </h4>
                 {{-- Form Input Khusus Role FL --}}
                 @if (Auth::user())
@@ -768,11 +786,11 @@
                         {{-- Tabs --}}
                         <div class="flex p-1 bg-neutral-100 rounded-2xl w-fit">
                             <button type="button" wire:click="$set('isNewCustomer', true)"
-                                class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all {{ $isNewCustomer ? 'bg-white text-violet-600 shadow-sm' : 'text-neutral-500 hover:text-neutral-700' }}">
+                                class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all {{ $isNewCustomer ? 'bg-white text-amber-800 shadow-sm border border-amber-200' : 'text-neutral-500 hover:text-neutral-700' }}">
                                 Pelanggan Baru
                             </button>
                             <button type="button" wire:click="$set('isNewCustomer', false)"
-                                class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all {{ !$isNewCustomer ? 'bg-white text-violet-600 shadow-sm' : 'text-neutral-500 hover:text-neutral-700' }}">
+                                class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all {{ !$isNewCustomer ? 'bg-white text-amber-800 shadow-sm border border-amber-200' : 'text-neutral-500 hover:text-neutral-700' }}">
                                 Cari Pelanggan Lama
                             </button>
                         </div>
@@ -787,10 +805,10 @@
                                 @if ($selectedCustomerId)
                                     @php $selectedUser = \App\Models\User::find($selectedCustomerId); @endphp
                                     <div
-                                        class="p-4 bg-violet-50 border border-violet-100 rounded-2xl flex items-center justify-between">
+                                        class="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between">
                                         <div>
                                             <p
-                                                class="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-1">
+                                                class="text-[10px] font-black text-amber-800 uppercase tracking-widest mb-1">
                                                 Pelanggan Terpilih</p>
                                             <h3 class="font-bold text-neutral-800">{{ $selectedUser->name }}</h3>
                                             <p class="text-xs text-neutral-500">{{ $selectedUser->email }} •
@@ -814,16 +832,16 @@
                                             </svg>
                                         </div>
                                         <input type="text" wire:model.live.debounce.300ms="searchCustomer"
-                                            class="w-full pl-11 pr-4 py-3 text-sm bg-white border @error('selectedCustomerId') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            class="w-full pl-11 pr-4 py-3 text-sm bg-white border @error('selectedCustomerId') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-colors"
                                             placeholder="Cari nama, email, atau no HP...">
                                     </div>
 
                                     @if (strlen($searchCustomer) >= 2)
                                         <div
-                                            class="bg-white border border-neutral-100 rounded-2xl shadow-lg max-h-60 overflow-y-auto divide-y mt-2 overflow-hidden">
+                                            class="bg-white border border-amber-100 rounded-2xl shadow-lg max-h-60 overflow-y-auto divide-y mt-2 overflow-hidden">
                                             @forelse($this->customerResults as $user)
                                                 <div wire:click="selectCustomer({{ $user->id }})"
-                                                    class="p-4 hover:bg-neutral-50 cursor-pointer transition-colors flex justify-between items-center group">
+                                                    class="p-4 hover:bg-amber-50/60 cursor-pointer transition-colors flex justify-between items-center group">
                                                     <div>
                                                         <h4 class="font-bold text-neutral-800">{{ $user->name }}
                                                         </h4>
@@ -831,7 +849,7 @@
                                                             {{ $user->profile->phone_number ?? '-' }}</p>
                                                     </div>
                                                     <span
-                                                        class="text-violet-500 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">Pilih</span>
+                                                        class="text-amber-700 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">Pilih</span>
                                                 </div>
                                             @empty
                                                 <div class="p-4 text-center text-neutral-500 text-sm">
@@ -859,7 +877,7 @@
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
                                             Lengkap</label>
                                         <input type="text" id="name" wire:model="name" required
-                                            class="w-full px-4 py-3 text-sm bg-white border @error('name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-colors"
                                             placeholder="Masukkan nama lengkap">
                                         @error('name')
                                             <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
@@ -872,7 +890,7 @@
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nomor
                                             HP</label>
                                         <input type="tel" id="mobilePhone" wire:model="mobilePhone" required
-                                            class="w-full px-4 py-3 text-sm bg-white border @error('mobilePhone') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('mobilePhone') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-colors"
                                             placeholder="Contoh: 08123456789">
                                         @error('mobilePhone')
                                             <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
@@ -884,7 +902,7 @@
                                         <label for="email"
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Email</label>
                                         <input type="email" id="email" wire:model="email" required
-                                            class="w-full px-4 py-3 text-sm bg-white border @error('email') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('email') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-colors"
                                             placeholder="Contoh: user@email.com">
                                         @error('email')
                                             <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
@@ -898,7 +916,7 @@
                                             (KTP)</label>
                                         <input type="text" id="nik" wire:model="nik" required
                                             maxlength="16"
-                                            class="w-full px-4 py-3 text-sm bg-white border @error('nik') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('nik') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-colors"
                                             placeholder="16 digit nomor NIK">
                                         @error('nik')
                                             <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
@@ -911,7 +929,7 @@
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">NPWP
                                             (Opsional)</label>
                                         <input type="text" id="npwp" wire:model="npwp" maxlength="16"
-                                            class="w-full px-4 py-3 text-sm bg-white border @error('npwp') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('npwp') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-colors"
                                             placeholder="Masukkan nomor NPWP">
                                         @error('npwp')
                                             <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
@@ -930,7 +948,7 @@
 
                                                     {{-- Indikator Loading upload file --}}
                                                     <div wire:loading wire:target="foto_ktp"
-                                                        class="text-xs text-violet-600 font-bold mb-2 animate-pulse">
+                                                        class="text-xs text-amber-600 font-bold mb-2 animate-pulse">
                                                         Memproses foto KTP...
                                                     </div>
 
@@ -947,8 +965,7 @@
                                                             <svg class="w-8 h-8 mb-2 text-neutral-400"
                                                                 aria-hidden="true" xmlns="http://www.w3.org/2000/svg"
                                                                 fill="none" viewBox="0 0 20 16">
-                                                                <path stroke="currentColor" stroke-linecap="round"
-                                                                    stroke-linejoin="round" stroke-width="2"
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                                     d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
                                                             </svg>
                                                             <p class="mb-1 text-xs text-neutral-500 font-medium">Klik
@@ -1001,7 +1018,7 @@
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
                                             Bank</label>
                                         <input type="text" id="bank_name" wire:model="bank_name" required
-                                            class="w-full px-4 py-3 text-sm bg-white border @error('bank_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('bank_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-colors"
                                             placeholder="Masukkan Nama Bank">
                                         @error('bank_name')
                                             <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
@@ -1015,7 +1032,7 @@
                                             Rekening</label>
                                         <input type="number" id="account_number" wire:model="account_number"
                                             required
-                                            class="w-full px-4 py-3 text-sm bg-white border @error('account_number') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('account_number') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-colors"
                                             placeholder="Contoh: 3121321312312">
                                         @error('account_number')
                                             <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
@@ -1028,7 +1045,7 @@
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
                                             Pemilik Rekening</label>
                                         <input type="text" id="account_name" wire:model="account_name" required
-                                            class="w-full px-4 py-3 text-sm bg-white border @error('account_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-violet-500 transition-colors"
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('account_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-colors"
                                             placeholder="Contoh: user">
                                         @error('account_name')
                                             <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
@@ -1051,7 +1068,7 @@
                             <div class="flex flex-col gap-1">
                                 <span
                                     class="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Brand</span>
-                                <span class="font-bold text-violet-600">{{ $selected_brand_id ?? '-' }}</span>
+                                <span class="font-bold text-amber-800">{{ $selected_brand_id ?? '-' }}</span>
                             </div>
                             <div class="flex flex-col gap-1">
                                 <span
@@ -1066,18 +1083,18 @@
                     </div>
 
                     <div
-                        class="bg-emerald-50 rounded-3xl p-5 border border-emerald-100 flex items-center justify-between gap-4">
+                        class="bg-amber-50/80 rounded-3xl p-5 border border-amber-200 flex items-center justify-between gap-4">
                         <div class="text-xs">
-                            <p class="font-black text-emerald-900">Estimasi Harga Jual Anda</p>
-                            <p class="text-emerald-700 font-medium">Berdasarkan kondisi yang Anda cantumkan.</p>
+                            <p class="font-black text-amber-950">Estimasi Harga Jual Anda</p>
+                            <p class="text-amber-800 font-medium">Berdasarkan kondisi yang Anda cantumkan.</p>
                             @if ($is_price_adjusted)
                                 <div class="mt-1 flex flex-wrap items-center gap-2">
                                     <span
-                                        class="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded border border-amber-200">
+                                        class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-300">
                                         Harga Disesuaikan Manual
                                     </span>
                                     <button type="button" wire:click="resetCalculation"
-                                        class="text-[10px] font-bold text-emerald-600 hover:text-emerald-800 underline">
+                                        class="text-[10px] font-bold text-amber-700 hover:text-amber-900 underline">
                                         Reset ke Otomatis
                                     </button>
                                 </div>
@@ -1108,11 +1125,11 @@
                         }">
                             {{-- TAMPILAN NORMAL --}}
                             <div class="flex items-center justify-end gap-3">
-                                <p class="text-2xl md:text-3xl font-black text-emerald-600">
+                                <p class="text-2xl md:text-3xl font-black text-amber-700">
                                     Rp <span x-text="new Intl.NumberFormat('id-ID').format(price || 0)"></span>
                                 </p>
                                 <button type="button" @click="modalOpen = true"
-                                    class="p-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-xl transition-colors"
+                                    class="p-2 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-xl transition-colors"
                                     title="Sesuaikan Harga">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1152,10 +1169,10 @@
                                             Kesepakatan Akhir</label>
                                         <div class="relative">
                                             <span
-                                                class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-emerald-600 text-lg">Rp</span>
+                                                class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-amber-700 text-lg">Rp</span>
                                             <input type="text" x-ref="priceInput" :value="formattedPrice"
                                                 @input="updatePrice($event.target.value)"
-                                                class="w-full pl-12 pr-4 py-4 border-2 border-emerald-200 rounded-xl font-bold text-emerald-800 focus:outline-none focus:border-emerald-500 bg-white text-xl shadow-inner transition-colors"
+                                                class="w-full pl-12 pr-4 py-4 border-2 border-amber-300 rounded-xl font-bold text-neutral-800 focus:outline-none focus:border-amber-600 bg-white text-xl shadow-inner transition-colors"
                                                 @keydown.enter="modalOpen = false; $wire.set('is_price_adjusted', true)">
                                         </div>
                                     </div>
@@ -1167,7 +1184,7 @@
                                         </button>
                                         <button type="button"
                                             @click="modalOpen = false; $wire.set('is_price_adjusted', true)"
-                                            class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-emerald-600/30">
+                                            class="w-full py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-amber-600/30">
                                             Simpan Harga
                                         </button>
                                     </div>
@@ -1189,7 +1206,7 @@
                 </button>
                 <div class="w-full md:w-auto">
                     <button type="button" wire:click="submit" wire:loading.attr="disabled"
-                        class="w-full md:w-auto bg-violet-600 hover:bg-violet-700 text-white px-10 py-4 rounded-2xl font-black text-lg transition-all active:scale-[0.97] shadow-xl shadow-violet-900/20 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:pointer-events-none">
+                        class="w-full md:w-auto bg-amber-600 hover:bg-amber-700 text-white px-10 py-4 rounded-2xl font-black text-lg transition-all active:scale-[0.97] shadow-xl shadow-amber-900/20 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:pointer-events-none">
 
                         {{-- Kondisi 1: Teks Normal (Akan hilang/tersembunyi saat loading) --}}
                         <span wire:loading.remove wire:target="submit">
@@ -1197,7 +1214,6 @@
                         </span>
 
                         {{-- Kondisi 2: Konten Loading (Hanya muncul saat method submit berjalan) --}}
-                        {{-- Ganti baris pembuka span menjadi wire:loading.flex --}}
                         <span wire:loading.flex wire:target="submit" class="items-center justify-center gap-2">
                             <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg"
                                 fill="none" viewBox="0 0 24 24">
@@ -1218,3 +1234,4 @@
             </div>
         </div>
     </div>
+</div>
