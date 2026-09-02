@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('warranty_claims', function (Blueprint $table) {
-            $table->string('replacement_item_no')->nullable()->after('replacement_serial_number');
-            $table->string('replacement_product_name')->nullable()->after('replacement_item_no');
+            $table->string('replacement_item_no')->nullable();
+            $table->string('replacement_product_name')->nullable();
         });
     }
 

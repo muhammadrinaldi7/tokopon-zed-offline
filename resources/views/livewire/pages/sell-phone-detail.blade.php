@@ -152,17 +152,29 @@
             <div class="mt-4">
                 <div class="flex justify-between items-center mb-2">
                     <h4 class="text-sm font-bold text-gray-700">Bukti Pembayaran (Transfer)</h4>
-                    <button wire:click="sendPaymentReceiptToQontak" wire:loading.attr="disabled"
-                        class="text-emerald-600 hover:text-emerald-700 font-bold text-xs flex items-center gap-1 transition disabled:opacity-50">
-                        <svg wire:loading.remove wire:target="sendPaymentReceiptToQontak" class="w-5 h-auto" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397 0 11.983 0c3.192.001 6.192 1.242 8.447 3.498c2.256 2.255 3.497 5.255 3.497 8.447c-.004 6.585-5.342 11.93-11.93 11.93c-2.002-.001-3.973-.503-5.729-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451c5.436 0 9.86-4.42 9.864-9.858c.002-2.634-1.023-5.11-2.887-6.974c-1.864-1.864-4.341-2.887-6.973-2.889c-5.44 0-9.865 4.42-9.869 9.859c-.001 1.706.469 3.372 1.36 4.866l-.993 3.626l3.71-.973zm11.233-6.17c-.3-.149-1.774-.875-2.046-.974c-.272-.1-.471-.149-.669.149c-.198.299-.768.974-.941 1.173c-.173.199-.347.224-.647.075c-.3-.15-1.266-.466-2.41-1.487c-.89-.794-1.49-1.774-1.664-2.073c-.173-.3-.018-.462.13-.61c.134-.133.298-.348.446-.521c.15-.173.199-.298.298-.497c.099-.198.05-.372-.025-.521c-.075-.149-.669-1.612-.916-2.207c-.242-.579-.487-.501-.669-.51l-.57-.01c-.199 0-.52.074-.792.372c-.272.297-1.04 1.016-1.04 2.479c0 1.462 1.065 2.875 1.213 3.074c.149.198 2.095 3.2 5.076 4.487c.709.306 1.263.489 1.694.626c.712.226 1.36.194 1.872.118c.571-.085 1.774-.726 2.022-1.392c.247-.667.247-1.241.173-1.392c-.074-.15-.272-.249-.571-.398z" />
-                        </svg>
-                        <svg wire:loading wire:target="sendPaymentReceiptToQontak" class="animate-spin w-4 h-auto text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Kirim WA
-                    </button>
+                    <div class="flex items-center gap-2">
+                        {{-- Kirim Email Button --}}
+                        <button type="button" wire:click="openEmailModal"
+                            class="text-blue-600 hover:text-blue-700 font-bold text-xs flex items-center gap-1.5 transition px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            Kirim Email
+                        </button>
+
+                        {{-- Kirim WA Button --}}
+                        <button wire:click="sendPaymentReceiptToQontak" wire:loading.attr="disabled"
+                            class="text-emerald-600 hover:text-emerald-700 font-bold text-xs flex items-center gap-1.5 transition px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50">
+                            <svg wire:loading.remove wire:target="sendPaymentReceiptToQontak" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397 0 11.983 0c3.192.001 6.192 1.242 8.447 3.498c2.256 2.255 3.497 5.255 3.497 8.447c-.004 6.585-5.342 11.93-11.93 11.93c-2.002-.001-3.973-.503-5.729-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451c5.436 0 9.86-4.42 9.864-9.858c.002-2.634-1.023-5.11-2.887-6.974c-1.864-1.864-4.341-2.887-6.973-2.889c-5.44 0-9.865 4.42-9.869 9.859c-.001 1.706.469 3.372 1.36 4.866l-.993 3.626l3.71-.973zm11.233-6.17c-.3-.149-1.774-.875-2.046-.974c-.272-.1-.471-.149-.669.149c-.198.299-.768.974-.941 1.173c-.173.199-.347.224-.647.075c-.3-.15-1.266-.466-2.41-1.487c-.89-.794-1.49-1.774-1.664-2.073c-.173-.3-.018-.462.13-.61c.134-.133.298-.348.446-.521c.15-.173.199-.298.298-.497c.099-.198.05-.372-.025-.521c-.075-.149-.669-1.612-.916-2.207c-.242-.579-.487-.501-.669-.51l-.57-.01c-.199 0-.52.074-.792.372c-.272.297-1.04 1.016-1.04 2.479c0 1.462 1.065 2.875 1.213 3.074c.149.198 2.095 3.2 5.076 4.487c.709.306 1.263.489 1.694.626c.712.226 1.36.194 1.872.118c.571-.085 1.774-.726 2.022-1.392c.247-.667.247-1.241.173-1.392c-.074-.15-.272-.249-.571-.398z" />
+                            </svg>
+                            <svg wire:loading wire:target="sendPaymentReceiptToQontak" class="animate-spin w-4 h-4 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Kirim WA
+                        </button>
+                    </div>
                 </div>
                 <div class="rounded-xl overflow-hidden border border-gray-200">
                     {{-- Menggunakan Storage::url() untuk memanggil gambar dari folder public --}}
@@ -172,6 +184,85 @@
                 <div class="mt-2 text-xs text-gray-500">
                     Dibayarkan menggunakan Rekening Toko: <span
                         class="font-bold">{{ $sellPhone->store_bank_no }}</span>
+                </div>
+            </div>
+
+            {{-- Modal Kirim Bukti Transfer ke Email --}}
+            <div x-data="{ open: @entangle('isEmailModalOpen') }" x-show="open" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/50 backdrop-blur-sm p-4"
+                x-transition:enter="ease-out duration-300"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-200"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0">
+                
+                <div class="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl text-left" @click.away="open = false"
+                    x-transition:enter="ease-out duration-300"
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100">
+                    
+                    <div class="flex justify-between items-center mb-5">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-neutral-800">Kirim Bukti Transfer</h3>
+                                <p class="text-xs text-neutral-400">Ke Email Customer</p>
+                            </div>
+                        </div>
+                        <button @click="open = false" type="button" class="text-neutral-400 hover:text-neutral-600 transition-colors bg-neutral-100 hover:bg-neutral-200 p-2 rounded-full">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+
+                    <div class="bg-neutral-50 rounded-2xl p-4 border border-neutral-100 space-y-2 mb-5">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-neutral-400">No. Transaksi</span>
+                            <span class="font-mono font-bold text-neutral-800">SPL-{{ $sellPhone->id }}</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-neutral-400">Customer</span>
+                            <span class="font-bold text-neutral-800">{{ $sellPhone->user->name ?? '-' }}</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-neutral-400">Unit</span>
+                            <span class="font-bold text-neutral-800">{{ $sellPhone->phone_brand }} {{ $sellPhone->phone_model }}</span>
+                        </div>
+                        <div class="flex justify-between text-xs pt-1 border-t border-neutral-200">
+                            <span class="text-neutral-400">Total Ditransfer</span>
+                            <span class="font-black text-emerald-600">Rp {{ number_format($sellPhone->appraised_value, 0, ',', '.') }}</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <label class="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-1.5">Alamat Email Customer</label>
+                            <input type="email" wire:model="recipientEmail" 
+                                class="w-full px-4 py-3 border-2 border-neutral-200 rounded-xl text-sm focus:border-blue-500 focus:outline-none transition-colors" 
+                                placeholder="customer@example.com">
+                            @error('recipientEmail') <span class="text-xs text-rose-500 mt-1 block font-bold">{{ $message }}</span> @enderror
+                            <p class="text-[11px] text-neutral-400 mt-1.5">Bukti transfer asli akan dilampirkan otomatis dalam email.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button type="button" @click="open = false" class="w-1/3 py-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl transition-colors text-sm">
+                            Batal
+                        </button>
+                        <button type="button" wire:click="sendPaymentReceiptToEmail" wire:loading.attr="disabled" class="w-2/3 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-blue-600/30 text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                            <svg wire:loading.remove wire:target="sendPaymentReceiptToEmail" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                            <svg wire:loading wire:target="sendPaymentReceiptToEmail" class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Kirim Email</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         @else

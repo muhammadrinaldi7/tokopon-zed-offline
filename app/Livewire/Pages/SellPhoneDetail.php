@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\SellPhonePaymentReceiptMail;
 
 class SellPhoneDetail extends Component
 {
@@ -26,6 +28,10 @@ class SellPhoneDetail extends Component
     public $bank_name = '';
     public $account_number = '';
     public $account_name = '';
+
+    // Form Email Bukti Transfer
+    public $isEmailModalOpen = false;
+    public $recipientEmail = '';
 
     public function mount(SellPhone $sellPhone)
     {
@@ -183,6 +189,68 @@ class SellPhoneDetail extends Component
         } catch (\Exception $e) {
             Log::error('Mekari API Exception: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    public function openEmailModal()
+    {
+        if (!$this->sellPhone->payment_receipt_path) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Bukti pembayaran belum diupload oleh finance.', type: 'warning');
+            return;
+        }
+
+        $email = $this->sellPhone->user->email ?? '';
+        // If dummy pos/offline email, clear it so user can enter the customer's real email
+        if (str_contains($email, '@customer.zpos.local') || str_contains($email, '@pos.tokopun.com') || str_contains($email, '@tokopon.com')) {
+            $this->recipientEmail = '';
+        } else {
+            $this->recipientEmail = $email;
+        }
+
+        $this->isEmailModalOpen = true;
+    }
+
+    public function closeEmailModal()
+    {
+        $this->isEmailModalOpen = false;
+    }
+
+    public function sendPaymentReceiptToEmail()
+    {
+        if (!$this->sellPhone->payment_receipt_path) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Bukti pembayaran belum diupload oleh finance.', type: 'warning');
+            return;
+        }
+
+        $this->validate([
+            'recipientEmail' => 'required|email'
+        ], [
+            'recipientEmail.required' => 'Email penerima wajib diisi.',
+            'recipientEmail.email' => 'Format email tidak valid.'
+        ]);
+
+        $fileExists = Storage::disk('public')->exists($this->sellPhone->payment_receipt_path)
+            || file_exists(storage_path('app/public/' . $this->sellPhone->payment_receipt_path))
+            || file_exists(public_path('storage/' . $this->sellPhone->payment_receipt_path));
+
+        if (!$fileExists) {
+            Log::warning("Bukti transfer file not found on disk: {$this->sellPhone->payment_receipt_path}");
+        }
+
+        try {
+            $mailer = config('mail.mailers.pos_sales.host') ? Mail::mailer('pos_sales') : Mail::mailer();
+
+            $mailer->to($this->recipientEmail)
+                ->send(new SellPhonePaymentReceiptMail($this->sellPhone));
+
+            $this->sellPhone->update(['is_email_sent' => true]);
+            $this->sellPhone->refresh();
+
+            $this->isEmailModalOpen = false;
+            $this->dispatch('toast', title: 'Berhasil', message: 'Bukti pembayaran berhasil dikirim ke ' . $this->recipientEmail, type: 'success');
+        } catch (\Exception $e) {
+            Log::error('Send Payment Receipt Email Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal Kirim Email', message: 'SMTP Error: ' . $e->getMessage(), type: 'error');
         }
     }
 
