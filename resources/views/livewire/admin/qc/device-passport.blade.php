@@ -94,11 +94,11 @@
                         {{-- Left QC Selector --}}
                         <div
                             class="flex-1 w-full bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm relative overflow-hidden group hover:border-indigo-300 transition-colors">
-                            <div class="absolute top-0 left-0 w-1 h-full bg-rose-400"></div>
-                            <label class="block text-xs font-black text-rose-500 uppercase tracking-wider mb-2">QC
+                            <div class="absolute top-0 left-0 w-1 h-full bg-blue-400"></div>
+                            <label class="block text-xs font-black text-blue-500 uppercase tracking-wider mb-2">QC
                                 Referensi (Kiri)</label>
                             <select wire:model.live="selectedQc1Id"
-                                class="w-full bg-neutral-50 border-0 rounded-xl p-3 text-sm font-bold text-neutral-700 focus:ring-2 focus:ring-rose-500">
+                                class="w-full bg-neutral-50 border-0 rounded-xl p-3 text-sm font-bold text-neutral-700 focus:ring-2 focus:ring-blue-500">
                                 <option value="">-- Pilih Inspeksi --</option>
                                 @foreach ($this->inspections as $idx => $qc)
                                     <option value="{{ $qc->id }}">QC #{{ $this->inspections->count() - $idx }}
@@ -113,7 +113,7 @@
                                     <span class="text-xs text-neutral-500 font-medium">Inspektor: <strong
                                             class="text-neutral-700">{{ $this->qc1->inspector->name ?? 'Unknown' }}</strong></span>
                                     <span
-                                        class="px-2 py-1 {{ $this->qc1->verdict === 'pass' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700' }} rounded-md text-[10px] font-bold uppercase">{{ $this->qc1->verdict === 'pass' ? 'Lulus' : 'Tidak Lulus' }}</span>
+                                        class="px-2 py-1 {{ $this->qc1->verdict === 'pass' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }} rounded-md text-[10px] font-bold uppercase">{{ $this->qc1->verdict === 'pass' ? 'Lulus' : 'Tidak Lulus' }}</span>
                                 </div>
                             @endif
                         </div>
@@ -147,7 +147,7 @@
                             @if ($this->qc2)
                                 <div class="mt-3 pt-3 border-t border-neutral-100 flex justify-between items-center">
                                     <span
-                                        class="px-2 py-1 {{ $this->qc2->verdict === 'pass' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700' }} rounded-md text-[10px] font-bold uppercase">{{ $this->qc2->verdict === 'pass' ? 'Lulus' : 'Tidak Lulus' }}</span>
+                                        class="px-2 py-1 {{ $this->qc2->verdict === 'pass' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }} rounded-md text-[10px] font-bold uppercase">{{ $this->qc2->verdict === 'pass' ? 'Lulus' : 'Tidak Lulus' }}</span>
                                     <span class="text-xs text-neutral-500 font-medium">Inspektor: <strong
                                             class="text-neutral-700">{{ $this->qc2->inspector->name ?? 'Unknown' }}</strong></span>
                                 </div>
@@ -213,7 +213,7 @@
                                     ($item['value'] == 1 || $item['value'] === true || $item['value'] === '1');
                                 return $val
                                     ? '<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold mx-auto"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Berfungsi</div>'
-                                    : '<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold mx-auto"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg> Tidak Berfungsi</div>';
+                                    : '<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold mx-auto"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg> Tidak Berfungsi</div>';
                             }
                             return '<span class="text-sm font-bold text-neutral-800 bg-neutral-100 px-3 py-1 rounded-lg">' .
                                 htmlspecialchars($item['value'] ?? '-') .
@@ -229,7 +229,7 @@
                                         class="px-6 py-4 bg-white font-black text-neutral-400 uppercase tracking-widest text-xs border-b border-neutral-100 w-1/3">
                                         Item Pengecekan</th>
                                     <th
-                                        class="px-6 py-4 bg-rose-50/30 text-center font-black text-rose-500 uppercase tracking-widest text-xs border-b border-rose-100/50 border-l border-neutral-100 w-1/3 shadow-inner">
+                                        class="px-6 py-4 bg-blue-50/30 text-center font-black text-blue-500 uppercase tracking-widest text-xs border-b border-blue-100/50 border-l border-neutral-100 w-1/3 shadow-inner">
                                         QC Kiri
                                     </th>
                                     <th
@@ -320,7 +320,7 @@
                                             <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
                                                 @foreach ($mediaList1 as $media)
                                                     <a href="{{ $media->getUrl() }}" target="_blank"
-                                                        class="block aspect-square rounded-xl overflow-hidden border border-neutral-200 hover:border-rose-400 hover:shadow-md transition relative group">
+                                                        class="block aspect-square rounded-xl overflow-hidden border border-neutral-200 hover:border-indigo-400 hover:shadow-md transition relative group">
                                                         <img src="{{ $media->getUrl() }}"
                                                             class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
                                                         <div
@@ -404,7 +404,7 @@
                 <div class="p-5 border-b border-neutral-100 bg-neutral-50 flex justify-between items-center">
                     <h3 class="font-bold text-neutral-800 text-lg">Inspeksi QC Baru</h3>
                     <button wire:click="$set('showQcModal', false)"
-                        class="text-neutral-400 hover:text-rose-500 font-bold w-8 h-8 rounded-full hover:bg-rose-50 flex items-center justify-center transition-colors">&times;</button>
+                        class="text-neutral-400 hover:text-neutral-900 font-bold w-8 h-8 rounded-full hover:bg-neutral-100 flex items-center justify-center transition-colors">&times;</button>
                 </div>
                 <div class="p-5 overflow-y-auto flex-1 bg-neutral-50/50">
                     <div class="mb-5 bg-white p-4 rounded-2xl shadow-sm border border-neutral-100">
