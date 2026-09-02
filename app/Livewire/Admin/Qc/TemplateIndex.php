@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Qc;
 
 use App\Models\Brand;
 use App\Models\QcTemplate;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 
@@ -16,6 +17,7 @@ class TemplateIndex extends Component
 
     // Form fields
     public $name     = '';
+    public $business_unit_id = '';
     public $brand_id = '';
     public $device_category = '';
     public $is_default = false;
@@ -45,12 +47,13 @@ class TemplateIndex extends Component
         $template           = QcTemplate::findOrFail($id);
         $this->templateId   = $template->id;
         $this->name         = $template->name;
+        $this->business_unit_id = $template->business_unit_id ?? '';
         $this->brand_id     = $template->brand_id ?? '';
         $this->device_category = $template->device_category ?? '';
         $this->is_default   = $template->is_default;
         $this->is_active    = $template->is_active;
         $this->max_weight_threshold = $template->max_weight_threshold ?? 3;
-        
+
         $loadedItems = $template->items ?? [];
         // Inject default weight, is_fatal, and category if editing an old template
         $this->items = collect($loadedItems)->map(function ($item) {
@@ -89,15 +92,18 @@ class TemplateIndex extends Component
             ->values()
             ->toArray();
 
-        // If setting as default, unset other defaults
+        // If setting as default, unset other defaults within the same business unit scope
         if ($this->is_default) {
-            QcTemplate::where('is_default', true)->update(['is_default' => false]);
+            QcTemplate::where('is_default', true)
+                ->where('business_unit_id', $this->business_unit_id ?: null)
+                ->update(['is_default' => false]);
         }
 
         QcTemplate::updateOrCreate(
             ['id' => $this->templateId],
             [
                 'name'       => $this->name,
+                'business_unit_id' => $this->business_unit_id ?: null,
                 'brand_id'   => $this->brand_id ?: null,
                 'device_category' => $this->device_category ?: null,
                 'is_default' => $this->is_default,
@@ -128,6 +134,7 @@ class TemplateIndex extends Component
         $original = QcTemplate::findOrFail($id);
         QcTemplate::create([
             'name'       => $original->name . ' (Salinan)',
+            'business_unit_id' => $original->business_unit_id,
             'brand_id'   => $original->brand_id,
             'device_category' => $original->device_category,
             'is_default' => false,
@@ -210,6 +217,7 @@ class TemplateIndex extends Component
     {
         $this->templateId = null;
         $this->name       = '';
+        $this->business_unit_id = '';
         $this->brand_id   = '';
         $this->device_category = '';
         $this->is_default = false;
@@ -220,9 +228,23 @@ class TemplateIndex extends Component
 
     public function render()
     {
+        $activeBuId = Auth::user()->getActiveBusinessUnitId();
+
+        $query = QcTemplate::with('brand', 'businessUnit')
+            ->orderBy('is_default', 'desc')
+            ->orderBy('name');
+
+        if ($activeBuId) {
+            $query->where(function ($q) use ($activeBuId) {
+                $q->where('business_unit_id', $activeBuId)
+                    ->orWhereNull('business_unit_id');
+            });
+        }
+
         return view('livewire.admin.qc.template-index', [
-            'templates' => QcTemplate::with('brand')->orderBy('is_default', 'desc')->orderBy('name')->get(),
+            'templates' => $query->get(),
             'brands'    => Brand::orderBy('name')->get(),
+            'businessUnits' => \App\Models\BusinessUnit::orderBy('name')->get(),
         ]);
     }
 }

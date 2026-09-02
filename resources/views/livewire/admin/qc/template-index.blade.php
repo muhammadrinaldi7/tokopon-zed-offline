@@ -45,6 +45,16 @@
                                 </span>
                             @endif
 
+                            @if ($template->business_unit_id)
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-widest mb-3 shadow-sm ml-2">
+                                    {{ strtoupper($template->businessUnit->name) }}
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border border-gray-200 text-gray-500 rounded-lg text-[10px] font-black uppercase tracking-widest mb-3 shadow-sm ml-2">
+                                    GLOBAL
+                                </span>
+                            @endif
+
                             <h2 class="text-2xl font-black text-gray-900 leading-tight mb-1">{{ $template->name }}</h2>
                             <p class="text-xs text-gray-500 font-medium">
                                 {{ count($template->items ?? []) }} Item Pengecekan
@@ -171,6 +181,19 @@
                                 class="w-full bg-gray-50 border-transparent rounded-lg py-3 px-4 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all font-semibold text-gray-900">
                             @error('name') <span class="text-xs font-bold text-rose-500 mt-1.5 block">{{ $message }}</span> @enderror
                         </div>
+
+                        @if(auth()->user()->role === 'superadmin' || auth()->user()->role === 'owner')
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Business Unit</label>
+                            <select wire:model="business_unit_id"
+                                class="w-full bg-gray-50 border-transparent rounded-lg py-3 px-4 focus:bg-white focus:border-[#1c69d4] focus:ring-2 focus:ring-[#1c69d4]/20 transition-all font-semibold text-gray-900">
+                                <option value="">-- Global (Semua BU) --</option>
+                                @foreach ($businessUnits as $bu)
+                                    <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endif
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>

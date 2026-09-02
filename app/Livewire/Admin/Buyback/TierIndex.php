@@ -22,14 +22,27 @@ class TierIndex extends Component
     // Struktur: [['category' => 'Kondisi Fisik', 'items' => [['name'=>'', 'type'=>'fixed', 'value'=>0]]]]
     public $ruleCategories = [];
 
+    public $search = '';
+
     public function mount()
+    {
+        $this->loadTiers();
+    }
+
+    public function updatedSearch()
     {
         $this->loadTiers();
     }
 
     public function loadTiers()
     {
-        $this->tiers = BuybackTier::withCount('devices')->orderBy('min_price')->get();
+        $query = BuybackTier::withCount('devices')->orderBy('min_price');
+        
+        if (!empty($this->search)) {
+            $query->where('name', 'like', '%' . $this->search . '%');
+        }
+        
+        $this->tiers = $query->get();
     }
 
     // ──────────────────────────────────────────────
@@ -101,6 +114,17 @@ class TierIndex extends Component
     {
         BuybackTier::findOrFail($id)->delete();
         $this->dispatch('toast', title: 'Dihapus', message: 'Tier berhasil dihapus.', type: 'success');
+        $this->loadTiers();
+    }
+
+    public function duplicate($id)
+    {
+        $original = BuybackTier::findOrFail($id);
+        BuybackTier::create([
+            'name'       => $original->name . ' (Salinan)',
+            'rules'      => $original->rules,
+        ]);
+        $this->dispatch('toast', title: 'Berhasil', message: 'Tier berhasil diduplikat.', type: 'success');
         $this->loadTiers();
     }
 

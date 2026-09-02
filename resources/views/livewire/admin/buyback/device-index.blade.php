@@ -5,37 +5,43 @@
             <p class="text-sm text-gray-500 mt-1">Kelola data harga dasar HP untuk fitur Tukar Tambah & Jual HP.</p>
         </div>
         <div class="flex items-center gap-3">
-            <a href="{{ route('admin.buyback.create') }}" wire:navigate
+            {{-- <a href="{{ route('admin.buyback.create') }}" wire:navigate
                 class="flex items-center gap-2 bg-[#1c69d4] hover:bg-[#1553a8] text-white px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
                 Mapping Tier / Perangkat Baru
-            </a>
+            </a> --}}
             <button wire:click="exportCsv" wire:loading.attr="disabled"
                 class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
                 Export (CSV)
             </button>
             <button wire:click="$set('showImportModal', true)"
                 class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition-all">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
                 Import (CSV)
             </button>
         </div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 overflow-hidden mb-6">
-        <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col xl:flex-row gap-4 items-center justify-between">
+    <div
+        class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 overflow-hidden mb-6">
+        <div
+            class="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col xl:flex-row gap-4 items-center justify-between">
             <div class="flex flex-col md:flex-row items-center gap-3 w-full">
                 {{-- Search Bar --}}
                 <div class="relative w-full md:w-64">
-                    <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari SKU atau nama..."
                         class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white transition-all shadow-sm">
@@ -43,31 +49,41 @@
 
                 {{-- Filters --}}
                 <div class="flex items-center gap-2 w-full overflow-x-auto pb-1 md:pb-0">
-                    <select wire:model.live="filterBrandName" class="w-full md:w-auto border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white text-gray-700 shadow-sm min-w-[140px]">
+                    <select wire:model.live="filterBrandName"
+                        class="w-full md:w-auto border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white text-gray-700 shadow-sm min-w-[140px]">
                         <option value="">Semua Merek</option>
-                        @foreach($availableBrands as $brand)
+                        @foreach ($availableBrands as $brand)
                             <option value="{{ $brand }}">{{ $brand }}</option>
                         @endforeach
                     </select>
 
-                    <select wire:model.live="filterCategoryName" class="w-full md:w-auto border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white text-gray-700 shadow-sm min-w-[140px]">
+                    <select wire:model.live="filterCategoryName"
+                        class="w-full md:w-auto border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white text-gray-700 shadow-sm min-w-[140px]">
                         <option value="">Semua Kategori</option>
-                        @foreach($availableCategories as $category)
+                        @foreach ($availableCategories as $category)
                             <option value="{{ $category }}">{{ $category }}</option>
                         @endforeach
                     </select>
 
-                    <select wire:model.live="filterProyek" class="w-full md:w-auto border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white text-gray-700 shadow-sm min-w-[140px]">
+                    <select wire:model.live="filterProyek"
+                        class="w-full md:w-auto border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white text-gray-700 shadow-sm min-w-[140px]">
                         <option value="">Semua Proyek</option>
-                        @foreach($availableProyeks as $proyek)
+                        @foreach ($availableProyeks as $proyek)
                             <option value="{{ $proyek }}">{{ $proyek }}</option>
                         @endforeach
                     </select>
                 </div>
             </div>
-            
-            <div wire:loading wire:target="search, filterBrandName, filterCategoryName, filterProyek" class="text-xs text-gray-500 flex items-center gap-2 flex-shrink-0">
-                <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+
+            <div wire:loading wire:target="search, filterBrandName, filterCategoryName, filterProyek"
+                class="text-xs text-gray-500 flex items-center gap-2 flex-shrink-0">
+                <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                        stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
+                </svg>
                 Memuat data...
             </div>
         </div>
@@ -102,7 +118,8 @@
                                 <span class="text-gray-600 font-semibold">{{ $device->categoryName ?: '-' }}</span>
                             </td>
                             <td class="p-4">
-                                <span class="inline-flex px-2.5 py-1 bg-violet-50 text-violet-700 rounded-lg text-[11px] font-bold">
+                                <span
+                                    class="inline-flex px-2.5 py-1 bg-violet-50 text-violet-700 rounded-lg text-[11px] font-bold">
                                     {{ $device->proyek ?: '-' }}
                                 </span>
                             </td>
@@ -130,7 +147,8 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                             d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                     </svg>
-                                    <p class="font-medium text-gray-900">Belum ada perangkat yang dikonfigurasi dari Accurate</p>
+                                    <p class="font-medium text-gray-900">Belum ada perangkat yang dikonfigurasi dari
+                                        Accurate</p>
                                 </div>
                             </td>
                         </tr>
@@ -138,11 +156,11 @@
                 </tbody>
             </table>
         </div>
-        
-        @if($devices->hasPages())
-        <div class="p-4 border-t border-gray-100 bg-gray-50/30">
-            {{ $devices->links() }}
-        </div>
+
+        @if ($devices->hasPages())
+            <div class="p-4 border-t border-gray-100 bg-gray-50/30">
+                {{ $devices->links() }}
+            </div>
         @endif
     </div>
 
@@ -168,16 +186,18 @@
 
                 {{-- Body --}}
                 <form wire:submit.prevent="updateDevice" class="p-6 space-y-5">
-                    
+
                     <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">SKU</label>
+                            <label
+                                class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">SKU</label>
                             <input type="text" wire:model="editItemNo"
                                 class="w-full text-sm bg-gray-100 border-none rounded px-3 py-2 text-gray-600 font-mono"
                                 readonly disabled>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Nama Barang</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Nama
+                                Barang</label>
                             <input type="text" wire:model="editName"
                                 class="w-full text-sm bg-gray-100 border-none rounded px-3 py-2 text-gray-700 font-semibold"
                                 readonly disabled>
@@ -219,14 +239,15 @@
     @endif
 
     {{-- Import CSV Modal --}}
-    @if($showImportModal)
+    @if ($showImportModal)
         <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
             {{-- Backdrop --}}
             <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
                 wire:click="$set('showImportModal', false)"></div>
 
             {{-- Modal Content --}}
-            <div class="relative bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div
+                class="relative bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                     <div>
                         <h3 class="text-xl font-bold text-gray-900">Import CSV</h3>
@@ -235,18 +256,22 @@
                     <button wire:click="$set('showImportModal', false)"
                         class="text-gray-400 hover:text-gray-600 transition-colors p-2 bg-white rounded-full hover:bg-gray-100 border border-gray-200">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
 
                 <form wire:submit.prevent="importCsv" class="p-6 space-y-5">
-                    <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-800 space-y-2">
+                    <div
+                        class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl text-sm text-indigo-800 space-y-2">
                         <p><strong>Cara Penggunaan:</strong></p>
                         <ol class="list-decimal pl-5 space-y-1 text-xs">
-                            <li>Klik tombol <strong>Export (CSV)</strong> untuk mendownload template dan data saat ini.</li>
+                            <li>Klik tombol <strong>Export (CSV)</strong> untuk mendownload template dan data saat ini.
+                            </li>
                             <li>Buka file CSV tersebut di Excel / Spreadsheet.</li>
-                            <li>Edit kolom <code class="bg-white px-1 py-0.5 rounded border border-indigo-200">Buy Price</code> sesuai keinginan. <strong>Jangan ubah kolom ID.</strong></li>
+                            <li>Edit kolom <code class="bg-white px-1 py-0.5 rounded border border-indigo-200">Buy
+                                    Price</code> sesuai keinginan. <strong>Jangan ubah kolom ID.</strong></li>
                             <li>Simpan kembali dalam format CSV, lalu upload di sini.</li>
                         </ol>
                     </div>
@@ -255,9 +280,18 @@
                         <label class="block text-sm font-bold text-gray-700 mb-1.5">File CSV</label>
                         <input type="file" wire:model="csvFile" accept=".csv" required
                             class="block w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-gray-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500">
-                        @error('csvFile') <span class="text-rose-500 text-xs mt-1">{{ $message }}</span> @enderror
-                        <div wire:loading wire:target="csvFile" class="text-xs text-indigo-600 mt-2 flex items-center gap-2">
-                            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        @error('csvFile')
+                            <span class="text-rose-500 text-xs mt-1">{{ $message }}</span>
+                        @enderror
+                        <div wire:loading wire:target="csvFile"
+                            class="text-xs text-indigo-600 mt-2 flex items-center gap-2">
+                            <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10"
+                                    stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
                             Mengunggah file...
                         </div>
                     </div>
@@ -269,9 +303,13 @@
                         </button>
                         <button type="submit" wire:loading.attr="disabled"
                             class="flex-[2] flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 rounded-xl text-[15px] font-bold hover:bg-indigo-700 shadow-sm transition-all">
-                            <svg wire:loading wire:target="importCsv" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            <svg wire:loading wire:target="importCsv" class="w-5 h-5 animate-spin" fill="none"
+                                viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10"
+                                    stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
                             </svg>
                             <span wire:loading.remove wire:target="importCsv">Mulai Import Data</span>
                             <span wire:loading wire:target="importCsv">Memproses...</span>

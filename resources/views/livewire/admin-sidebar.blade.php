@@ -156,8 +156,10 @@
 
         <a href="/admin/device-passport" wire:navigate
             class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors {{ request()->is('admin/device-passport') ? $activeClass : $inactiveClass }} group relative">
-            <svg class="w-5 h-5 flex-shrink-0 {{ request()->is('admin/device-passport') ? $activeIconClass : $inactiveIconClass }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
+            <svg class="w-5 h-5 flex-shrink-0 {{ request()->is('admin/device-passport') ? $activeIconClass : $inactiveIconClass }}"
+                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" />
             </svg>
             <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Device Passport</span><span
                 class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
@@ -307,9 +309,11 @@
                     <div class="flex items-center gap-3">
                         <svg class="w-5 h-5 {{ request()->routeIs('zoffline.sell-phone', 'admin.finance.*') ? $activeIconClass : $inactiveIconClass }}"
                             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Finance Dashboard</span><span
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Finance
+                            Dashboard</span><span
                             class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                             x-show="sidebarCollapsed" style="display:none;" x-cloak>Finance Dashboard</span>
                     </div>
@@ -427,7 +431,8 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kendala Penjualan HP</span><span
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Kendala Penjualan
+                    HP</span><span
                     class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                     x-show="sidebarCollapsed" style="display:none;" x-cloak>Kendala Penjualan HP</span>
             </a>
@@ -458,15 +463,15 @@
                 <div x-show="openBuyback && !sidebarCollapsed" style="display: none;" class="pl-12 mt-1 mb-2 space-y-1">
                     <a href="{{ route('admin.buyback.index') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.index') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Daftar SKU / Base Price
+                        Daftar Harga Beli Dasar
                     </a>
                     <a href="{{ route('admin.buyback.mapped-devices') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.mapped-devices', 'admin.buyback.create') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Perangkat Ter-mapping
+                        Perangkat Tertaut
                     </a>
                     <a href="{{ route('admin.buyback.tiers') }}" wire:navigate
                         class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.buyback.tiers') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                        Buyback Tiers
+                        Aturan Harga Beli
                     </a>
                 </div>
             </div>
@@ -657,7 +662,8 @@
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.telegram') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.telegram') ? $activeIconClass : $inactiveIconClass }}"
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.18-.08-.05-.19-.02-.27 0-.11.03-1.84 1.18-5.18 3.44-.49.34-.93.5-1.33.49-.44-.01-1.28-.24-1.9-.44-.77-.24-1.38-.37-1.33-.79.03-.22.34-.45.92-.69 3.6-1.57 6.01-2.6 7.24-3.12 3.44-1.43 4.15-1.68 4.62-1.68.1 0 .33.02.48.13.12.1.16.23.17.34.01.12.01.23 0 .32z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.18-.08-.05-.19-.02-.27 0-.11.03-1.84 1.18-5.18 3.44-.49.34-.93.5-1.33.49-.44-.01-1.28-.24-1.9-.44-.77-.24-1.38-.37-1.33-.79.03-.22.34-.45.92-.69 3.6-1.57 6.01-2.6 7.24-3.12 3.44-1.43 4.15-1.68 4.62-1.68.1 0 .33.02.48.13.12.1.16.23.17.34.01.12.01.23 0 .32z" />
                 </svg>
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Integrasi Telegram</span>
             </a>
@@ -681,7 +687,8 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity text-red-500 font-bold">System Reset</span>
+                <span x-show="!sidebarCollapsed"
+                    class="whitespace-nowrap transition-opacity text-red-500 font-bold">System Reset</span>
                 <span
                     class="absolute left-full ml-4 px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                     x-show="sidebarCollapsed" style="display:none;" x-cloak>System Reset</span>

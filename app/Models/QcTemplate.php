@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 class QcTemplate extends Model
 {
@@ -24,6 +25,11 @@ class QcTemplate extends Model
     public function inspections()
     {
         return $this->hasMany(DeviceInspection::class);
+    }
+
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
     }
 
     // ─── Scopes ──────────────────────────────────────
@@ -49,38 +55,73 @@ class QcTemplate extends Model
      *   4. Template default
      *   5. Template aktif pertama (fallback terakhir)
      */
-    public static function findForBrandAndCategory(?int $brandId, ?string $deviceCategory = null): ?self
+    public static function findForBrandAndCategory(?int $brandId, ?string $deviceCategory = null, ?int $businessUnitId = null): ?self
     {
-        // 1. Brand + Category (paling spesifik)
-        if ($brandId && $deviceCategory) {
-            $specific = self::active()
-                ->where('brand_id', $brandId)
-                ->where('device_category', $deviceCategory)
-                ->first();
-            if ($specific) return $specific;
+        if (is_null($businessUnitId) && Auth::check()) {
+            $businessUnitId = Auth::user()->getActiveBusinessUnitId();
         }
 
-        // 2. Kategori saja (Tanpa Brand) -> Lebih spesifik dari sekadar Brand
-        if ($deviceCategory) {
-            $categoryOnly = self::active()
+        $findWithBU = function ($buId) use ($brandId, $deviceCategory) {
+            // 1. Brand + Category (paling spesifik)
+            if ($brandId && $deviceCategory) {
+                $specific = self::active()
+                    ->where('business_unit_id', $buId)
+                    ->where('brand_id', $brandId)
+                    ->where('device_category', $deviceCategory)
+                    ->first();
+                if ($specific) return $specific;
+            }
+
+            // 2. Kategori saja (Tanpa Brand)
+            if ($deviceCategory) {
+                $categoryOnly = self::active()
+                    ->where('business_unit_id', $buId)
+                    ->whereNull('brand_id')
+                    ->where('device_category', $deviceCategory)
+                    ->first();
+                if ($categoryOnly) return $categoryOnly;
+            }
+
+            // 3. Brand saja (tanpa kategori)
+            if ($brandId) {
+                $brandOnly = self::active()
+                    ->where('business_unit_id', $buId)
+                    ->where('brand_id', $brandId)
+                    ->whereNull('device_category')
+                    ->first();
+                if ($brandOnly) return $brandOnly;
+            }
+
+            // 4. Generic template (tanpa brand & tanpa kategori)
+            $genericTemplate = self::active()
+                ->where('business_unit_id', $buId)
                 ->whereNull('brand_id')
-                ->where('device_category', $deviceCategory)
-                ->first();
-            if ($categoryOnly) return $categoryOnly;
+                ->whereNull('device_category');
+
+            // Prioritaskan yang is_default = true
+            $defaultGeneric = (clone $genericTemplate)->default()->first();
+            if ($defaultGeneric) return $defaultGeneric;
+
+            // Jika tidak ada yang default, ambil yang pertama
+            $anyGeneric = $genericTemplate->first();
+            if ($anyGeneric) return $anyGeneric;
+
+            return null;
+        };
+
+        // Coba cari untuk BU spesifik terlebih dahulu
+        if ($businessUnitId) {
+            $template = $findWithBU($businessUnitId);
+            if ($template) return $template;
         }
 
-        // 3. Brand saja (tanpa kategori)
-        if ($brandId) {
-            $brandOnly = self::active()
-                ->where('brand_id', $brandId)
-                ->whereNull('device_category')
-                ->first();
-            if ($brandOnly) return $brandOnly;
-        }
+        // Fallback ke Global Template (business_unit_id = null)
+        $template = $findWithBU(null);
+        if ($template) return $template;
 
-        // 4. Default
-        // 5. Fallback
-        return self::active()->default()->first()
+        // Fallback terakhir: Template apapun yang default atau aktif
+        return self::active()->where('business_unit_id', $businessUnitId)->default()->first()
+            ?? self::active()->whereNull('business_unit_id')->default()->first()
             ?? self::active()->first();
     }
 
@@ -97,7 +138,7 @@ class QcTemplate extends Model
             'handphone' => 'smartphone',
             'hp baru'   => 'smartphone',
             'hp second' => 'smartphone',
-            'smartphone'=> 'smartphone',
+            'smartphone' => 'smartphone',
 
             'smartwatch'    => 'smartwatch',
             'iwatch second' => 'smartwatch',

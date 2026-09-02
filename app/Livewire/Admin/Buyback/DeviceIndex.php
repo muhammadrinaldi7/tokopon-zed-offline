@@ -88,9 +88,9 @@ class DeviceIndex extends Component
         $query = ProductAccurate::where('business_unit_id', 2);
 
         if (!empty($this->search)) {
-            $query->where(function($q) {
+            $query->where(function ($q) {
                 $q->where('name', 'like', '%' . $this->search . '%')
-                  ->orWhere('item_no', 'like', '%' . $this->search . '%');
+                    ->orWhere('item_no', 'like', '%' . $this->search . '%');
             });
         }
 
@@ -107,7 +107,7 @@ class DeviceIndex extends Component
         }
 
         $devices = $query->orderBy('name')->get();
-        
+
         $csvFileName = 'product_accurates_' . date('Ymd_His') . '.csv';
         $headers = [
             "Content-type"        => "text/csv",
@@ -214,7 +214,7 @@ class DeviceIndex extends Component
 
         fclose($file);
     }
-    
+
     public function render()
     {
         $baseQuery = ProductAccurate::where('business_unit_id', 2);
@@ -227,9 +227,9 @@ class DeviceIndex extends Component
         $query = clone $baseQuery;
 
         if (!empty($this->search)) {
-            $query->where(function($q) {
+            $query->where(function ($q) {
                 $q->where('name', 'like', '%' . $this->search . '%')
-                  ->orWhere('item_no', 'like', '%' . $this->search . '%');
+                    ->orWhere('item_no', 'like', '%' . $this->search . '%');
             });
         }
 
