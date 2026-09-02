@@ -7,7 +7,7 @@
             <div class="flex items-center justify-between mb-8">
                 <div>
                     <h1 class="text-3xl font-bold text-gray-800">Monitoring Kasir</h1>
-                    <p class="text-neutral-500 text-sm mt-1">Rekapitulasi transaksi kasir (Hari Ini)</p>
+                    <p class="text-neutral-500 text-sm mt-1">Rekapitulasi transaksi kasir (Hari Ini) - Cabang: {{ $branchName }}</p>
                 </div>
 
             </div>

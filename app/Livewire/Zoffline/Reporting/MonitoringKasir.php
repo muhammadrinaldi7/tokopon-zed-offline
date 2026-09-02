@@ -34,11 +34,16 @@ class MonitoringKasir extends Component
     {
         if (!$this->selectedKasirId) return;
 
-        $orders = Order::with(['payments.paymentMethod', 'cashSettlement.monitoringBy'])
+        $query = Order::with(['payments.paymentMethod', 'cashSettlement.monitoringBy'])
             ->where('business_unit_id', 2)
             ->where('handled_by', $this->selectedKasirId)
-            ->whereDate('created_at', today())
-            ->get();
+            ->whereDate('created_at', today());
+
+        if (Auth::user()->branch_id) {
+            $query->where('branch_id', Auth::user()->branch_id);
+        }
+
+        $orders = $query->get();
 
         $this->kasirOrders = [];
         foreach ($orders as $order) {
@@ -107,10 +112,17 @@ class MonitoringKasir extends Component
             abort(403, 'Unauthorized action.');
         }
 
-        $orders = Order::with(['handledBy', 'payments.paymentMethod', 'cashSettlement'])
+        $branchName = Auth::user()->branch->name ?? 'Semua Cabang';
+
+        $query = Order::with(['handledBy', 'payments.paymentMethod', 'cashSettlement'])
             ->where('business_unit_id', 2)
-            ->whereDate('created_at', today())
-            ->get();
+            ->whereDate('created_at', today());
+
+        if (Auth::user()->branch_id) {
+            $query->where('branch_id', Auth::user()->branch_id);
+        }
+
+        $orders = $query->get();
 
         $monitoringData = $orders->groupBy('handled_by')->map(function ($group) {
             $nominalTunai = $group->flatMap->payments->filter(function ($payment) {
@@ -142,7 +154,8 @@ class MonitoringKasir extends Component
         })->values()->toArray();
 
         return view('livewire.zoffline.reporting.monitoring-kasir', [
-            'monitoringData' => $monitoringData
+            'monitoringData' => $monitoringData,
+            'branchName' => $branchName
         ]);
     }
 }
