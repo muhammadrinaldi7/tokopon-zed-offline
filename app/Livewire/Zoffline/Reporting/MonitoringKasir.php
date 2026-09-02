@@ -37,7 +37,7 @@ class MonitoringKasir extends Component
         $query = Order::with(['payments.paymentMethod', 'cashSettlement.monitoringBy'])
             ->where('business_unit_id', 2)
             ->where('handled_by', $this->selectedKasirId)
-            ->whereDate('created_at', today());
+            ->whereDate('order_date', today());
 
         if (Auth::user()->branch_id) {
             $query->where('branch_id', Auth::user()->branch_id);
@@ -56,7 +56,7 @@ class MonitoringKasir extends Component
             if ($nominalTunai > 0) {
                 $this->kasirOrders[] = [
                     'order_id' => $order->id,
-                    'order_number' => $order->order_number ?? 'Order #'.$order->id,
+                    'order_number' => $order->order_number ?? 'Order #' . $order->id,
                     'nominal_tunai' => $nominalTunai,
                     'settlement' => $order->cashSettlement ? [
                         'nominal_settle' => $order->cashSettlement->nominal_settle,
@@ -81,7 +81,7 @@ class MonitoringKasir extends Component
         $nominalSettle = $this->formSettle[$orderId] ?? 0;
         // Konversi jika kosong/string menjadi float, hilangkan titik atau koma
         $nominalSettle = (float) str_replace(['.', ','], '', $nominalSettle);
-        
+
         $order = Order::with('payments.paymentMethod')->find($orderId);
         if (!$order) return;
 

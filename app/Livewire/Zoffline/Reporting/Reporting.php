@@ -58,6 +58,11 @@ class Reporting extends Component
         return $this->redirectRoute('reporting.closing-kasir', navigate: true);
     }
 
+    public function navigateToMonitoringKasirReport()
+    {
+        return $this->redirectRoute('reporting.monitoring-kasir-report', navigate: true);
+    }
+
     public function navigateToInvoiceReport()
     {
         return $this->redirectRoute('reporting.pembayaran', navigate: true);

@@ -166,6 +166,24 @@
             </div>
         @endcan
 
+        @can('report-monitoring-kasir')
+            <!-- Card: Monitoring Kasir Report -->
+            <div wire:click="navigateToMonitoringKasirReport"
+                class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+                <div class="rounded-full w-16 h-16 bg-blue-50 flex items-center justify-center text-blue-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Laporan Monitoring Kasir</h2>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Riwayat setoran settlement per kasir</p>
+                </div>
+            </div>
+        @endcan
+
         <div wire:click="navigateToInvoiceReport"
             class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
             <div class="rounded-full w-16 h-16 bg-indigo-50 flex items-center justify-center text-indigo-600">
