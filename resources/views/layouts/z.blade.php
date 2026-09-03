@@ -55,7 +55,8 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            const maxSize = 1 * 1024 * 1024; // 5 MB
+            const isImage = file.type.startsWith('image/');
+            const maxSize = 1 * 1024 * 1024; // 1 MB
 
             // PERBAIKAN DINAMIS: Mencari container Livewire terdekat secara otomatis dari DOM Element
             const livewireElement = event.target.closest('[wire\\:id]');
@@ -72,31 +73,44 @@
             console.log(`• Ukuran Asli : ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
 
             // Fix for iOS Safari: Generate unique filename to prevent Livewire upload conflicts
-            const ext = file.name.split('.').pop() || 'jpg';
+            const ext = isImage ? 'webp' : (file.name.split('.').pop() || 'tmp');
             const randomStr = Math.random().toString(36).substring(2, 8);
             const uniqueName = `${wirePropertyName}_${Date.now()}_${randomStr}.${ext}`;
-            const uniqueFile = new File([file], uniqueName, { type: file.type });
+            const uniqueFile = new File([file], uniqueName, {
+                type: isImage ? 'image/webp' : file.type
+            });
 
-            // JIKA DI BAWAH 5MB (Langsung Upload Asli)
-            if (file.size <= maxSize) {
-                console.log('%c[Info] Ukuran file aman (<= 1MB). Langsung mengunggah file asli...',
-                    'color: #65a30d; font-weight: bold;');
+            // PENANGANAN FILE NON-GAMBAR
+            if (!isImage) {
+                if (file.size <= maxSize) {
+                    console.log('%c[Info] File non-gambar (<= 1MB). Langsung mengunggah file asli...',
+                        'color: #65a30d; font-weight: bold;');
 
-                component.set(wirePropertyName, null);
+                    component.set(wirePropertyName, null);
 
-                // Memanggil fungsi upload dinamis melalui instance component yang ditemukan
-                component.upload(wirePropertyName, uniqueFile,
-                    (uploadedName) => console.log(`%c[Upload Success] File asli "${uniqueName}" terunggah!`,
-                        'color: #16a34a; font-weight: bold;'),
-                    () => console.error(`[Upload Error] Gagal mengunggah file asli pada: ${wirePropertyName}`),
-                    (progressEvent) => {}
-                );
+                    // Memanggil fungsi upload dinamis melalui instance component yang ditemukan
+                    component.upload(wirePropertyName, uniqueFile,
+                        (uploadedName) => console.log(`%c[Upload Success] File asli "${uniqueName}" terunggah!`,
+                            'color: #16a34a; font-weight: bold;'),
+                        () => console.error(`[Upload Error] Gagal mengunggah file asli pada: ${wirePropertyName}`),
+                        (progressEvent) => {}
+                    );
+                } else {
+                    console.error('[Error] File non-gambar melebihi batas 1MB.');
+                    alert('File terlalu besar! Maksimal 1MB.');
+                }
                 return;
             }
 
-            // JIKA DI ATAS 5MB (Proses Kompresi Lokal)
-            console.log('%c[Warning] File besar (> 5MB). Memulai kompresi kanvas di sisi browser...',
-                'color: #ea580c; font-weight: bold;');
+            // PENANGANAN GAMBAR: SELALU KONVERSI KE WEBP
+            if (file.size > maxSize) {
+                console.log('%c[Warning] Gambar besar (> 1MB). Memulai kompresi & konversi WebP di sisi browser...',
+                    'color: #ea580c; font-weight: bold;');
+            } else {
+                console.log('%c[Info] Gambar (<= 1MB). Memulai konversi WebP di sisi browser...',
+                    'color: #65a30d; font-weight: bold;');
+            }
+            
             component.set(wirePropertyName, null);
 
             const reader = new FileReader();
@@ -127,9 +141,11 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
 
+                    const quality = file.size > maxSize ? 0.75 : 0.85; // Kualitas kompresi dinamis
+
                     canvas.toBlob(function(blob) {
                         const compressedFile = new File([blob], uniqueName, {
-                            type: 'image/jpeg',
+                            type: 'image/webp',
                             lastModified: Date.now()
                         });
 
@@ -147,7 +163,7 @@
                             ),
                             (progress) => {}
                         );
-                    }, 'image/jpeg', 0.65);
+                    }, 'image/webp', quality);
                 };
             };
         }
