@@ -1769,19 +1769,39 @@ class AccurateService
             $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
             $customerName = $claim->customer->name ?? 'Pelanggan Garansi';
         }
-        $originalInvoiceNo = $order->accurate_invoice_no ?? null;
+        $originalInvoiceNo = null;
 
+        // Periksa apakah unit ini pernah diganti sebelumnya (Replacement beruntun)
+        // Jika ya, gunakan invoice dari penggantian terakhir (Order: WR-xxx)
+        $previousClaims = $claim->warranty->claims()
+            ->where('id', '!=', $claim->id)
+            ->where('status', 'resolved')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        foreach ($previousClaims as $prevClaim) {
+            $wrOrder = \App\Models\Order::where('order_number', 'WR-' . $prevClaim->claim_number)->first();
+            if ($wrOrder && $wrOrder->accurate_invoice_no) {
+                $originalInvoiceNo = $wrOrder->accurate_invoice_no;
+                break;
+            }
+        }
+
+        // Jika tidak ada penggantian sebelumnya, gunakan invoice dari pesanan pertama kali
         if (!$originalInvoiceNo && $order) {
-            $siDoc = $order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->first();
-            if ($siDoc) {
-                $originalInvoiceNo = $siDoc->doc_number;
+            $originalInvoiceNo = $order->accurate_invoice_no ?? null;
+            if (!$originalInvoiceNo) {
+                $siDoc = $order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->first();
+                if ($siDoc) {
+                    $originalInvoiceNo = $siDoc->doc_number;
+                }
             }
         }
 
         // Validasi: Accurate mewajibkan nomor Faktur Penjualan (Sales Invoice) untuk Retur.
         // Jika tidak ada, jangan paksakan hit API agar tidak error berantakan.
         if (!$originalInvoiceNo) {
-            throw new \Exception("Faktur Penjualan (Sales Invoice) Accurate untuk pesanan ini tidak ditemukan di sistem. Pastikan pesanan asli sudah dibuatkan invoice-nya di Accurate.");
+            throw new \Exception("Faktur Penjualan (Sales Invoice) Accurate untuk pesanan/unit ini tidak ditemukan di sistem. Pastikan pesanan asli sudah dibuatkan invoice-nya di Accurate.");
         }
 
         // Ambil Item No (SKU) dari relasi Variant

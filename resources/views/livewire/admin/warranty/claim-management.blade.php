@@ -162,12 +162,6 @@
                         </div>
                     </div>
 
-                    @php
-                        $hasPendingApproval = $selectedClaim->approvalRequests()
-                            ->where('request_type', 'WARRANTY_REPLACEMENT')
-                            ->where('status', 'PENDING')
-                            ->exists();
-                    @endphp
 
                     @if($hasPendingApproval)
                         <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
@@ -1012,7 +1006,7 @@
                                 <h5 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Tindakan
                                     Sistem & Accurate</h5>
                                 <div class="flex flex-wrap gap-3">
-                                    @if ($selectedClaim->status === 'pending')
+                                    @if ($selectedClaim->status === 'pending' && !$hasPendingApproval)
                                         <button wire:click="openReplacementForm"
                                             class="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm transition-all shadow-sm shadow-amber-500/20 flex flex-col items-start gap-1">
                                             <span class="flex items-center gap-2">
@@ -1042,7 +1036,7 @@
                                                 tanpa ganti unit</span>
                                         </button>
                                         <button wire:click="openRejectForm"
-                                            class="px-5 py-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-xl text-sm transition-all flex flex-col items-start gap-1">
+                                            class="px-5 py-3 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl text-sm transition-all shadow-sm shadow-rose-500/20 flex flex-col items-start gap-1">
                                             <span class="flex items-center gap-2">
                                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
                                                     stroke="currentColor" stroke-width="2">
@@ -1051,9 +1045,19 @@
                                                 </svg>
                                                 Tolak Klaim
                                             </span>
-                                            <span class="text-[10px] font-normal text-rose-500">Batalkan dan tutup
-                                                kasus ini</span>
+                                            <span class="text-[10px] font-normal text-rose-100">Batal / Tidak Berlaku</span>
                                         </button>
+                                    @elseif ($selectedClaim->status === 'pending' && $hasPendingApproval)
+                                        <div class="px-5 py-3 bg-amber-50 border border-amber-200 text-amber-700 font-bold rounded-xl text-sm w-full flex items-center justify-between">
+                                            <div class="flex items-center gap-3">
+                                                <svg class="w-5 h-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                <span>Sedang Menunggu Persetujuan Atasan (Approval Pending)</span>
+                                            </div>
+                                            <span class="text-xs bg-amber-200 text-amber-800 px-2 py-1 rounded-md">Mohon tunggu</span>
+                                        </div>
                                     @endif
 
                                     @if ($selectedClaim->status === 'approved')

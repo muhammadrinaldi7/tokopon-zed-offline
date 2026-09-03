@@ -46,9 +46,19 @@ class TierIndex extends Component
 
     public function loadDropdowns()
     {
-        $this->listOs = \App\Models\ProductAccurate::whereNotNull('os')->select('os')->distinct()->pluck('os')->toArray();
-        $this->listCategories = \App\Models\ProductAccurate::whereNotNull('categoryName')->select('categoryName')->distinct()->pluck('categoryName')->toArray();
-        $this->listBrands = \App\Models\ProductAccurate::whereNotNull('brandName')->select('brandName')->distinct()->pluck('brandName')->toArray();
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() ?? 1;
+
+        $this->listOs = \App\Models\ProductAccurate::whereNotNull('os')
+            ->where('business_unit_id', $buId)
+            ->select('os')->distinct()->pluck('os')->toArray();
+            
+        $this->listCategories = \App\Models\ProductAccurate::whereNotNull('categoryName')
+            ->where('business_unit_id', $buId)
+            ->select('categoryName')->distinct()->pluck('categoryName')->toArray();
+            
+        $this->listBrands = \App\Models\ProductAccurate::whereNotNull('brandName')
+            ->where('business_unit_id', $buId)
+            ->select('brandName')->distinct()->pluck('brandName')->toArray();
     }
 
     public function updatedSearch()

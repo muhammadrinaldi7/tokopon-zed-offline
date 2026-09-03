@@ -275,6 +275,48 @@ class ClaimManagement extends Component
             return;
         }
 
+        // Tentukan Target SKU/Item No untuk validasi
+        $targetItemNo = null;
+        if ($this->replacement_type === 'different') {
+            $targetItemNo = $this->replacement_item_no;
+        } else {
+            $variant = $claim->warranty->orderItem->variant ?? null;
+            if ($variant) {
+                if (isset($variant->item_no)) {
+                    $targetItemNo = $variant->item_no;
+                } elseif ($variant->accurateData) {
+                    $targetItemNo = $variant->accurateData->item_no;
+                } elseif (method_exists($variant, 'accurateData') && $variant->accurateData()->first()) {
+                    $targetItemNo = $variant->accurateData()->first()->item_no;
+                }
+            }
+        }
+
+        // Validasi ketersediaan Unit/IMEI di sistem dan lokasinya
+        $userWarehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() ?? 1;
+
+        $imeiQuery = \App\Models\ProductSerialNumber::where('serial_number', $this->replacement_imei)
+            ->where('status', 'Available');
+        
+        if ($userWarehouseId) {
+            $imeiQuery->where('warehouse_id', $userWarehouseId);
+        } else {
+            $imeiQuery->where('business_unit_id', $buId);
+        }
+
+        if ($targetItemNo) {
+            $imeiQuery->where('item_no', $targetItemNo);
+        }
+
+        $validImei = $imeiQuery->first();
+
+        if (!$validImei) {
+            $this->addError('replacement_imei', 'Unit dengan IMEI ini tidak ditemukan, statusnya tidak Available, atau SKU tidak sesuai dengan pilihan Anda.');
+            return;
+        }
+
+
         $payload = [
             'replacement_imei' => $this->replacement_imei,
             'replacement_type' => $this->replacement_type,
@@ -467,11 +509,21 @@ class ClaimManagement extends Component
                 }
             }
 
+            $userWarehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
+            $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() ?? 1;
+
             $query = \App\Models\ProductSerialNumber::with('productAccurate')
                 ->where('serial_number', 'like', '%' . $this->search_imei_query . '%')
+                ->where('status', 'Available')
                 ->whereNotIn('serial_number', function ($q) {
                     $q->select('serial_number')->from('warranties')->where('status', 'active')->whereNotNull('serial_number');
                 });
+
+            if ($userWarehouseId) {
+                $query->where('warehouse_id', $userWarehouseId);
+            } else {
+                $query->where('business_unit_id', $buId);
+            }
 
             if ($targetItemNo) {
                 $query->where('item_no', $targetItemNo);
@@ -531,10 +583,19 @@ class ClaimManagement extends Component
             }
         }
 
+        $hasPendingApproval = false;
+        if ($selectedClaimObj) {
+            $hasPendingApproval = \App\Models\ApprovalRequest::where('approvable_type', WarrantyClaim::class)
+                ->where('approvable_id', $selectedClaimObj->id)
+                ->where('status', 'PENDING')
+                ->exists();
+        }
+
         return view('livewire.admin.warranty.claim-management', [
             'claims' => $claims,
             'banks' => $banks,
-            'selectedClaimObj' => $selectedClaimObj
+            'selectedClaimObj' => $selectedClaimObj,
+            'hasPendingApproval' => $hasPendingApproval
         ])->layout('layouts.z');
     }
 }
