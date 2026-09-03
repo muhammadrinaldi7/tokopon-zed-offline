@@ -490,14 +490,19 @@
 
                         <div class="space-y-5">
                             @foreach ($ruleCategories as $catIndex => $catData)
-                                <div
+                                <div x-data="{ expanded: true }"
                                     class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden group">
 
                                     {{-- Category Header --}}
                                     <div
                                         class="flex items-center gap-3 px-5 py-4 bg-gray-50/80 border-b border-gray-100">
+                                        <button type="button" @click="expanded = !expanded" class="p-1 text-gray-400 hover:text-[#1c69d4] hover:bg-blue-50 rounded-md transition focus:outline-none" title="Tutup/Buka Kategori">
+                                            <svg class="w-5 h-5 transition-transform duration-200" :class="expanded ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
                                         <div
-                                            class="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center font-black text-gray-400">
+                                            class="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center font-black text-gray-400 shrink-0">
                                             {{ $catIndex + 1 }}
                                         </div>
                                         <input type="text"
@@ -521,7 +526,7 @@
                                     </div>
 
                                     {{-- Items --}}
-                                    <div class="p-5 space-y-3 bg-white">
+                                    <div x-show="expanded" x-transition class="p-5 space-y-3 bg-white">
                                         @foreach ($catData['items'] as $itemIndex => $item)
                                             <div class="flex flex-col gap-2 group/item p-3 border border-gray-100 rounded-xl bg-white shadow-sm">
                                                 {{-- Baris Atas --}}
@@ -571,15 +576,19 @@
                                                 </div>
                                             </div>
                                         @endforeach
-
-                                        <button type="button" wire:click="addItem({{ $catIndex }})"
-                                            class="w-full mt-2 py-3 border-2 border-dashed border-gray-200 hover:border-indigo-300 hover:bg-[#eff6ff]/50 rounded-lg flex items-center justify-center gap-2 text-sm font-bold text-gray-500 hover:text-#1c69d4 transition-colors">
-                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                    </div>
+                                    
+                                    {{-- Footer Add Item --}}
+                                    <div x-show="expanded" class="px-5 py-3 bg-gray-50 border-t border-gray-100">
+                                        <button type="button"
+                                            wire:click="addItem({{ $catIndex }})"
+                                            class="text-sm font-bold text-[#1c69d4] hover:text-blue-800 flex items-center gap-1.5 transition">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
                                                 stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M12 4v16m8-8H4" />
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    stroke-width="2.5" d="M12 4v16m8-8H4" />
                                             </svg>
-                                            Tambah Kondisi Minus
+                                            Tambah Kondisi
                                         </button>
                                     </div>
                                 </div>
