@@ -4,6 +4,7 @@ namespace App\Livewire\Zoffline\Reporting;
 
 use App\Models\SellPhone;
 use App\Models\Branch;
+use App\Models\Employe;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
@@ -19,6 +20,7 @@ class LaporanPembelian extends Component
     public $filterEndDate = '';
     public $filterBranchId = '';
     public $filterStatus = '';
+    public $filterSalesId = '';
 
     public function updatingSearch()
     {
@@ -45,6 +47,11 @@ class LaporanPembelian extends Component
         $this->resetPage();
     }
 
+    public function updatingFilterSalesId()
+    {
+        $this->resetPage();
+    }
+
     public function exportXls()
     {
         $filters = [
@@ -53,6 +60,7 @@ class LaporanPembelian extends Component
             'filterEndDate' => $this->filterEndDate,
             'filterBranchId' => $this->filterBranchId,
             'filterStatus' => $this->filterStatus,
+            'filterSalesId' => $this->filterSalesId,
         ];
 
         return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\LaporanPembelianExport($filters), 'Laporan_Pembelian_' . date('Y-m-d_H-i') . '.xlsx');
@@ -68,16 +76,36 @@ class LaporanPembelian extends Component
         // Get all branches that belong to Business Unit 2
         $availableBranches = Branch::where('business_unit_id', 2)->orderBy('name')->get();
 
+        // Get all sales employees for Business Unit 2
+        $availableSales = Employe::active()
+            ->where(function ($q) {
+                $q->where('business_unit_id', 2)
+                  ->orWhereNull('business_unit_id');
+            })
+            ->orderBy('name')
+            ->get();
+
         // Base query for Laporan Pembelian (SellPhone) for Business Unit 2
-        $query = SellPhone::with(['user', 'handledBy', 'branch'])
+        $query = SellPhone::with(['user', 'handledBy', 'salesBy', 'branch'])
             ->where('business_unit_id', 2);
 
-        // Apply Search Filter (Invoice or Phone Model)
+        // Apply Search Filter (Invoice, Phone Model, Brand, or Sales)
         if (!empty($this->search)) {
             $query->where(function($q) {
                 $q->where('invoice_number', 'like', '%' . $this->search . '%')
                   ->orWhere('phone_model', 'like', '%' . $this->search . '%')
-                  ->orWhere('phone_brand', 'like', '%' . $this->search . '%');
+                  ->orWhere('phone_brand', 'like', '%' . $this->search . '%')
+                  ->orWhere('imei', 'like', '%' . $this->search . '%')
+                  ->orWhereHas('salesBy', function($sq) {
+                      $sq->where('name', 'like', '%' . $this->search . '%')
+                        ->orWhere('employee_no', 'like', '%' . $this->search . '%');
+                  })
+                  ->orWhereHas('handledBy', function($hq) {
+                      $hq->where('name', 'like', '%' . $this->search . '%');
+                  })
+                  ->orWhereHas('user', function($uq) {
+                      $uq->where('name', 'like', '%' . $this->search . '%');
+                  });
             });
         }
 
@@ -95,6 +123,11 @@ class LaporanPembelian extends Component
             $query->where('branch_id', $this->filterBranchId);
         }
 
+        // Apply Sales Filter
+        if (!empty($this->filterSalesId)) {
+            $query->where('sales_id', $this->filterSalesId);
+        }
+
         // Apply Status Filter
         if (!empty($this->filterStatus)) {
             $query->where('status', $this->filterStatus);
@@ -102,6 +135,6 @@ class LaporanPembelian extends Component
 
         $purchases = $query->orderBy('created_at', 'desc')->paginate(15);
 
-        return view('livewire.zoffline.reporting.laporan-pembelian', compact('purchases', 'availableBranches'));
+        return view('livewire.zoffline.reporting.laporan-pembelian', compact('purchases', 'availableBranches', 'availableSales'));
     }
 }

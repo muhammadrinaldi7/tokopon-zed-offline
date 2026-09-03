@@ -32,6 +32,11 @@ class SellPhone extends Component
     public $selectedCustomerId = null;
     public $needsBankInfo = false;
 
+    // Tenaga Penjualan (Sales)
+    public $selected_sales_id = null;
+    public $searchSales = '';
+    public $selectedSalesName = '';
+
     // END KEPERLUAN DATA USER DI FL
 
     public $selected_brand_id;
@@ -87,6 +92,49 @@ class SellPhone extends Component
         $this->brands = $accurateBrands->map(function ($name) {
             return (object) ['id' => $name, 'name' => $name];
         });
+    }
+
+    #[Computed]
+    public function salesResults()
+    {
+        if (strlen($this->searchSales) < 2) return [];
+
+        $user = Auth::user();
+        $businessUnitId = $user ? $user->getActiveBusinessUnitId() : 2;
+
+        return \App\Models\Employe::active()
+            ->where(function ($q) use ($businessUnitId) {
+                $q->where('business_unit_id', $businessUnitId)
+                  ->orWhereNull('business_unit_id');
+            })
+            ->with('branch')
+            ->where(function ($q) {
+                if (Auth::user()?->branch_id) {
+                    $q->where('branch_id', Auth::user()->branch_id)
+                      ->orWhereNull('branch_id');
+                }
+            })
+            ->where(function ($q) {
+                $q->where('name', 'like', '%' . $this->searchSales . '%')
+                  ->orWhere('employee_no', 'like', '%' . $this->searchSales . '%');
+            })->take(10)->get();
+    }
+
+    public function selectSales($id)
+    {
+        $sales = \App\Models\Employe::find($id);
+        if ($sales) {
+            $this->selected_sales_id = $sales->id;
+            $this->selectedSalesName = $sales->name . ($sales->employee_no ? ' (' . $sales->employee_no . ')' : '');
+        }
+        $this->searchSales = '';
+    }
+
+    public function clearSelectedSales()
+    {
+        $this->selected_sales_id = null;
+        $this->selectedSalesName = '';
+        $this->searchSales = '';
     }
 
     #[Computed]
@@ -412,6 +460,7 @@ class SellPhone extends Component
     protected function rules()
     {
         $rules = [
+            'selected_sales_id'         => 'required|exists:employes,id',
             'selected_brand_id'         => 'required',
             'selected_categoryName'     => 'required',
             'selected_proyek'           => 'required',
@@ -468,6 +517,8 @@ class SellPhone extends Component
     }
 
     protected $messages = [
+        'selected_sales_id.required'    => 'Silakan pilih tenaga penjualan (sales).',
+        'selected_sales_id.exists'      => 'Tenaga penjualan yang dipilih tidak valid.',
         'selected_model_name.required'  => 'Silakan pilih model perangkat terlebih dahulu.',
         'imei.required'                 => 'IMEI perangkat wajib diisi saat proses QC.',
         'selected_rules.required'       => 'Silakan pilih kondisi perangkat Anda.',
@@ -658,6 +709,7 @@ class SellPhone extends Component
         // Simpan ke Database
         $sellPhone = \App\Models\SellPhone::create([
             'user_id'           => $userIdToSave,
+            'sales_id'          => $this->selected_sales_id,
             'product_accurate_id' => $productAccurate->id,
             'phone_brand'       => $productAccurate->brandName,
             'phone_model'       => $productAccurate->name,
@@ -733,7 +785,9 @@ class SellPhone extends Component
             }
             $qcListText = implode("\n", $qcList);
 
-            $reasonText = 'Pembelian: ' . $sellPhone->phone_brand . ' ' . $sellPhone->phone_model . " (Rp " . number_format($sellPhone->appraised_value, 0, ',', '.') . ")\n\n" .
+            $salesInfo = $sellPhone->salesBy ? "\nSales: " . $sellPhone->salesBy->name . ($sellPhone->salesBy->employee_no ? " ({$sellPhone->salesBy->employee_no})" : "") : "";
+
+            $reasonText = 'Pembelian: ' . $sellPhone->phone_brand . ' ' . $sellPhone->phone_model . " (Rp " . number_format($sellPhone->appraised_value, 0, ',', '.') . ")" . $salesInfo . "\n\n" .
                 "IMEI: " . $sellPhone->imei . "\n\n" .
                 "List QC:\n" . $qcListText . "\n\n" .
                 "Minus:\n" . str_replace(" | ", "\n", $sellPhone->minus_desc);
@@ -810,6 +864,9 @@ class SellPhone extends Component
             'isNewCustomer',
             'searchCustomer',
             'selectedCustomerId',
+            'selected_sales_id',
+            'searchSales',
+            'selectedSalesName',
             'selected_brand_id',
             'selected_categoryName',
             'selected_proyek',

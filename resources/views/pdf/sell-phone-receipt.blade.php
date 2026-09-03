@@ -69,6 +69,9 @@
         
         <p class="text-xs text-gray">No Transaksi : SPL-{{ $sellPhone->id }}</p>
         <p class="text-xs text-gray">Frontliner   : {{ optional($sellPhone->handledBy)->name ?? '-' }}</p>
+        @if($sellPhone->salesBy)
+        <p class="text-xs text-gray">Sales        : {{ $sellPhone->salesBy->name }} ({{ $sellPhone->salesBy->employee_no ?? '-' }})</p>
+        @endif
         <p class="text-xs text-gray">Pelanggan    : {{ optional($sellPhone->user)->name ?? '-' }}</p>
         <p class="text-xs text-gray">No. HP       : {{ optional(optional($sellPhone->user)->profile)->phone_number ?? '-' }}</p>
         

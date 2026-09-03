@@ -1178,6 +1178,103 @@
                                 </div>
                             </div>
                         @endif
+
+                        {{-- Section: Pilih Tenaga Penjual (Sales) --}}
+                        <div class="p-6 bg-neutral-50 rounded-3xl border border-neutral-100 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs font-black text-neutral-400 uppercase tracking-widest">
+                                    Tenaga Penjual (Sales)
+                                </p>
+                                <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/60">
+                                    Wajib Dipilih
+                                </span>
+                            </div>
+
+                            @if ($selected_sales_id)
+                                @php
+                                    $salesObj = \App\Models\Employe::with('branch')->find($selected_sales_id);
+                                @endphp
+                                <div class="p-4 bg-[#D3AD7B]/10 border border-[#D3AD7B]/30 rounded-2xl flex items-center justify-between gap-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-xl bg-linear-to-br from-[#D3AD7B] to-[#A28153] text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                                            {{ strtoupper(substr($salesObj->name ?? 'S', 0, 2)) }}
+                                        </div>
+                                        <div>
+                                            <p class="text-[10px] font-black text-[#A28153] uppercase tracking-widest">Sales Terpilih</p>
+                                            <h4 class="font-bold text-neutral-800 text-sm md:text-base">{{ $salesObj->name ?? '-' }}</h4>
+                                            <p class="text-xs text-neutral-500 font-mono">
+                                                No. Karyawan: {{ $salesObj->employee_no ?? 'N/A' }} 
+                                                @if($salesObj && $salesObj->branch)
+                                                    &bull; Cabang: {{ $salesObj->branch->name }}
+                                                @endif
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button type="button" wire:click="clearSelectedSales"
+                                        class="text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-colors font-bold text-sm">
+                                        Ganti Sales
+                                    </button>
+                                </div>
+                            @else
+                                <div class="relative" x-data="{ openSalesDropdown: true }" @click.outside="openSalesDropdown = false">
+                                    <div class="relative flex items-center">
+                                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-neutral-400">
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />
+                                            </svg>
+                                        </div>
+                                        <input type="text" wire:model.live.debounce.300ms="searchSales"
+                                            @focus="openSalesDropdown = true"
+                                            class="w-full pl-11 pr-12 py-3 text-sm bg-white border @error('selected_sales_id') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors"
+                                            placeholder="Ketik nama sales atau nomor karyawan (min. 2 karakter)...">
+                                        <div wire:loading wire:target="searchSales" class="absolute right-4 text-[#A28153]">
+                                            <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+
+                                    @if (strlen($searchSales) >= 2)
+                                        <div x-show="openSalesDropdown"
+                                            class="bg-white border border-[#D3AD7B]/30 rounded-2xl shadow-xl max-h-60 overflow-y-auto divide-y divide-neutral-100 mt-2 z-50 relative overflow-hidden">
+                                            @forelse($this->salesResults as $salesEmp)
+                                                <div wire:click="selectSales({{ $salesEmp->id }})"
+                                                    class="p-4 hover:bg-[#D3AD7B]/10 cursor-pointer transition-colors flex justify-between items-center group">
+                                                    <div class="flex items-center gap-3">
+                                                        <div class="w-8 h-8 rounded-lg bg-neutral-100 group-hover:bg-white text-neutral-700 flex items-center justify-center font-bold text-xs">
+                                                            {{ strtoupper(substr($salesEmp->name, 0, 2)) }}
+                                                        </div>
+                                                        <div>
+                                                            <h4 class="font-bold text-neutral-800 text-sm group-hover:text-[#A28153] transition-colors">
+                                                                {{ $salesEmp->name }}
+                                                            </h4>
+                                                            <p class="text-xs text-neutral-500 font-mono">
+                                                                {{ $salesEmp->employee_no ?? 'N/A' }} 
+                                                                @if($salesEmp->branch)
+                                                                    &bull; {{ $salesEmp->branch->name }}
+                                                                @endif
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <span class="text-[#A28153] font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity bg-white px-2.5 py-1 rounded-md border border-[#D3AD7B]/30">
+                                                        Pilih
+                                                    </span>
+                                                </div>
+                                            @empty
+                                                <div class="p-4 text-center text-neutral-500 text-xs font-medium">
+                                                    Karyawan / Sales tidak ditemukan di unit bisnis & cabang ini.
+                                                </div>
+                                            @endforelse
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
+
+                            @error('selected_sales_id')
+                                <span class="text-red-500 text-xs font-bold block">{{ $message }}</span>
+                            @enderror
+                        </div>
                     </div>
                 @endif
                 <div class="space-y-6 relative">
