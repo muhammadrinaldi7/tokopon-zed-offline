@@ -20,7 +20,8 @@ class BuybackDeviceTemplateSheet implements FromCollection, WithTitle, WithHeadi
     public function collection()
     {
         // Ambil semua produk Accurate untuk referensi template
-        return ProductAccurate::where('business_unit_id', 2)
+        return ProductAccurate::with(['buybackDevice.tier'])
+            ->where('business_unit_id', 2)
             ->orderBy('name')
             ->get();
     }
@@ -41,9 +42,13 @@ class BuybackDeviceTemplateSheet implements FromCollection, WithTitle, WithHeadi
 
     public function map($product): array
     {
+        // Jika produk sudah pernah di-mapping sebelumnya, ambil ID mapping dan Nama Tier-nya
+        $mappingId = $product->buybackDevice ? $product->buybackDevice->id : '';
+        $tierName = ($product->buybackDevice && $product->buybackDevice->tier) ? $product->buybackDevice->tier->name : '';
+
         return [
-            '', // ID kosong karena ini template untuk data baru/mapping baru
-            '', // Tier Name kosong, user akan mengisi lewat dropdown
+            $mappingId, // ID kosong untuk data baru, atau terisi jika sudah pernah di-mapping
+            $tierName, // Kosong jika belum di-mapping, terisi jika sudah
             $product->item_no ?? '',
             $product->os ?? '',
             $product->categoryName ?? '',

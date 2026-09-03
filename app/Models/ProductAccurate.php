@@ -47,4 +47,9 @@ class ProductAccurate extends Model
     {
         return $this->hasMany(ProductSerialNumber::class, 'product_accurate_id', 'id');
     }
+
+    public function buybackDevice()
+    {
+        return $this->hasOne(BuybackDevice::class, 'product_accurate_id', 'id');
+    }
 }
