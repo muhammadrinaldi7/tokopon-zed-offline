@@ -857,8 +857,8 @@
 
                             @if ($selectedDesc)
                                 <div
-                                    class="mt-3 p-3 bg-sky-50 border border-sky-200 rounded-xl flex items-start gap-3 transition-all duration-300 ease-out">
-                                    <div class="mt-0.5 text-sky-500">
+                                    class="mt-3 p-3 bg-transparent border border-[#D3AD7B]/50 rounded-xl flex items-start gap-3 transition-all duration-300 ease-out">
+                                    <div class="mt-0.5 text-[#D3AD7B]">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -866,8 +866,8 @@
                                         </svg>
                                     </div>
                                     <div>
-                                        <p class="text-xs font-bold text-sky-900 mb-0.5">{{ $selectedTitle }}</p>
-                                        <p class="text-xs text-sky-800/80 leading-relaxed">{!! $selectedDesc !!}</p>
+                                        <p class="text-xs font-bold text-[#A28153] mb-0.5">{{ $selectedTitle }}</p>
+                                        <p class="text-xs text-[#A28153]/80 leading-relaxed">{!! $selectedDesc !!}</p>
                                     </div>
                                 </div>
                             @endif
