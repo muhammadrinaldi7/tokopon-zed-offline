@@ -214,6 +214,9 @@ class TierIndex extends Component
 
     public function delete($id)
     {
+        // Hapus mapping perangkat (BuybackDevice) yang terkait dengan tier ini agar tidak menggantung
+        \App\Models\BuybackDevice::where('buyback_tier_id', $id)->delete();
+        
         BuybackTier::findOrFail($id)->delete();
         $this->dispatch('toast', title: 'Dihapus', message: 'Tier berhasil dihapus.', type: 'success');
         $this->loadTiers();
