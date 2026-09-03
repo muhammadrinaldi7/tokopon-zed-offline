@@ -35,6 +35,11 @@ class MonitoringKasir extends Component
         if (!$this->selectedKasirId) return;
 
         $query = Order::with(['payments.paymentMethod', 'cashSettlement.monitoringBy'])
+            ->whereHas('payments.paymentMethod', function ($q) {
+                $q->where('name', 'like', '%TUNAI%')
+                  ->orWhere('name', 'like', '%CASH%')
+                  ->orWhere('category', 'like', '%CASH%');
+            })
             ->where('business_unit_id', 2)
             ->where('handled_by', $this->selectedKasirId)
             ->whereDate('order_date', today());
@@ -53,21 +58,19 @@ class MonitoringKasir extends Component
                 return str_contains($paymentName, 'TUNAI') || str_contains($paymentName, 'CASH') || str_contains($paymentCategory, 'CASH');
             })->sum('amount');
 
-            if ($nominalTunai > 0) {
-                $this->kasirOrders[] = [
-                    'order_id' => $order->id,
-                    'order_number' => $order->order_number ?? 'Order #' . $order->id,
-                    'nominal_tunai' => $nominalTunai,
-                    'settlement' => $order->cashSettlement ? [
-                        'nominal_settle' => $order->cashSettlement->nominal_settle,
-                        'monitoring_by_name' => optional($order->cashSettlement->monitoringBy)->name,
-                        'selisih' => $order->cashSettlement->selisih
-                    ] : null
-                ];
+            $this->kasirOrders[] = [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number ?? 'Order #' . $order->id,
+                'nominal_tunai' => $nominalTunai,
+                'settlement' => $order->cashSettlement ? [
+                    'nominal_settle' => $order->cashSettlement->nominal_settle,
+                    'monitoring_by_name' => optional($order->cashSettlement->monitoringBy)->name,
+                    'selisih' => $order->cashSettlement->selisih
+                ] : null
+            ];
 
-                if (!$order->cashSettlement) {
-                    $this->formSettle[$order->id] = $nominalTunai;
-                }
+            if (!$order->cashSettlement) {
+                $this->formSettle[$order->id] = $nominalTunai;
             }
         }
     }
@@ -115,6 +118,11 @@ class MonitoringKasir extends Component
         $branchName = Auth::user()->branch->name ?? 'Semua Cabang';
 
         $query = Order::with(['handledBy', 'payments.paymentMethod', 'cashSettlement'])
+            ->whereHas('payments.paymentMethod', function ($q) {
+                $q->where('name', 'like', '%TUNAI%')
+                  ->orWhere('name', 'like', '%CASH%')
+                  ->orWhere('category', 'like', '%CASH%');
+            })
             ->where('business_unit_id', 2)
             ->whereDate('created_at', today());
 
