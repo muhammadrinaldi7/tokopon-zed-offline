@@ -249,10 +249,16 @@ class AccurateInvoiceExport extends Component
                 $itemCodesToCheck[] = $itemCode;
                 $vendorIdsToCheck[] = $vendorId;
 
-                // Validasi Kuantitas vs SN
+                // Bersihkan SN dan dukung pemisah koma (,) maupun titik koma (;)
+                $snArray = [];
                 if (!empty($snRaw)) {
-                    $cleanSn = trim($snRaw, " \t\n\r\0\x0B;");
-                    $snArray = array_filter(explode(';', $cleanSn), 'strlen');
+                    // Ganti koma dengan titik koma agar seragam
+                    $cleanSn = str_replace(',', ';', $snRaw);
+                    $cleanSn = trim($cleanSn, " \t\n\r\0\x0B;");
+                    // Pecah dan bersihkan spasi
+                    $snArray = array_map('trim', explode(';', $cleanSn));
+                    $snArray = array_filter($snArray, 'strlen'); // Buang yang kosong
+                    
                     $snCount = count($snArray);
                     if ($snCount != $qty) {
                         $errors[] = "Baris $rowNumber: Barang '$itemCode' Kuantitas $qty tapi terdapat $snCount Serial Number (IMEI).";
@@ -276,13 +282,31 @@ class AccurateInvoiceExport extends Component
                     ];
                 }
 
-                $invoicesData[$invoiceNo]['items'][] = [
-                    'item_code' => $itemCode,
-                    'quantity' => $qty,
-                    'unit_price' => trim((string)($data['unit_price'] ?? '0')),
-                    'warehouse_name' => trim((string)($data['warehouse_name'] ?? '')),
-                    'serial_numbers' => $snRaw,
-                ];
+                $unitPrice = trim((string)($data['unit_price'] ?? '0'));
+                $warehouseName = trim((string)($data['warehouse_name'] ?? ''));
+                
+                // Smart Grouping: Kelompokkan berdasarkan item_code, unit_price, dan warehouse
+                $itemKey = $itemCode . '|' . $unitPrice . '|' . $warehouseName;
+
+                if (!isset($invoicesData[$invoiceNo]['items'][$itemKey])) {
+                    $invoicesData[$invoiceNo]['items'][$itemKey] = [
+                        'item_code' => $itemCode,
+                        'quantity' => 0,
+                        'unit_price' => $unitPrice,
+                        'warehouse_name' => $warehouseName,
+                        'serial_numbers' => [],
+                    ];
+                }
+
+                // Tambahkan Qty dan gabungkan SN
+                $invoicesData[$invoiceNo]['items'][$itemKey]['quantity'] += $qty;
+                if (!empty($snArray)) {
+                    // Merge array SN baru ke dalam array yang sudah ada
+                    $invoicesData[$invoiceNo]['items'][$itemKey]['serial_numbers'] = array_merge(
+                        $invoicesData[$invoiceNo]['items'][$itemKey]['serial_numbers'], 
+                        $snArray
+                    );
+                }
             }
 
             // Bulk Validation Database (Lebih cepat daripada query per baris)
@@ -335,10 +359,10 @@ class AccurateInvoiceExport extends Component
                     $invoice->items()->create([
                         'item_code' => $item['item_code'],
                         'quantity' => $item['quantity'],
-                        'unit' => 'UNIT',
+                        'unit' => '',
                         'unit_price' => $item['unit_price'],
                         'warehouse_name' => $item['warehouse_name'],
-                        'serial_numbers' => $item['serial_numbers'], // Simpan IMEI
+                        'serial_numbers' => implode(';', $item['serial_numbers']), // Gabungkan IMEI yang sudah di-group
                     ]);
                 }
             }
@@ -392,44 +416,26 @@ class AccurateInvoiceExport extends Component
                 $headerRow[2]  = $inv->invoice_no;
                 $headerRow[3]  = Carbon::parse($inv->invoice_date)->format('d/m/Y');
                 $headerRow[4]  = $inv->vendor_id;
+                $headerRow[6]  = 'Tidak'; // Kena PPN
                 $headerRow[12] = $inv->description ?? '';
                 $headerRow[13] = $inv->branch_name ?? '';
 
                 fputcsv($file, array_pad($headerRow, $maxColumns, ''));
 
                 foreach ($inv->items as $item) {
+                    $itemRow = array_fill(0, count($row2_item), '');
+                    $itemRow[0] = 'ITEM';
+                    $itemRow[1] = $item->item_code;
+                    $itemRow[3] = $item->quantity; // Gunakan kuantitas asli hasil grouping
+                    $itemRow[4] = $item->unit ?? ''; // Kosongkan agar Accurate memakai default
+                    $itemRow[5] = round($item->unit_price, 0);
+                    $itemRow[9] = $item->warehouse_name ?? '';
+
                     if (!empty(trim($item->serial_numbers))) {
-                        // Bersihkan jika ada spasi atau titik koma berlebih di ujung teks
-                        $cleanSn = trim($item->serial_numbers, " \t\n\r\0\x0B;");
-
-                        // Pecah IMEI berdasarkan titik koma
-                        $snArray = explode(';', $cleanSn);
-
-                        // Buat 1 baris per Serial Number dengan Kuantitas = 1
-                        foreach ($snArray as $sn) {
-                            $itemRow = array_fill(0, count($row2_item), '');
-                            $itemRow[0] = 'ITEM';
-                            $itemRow[1] = $item->item_code;
-                            $itemRow[3] = 1; // Kuantitas dipecah jadi 1
-                            $itemRow[4] = $item->unit;
-                            $itemRow[5] = round($item->unit_price, 0);
-                            $itemRow[9] = $item->warehouse_name ?? '';
-                            $itemRow[16] = trim($sn); // Masukkan Serial Number
-
-                            fputcsv($file, array_pad($itemRow, $maxColumns, ''));
-                        }
-                    } else {
-                        // Jika tidak ada Serial Number, export utuh seperti biasa
-                        $itemRow = array_fill(0, count($row2_item), '');
-                        $itemRow[0] = 'ITEM';
-                        $itemRow[1] = $item->item_code;
-                        $itemRow[3] = $item->quantity;
-                        $itemRow[4] = $item->unit;
-                        $itemRow[5] = round($item->unit_price, 0);
-                        $itemRow[9] = $item->warehouse_name ?? '';
-
-                        fputcsv($file, array_pad($itemRow, $maxColumns, ''));
+                        $itemRow[16] = trim($item->serial_numbers, " \t\n\r\0\x0B;"); // Masukkan gabungan SN utuh
                     }
+
+                    fputcsv($file, array_pad($itemRow, $maxColumns, ''));
                 }
 
                 $inv->update(['is_exported' => true]);
