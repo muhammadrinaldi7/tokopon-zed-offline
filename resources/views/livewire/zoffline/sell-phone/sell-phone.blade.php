@@ -857,7 +857,7 @@
 
                             @if ($selectedDesc)
                                 <div
-                                    class="mt-3 p-3 bg-transparent border border-[#D3AD7B]/50 rounded-xl flex items-start gap-3 transition-all duration-300 ease-out">
+                                    class="mt-3 p-3 rounded-xl flex items-start gap-3 transition-all duration-300 ease-out">
                                     <div class="mt-0.5 text-[#D3AD7B]">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24">
