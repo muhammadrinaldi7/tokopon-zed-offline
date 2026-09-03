@@ -20,6 +20,8 @@ class SellPhone extends Model implements HasMedia
         'appraised_value',
         'original_appraised_value',
         'is_price_adjusted',
+        'price_adjusted_by',
+        'price_adjustment_reason',
         'is_wa_sent',
         'is_email_sent',
         'status',

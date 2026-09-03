@@ -494,10 +494,15 @@
                                             class="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center font-black text-gray-400">
                                             {{ $catIndex + 1 }}
                                         </div>
-                                        <input type="text" @if ($catIndex < 3) readonly @endif
+                                        <input type="text"
                                             wire:model="ruleCategories.{{ $catIndex }}.category"
                                             placeholder="Nama Kategori (cth: Layar / Fisik / Kelengkapan)"
                                             class="flex-1 bg-transparent border-none py-1.5 px-2 text-base font-black text-gray-800 placeholder-gray-400 focus:ring-0">
+                                            
+                                        <label class="flex items-center gap-2 cursor-pointer border-l border-gray-200 pl-4">
+                                            <input type="checkbox" wire:model="ruleCategories.{{ $catIndex }}.is_multiple" class="w-4 h-4 text-[#1c69d4] bg-gray-100 border-gray-300 rounded focus:ring-[#1c69d4]">
+                                            <span class="text-xs font-bold text-gray-500">Bisa Pilih Banyak (Checkbox)</span>
+                                        </label>
                                         <button type="button" wire:click="removeCategory({{ $catIndex }})"
                                             class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
                                             title="Hapus Kategori">

@@ -31,6 +31,11 @@ class Index extends Component
     public $rejectingApprovalId = null;
     public $rejectionReason = '';
 
+    // SellPhone Edit Price Modal
+    public $editingPriceId = null;
+    public $adjustedPrice = 0;
+    public $priceAdjustmentReason = '';
+
     public function viewDetail($id)
     {
         $this->detailRequest = ApprovalRequest::with([
@@ -93,9 +98,17 @@ class Index extends Component
             }
         }
 
-        if ($nextLevel >= $request->required_level) {
+        if ($nextLevel >= $request->required_level || $request->request_type === 'SELL_PHONE_APPROVAL') {
             $this->confirmingApprovalId = $id;
             $this->confirmingRequestType = $request->request_type;
+            
+            if ($request->request_type === 'SELL_PHONE_APPROVAL') {
+                $this->editingPriceId = $id;
+                // Get current value
+                if ($request->approvable && isset($request->approvable->appraised_value)) {
+                    $this->adjustedPrice = $request->approvable->appraised_value;
+                }
+            }
         } else {
             $this->approve($id); // Langsung setujui kalau belum tahap akhir
         }
@@ -104,6 +117,14 @@ class Index extends Component
     public function executeApprove()
     {
         if ($this->confirmingApprovalId) {
+            // Check if it's SellPhone price edit
+            if ($this->confirmingRequestType === 'SELL_PHONE_APPROVAL' && $this->editingPriceId) {
+                if ($this->adjustedPrice > 0 && empty(trim($this->priceAdjustmentReason))) {
+                    $this->addError('priceAdjustmentReason', 'Alasan ubah harga wajib diisi!');
+                    return;
+                }
+            }
+
             $this->approve($this->confirmingApprovalId);
             $this->cancelApprove();
         }
@@ -114,6 +135,9 @@ class Index extends Component
         $this->confirmingApprovalId = null;
         $this->confirmingRequestType = null;
         $this->extensionDays = 7;
+        $this->editingPriceId = null;
+        $this->adjustedPrice = 0;
+        $this->priceAdjustmentReason = '';
     }
 
     public function approve($id)
@@ -139,7 +163,7 @@ class Index extends Component
             'acted_by' => $user->id,
             'action' => 'APPROVED',
             'level' => $request->current_level + 1,
-            'notes' => 'Approved by ' . $user->name
+            'notes' => 'Approved by ' . $user->name . ($this->priceAdjustmentReason ? " (Adjusted Price: {$this->priceAdjustmentReason})" : "")
         ]);
 
         $request->current_level += 1;
@@ -150,7 +174,10 @@ class Index extends Component
 
             try {
                 $request->executeAction([
-                    'extension_days' => $this->extensionDays
+                    'extension_days' => $this->extensionDays,
+                    'adjusted_price' => $this->adjustedPrice > 0 ? $this->adjustedPrice : null,
+                    'price_adjusted_by' => $this->adjustedPrice > 0 ? $user->id : null,
+                    'price_adjustment_reason' => $this->priceAdjustmentReason,
                 ]);
 
                 // --- KIRIM NOTIFIKASI GRUP TELEGRAM ---

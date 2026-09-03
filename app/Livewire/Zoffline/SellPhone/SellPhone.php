@@ -325,11 +325,14 @@ class SellPhone extends Component
 
                 if ($tier) {
                     $flat = [];
-                    foreach ($tier->getRulesByCategory() as $category => $items) {
+                    foreach ($tier->getRulesByCategory() as $category => $data) {
+                        $isMultiple = $data['is_multiple'] ?? false;
+                        $items = $data['items'] ?? [];
                         foreach ($items as $idx => $item) {
                             $flat[] = [
                                 'key'         => \Illuminate\Support\Str::slug($category) . '_' . $idx,
                                 'category'    => $category,
+                                'is_multiple' => $isMultiple,
                                 'name'        => $item['name'],
                                 'type'        => $item['type'],
                                 'value'       => (float) $item['value'],
@@ -360,7 +363,6 @@ class SellPhone extends Component
 
     public function calculatePrice()
     {
-        if ($this->is_price_adjusted) return;
 
         $price = $this->base_price;
 
@@ -647,7 +649,8 @@ class SellPhone extends Component
         $requiredLevel = \App\Models\ApprovalRule::where('module', 'SELL_PHONE_APPROVAL')->max('level') ?? 0;
         $needsApproval = false;
 
-        if ($finalStatus === 'PAYING' && $requiredLevel > 0) {
+        // WAJIB APPROVAL UNTUK SEMUA TRANSAKSI SELLPHONE (Jika tidak cancelled)
+        if ($finalStatus === 'PAYING') {
             $finalStatus = 'PENDING_APPROVAL';
             $needsApproval = true;
         }
@@ -664,7 +667,7 @@ class SellPhone extends Component
             'minus_desc'        => $minusDesc,
             'appraised_value'   => $this->final_price,
             'original_appraised_value' => $this->calculated_price,
-            'is_price_adjusted' => $this->is_price_adjusted,
+            'is_price_adjusted' => false, // Set false karena kasir tidak bisa mengubah harga lagi
             'status'            => $finalStatus,
             'handled_by'        => $currentUser->id,
             'business_unit_id'  => $currentUser->getActiveBusinessUnitId(),
@@ -735,7 +738,7 @@ class SellPhone extends Component
                 "List QC:\n" . $qcListText . "\n\n" .
                 "Minus:\n" . str_replace(" | ", "\n", $sellPhone->minus_desc);
 
-            // 1. Peringatan Edit Harga
+            // Peringatan Nego Harga (sudah tidak bisa di-trigger dari kasir, tapi disisakan logikanya kalau diperlukan)
             if ($sellPhone->is_price_adjusted) {
                 $difference = $sellPhone->appraised_value - $sellPhone->original_appraised_value;
                 $diffText = "Rp " . number_format(abs($difference), 0, ',', '.');

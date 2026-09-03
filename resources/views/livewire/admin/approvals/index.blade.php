@@ -159,6 +159,36 @@
                     Menyetujui pengajuan ini akan otomatis mengeksekusi retur dan penggantian unit di Accurate (membuat <b>Sales Return</b>, <b>Sales Invoice</b>, dan <b>Sales Receipt</b>).
                     <br><br>Apakah Anda yakin ingin melanjutkan?
                 </p>
+                @elseif($confirmingRequestType === 'SELL_PHONE_APPROVAL')
+                <div class="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4 border-4 border-amber-50">
+                    <svg class="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                
+                <h3 class="mb-2 text-xl font-bold text-gray-900">Persetujuan & Edit Harga</h3>
+                <p class="text-sm text-gray-500 mb-4 font-medium leading-relaxed">
+                    Anda dapat menyetujui dengan harga asli, atau menyesuaikan harga terlebih dahulu sebelum menyetujui.
+                </p>
+
+                <div class="mb-5 text-left bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <label class="block text-xs font-bold text-gray-700 mb-1.5">
+                        Harga Disetujui (Rp)
+                    </label>
+                    <input type="number" wire:model="adjustedPrice" class="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition mb-3">
+                    
+                    <label class="block text-xs font-bold text-gray-700 mb-1.5">
+                        Alasan Perubahan Harga <span class="text-xs font-normal text-gray-500">(Wajib jika harga diubah)</span>
+                    </label>
+                    <textarea 
+                        wire:model="priceAdjustmentReason" 
+                        rows="2" 
+                        placeholder="Contoh: Kondisi fisik lebih buruk dari deskripsi..."
+                        class="w-full px-3.5 py-2.5 bg-white border @error('priceAdjustmentReason') border-rose-300 ring-1 ring-rose-300 @else border-gray-300 @enderror rounded-xl text-xs focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition resize-none"></textarea>
+                    @error('priceAdjustmentReason')
+                        <p class="text-rose-600 text-[11px] mt-1 font-medium">{{ $message }}</p>
+                    @enderror
+                </div>
                 @else
                 <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 border-4 border-red-50">
                     <svg class="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -188,6 +218,10 @@
                     @elseif($confirmingRequestType === 'WARRANTY_REPLACEMENT')
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20">
                         Setujui Ganti Unit
+                    </button>
+                    @elseif($confirmingRequestType === 'SELL_PHONE_APPROVAL')
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-amber-600 rounded-xl hover:bg-amber-700 focus:ring-4 focus:ring-amber-300 transition-colors shadow-md shadow-amber-500/20">
+                        Simpan & Setujui
                     </button>
                     @else
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-300 transition-colors shadow-md shadow-red-500/20">

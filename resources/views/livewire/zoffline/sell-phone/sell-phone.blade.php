@@ -796,7 +796,7 @@
                             <div class="flex flex-wrap gap-3">
                                 @foreach ($rules as $rule)
                                     <label class="cursor-pointer block group">
-                                        @if (str_contains(strtolower($category), 'kelengkapan'))
+                                        @if ($rule['is_multiple'])
                                             <input type="checkbox"
                                                 wire:model.live="selected_rules.{{ $rule['key'] }}" class="hidden">
                                         @else
@@ -1198,108 +1198,14 @@
                         <div class="text-xs">
                             <p class="font-black text-amber-950">Estimasi Harga Jual Anda</p>
                             <p class="text-amber-800 font-medium">Berdasarkan kondisi yang Anda cantumkan.</p>
-                            @if ($is_price_adjusted)
-                                <div class="mt-1 flex flex-wrap items-center gap-2">
-                                    <span
-                                        class="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-300">
-                                        Harga Disesuaikan Manual
-                                    </span>
-                                    <button type="button" wire:click="resetCalculation"
-                                        class="text-[10px] font-bold text-amber-700 hover:text-amber-900 underline">
-                                        Reset ke Otomatis
-                                    </button>
-                                </div>
-                            @endif
+
                         </div>
-                        <div class="text-right" x-data="{
-                            modalOpen: false,
-                            price: @entangle('final_price'),
-                            formattedPrice: '',
-                            init() {
-                                this.formattedPrice = this.formatNumber(this.price);
-                                $watch('price', value => {
-                                    if (document.activeElement !== this.$refs.priceInput) {
-                                        this.formattedPrice = this.formatNumber(value);
-                                    }
-                                });
-                            },
-                            formatNumber(value) {
-                                if (!value) return '';
-                                let str = value.toString().replace(/\D/g, '');
-                                return new Intl.NumberFormat('id-ID').format(str);
-                            },
-                            updatePrice(value) {
-                                let cleanValue = value.replace(/\D/g, '');
-                                this.price = cleanValue ? parseInt(cleanValue) : 0;
-                                this.formattedPrice = this.formatNumber(cleanValue);
-                            }
-                        }">
+                        <div class="text-right">
                             {{-- TAMPILAN NORMAL --}}
                             <div class="flex items-center justify-end gap-3">
                                 <p class="text-2xl md:text-3xl font-black text-amber-700">
-                                    Rp <span x-text="new Intl.NumberFormat('id-ID').format(price || 0)"></span>
+                                    Rp <span x-text="new Intl.NumberFormat('id-ID').format($wire.final_price || 0)"></span>
                                 </p>
-                                {{-- <button type="button" @click="modalOpen = true"
-                                    class="p-2 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-xl transition-colors"
-                                    title="Sesuaikan Harga">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
-                                        </path>
-                                    </svg>
-                                </button> --}}
-                            </div>
-
-                            {{-- TAMPILAN EDIT MODAL --}}
-                            <div x-show="modalOpen" x-cloak
-                                class="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/50 backdrop-blur-sm p-4"
-                                x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
-                                x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200"
-                                x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
-
-                                <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl text-left"
-                                    @click.away="modalOpen = false" x-transition:enter="ease-out duration-300"
-                                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100">
-
-                                    <div class="flex justify-between items-center mb-6">
-                                        <h3 class="text-lg font-bold text-neutral-800">Sesuaikan Harga Manual</h3>
-                                        <button @click="modalOpen = false" type="button"
-                                            class="text-neutral-400 hover:text-neutral-600 transition-colors bg-neutral-100 hover:bg-neutral-200 p-2 rounded-full">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M6 18L18 6M6 6l12 12"></path>
-                                            </svg>
-                                        </button>
-                                    </div>
-
-                                    <div class="relative w-full mb-8">
-                                        <label
-                                            class="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2">Harga
-                                            Kesepakatan Akhir</label>
-                                        <div class="relative">
-                                            <span
-                                                class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-amber-700 text-lg">Rp</span>
-                                            <input type="text" x-ref="priceInput" :value="formattedPrice"
-                                                @input="updatePrice($event.target.value)"
-                                                class="w-full pl-12 pr-4 py-4 border-2 border-amber-300 rounded-xl font-bold text-neutral-800 focus:outline-none focus:border-amber-600 bg-white text-xl shadow-inner transition-colors"
-                                                @keydown.enter="modalOpen = false; $wire.set('is_price_adjusted', true)">
-                                        </div>
-                                    </div>
-
-                                    <div class="flex gap-3">
-                                        <button type="button" @click="modalOpen = false"
-                                            class="w-full py-3.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl transition-colors">
-                                            Batal
-                                        </button>
-                                        <button type="button"
-                                            @click="modalOpen = false; $wire.set('is_price_adjusted', true)"
-                                            class="w-full py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-amber-600/30">
-                                            Simpan Harga
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>

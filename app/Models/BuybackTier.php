@@ -25,7 +25,25 @@ class BuybackTier extends Model
      */
     public function getRulesByCategory(): array
     {
-        return $this->rules ?? [];
+        $rawRules = $this->rules ?? [];
+        $formattedRules = [];
+
+        foreach ($rawRules as $category => $data) {
+            // Backward compatibility: If $data is a sequential array, it's the old format
+            if (is_array($data) && (empty($data) || array_keys($data) === range(0, count($data) - 1))) {
+                // Automatically mark 'kelengkapan' as multiple for old data
+                $isMultiple = str_contains(strtolower($category), 'kelengkapan');
+                $formattedRules[$category] = [
+                    'is_multiple' => $isMultiple,
+                    'items'       => $data
+                ];
+            } else {
+                // New format: associative array with 'is_multiple' and 'items'
+                $formattedRules[$category] = $data;
+            }
+        }
+        
+        return $formattedRules;
     }
 
 

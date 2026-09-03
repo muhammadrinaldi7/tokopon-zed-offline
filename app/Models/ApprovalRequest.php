@@ -104,7 +104,16 @@ class ApprovalRequest extends Model
                 throw new \Exception("SellPhone not found.");
             }
 
-            $sellPhone->update(['status' => 'PAYING']);
+            $updateData = ['status' => 'PAYING'];
+
+            if (isset($params['adjusted_price']) && $params['adjusted_price'] > 0) {
+                $updateData['appraised_value'] = $params['adjusted_price'];
+                $updateData['is_price_adjusted'] = true;
+                $updateData['price_adjusted_by'] = $params['price_adjusted_by'] ?? null;
+                $updateData['price_adjustment_reason'] = $params['price_adjustment_reason'] ?? null;
+            }
+
+            $sellPhone->update($updateData);
 
             $this->update(['status' => 'COMPLETED']);
             

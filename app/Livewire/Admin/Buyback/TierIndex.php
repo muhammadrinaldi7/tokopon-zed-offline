@@ -51,11 +51,11 @@ class TierIndex extends Component
         $this->listOs = \App\Models\ProductAccurate::whereNotNull('os')
             ->where('business_unit_id', $buId)
             ->select('os')->distinct()->pluck('os')->toArray();
-            
+
         $this->listCategories = \App\Models\ProductAccurate::whereNotNull('categoryName')
             ->where('business_unit_id', $buId)
             ->select('categoryName')->distinct()->pluck('categoryName')->toArray();
-            
+
         $this->listBrands = \App\Models\ProductAccurate::whereNotNull('brandName')
             ->where('business_unit_id', $buId)
             ->select('brandName')->distinct()->pluck('brandName')->toArray();
@@ -68,12 +68,12 @@ class TierIndex extends Component
 
     public function loadTiers()
     {
-        $query = BuybackTier::withCount('devices')->orderBy('min_price');
-        
+        $query = BuybackTier::withCount('devices');
+
         if (!empty($this->search)) {
             $query->where('name', 'like', '%' . $this->search . '%');
         }
-        
+
         $this->tiers = $query->get();
     }
 
@@ -110,7 +110,7 @@ class TierIndex extends Component
         $genericMapping = \App\Models\BuybackDevice::where('buyback_tier_id', $tier->id)
             ->whereNull('product_accurate_id')
             ->first();
-            
+
         if ($genericMapping) {
             $this->mapping_os = $genericMapping->os_name ?? '';
             $this->mapping_category = $genericMapping->category_name ?? '';
@@ -118,16 +118,18 @@ class TierIndex extends Component
         }
 
         // Konversi JSON rules ke format array untuk editor
-        $rulesJson = $tier->rules ?? [];
-        foreach ($rulesJson as $category => $items) {
-            foreach($items as &$item) {
+        $rulesJson = $tier->getRulesByCategory();
+        foreach ($rulesJson as $category => $data) {
+            $items = $data['items'] ?? [];
+            foreach ($items as &$item) {
                 if (!isset($item['description'])) {
                     $item['description'] = '';
                 }
             }
             $this->ruleCategories[] = [
-                'category' => $category,
-                'items'    => array_values($items),
+                'category'    => $category,
+                'is_multiple' => $data['is_multiple'] ?? false,
+                'items'       => array_values($items),
             ];
         }
 
@@ -158,7 +160,7 @@ class TierIndex extends Component
         // --- Sinkronisasi Pemetaan Perangkat ---
         $existingDeviceIds = \App\Models\BuybackDevice::where('buyback_tier_id', $tier->id)->pluck('product_accurate_id')->toArray();
         $newDeviceIds = array_keys($this->selectedProducts);
-        
+
         // Items to delete
         $toDelete = array_diff($existingDeviceIds, $newDeviceIds);
         if (!empty($toDelete)) {
@@ -166,7 +168,7 @@ class TierIndex extends Component
                 ->whereIn('product_accurate_id', $toDelete)
                 ->delete();
         }
-        
+
         // Items to add/update
         foreach ($newDeviceIds as $productId) {
             \App\Models\BuybackDevice::updateOrCreate(
@@ -177,7 +179,7 @@ class TierIndex extends Component
                 ]
             );
         }
-        
+
         // --- Sinkronisasi Generic Mapping ---
         if (!empty($this->mapping_os) || !empty($this->mapping_category) || !empty($this->mapping_brand)) {
             \App\Models\BuybackDevice::updateOrCreate(
@@ -239,7 +241,7 @@ class TierIndex extends Component
                 $q->where('name', 'like', '%' . $this->searchProduct . '%')
                     ->orWhere('item_no', 'like', '%' . $this->searchProduct . '%');
             });
-            
+
             $query->whereNotIn('id', function ($subQuery) {
                 $subQuery->select('product_accurate_id')->from('buyback_devices');
                 if ($this->tierId) {
@@ -250,7 +252,7 @@ class TierIndex extends Component
             if (!empty($this->selectedProducts)) {
                 $query->whereNotIn('id', array_keys($this->selectedProducts));
             }
-            
+
             $query->where('business_unit_id', 2);
 
             $this->productsAccurateList = $query->limit(20)->get();
@@ -325,6 +327,9 @@ class TierIndex extends Component
 
     public function addItem($catIndex)
     {
+        if (!isset($this->ruleCategories[$catIndex]['is_multiple'])) {
+            $this->ruleCategories[$catIndex]['is_multiple'] = false;
+        }
         $this->ruleCategories[$catIndex]['items'][] = [
             'name'  => '',
             'type'  => 'fixed',
@@ -358,7 +363,10 @@ class TierIndex extends Component
             }
 
             if (!empty($items)) {
-                $result[$category] = $items;
+                $result[$category] = [
+                    'is_multiple' => $catData['is_multiple'] ?? false,
+                    'items'       => $items,
+                ];
             }
         }
         return $result;
@@ -382,7 +390,7 @@ class TierIndex extends Component
         $this->selectedProducts = [];
         $this->searchProduct = '';
         $this->productsAccurateList = [];
-        
+
         $this->mapping_os = '';
         $this->mapping_category = '';
         $this->mapping_brand = '';
