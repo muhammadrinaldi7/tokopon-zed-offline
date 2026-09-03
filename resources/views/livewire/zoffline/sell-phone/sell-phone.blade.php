@@ -760,7 +760,7 @@
                             :class="!$wire.qc_verdict ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed' : ($wire
                                 .qc_verdict === 'fail' ? 'bg-rose-600 hover:bg-rose-700 text-white' :
                                 'bg-linear-to-r from-[#D3AD7B] to-[#A28153] hover:from-[#C39D6B] hover:to-[#927143] text-white shadow-md shadow-[#A28153]/30'
-                                )">
+                            )">
                             <span
                                 x-text="$wire.qc_verdict === 'fail' ? 'Batalkan Transaksi' : 'Lanjut Kondisi Harga'"></span>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -867,7 +867,8 @@
                                     </div>
                                     <div>
                                         <p class="text-xs font-bold text-[#A28153] mb-0.5">{{ $selectedTitle }}</p>
-                                        <p class="text-xs text-[#A28153]/80 leading-relaxed">{!! $selectedDesc !!}</p>
+                                        <p class="text-xs text-[#A28153]/80 leading-relaxed">{!! $selectedDesc !!}
+                                        </p>
                                     </div>
                                 </div>
                             @endif
@@ -894,7 +895,7 @@
                 if ($base_price > 0 && count($device_rules) > 0) {
                     $requiredCategories = collect($device_rules)
                         ->filter(function ($rule) {
-                            return !str_contains(strtolower($rule['category']), 'kelengkapan');
+                            return !$rule['is_multiple'];
                         })
                         ->pluck('category')
                         ->unique();
