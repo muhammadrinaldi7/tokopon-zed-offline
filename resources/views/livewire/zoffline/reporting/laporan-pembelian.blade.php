@@ -25,7 +25,7 @@
         <div class="bg-white/95 backdrop-blur-xl rounded-3xl p-5 shadow-md border border-gray-100">
             <div class="flex flex-col gap-4 w-full">
                 {{-- Dropdown Filters --}}
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 w-full">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 w-full">
                     <input type="date" wire:model.live="filterStartDate"
                         class="w-full bg-gray-50/50 border border-gray-200 rounded-2xl px-4 py-3.5 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 text-gray-700 font-semibold transition-all"
                         placeholder="Tanggal Mulai">
@@ -38,6 +38,13 @@
                         <option value="">Semua Cabang</option>
                         @foreach($availableBranches as $branch)
                             <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                        @endforeach
+                    </select>
+
+                    <select wire:model.live="filterSalesId" class="w-full bg-gray-50/50 border border-gray-200 rounded-2xl px-4 py-3.5 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 text-gray-700 font-semibold transition-all">
+                        <option value="">Semua Sales</option>
+                        @foreach($availableSales as $sales)
+                            <option value="{{ $sales->id }}">{{ $sales->name }} ({{ $sales->employee_no ?? '-' }})</option>
                         @endforeach
                     </select>
 
@@ -56,7 +63,7 @@
                     <svg class="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari No. Invoice atau Model HP..."
+                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari No. Invoice, Model HP, IMEI, Sales, atau Frontliner..."
                         class="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 hover:border-gray-300 rounded-2xl text-gray-800 text-[15px] focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-medium placeholder-gray-400">
                 </div>
             </div>
@@ -79,6 +86,7 @@
                             <th class="p-5">No. Invoice</th>
                             <th class="p-5">Merek & Model HP</th>
                             <th class="p-5">Handled By</th>
+                            <th class="p-5">Tenaga Penjual (Sales)</th>
                             <th class="p-5">Customer</th>
                             <th class="p-5 text-center">Status</th>
                             <th class="p-5 text-right">Harga Beli</th>
@@ -109,6 +117,14 @@
                                     @endif
                                 </td>
                                 <td class="p-5">
+                                    @if($item->salesBy)
+                                        <span class="text-sm font-semibold text-indigo-600 block">{{ $item->salesBy->name }}</span>
+                                        <span class="text-xs text-gray-500 font-mono">{{ $item->salesBy->employee_no ?? '-' }}</span>
+                                    @else
+                                        <span class="text-xs text-gray-400 italic">-</span>
+                                    @endif
+                                </td>
+                                <td class="p-5">
                                     <span class="text-sm font-semibold text-gray-700">{{ $item->user->name ?? 'Tamu' }}</span>
                                 </td>
                                 <td class="p-5 text-center">
@@ -130,7 +146,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="p-12 text-center">
+                                <td colspan="8" class="p-12 text-center">
                                     <div class="flex flex-col items-center justify-center">
                                         <div class="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
                                             <svg class="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">

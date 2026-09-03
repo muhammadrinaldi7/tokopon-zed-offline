@@ -316,6 +316,19 @@
                             </span>
                         </div>
 
+                        {{-- Sales / Tenaga Penjual --}}
+                        @if($item->salesBy)
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-400 font-medium w-16 shrink-0">Sales:</span>
+                                <span class="font-semibold text-indigo-600 truncate">
+                                    {{ $item->salesBy->name }}
+                                    @if($item->salesBy->employee_no)
+                                        <span class="text-gray-400 font-normal font-mono text-[10px]">({{ $item->salesBy->employee_no }})</span>
+                                    @endif
+                                </span>
+                            </div>
+                        @endif
+
                         {{-- Bank Info --}}
                         <div class="flex items-center gap-2 text-[11px]">
                             <span class="text-gray-400 font-medium w-16 shrink-0">Rek. Tujuan:</span>

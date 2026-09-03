@@ -275,6 +275,9 @@
 
                 <p class="text-xs text-neutral-400 font-medium">Customer: <strong
                         class="text-neutral-700">{{ $sellPhone->user->name ?? '-' }}</strong> 
+                    @if($sellPhone->salesBy)
+                        • Sales: <strong class="text-indigo-600">{{ $sellPhone->salesBy->name }} ({{ $sellPhone->salesBy->employee_no ?? '-' }})</strong>
+                    @endif
                     @if($sellPhone->user && $sellPhone->user->bankAccounts->first())
                         • Rekening: <strong class="text-neutral-700">{{ $sellPhone->user->bankAccounts->first()->bank_name }}
                         ({{ $sellPhone->user->bankAccounts->first()->account_number }})</strong>

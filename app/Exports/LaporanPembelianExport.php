@@ -17,6 +17,7 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
     protected $filterEndDate;
     protected $filterBranchId;
     protected $filterStatus;
+    protected $filterSalesId;
     
     private $rowNumber = 0;
 
@@ -27,19 +28,31 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
         $this->filterEndDate = $filters['filterEndDate'] ?? '';
         $this->filterBranchId = $filters['filterBranchId'] ?? '';
         $this->filterStatus = $filters['filterStatus'] ?? '';
+        $this->filterSalesId = $filters['filterSalesId'] ?? '';
     }
 
     public function query()
     {
         $query = SellPhone::query()
-            ->with(['user', 'handledBy', 'branch', 'productAccurate'])
+            ->with(['user', 'handledBy', 'salesBy', 'branch', 'productAccurate'])
             ->where('business_unit_id', 2);
 
         if (!empty($this->search)) {
             $query->where(function($q) {
                 $q->where('invoice_number', 'like', '%' . $this->search . '%')
                   ->orWhere('phone_model', 'like', '%' . $this->search . '%')
-                  ->orWhere('phone_brand', 'like', '%' . $this->search . '%');
+                  ->orWhere('phone_brand', 'like', '%' . $this->search . '%')
+                  ->orWhere('imei', 'like', '%' . $this->search . '%')
+                  ->orWhereHas('salesBy', function($sq) {
+                      $sq->where('name', 'like', '%' . $this->search . '%')
+                        ->orWhere('employee_no', 'like', '%' . $this->search . '%');
+                  })
+                  ->orWhereHas('handledBy', function($hq) {
+                      $hq->where('name', 'like', '%' . $this->search . '%');
+                  })
+                  ->orWhereHas('user', function($uq) {
+                      $uq->where('name', 'like', '%' . $this->search . '%');
+                  });
             });
         }
 
@@ -53,6 +66,10 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
 
         if (!empty($this->filterBranchId)) {
             $query->where('branch_id', $this->filterBranchId);
+        }
+
+        if (!empty($this->filterSalesId)) {
+            $query->where('sales_id', $this->filterSalesId);
         }
 
         if (!empty($this->filterStatus)) {
@@ -71,7 +88,9 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
             'Merek & Model HP',
             'Kategori',
             'Proyek',
-            'Handled By',
+            'Handled By (Frontliner)',
+            'Tenaga Penjual (Sales)',
+            'No. Karyawan Sales',
             'Cabang',
             'Customer',
             'Status',
@@ -97,6 +116,8 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
             $kategori,
             $proyek,
             $sellPhone->handledBy ? $sellPhone->handledBy->name : '-',
+            $sellPhone->salesBy ? $sellPhone->salesBy->name : '-',
+            $sellPhone->salesBy ? ($sellPhone->salesBy->employee_no ?? '-') : '-',
             $sellPhone->branch ? $sellPhone->branch->name : '-',
             $sellPhone->user ? $sellPhone->user->name : 'Tamu',
             $sellPhone->status,

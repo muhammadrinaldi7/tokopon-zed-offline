@@ -72,7 +72,7 @@ class History extends Component
 
     public function showReceipt(SellPhone $sellPhone)
     {
-        $this->selectedSell = $sellPhone->load(['handledBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch']);
+        $this->selectedSell = $sellPhone->load(['handledBy', 'salesBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch']);
         $this->showReceiptModal = true;
     }
 
@@ -97,8 +97,8 @@ class History extends Component
     public function printReceipt($sellPhoneId = null)
     {
         $sellPhone = $sellPhoneId
-            ? SellPhone::with(['handledBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch'])->find($sellPhoneId)
-            : ($this->selectedSell ? $this->selectedSell->loadMissing(['handledBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch']) : null);
+            ? SellPhone::with(['handledBy', 'salesBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch'])->find($sellPhoneId)
+            : ($this->selectedSell ? $this->selectedSell->loadMissing(['handledBy', 'salesBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch']) : null);
 
         if (!$sellPhone) {
             $this->dispatch('toast', title: 'Error', message: 'Transaksi tidak ditemukan untuk dicetak.', type: 'error');
@@ -156,6 +156,9 @@ class History extends Component
             $printer->text($this->formatLine("No. Invoice", $sellPhone->invoice_number, $maxColumns) . "\n");
         }
         $printer->text($this->formatLine("Frontliner", optional($sellPhone->handledBy)->name ?? '-', $maxColumns) . "\n");
+        if ($sellPhone->salesBy) {
+            $printer->text($this->formatLine("Sales", $sellPhone->salesBy->name, $maxColumns) . "\n");
+        }
         $printer->text($this->formatLine("Pelanggan", optional($sellPhone->user)->name ?? '-', $maxColumns) . "\n");
         $printer->text($this->formatLine("No. HP", optional(optional($sellPhone->user)->profile)->phone_number ?? '-', $maxColumns) . "\n");
         $printer->text($separator);
@@ -227,7 +230,7 @@ class History extends Component
 
     private function generateReceiptPdf(SellPhone $sellPhone)
     {
-        $pdf = Pdf::loadView('pdf.sell-phone-receipt', ['sellPhone' => $sellPhone]);
+        $pdf = Pdf::loadView('pdf.sell-phone-receipt', ['sellPhone' => $sellPhone->loadMissing(['salesBy', 'handledBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch'])]);
 
         // 80mm thermal printer width
         $customPaper = array(0, 0, 226.77, 1000);
@@ -349,14 +352,19 @@ class History extends Component
         $sellPhone = SellPhone::with('user')->find($sellPhoneId);
         $email = $sellPhone->user->email ?? null;
 
+        if (!$email) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Email customer tidak ditemukan.', type: 'warning');
+            return;
+        }
+
         $userAktif = Auth::user();
         if (!$userAktif->hasRole('admin') && $sellPhone->is_email_sent) {
             $this->dispatch('toast', title: 'Akses Ditolak', message: 'Struk email hanya dapat dikirim sekali oleh Kasir/FL.', type: 'warning');
             return;
         }
 
-        if (!$email || str_contains($email, '@pos.tokopun.com') || str_contains($email, '@tokopon.com')) {
-            $this->dispatch('toast', title: 'Gagal Kirim', message: 'Email customer tidak valid atau kosong.', type: 'warning');
+        if (str_contains($email, '@pos.tokopun.com') || str_contains($email, '@tokopon.com')) {
+            $this->dispatch('toast', title: 'Gagal Kirim', message: 'Email customer tidak valid.', type: 'warning');
             return;
         }
 
@@ -386,7 +394,7 @@ class History extends Component
 
         $availableBranches = Branch::where('business_unit_id', $buId)->orderBy('name')->get();
 
-        $baseQuery = SellPhone::with(['media', 'handledBy', 'branch', 'user.profile', 'user.bankAccounts', 'businessUnit'])
+        $baseQuery = SellPhone::with(['media', 'handledBy', 'salesBy', 'branch', 'user.profile', 'user.bankAccounts', 'businessUnit'])
             ->where('business_unit_id', $buId);
 
         // Branch filtering
@@ -448,6 +456,10 @@ class History extends Component
                     })
                     ->orWhereHas('handledBy', function ($hq) use ($term) {
                         $hq->where('name', 'like', $term);
+                    })
+                    ->orWhereHas('salesBy', function ($sq) use ($term) {
+                        $sq->where('name', 'like', $term)
+                            ->orWhere('employee_no', 'like', $term);
                     });
 
                 if (is_numeric($cleanId)) {

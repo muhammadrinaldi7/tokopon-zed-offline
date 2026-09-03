@@ -36,8 +36,19 @@ class SellPhone extends Model implements HasMedia
         'reject_reason',
         'payment_receipt_path',
         'store_bank_no',
-        'branch_id'
+        'branch_id',
+        'sales_id'
     ];
+
+    public function salesBy()
+    {
+        return $this->belongsTo(Employe::class, 'sales_id');
+    }
+
+    public function sales()
+    {
+        return $this->belongsTo(Employe::class, 'sales_id');
+    }
 
     public function productAccurate()
     {

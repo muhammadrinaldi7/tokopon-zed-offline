@@ -45,6 +45,11 @@ class Employe extends Model
         return $this->hasMany(Order::class);
     }
 
+    public function sellPhones()
+    {
+        return $this->hasMany(SellPhone::class, 'sales_id');
+    }
+
     public function branch()
     {
         return $this->belongsTo(Branch::class);
