@@ -89,18 +89,24 @@
 
                     <div x-show="showRules" x-transition.opacity.duration.200ms class="space-y-5 mt-5"
                         style="display: none;">
-                        @if (!empty($tier->rules))
-                            @foreach ($tier->rules as $category => $items)
+                        @php
+                            $formattedRules = $tier->getRulesByCategory();
+                        @endphp
+                        @if (!empty($formattedRules))
+                            @foreach ($formattedRules as $category => $data)
                                 <div class="space-y-2">
                                     <div class="flex items-center gap-2">
                                         <div class="w-8 h-[1px] bg-gray-200"></div>
                                         <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                                             {{ $category }}
+                                            @if($data['is_multiple'] ?? false)
+                                                <span class="text-blue-500 ml-1">(Multi)</span>
+                                            @endif
                                         </p>
                                         <div class="flex-1 h-[1px] bg-gray-100"></div>
                                     </div>
                                     <div class="grid grid-cols-1 gap-2">
-                                        @foreach ($items as $item)
+                                        @foreach ($data['items'] ?? [] as $item)
                                             <div
                                                 class="flex flex-col p-3 bg-gray-50/50 hover:bg-gray-50 border border-gray-100 rounded-lg transition-colors gap-1">
                                                 <div class="flex items-center justify-between">
