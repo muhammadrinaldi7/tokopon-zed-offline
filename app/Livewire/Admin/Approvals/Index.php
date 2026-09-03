@@ -98,7 +98,7 @@ class Index extends Component
             }
         }
 
-        if ($nextLevel >= $request->required_level || $request->request_type === 'SELL_PHONE_APPROVAL') {
+        if ($nextLevel >= $request->required_level) {
             $this->confirmingApprovalId = $id;
             $this->confirmingRequestType = $request->request_type;
             
