@@ -38,14 +38,16 @@ class Form extends Component
             ManualDiscountPreset::find($this->presetId)->update([
                 'amount' => $this->amount,
                 'brand_id' => $this->brand_id ?: null,
-                'is_active' => $this->is_active
+                'is_active' => $this->is_active,
+                'business_unit_id' => \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId()
             ]);
             $msg = 'Preset diskon berhasil diperbarui.';
         } else {
             ManualDiscountPreset::create([
                 'amount' => $this->amount,
                 'brand_id' => $this->brand_id ?: null,
-                'is_active' => $this->is_active
+                'is_active' => $this->is_active,
+                'business_unit_id' => \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId()
             ]);
             $msg = 'Preset diskon berhasil ditambahkan.';
         }
@@ -57,7 +59,8 @@ class Form extends Component
     public function render()
     {
         return view('livewire.admin.manual-discount.form', [
-            'brands' => Brand::orderBy('name')->get()
+            'brands' => Brand::where('business_unit_id', \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId())
+                ->orderBy('name')->get()
         ]);
     }
 }

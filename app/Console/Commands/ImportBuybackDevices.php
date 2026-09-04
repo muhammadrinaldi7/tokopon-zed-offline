@@ -61,11 +61,12 @@ class ImportBuybackDevices extends Command
                 continue; // Lewati jika tidak ada merk
             }
 
-            $slug = \Illuminate\Support\Str::slug($brandName);
-            $brand = Brand::firstOrCreate(
-                ['slug' => $slug],
-                ['name' => $brandName]
-            );
+            $brand = Brand::whereNull('business_unit_id')
+                ->whereRaw('LOWER(name) = ?', [strtolower(trim($brandName))])
+                ->first();
+            if (!$brand) {
+                $brand = Brand::create(['name' => trim($brandName), 'business_unit_id' => null]);
+            }
 
             // --- B. Ambil Data Lainnya ---
             $modelName = trim($row['nama'] ?? '');

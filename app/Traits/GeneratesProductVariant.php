@@ -109,10 +109,11 @@ trait GeneratesProductVariant
 
         // BRAND
         $brandName = $accurateItem['itemBrand']['name'] ?? 'Uncategorized';
-        $brand = Brand::firstOrCreate(
-            ['slug' => Str::slug($brandName)],
-            ['name' => $brandName]
-        );
+        $buId = \Illuminate\Support\Facades\Auth::check() ? \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() : null;
+        $brand = Brand::where('business_unit_id', $buId)->whereRaw('LOWER(name) = ?', [strtolower(trim($brandName))])->first();
+        if (!$brand) {
+            $brand = Brand::create(['name' => trim($brandName), 'business_unit_id' => $buId]);
+        }
 
         // TODO: Ekstrak Brand dari Accurate jika ada fieldnya, atau ambil dari kata pertama Parent Name
 
@@ -179,10 +180,11 @@ trait GeneratesProductVariant
 
         // 3. Ambil Brand dari Accurate
         $brandName = $accurateItem['itemBrand']['name'] ?? 'Uncategorized';
-        $brand = Brand::firstOrCreate(
-            ['slug' => Str::slug($brandName)],
-            ['name' => $brandName]
-        );
+        $buId = \Illuminate\Support\Facades\Auth::check() ? \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() : null;
+        $brand = Brand::where('business_unit_id', $buId)->whereRaw('LOWER(name) = ?', [strtolower(trim($brandName))])->first();
+        if (!$brand) {
+            $brand = Brand::create(['name' => trim($brandName), 'business_unit_id' => $buId]);
+        }
 
         // 4. Pecah Nama (Regex)
         $parsedData = $this->parseItemName($itemName);

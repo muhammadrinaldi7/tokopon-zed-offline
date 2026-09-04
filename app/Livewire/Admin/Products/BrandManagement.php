@@ -8,7 +8,6 @@ use Livewire\WithPagination;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
-use Illuminate\Support\Str;
 
 class BrandManagement extends Component
 {
@@ -53,8 +52,11 @@ class BrandManagement extends Component
 
         $data = [
             'name' => $this->name,
-            'slug' => Str::slug($this->name),
         ];
+
+        if (!$this->isEditing) {
+            $data['business_unit_id'] = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+        }
 
         if ($this->isEditing) {
             $brand = Brand::find($this->brandId);
@@ -94,6 +96,35 @@ class BrandManagement extends Component
         $this->dispatch('toast', title: 'Terhapus', message: 'Merek berhasil dihapus.', type: 'info');
     }
 
+    public function syncFromAccurate()
+    {
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+
+        $accurateBrands = \App\Models\ProductAccurate::where('business_unit_id', $buId)
+            ->whereNotNull('brandName')
+            ->where('brandName', '!=', '')
+            ->select('brandName')
+            ->distinct()
+            ->pluck('brandName');
+
+        $newCount = 0;
+        foreach ($accurateBrands as $brandName) {
+            $exists = Brand::where('business_unit_id', $buId)
+                ->whereRaw('LOWER(name) = ?', [strtolower(trim($brandName))])
+                ->exists();
+
+            if (!$exists) {
+                Brand::create([
+                    'name' => trim($brandName),
+                    'business_unit_id' => $buId
+                ]);
+                $newCount++;
+            }
+        }
+
+        $this->dispatch('toast', title: 'Sinkronisasi Selesai', message: "Berhasil menambahkan $newCount merek baru dari Accurate.", type: 'success');
+    }
+
     public function resetFields()
     {
         $this->name = '';
@@ -106,7 +137,11 @@ class BrandManagement extends Component
     #[Layout('layouts.admin')]
     public function render()
     {
-        $brands = Brand::withCount('products')->orderBy('name')->paginate(10);
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+        $brands = Brand::where('business_unit_id', $buId)
+            ->withCount('products')
+            ->orderBy('name')
+            ->paginate(10);
         return view('livewire.admin.products.brand-management', [
             'brands' => $brands
         ]);

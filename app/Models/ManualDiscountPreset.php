@@ -12,4 +12,9 @@ class ManualDiscountPreset extends Model
     {
         return $this->belongsTo(Brand::class);
     }
+
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
+    }
 }

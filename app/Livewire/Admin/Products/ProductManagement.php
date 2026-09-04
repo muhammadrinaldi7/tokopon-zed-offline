@@ -199,10 +199,11 @@ class ProductManagement extends Component
                 // 2. Cari atau buat Brand (jika diisi)
                 $brandId = null;
                 if (!empty($brandName)) {
-                    $brand = Brand::firstOrCreate(
-                        ['name' => $brandName],
-                        ['slug' => \Illuminate\Support\Str::slug($brandName)]
-                    );
+                    $buId = \Illuminate\Support\Facades\Auth::check() ? \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() : null;
+                    $brand = Brand::where('business_unit_id', $buId)->whereRaw('LOWER(name) = ?', [strtolower(trim($brandName))])->first();
+                    if (!$brand) {
+                        $brand = Brand::create(['name' => trim($brandName), 'business_unit_id' => $buId]);
+                    }
                     $brandId = $brand->id;
                 }
 

@@ -36,7 +36,10 @@ class Index extends Component
 
     public function render()
     {
-        $query = ManualDiscountPreset::with('brand')->latest();
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+        $query = ManualDiscountPreset::where(function ($q) use ($buId) {
+            $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+        })->with('brand')->latest();
 
         if ($this->search) {
             $query->where('amount', 'like', '%' . $this->search . '%')

@@ -10,7 +10,7 @@ class Brand extends Model implements HasMedia
 {
     use InteractsWithMedia;
 
-    protected $fillable = ['name', 'slug', 'business_unit_id'];
+    protected $fillable = ['name', 'business_unit_id'];
 
     public function products()
     {

@@ -328,7 +328,10 @@ trait WithCart
 
         $brandId = null;
         if (!empty($productAccurate->brandName)) {
-            $brand = \App\Models\Brand::whereRaw('LOWER(name) = ?', [strtolower(trim($productAccurate->brandName))])->first();
+            $buId = \Illuminate\Support\Facades\Auth::check() ? \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() : null;
+            $brand = \App\Models\Brand::where('business_unit_id', $buId)
+                        ->whereRaw('LOWER(name) = ?', [strtolower(trim($productAccurate->brandName))])
+                        ->first();
             if ($brand) {
                 $brandId = $brand->id;
             }
@@ -844,7 +847,13 @@ trait WithCart
     // ─── Manual Discount Presets ───────────────────────────────
     public function getActiveManualDiscountPresets()
     {
-        return \App\Models\ManualDiscountPreset::where('is_active', true)->orderBy('amount', 'asc')->get();
+        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+        return \App\Models\ManualDiscountPreset::where('is_active', true)
+            ->where(function($q) use ($buId) {
+                $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+            })
+            ->orderBy('amount', 'asc')
+            ->get();
     }
 
     public $showManualDiscountModal = false;

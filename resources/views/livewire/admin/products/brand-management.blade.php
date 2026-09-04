@@ -1,10 +1,19 @@
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-gray-800">Manajemen Merek</h1>
-        <button wire:click="create"
-            class="bg-[#1c69d4] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-opacity-90 transition">
-            Tambah Merek
-        </button>
+        <div class="flex gap-2">
+            <button wire:click="syncFromAccurate"
+                class="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-600 transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Sync dari Accurate
+            </button>
+            <button wire:click="create"
+                class="bg-[#1c69d4] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-opacity-90 transition">
+                Tambah Merek
+            </button>
+        </div>
     </div>
 
     <div class="bg-white rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 overflow-hidden">
@@ -12,7 +21,6 @@
             <thead class="bg-gray-50 text-gray-600 font-semibold border-b border-gray-100">
                 <tr>
                     <th class="px-6 py-4">Nama Merek</th>
-                    <th class="px-6 py-4">Slug</th>
                     <th class="px-6 py-4">Logo</th>
                     <th class="px-6 py-4 text-right">Aksi</th>
                 </tr>
@@ -21,7 +29,6 @@
                 @forelse($brands as $brand)
                     <tr class="hover:bg-gray-50 transition">
                         <td class="px-6 py-4 font-medium">{{ $brand->name }}</td>
-                        <td class="px-6 py-4 text-gray-500">{{ $brand->slug }}</td>
                         <td class="px-6 py-4 text-gray-500">
                             @if ($brand->hasMedia('logo'))
                                 <img src="{{ $brand->getFirstMediaUrl('logo') }}" alt="{{ $brand->name }}"
