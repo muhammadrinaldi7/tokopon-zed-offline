@@ -106,8 +106,12 @@ class ApprovalRequest extends Model
 
             $updateData = ['status' => 'PAYING'];
 
-            if (isset($params['adjusted_price']) && $params['adjusted_price'] > 0) {
-                $updateData['appraised_value'] = $params['adjusted_price'];
+            $originalPrice = (float)($sellPhone->appraised_value ?? 0);
+            $newPrice = isset($params['adjusted_price']) ? (float)$params['adjusted_price'] : 0;
+            $isPriceChanged = $newPrice > 0 && abs($newPrice - $originalPrice) > 0.01;
+
+            if ($isPriceChanged) {
+                $updateData['appraised_value'] = $newPrice;
                 $updateData['is_price_adjusted'] = true;
                 $updateData['price_adjusted_by'] = $params['price_adjusted_by'] ?? null;
                 $updateData['price_adjustment_reason'] = $params['price_adjustment_reason'] ?? null;

@@ -119,8 +119,13 @@ class Index extends Component
         if ($this->confirmingApprovalId) {
             // Check if it's SellPhone price edit
             if ($this->confirmingRequestType === 'SELL_PHONE_APPROVAL' && $this->editingPriceId) {
-                if ($this->adjustedPrice > 0 && empty(trim($this->priceAdjustmentReason))) {
-                    $this->addError('priceAdjustmentReason', 'Alasan ubah harga wajib diisi!');
+                $request = ApprovalRequest::with('approvable')->find($this->confirmingApprovalId);
+                $originalPrice = (float)($request?->approvable?->appraised_value ?? 0);
+                $newPrice = (float)$this->adjustedPrice;
+                $isPriceChanged = $newPrice > 0 && abs($newPrice - $originalPrice) > 0.01;
+
+                if ($isPriceChanged && empty(trim($this->priceAdjustmentReason))) {
+                    $this->addError('priceAdjustmentReason', 'Alasan ubah harga wajib diisi jika harga diubah!');
                     return;
                 }
             }
@@ -158,12 +163,25 @@ class Index extends Component
             }
         }
 
+        // Cek apakah ada perubahan harga nyata pada SellPhone
+        $originalPrice = (float)($request->approvable?->appraised_value ?? 0);
+        $newPrice = (float)$this->adjustedPrice;
+        $isPriceChanged = $request->request_type === 'SELL_PHONE_APPROVAL'
+            && $this->editingPriceId
+            && $newPrice > 0
+            && abs($newPrice - $originalPrice) > 0.01;
+
+        $historyNote = 'Approved by ' . $user->name;
+        if ($isPriceChanged && $this->priceAdjustmentReason) {
+            $historyNote .= " (Adjusted Price: Rp " . number_format($newPrice, 0, ',', '.') . " - {$this->priceAdjustmentReason})";
+        }
+
         // Add history
         $request->histories()->create([
             'acted_by' => $user->id,
             'action' => 'APPROVED',
             'level' => $request->current_level + 1,
-            'notes' => 'Approved by ' . $user->name . ($this->priceAdjustmentReason ? " (Adjusted Price: {$this->priceAdjustmentReason})" : "")
+            'notes' => $historyNote
         ]);
 
         $request->current_level += 1;
@@ -175,9 +193,9 @@ class Index extends Component
             try {
                 $request->executeAction([
                     'extension_days' => $this->extensionDays,
-                    'adjusted_price' => $this->adjustedPrice > 0 ? $this->adjustedPrice : null,
-                    'price_adjusted_by' => $this->adjustedPrice > 0 ? $user->id : null,
-                    'price_adjustment_reason' => $this->priceAdjustmentReason,
+                    'adjusted_price' => $isPriceChanged ? $newPrice : null,
+                    'price_adjusted_by' => $isPriceChanged ? $user->id : null,
+                    'price_adjustment_reason' => $isPriceChanged ? $this->priceAdjustmentReason : null,
                 ]);
 
                 // --- KIRIM NOTIFIKASI GRUP TELEGRAM ---
@@ -186,6 +204,11 @@ class Index extends Component
                 $orderInfo = '-';
                 if ($request->approvable_type === \App\Models\Order::class && $request->approvable) {
                     $orderInfo = $request->approvable->order_number;
+                } elseif ($request->approvable_type === \App\Models\SellPhone::class && $request->approvable) {
+                    $orderInfo = $request->approvable->phone_brand . ' ' . $request->approvable->phone_model;
+                    if ($isPriceChanged) {
+                        $orderInfo .= " (Harga Disesuaikan: Rp " . number_format($newPrice, 0, ',', '.') . ")";
+                    }
                 }
                 $cabang = $request->requestedBy->branch->name ?? '-';
                 $waktu = $request->created_at->format('d M Y H:i');

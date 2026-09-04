@@ -145,7 +145,8 @@ class PolicyManagement extends Component
             ->orderBy('id', 'desc')
             ->paginate(15);
 
-        $brands = \App\Models\Brand::orderBy('name')->get();
+        $brands = \App\Models\Brand::where('business_unit_id', \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId())
+            ->orderBy('name')->get();
 
         $searchedProducts = collect();
         if ($this->type === 'addon_warranty' && strlen($this->searchProduct) > 2) {

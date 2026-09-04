@@ -243,7 +243,8 @@ class TemplateIndex extends Component
 
         return view('livewire.admin.qc.template-index', [
             'templates' => $query->get(),
-            'brands'    => Brand::orderBy('name')->get(),
+            'brands' => Brand::where('business_unit_id', \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId())
+                ->orderBy('name')->get(),
             'businessUnits' => \App\Models\BusinessUnit::orderBy('name')->get(),
         ]);
     }
