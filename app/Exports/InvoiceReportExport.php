@@ -12,17 +12,30 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class InvoiceReportExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyles, WithTitle
 {
     protected array $data;
+    protected array $uniqueProjects = [];
 
     public function __construct(array $data)
     {
         $this->data = $data;
+
+        // Kumpulkan semua proyek unik
+        $projects = [];
+        foreach ($this->data as $item) {
+            if (!empty($item['projects'])) {
+                foreach (array_keys($item['projects']) as $p) {
+                    $projects[$p] = true;
+                }
+            }
+        }
+        $this->uniqueProjects = array_keys($projects);
+        sort($this->uniqueProjects);
     }
 
     public function array(): array
     {
         $formatted = [];
         foreach ($this->data as $item) {
-            $formatted[] = [
+            $rowValues = [
                 $item['created_at'] ?? '-',
                 $item['nama_kasir'] ?? '-',
                 $item['jam'] ?? '-',
@@ -38,13 +51,20 @@ class InvoiceReportExport implements FromArray, WithHeadings, ShouldAutoSize, Wi
                 $item['amount'] !== null ? round($item['amount']) : null,
                 $item['mdr'] !== null ? round($item['mdr']) : null,
             ];
+
+            // Tambahkan nilai per proyek
+            foreach ($this->uniqueProjects as $p) {
+                $rowValues[] = isset($item['projects'][$p]) ? round($item['projects'][$p]) : 0;
+            }
+
+            $formatted[] = $rowValues;
         }
         return $formatted;
     }
 
     public function headings(): array
     {
-        return [
+        $headers = [
             'TANGGAL',
             'NAMA KASIR',
             'JAM',
@@ -60,6 +80,13 @@ class InvoiceReportExport implements FromArray, WithHeadings, ShouldAutoSize, Wi
             'AMOUNT (Rp)',
             'MDR (Rp)',
         ];
+
+        // Tambahkan header per proyek
+        foreach ($this->uniqueProjects as $p) {
+            $headers[] = strtoupper($p) . ' (Rp)';
+        }
+
+        return $headers;
     }
 
     public function title(): string

@@ -109,63 +109,106 @@ class InvoiceReport extends Component
 
     protected function getPaymentRows(): array
     {
-        $orders = $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate'])->get();
         $rows = [];
 
-        foreach ($orders as $order) {
-            $namaToko = $order->shipping_address_snapshot['store'] ?? null;
-            $invoiceNo = $order->accurate_invoice_no ?? $order->accurate_so_number ?? null;
-            $orderNo = $order->order_number;
+        // Gunakan chunk untuk menghemat memori (optimalisasi memory limit)
+        $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate'])->chunk(100, function ($orders) use (&$rows) {
+            foreach ($orders as $order) {
+                $namaToko = $order->shipping_address_snapshot['store'] ?? null;
+                $invoiceNo = $order->accurate_invoice_no ?? $order->accurate_so_number ?? null;
+                $orderNo = $order->order_number;
 
-            if ($order->payments && $order->payments->count() > 0) {
-                foreach ($order->payments as $payment) {
-                    $paymentDate = $payment->paid_at ?? $payment->created_at;
-                    $createdAt = $paymentDate ? $paymentDate->format('Y-m-d') : null;
-                    $bankName = $payment->paymentMethod->bank_name ?? null;
-                    $paymentType = $this->getPaymentType($payment);
-                    $pmName = $payment->paymentMethod->name ?? null;
-                    $pmrName = $payment->paymentMethodRate->name ?? null;
-                    $mdrPct = $payment->paymentMethodRate->mdr_percentage ?? 0;
-                    $amount = $payment->amount ?? 0;
-                    $jamBayar = $payment ? $payment->created_at->format('H:i:s') : null;
-                    $mdr = round(($amount * $mdrPct) / 100);
+                // 1. Kalkulasi Proyek dari Order Items
+                $projectTotals = [];
+                $totalItemPrice = 0;
 
+                if ($order->items) {
+                    foreach ($order->items as $item) {
+                        // Cari proyek dari relasi variant -> productAccurate -> proyek
+                        $proyek = 'UMUM'; // Default
+                        if ($item->variant && method_exists($item->variant, 'accurateData') && $item->variant->accurateData) {
+                            $proyek = trim(strtoupper($item->variant->accurateData->proyek ?? 'UMUM'));
+                        } elseif ($item->variant && method_exists($item->variant, 'product') && $item->variant->product && method_exists($item->variant->product, 'productAccurate') && $item->variant->product->productAccurate) {
+                            $proyek = trim(strtoupper($item->variant->product->productAccurate->proyek ?? 'UMUM'));
+                        }
+                        
+                        if (empty($proyek)) $proyek = 'UMUM';
+
+                        $subtotal = ((float)$item->price - (float)$item->discount_amount - (float)$item->promo_discount_amount) * (int)$item->quantity;
+                        
+                        if (!isset($projectTotals[$proyek])) {
+                            $projectTotals[$proyek] = 0;
+                        }
+                        $projectTotals[$proyek] += $subtotal;
+                        $totalItemPrice += $subtotal;
+                    }
+                }
+
+                // Jika tidak ada total, masukkan semua ke UMUM 100%
+                if ($totalItemPrice <= 0) {
+                    $projectTotals = ['UMUM' => 1]; 
+                    $totalItemPrice = 1;
+                }
+
+                if ($order->payments && $order->payments->count() > 0) {
+                    foreach ($order->payments as $payment) {
+                        $paymentDate = $payment->paid_at ?? $payment->created_at;
+                        $createdAt = $paymentDate ? $paymentDate->format('Y-m-d') : null;
+                        $bankName = $payment->paymentMethod->bank_name ?? null;
+                        $paymentType = $this->getPaymentType($payment);
+                        $pmName = $payment->paymentMethod->name ?? null;
+                        $pmrName = $payment->paymentMethodRate->name ?? null;
+                        $mdrPct = $payment->paymentMethodRate->mdr_percentage ?? 0;
+                        $amount = (float)($payment->amount ?? 0);
+                        $jamBayar = $payment ? $payment->created_at->format('H:i:s') : null;
+                        $mdr = round(($amount * $mdrPct) / 100);
+
+                        // 2. Kalkulasi nominal pembayaran per proyek
+                        $projectAmounts = [];
+                        foreach ($projectTotals as $pName => $pTotal) {
+                            $proportion = $pTotal / $totalItemPrice;
+                            $projectAmounts[$pName] = round($amount * $proportion, 2);
+                        }
+
+                        $rows[] = [
+                            'created_at' => $createdAt,
+                            'nama_kasir' => $order->handledBy->name ?? '-',
+                            'jam' => $jamBayar,
+                            'nama_toko' => $namaToko,
+                            'accurate_invoice_no' => $invoiceNo,
+                            'order_number' => $orderNo,
+                            'catatan' => $order->notes,
+                            'no_kontrak' => $payment->no_kontrak,
+                            'tipe_pembayaran' => $paymentType,
+                            'bankName' => $bankName,
+                            'paymentMethod' => $pmName,
+                            'variantMethod' => $pmrName,
+                            'amount' => $amount,
+                            'mdr' => $mdr,
+                            'projects' => $projectAmounts, // Data dinamis proyek
+                        ];
+                    }
+                } else {
                     $rows[] = [
-                        'created_at' => $createdAt,
+                        'created_at' => $order->created_at ? $order->created_at->format('Y-m-d') : null,
                         'nama_kasir' => $order->handledBy->name ?? '-',
-                        'jam' => $jamBayar,
+                        'jam' => $order->created_at ? $order->created_at->format('H:i:s') : '-',
                         'nama_toko' => $namaToko,
                         'accurate_invoice_no' => $invoiceNo,
                         'order_number' => $orderNo,
                         'catatan' => $order->notes,
-                        'no_kontrak' => $payment->no_kontrak,
-                        'tipe_pembayaran' => $paymentType,
-                        'bankName' => $bankName,
-                        'paymentMethod' => $pmName,
-                        'variantMethod' => $pmrName,
-                        'amount' => $amount,
-                        'mdr' => $mdr,
+                        'no_kontrak' => null,
+                        'tipe_pembayaran' => null,
+                        'bankName' => null,
+                        'paymentMethod' => null,
+                        'variantMethod' => null,
+                        'amount' => null,
+                        'mdr' => null,
+                        'projects' => [], // Kosong
                     ];
                 }
-            } else {
-                $rows[] = [
-                    'created_at' => $order->created_at ? $order->created_at->format('Y-m-d') : null,
-                    'nama_kasir' => $order->handledBy->name ?? '-',
-                    'jam' => $order->created_at ? $order->created_at->format('H:i:s') : '-',
-                    'nama_toko' => $namaToko,
-                    'accurate_invoice_no' => $invoiceNo,
-                    'order_number' => $orderNo,
-                    'catatan' => $order->notes,
-                    'no_kontrak' => null,
-                    'tipe_pembayaran' => null,
-                    'bankName' => null,
-                    'paymentMethod' => null,
-                    'variantMethod' => null,
-                    'amount' => null,
-                    'mdr' => null,
-                ];
             }
-        }
+        });
 
         return $rows;
     }
@@ -198,6 +241,18 @@ class InvoiceReport extends Component
         return response()->streamDownload(function () use ($rows, $separator) {
             $file = fopen('php://output', 'w');
 
+            // Temukan semua proyek unik yang ada di dalam row
+            $uniqueProjects = [];
+            foreach ($rows as $row) {
+                if (!empty($row['projects'])) {
+                    foreach (array_keys($row['projects']) as $p) {
+                        $uniqueProjects[$p] = true;
+                    }
+                }
+            }
+            $uniqueProjects = array_keys($uniqueProjects);
+            sort($uniqueProjects);
+
             $headers = [
                 'created_at',
                 'nama_kasir',
@@ -215,10 +270,37 @@ class InvoiceReport extends Component
                 'mdr'
             ];
 
+            // Tambahkan header proyek
+            foreach ($uniqueProjects as $p) {
+                $headers[] = strtoupper($p) . ' (Rp)';
+            }
+
             fputcsv($file, $headers, $separator);
 
             foreach ($rows as $row) {
-                fputcsv($file, array_values($row), $separator);
+                $rowValues = [
+                    $row['created_at'],
+                    $row['nama_kasir'],
+                    $row['jam'],
+                    $row['nama_toko'],
+                    $row['accurate_invoice_no'],
+                    $row['order_number'],
+                    $row['catatan'],
+                    $row['no_kontrak'],
+                    $row['tipe_pembayaran'],
+                    $row['bankName'],
+                    $row['paymentMethod'],
+                    $row['variantMethod'],
+                    $row['amount'],
+                    $row['mdr'],
+                ];
+
+                // Tambahkan nilai proyek secara berurutan sesuai urutan header
+                foreach ($uniqueProjects as $p) {
+                    $rowValues[] = isset($row['projects'][$p]) ? $row['projects'][$p] : 0;
+                }
+
+                fputcsv($file, $rowValues, $separator);
             }
 
             fclose($file);

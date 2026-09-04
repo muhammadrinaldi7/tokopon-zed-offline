@@ -57,33 +57,23 @@ class VendorManage extends Component
                         foreach ($response as $vnd) {
                             $vendorNo = $vnd['vendorNo'] ?? '';
 
-                            if ($vendorNo !== '') {
-                                Vendor::updateOrCreate(
-                                    [
-                                        'vendor_no' => $vendorNo,
-                                    ],
-                                    [
-                                        'accurate_vendor_id' => $vnd['id'],
-                                        'database_source' => $bu->code,
-                                        'vendor_name' => $vnd['name'],
-                                        'email'       => $vnd['email'] ?? null,
-                                        'phone'       => $vnd['mobilePhone'] ?? null,
-                                    ]
-                                );
-                            } else {
-                                Vendor::updateOrCreate(
-                                    [
-                                        'accurate_vendor_id' => $vnd['id'],
-                                        'database_source' => $bu->code,
-                                    ],
-                                    [
-                                        'vendor_no'   => $vendorNo,
-                                        'vendor_name' => $vnd['name'],
-                                        'email'       => $vnd['email'] ?? null,
-                                        'phone'       => $vnd['mobilePhone'] ?? null,
-                                    ]
-                                );
+                            if ($vendorNo === '') {
+                                // Skip vendor tanpa vendorNo karena akan memicu crash Duplicate Entry
+                                continue;
                             }
+
+                            Vendor::updateOrCreate(
+                                [
+                                    'vendor_no' => $vendorNo,
+                                ],
+                                [
+                                    'accurate_vendor_id' => $vnd['id'],
+                                    'database_source' => $bu->code,
+                                    'vendor_name' => $vnd['name'],
+                                    'email'       => $vnd['email'] ?? null,
+                                    'phone'       => $vnd['mobilePhone'] ?? null,
+                                ]
+                            );
 
                             $syncedCount++;
                         }

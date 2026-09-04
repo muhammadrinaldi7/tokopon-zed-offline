@@ -61,17 +61,20 @@ class SyncPurchaseOrders extends Command
                     // Sync Vendor
                     $vendorId = null;
                     if (isset($detailPo['vendor']['id'])) {
-                        $vendor = Vendor::firstOrCreate(
-                            [
-                                'accurate_vendor_id' => $detailPo['vendor']['id'],
-                                'database_source' => $bu->code
-                            ],
-                            [
-                                'vendor_no' => $detailPo['vendor']['vendorNo'] ?? '',
-                                'vendor_name' => $detailPo['vendor']['name'] ?? 'Unknown',
-                            ]
-                        );
-                        $vendorId = $vendor->id;
+                        $poVendorNo = $detailPo['vendor']['vendorNo'] ?? '';
+                        if ($poVendorNo !== '') {
+                            $vendor = Vendor::firstOrCreate(
+                                [
+                                    'accurate_vendor_id' => $detailPo['vendor']['id'],
+                                    'database_source' => $bu->code
+                                ],
+                                [
+                                    'vendor_no' => $poVendorNo,
+                                    'vendor_name' => $detailPo['vendor']['name'] ?? 'Unknown',
+                                ]
+                            );
+                            $vendorId = $vendor->id;
+                        }
                     }
 
                     $po = PurchaseOrder::updateOrCreate(

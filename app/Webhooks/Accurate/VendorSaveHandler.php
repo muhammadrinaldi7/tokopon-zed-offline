@@ -45,19 +45,22 @@ class VendorSaveHandler implements WebhookHandlerInterface
                 $phone = $accurateVendor['mobilePhone'] ?? $accurateVendor['workPhone'] ?? null;
                 $accurateVendorId = $accurateVendor['id'] ?? $vendorId;
 
-                Vendor::updateOrCreate(
-                    [
-                        // Kita gunakan vendor_no sebagai acuan pencarian yang utama atau accurate_vendor_id
-                        'accurate_vendor_id' => $accurateVendorId,
-                        'database_source' => $dbSource,
-                    ],
-                    [
-                        'vendor_no' => $accurateVendor['vendorNo'] ?? $vendorNo,
-                        'vendor_name' => $name,
-                        'email' => $email,
-                        'phone' => $phone,
-                    ]
-                );
+                $finalVendorNo = $accurateVendor['vendorNo'] ?? $vendorNo;
+
+                if ($finalVendorNo) {
+                    Vendor::updateOrCreate(
+                        [
+                            'vendor_no' => $finalVendorNo,
+                        ],
+                        [
+                            'accurate_vendor_id' => $accurateVendorId,
+                            'database_source' => $dbSource,
+                            'vendor_name' => $name,
+                            'email' => $email,
+                            'phone' => $phone,
+                        ]
+                    );
+                }
 
                 Log::info("Webhook Berhasil: Vendor Updated via Webhook: Vendor No {$vendorNo} | Name: {$name}");
             }

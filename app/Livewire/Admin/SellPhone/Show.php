@@ -283,7 +283,7 @@ class Show extends Component
                         'vendorNo' => str_replace('"', '', $vendorNoBaru),
                         'paymentDate' => date('d/m/Y'),
                         'chequeAmount' => (int) $this->sellPhone->appraised_value,
-                        'branchName' => Auth::user()->branch->name,
+                        'branchName' => $accurateBranchName,
                         'charField1' => $namaProyek ?: 'UMUM',
                         'detailInvoice' => [
                             [
