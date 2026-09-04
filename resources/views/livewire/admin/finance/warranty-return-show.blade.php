@@ -72,7 +72,7 @@
                         $variant = $claim->warranty->orderItem->variant ?? null;
                         $productName = '-';
                         if ($variant) {
-                            $productName = "{$variant->product->brand} {$variant->product->name} {$variant->ram}/{$variant->storage} - {$variant->color}";
+                            $productName = "{$variant->brandName} {$variant->name}";
                             if (isset($variant->name)) {
                                 $productName = $variant->name ?? '-';
                             }

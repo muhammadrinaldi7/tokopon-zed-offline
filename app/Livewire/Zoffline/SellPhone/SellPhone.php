@@ -685,15 +685,15 @@ class SellPhone extends Component
 
         // Hasil akhir: "Kondisi Fisik: Lecet Wajar | Kelengkapan: Fullset. Catatan Tambahan: Casing belakang agak kotor"
         $minusDesc = "{$kondisi}{$catatanText}";
-        // Hit API Accurate dengan data user/customer yang sesuai
+        // Hit API Accurate dengan data user/customer yang sesuai di latar belakang via Queue
         try {
             $buId = Auth::user()->getActiveBusinessUnitId();
             $bu = \App\Models\BusinessUnit::find($buId);
             $dbSource = $bu ? $bu->code : 'syihab';
 
-            app(\App\Services\AccurateService::class)->syncVendor($userForAccurate, $dbSource);
+            \App\Jobs\SyncAccurateVendorJob::dispatch($userForAccurate, $dbSource);
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to sync vendor to Accurate: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Failed to dispatch sync vendor job to Accurate: ' . $e->getMessage());
         }
 
         $finalStatus = $this->qc_verdict === 'fail' ? 'CANCELLED' : 'PAYING';

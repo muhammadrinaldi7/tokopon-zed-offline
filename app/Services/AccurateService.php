@@ -1441,9 +1441,9 @@ class AccurateService
     public function findSkuBySerialNumber($sn, $databaseSource = 'syihab')
     {
         $config = $this->getHeaders($databaseSource);
-
         try {
-            $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            // Gunakan timeout singkat (4 detik) agar proses scan kasir tidak macet dan bisa langsung fallback ke database lokal jika Accurate lambat
+            $response = Http::timeout(4)->retry(1, 200)->withHeaders($config['headers'])
                 ->get($config['host'] . '/item/search-by-item-or-sn.do', [
                     // Tetap pertahankan strtoupper + trim agar aman dari masalah case-sensitive kemarin
                     'keywords' => trim($sn)
