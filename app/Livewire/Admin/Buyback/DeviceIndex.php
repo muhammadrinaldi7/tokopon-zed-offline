@@ -85,7 +85,8 @@ class DeviceIndex extends Component
 
     public function exportCsv()
     {
-        $query = ProductAccurate::where('business_unit_id', 2);
+        $query = ProductAccurate::where('business_unit_id', 2)
+            ->select('id', 'item_no', 'name', 'buy_price');
 
         if (!empty($this->search)) {
             $query->where(function ($q) {
@@ -106,20 +107,14 @@ class DeviceIndex extends Component
             $query->where('proyek', $this->filterProyek);
         }
 
-        $devices = $query->orderBy('name')->get();
-
         $csvFileName = 'product_accurates_' . date('Ymd_His') . '.csv';
         $headers = [
-            "Content-type"        => "text/csv",
-            "Content-Disposition" => "attachment; filename=$csvFileName",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ];
 
         $columns = ['ID', 'SKU', 'Nama Barang', 'Buy Price'];
 
-        $callback = function () use ($devices, $columns) {
+        $callback = function () use ($query, $columns) {
             $file = fopen('php://output', 'w');
 
             // Tambahkan BOM untuk Excel agar mengenali UTF-8
@@ -127,7 +122,7 @@ class DeviceIndex extends Component
 
             fputcsv($file, $columns, ';'); // Menggunakan ; agar ramah Excel Indonesia
 
-            foreach ($devices as $device) {
+            foreach ($query->orderBy('name')->cursor() as $device) {
                 fputcsv($file, [
                     $device->id,
                     $device->item_no,
@@ -139,7 +134,7 @@ class DeviceIndex extends Component
             fclose($file);
         };
 
-        return response()->stream($callback, 200, $headers);
+        return response()->streamDownload($callback, $csvFileName, $headers);
     }
 
     public function importCsv()

@@ -19,8 +19,16 @@ class BuybackDeviceTemplateSheet implements FromCollection, WithTitle, WithHeadi
 {
     public function collection()
     {
-        // Ambil semua produk Accurate untuk referensi template
-        return ProductAccurate::with(['buybackDevice.tier'])
+        // Ambil semua produk Accurate untuk referensi template (select kolom yang diperlukan saja agar tidak memuat raw_data)
+        return ProductAccurate::with([
+                'buybackDevice' => function ($q) {
+                    $q->select('id', 'product_accurate_id', 'buyback_tier_id');
+                },
+                'buybackDevice.tier' => function ($q) {
+                    $q->select('id', 'name');
+                }
+            ])
+            ->select('id', 'item_no', 'os', 'categoryName', 'brandName', 'buy_price')
             ->where('business_unit_id', 2)
             ->orderBy('name')
             ->get();

@@ -14,7 +14,10 @@ class BuybackDeviceExport implements FromCollection, WithHeadings, WithMapping, 
 {
     public function collection()
     {
-        return BuybackDevice::with(['tier', 'productAccurate'])->get();
+        return BuybackDevice::with([
+            'tier:id,name',
+            'productAccurate:id,item_no',
+        ])->get();
     }
 
     public function headings(): array
