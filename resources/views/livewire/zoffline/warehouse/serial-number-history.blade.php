@@ -10,7 +10,11 @@
             </a>
             <h1 class="text-2xl font-bold text-gray-900">Riwayat Serial Number</h1>
             <p class="text-gray-500 text-sm mt-1">Perjalanan masuk dan keluar barang untuk SN/IMEI: <span
-                    class="font-mono font-bold text-gray-800">{{ $sn }}</span></p>
+                    class="font-mono font-bold text-gray-800">{{ $sn }}</span>
+                @if ($productSn && $productSn->product_name)
+                    <span class="block mt-1 font-semibold text-gray-800 text-base">{{ $productSn->product_name }}</span>
+                @endif
+            </p>
         </div>
 
         @if ($productSn)

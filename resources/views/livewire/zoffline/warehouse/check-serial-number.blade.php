@@ -99,9 +99,13 @@
 
                                     <div class="md:col-span-2">
                                         <p class="text-sm text-gray-500 font-medium mb-1">Nama Produk</p>
-                                        @if ($result->variant && $result->variant->product)
+                                        @if ($result->product_name)
                                             <p class="text-lg font-bold text-gray-900">
-                                                {{ $result->variant->product->name }}
+                                                {{ $result->product_name }}
+                                            </p>
+                                        @elseif ($result->variant)
+                                            <p class="text-lg font-bold text-gray-900">
+                                                {{ $result->variant->product?->name ?? ($result->variant->secondProduct?->name ?? '-') }}
                                                 @if ($result->variant->name && $result->variant->name !== 'Default')
                                                     - {{ $result->variant->name }}
                                                 @endif
@@ -109,7 +113,7 @@
                                         @else
                                             <p class="text-lg font-medium text-gray-500 italic">Nama produk tidak
                                                 ditemukan
-                                                di katalog lokal</p>
+                                                di katalog lokal maupun Accurate</p>
                                         @endif
                                     </div>
 

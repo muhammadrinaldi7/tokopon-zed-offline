@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Models\BusinessUnitProject;
 use App\Models\MigrationInvoice;
+use App\Models\ProductAccurate;
 use App\Services\AccurateService;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -54,6 +56,10 @@ class PushInvoiceToAccurateJob implements ShouldQueue
 
         $detailItemArray = [];
 
+        // Ambil data produk terkait untuk memetakan nomor proyek (projectNo)
+        $itemCodes = $this->invoice->items->pluck('item_code')->filter()->unique();
+        $products = ProductAccurate::whereIn('item_no', $itemCodes)->get()->keyBy('item_no');
+
         foreach ($this->invoice->items as $item) {
             $itemData = [
                 'itemNo'        => $item->item_code,
@@ -61,6 +67,33 @@ class PushInvoiceToAccurateJob implements ShouldQueue
                 'unitPrice'     => (float) $item->unit_price,
                 'quantity'      => (float) $item->quantity,
             ];
+
+            // Mapping Project No seperti pada Sales Invoice / POS
+            $product = $products->get($item->item_code);
+            if ($product) {
+                $namaProyek = trim(strtoupper($product->proyek ?? ''));
+
+                // 1. Cek dari mapping BusinessUnitProject jika dikonfigurasi per unit
+                $projectNo = BusinessUnitProject::getProjectNoByBusinessUnit(
+                    $product->business_unit_id,
+                    $namaProyek,
+                    null
+                );
+
+                // 2. Mapping standar sesuai POS / Sales Invoice
+                if (empty($projectNo) && !empty($namaProyek)) {
+                    $projectNo = match ($namaProyek) {
+                        'SJU'   => 'P.00003',
+                        'SAB'   => 'P.00004',
+                        'RESMI' => 'P.00008',
+                        default => $product->proyek ?? ''
+                    };
+                }
+
+                if (!empty($projectNo)) {
+                    $itemData['projectNo'] = $projectNo;
+                }
+            }
 
             // Proses IMEI menjadi Array
             if (!empty(trim($item->serial_numbers))) {

@@ -29,7 +29,7 @@ class CheckSerialNumber extends Component
 
         $this->hasSearched = true;
 
-        $this->result = ProductSerialNumber::with('warehouse')
+        $this->result = ProductSerialNumber::with(['warehouse', 'productAccurate'])
             ->where('serial_number', trim($this->keyword))
             ->first();
 
