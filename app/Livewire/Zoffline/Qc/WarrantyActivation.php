@@ -258,7 +258,16 @@ class WarrantyActivation extends Component
             return; // Jangan buat garansi baru
         }
 
-        // 2. Calculate Warranties using Service (Returns Collection of WarrantyPolicy)
+        // 2. Otomatis batalkan (void) garansi aktif dari transaksi sebelumnya untuk SN ini
+        //    karena unit telah berpindah kepemilikan / dijual kembali ke pembeli baru.
+        \App\Models\Warranty::where('serial_number', $this->searchQuery)
+            ->where('status', 'active')
+            ->where('order_item_id', '!=', $this->foundItem->id)
+            ->update([
+                'status' => 'voided',
+            ]);
+
+        // 3. Calculate Warranties using Service (Returns Collection of WarrantyPolicy)
         $calculator = new \App\Services\WarrantyCalculatorService();
         $policies = $calculator->calculateWarranties($order, $this->foundItem);
 

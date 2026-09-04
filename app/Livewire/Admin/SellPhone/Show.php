@@ -301,6 +301,16 @@ class Show extends Component
                     'status' => 'COMPLETED'
                 ]);
 
+                // Otomatis void garansi aktif jika unit ini pernah dibeli sebelumnya di toko
+                // karena unit telah dibeli kembali (buyback) oleh toko.
+                if (!empty($this->sellPhone->imei)) {
+                    \App\Models\Warranty::where('serial_number', $this->sellPhone->imei)
+                        ->where('status', 'active')
+                        ->update([
+                            'status' => 'voided',
+                        ]);
+                }
+
                 $this->dispatch('toast', [
                     'type' => 'success',
                     'title' => 'Success',

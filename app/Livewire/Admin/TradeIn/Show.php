@@ -44,6 +44,7 @@ class Show extends Component
 
     // Payment Method
     public $payment_method_id;
+    /** @var \Illuminate\Database\Eloquent\Collection|array */
     public $available_payment_methods = [];
     public function mount(TradeIn $tradeIn)
     {
@@ -170,9 +171,10 @@ class Show extends Component
         $this->oldPhoneSN = 'TRD-SN-' . str_pad($this->tradeIn->id, 4, '0', STR_PAD_LEFT);
         $this->targetSN = '';
 
-        $this->available_payment_methods = \App\Models\PaymentMethod::where('is_active', true)->get();
-        if ($this->available_payment_methods->count() > 0) {
-            $this->payment_method_id = $this->available_payment_methods->first()->id;
+        $paymentMethods = \App\Models\PaymentMethod::where('is_active', true)->get();
+        $this->available_payment_methods = $paymentMethods;
+        if ($paymentMethods->isNotEmpty()) {
+            $this->payment_method_id = $paymentMethods->first()->id;
         }
         // dd($this->available_payment_methods);
 
@@ -315,6 +317,14 @@ class Show extends Component
 
             // Mark TradeIn as Completed jika semua berhasil
             $this->tradeIn->update(['status' => 'COMPLETED']);
+
+            // Otomatis void garansi aktif jika unit ini pernah dibeli sebelumnya di toko
+            // karena unit telah dibeli kembali (trade-in) oleh toko.
+            if (!empty($this->tradeIn->imei)) {
+                \App\Models\Warranty::where('serial_number', $this->tradeIn->imei)
+                    ->where('status', 'active')
+                    ->update(['status' => 'voided']);
+            }
 
             $this->showConfirmModal = false;
             $this->dispatch('toast', title: 'Pembayaran Dikonfirmasi', message: 'Pembayaran selesai dan data telah diupdate.', type: 'success');

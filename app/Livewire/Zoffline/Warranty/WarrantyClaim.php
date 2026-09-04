@@ -69,27 +69,51 @@ class WarrantyClaim extends Component
             'searchQuery.min' => 'Serial Number minimal 3 karakter'
         ]);
 
-        $this->foundWarranties = Warranty::with(['policy', 'orderItem.order.user', 'orderItem.variant'])
+        $warranties = Warranty::with(['policy', 'orderItem.order.user.profile', 'orderItem.variant', 'customer.profile'])
             ->where('serial_number', $this->searchQuery)
             ->where('status', '!=', 'voided')
+            ->orderByDesc('id')
             ->get();
 
         $this->selectedWarrantyId = null;
         $this->isSubmitted = false;
 
-        if ($this->foundWarranties->count() === 0) {
+        if ($warranties->isEmpty()) {
+            $this->foundWarranties = collect();
             $this->addError('searchQuery', 'Tidak ada garansi atau data perangkat ditemukan untuk Serial Number ini.');
             return;
         }
 
-        // Auto-select if there's only one active warranty
-        $activeWarranties = $this->foundWarranties->filter(function ($w) {
+        // Cek apakah ada garansi aktif
+        $activeWarranties = $warranties->filter(function ($w) {
             return $w->status === 'active' && $w->expires_at > Carbon::now();
         });
 
-        if ($activeWarranties->count() === 1) {
-            $this->selectWarranty($activeWarranties->first()->id);
-        } elseif ($activeWarranties->count() === 0) {
+        if ($activeWarranties->isNotEmpty()) {
+            // Jika ada garansi aktif:
+            // Ambil order_item_id dari transaksi aktif TERBARU (misal jika unit pernah dijual beberapa kali di masa lalu)
+            $latestActiveOrderItemId = $activeWarranties->first()->order_item_id;
+
+            // Ambil seluruh garansi yang terikat pada transaksi terbaru tersebut (misal policy toko + addon asuransi)
+            $this->foundWarranties = $warranties->filter(function ($w) use ($latestActiveOrderItemId) {
+                return $w->order_item_id === $latestActiveOrderItemId;
+            })->values();
+        } else {
+            // Jika semua sudah expired, ambil garansi dari transaksi paling baru saja
+            $latestOrderItemId = $warranties->first()->order_item_id;
+            $this->foundWarranties = $warranties->filter(function ($w) use ($latestOrderItemId) {
+                return $w->order_item_id === $latestOrderItemId;
+            })->values();
+        }
+
+        // Auto-select jika hanya ada 1 garansi aktif di transaksi terbaru tersebut
+        $activeInLatest = $this->foundWarranties->filter(function ($w) {
+            return $w->status === 'active' && $w->expires_at > Carbon::now();
+        });
+
+        if ($activeInLatest->count() === 1) {
+            $this->selectWarranty($activeInLatest->first()->id);
+        } elseif ($activeInLatest->count() === 0) {
             // ALL warranties are expired. Auto-select the first one just to get customer info.
             $this->selectWarranty($this->foundWarranties->first()->id);
         }
@@ -100,11 +124,13 @@ class WarrantyClaim extends Component
         $this->selectedWarrantyId = $id;
 
         // Re-query to ensure relations are loaded
-        $warranty = Warranty::with('orderItem.order.user.profile')->find($id);
-        if ($warranty && $warranty->orderItem && $warranty->orderItem->order && $warranty->orderItem->order->user) {
-            $user = $warranty->orderItem->order->user;
-            $this->customer_name = $user->name;
-            $this->customer_phone = $user->profile->phone_number ?? '';
+        $warranty = Warranty::with(['orderItem.order.user.profile', 'customer.profile'])->find($id);
+        if ($warranty) {
+            $customer = $warranty->customer ?? $warranty->orderItem?->order?->user;
+            if ($customer) {
+                $this->customer_name = $customer->name;
+                $this->customer_phone = $customer->profile->phone_number ?? '';
+            }
         }
 
         $this->checkPendingRequest();

@@ -114,11 +114,16 @@
                                                 <span
                                                     class="font-bold {{ $isExpired ? 'text-rose-600' : 'text-gray-700' }}">{{ $warranty->expires_at->format('d M Y') }}</span>
                                             </div>
-                                            {{-- <div class="flex justify-between">
-                                                <span>Telah Diklaim:</span>
-                                                <span
-                                                    class="font-bold text-gray-700">{{ $warranty->claims_used }}x</span>
-                                            </div> --}}
+                                            <div class="flex justify-between pt-1 border-t border-gray-100">
+                                                <span>Pembeli:</span>
+                                                <span class="font-semibold text-gray-800 truncate max-w-[140px]">{{ $warranty->customer->name ?? $warranty->orderItem?->order?->user?->name ?? '-' }}</span>
+                                            </div>
+                                            @if ($warranty->orderItem?->order?->invoice_number)
+                                                <div class="flex justify-between">
+                                                    <span>Invoice:</span>
+                                                    <span class="font-mono text-[11px] text-blue-600 font-bold">{{ $warranty->orderItem->order->invoice_number }}</span>
+                                                </div>
+                                            @endif
                                         </div>
 
                                         <!-- Custom Radio Button Indicator -->
