@@ -358,7 +358,7 @@ class Form extends Component
         }
 
         return view('livewire.admin.promo.form', [
-            'brands' => Brand::orderBy('name')->get(),
+            'brands' => Brand::where('business_unit_id', \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId())->orderBy('name')->get(),
             'branches' => $branchesQuery->orderBy('name')->get(),
             'paymentMethods' => \App\Models\PaymentMethod::where(function ($q) {
                 $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
