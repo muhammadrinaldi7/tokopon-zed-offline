@@ -18,17 +18,18 @@ class InvoiceReportExport implements FromArray, WithHeadings, ShouldAutoSize, Wi
     {
         $this->data = $data;
 
-        // Kumpulkan semua proyek unik
         $projects = [];
         foreach ($this->data as $item) {
-            if (!empty($item['projects'])) {
-                foreach (array_keys($item['projects']) as $p) {
+            if (!empty($item['proyek'])) {
+                foreach (array_keys($item['proyek']) as $p) {
                     $projects[$p] = true;
                 }
             }
         }
         $this->uniqueProjects = array_keys($projects);
         sort($this->uniqueProjects);
+        
+        \Illuminate\Support\Facades\Log::info("EXPORT_EXCEL_DEBUG: Unique Projects Found: " . json_encode($this->uniqueProjects));
     }
 
     public function array(): array
@@ -54,7 +55,7 @@ class InvoiceReportExport implements FromArray, WithHeadings, ShouldAutoSize, Wi
 
             // Tambahkan nilai per proyek
             foreach ($this->uniqueProjects as $p) {
-                $rowValues[] = isset($item['projects'][$p]) ? round($item['projects'][$p]) : 0;
+                $rowValues[] = isset($item['proyek'][$p]) ? round($item['proyek'][$p]) : 0;
             }
 
             $formatted[] = $rowValues;

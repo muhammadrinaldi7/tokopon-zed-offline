@@ -112,7 +112,16 @@ class InvoiceReport extends Component
         $rows = [];
 
         // Gunakan chunk untuk menghemat memori (optimalisasi memory limit)
-        $this->ordersQuery->with(['payments.paymentMethod', 'payments.paymentMethodRate'])->chunk(100, function ($orders) use (&$rows) {
+        $this->ordersQuery->with([
+            'payments.paymentMethod',
+            'payments.paymentMethodRate',
+            'items.variant' => function (\Illuminate\Database\Eloquent\Relations\MorphTo $morphTo) {
+                $morphTo->morphWith([
+                    \App\Models\ProductVariant::class => ['accurateData'],
+                    \App\Models\SecondProductVariant::class => ['accurateData'],
+                ]);
+            },
+        ])->chunk(100, function ($orders) use (&$rows) {
             foreach ($orders as $order) {
                 $namaToko = $order->shipping_address_snapshot['store'] ?? null;
                 $invoiceNo = $order->accurate_invoice_no ?? $order->accurate_so_number ?? null;
@@ -126,16 +135,29 @@ class InvoiceReport extends Component
                     foreach ($order->items as $item) {
                         // Cari proyek dari relasi variant -> productAccurate -> proyek
                         $proyek = 'UMUM'; // Default
-                        if ($item->variant && method_exists($item->variant, 'accurateData') && $item->variant->accurateData) {
-                            $proyek = trim(strtoupper($item->variant->accurateData->proyek ?? 'UMUM'));
-                        } elseif ($item->variant && method_exists($item->variant, 'product') && $item->variant->product && method_exists($item->variant->product, 'productAccurate') && $item->variant->product->productAccurate) {
-                            $proyek = trim(strtoupper($item->variant->product->productAccurate->proyek ?? 'UMUM'));
+                        if ($item->variant) {
+                            if ($item->variant instanceof \App\Models\ProductAccurate) {
+                                $proyek = trim(strtoupper($item->variant->proyek ?? 'UMUM'));
+                            } elseif (method_exists($item->variant, 'accurateData') && $item->variant->accurateData) {
+                                $proyek = trim(strtoupper($item->variant->accurateData->proyek ?? 'UMUM'));
+                            } elseif (isset($item->variant->product_id)) {
+                                // Fallback: cari di product_accurates berdasarkan product_id jika relasi tidak ada
+                                $pa = \App\Models\ProductAccurate::where('product_id', $item->variant->product_id)->first();
+                                if ($pa) {
+                                    $proyek = trim(strtoupper($pa->proyek ?? 'UMUM'));
+                                }
+                            }
                         }
-                        
+
                         if (empty($proyek)) $proyek = 'UMUM';
 
-                        $subtotal = ((float)$item->price - (float)$item->discount_amount - (float)$item->promo_discount_amount) * (int)$item->quantity;
-                        
+                        $qty = (int)($item->qty ?? $item->quantity ?? 1);
+                        $unitPrice = (float)($item->price_at_checkout ?? $item->price ?? 0);
+                        $gross = (float)($item->subtotal ?? ($unitPrice * $qty));
+                        $discount = (float)($item->discount_amount ?? 0) + (float)($item->promo_discount_amount ?? 0);
+                        $net = max(0, $gross - $discount);
+                        $subtotal = $net > 0 ? $net : $gross;
+
                         if (!isset($projectTotals[$proyek])) {
                             $projectTotals[$proyek] = 0;
                         }
@@ -144,10 +166,22 @@ class InvoiceReport extends Component
                     }
                 }
 
-                // Jika tidak ada total, masukkan semua ke UMUM 100%
+                // Denominator acuan proporsi = total keseluruhan order item
+                $denominator = $totalItemPrice;
+
+                // Jika subtotal seluruh barang adalah 0, kita tidak punya angka untuk acuan proporsi.
+                // Maka, kita bagi rata persentasenya ke semua proyek yang ada di pesanan tersebut.
                 if ($totalItemPrice <= 0) {
-                    $projectTotals = ['UMUM' => 1]; 
-                    $totalItemPrice = 1;
+                    $projectCount = count($projectTotals);
+                    if ($projectCount > 0) {
+                        foreach ($projectTotals as $k => $v) {
+                            $projectTotals[$k] = 1; // Bobot sama rata (1)
+                        }
+                        $denominator = $projectCount; // Paksa pembagi agar total proporsinya 100%
+                    } else {
+                        $projectTotals = ['UMUM' => 1];
+                        $denominator = 1;
+                    }
                 }
 
                 if ($order->payments && $order->payments->count() > 0) {
@@ -166,7 +200,7 @@ class InvoiceReport extends Component
                         // 2. Kalkulasi nominal pembayaran per proyek
                         $projectAmounts = [];
                         foreach ($projectTotals as $pName => $pTotal) {
-                            $proportion = $pTotal / $totalItemPrice;
+                            $proportion = $pTotal / $denominator;
                             $projectAmounts[$pName] = round($amount * $proportion, 2);
                         }
 
@@ -185,10 +219,15 @@ class InvoiceReport extends Component
                             'variantMethod' => $pmrName,
                             'amount' => $amount,
                             'mdr' => $mdr,
-                            'projects' => $projectAmounts, // Data dinamis proyek
+                            'proyek' => $projectAmounts, // Data dinamis proyek
                         ];
                     }
                 } else {
+                    $emptyProjectAmounts = [];
+                    foreach ($projectTotals as $pName => $pTotal) {
+                        $emptyProjectAmounts[$pName] = 0;
+                    }
+                    
                     $rows[] = [
                         'created_at' => $order->created_at ? $order->created_at->format('Y-m-d') : null,
                         'nama_kasir' => $order->handledBy->name ?? '-',
@@ -204,7 +243,7 @@ class InvoiceReport extends Component
                         'variantMethod' => null,
                         'amount' => null,
                         'mdr' => null,
-                        'projects' => [], // Kosong
+                        'proyek' => $emptyProjectAmounts, // Menampilkan header proyek meskipun belum ada pembayaran
                     ];
                 }
             }
@@ -244,8 +283,8 @@ class InvoiceReport extends Component
             // Temukan semua proyek unik yang ada di dalam row
             $uniqueProjects = [];
             foreach ($rows as $row) {
-                if (!empty($row['projects'])) {
-                    foreach (array_keys($row['projects']) as $p) {
+                if (!empty($row['proyek'])) {
+                    foreach (array_keys($row['proyek']) as $p) {
                         $uniqueProjects[$p] = true;
                     }
                 }
@@ -297,7 +336,7 @@ class InvoiceReport extends Component
 
                 // Tambahkan nilai proyek secara berurutan sesuai urutan header
                 foreach ($uniqueProjects as $p) {
-                    $rowValues[] = isset($row['projects'][$p]) ? $row['projects'][$p] : 0;
+                    $rowValues[] = isset($row['proyek'][$p]) ? round($row['proyek'][$p]) : 0;
                 }
 
                 fputcsv($file, $rowValues, $separator);
@@ -371,7 +410,7 @@ class InvoiceReport extends Component
             ->sum(\Illuminate\Support\Facades\DB::raw('(order_payments.amount * COALESCE(payment_method_rates.mdr_percentage, 0)) / 100'));
 
         $totalNet = $totalGrandTotal - $totalMdr;
-        
+
         return view('livewire.zoffline.reporting.invoice-report', [
             'orders' => $orders,
             'availableBranches' => $availableBranches,
