@@ -2,45 +2,47 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ApprovalRequest;
+use App\Models\BusinessUnit;
+use App\Models\User;
+use App\Services\ApprovalService;
+use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use App\Models\ApprovalRequest;
 use Illuminate\Support\Facades\Log;
 
 class ApprovalController extends Controller
 {
     /**
      * Helper untuk memicu pengiriman notifikasi ke Telegram via n8n webhook
-     * Sekarang menggunakan mekanisme Inline Keyboard Callback Data, bukan link sakti
+     * Sekarang menggunakan mekanisme Inline Keyboard Callback Data
      */
     public static function sendTelegramNotification(ApprovalRequest $approval)
     {
         $n8nWebhookUrl = 'https://n8n.zedgroup.tech/webhook/approval-telegram-zedpos';
-        $businessUnitId = $approval->requestedBy->business_unit_id ?? null;
+        $businessUnitId = $approval->business_unit_id ?? $approval->requestedBy?->business_unit_id;
 
         if ($businessUnitId) {
-            $bu = \App\Models\BusinessUnit::find($businessUnitId);
+            $bu = BusinessUnit::find($businessUnitId);
             if ($bu && $bu->telegram_approval_webhook) {
                 $n8nWebhookUrl = $bu->telegram_approval_webhook;
             }
         }
 
         $nextLevel = $approval->current_level + 1;
-        $rule = \App\Models\ApprovalRule::with('role')->where('module', $approval->request_type)->where('level', $nextLevel)->first();
+        $rule = app(ApprovalService::class)->getRuleForLevel($approval->request_type, $nextLevel, $businessUnitId);
         $targetRole = $rule && $rule->role ? strtolower($rule->role->name) : 'manager';
 
-        $cabangId = $approval->requestedBy->branch_id ?? null;
+        $cabangId = $approval->branch_id ?? $approval->requestedBy?->branch_id;
 
         $globalRoles = ['admin', 'direktur', 'superadmin'];
-        // Role tingkat cabang (difilter berdasarkan BU dan Cabang)
-        $localRoles = ['manager', 'bm', 'supervisor'];
+        $localRoles = ['manager', 'bm', 'supervisor', 'fl', 'kasir_sju'];
 
-        $query = \App\Models\User::role($targetRole)
+        $query = User::role($targetRole)
             ->whereNotNull('telegram_chat_id')
             ->where('telegram_chat_id', '!=', '');
 
-        // Jika bukan role global (seperti admin/direktur/superadmin), filter berdasarkan Business Unit
-        // Ini berlaku untuk manager, bm, supervisor, manageroperasional, dll.
+        // Filter berdasarkan Business Unit jika bukan role global (atau jika rule spesifik BU)
         if (!in_array($targetRole, $globalRoles) && $businessUnitId) {
             $query->where('business_unit_id', $businessUnitId);
         }
@@ -56,7 +58,7 @@ class ApprovalController extends Controller
         $targetUsers = $query->get();
 
         if ($targetUsers->isEmpty()) {
-            Log::info("Telegram Webhook: Tidak ada user dengan role {$targetRole} dan telegram_chat_id yang valid untuk cabang {$cabangId}");
+            Log::info("Telegram Webhook: Tidak ada user dengan role {$targetRole} dan telegram_chat_id yang valid untuk BU {$businessUnitId}, cabang {$cabangId}");
             return false;
         }
 
@@ -79,6 +81,7 @@ class ApprovalController extends Controller
             $keterangan .= "\n\nHarga Jual: Rp " . number_format($price, 0, ',', '.') . "\nNominal Cashback: Rp " . number_format($amount, 0, ',', '.');
         }
 
+        $branchName = $approval->branch?->name ?? ($approval->requestedBy?->branch?->name ?? '-');
         $successCount = 0;
 
         foreach ($targetUsers as $user) {
@@ -87,7 +90,7 @@ class ApprovalController extends Controller
                     'chat_id_penerima' => $user->telegram_chat_id,
                     'judul'            => "Pengajuan {$tipe} untuk {$orderInfo}",
                     'kasir'            => $kasirName,
-                    'branch'           => $approval->requestedBy->branch->name,
+                    'branch'           => $branchName,
                     'waktu'            => $approval->created_at->format('d M Y H:i'),
                     'keterangan'       => $keterangan,
                     'action'           => 'PENDING',
@@ -98,39 +101,37 @@ class ApprovalController extends Controller
                 if ($response->successful()) {
                     $successCount++;
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error("Gagal kirim Webhook Telegram ke user {$user->id}: " . $e->getMessage());
             }
         }
 
-        // --- KIRIM NOTIFIKASI KE GRUP JUGA ---
+        // --- KIRIM NOTIFIKASI KE GRUP TELEGRAM ---
         $alasan = $keterangan;
-        $cabang = $approval->requestedBy->branch->name ?? '-';
         $waktuFormat = $approval->created_at->format('d M Y H:i');
 
         $teksGrup = "🔔 *PENGAJUAN BARU*\n\n"
             . "Pengajuan: {$tipe} untuk {$orderInfo}\n"
             . "Kasir: {$kasirName}\n"
             . "Waktu: {$waktuFormat}\n"
-            . "Cabang: {$cabang}\n"
+            . "Cabang: {$branchName}\n"
             . "Keterangan: \"{$alasan}\"\n\n"
             . "⏳ _Menunggu persetujuan dari divisi terkait._";
 
         self::sendGroupNotification($teksGrup, $businessUnitId);
-        // -------------------------------------
 
         return $successCount > 0;
     }
+
     /**
      * Helper khusus untuk mengirim pesan log ke Grup Telegram
      */
     public static function sendGroupNotification($pesan_teks, $businessUnitId = null)
     {
-        // Ganti dengan URL Webhook Workflow 3 Anda yang baru
         $n8nGroupWebhook = 'https://n8n.zedgroup.tech/webhook/approval-group-log';
 
         if ($businessUnitId) {
-            $bu = \App\Models\BusinessUnit::find($businessUnitId);
+            $bu = BusinessUnit::find($businessUnitId);
             if ($bu && $bu->telegram_log_webhook) {
                 $n8nGroupWebhook = $bu->telegram_log_webhook;
             }
@@ -140,22 +141,22 @@ class ApprovalController extends Controller
             Http::timeout(5)->post($n8nGroupWebhook, [
                 'pesan_grup' => $pesan_teks
             ]);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Gagal kirim log grup: " . $e->getMessage());
+        } catch (Exception $e) {
+            Log::error("Gagal kirim log grup Telegram: " . $e->getMessage());
         }
     }
+
     /**
-     * Proses persetujuan via API (Ditembak oleh n8n secara otomatis di belakang layar ketika tombol callback ditekan)
+     * Proses persetujuan via API (Ditembak oleh n8n secara otomatis ketika tombol callback ditekan)
      */
     public function apiProcess(Request $request)
     {
-        // 1. VALIDASI KEAMANAN API (Pengganti Signed Route)
+        // 1. VALIDASI KEAMANAN API
         $secretKey = env('N8N_API_SECRET', 'ZedposRahasia123');
         if ($request->header('X-API-KEY') !== $secretKey) {
             return response()->json(['success' => false, 'message' => 'Unauthorized Access'], 401);
         }
 
-        // Tangkap data dari body JSON yang dikirim n8n
         Log::info('Webhook Telegram Masuk:', $request->all());
 
         $id = $request->input('approval_id');
@@ -168,7 +169,7 @@ class ApprovalController extends Controller
             return response()->json(['success' => false, 'message' => 'Telegram Chat ID tidak ditemukan.']);
         }
 
-        $user = \App\Models\User::where('telegram_chat_id', $chatId)->first();
+        $user = User::where('telegram_chat_id', $chatId)->first();
 
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Akun dengan Chat ID tersebut tidak terdaftar di sistem.']);
@@ -191,24 +192,25 @@ class ApprovalController extends Controller
         }
 
         // 4. VALIDASI JABATAN (ROLE AUTHORIZATION)
-        $rule = \App\Models\ApprovalRule::with('role')->where('module', $approval->request_type)->where('level', $expectedLevel)->first();
+        $rule = app(ApprovalService::class)->getRuleForLevel($approval->request_type, $expectedLevel, $approval->business_unit_id);
         $targetRole = $rule && $rule->role ? strtolower($rule->role->name) : 'manager';
 
-        if (!$user->hasRole($targetRole)) {
+        if (!$user->hasRole($targetRole) && !$user->hasRole('superadmin')) {
             return response()->json(['success' => false, 'message' => "Anda tidak memiliki hak akses ({$targetRole}) untuk menyetujui level ini."]);
         }
 
         $approverId = $user->id;
+        $userRoleSnapshot = $user->roles->pluck('name')->join(', ');
         $pesan = "";
 
-        // 3. Eksekusi Perubahan Status
+        // 5. Eksekusi Perubahan Status
         if ($action === 'approve') {
-
             $approval->histories()->create([
-                'acted_by' => $approverId,
-                'action'   => 'APPROVED',
-                'level'    => $approval->current_level + 1,
-                'notes'    => 'Approved via Telegram API Callback'
+                'acted_by'      => $approverId,
+                'role_snapshot' => $userRoleSnapshot,
+                'action'        => 'APPROVED',
+                'level'         => $expectedLevel,
+                'notes'         => 'Approved via Telegram API Callback'
             ]);
 
             $approval->current_level += 1;
@@ -229,7 +231,7 @@ class ApprovalController extends Controller
                     } elseif ($approval->approvable_type === \App\Models\SellPhone::class && $approval->approvable) {
                         $orderInfo = $approval->approvable->phone_brand . ' ' . $approval->approvable->phone_model;
                     }
-                    $cabang = $approval->requestedBy->branch->name ?? '-';
+                    $cabang = $approval->branch?->name ?? ($approval->requestedBy?->branch?->name ?? '-');
                     $waktu = $approval->created_at->format('d M Y H:i');
                     $alasan = $approval->reason ?? '-';
 
@@ -241,9 +243,8 @@ class ApprovalController extends Controller
                         . "Keterangan: \"{$alasan}\"\n\n"
                         . "Telah disetujui sepenuhnya oleh *{$user->name}*.";
 
-                    $buId = $approval->requestedBy->business_unit_id ?? null;
-                    self::sendGroupNotification($teksGrup, $buId);
-                } catch (\Exception $e) {
+                    self::sendGroupNotification($teksGrup, $approval->business_unit_id);
+                } catch (Exception $e) {
                     $pesan = "⚠️ Disetujui, tapi gagal eksekusi aksi: " . $e->getMessage();
                 }
             } else {
@@ -255,31 +256,29 @@ class ApprovalController extends Controller
                 $pesan = "✅ Disetujui (Diteruskan ke level selanjutnya).";
             }
         } elseif ($action === 'reject') {
-
             $approval->histories()->create([
-                'acted_by' => $approverId,
-                'action'   => 'REJECTED',
-                'level'    => $approval->current_level + 1,
-                'notes'    => 'Rejected via Telegram API Callback'
+                'acted_by'      => $approverId,
+                'role_snapshot' => $userRoleSnapshot,
+                'action'        => 'REJECTED',
+                'level'         => $expectedLevel,
+                'notes'         => 'Rejected via Telegram API Callback'
             ]);
 
             $approval->update(['status' => 'REJECTED']);
             try {
                 $approval->executeRejectedAction();
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error("Failed to execute rejected action via Telegram for Request ID {$approval->id}: " . $e->getMessage());
+            } catch (Exception $e) {
+                Log::error("Failed to execute rejected action via Telegram for Request ID {$approval->id}: " . $e->getMessage());
             }
+
             $pesan = "❌ Pengajuan telah DITOLAK.";
             $teksGrup = "❌ *APPROVAL DITOLAK*\nPengajuan {$approval->request_type} (ID: {$approval->id}) telah DITOLAK oleh {$user->name}.";
 
-            $buId = $approval->requestedBy->business_unit_id ?? null;
-            self::sendGroupNotification($teksGrup, $buId);
+            self::sendGroupNotification($teksGrup, $approval->business_unit_id);
         } else {
             return response()->json(['success' => false, 'message' => 'Action tidak dikenali.']);
         }
 
-        // 4. RETURN BERUPA JSON
-        // n8n akan membaca pesan ini dan menampilkannya sebagai popup (Answer Callback Query) di Telegram
         return response()->json([
             'success' => true,
             'message' => $pesan

@@ -335,21 +335,17 @@ class ClaimManagement extends Component
 
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
-            $requiredLevel = \App\Models\ApprovalRule::where('module', 'WARRANTY_REPLACEMENT')->max('level') ?? 1;
-
-            $approval = \App\Models\ApprovalRequest::create([
-                'request_type' => 'WARRANTY_REPLACEMENT',
-                'approvable_type' => WarrantyClaim::class,
-                'approvable_id' => $claim->id,
-                'requested_by' => Auth::id(),
-                'payload' => $payload,
-                'reason' => "Pengajuan Ganti Unit Garansi ke IMEI: {$this->replacement_imei}",
-                'status' => 'PENDING',
-                'required_level' => $requiredLevel,
-                'current_level' => 0
+            $businessUnitId = $claim->warranty?->policy?->business_unit_id ?? (Auth::user()->getActiveBusinessUnitId() ?? 1);
+            $approval = app(\App\Services\ApprovalService::class)->createRequest([
+                'approvable'       => $claim,
+                'request_type'     => 'WARRANTY_REPLACEMENT',
+                'requested_by'     => Auth::id(),
+                'business_unit_id' => $businessUnitId,
+                'branch_id'        => Auth::user()->branch_id,
+                'total_amount'     => (float) $this->original_price,
+                'payload'          => $payload,
+                'reason'           => "Pengajuan Ganti Unit Garansi ke IMEI: {$this->replacement_imei}",
             ]);
-
-            \App\Http\Controllers\ApprovalController::sendTelegramNotification($approval);
 
             \Illuminate\Support\Facades\DB::commit();
         } catch (\Exception $e) {

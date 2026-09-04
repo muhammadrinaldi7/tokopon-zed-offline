@@ -941,13 +941,8 @@ trait WithCart
 
         $item = $this->cart[$this->customCashbackCartIndex];
 
-        // Minta level ACC yang dibutuhkan dari ApprovalRule
-        $requiredLevel = \App\Models\ApprovalRule::where('module', 'CUSTOM_CASHBACK')->max('level');
-        if (!$requiredLevel) {
-            $requiredLevel = 1;
-        }
-
         $user = Auth::user();
+        $buId = $user ? $user->getActiveBusinessUnitId() : 1;
 
         $reasonText = trim($this->customCashbackReason);
         if (empty($reasonText)) {
@@ -955,25 +950,23 @@ trait WithCart
             return;
         }
 
-        // Buat ApprovalRequest
-        $request = \App\Models\ApprovalRequest::create([
-            'approvable_type' => \App\Models\User::class,
-            'approvable_id' => $user->id,
-            'request_type' => 'CUSTOM_CASHBACK',
-            'requested_by' => $user->id,
-            'reason' => $reasonText,
-            'status' => 'PENDING',
-            'required_level' => $requiredLevel,
-            'current_level' => 0,
-            'payload' => [
-                'cart_index' => $this->customCashbackCartIndex,
-                'amount' => $amount,
+        // Buat ApprovalRequest via ApprovalService
+        $request = app(\App\Services\ApprovalService::class)->createRequest([
+            'approvable_type'  => \App\Models\User::class,
+            'approvable_id'    => $user->id,
+            'request_type'     => 'CUSTOM_CASHBACK',
+            'requested_by'     => $user->id,
+            'business_unit_id' => $buId,
+            'branch_id'        => $user->branch_id,
+            'total_amount'     => (float) $amount,
+            'reason'           => $reasonText,
+            'payload'          => [
+                'cart_index'   => $this->customCashbackCartIndex,
+                'amount'       => $amount,
                 'product_name' => $item['name'],
-                'item_price' => $item['price']
+                'item_price'   => $item['price']
             ]
         ]);
-
-        \App\Http\Controllers\ApprovalController::sendTelegramNotification($request);
 
         // Batalkan request yang masih pending untuk item ini jika ada
         if (isset($this->pendingCustomCashbacks[$this->customCashbackCartIndex])) {

@@ -2,13 +2,16 @@
 
 namespace App\Livewire\Admin\Approvals;
 
+use App\Http\Controllers\ApprovalController;
 use App\Models\ApprovalRequest;
+use App\Models\BusinessUnit;
 use App\Models\Order;
+use App\Services\ApprovalService;
+use Exception;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Livewire\Attributes\Layout;
-use Illuminate\Support\Facades\Auth;
-use App\Models\ApprovalRule;
 
 class Index extends Component
 {
@@ -16,6 +19,7 @@ class Index extends Component
 
     public $search = '';
     public $filterStatus = 'PENDING';
+    public $filterBusinessUnitId = null; // null = ikuti active BU atau semua
 
     // Final Level Confirmations
     public $confirmingApprovalId = null;
@@ -36,11 +40,22 @@ class Index extends Component
     public $adjustedPrice = 0;
     public $priceAdjustmentReason = '';
 
+    public function mount()
+    {
+        $user = Auth::user();
+        if ($user) {
+            // Default ke active business unit jika ada
+            $this->filterBusinessUnitId = $user->getActiveBusinessUnitId();
+        }
+    }
+
     public function viewDetail($id)
     {
         $this->detailRequest = ApprovalRequest::with([
             'approvable',
             'requestedBy.branch',
+            'businessUnit',
+            'branch',
             'histories.actedBy'
         ])->find($id);
 
@@ -80,6 +95,11 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function updatingFilterBusinessUnitId()
+    {
+        $this->resetPage();
+    }
+
     public function confirmApprove($id)
     {
         $request = ApprovalRequest::find($id);
@@ -88,12 +108,12 @@ class Index extends Component
         $user = Auth::user();
         $nextLevel = $request->current_level + 1;
 
-        // Validasi Role (Early Check)
-        $rule = ApprovalRule::with('role')->where('module', $request->request_type)->where('level', $nextLevel)->first();
+        // Validasi Role menggunakan resolusi dinamis BU
+        $rule = app(ApprovalService::class)->getRuleForLevel($request->request_type, $nextLevel, $request->business_unit_id);
 
         if ($rule && $rule->role) {
             if (!$user->hasRole($rule->role->name) && !$user->hasRole('superadmin')) {
-                $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki role yang diizinkan untuk menyetujui Level ' . $nextLevel, type: 'error');
+                $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki role (' . $rule->role->name . ') untuk menyetujui Level ' . $nextLevel, type: 'error');
                 return;
             }
         }
@@ -101,10 +121,9 @@ class Index extends Component
         if ($nextLevel >= $request->required_level) {
             $this->confirmingApprovalId = $id;
             $this->confirmingRequestType = $request->request_type;
-            
+
             if ($request->request_type === 'SELL_PHONE_APPROVAL') {
                 $this->editingPriceId = $id;
-                // Get current value
                 if ($request->approvable && isset($request->approvable->appraised_value)) {
                     $this->adjustedPrice = $request->approvable->appraised_value;
                 }
@@ -117,11 +136,10 @@ class Index extends Component
     public function executeApprove()
     {
         if ($this->confirmingApprovalId) {
-            // Check if it's SellPhone price edit
             if ($this->confirmingRequestType === 'SELL_PHONE_APPROVAL' && $this->editingPriceId) {
                 $request = ApprovalRequest::with('approvable')->find($this->confirmingApprovalId);
-                $originalPrice = (float)($request?->approvable?->appraised_value ?? 0);
-                $newPrice = (float)$this->adjustedPrice;
+                $originalPrice = (float) ($request?->approvable?->appraised_value ?? 0);
+                $newPrice = (float) $this->adjustedPrice;
                 $isPriceChanged = $newPrice > 0 && abs($newPrice - $originalPrice) > 0.01;
 
                 if ($isPriceChanged && empty(trim($this->priceAdjustmentReason))) {
@@ -154,7 +172,7 @@ class Index extends Component
         $nextLevel = $request->current_level + 1;
 
         // Validasi Role
-        $rule = ApprovalRule::with('role')->where('module', $request->request_type)->where('level', $nextLevel)->first();
+        $rule = app(ApprovalService::class)->getRuleForLevel($request->request_type, $nextLevel, $request->business_unit_id);
 
         if ($rule && $rule->role) {
             if (!$user->hasRole($rule->role->name) && !$user->hasRole('superadmin')) {
@@ -163,9 +181,8 @@ class Index extends Component
             }
         }
 
-        // Cek apakah ada perubahan harga nyata pada SellPhone
-        $originalPrice = (float)($request->approvable?->appraised_value ?? 0);
-        $newPrice = (float)$this->adjustedPrice;
+        $originalPrice = (float) ($request->approvable?->appraised_value ?? 0);
+        $newPrice = (float) $this->adjustedPrice;
         $isPriceChanged = $request->request_type === 'SELL_PHONE_APPROVAL'
             && $this->editingPriceId
             && $newPrice > 0
@@ -176,12 +193,13 @@ class Index extends Component
             $historyNote .= " (Adjusted Price: Rp " . number_format($newPrice, 0, ',', '.') . " - {$this->priceAdjustmentReason})";
         }
 
-        // Add history
+        // Add history with role snapshot
         $request->histories()->create([
-            'acted_by' => $user->id,
-            'action' => 'APPROVED',
-            'level' => $request->current_level + 1,
-            'notes' => $historyNote
+            'acted_by'      => $user->id,
+            'role_snapshot' => $user->roles->pluck('name')->join(', '),
+            'action'        => 'APPROVED',
+            'level'         => $nextLevel,
+            'notes'         => $historyNote
         ]);
 
         $request->current_level += 1;
@@ -192,9 +210,9 @@ class Index extends Component
 
             try {
                 $request->executeAction([
-                    'extension_days' => $this->extensionDays,
-                    'adjusted_price' => $isPriceChanged ? $newPrice : null,
-                    'price_adjusted_by' => $isPriceChanged ? $user->id : null,
+                    'extension_days'          => $this->extensionDays,
+                    'adjusted_price'          => $isPriceChanged ? $newPrice : null,
+                    'price_adjusted_by'       => $isPriceChanged ? $user->id : null,
                     'price_adjustment_reason' => $isPriceChanged ? $this->priceAdjustmentReason : null,
                 ]);
 
@@ -202,7 +220,7 @@ class Index extends Component
                 $kasirName = $request->requestedBy->name ?? 'Kasir';
                 $tipe = str_replace('_', ' ', $request->request_type) . " (Level {$request->required_level})";
                 $orderInfo = '-';
-                if ($request->approvable_type === \App\Models\Order::class && $request->approvable) {
+                if ($request->approvable_type === Order::class && $request->approvable) {
                     $orderInfo = $request->approvable->order_number;
                 } elseif ($request->approvable_type === \App\Models\SellPhone::class && $request->approvable) {
                     $orderInfo = $request->approvable->phone_brand . ' ' . $request->approvable->phone_model;
@@ -210,7 +228,7 @@ class Index extends Component
                         $orderInfo .= " (Harga Disesuaikan: Rp " . number_format($newPrice, 0, ',', '.') . ")";
                     }
                 }
-                $cabang = $request->requestedBy->branch->name ?? '-';
+                $cabang = $request->branch?->name ?? ($request->requestedBy?->branch?->name ?? '-');
                 $waktu = $request->created_at->format('d M Y H:i');
                 $alasan = $request->reason ?? '-';
 
@@ -222,22 +240,21 @@ class Index extends Component
                     . "Keterangan: \"{$alasan}\"\n\n"
                     . "Telah disetujui sepenuhnya oleh *{$user->name}* (via Web).";
 
-                \App\Http\Controllers\ApprovalController::sendGroupNotification($teksGrup);
-                // ----------------------------------------
+                ApprovalController::sendGroupNotification($teksGrup, $request->business_unit_id);
 
                 $msg = $request->request_type === 'ORDER_CANCELLATION'
                     ? 'Persetujuan berhasil dan transaksi dibatalkan di Accurate.'
                     : 'Persetujuan berhasil dieksekusi.';
 
                 $this->dispatch('toast', title: 'Berhasil', message: $msg, type: 'success');
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->dispatch('toast', title: 'Error Eksekusi', message: 'Gagal mengeksekusi persetujuan: ' . $e->getMessage(), type: 'error');
             }
         } else {
             $request->save();
 
             // Trigger notifikasi untuk level selanjutnya
-            \App\Http\Controllers\ApprovalController::sendTelegramNotification($request);
+            ApprovalController::sendTelegramNotification($request);
 
             $this->dispatch('toast', title: 'Berhasil', message: 'Disetujui. Menunggu persetujuan level selanjutnya.', type: 'success');
         }
@@ -251,8 +268,7 @@ class Index extends Component
         $user = Auth::user();
         $nextLevel = $request->current_level + 1;
 
-        // Validasi Role (Early Check)
-        $rule = ApprovalRule::with('role')->where('module', $request->request_type)->where('level', $nextLevel)->first();
+        $rule = app(ApprovalService::class)->getRuleForLevel($request->request_type, $nextLevel, $request->business_unit_id);
 
         if ($rule && $rule->role) {
             if (!$user->hasRole($rule->role->name) && !$user->hasRole('superadmin')) {
@@ -278,7 +294,7 @@ class Index extends Component
             'rejectionReason' => 'required|min:5',
         ], [
             'rejectionReason.required' => 'Alasan penolakan wajib diisi.',
-            'rejectionReason.min' => 'Alasan penolakan minimal 5 karakter.',
+            'rejectionReason.min'      => 'Alasan penolakan minimal 5 karakter.',
         ]);
 
         if ($this->rejectingApprovalId) {
@@ -295,8 +311,7 @@ class Index extends Component
         $user = Auth::user();
         $nextLevel = $request->current_level + 1;
 
-        // Validasi Role
-        $rule = ApprovalRule::with('role')->where('module', $request->request_type)->where('level', $nextLevel)->first();
+        $rule = app(ApprovalService::class)->getRuleForLevel($request->request_type, $nextLevel, $request->business_unit_id);
 
         if ($rule && $rule->role) {
             if (!$user->hasRole($rule->role->name) && !$user->hasRole('superadmin')) {
@@ -308,19 +323,23 @@ class Index extends Component
         $notes = $reason ? $reason . ' (Ditolak oleh ' . $user->name . ')' : 'Rejected by ' . $user->name;
 
         $request->histories()->create([
-            'acted_by' => $user->id,
-            'action' => 'REJECTED',
-            'level' => $request->current_level + 1,
-            'notes' => $notes
+            'acted_by'      => $user->id,
+            'role_snapshot' => $user->roles->pluck('name')->join(', '),
+            'action'        => 'REJECTED',
+            'level'         => $nextLevel,
+            'notes'         => $notes
         ]);
 
         $request->update(['status' => 'REJECTED']);
 
         try {
             $request->executeRejectedAction();
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Failed to execute rejected action for Request ID {$request->id}: " . $e->getMessage());
+        } catch (Exception $e) {
+            Log::error("Failed to execute rejected action for Request ID {$request->id}: " . $e->getMessage());
         }
+
+        $teksGrup = "❌ *APPROVAL DITOLAK*\nPengajuan {$request->request_type} (ID: {$request->id}) telah DITOLAK oleh {$user->name}.";
+        ApprovalController::sendGroupNotification($teksGrup, $request->business_unit_id);
 
         $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan telah ditolak.', type: 'info');
     }
@@ -328,20 +347,27 @@ class Index extends Component
     public function render()
     {
         $user = Auth::user();
-        $isGlobal = $user->hasAnyRole(['admin', 'direktur', 'superadmin', 'manager_operasional']);
+        $isGlobal = $user->hasAnyRole(['admin', 'direktur', 'superadmin']);
 
-        $requests = ApprovalRequest::with(['approvable', 'requestedBy.branch', 'histories.actedBy'])
+        $requests = ApprovalRequest::with([
+            'approvable',
+            'requestedBy.branch',
+            'businessUnit',
+            'branch',
+            'histories.actedBy'
+        ])
+            // Scoping Business Unit
             ->when(!$isGlobal, function ($q) use ($user) {
-                $q->whereHas('requestedBy', function ($uq) use ($user) {
-                    // Filter berdasarkan Business Unit
-                    if ($user->business_unit_id) {
-                        $uq->where('business_unit_id', $user->business_unit_id);
-                    }
-                    // Filter lebih spesifik ke Cabang jika role-nya ada di level cabang
-                    if ($user->branch_id && $user->hasAnyRole(['bm', 'supervisor', 'kasir'])) {
-                        $uq->where('branch_id', $user->branch_id);
-                    }
-                });
+                // User lokal dikunci ke BU dan Cabangnya
+                if ($user->business_unit_id) {
+                    $q->where('business_unit_id', $user->business_unit_id);
+                }
+                if ($user->branch_id && $user->hasAnyRole(['bm', 'supervisor', 'kasir', 'fl'])) {
+                    $q->where('branch_id', $user->branch_id);
+                }
+            })
+            ->when($isGlobal && $this->filterBusinessUnitId, function ($q) {
+                $q->where('business_unit_id', $this->filterBusinessUnitId);
             })
             ->when($this->search, function ($q) {
                 $q->whereHas('requestedBy', function ($uq) {
@@ -354,10 +380,13 @@ class Index extends Component
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
+        $businessUnits = BusinessUnit::all();
         $layout = request()->routeIs('zoffline.*') ? 'layouts.z' : 'layouts.admin';
 
         return view('livewire.admin.approvals.index', [
-            'requests' => $requests
-        ])->layout($layout, ['title' => 'Persetujuan Pembatalan']);
+            'requests'      => $requests,
+            'businessUnits' => $businessUnits,
+            'isGlobal'      => $isGlobal,
+        ])->layout($layout, ['title' => 'Persetujuan Transaksi']);
     }
 }

@@ -697,7 +697,11 @@ class SellPhone extends Component
         }
 
         $finalStatus = $this->qc_verdict === 'fail' ? 'CANCELLED' : 'PAYING';
-        $requiredLevel = \App\Models\ApprovalRule::where('module', 'SELL_PHONE_APPROVAL')->max('level') ?? 0;
+        $activeBuId = $currentUser->getActiveBusinessUnitId() ?? 2;
+        $requiredLevel = app(\App\Services\ApprovalService::class)->getRequiredLevel('SELL_PHONE_APPROVAL', $activeBuId, (float) $this->final_price, Auth::user()->branch_id);
+        if ($requiredLevel <= 0) {
+            $requiredLevel = 1;
+        }
         $needsApproval = false;
 
         // WAJIB APPROVAL UNTUK SEMUA TRANSAKSI SELLPHONE (Jika tidak cancelled)
@@ -837,16 +841,17 @@ class SellPhone extends Component
                 $reasonText .= "Belum ada riwayat transaksi sukses untuk tipe HP ini.";
             }
 
-            $requestApproval = $sellPhone->approvalRequests()->create([
-                'request_type' => 'SELL_PHONE_APPROVAL',
-                'requested_by' => Auth::id(),
-                'reason' => $reasonText,
-                'status' => 'PENDING',
-                'required_level' => $requiredLevel,
-                'current_level' => 0
+            $requestApproval = app(\App\Services\ApprovalService::class)->createRequest([
+                'approvable'       => $sellPhone,
+                'request_type'     => 'SELL_PHONE_APPROVAL',
+                'requested_by'     => Auth::id(),
+                'business_unit_id' => $sellPhone->business_unit_id,
+                'branch_id'        => $sellPhone->branch_id,
+                'total_amount'     => $sellPhone->appraised_value,
+                'reason'           => $reasonText,
+                'required_level'   => $requiredLevel,
             ]);
 
-            \App\Http\Controllers\ApprovalController::sendTelegramNotification($requestApproval);
             $this->dispatch('toast', title: 'Menunggu Persetujuan', message: 'Transaksi berhasil disimpan dan sedang menunggu approval Pusat.', type: 'info');
         } else {
             $this->dispatch('toast', title: 'Transaksi berhasil diproses!', message: 'Data berhasil disimpan.', type: 'success');

@@ -6,32 +6,50 @@
         <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
                 <h1 class="text-3xl font-black tracking-tight mb-2">Aturan Persetujuan Transaksi</h1>
-                <p class="text-indigo-100 text-sm font-medium">Tentukan level berjenjang dan Role (Peran) yang wajib
-                    memberikan persetujuan (Approval) untuk setiap modul.</p>
+                <p class="text-indigo-100 text-sm font-medium">Tentukan jenjang approval bertingkat dan batasan nominal per Unit Bisnis secara fleksibel.</p>
             </div>
             <div
                 class="bg-white/10 backdrop-blur-md border border-white/20 px-5 py-3 rounded-2xl text-sm font-bold flex items-center gap-3 h-fit">
-                Modul:
+                <span class="text-indigo-200">Modul:</span>
                 <select wire:model.live="module"
-                    class="bg-transparent border-none text-white focus:ring-0 cursor-pointer font-bold outline-none">
-                    @foreach ($availableModules as $key => $label)
-                        <option value="{{ $key }}" class="text-gray-800">{{ $label }}</option>
+                    class="bg-transparent border-none text-white focus:ring-0 cursor-pointer font-black outline-none">
+                    @foreach ($this->availableModules as $key => $label)
+                        <option value="{{ $key }}" class="text-gray-800 font-semibold">{{ $label }}</option>
                     @endforeach
                 </select>
             </div>
+        </div>
+
+        {{-- Business Unit Selector Tabs --}}
+        <div class="relative z-10 mt-6 pt-6 border-t border-white/15 flex flex-wrap items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-indigo-200 mr-2">Cakupan Unit Bisnis:</span>
+            <button type="button" wire:click="setBusinessUnit(null)"
+                class="px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer {{ is_null($this->businessUnitId) ? 'bg-white text-[#4E44DB] shadow-md shadow-black/10 scale-105' : 'bg-white/10 text-white hover:bg-white/20' }}">
+                🌐 Global Default (Semua Unit)
+            </button>
+            @foreach($this->businessUnits as $bu)
+                <button type="button" wire:click="setBusinessUnit({{ $bu->id }})"
+                    class="px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer {{ $this->businessUnitId == $bu->id ? 'bg-white text-[#4E44DB] shadow-md shadow-black/10 scale-105' : 'bg-white/10 text-white hover:bg-white/20' }}">
+                    🏢 Unit {{ $bu->id }}: {{ $bu->name }}
+                </button>
+            @endforeach
         </div>
     </div>
 
     <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-8 p-8">
         <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
             <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs font-extrabold uppercase px-2.5 py-1 rounded-lg {{ is_null($this->businessUnitId) ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800' }}">
+                        {{ is_null($this->businessUnitId) ? 'Cakupan: Global Default' : 'Cakupan: ' . ($this->businessUnits->firstWhere('id', $this->businessUnitId)?->name ?? 'Unit Bisnis') }}
+                    </span>
+                </div>
                 <h3 class="font-extrabold text-gray-800 text-lg">Alur Persetujuan:
-                    {{ $availableModules[$module] ?? ucfirst($module) }}</h3>
-                <p class="text-xs text-gray-400 mt-0.5 font-medium">Pengajuan akan ditinjau secara berjenjang mulai dari
-                    Level 1 hingga level tertinggi.</p>
+                    {{ $this->availableModules[$this->module] ?? ucfirst($this->module) }}</h3>
+                <p class="text-xs text-gray-400 mt-0.5 font-medium">Pengajuan akan ditinjau berjenjang dari Level 1 hingga level tertinggi untuk cakupan ini.</p>
             </div>
             <button wire:click="addLevel"
-                class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-bold px-4 py-2 rounded-xl transition-colors text-sm flex items-center gap-2">
+                class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-bold px-4 py-2.5 rounded-xl transition-colors text-sm flex items-center gap-2 cursor-pointer shadow-xs">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
@@ -46,18 +64,20 @@
 
             @forelse($rules as $index => $rule)
                 <div
-                    class="flex flex-col md:flex-row md:items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100 relative z-10 hover:border-indigo-200 transition-colors">
+                    class="flex flex-col md:flex-row md:items-center gap-4 bg-gray-50/50 p-5 rounded-2xl border border-gray-100 relative z-10 hover:border-indigo-200 transition-colors">
                     <div
                         class="w-12 h-12 rounded-full bg-white border-2 border-indigo-500 text-indigo-600 flex items-center justify-center font-black text-lg shadow-sm shrink-0">
                         {{ $rule['level'] }}
                     </div>
+
+                    {{-- Role Selection --}}
                     <div class="flex-1 w-full space-y-1">
                         <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Role Penyetuju
                             (Level {{ $rule['level'] }})</label>
                         <select wire:model="rules.{{ $index }}.role_id"
                             class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-semibold focus:border-[#4E44DB] focus:ring-0 transition-all cursor-pointer">
                             <option value="">-- Pilih Role --</option>
-                            @foreach ($roles as $role)
+                            @foreach ($this->roles as $role)
                                 <option value="{{ $role->id }}">{{ strtoupper($role->name) }}</option>
                             @endforeach
                         </select>
@@ -65,8 +85,28 @@
                             <span class="text-xs text-red-500 font-bold">{{ $message }}</span>
                         @enderror
                     </div>
+
+                    @if($this->isFinancial)
+                    {{-- Min Amount --}}
+                    <div class="w-full md:w-44 space-y-1">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Min. Nominal (Rp)</label>
+                        <input type="number" step="1000" wire:model="rules.{{ $index }}.min_amount"
+                            class="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:border-[#4E44DB] focus:ring-0 transition-all"
+                            placeholder="0 (Semua)">
+                    </div>
+
+                    {{-- Max Amount --}}
+                    <div class="w-full md:w-44 space-y-1">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Maks. Nominal (Rp)</label>
+                        <input type="number" step="1000" wire:model="rules.{{ $index }}.max_amount"
+                            class="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:border-[#4E44DB] focus:ring-0 transition-all"
+                            placeholder="Tanpa Batas">
+                    </div>
+                    @endif
+
+                    {{-- Delete Button --}}
                     <button wire:click="removeLevel({{ $index }})"
-                        class="shrink-0 p-3 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors self-end md:self-center"
+                        class="shrink-0 p-3 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors self-end md:self-center cursor-pointer"
                         title="Hapus Level">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -81,17 +121,22 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
-                    <p class="text-sm font-bold text-gray-500">Belum ada jenjang persetujuan (Otomatis langsung batal).
+                    <p class="text-sm font-bold text-gray-500">
+                        Belum ada aturan khusus untuk {{ is_null($this->businessUnitId) ? 'Global Default' : ($this->businessUnits->firstWhere('id', $this->businessUnitId)?->name ?? 'Unit ini') }}.
                     </p>
-                    <button wire:click="addLevel" class="mt-4 text-indigo-600 font-bold text-sm hover:underline">Klik di
-                        sini untuk menambah level 1</button>
+                    <p class="text-xs text-gray-400 mt-1">
+                        {{ is_null($this->businessUnitId) ? 'Jika tidak ada aturan, transaksi modul ini tidak memerlukan approval.' : 'Sistem akan otomatis menggunakan aturan Global Default jika tersedia.' }}
+                    </p>
+                    <button wire:click="addLevel" class="mt-4 text-indigo-600 font-bold text-sm hover:underline cursor-pointer">
+                        + Tambah Level 1 untuk {{ is_null($this->businessUnitId) ? 'Global' : ($this->businessUnits->firstWhere('id', $this->businessUnitId)?->name ?? 'Unit ini') }}
+                    </button>
                 </div>
             @endforelse
         </div>
 
-        <div class="border-t border-gray-50 mt-8 pt-6 flex justify-end">
+        <div class="border-t border-gray-100 mt-8 pt-6 flex justify-end">
             <button wire:click="save"
-                class="bg-[#4E44DB] hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-2xl transition-all shadow-md shadow-blue-500/10 cursor-pointer flex items-center gap-2">
+                class="bg-[#4E44DB] hover:bg-indigo-700 text-white font-bold px-8 py-3 rounded-2xl transition-all shadow-md shadow-indigo-500/15 cursor-pointer flex items-center gap-2">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />

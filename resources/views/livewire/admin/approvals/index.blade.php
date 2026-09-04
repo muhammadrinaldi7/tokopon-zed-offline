@@ -1,12 +1,29 @@
 <div class="p-6">
-    <div class="mb-6">
-        <h2 class="text-2xl font-bold text-gray-800">Persetujuan Transaksi</h2>
-        <p class="text-gray-600 text-sm mt-1">Kelola pengajuan pembatalan, diskon, dll dari sistem POS.</p>
+    <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">Persetujuan Transaksi</h2>
+            <p class="text-gray-600 text-sm mt-1">Kelola pengajuan pembatalan, buyback, perpanjangan garansi, dll.</p>
+        </div>
+        @if($isGlobal && count($businessUnits) > 1)
+        <div class="flex items-center gap-2 bg-gray-100 p-1.5 rounded-xl text-xs font-bold">
+            <span class="text-gray-500 px-2">Unit:</span>
+            <button wire:click="$set('filterBusinessUnitId', null)"
+                class="px-3 py-1.5 rounded-lg transition-all {{ is_null($filterBusinessUnitId) ? 'bg-white text-blue-600 shadow-xs' : 'text-gray-600 hover:text-gray-900' }}">
+                Semua Unit
+            </button>
+            @foreach($businessUnits as $bu)
+                <button wire:click="$set('filterBusinessUnitId', {{ $bu->id }})"
+                    class="px-3 py-1.5 rounded-lg transition-all {{ $filterBusinessUnitId == $bu->id ? 'bg-white text-blue-600 shadow-xs' : 'text-gray-600 hover:text-gray-900' }}">
+                    {{ $bu->name }}
+                </button>
+            @endforeach
+        </div>
+        @endif
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-4 justify-between">
-            <div class="flex gap-4">
+        <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-4 justify-between items-center">
+            <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                 <input wire:model.live.debounce.300ms="search" type="text" placeholder="Cari nama pemohon..." class="px-4 py-2 border border-gray-200 rounded-lg text-sm w-64 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
                 <select wire:model.live="filterStatus" class="px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
                     <option value="ALL">Semua Status</option>
@@ -23,6 +40,7 @@
                 <thead class="bg-gray-50 border-b border-gray-100 text-gray-600">
                     <tr>
                         <th class="px-6 py-3 font-semibold">Tgl Pengajuan</th>
+                        <th class="px-6 py-3 font-semibold">Unit Bisnis</th>
                         <th class="px-6 py-3 font-semibold">Pemohon</th>
                         <th class="px-6 py-3 font-semibold">Cabang</th>
                         <th class="px-6 py-3 font-semibold">Tipe & Dokumen</th>
@@ -37,22 +55,38 @@
                         <td class="px-6 py-4 whitespace-nowrap text-xs">
                             {{ $req->created_at->format('d M Y H:i') }}
                         </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            @if($req->business_unit_id == 1)
+                                <span class="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-black rounded-lg uppercase">Syihab</span>
+                            @elseif($req->business_unit_id == 2)
+                                <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black rounded-lg uppercase">GSK Second</span>
+                            @elseif($req->business_unit_id == 3)
+                                <span class="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black rounded-lg uppercase">GSK Distri</span>
+                            @else
+                                <span class="px-2.5 py-1 bg-gray-100 text-gray-600 text-[10px] font-bold rounded-lg uppercase">{{ $req->businessUnit->name ?? '-' }}</span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4">
                             <span class="font-bold text-gray-900">{{ $req->requestedBy->name ?? '-' }}</span>
                         </td>
                         <td class="px-6 py-4">
-                            <span class="text-gray-900">{{ $req->requestedBy->branch->name ?? '-' }}</span>
+                            <span class="text-gray-900">{{ $req->branch?->name ?? ($req->requestedBy->branch->name ?? '-') }}</span>
                         </td>
                         <td class="px-6 py-4">
-                            <span class="inline-block px-2 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold rounded uppercase mb-1">
+                            <span class="inline-block px-2 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-bold rounded uppercase mb-1">
                                 {{ str_replace('_', ' ', $req->request_type) }}
                             </span>
                             <div class="text-xs text-gray-500 mt-1 font-mono">
                                 @if($req->request_type === 'CUSTOM_CASHBACK')
                                     Item: {{ $req->payload['product_name'] ?? '-' }}<br>
                                     Nominal: Rp {{ number_format($req->payload['amount'] ?? 0, 0, ',', '.') }}
-                                @elseif($req->approvable_type === 'App\Models\Order')
+                                @elseif($req->approvable_type === 'App\Models\Order' || $req->approvable instanceof \App\Models\Order)
                                     Order: {{ $req->approvable->order_number ?? '-' }}
+                                @elseif($req->approvable_type === 'App\Models\SellPhone' || $req->approvable instanceof \App\Models\SellPhone)
+                                    HP: {{ $req->approvable->phone_brand ?? '' }} {{ $req->approvable->phone_model ?? '' }}
+                                    @if($req->approvable?->appraised_value)
+                                        <br><span class="text-gray-600 font-bold">Rp {{ number_format($req->approvable->appraised_value, 0, ',', '.') }}</span>
+                                    @endif
                                 @else
                                     ID: {{ $req->approvable_id }}
                                 @endif
@@ -61,7 +95,7 @@
                         <td class="px-6 py-4">
                             <p class="text-xs max-w-xs truncate" title="{{ $req->reason }}">{{ $req->reason }}</p>
                         </td>
-                        <td class="px-6 py-4">
+                        <td class="px-6 py-4 whitespace-nowrap">
                             @if($req->status === 'PENDING')
                                 <span class="px-2 py-1 bg-amber-50 text-amber-700 text-[10px] font-bold rounded uppercase">Pending</span>
                             @elseif($req->status === 'APPROVED')
@@ -73,10 +107,10 @@
                             @endif
                             <div class="text-[10px] text-gray-500 mt-1">Level: {{ $req->current_level }} / {{ $req->required_level }}</div>
                         </td>
-                        <td class="px-6 py-4 text-center">
+                        <td class="px-6 py-4 text-center whitespace-nowrap">
                             <div class="flex items-center justify-center gap-2">
                                 {{-- Tombol Lihat Detail (Selalu muncul untuk semua status) --}}
-                                <button wire:click="viewDetail({{ $req->id }})" class="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition" title="Lihat Detail & Struk">
+                                <button wire:click="viewDetail({{ $req->id }})" class="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition cursor-pointer" title="Lihat Detail & Struk">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -84,10 +118,10 @@
                                 </button>
 
                                 @if($req->status === 'PENDING')
-                                    <button wire:click="confirmApprove({{ $req->id }})" class="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition" title="Setujui">
+                                    <button wire:click="confirmApprove({{ $req->id }})" class="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition cursor-pointer" title="Setujui">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     </button>
-                                    <button wire:click="confirmReject({{ $req->id }})" class="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition" title="Tolak">
+                                    <button wire:click="confirmReject({{ $req->id }})" class="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition cursor-pointer" title="Tolak">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                     </button>
                                 @else
@@ -98,11 +132,11 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="px-6 py-12 text-center">
+                        <td colspan="8" class="px-6 py-12 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                             </svg>
-                            <p class="text-gray-500 font-medium text-sm">Belum ada pengajuan approval.</p>
+                            <p class="text-gray-500 font-medium text-sm">Belum ada pengajuan persetujuan untuk filter ini.</p>
                         </td>
                     </tr>
                     @endforelse
@@ -204,27 +238,27 @@
                 @endif
                 
                 <div class="flex justify-center gap-3">
-                    <button wire:click="cancelApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-blue-700 focus:ring-4 focus:ring-gray-100 transition-colors">
+                    <button wire:click="cancelApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-blue-700 focus:ring-4 focus:ring-gray-100 transition-colors cursor-pointer">
                         Batal
                     </button>
                     @if($confirmingRequestType === 'WARRANTY_EXTENSION')
-                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20">
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20 cursor-pointer">
                         Setujui Perpanjangan
                     </button>
                     @elseif($confirmingRequestType === 'CUSTOM_CASHBACK')
-                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-300 transition-colors shadow-md shadow-emerald-500/20">
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-300 transition-colors shadow-md shadow-emerald-500/20 cursor-pointer">
                         Setujui Cashback
                     </button>
                     @elseif($confirmingRequestType === 'WARRANTY_REPLACEMENT')
-                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20">
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20 cursor-pointer">
                         Setujui Ganti Unit
                     </button>
                     @elseif($confirmingRequestType === 'SELL_PHONE_APPROVAL')
-                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-amber-600 rounded-xl hover:bg-amber-700 focus:ring-4 focus:ring-amber-300 transition-colors shadow-md shadow-amber-500/20">
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-amber-600 rounded-xl hover:bg-amber-700 focus:ring-4 focus:ring-amber-300 transition-colors shadow-md shadow-amber-500/20 cursor-pointer">
                         Simpan & Setujui
                     </button>
                     @else
-                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-300 transition-colors shadow-md shadow-red-500/20">
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 focus:ring-4 focus:ring-red-300 transition-colors shadow-md shadow-red-500/20 cursor-pointer">
                         Ya, Setujui & Hapus
                     </button>
                     @endif
@@ -265,10 +299,10 @@
                 </div>
 
                 <div class="flex justify-end gap-2.5">
-                    <button wire:click="cancelReject" type="button" class="px-4 py-2 text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm">
+                    <button wire:click="cancelReject" type="button" class="px-4 py-2 text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm cursor-pointer">
                         Batal
                     </button>
-                    <button wire:click="executeReject" type="button" class="px-4 py-2 text-xs font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 focus:ring-4 focus:ring-rose-200 transition shadow-sm shadow-rose-500/20">
+                    <button wire:click="executeReject" type="button" class="px-4 py-2 text-xs font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 focus:ring-4 focus:ring-rose-200 transition shadow-sm shadow-rose-500/20 cursor-pointer">
                         Tolak Pengajuan
                     </button>
                 </div>

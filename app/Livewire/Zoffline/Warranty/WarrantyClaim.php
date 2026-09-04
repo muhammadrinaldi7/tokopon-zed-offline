@@ -177,20 +177,15 @@ class WarrantyClaim extends Component
             return;
         }
 
-        $requiredLevel = \App\Models\ApprovalRule::where('module', 'WARRANTY_EXTENSION')->max('level') ?? 1;
-
-        $request = \App\Models\ApprovalRequest::create([
-            'requested_by' => $user->id,
-            'approvable_type' => Warranty::class,
-            'approvable_id' => $warranty->id,
-            'request_type' => 'WARRANTY_EXTENSION',
-            'reason' => 'Pengajuan toleransi perpanjangan garansi (otomatis).',
-            'required_level' => $requiredLevel,
-            'current_level' => 0,
-            'status' => 'PENDING',
+        $businessUnitId = $warranty->policy?->business_unit_id ?? ($user->getActiveBusinessUnitId() ?? 1);
+        $request = app(\App\Services\ApprovalService::class)->createRequest([
+            'approvable'       => $warranty,
+            'request_type'     => 'WARRANTY_EXTENSION',
+            'requested_by'     => $user->id,
+            'business_unit_id' => $businessUnitId,
+            'branch_id'        => $user->branch_id,
+            'reason'           => 'Pengajuan toleransi perpanjangan garansi (otomatis).',
         ]);
-
-        \App\Http\Controllers\ApprovalController::sendTelegramNotification($request);
 
         $this->checkPendingRequest();
         $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan perpanjangan garansi telah dikirim ke Manajer.', type: 'success');
