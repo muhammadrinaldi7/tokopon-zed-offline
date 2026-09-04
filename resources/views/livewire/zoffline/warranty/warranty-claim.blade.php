@@ -347,8 +347,7 @@
                                         <label x-show="!localPreview && !'{{ $photoFile ? 'true' : '' }}'"
                                             class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center select-none overflow-hidden cursor-pointer z-10">
                                             <input type="file" accept="image/*" capture="environment"
-                                                wire:model="{{ $propertyName }}" class="hidden"
-                                                @change="if($event.target.files.length > 0) { localPreview = URL.createObjectURL($event.target.files[0]); }">
+                                                class="hidden" @change="if($event.target.files.length > 0) { localPreview = URL.createObjectURL($event.target.files[0]); } customCompressHandler($event, '{{ $propertyName }}')">
                                             <div
                                                 class="absolute inset-0 flex items-center justify-center z-0 group-hover:scale-110 transition-transform duration-300">
                                                 <img src="{{ asset('assets/png/' . $key . '.png') }}"
