@@ -86,8 +86,6 @@
                     console.log('%c[Info] File non-gambar (<= 1MB). Langsung mengunggah file asli...',
                         'color: #65a30d; font-weight: bold;');
 
-                    component.set(wirePropertyName, null);
-
                     // Memanggil fungsi upload dinamis melalui instance component yang ditemukan
                     component.upload(wirePropertyName, uniqueFile,
                         (uploadedName) => console.log(`%c[Upload Success] File asli "${uniqueName}" terunggah!`,
@@ -110,8 +108,6 @@
                 console.log('%c[Info] Gambar (<= 1MB). Memulai konversi WebP di sisi browser...',
                     'color: #65a30d; font-weight: bold;');
             }
-            
-            component.set(wirePropertyName, null);
 
             const reader = new FileReader();
             reader.readAsDataURL(file);

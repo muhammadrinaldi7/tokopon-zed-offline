@@ -810,11 +810,11 @@
                                     <label class="cursor-pointer block group">
                                         @if ($rule['is_multiple'])
                                             <input type="checkbox"
-                                                wire:model.live="selected_rules.{{ $rule['key'] }}" class="hidden">
+                                                wire:model.live.debounce.300ms="selected_rules.{{ $rule['key'] }}" class="hidden">
                                         @else
                                             <input type="radio" name="{{ $category }}"
                                                 value="{{ $rule['key'] }}"
-                                                wire:model.live="selected_rules.{{ $category }}" class="hidden">
+                                                wire:model.live.debounce.300ms="selected_rules.{{ $category }}" class="hidden">
                                         @endif
 
                                         <div

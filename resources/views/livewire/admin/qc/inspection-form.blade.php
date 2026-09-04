@@ -77,23 +77,25 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             @foreach ($groupedChecklist[$category] as $item)
                                 @php $index = $item['_index']; @endphp
-                                <div class="p-4 border rounded-xl hover:bg-gray-50 transition-colors {{ $item['value'] ? 'border-emerald-200 bg-emerald-50/30' : 'border-gray-200' }}">
+                                <div class="p-4 border rounded-xl hover:bg-gray-50 transition-colors"
+                                     x-data="{ checked: {{ $item['value'] ? 'true' : 'false' }} }"
+                                     :class="checked ? 'border-emerald-200 bg-emerald-50/30' : 'border-gray-200'">
                                     <div class="flex justify-between items-center">
                                         <span class="text-sm font-bold text-gray-800">{{ $item['name'] }}</span>
                                         <div>
                                             @if ($item['type'] === 'boolean')
                                                 <label class="flex items-center gap-3 cursor-pointer select-none">
-                                                    <span class="text-xs font-bold {{ $item['value'] ? 'text-emerald-600' : 'text-gray-400' }}">
+                                                    <span class="text-xs font-bold" :class="checked ? 'text-emerald-600' : 'text-gray-400'" x-text="checked ? 'OK' : 'TIDAK OK'">
                                                         {{ $item['value'] ? 'OK' : 'TIDAK OK' }}
                                                     </span>
                                                     <div class="relative flex items-center">
-                                                        <input type="checkbox" wire:model.live="checklistResults.{{ $index }}.value" class="sr-only peer">
+                                                        <input type="checkbox" wire:model="checklistResults.{{ $index }}.value" @change="checked = $event.target.checked" class="sr-only peer">
                                                         <div class="w-12 h-6 bg-gray-200 border-2 border-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 peer-checked:border-emerald-500 shadow-inner">
                                                         </div>
                                                     </div>
                                                 </label>
                                             @else
-                                                <input type="text" wire:model.live="checklistResults.{{ $index }}.value"
+                                                <input type="text" wire:model="checklistResults.{{ $index }}.value"
                                                     placeholder="Input (cth: 92%)"
                                                     class="w-full max-w-[120px] bg-white border border-gray-300 rounded-lg py-1.5 px-3 text-sm focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all font-semibold">
                                             @endif
