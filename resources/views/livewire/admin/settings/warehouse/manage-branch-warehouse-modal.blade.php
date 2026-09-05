@@ -18,7 +18,7 @@
                     </button>
                 </div>
 
-                <form wire:submit.prevent="saveBranch">
+                <form wire:submit="saveBranch">
                     <div class="p-6 space-y-5">
                         <!-- Info User -->
                         <div class="p-4 bg-gray-50 rounded-2xl flex items-center gap-4 border border-gray-100">

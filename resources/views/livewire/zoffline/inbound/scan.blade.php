@@ -13,14 +13,30 @@
             <h2 class="text-2xl font-bold text-gray-800 tracking-tight flex items-center gap-2">
                 Pindai Inbound: <span class="text-blue-600">{{ $po->po_number }}</span>
             </h2>
-            <p class="text-sm text-gray-500 mt-1 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
-                    </path>
-                </svg>
-                Vendor: <strong>{{ $po->vendor->vendor_name ?? '-' }}</strong>
-            </p>
+            <div class="flex flex-wrap items-center gap-y-1 gap-x-3 text-sm text-gray-500 mt-1">
+                <span class="flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
+                        </path>
+                    </svg>
+                    Vendor: <strong class="text-gray-800">{{ $po->vendor->vendor_name ?? '-' }}</strong>
+                </span>
+                <span class="text-gray-300">|</span>
+                <span class="flex items-center gap-1.5">
+                    Cabang: <strong class="text-gray-800">{{ Auth::user()->branch->name ?? 'Pusat' }}</strong>
+                </span>
+                <span class="text-gray-300">|</span>
+                <div class="flex items-center gap-1.5">
+                    <label class="text-xs font-semibold text-gray-600">Gudang Masuk:</label>
+                    <select wire:model.live="selectedWarehouseId"
+                        class="text-xs font-bold text-blue-700 bg-blue-50/80 border border-blue-200 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors">
+                        @foreach ($availableWarehouses as $w)
+                            <option value="{{ $w->id }}">{{ $w->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
         </div>
 
         <div>

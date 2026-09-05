@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\Settings\Warehouse;
 use App\Models\Branch;
 use App\Models\User;
 use App\Models\Warehouse;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -31,13 +32,20 @@ class ManageBranchWarehouseModal extends Component
         $this->branch_id = $user->branch_id;
         $this->warehouse_id = $user->warehouse_id;
 
+        $buId = $user->business_unit_id ?? Auth::user()?->business_unit_id ?? 2;
+        $this->branches = Branch::where('business_unit_id', $buId)->orderBy('name')->get();
+        $this->warehouses = Warehouse::where('business_unit_id', $buId)->orderBy('name')->get();
+
         $this->isOpen = true;
     }
+
     public function loadAll()
     {
-        $this->branches = Branch::all();
-        $this->warehouses = Warehouse::all();
+        $buId = Auth::user()?->business_unit_id ?? 2;
+        $this->branches = Branch::where('business_unit_id', $buId)->orderBy('name')->get();
+        $this->warehouses = Warehouse::where('business_unit_id', $buId)->orderBy('name')->get();
     }
+
     public function mount()
     {
         $this->loadAll();

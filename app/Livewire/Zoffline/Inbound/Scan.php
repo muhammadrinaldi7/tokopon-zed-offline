@@ -27,9 +27,13 @@ class Scan extends Component
     public $scannedImei = '';
     public $activeItemId = null;
 
+    // Warehouse Selection
+    public $selectedWarehouseId = null;
+
     public function mount(PurchaseOrder $po)
     {
         $this->po = $po->load('items.inspections');
+        $this->selectedWarehouseId = Auth::user()->warehouse_id;
     }
 
     public function setActiveItem($itemNo)
@@ -155,6 +159,13 @@ class Scan extends Component
             $service = app(AccurateService::class);
             list($host, $token, $secretKey) = $service->getCredentials($this->po->database_source);
 
+            $targetWarehouse = \App\Models\Warehouse::find($this->selectedWarehouseId) ?? Auth::user()->warehouse;
+            if (!$targetWarehouse) {
+                $this->dispatch('toast', title: 'Peringatan', message: 'Gudang tujuan penerimaan belum dipilih atau user belum memiliki penempatan gudang.', type: 'warning');
+                return;
+            }
+            $targetWarehouseName = $targetWarehouse->name;
+
             $detailItem = [];
             foreach ($this->po->items as $item) {
                 // Hitung selisih kuantitas yang belum di-push
@@ -177,7 +188,7 @@ class Scan extends Component
                         'unitPrice' => (float)$item->unit_price,
                         'quantity' => (float)$qtyToPush,
                         'purchaseOrderNumber' => $this->po->po_number,
-                        'warehouseName' => Auth::user()->warehouse->name
+                        'warehouseName' => $targetWarehouseName
                     ];
 
                     if (!empty($serialNumbers)) {
@@ -205,6 +216,7 @@ class Scan extends Component
                 // Gunakan timestamp (His) untuk mencegah bentrok SJ ganda di hari yang sama
                 'receiveNumber' => $receiveNumber,
                 'vendorNo' => $this->po->vendor->vendor_no ?? '',
+                'warehouseName' => $targetWarehouseName,
                 'detailItem' => $detailItem,
                 'branchName' => Auth::user()->branch->name ?? null
             ];
@@ -255,6 +267,14 @@ class Scan extends Component
 
     public function render()
     {
-        return view('livewire.zoffline.inbound.scan');
+        $buId = Auth::user()->getActiveBusinessUnitId() ?? Auth::user()->business_unit_id ?? 2;
+        $availableWarehouses = \App\Models\Warehouse::where('business_unit_id', $buId)
+            ->whereNotNull('warehouse_id')
+            ->orderBy('name')
+            ->get();
+
+        return view('livewire.zoffline.inbound.scan', [
+            'availableWarehouses' => $availableWarehouses
+        ]);
     }
 }
