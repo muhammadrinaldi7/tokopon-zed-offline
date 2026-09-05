@@ -76,22 +76,25 @@ class DeviceIndex extends Component
             $this->editingDeviceId = $id;
             $this->editItemNo = $device->item_no;
             $this->editName = $device->name;
-            $this->editBuyPrice = $device->buy_price ?? 0;
+            $this->editBuyPrice = $device->buy_price ? (int) round((float) $device->buy_price) : 0;
             $this->showEditModal = true;
         }
     }
 
     public function updatedEditBuyPrice($value)
     {
-        if (is_string($value)) {
-            $cleaned = preg_replace('/[^0-9]/', '', $value);
+        if (is_numeric($value)) {
+            $this->editBuyPrice = (int) round((float) $value);
+        } elseif (is_string($value)) {
+            $integerPart = explode('.', $value)[0];
+            $cleaned = preg_replace('/[^0-9]/', '', $integerPart);
             $this->editBuyPrice = $cleaned !== '' ? (int) $cleaned : 0;
         }
     }
 
     public function updateDevice()
     {
-        $this->editBuyPrice = (int) preg_replace('/[^0-9]/', '', (string)$this->editBuyPrice);
+        $this->editBuyPrice = (int) (is_numeric($this->editBuyPrice) ? $this->editBuyPrice : preg_replace('/[^0-9]/', '', explode('.', (string)$this->editBuyPrice)[0]));
 
         $this->validate([
             'editBuyPrice' => 'required|numeric|min:0',

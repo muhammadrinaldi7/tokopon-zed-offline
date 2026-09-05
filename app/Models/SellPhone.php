@@ -40,6 +40,14 @@ class SellPhone extends Model implements HasMedia
         'sales_id'
     ];
 
+    protected $casts = [
+        'appraised_value' => 'integer',
+        'original_appraised_value' => 'integer',
+        'is_price_adjusted' => 'boolean',
+        'is_wa_sent' => 'boolean',
+        'is_email_sent' => 'boolean',
+    ];
+
     public function salesBy()
     {
         return $this->belongsTo(Employe::class, 'sales_id');

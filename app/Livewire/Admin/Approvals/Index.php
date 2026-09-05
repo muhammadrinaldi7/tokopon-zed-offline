@@ -42,8 +42,11 @@ class Index extends Component
 
     public function updatedAdjustedPrice($value)
     {
-        if (is_string($value)) {
-            $cleaned = preg_replace('/[^0-9]/', '', $value);
+        if (is_numeric($value)) {
+            $this->adjustedPrice = (int) round((float) $value);
+        } elseif (is_string($value)) {
+            $integerPart = explode('.', $value)[0];
+            $cleaned = preg_replace('/[^0-9]/', '', $integerPart);
             $this->adjustedPrice = $cleaned !== '' ? (int) $cleaned : 0;
         }
     }
@@ -133,7 +136,7 @@ class Index extends Component
             if ($request->request_type === 'SELL_PHONE_APPROVAL') {
                 $this->editingPriceId = $id;
                 if ($request->approvable && isset($request->approvable->appraised_value)) {
-                    $this->adjustedPrice = $request->approvable->appraised_value;
+                    $this->adjustedPrice = (int) round((float) $request->approvable->appraised_value);
                 }
             }
         } else {
@@ -147,7 +150,7 @@ class Index extends Component
             if ($this->confirmingRequestType === 'SELL_PHONE_APPROVAL' && $this->editingPriceId) {
                 $request = ApprovalRequest::with('approvable')->find($this->confirmingApprovalId);
                 $originalPrice = (float) ($request?->approvable?->appraised_value ?? 0);
-                $newPrice = (float) preg_replace('/[^0-9]/', '', (string)$this->adjustedPrice);
+                $newPrice = (float) (is_numeric($this->adjustedPrice) ? $this->adjustedPrice : preg_replace('/[^0-9]/', '', explode('.', (string)$this->adjustedPrice)[0]));
                 $isPriceChanged = $newPrice > 0 && abs($newPrice - $originalPrice) > 0.01;
 
                 if ($isPriceChanged && empty(trim($this->priceAdjustmentReason))) {
@@ -190,7 +193,7 @@ class Index extends Component
         }
 
         $originalPrice = (float) ($request->approvable?->appraised_value ?? 0);
-        $newPrice = (float) preg_replace('/[^0-9]/', '', (string)$this->adjustedPrice);
+        $newPrice = (float) (is_numeric($this->adjustedPrice) ? $this->adjustedPrice : preg_replace('/[^0-9]/', '', explode('.', (string)$this->adjustedPrice)[0]));
         $isPriceChanged = $request->request_type === 'SELL_PHONE_APPROVAL'
             && $this->editingPriceId
             && $newPrice > 0

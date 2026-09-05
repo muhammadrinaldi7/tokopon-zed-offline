@@ -12,6 +12,10 @@ class TradeIn extends Model implements HasMedia
 
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'appraised_value' => 'integer',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class);
