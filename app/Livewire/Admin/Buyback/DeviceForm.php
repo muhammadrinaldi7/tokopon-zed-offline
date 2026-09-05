@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\Buyback;
 use App\Models\Brand;
 use App\Models\BuybackDevice;
 use App\Models\BuybackTier;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 
@@ -22,18 +23,17 @@ class DeviceForm extends Component
     public $searchProduct = '';
     public $product_accurate_id = null;
     public $productsAccurateList = [];
-    public $target_business_unit_id = 2;
+    public $target_business_unit_id = null;
 
     public function mount()
     {
-        $this->target_business_unit_id = config('settings.target_business_unit_id');
+        $user = Auth::user();
+        $this->target_business_unit_id = $user ? $user->getActiveBusinessUnitId() : null;
 
         if (request()->has('tier_id')) {
             $this->selected_tier_id = request()->query('tier_id');
         }
     }
-
-
 
     public function updatedSearchProduct()
     {
@@ -42,10 +42,20 @@ class DeviceForm extends Component
                 $q->where('name', 'like', '%' . $this->searchProduct . '%')
                     ->orWhere('item_no', 'like', '%' . $this->searchProduct . '%');
             })->whereNotIn('id', function ($query) {
-                $query->select('product_accurate_id')->from('buyback_devices');
+                $query->select('product_accurate_id')
+                    ->from('buyback_devices')
+                    ->whereNotNull('product_accurate_id');
             });
-            $query->where('business_unit_id', 2);
 
+            // Filter otomatis berdasarkan Business Unit user yang sedang login
+            $userBuId = $this->target_business_unit_id ?: (Auth::user()?->getActiveBusinessUnitId() ?? Auth::user()?->business_unit_id);
+            if ($userBuId) {
+                $query->where('business_unit_id', $userBuId);
+            }
+
+            if (!empty($this->selectedProducts)) {
+                $query->whereNotIn('id', array_keys($this->selectedProducts));
+            }
 
             $this->productsAccurateList = $query->limit(20)->get();
         } else {

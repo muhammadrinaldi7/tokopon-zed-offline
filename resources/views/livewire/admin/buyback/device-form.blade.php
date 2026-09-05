@@ -35,16 +35,17 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    {{-- <div class="md:col-span-1">
+                    <div class="md:col-span-1">
                         <label class="block text-sm font-bold text-blue-900 mb-1.5">Business Unit</label>
-                        <select wire:model.live="target_business_unit_id"
-                            class="w-full rounded-lg border-blue-200 bg-white py-2.5 text-blue-900 focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm">
-                            <option value="">-- Semua BU --</option>
-                            @foreach (\App\Models\BusinessUnit::all() as $bu)
-                                <option value="{{ $bu->id }}">{{ $bu->name }}</option>
-                            @endforeach
-                        </select>
-                    </div> --}}
+                        <div
+                            class="w-full rounded-xl border border-blue-200 bg-white py-3 px-3.5 text-blue-900 font-bold text-sm shadow-sm flex items-center justify-between">
+                            <span class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                                {{ auth()->user()?->getActiveBusinessUnit()?->name ?? (auth()->user()?->businessUnit?->name ?? 'Unit Aktif') }}
+                            </span>
+                            <span class="text-xs bg-blue-100 text-blue-800 font-mono px-2 py-0.5 rounded-md">Akun Login</span>
+                        </div>
+                    </div>
                     <div class="md:col-span-2">
                         <label class="block text-sm font-bold text-blue-900 mb-1.5">Pilih SKU Produk (Ketik untuk
                             mencari)</label>
@@ -86,7 +87,7 @@
                             </div>
 
                             <!-- List Hasil Pencarian -->
-                            @if (!empty($productsAccurateList))
+                            @if (count($productsAccurateList) > 0)
                                 <div
                                     class="absolute z-10 mt-2 w-full bg-white/95 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-xl max-h-64 overflow-y-auto transform origin-top transition-all">
                                     <ul class="p-2 space-y-1">

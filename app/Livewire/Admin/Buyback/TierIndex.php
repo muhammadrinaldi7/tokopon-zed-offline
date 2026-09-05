@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Buyback;
 
 use App\Models\BuybackTier;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 
@@ -216,7 +217,7 @@ class TierIndex extends Component
     {
         // Hapus mapping perangkat (BuybackDevice) yang terkait dengan tier ini agar tidak menggantung
         \App\Models\BuybackDevice::where('buyback_tier_id', $id)->delete();
-        
+
         BuybackTier::findOrFail($id)->delete();
         $this->dispatch('toast', title: 'Dihapus', message: 'Tier berhasil dihapus.', type: 'success');
         $this->loadTiers();
@@ -246,7 +247,9 @@ class TierIndex extends Component
             });
 
             $query->whereNotIn('id', function ($subQuery) {
-                $subQuery->select('product_accurate_id')->from('buyback_devices');
+                $subQuery->select('product_accurate_id')
+                    ->from('buyback_devices')
+                    ->whereNotNull('product_accurate_id');
                 if ($this->tierId) {
                     $subQuery->where('buyback_tier_id', '!=', $this->tierId);
                 }
@@ -256,7 +259,11 @@ class TierIndex extends Component
                 $query->whereNotIn('id', array_keys($this->selectedProducts));
             }
 
-            $query->where('business_unit_id', 2);
+            // Filter otomatis berdasarkan Business Unit user yang login
+            $userBuId = Auth::user()?->getActiveBusinessUnitId() ?? Auth::user()?->business_unit_id;
+            if ($userBuId) {
+                $query->where('business_unit_id', $userBuId);
+            }
 
             $this->productsAccurateList = $query->limit(20)->get();
         } else {
