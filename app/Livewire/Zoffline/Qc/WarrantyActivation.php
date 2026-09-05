@@ -97,7 +97,7 @@ class WarrantyActivation extends Component
         });
 
         if (!$item) {
-            // Fallback: jika semua sudah diinspeksi, tampilkan pesan yang informatif
+            // Fallback: jika semua sudah diinspeksi, cek apakah ini kasus garansi gantung
             $anyMatch = $items->first(function ($i) use ($search) {
                 $sns = array_map(function($s) {
                     return strtolower(trim($s));
@@ -106,7 +106,43 @@ class WarrantyActivation extends Component
             });
             
             if ($anyMatch) {
-                $this->errorMessage = 'Semua transaksi untuk IMEI ini sudah pernah diaktivasi garansinya (Sudah ada Inspeksi).';
+                if ($anyMatch->order->business_unit_id != $activeUnitId) {
+                    $this->errorMessage = 'Barang ini dibeli dari cabang lain. Anda hanya dapat melakukan aktivasi garansi untuk transaksi dari cabang Anda.';
+                    return;
+                }
+
+                // Cek apakah perangkat ini sudah memiliki garansi aktif
+                $hasActiveWarranty = \App\Models\Warranty::where('serial_number', $search)
+                    ->where('order_item_id', $anyMatch->id)
+                    ->where('status', 'active')
+                    ->exists();
+
+                if (!$hasActiveWarranty) {
+                    // Kasus Garansi Gantung: Inspeksi QC sudah ada, tapi garansi belum terbentuk
+                    $existingInspection = \App\Models\DeviceInspection::where('imei', $search)
+                        ->where('inspectable_type', get_class($anyMatch))
+                        ->where('inspectable_id', $anyMatch->id)
+                        ->latest()
+                        ->first();
+
+                    if ($existingInspection) {
+                        $this->foundItem = $anyMatch;
+                        $this->generateWarranties($existingInspection);
+
+                        if (count($this->generatedWarranties) > 0) {
+                            $this->isSaved = true;
+                            $this->isInspecting = false;
+                            $this->dispatch('toast', 
+                                title: 'Garansi Otomatis Diaktifkan', 
+                                message: 'Perangkat ini sebelumnya belum memiliki garansi aktif. Kartu garansi berhasil digenerate otomatis!', 
+                                type: 'success'
+                            );
+                            return;
+                        }
+                    }
+                }
+
+                $this->errorMessage = 'Semua transaksi untuk IMEI ini sudah pernah diaktivasi garansinya (Sudah ada Inspeksi & Garansi Aktif).';
             } else {
                 $this->errorMessage = 'Barang dengan Serial Number tersebut tidak ditemukan di sistem.';
             }

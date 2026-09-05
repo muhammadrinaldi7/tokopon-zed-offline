@@ -207,6 +207,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::prefix('warranty')->name('warranty.')->group(function () {
         Route::get('/policies', \App\Livewire\Admin\Warranty\PolicyManagement::class)->name('policies');
         Route::get('/claims', \App\Livewire\Admin\Warranty\ClaimManagement::class)->name('claims');
+        Route::get('/pending-activations', \App\Livewire\Admin\Warranty\PendingActivationManagement::class)->name('pending-activations');
     });
 
     Route::prefix('qc')->name('qc.')->group(function () {

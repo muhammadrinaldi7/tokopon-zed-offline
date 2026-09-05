@@ -4,6 +4,10 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\WarrantyPolicy;
+use App\Models\Brand;
+use App\Models\ProductAccurate;
+use App\Models\ProductVariant;
+use App\Models\SecondProductVariant;
 
 class WarrantyCalculatorService
 {
@@ -16,22 +20,23 @@ class WarrantyCalculatorService
     public function calculateWarranties(Order $order, $orderItem)
     {
         $policiesToApply = collect();
-        $brandId = $this->extractBrandId($orderItem);
         $businessUnitId = $order->business_unit_id;
+        $brandId = $this->extractBrandId($orderItem, $businessUnitId);
 
         // Identifikasi Status Kondisi Barang (Baru/Bekas)
-        // Mengecek database_source dari item (karena variant adalah ProductAccurate)
         $variant = $orderItem->variant; 
-        $isNew = $variant && strtolower($variant->database_source) !== 'second';
+        $isNew = $variant && strtolower($variant->database_source ?? '') !== 'second';
 
         // Identifikasi Status Harga (Normal/Diskon Kasir atau Internal Promo)
-        $hasManualDiscount = (float)$orderItem->discount_amount > 0;
+        $hasManualDiscount = (float)($orderItem->discount_amount ?? 0) > 0;
 
         $hasInternalPromo = false;
-        foreach ($orderItem->promos as $promo) {
-            if (strtolower(trim($promo->category)) === 'internal') {
-                $hasInternalPromo = true;
-                break;
+        if ($orderItem->relationLoaded('promos') || method_exists($orderItem, 'promos')) {
+            foreach ($orderItem->promos as $promo) {
+                if (strtolower(trim($promo->category ?? '')) === 'internal') {
+                    $hasInternalPromo = true;
+                    break;
+                }
             }
         }
 
@@ -39,7 +44,13 @@ class WarrantyCalculatorService
 
         // 1. EVALUASI GARANSI UTAMA (MAIN WARRANTY)
         $targetType = $isDiscounted ? 'store_discount' : 'store_normal';
-        $mainPolicy = $this->findMainWarrantyPolicy($businessUnitId, $targetType, $brandId);
+        $mainPolicy = $this->findMainWarrantyPolicy($businessUnitId, $targetType, $brandId, $orderItem);
+
+        // Fallback: Jika barang diskon tetapi toko TIDAK membuat kebijakan 'store_discount',
+        // otomatis gunakan kebijakan 'store_normal' agar pelanggan tidak kehilangan hak garansi.
+        if (!$mainPolicy && $targetType === 'store_discount') {
+            $mainPolicy = $this->findMainWarrantyPolicy($businessUnitId, 'store_normal', $brandId, $orderItem);
+        }
 
         if ($mainPolicy) {
             $policiesToApply->push($mainPolicy);
@@ -66,26 +77,88 @@ class WarrantyCalculatorService
      * Cari Garansi Utama yang paling cocok berdasarkan:
      * - Business Unit
      * - Tipe (Diskon / Normal)
-     * - Filter Brand (Prioritaskan spesifik brand, lalu fallback ke all_brands)
+     * - Filter Brand (Include / All Brands)
+     * - Spesifikasi Produk (misal iPhone 90 hari vs Apple Ecosystem 10 hari)
      */
-    private function findMainWarrantyPolicy($businessUnitId, $type, $brandId)
+    private function findMainWarrantyPolicy($businessUnitId, $type, $brandId, $orderItem = null)
     {
         $policies = WarrantyPolicy::where('type', $type)
             ->where('business_unit_id', $businessUnitId)
             ->where('is_active', true)
             ->get();
 
-        // Cari yang spesifik brand dulu
+        if ($policies->isEmpty()) {
+            return null;
+        }
+
+        $matchedPolicies = collect();
+
+        // 1. Cari yang spesifik Brand (brand_rule === 'include')
         foreach ($policies as $policy) {
             if ($policy->brand_rule === 'include') {
-                $brandList = is_array($policy->brand_list) ? $policy->brand_list : json_decode($policy->brand_list, true) ?? [];
-                if (in_array($brandId, $brandList)) {
-                    return $policy;
+                $brandList = is_array($policy->brand_list) ? $policy->brand_list : (json_decode($policy->brand_list, true) ?? []);
+                $brandListStr = array_map('strval', $brandList);
+
+                // Cek pencocokan langsung berdasarkan Brand ID
+                $isMatched = $brandId && in_array((string)$brandId, $brandListStr);
+
+                // Fallback pencocokan Nama Brand jika ID berbeda antar Business Unit
+                if (!$isMatched && $brandId) {
+                    $detectedBrand = Brand::find($brandId);
+                    if ($detectedBrand) {
+                        $detectedName = strtolower(trim($detectedBrand->name));
+                        $policyBrandNames = Brand::whereIn('id', $brandList)->pluck('name')->map(fn($n) => strtolower(trim($n)))->toArray();
+
+                        if (in_array($detectedName, $policyBrandNames)) {
+                            $isMatched = true;
+                        } elseif (in_array($detectedName, ['apple', 'iphone']) && (in_array('apple', $policyBrandNames) || in_array('iphone', $policyBrandNames))) {
+                            $isMatched = true;
+                        }
+                    }
+                }
+
+                if ($isMatched) {
+                    $matchedPolicies->push($policy);
                 }
             }
         }
 
-        // Jika tidak ketemu yang spesifik, cari yang all_brands
+        if ($matchedPolicies->isNotEmpty()) {
+            if ($matchedPolicies->count() === 1) {
+                return $matchedPolicies->first();
+            }
+
+            // Jika lebih dari 1 policy cocok (contoh: Policy iPhone vs Policy Apple Ecosystem):
+            $productName = strtolower($orderItem?->product_name ?? '');
+            $variant = $orderItem?->variant;
+            $categoryName = strtolower($variant->categoryName ?? '');
+
+            $isIphone = str_contains($productName, 'iphone') 
+                || ((str_contains($categoryName, 'handphone') || str_contains($categoryName, 'hp')) && str_contains($productName, 'hp 2nd'));
+
+            if ($isIphone) {
+                // Utamakan policy yang namanya khusus IPHONE
+                $iphonePolicy = $matchedPolicies->first(function ($p) {
+                    return str_contains(strtolower($p->name), 'iphone');
+                });
+                if ($iphonePolicy) return $iphonePolicy;
+            } else {
+                // Untuk non-iPhone (Apple Watch, iPad, MacBook, AirPods, Android), utamakan policy ECO/ANDROID
+                $ecoPolicy = $matchedPolicies->first(function ($p) {
+                    $name = strtolower($p->name);
+                    return str_contains($name, 'eco') || str_contains($name, 'android');
+                });
+                if ($ecoPolicy) return $ecoPolicy;
+            }
+
+            // Fallback: Pilih policy yang paling spesifik (jumlah brand_list paling sedikit)
+            return $matchedPolicies->sortBy(function ($p) {
+                $bList = is_array($p->brand_list) ? $p->brand_list : (json_decode($p->brand_list, true) ?? []);
+                return count($bList);
+            })->first();
+        }
+
+        // 2. Jika tidak ada yang cocok spesifik brand, cari yang 'all_brands'
         foreach ($policies as $policy) {
             if ($policy->brand_rule === 'all_brands') {
                 return $policy;
@@ -100,11 +173,9 @@ class WarrantyCalculatorService
      */
     private function hasInsurance(Order $order, $item)
     {
-        // Pertama, cek nama item itu sendiri
         $name = strtolower($item->product_name ?? '');
         if (str_contains($name, 'asuransi')) return true;
 
-        // Kedua, cek semua item di order
         foreach ($order->items as $oItem) {
             $oName = strtolower($oItem->product_name ?? '');
             if (str_contains($oName, 'asuransi')) {
@@ -153,12 +224,93 @@ class WarrantyCalculatorService
         return $totalPurchasedQty > $usedQty;
     }
 
-    private function extractBrandId($orderItem)
+    /**
+     * Ekstrak Brand ID yang valid untuk Business Unit yang bersangkutan
+     */
+    public function extractBrandId($orderItem, $businessUnitId = null)
     {
-        if (!$orderItem || !$orderItem->variant) return null;
+        if (!$orderItem) return null;
 
+        $brandName = null;
         $variant = $orderItem->variant;
-        $brand = \App\Models\Brand::where('name', $variant->brandName)->first();
-        return $brand->id ?? null;
+
+        // 1. Ekstrak nama brand dari polymorphic variant
+        if ($variant instanceof \App\Models\ProductAccurate) {
+            $brandName = $variant->brandName;
+        } elseif ($variant instanceof \App\Models\ProductVariant) {
+            $brandName = $variant->product?->brand?->name;
+            $directBrandId = $variant->product?->brand_id;
+            if ($directBrandId && empty($brandName)) {
+                $brandName = Brand::find($directBrandId)?->name;
+            }
+        } elseif ($variant instanceof \App\Models\SecondProductVariant) {
+            $brandName = $variant->brand?->name ?? $variant->brandName ?? $variant->product?->brand?->name;
+        }
+
+        // Fallback: deteksi brand dari nama produk jika belum ditemukan
+        if (empty($brandName)) {
+            $productName = strtolower($orderItem->product_name ?? '');
+            if (str_contains($productName, 'iphone') || str_contains($productName, 'apple') || str_contains($productName, 'ipad') || str_contains($productName, 'macbook') || str_contains($productName, 'airpods') || str_contains($productName, 'iwatch') || str_contains($productName, 'watch')) {
+                $brandName = 'Apple';
+            } elseif (str_contains($productName, 'samsung') || str_contains($productName, 'galaxy')) {
+                $brandName = 'Samsung';
+            } elseif (str_contains($productName, 'xiaomi') || str_contains($productName, 'redmi') || str_contains($productName, 'mi ')) {
+                $brandName = 'Xiaomi';
+            } elseif (str_contains($productName, 'oppo')) {
+                $brandName = 'Oppo';
+            } elseif (str_contains($productName, 'vivo')) {
+                $brandName = 'Vivo';
+            } elseif (str_contains($productName, 'realme')) {
+                $brandName = 'Realme';
+            } elseif (str_contains($productName, 'infinix')) {
+                $brandName = 'Infinix';
+            } elseif (str_contains($productName, 'tecno')) {
+                $brandName = 'Tecno';
+            } elseif (str_contains($productName, 'iqoo')) {
+                $brandName = 'Iqoo';
+            }
+        }
+
+        if (empty($brandName)) {
+            return null;
+        }
+
+        $cleanBrandName = strtolower(trim($brandName));
+
+        // 2. Cari Brand ID di business unit yang bersangkutan (prioritas utama)
+        $brandQuery = Brand::query();
+        if ($businessUnitId) {
+            $brandQuery->where('business_unit_id', $businessUnitId);
+        }
+
+        $buBrand = (clone $brandQuery)->whereRaw('LOWER(name) = ?', [$cleanBrandName])->first();
+
+        // Jika brand Apple/iPhone, cocokkan variasi Apple dan iPhone
+        if (!$buBrand && in_array($cleanBrandName, ['apple', 'iphone', 'ios'])) {
+            $buBrand = (clone $brandQuery)->where(function ($q) {
+                $q->whereRaw('LOWER(name) LIKE ?', ['%apple%'])
+                  ->orWhereRaw('LOWER(name) LIKE ?', ['%iphone%']);
+            })->first();
+        }
+
+        // Cari pencocokan parsial di BU
+        if (!$buBrand) {
+            $buBrand = (clone $brandQuery)->whereRaw('LOWER(name) LIKE ?', ['%' . $cleanBrandName . '%'])->first();
+        }
+
+        if ($buBrand) {
+            return $buBrand->id;
+        }
+
+        // 3. Fallback: Cari Brand secara global (jika BU belum diset pada tabel Brand)
+        $globalBrand = Brand::whereRaw('LOWER(name) = ?', [$cleanBrandName])->first();
+        if (!$globalBrand && in_array($cleanBrandName, ['apple', 'iphone', 'ios'])) {
+            $globalBrand = Brand::where(function ($q) {
+                $q->whereRaw('LOWER(name) LIKE ?', ['%apple%'])
+                  ->orWhereRaw('LOWER(name) LIKE ?', ['%iphone%']);
+            })->first();
+        }
+
+        return $globalBrand->id ?? null;
     }
 }

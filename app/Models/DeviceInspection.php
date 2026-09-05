@@ -39,6 +39,11 @@ class DeviceInspection extends Model implements HasMedia
         return $this->belongsTo(User::class, 'inspected_by');
     }
 
+    public function warranty()
+    {
+        return $this->hasOne(Warranty::class, 'device_inspection_id');
+    }
+
     // ─── Scopes ──────────────────────────────────────
 
     public function scopeByImei($query, string $imei)
