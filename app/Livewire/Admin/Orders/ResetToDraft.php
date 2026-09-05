@@ -337,6 +337,8 @@ class ResetToDraft extends Component
                                 'SJU' => 'P.00003',
                                 'SAB' => 'P.00004',
                                 'RESMI' => 'P.00008',
+                                'INTER' => 'P.00009',
+                                'BEACUKAI' => 'P.00010',
                                 default => $product->proyek ?? ''
                             };
                         }

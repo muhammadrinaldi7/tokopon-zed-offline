@@ -46,6 +46,7 @@ return [
         'client_secret' => env('QONTAK_CLIENT_SECRET'),
         'integration_id' => env('QONTAK_CHANNEL_INTEGRATION_ID'),
         'template_id' => env('QONTAK_TEMPLATE_ID'),
+        'sellphone_template_id' => env('QONTAK_SELLPHONE_TEMPLATE_ID', env('QONTAK_TEMPLATE_ID')),
     ],
 
 ];

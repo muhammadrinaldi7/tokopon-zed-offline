@@ -230,10 +230,10 @@ class History extends Component
 
     private function generateReceiptPdf(SellPhone $sellPhone)
     {
-        $pdf = Pdf::loadView('pdf.sell-phone-receipt', ['sellPhone' => $sellPhone->loadMissing(['salesBy', 'handledBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch'])]);
+        $pdf = Pdf::loadView('pdf.sell-phone-receipt', ['sellPhone' => $sellPhone->loadMissing(['handledBy', 'user.profile', 'user.bankAccounts', 'businessUnit', 'branch'])]);
 
-        // 80mm thermal printer width
-        $customPaper = array(0, 0, 226.77, 1000);
+        // 80mm thermal printer width (226.77 pt x 520 pt)
+        $customPaper = array(0, 0, 226.77, 520);
         $pdf->setPaper($customPaper, 'portrait');
 
         return $pdf;
@@ -282,7 +282,7 @@ class History extends Component
 
         try {
             $pdf = $this->generateReceiptPdf($sellPhone);
-            $filename = 'Struk_SellPhone_' . $sellPhone->id . '.pdf';
+            $filename = 'Tanda_Terima_SPL-' . $sellPhone->id . '.pdf';
             $folderPath = 'receipts_sellphone';
             $path = $folderPath . '/' . $filename;
 
@@ -301,11 +301,13 @@ class History extends Component
         $hmacHeader = "hmac username=\"{$clientId}\", algorithm=\"hmac-sha256\", headers=\"date request-line\", signature=\"{$signature}\"";
         $idempotencyKey = (string) \Illuminate\Support\Str::uuid();
 
+        $templateId = config('services.qontak.sellphone_template_id') ?: config('services.qontak.template_id');
+
         $payload = [
             'to_name' => $sellPhone->user->name ?? 'Customer',
             'to_number' => $phone,
             'channel_integration_id' =>  config('services.qontak.integration_id'),
-            'message_template_id' => config('services.qontak.template_id'),
+            'message_template_id' => $templateId,
             'language' => ['code' => 'id'],
             'parameters' => [
                 'header' => [
@@ -371,7 +373,7 @@ class History extends Component
         try {
             $pdf = $this->generateReceiptPdf($sellPhone);
             $pdfContent = $pdf->output();
-            $filename = 'Struk_SellPhone_' . $sellPhone->id . '.pdf';
+            $filename = 'Tanda_Terima_SPL-' . $sellPhone->id . '.pdf';
 
             Mail::mailer('pos_sales')
                 ->to($email)
