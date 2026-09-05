@@ -212,16 +212,26 @@
                     <div class="relative mb-3" wire:key="approval-adjusted-price" x-data="{
                         rawVal: @entangle('adjustedPrice'),
                         get maskedVal() {
-                            if (!this.rawVal && this.rawVal !== 0) return '';
-                            return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                            if (this.rawVal === null || this.rawVal === undefined || this.rawVal === '') return '';
+                            let num = typeof this.rawVal === 'number' ? Math.round(this.rawVal) : Math.round(Number(this.rawVal) || 0);
+                            if (isNaN(num)) return '';
+                            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
                         },
                         set maskedVal(val) {
-                            this.rawVal = val ? parseInt(val.replace(/\D/g, '')) || 0 : 0;
+                            if (!val) {
+                                this.rawVal = 0;
+                                return;
+                            }
+                            let clean = val.toString().replace(/\D/g, '');
+                            this.rawVal = clean !== '' ? parseInt(clean, 10) : 0;
                         }
                     }">
                         <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">Rp</span>
                         <input type="text" x-model="maskedVal"
-                            @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
+                            @keydown="
+                                if ($event.ctrlKey || $event.metaKey || ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Enter'].includes($event.key)) return;
+                                if (!/[0-9]/.test($event.key)) $event.preventDefault();
+                            "
                             class="w-full pl-11 pr-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition font-mono"
                             placeholder="0">
                     </div>

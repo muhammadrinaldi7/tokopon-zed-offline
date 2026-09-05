@@ -13,6 +13,7 @@ class ProductAccurate extends Model
         'raw_data' => 'array',
         'base_price' => 'decimal:2',
         'base_cost' => 'decimal:2',
+        'buy_price' => 'integer',
         'has_sn' => 'boolean',
         'is_addon' => 'boolean',
         'business_unit_id' => 'integer',

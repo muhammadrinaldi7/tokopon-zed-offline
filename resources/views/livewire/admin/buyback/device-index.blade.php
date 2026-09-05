@@ -229,17 +229,27 @@
                         <div class="relative" wire:key="device-edit-buy-price-{{ $editingDeviceId }}" x-data="{
                             rawVal: @entangle('editBuyPrice'),
                             get maskedVal() {
-                                if (!this.rawVal && this.rawVal !== 0) return '';
-                                return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                if (this.rawVal === null || this.rawVal === undefined || this.rawVal === '') return '';
+                                let num = typeof this.rawVal === 'number' ? Math.round(this.rawVal) : Math.round(Number(this.rawVal) || 0);
+                                if (isNaN(num)) return '';
+                                return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
                             },
                             set maskedVal(val) {
-                                this.rawVal = val ? parseInt(val.replace(/\D/g, '')) || 0 : 0;
+                                if (!val) {
+                                    this.rawVal = 0;
+                                    return;
+                                }
+                                let clean = val.toString().replace(/\D/g, '');
+                                this.rawVal = clean !== '' ? parseInt(clean, 10) : 0;
                             }
                         }">
                             <span
                                 class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">Rp</span>
                             <input type="text" x-model="maskedVal"
-                                @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
+                                @keydown="
+                                    if ($event.ctrlKey || $event.metaKey || ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Enter'].includes($event.key)) return;
+                                    if (!/[0-9]/.test($event.key)) $event.preventDefault();
+                                "
                                 class="w-full text-[15px] bg-white border border-gray-300 focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/10 rounded-lg pl-11 pr-4 py-3 shadow-sm transition-all text-gray-900 font-bold font-mono"
                                 placeholder="0"
                                 required>
