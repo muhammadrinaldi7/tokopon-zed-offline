@@ -295,7 +295,7 @@ class PendingActivationManagement extends Component
                                 $qOrder->where('order_number', 'like', "%{$s}%")
                                        ->orWhereHas('user', function ($qUser) use ($s) {
                                            $qUser->where('name', 'like', "%{$s}%")
-                                                 ->orWhere('phone', 'like', "%{$s}%");
+                                                 ->orWhere('email', 'like', "%{$s}%");
                                        });
                             });
                   });

@@ -183,7 +183,7 @@
                                     {{ $order?->user?->name ?? $order?->customer_name ?? 'Pelanggan Toko' }}
                                 </div>
                                 <div class="text-[11px] text-gray-500">
-                                    {{ $order?->user?->phone ?? $order?->customer_phone ?? '-' }}
+                                    {{ $order?->user?->email ?? '-' }}
                                 </div>
                             </td>
 

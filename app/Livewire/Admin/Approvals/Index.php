@@ -362,7 +362,7 @@ class Index extends Component
                 if ($user->business_unit_id) {
                     $q->where('business_unit_id', $user->business_unit_id);
                 }
-                if ($user->branch_id && $user->hasAnyRole(['bm', 'supervisor', 'kasir', 'fl'])) {
+                if ($user->branch_id && $user->hasAnyRole(['bm', 'bm_gsk', 'supervisor', 'kasir', 'fl', 'fl_gsk'])) {
                     $q->where('branch_id', $user->branch_id);
                 }
             })

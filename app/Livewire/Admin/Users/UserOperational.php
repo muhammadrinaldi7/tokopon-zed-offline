@@ -38,6 +38,14 @@ class UserOperational extends Component
     public $createWarehouseId = '';
     public $createTelegramChatId = '';
 
+    // Change Password Modal
+    public $isPasswordModalOpen = false;
+    public $passwordUserId = null;
+    public $passwordUserName = '';
+    public $passwordUserEmail = '';
+    public $newPassword = '';
+    public $newPasswordConfirmation = '';
+
     public function mount()
     {
         /** @var \App\Models\User $user */
@@ -228,6 +236,52 @@ class UserOperational extends Component
         $this->createWarehouseId = '';
         $this->createTelegramChatId = '';
     }
+    public function openPasswordModal($userId)
+    {
+        $this->resetValidation();
+        $user = User::findOrFail($userId);
+        $this->passwordUserId = $user->id;
+        $this->passwordUserName = $user->name;
+        $this->passwordUserEmail = $user->email;
+        $this->newPassword = '';
+        $this->newPasswordConfirmation = '';
+        $this->isPasswordModalOpen = true;
+    }
+
+    public function closePasswordModal()
+    {
+        $this->isPasswordModalOpen = false;
+        $this->passwordUserId = null;
+        $this->passwordUserName = '';
+        $this->passwordUserEmail = '';
+        $this->newPassword = '';
+        $this->newPasswordConfirmation = '';
+        $this->resetValidation();
+    }
+
+    public function updatePassword()
+    {
+        $this->validate([
+            'newPassword' => 'required|string|min:8|same:newPasswordConfirmation',
+            'newPasswordConfirmation' => 'required',
+        ], [
+            'newPassword.required' => 'Password baru wajib diisi.',
+            'newPassword.min' => 'Password baru minimal 8 karakter.',
+            'newPassword.same' => 'Konfirmasi password baru tidak cocok.',
+            'newPasswordConfirmation.required' => 'Konfirmasi password wajib diisi.',
+        ]);
+
+        $user = User::findOrFail($this->passwordUserId);
+        $user->update([
+            'password' => bcrypt($this->newPassword),
+        ]);
+
+        $userName = $user->name;
+        $this->closePasswordModal();
+
+        $this->dispatch('admin-alert', type: 'success', message: 'Password untuk staff "' . $userName . '" berhasil diperbarui!');
+    }
+
     // Di dalam Class Index.php Anda
     #[On('refresh-user-table')]
     public function refreshTable() {}
