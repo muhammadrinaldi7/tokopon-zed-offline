@@ -1604,6 +1604,104 @@ class AccurateService
         return $allIds;
     }
 
+    /**
+     * Ambil daftar Receive Item terbaru dari Accurate dengan sorting id|desc
+     */
+    public function getRecentReceiveItemList($databaseSource = 'syihab', $limit = 25, $keyword = null)
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $params = [
+            'sp.pageSize' => $limit,
+            'sp.page' => 1,
+            'sp.sort' => 'id|desc',
+        ];
+
+        if (!empty($keyword)) {
+            $params['filter.keywords.val'] = trim($keyword);
+        }
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/receive-item/list.do', $params);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                $items = $data['d'] ?? [];
+                $result = [];
+                foreach ($items as $item) {
+                    if (isset($item['id'])) {
+                        $result[] = [
+                            'id' => $item['id'],
+                            'number' => $item['number'] ?? ($item['no'] ?? 'RI-' . $item['id']),
+                            'transDate' => $item['transDate'] ?? null,
+                            'vendor' => $item['vendor']['name'] ?? ($item['vendorName'] ?? null),
+                        ];
+                    }
+                }
+                return $result;
+            } else {
+                Log::error("Accurate API Get Recent Receive Items Error ({$databaseSource}): " . json_encode($data));
+            }
+        } else {
+            Log::error("Accurate API Get Recent Receive Items Failed ({$databaseSource}): " . $response->body());
+        }
+
+        return [];
+    }
+
+    /**
+     * Cari ID Dokumen Receive Item berdasarkan Nomor Dokumen
+     */
+    public function findReceiveItemIdByNumber($docNumber, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/receive-item/list.do', [
+            'filter.keywords.val' => trim($docNumber),
+            'sp.pageSize' => 10,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true && !empty($data['d'])) {
+                foreach ($data['d'] as $item) {
+                    $itemNum = $item['number'] ?? ($item['no'] ?? '');
+                    if (strcasecmp(trim($itemNum), trim($docNumber)) === 0 || $item['id'] == $docNumber) {
+                        return $item['id'];
+                    }
+                }
+                // Fallback to first item if keyword matched closely
+                return $data['d'][0]['id'] ?? null;
+            }
+        }
+
+        return null;
+    }
+
     public function getReceiveItemDetail($id, $databaseSource = 'syihab')
     {
         list($host, $token, $secretKey) = $this->getCredentials($databaseSource);

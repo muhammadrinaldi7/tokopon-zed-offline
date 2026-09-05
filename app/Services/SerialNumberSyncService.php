@@ -447,4 +447,139 @@ class SerialNumberSyncService
 
         return ['updated' => false, 'old_price' => 0, 'new_price' => 0];
     }
+
+    /**
+     * Sinkronisasi presisi untuk 1 Serial Number (HPP dari Nearest Cost & inferensi Vendor)
+     * 
+     * @param int|string $snId
+     * @return array
+     */
+    public function syncSingleSerialNumber($snId)
+    {
+        $sn = ProductSerialNumber::find($snId);
+        if (!$sn) {
+            throw new \Exception("Data Serial Number dengan ID {$snId} tidak ditemukan.");
+        }
+
+        $bu = $sn->business_unit_id ? \App\Models\BusinessUnit::find($sn->business_unit_id) : null;
+        $dbSource = $bu ? $bu->code : 'syihab';
+
+        $hppUpdated = false;
+        $vendorUpdated = false;
+        $oldHpp = (float)$sn->hpp;
+
+        // 1. Tarik HPP jika belum ada atau 0
+        if (empty($sn->hpp) || (float)$sn->hpp <= 0) {
+            try {
+                $costData = $this->accurateService->getNearestCost($sn->item_no, $dbSource);
+                $cost = 0;
+                if (is_numeric($costData)) {
+                    $cost = (float) $costData;
+                } elseif (is_array($costData)) {
+                    $cost = (float) ($costData['cost'] ?? ($costData['nearestCost'] ?? current($costData)));
+                }
+
+                if ($cost > 0) {
+                    $sn->update(['hpp' => $cost]);
+                    $hppUpdated = true;
+                }
+            } catch (\Exception $e) {
+                Log::warning("Gagal ambil nearestCost untuk SN {$sn->serial_number}: " . $e->getMessage());
+            }
+        }
+
+        // 2. Inferensi Vendor jika vendor_id masih null
+        if (empty($sn->vendor_id)) {
+            // Coba ambil vendor dari SN lain dengan SKU dan BU yang sama yang sudah punya vendor
+            $siblingWithVendor = ProductSerialNumber::where('item_no', $sn->item_no)
+                ->where('business_unit_id', $sn->business_unit_id)
+                ->whereNotNull('vendor_id')
+                ->latest()
+                ->first();
+
+            if ($siblingWithVendor) {
+                $sn->update([
+                    'vendor_id' => $siblingWithVendor->vendor_id,
+                    'receipt_date' => $sn->receipt_date ?: $siblingWithVendor->receipt_date
+                ]);
+                $vendorUpdated = true;
+            }
+        }
+
+        $sn->refresh();
+
+        return [
+            'sn' => $sn->serial_number,
+            'item_no' => $sn->item_no,
+            'hpp_updated' => $hppUpdated,
+            'old_hpp' => $oldHpp,
+            'new_hpp' => (float)$sn->hpp,
+            'vendor_updated' => $vendorUpdated,
+            'vendor_name' => $sn->vendor?->vendor_name ?? '-',
+        ];
+    }
+
+    /**
+     * Tarik dan sinkronkan dokumen Penerimaan Barang (Receive Item) terbaru
+     * 
+     * @param string $databaseSource
+     * @param int $limit
+     * @return array
+     */
+    public function syncRecentReceiveItems($databaseSource = 'syihab', $limit = 25)
+    {
+        $recentDocs = $this->accurateService->getRecentReceiveItemList($databaseSource, $limit);
+        $totalDocs = count($recentDocs);
+        $totalSnUpdated = 0;
+        $processedDocDetails = [];
+
+        foreach ($recentDocs as $doc) {
+            try {
+                $count = $this->syncFromReceiveItem($doc['id'], $databaseSource);
+                $totalSnUpdated += $count;
+                $processedDocDetails[] = [
+                    'id' => $doc['id'],
+                    'number' => $doc['number'],
+                    'updated_count' => $count
+                ];
+            } catch (\Exception $e) {
+                Log::error("Gagal sync recent receive item {$doc['id']} ({$doc['number']}): " . $e->getMessage());
+            }
+        }
+
+        return [
+            'total_docs' => $totalDocs,
+            'total_sn_updated' => $totalSnUpdated,
+            'docs' => $processedDocDetails
+        ];
+    }
+
+    /**
+     * Tarik dan sinkronkan dokumen Penerimaan Barang spesifik berdasarkan nomor dokumen atau ID
+     * 
+     * @param string|int $docNumberOrId
+     * @param string $databaseSource
+     * @return array
+     */
+    public function syncSpecificReceiveItemDocument($docNumberOrId, $databaseSource = 'syihab')
+    {
+        $docId = null;
+        if (is_numeric($docNumberOrId)) {
+            $docId = (int)$docNumberOrId;
+        } else {
+            $docId = $this->accurateService->findReceiveItemIdByNumber($docNumberOrId, $databaseSource);
+        }
+
+        if (!$docId) {
+            throw new \Exception("Dokumen Penerimaan Barang '{$docNumberOrId}' tidak ditemukan di Accurate ({$databaseSource}).");
+        }
+
+        $updatedCount = $this->syncFromReceiveItem($docId, $databaseSource);
+
+        return [
+            'doc_id' => $docId,
+            'updated_count' => $updatedCount
+        ];
+    }
 }
+

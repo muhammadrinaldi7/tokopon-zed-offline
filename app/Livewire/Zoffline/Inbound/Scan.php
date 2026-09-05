@@ -36,7 +36,7 @@ class Scan extends Component
     {
         $this->errorMessage = '';
         $this->successMessage = '';
-        
+
         $item = $this->po->items->where('item_no', $itemNo)->first();
         if (!$item) return;
 
@@ -177,6 +177,7 @@ class Scan extends Component
                         'unitPrice' => (float)$item->unit_price,
                         'quantity' => (float)$qtyToPush,
                         'purchaseOrderNumber' => $this->po->po_number,
+                        'warehouseName' => Auth::user()->warehouse->name
                     ];
 
                     if (!empty($serialNumbers)) {
@@ -194,7 +195,7 @@ class Scan extends Component
 
             $baseSj = 'SJ-' . $this->po->po_number;
             $suffix = '-' . date('His');
-            
+
             // Maksimal karakter di Accurate adalah 30.
             // Potong string base agar tidak melampaui batas saat digabung dengan suffix
             $maxBaseLen = 30 - strlen($suffix);

@@ -7,6 +7,7 @@ use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
 use App\Models\DeviceInspection;
 use App\Models\OrderItem;
+use App\Models\Order;
 use App\Models\Warranty;
 use App\Models\WarrantyPolicy;
 use App\Models\BusinessUnit;
@@ -51,6 +52,14 @@ class PendingActivationManagement extends Component
     /** @var \App\Models\Warranty|null */
     public $viewingWarranty = null;
 
+    // Modal Lihat Struk Transaksi Mandiri (dibuka dari tabel)
+    public $showReceiptModal = false;
+    /** @var \App\Models\Order|null */
+    public $viewingOrder = null;
+
+    // Toggle tampilan struk di dalam modal Generate Garansi
+    public $showReceiptInGenerateModal = true;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'statusFilter' => ['except' => 'pending'],
@@ -84,11 +93,18 @@ class PendingActivationManagement extends Component
     {
         $this->resetValidation();
         $this->selectedInspectionId = $inspectionId;
+        $this->showReceiptInGenerateModal = true;
         
         $this->targetInspection = DeviceInspection::with([
             'inspector',
-            'inspectable.order.user',
+            'inspectable.order.user.profile',
             'inspectable.order.businessUnit',
+            'inspectable.order.handledBy',
+            'inspectable.order.salesBy',
+            'inspectable.order.items.variant',
+            'inspectable.order.items.promos',
+            'inspectable.order.payments.paymentMethod',
+            'inspectable.order.payments.paymentMethodRate',
             'inspectable.variant',
             'inspectable.promos'
         ])->findOrFail($inspectionId);
@@ -236,6 +252,44 @@ class PendingActivationManagement extends Component
         $this->showWarrantyModal = true;
     }
 
+    /**
+     * Buka modal struk transaksi mandiri dari row tabel
+     */
+    public function openReceiptModal($orderId)
+    {
+        $this->viewingOrder = Order::with([
+            'user.profile',
+            'businessUnit',
+            'handledBy',
+            'salesBy',
+            'items.variant',
+            'items.promos',
+            'payments.paymentMethod',
+            'payments.paymentMethodRate'
+        ])->find($orderId);
+
+        if (!$this->viewingOrder) {
+            $this->dispatch('toast', title: 'Error', message: 'Data transaksi order tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        $this->showReceiptModal = true;
+    }
+
+    public function closeReceiptModal()
+    {
+        $this->showReceiptModal = false;
+        $this->viewingOrder = null;
+    }
+
+    /**
+     * Toggle tampilan struk di dalam modal generate garansi
+     */
+    public function toggleReceiptInGenerateModal()
+    {
+        $this->showReceiptInGenerateModal = !$this->showReceiptInGenerateModal;
+    }
+
     public function render()
     {
         $calculator = new WarrantyCalculatorService();
@@ -345,8 +399,21 @@ class PendingActivationManagement extends Component
             'search' => $this->search,
             'selectedBuId' => $this->selectedBuId,
             'showGenerateModal' => $this->showGenerateModal,
+            'targetOrder' => $this->targetOrder,
+            'targetInspection' => $this->targetInspection,
+            'targetOrderItem' => $this->targetOrderItem,
+            'suggestedPolicy' => $this->suggestedPolicy,
+            'availablePolicies' => $this->availablePolicies,
+            'selectedPolicyId' => $this->selectedPolicyId,
+            'selectedInspectionId' => $this->selectedInspectionId,
+            'isSubmitting' => $this->isSubmitting,
             'showQcModal' => $this->showQcModal,
+            'viewingInspection' => $this->viewingInspection,
             'showWarrantyModal' => $this->showWarrantyModal,
+            'viewingWarranty' => $this->viewingWarranty,
+            'showReceiptModal' => $this->showReceiptModal,
+            'viewingOrder' => $this->viewingOrder,
+            'showReceiptInGenerateModal' => $this->showReceiptInGenerateModal,
         ]);
     }
 }

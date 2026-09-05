@@ -175,6 +175,15 @@
                                 <div class="text-[11px] text-gray-500 mt-0.5">
                                     BU: <span class="font-bold text-gray-700">{{ $order?->businessUnit?->name ?? 'BU ' . ($order?->business_unit_id ?? '-') }}</span>
                                 </div>
+                                @if($order)
+                                    <button type="button" wire:click="openReceiptModal({{ $order->id }})"
+                                        class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-800 hover:underline mt-1">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Lihat Struk
+                                    </button>
+                                @endif
                             </td>
 
                             <!-- Pelanggan -->
@@ -323,7 +332,7 @@
     <!-- MODAL GENERATE GARANSI (PER IMEI) -->
     @if($showGenerateModal)
         <div class="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
+            <div class="bg-white rounded-3xl {{ $showReceiptInGenerateModal && $targetOrder ? 'max-w-5xl' : 'max-w-xl' }} w-full shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200 transition-all">
                 <!-- Header Modal -->
                 <div class="bg-gradient-to-r from-blue-600 to-[#1c69d4] p-6 text-white">
                     <div class="flex items-center justify-between">
@@ -338,119 +347,269 @@
                                 <p class="text-blue-100 text-xs mt-0.5">Aktivasi garansi manual untuk 1 nomor IMEI ini</p>
                             </div>
                         </div>
-                        <button type="button" wire:click="$set('showGenerateModal', false)"
-                            class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
-                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+                        <div class="flex items-center gap-2">
+                            @if($targetOrder)
+                                <button type="button" wire:click="toggleReceiptInGenerateModal"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all {{ $showReceiptInGenerateModal ? 'bg-white/20 text-white hover:bg-white/30 border border-white/30' : 'bg-white text-[#1c69d4] hover:bg-blue-50 shadow-sm' }}"
+                                    title="{{ $showReceiptInGenerateModal ? 'Sembunyikan Struk Pesanan' : 'Buka Struk Pesanan' }}">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <span>{{ $showReceiptInGenerateModal ? 'Sembunyikan Struk' : 'Lihat Struk Pesanan' }}</span>
+                                </button>
+                            @endif
+                            <button type="button" wire:click="$set('showGenerateModal', false)"
+                                class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+                                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Body Modal -->
-                <div class="p-6 space-y-5">
-                    <!-- Info Perangkat Card -->
-                    <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2.5">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <span class="text-[10px] font-black uppercase text-gray-400 tracking-wider">Perangkat & Tipe</span>
-                                <h4 class="text-sm font-black text-gray-800">{{ $targetOrderItem?->product_name }}</h4>
+                <div class="p-6 {{ $showReceiptInGenerateModal && $targetOrder ? 'grid grid-cols-1 lg:grid-cols-12 gap-6 items-start' : 'space-y-5' }}">
+                    
+                    {{-- KOLOM KIRI: STRUK TRANSAKSI (THERMAL PREVIEW) --}}
+                    @if($showReceiptInGenerateModal && $targetOrder)
+                        <div class="lg:col-span-6 bg-gray-50/90 rounded-2xl border border-dashed border-gray-300 p-4 font-mono text-xs text-gray-800 shadow-inner max-h-[580px] overflow-y-auto">
+                            <div class="flex items-center justify-between border-b border-gray-200 pb-2 mb-3">
+                                <span class="font-sans font-bold text-gray-700 text-xs flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-[#1c69d4]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Struk Pesanan Asli
+                                </span>
+                                <span class="font-sans text-[10px] px-2 py-0.5 rounded bg-blue-100 font-bold text-blue-700">Bukti Pembelian</span>
                             </div>
-                            <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-[#1c69d4]">
-                                {{ $targetOrder?->businessUnit?->name ?? 'Cabang' }}
-                            </span>
+
+                            <div class="text-center mb-2.5">
+                                <p class="font-bold text-sm text-gray-900">{{ optional($targetOrder->businessUnit)->store_title ?? 'Z-POS STORE' }}</p>
+                                <p class="text-[10px] text-gray-500">{{ $targetOrder->shipping_address_snapshot['store'] ?? 'Toko' }}</p>
+                                <p class="text-[10px] text-gray-400">{{ $targetOrder->created_at ? $targetOrder->created_at->format('d/m/Y H:i') : '-' }}</p>
+                            </div>
+
+                            <div class="border-t border-dashed border-gray-300 my-2"></div>
+
+                            <div class="space-y-0.5 text-[11px]">
+                                <div class="flex justify-between"><span class="text-gray-500">No. Order:</span><span class="font-bold text-gray-900">{{ $targetOrder->order_number }}</span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">Kasir:</span><span>{{ $targetOrder->handledBy->name ?? '-' }}</span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">Sales:</span><span>{{ $targetOrder->salesBy->name ?? '-' }}</span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">Customer:</span><span class="font-semibold">{{ $targetOrder->user->name ?? $targetOrder->customer_name ?? '-' }}</span></div>
+                                @if(optional($targetOrder->user)->profile?->phone_number)
+                                    <div class="flex justify-between"><span class="text-gray-500">Telp:</span><span>{{ $targetOrder->user->profile->phone_number }}</span></div>
+                                @endif
+                            </div>
+
+                            <div class="border-t border-dashed border-gray-300 my-2.5"></div>
+
+                            {{-- Items List --}}
+                            <div class="space-y-2 mb-3">
+                                @foreach ($targetOrder->items as $item)
+                                    @php
+                                        $v = $item->variant;
+                                        if ($v instanceof \App\Models\ProductAccurate) {
+                                            $itemName = $v->name ?? '-';
+                                            $ram = '';
+                                            $storage = '';
+                                            $color = '';
+                                        } else {
+                                            $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : ($item->product_name ?? '-');
+                                            $ram = $v ? $v->ram ?? '' : '';
+                                            $storage = $v ? $v->storage ?? '' : '';
+                                            $color = $v ? $v->color ?? '' : '';
+                                        }
+                                        $itemName = preg_replace('/^(?:DS\s*-\s*HP\s*|DS\s*-\s*|HP\s*-\s*|HP\s*)/i', '', trim($itemName));
+                                        $isCurrentItem = ($item->serial_number && trim($item->serial_number) === trim($targetInspection->imei)) 
+                                                        || ($item->id == $targetInspection->inspectable_id);
+                                    @endphp
+                                    <div class="p-2 rounded-lg text-[11px] leading-tight {{ $isCurrentItem ? 'bg-blue-100/70 border border-blue-200' : 'bg-white/70 border border-gray-100' }}">
+                                        <div class="flex items-start justify-between gap-1">
+                                            <p class="font-bold text-gray-900">
+                                                {{ $itemName }}
+                                                @if ($ram != null){{ $ram }}/@endif{{ $storage }} {{ $color }}
+                                            </p>
+                                            @if($isCurrentItem)
+                                                <span class="shrink-0 font-sans text-[9px] font-black bg-[#1c69d4] text-white px-1.5 py-0.5 rounded shadow-xs">
+                                                    UNIT INI
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <div class="flex justify-between text-gray-600 mt-1">
+                                            <span>{{ $item->qty }}x Rp {{ number_format($item->price_at_checkout, 0, ',', '.') }}</span>
+                                            <span class="font-bold text-gray-800">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</span>
+                                        </div>
+                                        @if ($item->serial_number)
+                                            <p class="text-[10px] text-gray-500 font-mono mt-0.5">SN: <span class="font-bold {{ $isCurrentItem ? 'text-blue-700 underline' : 'text-gray-700' }}">{{ $item->serial_number }}</span></p>
+                                        @endif
+                                        @if ($item->promos && $item->promos->count() > 0)
+                                            <div class="mt-1 flex flex-wrap gap-1">
+                                                @foreach($item->promos as $promo)
+                                                    <span class="font-sans text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold">
+                                                        Promo: {{ $promo->name }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <div class="border-t border-dashed border-gray-300 my-2"></div>
+
+                            {{-- Subtotal & Total --}}
+                            <div class="space-y-1 text-[11px]">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Subtotal</span>
+                                    <span>Rp {{ number_format($targetOrder->total_amount, 0, ',', '.') }}</span>
+                                </div>
+                                @if ($targetOrder->discount_amount > 0)
+                                    <div class="flex justify-between text-rose-600 font-medium">
+                                        <span>Diskon</span>
+                                        <span>-Rp {{ number_format($targetOrder->discount_amount, 0, ',', '.') }}</span>
+                                    </div>
+                                @endif
+                                <div class="border-t border-dashed border-gray-300 my-1"></div>
+                                <div class="flex justify-between font-black text-xs text-gray-900">
+                                    <span>TOTAL</span>
+                                    <span>Rp {{ number_format($targetOrder->grand_total, 0, ',', '.') }}</span>
+                                </div>
+                            </div>
+
+                            <div class="border-t border-dashed border-gray-300 my-2"></div>
+
+                            {{-- Payments --}}
+                            <div class="space-y-0.5 text-[10px] text-gray-600">
+                                @forelse ($targetOrder->payments as $payment)
+                                    <div class="flex justify-between">
+                                        <span>Bayar ({{ $payment->paymentMethod->name ?? 'Cash' }}{{ optional($payment->paymentMethod)->bank_name ? ' - ' . $payment->paymentMethod->bank_name : '' }}):</span>
+                                        <span class="font-semibold text-gray-800">Rp {{ number_format($payment->amount, 0, ',', '.') }}</span>
+                                    </div>
+                                @empty
+                                    <div class="text-gray-400 italic">Belum ada pembayaran</div>
+                                @endforelse
+                            </div>
+
+                            @if ($targetOrder->notes)
+                                <div class="mt-2 pt-2 border-t border-dashed border-gray-200 text-[10px] text-gray-600">
+                                    <span class="font-bold">Catatan Kasir:</span> {{ $targetOrder->notes }}
+                                </div>
+                            @endif
+
+                            @if ($targetOrder->accurate_invoice_no)
+                                <div class="mt-2 text-[10px] text-gray-500 font-mono">
+                                    Accurate Inv: {{ $targetOrder->accurate_invoice_no }}
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    {{-- KOLOM KANAN: FORM PENERBITAN GARANSI --}}
+                    <div class="{{ $showReceiptInGenerateModal && $targetOrder ? 'lg:col-span-6 space-y-4' : 'space-y-5' }}">
+                        <!-- Info Perangkat Card -->
+                        <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2.5">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="text-[10px] font-black uppercase text-gray-400 tracking-wider">Perangkat & Tipe</span>
+                                    <h4 class="text-sm font-black text-gray-800">{{ $targetOrderItem?->product_name }}</h4>
+                                </div>
+                                <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-[#1c69d4]">
+                                    {{ $targetOrder?->businessUnit?->name ?? 'Cabang' }}
+                                </span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200/60 text-xs">
+                                <div>
+                                    <span class="text-gray-400 text-[10px] block">Nomor IMEI / SN</span>
+                                    <span class="font-mono font-bold text-gray-800 bg-white px-2 py-0.5 rounded border border-gray-200 inline-block mt-0.5">
+                                        {{ $targetInspection?->imei }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-400 text-[10px] block">No. Invoice Order</span>
+                                    <span class="font-bold text-gray-800 inline-block mt-0.5">
+                                        {{ $targetOrder?->order_number }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-400 text-[10px] block">Nama Pelanggan</span>
+                                    <span class="font-bold text-gray-800 inline-block mt-0.5">
+                                        {{ $targetOrder?->user?->name ?? $targetOrder?->customer_name ?? 'Pelanggan Toko' }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-400 text-[10px] block">Waktu QC Dilakukan</span>
+                                    <span class="font-bold text-gray-800 inline-block mt-0.5">
+                                        {{ $targetInspection?->inspected_at ? \Carbon\Carbon::parse($targetInspection->inspected_at)->translatedFormat('d M Y, H:i') : '-' }}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200/60 text-xs">
-                            <div>
-                                <span class="text-gray-400 text-[10px] block">Nomor IMEI / SN</span>
-                                <span class="font-mono font-bold text-gray-800 bg-white px-2 py-0.5 rounded border border-gray-200 inline-block mt-0.5">
-                                    {{ $targetInspection?->imei }}
-                                </span>
+                        <!-- Rekomendasi Otomatis Box -->
+                        @if($suggestedPolicy)
+                            <div class="p-3.5 bg-blue-50 rounded-2xl border border-blue-100 flex items-start gap-3">
+                                <div class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                </div>
+                                <div class="text-xs">
+                                    <p class="font-bold text-blue-900">Rekomendasi Kebijakan Toko:</p>
+                                    <p class="text-blue-700 font-semibold mt-0.5">
+                                        {{ $suggestedPolicy->name }} &bull; Durasi: <span class="font-bold underline">{{ $suggestedPolicy->duration_days }} Hari</span> ({{ $suggestedPolicy->coverage_type == 'full_cover' ? 'Full Cover' : 'Ganti Unit' }})
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <span class="text-gray-400 text-[10px] block">No. Invoice Order</span>
-                                <span class="font-bold text-gray-800 inline-block mt-0.5">
-                                    {{ $targetOrder?->order_number }}
-                                </span>
-                            </div>
-                            <div>
-                                <span class="text-gray-400 text-[10px] block">Nama Pelanggan</span>
-                                <span class="font-bold text-gray-800 inline-block mt-0.5">
-                                    {{ $targetOrder?->user?->name ?? $targetOrder?->customer_name ?? 'Pelanggan Toko' }}
-                                </span>
-                            </div>
-                            <div>
-                                <span class="text-gray-400 text-[10px] block">Waktu QC Dilakukan</span>
-                                <span class="font-bold text-gray-800 inline-block mt-0.5">
-                                    {{ $targetInspection?->inspected_at ? \Carbon\Carbon::parse($targetInspection->inspected_at)->translatedFormat('d M Y, H:i') : '-' }}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
+                        @endif
 
-                    <!-- Rekomendasi Otomatis Box -->
-                    @if($suggestedPolicy)
-                        <div class="p-3.5 bg-blue-50 rounded-2xl border border-blue-100 flex items-start gap-3">
-                            <div class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        <!-- Pilihan Kebijakan Garansi -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5">
+                                Pilih Kebijakan Garansi yang Diterapkan: <span class="text-rose-500">*</span>
+                            </label>
+                            <select wire:model.live="selectedPolicyId"
+                                class="w-full rounded-xl border-gray-200 text-xs font-bold text-gray-800 focus:ring-[#1c69d4] focus:border-[#1c69d4] p-2.5">
+                                <option value="">-- Pilih Kebijakan Garansi --</option>
+                                @foreach($availablePolicies as $pol)
+                                    <option value="{{ $pol->id }}">
+                                        {{ $pol->name }} ({{ $pol->duration_days }} Hari - {{ $pol->coverage_type == 'full_cover' ? 'Full Cover' : 'Ganti Unit' }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('selectedPolicyId')
+                                <p class="text-rose-500 text-[11px] mt-1 font-bold">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <!-- Preview Masa Berlaku -->
+                        @php
+                            $chosenPolicy = collect($availablePolicies)->firstWhere('id', $selectedPolicyId);
+                        @endphp
+                        @if($chosenPolicy)
+                            <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between text-xs">
+                                <div>
+                                    <span class="text-emerald-700 font-bold block">Masa Berlaku Garansi</span>
+                                    <span class="text-emerald-900 font-semibold text-[11px]">
+                                        Mulai: {{ \Carbon\Carbon::now()->format('d/m/Y') }} s/d {{ \Carbon\Carbon::now()->addDays($chosenPolicy->duration_days)->format('d/m/Y') }}
+                                    </span>
+                                </div>
+                                <span class="px-2.5 py-1 bg-emerald-600 text-white font-black text-xs rounded-xl shadow-xs">
+                                    {{ $chosenPolicy->duration_days }} HARI
+                                </span>
+                            </div>
+                        @endif
+
+                        <div class="p-3 bg-amber-50 rounded-xl border border-amber-200/80 text-[11px] text-amber-800">
+                            <div class="flex items-start gap-2">
+                                <svg class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                            </div>
-                            <div class="text-xs">
-                                <p class="font-bold text-blue-900">Rekomendasi Kebijakan Toko:</p>
-                                <p class="text-blue-700 font-semibold mt-0.5">
-                                    {{ $suggestedPolicy->name }} &bull; Durasi: <span class="font-bold underline">{{ $suggestedPolicy->duration_days }} Hari</span> ({{ $suggestedPolicy->coverage_type == 'full_cover' ? 'Full Cover' : 'Ganti Unit' }})
-                                </p>
-                            </div>
-                        </div>
-                    @endif
-
-                    <!-- Pilihan Kebijakan Garansi -->
-                    <div>
-                        <label class="block text-xs font-bold text-gray-700 mb-1.5">
-                            Pilih Kebijakan Garansi yang Diterapkan: <span class="text-rose-500">*</span>
-                        </label>
-                        <select wire:model.live="selectedPolicyId"
-                            class="w-full rounded-xl border-gray-200 text-xs font-bold text-gray-800 focus:ring-[#1c69d4] focus:border-[#1c69d4] p-2.5">
-                            <option value="">-- Pilih Kebijakan Garansi --</option>
-                            @foreach($availablePolicies as $pol)
-                                <option value="{{ $pol->id }}">
-                                    {{ $pol->name }} ({{ $pol->duration_days }} Hari - {{ $pol->coverage_type == 'full_cover' ? 'Full Cover' : 'Ganti Unit' }})
-                                </option>
-                            @endforeach
-                        </select>
-                        @error('selectedPolicyId')
-                            <p class="text-rose-500 text-[11px] mt-1 font-bold">{{ $message }}</p>
-                        @enderror
-                    </div>
-
-                    <!-- Preview Masa Berlaku -->
-                    @php
-                        $chosenPolicy = collect($availablePolicies)->firstWhere('id', $selectedPolicyId);
-                    @endphp
-                    @if($chosenPolicy)
-                        <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between text-xs">
-                            <div>
-                                <span class="text-emerald-700 font-bold block">Masa Berlaku Garansi</span>
-                                <span class="text-emerald-900 font-semibold text-[11px]">
-                                    Mulai: {{ \Carbon\Carbon::now()->format('d/m/Y') }} s/d {{ \Carbon\Carbon::now()->addDays($chosenPolicy->duration_days)->format('d/m/Y') }}
+                                <span>
+                                    Menekan tombol di bawah hanya akan mengaktifkan garansi <strong>khusus untuk IMEI ini saja</strong>. Transaksi atau IMEI lainnya tidak akan terpengaruh.
                                 </span>
                             </div>
-                            <span class="px-2.5 py-1 bg-emerald-600 text-white font-black text-xs rounded-xl shadow-xs">
-                                {{ $chosenPolicy->duration_days }} HARI
-                            </span>
-                        </div>
-                    @endif
-
-                    <div class="p-3 bg-amber-50 rounded-xl border border-amber-200/80 text-[11px] text-amber-800">
-                        <div class="flex items-start gap-2">
-                            <svg class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>
-                                Menekan tombol di bawah hanya akan mengaktifkan garansi <strong>khusus untuk IMEI ini saja</strong>. Transaksi atau IMEI lainnya tidak akan terpengaruh.
-                            </span>
                         </div>
                     </div>
                 </div>
@@ -625,6 +784,154 @@
                     <button type="button" wire:click="$set('showWarrantyModal', false)"
                         class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs rounded-xl transition-colors">
                         Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- MODAL LIHAT STRUK TRANSAKSI (STANDALONE DARI TABEL) -->
+    @if($showReceiptModal && $viewingOrder)
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+            wire:click.self="closeReceiptModal">
+            <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
+                <div class="bg-gradient-to-r from-gray-900 to-gray-800 p-5 text-white flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-sm">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-black leading-tight">Struk Transaksi Pesanan</h3>
+                            <p class="text-gray-300 text-[11px] mt-0.5">Invoice: {{ $viewingOrder->order_number }}</p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="closeReceiptModal"
+                        class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Thermal Content --}}
+                <div class="p-5 font-mono text-xs text-gray-800 max-h-[550px] overflow-y-auto space-y-3 bg-gray-50/50">
+                    <div class="text-center mb-2.5">
+                        <p class="font-bold text-sm text-gray-900">{{ optional($viewingOrder->businessUnit)->store_title ?? 'Z-POS STORE' }}</p>
+                        <p class="text-[10px] text-gray-500">{{ $viewingOrder->shipping_address_snapshot['store'] ?? 'Toko' }}</p>
+                        <p class="text-[10px] text-gray-400">{{ $viewingOrder->created_at ? $viewingOrder->created_at->format('d/m/Y H:i') : '-' }}</p>
+                    </div>
+
+                    <div class="border-t border-dashed border-gray-300 my-2"></div>
+
+                    <div class="space-y-0.5 text-[11px]">
+                        <div class="flex justify-between"><span class="text-gray-500">No. Order:</span><span class="font-bold text-gray-900">{{ $viewingOrder->order_number }}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Kasir:</span><span>{{ $viewingOrder->handledBy->name ?? '-' }}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Sales:</span><span>{{ $viewingOrder->salesBy->name ?? '-' }}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-500">Customer:</span><span class="font-semibold">{{ $viewingOrder->user->name ?? $viewingOrder->customer_name ?? '-' }}</span></div>
+                        @if(optional($viewingOrder->user)->profile?->phone_number)
+                            <div class="flex justify-between"><span class="text-gray-500">Telp:</span><span>{{ $viewingOrder->user->profile->phone_number }}</span></div>
+                        @endif
+                    </div>
+
+                    <div class="border-t border-dashed border-gray-300 my-2"></div>
+
+                    {{-- Items List --}}
+                    <div class="space-y-2 mb-3">
+                        @foreach ($viewingOrder->items as $item)
+                            @php
+                                $v = $item->variant;
+                                if ($v instanceof \App\Models\ProductAccurate) {
+                                    $itemName = $v->name ?? '-';
+                                    $ram = '';
+                                    $storage = '';
+                                    $color = '';
+                                } else {
+                                    $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : ($item->product_name ?? '-');
+                                    $ram = $v ? $v->ram ?? '' : '';
+                                    $storage = $v ? $v->storage ?? '' : '';
+                                    $color = $v ? $v->color ?? '' : '';
+                                }
+                                $itemName = preg_replace('/^(?:DS\s*-\s*HP\s*|DS\s*-\s*|HP\s*-\s*|HP\s*)/i', '', trim($itemName));
+                            @endphp
+                            <div class="p-2 rounded-lg text-[11px] leading-tight bg-white border border-gray-200">
+                                <p class="font-bold text-gray-900">
+                                    {{ $itemName }}
+                                    @if ($ram != null){{ $ram }}/@endif{{ $storage }} {{ $color }}
+                                </p>
+                                <div class="flex justify-between text-gray-600 mt-1">
+                                    <span>{{ $item->qty }}x Rp {{ number_format($item->price_at_checkout, 0, ',', '.') }}</span>
+                                    <span class="font-bold text-gray-800">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</span>
+                                </div>
+                                @if ($item->serial_number)
+                                    <p class="text-[10px] text-gray-500 font-mono mt-0.5">SN: <span class="font-bold text-blue-700">{{ $item->serial_number }}</span></p>
+                                @endif
+                                @if ($item->promos && $item->promos->count() > 0)
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        @foreach($item->promos as $promo)
+                                            <span class="font-sans text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold">
+                                                Promo: {{ $promo->name }}
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="border-t border-dashed border-gray-300 my-2"></div>
+
+                    {{-- Subtotal & Total --}}
+                    <div class="space-y-1 text-[11px]">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Subtotal</span>
+                            <span>Rp {{ number_format($viewingOrder->total_amount, 0, ',', '.') }}</span>
+                        </div>
+                        @if ($viewingOrder->discount_amount > 0)
+                            <div class="flex justify-between text-rose-600 font-medium">
+                                <span>Diskon</span>
+                                <span>-Rp {{ number_format($viewingOrder->discount_amount, 0, ',', '.') }}</span>
+                            </div>
+                        @endif
+                        <div class="border-t border-dashed border-gray-300 my-1.5"></div>
+                        <div class="flex justify-between font-black text-xs text-gray-900">
+                            <span>TOTAL</span>
+                            <span>Rp {{ number_format($viewingOrder->grand_total, 0, ',', '.') }}</span>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-dashed border-gray-300 my-2"></div>
+
+                    {{-- Payments --}}
+                    <div class="space-y-0.5 text-[10px] text-gray-600">
+                        @forelse ($viewingOrder->payments as $payment)
+                            <div class="flex justify-between">
+                                <span>Bayar ({{ $payment->paymentMethod->name ?? 'Cash' }}{{ optional($payment->paymentMethod)->bank_name ? ' - ' . $payment->paymentMethod->bank_name : '' }}):</span>
+                                <span class="font-semibold text-gray-800">Rp {{ number_format($payment->amount, 0, ',', '.') }}</span>
+                            </div>
+                        @empty
+                            <div class="text-gray-400 italic">Belum ada pembayaran</div>
+                        @endforelse
+                    </div>
+
+                    @if ($viewingOrder->notes)
+                        <div class="mt-2 pt-2 border-t border-dashed border-gray-200 text-[10px] text-gray-600">
+                            <span class="font-bold">Catatan Kasir:</span> {{ $viewingOrder->notes }}
+                        </div>
+                    @endif
+
+                    @if ($viewingOrder->accurate_invoice_no)
+                        <div class="mt-2 text-[10px] text-gray-500 font-mono">
+                            Inv Accurate: {{ $viewingOrder->accurate_invoice_no }}
+                        </div>
+                    @endif
+                </div>
+
+                <div class="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+                    <button type="button" wire:click="closeReceiptModal"
+                        class="px-5 py-2.5 bg-gray-800 hover:bg-black text-white font-bold text-xs rounded-xl shadow-xs transition-colors">
+                        Tutup Struk
                     </button>
                 </div>
             </div>
