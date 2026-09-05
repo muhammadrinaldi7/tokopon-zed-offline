@@ -932,6 +932,7 @@ trait WithCheckoutAndReceipt
                             'quantity' => $item['qty'],
                             'itemCashDiscount' => ((int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1)) + (int)($item['promo_discount'] ?? 0),
                             'salesmanListNumber' => $detailSalesman,
+                            'projectNo' => $item['project_number'] ?? ''
                         ];
 
                         $condition = $item['condition'] ?? '';
