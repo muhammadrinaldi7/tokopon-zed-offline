@@ -3,6 +3,7 @@
 namespace App\Livewire\Zoffline\Pos;
 
 use App\Mail\SalesReceiptMail;
+use App\Models\BusinessUnitProject;
 use App\Models\Employe;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -318,12 +319,8 @@ class Pos extends Component
 
             $projectNo = '';
             if ($variant instanceof \App\Models\ProductAccurate) {
-                $projectNo = match (trim(strtoupper($variant->proyek ?? ''))) {
-                    'SJU' => 'P.00003',
-                    'SAB' => 'P.00004',
-                    'RESMI' => 'P.00008',
-                    default => $variant->proyek ?? ''
-                };
+                $buId = $order->business_unit_id ?? $variant->business_unit_id ?? (Auth::check() ? Auth::user()->getActiveBusinessUnitId() : 1);
+                $projectNo = BusinessUnitProject::getProjectNoByBusinessUnit($buId, $variant->proyek, $variant->proyek ?? '');
             }
 
             $this->cart[] = [
@@ -470,12 +467,8 @@ class Pos extends Component
 
             $projectNo = '';
             if ($variant instanceof \App\Models\ProductAccurate) {
-                $projectNo = match (trim(strtoupper($variant->proyek ?? ''))) {
-                    'SJU' => 'P.00003',
-                    'SAB' => 'P.00004',
-                    'RESMI' => 'P.00008',
-                    default => $variant->proyek ?? ''
-                };
+                $buId = $order->business_unit_id ?? $variant->business_unit_id ?? (Auth::check() ? Auth::user()->getActiveBusinessUnitId() : 1);
+                $projectNo = BusinessUnitProject::getProjectNoByBusinessUnit($buId, $variant->proyek, $variant->proyek ?? '');
             }
 
             $this->cart[] = [
@@ -561,12 +554,8 @@ class Pos extends Component
 
             $projectNo = '';
             if ($variant instanceof \App\Models\ProductAccurate) {
-                $projectNo = match (trim(strtoupper($variant->proyek ?? ''))) {
-                    'SJU' => 'P.00003',
-                    'SAB' => 'P.00004',
-                    'RESMI' => 'P.00008',
-                    default => $variant->proyek ?? ''
-                };
+                $buId = $order->business_unit_id ?? $variant->business_unit_id ?? (Auth::check() ? Auth::user()->getActiveBusinessUnitId() : 1);
+                $projectNo = BusinessUnitProject::getProjectNoByBusinessUnit($buId, $variant->proyek, $variant->proyek ?? '');
             }
 
             $this->cart[] = [

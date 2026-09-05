@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Orders\SalesOrder;
 
 use App\Models\BusinessUnit;
+use App\Models\BusinessUnitProject;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ProductVariant;
@@ -610,12 +611,8 @@ class Create extends Component
                     $variant = \App\Models\ProductAccurate::find($item['variant_id']);
                     $itemName = $variant->name ?? 'Unknown';
 
-                    $projectNo = match (trim(strtoupper($variant->proyek ?? ''))) {
-                        'SJU' => 'P.00003',
-                        'SAB' => 'P.00004',
-                        'RESMI' => 'P.00008',
-                        default => $variant->proyek ?? ''
-                    };
+                    $buId = $businessUnit?->id ?? $variant->business_unit_id ?? 1;
+                    $projectNo = BusinessUnitProject::getProjectNoByBusinessUnit($buId, $variant->proyek, $variant->proyek ?? '');
 
                     $detailData = [
                         'itemNo' => $variant->item_no ?? 'ITEM-UNKNOWN',

@@ -73,22 +73,12 @@ class PushInvoiceToAccurateJob implements ShouldQueue
             if ($product) {
                 $namaProyek = trim(strtoupper($product->proyek ?? ''));
 
-                // 1. Cek dari mapping BusinessUnitProject jika dikonfigurasi per unit
+                // Ambil nomor proyek secara dinamis dari tabel business_unit_projects
                 $projectNo = BusinessUnitProject::getProjectNoByBusinessUnit(
                     $product->business_unit_id,
                     $namaProyek,
-                    null
+                    $namaProyek ?: null
                 );
-
-                // 2. Mapping standar sesuai POS / Sales Invoice
-                if (empty($projectNo) && !empty($namaProyek)) {
-                    $projectNo = match ($namaProyek) {
-                        'SJU'   => 'P.00003',
-                        'SAB'   => 'P.00004',
-                        'RESMI' => 'P.00008',
-                        default => $product->proyek ?? ''
-                    };
-                }
 
                 if (!empty($projectNo)) {
                     $itemData['projectNo'] = $projectNo;

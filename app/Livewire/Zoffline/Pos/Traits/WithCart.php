@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Zoffline\Pos\Traits;
 
+use App\Models\BusinessUnitProject;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -376,12 +377,11 @@ trait WithCart
                 'database_source' => $productAccurate->database_source,
                 'brand_id' => $brandId,
                 // 'condition' => '',
-                'project_number' => match (trim(strtoupper($productAccurate->proyek ?? ''))) {
-                    'SJU' => 'P.00003',
-                    'SAB' => 'P.00004',
-                    'RESMI' => 'P.00008',
-                    default => $productAccurate->proyek ?? ''
-                },
+                'project_number' => BusinessUnitProject::getProjectNoByBusinessUnit(
+                    $productAccurate->business_unit_id ?? (Auth::check() ? Auth::user()->getActiveBusinessUnitId() : 1),
+                    $productAccurate->proyek,
+                    $productAccurate->proyek ?? ''
+                ),
             ];
 
             $this->dispatch('toast', title: 'Sukses', message: "Berhasil menambahkan {$productAccurate->name} ke keranjang.", type: 'success');

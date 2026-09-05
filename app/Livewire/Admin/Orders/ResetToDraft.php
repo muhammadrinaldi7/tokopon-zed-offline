@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\Orders;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
+use App\Models\BusinessUnitProject;
 use App\Models\Order;
 use App\Models\OrderResetLog;
 use App\Models\Branch;
@@ -333,14 +334,8 @@ class ResetToDraft extends Component
                         $product = \App\Models\ProductAccurate::find($item->product_variant_id);
                         if ($product) {
                             $sku = $product->item_no;
-                            $projectNo = match (trim(strtoupper($product->proyek ?? ''))) {
-                                'SJU' => 'P.00003',
-                                'SAB' => 'P.00004',
-                                'RESMI' => 'P.00008',
-                                'INTER' => 'P.00009',
-                                'BEACUKAI' => 'P.00010',
-                                default => $product->proyek ?? ''
-                            };
+                            $buId = $order->business_unit_id ?? $product->business_unit_id ?? 1;
+                            $projectNo = BusinessUnitProject::getProjectNoByBusinessUnit($buId, $product->proyek, $product->proyek ?? '');
                         }
                     } else if ($item->product_variant_type == \App\Models\SecondProduct::class) {
                         $product = \App\Models\SecondProduct::find($item->product_variant_id);

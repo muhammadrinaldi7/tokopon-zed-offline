@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Admin\Orders;
 
+use App\Models\BusinessUnit;
+use App\Models\BusinessUnitProject;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ProductVariant;
@@ -290,12 +292,10 @@ class ImportDraft extends Component
                     $detailSN[] = ['serialNumberNo' => '-', 'quantity' => 1];
                 }
 
-                $projectNo = match (trim(strtoupper($variant->proyek ?? ''))) {
-                    'SJU' => 'P.00003',
-                    'SAB' => 'P.00004',
-                    'RESMI' => 'P.00008',
-                    default => $variant->proyek ?? ''
-                };
+                $bu = BusinessUnit::where('code', $dbSource)->first();
+                $buId = $order->business_unit_id ?? ($bu ? $bu->id : 1);
+                $namaProyek = $variant->proyek ?? ($variant->productAccurate->proyek ?? '');
+                $projectNo = BusinessUnitProject::getProjectNoByBusinessUnit($buId, $namaProyek, $namaProyek ?: '');
 
                 $accurateDetailItems[] = [
                     'itemNo' => $itemData['sku'],
