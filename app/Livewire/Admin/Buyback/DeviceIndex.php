@@ -81,8 +81,18 @@ class DeviceIndex extends Component
         }
     }
 
+    public function updatedEditBuyPrice($value)
+    {
+        if (is_string($value)) {
+            $cleaned = preg_replace('/[^0-9]/', '', $value);
+            $this->editBuyPrice = $cleaned !== '' ? (int) $cleaned : 0;
+        }
+    }
+
     public function updateDevice()
     {
+        $this->editBuyPrice = (int) preg_replace('/[^0-9]/', '', (string)$this->editBuyPrice);
+
         $this->validate([
             'editBuyPrice' => 'required|numeric|min:0',
         ]);

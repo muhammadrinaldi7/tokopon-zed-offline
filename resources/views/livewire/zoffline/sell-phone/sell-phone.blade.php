@@ -1,4 +1,4 @@
-<div class="max-w-7xl mx-auto p-2 md:p-6 min-h-screen" x-data="{ step: 1 }" x-cloak>
+<div class="max-w-7xl mx-auto p-2 md:p-6 min-h-screen" x-data="{ step: 1 }" @go-to-step.window="step = $event.detail.step" x-cloak>
     {{-- Header Navigation --}}
     <div class="flex gap-2">
         <a href="/"
@@ -376,17 +376,116 @@
                 </div>
             </div>
 
+            {{-- Card Validasi Status Harga Beli & Tier Buyback --}}
+            @if($selected_model_name)
+                @php
+                    $isPriceValid = (float) $base_price > 0;
+                    $isTierValid = count($device_rules) > 0;
+                    $isReady = $isPriceValid && $isTierValid;
+                @endphp
+
+                <div class="rounded-3xl p-5 md:p-6 transition-all duration-300 {{ $isReady ? 'bg-emerald-50/80 border-2 border-emerald-200/80 shadow-xs' : 'bg-rose-50/80 border-2 border-rose-200 shadow-xs' }}">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-5">
+                        <div class="flex items-start gap-4">
+                            <div class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs {{ $isReady ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white animate-pulse' }}">
+                                @if($isReady)
+                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                @else
+                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                @endif
+                            </div>
+
+                            <div class="space-y-1.5">
+                                <div class="flex items-center gap-2.5 flex-wrap">
+                                    <h4 class="font-black text-sm md:text-base {{ $isReady ? 'text-emerald-950' : 'text-rose-950' }}">
+                                        {{ $isReady ? 'Model Terverifikasi & Siap Lanjut QC' : 'Perhatian: Pengaturan Pembelian Belum Lengkap' }}
+                                    </h4>
+                                    @if($isReady)
+                                        <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-200 text-emerald-900 border border-emerald-300/60">
+                                            ✓ Siap Dibeli
+                                        </span>
+                                    @else
+                                        <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-rose-200 text-rose-900 border border-rose-300/60">
+                                            ⚠️ Butuh Setting Admin
+                                        </span>
+                                    @endif
+                                </div>
+
+                                @if($isReady)
+                                    <p class="text-xs text-emerald-800 font-medium leading-relaxed">
+                                        Harga beli dasar dan aturan pengurangan kondisi fisik/layar telah siap. Silakan lanjutkan ke tahap pemeriksaan QC fisik & fungsi.
+                                    </p>
+                                @else
+                                    <div class="space-y-1 mt-1 text-xs font-medium text-rose-800">
+                                        @if(!$isPriceValid)
+                                            <div class="flex items-center gap-2">
+                                                <span class="w-2 h-2 rounded-full bg-rose-600 shrink-0"></span>
+                                                <span><strong>Harga Beli Dasar Kosong (Rp 0):</strong> Belum disetting di sistem Accurate. Hubungi Tim Purchasing/Admin.</span>
+                                            </div>
+                                        @endif
+                                        @if(!$isTierValid)
+                                            <div class="flex items-center gap-2">
+                                                <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                                                <span><strong>Tier Buyback Belum Ditemukan:</strong> Model ini belum dipetakan ke rumus pengurangan kondisi fisik/layar. Hubungi Admin Master Data.</span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                    <p class="text-[11px] text-rose-600 italic mt-1 font-semibold">
+                                        * Tahap QC dikunci sementara agar Anda tidak membuang waktu mengambil 8 foto dan ceklis fisik sebelum harga tersedia.
+                                    </p>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- Ringkasan Info Parameter Harga & Tier --}}
+                        <div class="flex items-center gap-3 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-neutral-200/70">
+                            <div class="bg-white/90 px-4 py-2.5 rounded-2xl border {{ $isReady ? 'border-emerald-200 shadow-2xs' : 'border-rose-200 shadow-2xs' }} text-right min-w-[130px]">
+                                <span class="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Harga Dasar (Mulus)</span>
+                                <span class="text-sm md:text-base font-black {{ $isPriceValid ? 'text-neutral-900' : 'text-rose-600' }}">
+                                    {{ $isPriceValid ? 'Rp ' . number_format($base_price, 0, ',', '.') : 'Rp 0' }}
+                                </span>
+                            </div>
+
+                            <div class="bg-white/90 px-4 py-2.5 rounded-2xl border {{ $isReady ? 'border-emerald-200 shadow-2xs' : 'border-rose-200 shadow-2xs' }} text-right min-w-[120px]">
+                                <span class="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Tier Pengurangan</span>
+                                <span class="text-xs md:text-sm font-bold {{ $isTierValid ? 'text-neutral-800' : 'text-amber-600' }}">
+                                    {{ $selected_tier_name ?? ($isTierValid ? 'Terhubung' : 'Belum Ada') }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <div class="flex justify-end pt-4 pb-10">
-                <button type="button" @click="step = 2" :disabled="!$wire.selected_model_name"
-                    class="px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-2 shadow-lg active:scale-95"
-                    :class="$wire.selected_model_name ?
-                        'bg-linear-to-r from-[#D3AD7B] to-[#A28153] hover:from-[#C39D6B] hover:to-[#927143] text-white shadow-[#A28153]/30' :
-                        'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none'">
-                    Lanjut QC Kelayakan
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-                    </svg>
+                @php
+                    $isPriceValid = (float) $base_price > 0;
+                    $isTierValid = count($device_rules) > 0;
+                    $canProceed = !empty($selected_model_name) && $isPriceValid && $isTierValid;
+                @endphp
+
+                <button type="button" 
+                    wire:click="proceedToQc"
+                    {{ $canProceed ? '' : 'disabled' }}
+                    class="px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-2 shadow-lg active:scale-95 select-none {{ $canProceed ? 'bg-linear-to-r from-[#D3AD7B] to-[#A28153] hover:from-[#C39D6B] hover:to-[#927143] text-white shadow-[#A28153]/30 cursor-pointer' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none' }}">
+                    
+                    @if(empty($selected_model_name))
+                        <span>Pilih Model Terlebih Dahulu</span>
+                    @elseif(!$isPriceValid)
+                        <span>⚠️ Harga Beli Belum Disetting</span>
+                    @elseif(!$isTierValid)
+                        <span>⚠️ Tier Belum Dikonfigurasi</span>
+                    @else
+                        <span>Lanjut QC Kelayakan</span>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
+                    @endif
                 </button>
             </div>
         </div>

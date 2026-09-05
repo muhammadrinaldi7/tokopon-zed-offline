@@ -116,8 +116,22 @@
                             <span class="text-xs font-bold text-emerald-600 uppercase tracking-widest block mb-1">Trade In Value</span>
                             @if(in_array($tradeIn->status, ['WAITING_FOR_DEVICE', 'INSPECTING']))
                                 <div class="flex items-center justify-end gap-1">
-                                    <span class="text-lg font-bold text-emerald-700">Rp</span>
-                                    <input type="number" wire:model.live="appraisedValue" class="text-2xl font-black text-emerald-700 w-40 border-0 border-b-2 border-emerald-200 focus:ring-0 focus:border-emerald-500 px-1 bg-transparent text-right p-0 m-0 leading-none h-8">
+                                    <div class="relative" wire:key="tradein-appraised-value" x-data="{
+                                        rawVal: @entangle('appraisedValue'),
+                                        get maskedVal() {
+                                            if (!this.rawVal && this.rawVal !== 0) return '';
+                                            return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                        },
+                                        set maskedVal(val) {
+                                            this.rawVal = val ? parseInt(val.replace(/\D/g, '')) || 0 : 0;
+                                        }
+                                    }">
+                                        <span class="absolute left-1 top-1/2 -translate-y-1/2 text-emerald-700 font-bold text-sm">Rp</span>
+                                        <input type="text" x-model="maskedVal"
+                                            @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
+                                            class="text-2xl font-black text-emerald-700 w-48 border-0 border-b-2 border-emerald-200 focus:ring-0 focus:border-emerald-500 pl-8 pr-1 bg-transparent text-right p-0 m-0 leading-none h-8 font-mono"
+                                            placeholder="0">
+                                    </div>
                                     <button type="button" wire:click="updateAppraisedValue" class="ml-2 bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-emerald-200 transition shadow-sm">Ubah Harga</button>
                                 </div>
                                 @error('appraisedValue') <span class="text-xs text-rose-500 font-bold block mt-1">{{ $message }}</span> @enderror

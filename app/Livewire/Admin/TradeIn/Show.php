@@ -68,9 +68,19 @@ class Show extends Component
         $this->selectedVariants = [$variantId];
     }
 
+    public function updatedAppraisedValue($value)
+    {
+        if (is_string($value)) {
+            $cleaned = preg_replace('/[^0-9]/', '', $value);
+            $this->appraisedValue = $cleaned !== '' ? (int) $cleaned : 0;
+        }
+    }
+
     public function updateAppraisedValue()
     {
         if (!in_array($this->tradeIn->status, ['WAITING_FOR_DEVICE', 'INSPECTING'])) return;
+
+        $this->appraisedValue = (int) preg_replace('/[^0-9]/', '', (string)$this->appraisedValue);
 
         $this->validate([
             'appraisedValue' => 'required|numeric|min:0'

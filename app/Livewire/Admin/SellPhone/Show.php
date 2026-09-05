@@ -98,8 +98,27 @@ class Show extends Component
         // loadMissing akan me-load relasi hanya saat data ini dipanggil di Blade
         return $this->sellPhone->loadMissing(['buybackDevice.secondProductVariant', 'user']);
     }
+
+    public function updatedAppraisedValue($value)
+    {
+        if (is_string($value)) {
+            $cleaned = preg_replace('/[^0-9]/', '', $value);
+            $this->appraisedValue = $cleaned !== '' ? (int) $cleaned : 0;
+        }
+    }
+
+    public function updatedRevisedAppraisedValue($value)
+    {
+        if (is_string($value)) {
+            $cleaned = preg_replace('/[^0-9]/', '', $value);
+            $this->revisedAppraisedValue = $cleaned !== '' ? (int) $cleaned : 0;
+        }
+    }
+
     public function submitAppraisal()
     {
+        $this->appraisedValue = (int) preg_replace('/[^0-9]/', '', (string)$this->appraisedValue);
+
         $this->validate([
             'appraisedValue' => 'required|numeric|min:1000'
         ]);
@@ -114,6 +133,8 @@ class Show extends Component
 
     public function updatePrice()
     {
+        $this->appraisedValue = (int) preg_replace('/[^0-9]/', '', (string)$this->appraisedValue);
+
         $this->validate([
             'appraisedValue' => 'required|numeric|min:1000'
         ]);
@@ -130,6 +151,8 @@ class Show extends Component
 
     public function submitRevision()
     {
+        $this->revisedAppraisedValue = (int) preg_replace('/[^0-9]/', '', (string)$this->revisedAppraisedValue);
+
         $this->validate([
             'revisedAppraisedValue' => 'required|numeric|min:1000'
         ]);

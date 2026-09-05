@@ -72,6 +72,7 @@ class SellPhone extends Component
     public $available_models = [];
     public $brands = []; // Cache brands agar tidak query ulang di render()
     public $base_price = 0;
+    public $selected_tier_name = null;
 
     // QC Kelayakan (Step 2 Baru)
     public $imei = '';
@@ -185,6 +186,7 @@ class SellPhone extends Component
         $this->selected_categoryName = null;
         $this->selected_proyek = null;
         $this->selected_model_name = null;
+        $this->selected_tier_name = null;
 
         $this->available_categories = [];
         $this->available_proyek = [];
@@ -222,6 +224,7 @@ class SellPhone extends Component
     {
         $this->selected_proyek = null;
         $this->selected_model_name = null;
+        $this->selected_tier_name = null;
 
         $this->available_proyek = [];
         $this->available_models = [];
@@ -251,6 +254,7 @@ class SellPhone extends Component
     public function updatedSelectedProyek()
     {
         $this->selected_model_name = null;
+        $this->selected_tier_name = null;
 
         $this->available_models = [];
         $this->base_price = 0;
@@ -376,6 +380,7 @@ class SellPhone extends Component
         $this->device_rules = [];
         $this->selected_rules = [];
         $this->final_price = 0;
+        $this->selected_tier_name = null;
 
         $this->imei = '';
         $this->qc_template = null;
@@ -402,13 +407,14 @@ class SellPhone extends Component
             $productAccurate = $query->first();
 
             if ($productAccurate) {
-                $this->base_price = $productAccurate->buy_price ?? 0;
+                $this->base_price = (float) ($productAccurate->buy_price ?? 0);
 
                 // Cari tier menggunakan hierarki BuybackDevice
                 $buybackDevice = \App\Models\BuybackDevice::findByProductAccurate($productAccurate);
                 $tier = $buybackDevice?->tier;
 
                 if ($tier) {
+                    $this->selected_tier_name = $tier->name;
                     $flat = [];
                     foreach ($tier->getRulesByCategory() as $category => $data) {
                         $isMultiple = $data['is_multiple'] ?? false;
@@ -431,7 +437,67 @@ class SellPhone extends Component
 
             $this->calculatePrice();
             $this->loadQcTemplate();
+
+            // Beri notifikasi instan sesuai kondisi kelayakan
+            if ($this->base_price <= 0) {
+                $this->dispatch('toast', 
+                    title: 'Harga Beli Belum Disetting', 
+                    message: 'Model ini belum memiliki harga pembelian di Accurate (Rp 0). Harap hubungi Admin/Purchasing sebelum melanjutkan QC.', 
+                    type: 'error'
+                );
+            } elseif (empty($this->device_rules)) {
+                $this->dispatch('toast', 
+                    title: 'Tier Belum Dikonfigurasi', 
+                    message: 'Model ini belum memiliki pengaturan Tier Buyback / aturan pengurangan kondisi. Harap hubungi Admin Master Data.', 
+                    type: 'warning'
+                );
+            } else {
+                $this->dispatch('toast', 
+                    title: 'Model Siap Dibeli', 
+                    message: 'Harga dasar: Rp ' . number_format($this->base_price, 0, ',', '.') . ' (Tier: ' . ($this->selected_tier_name ?? 'Aktif') . ')', 
+                    type: 'success'
+                );
+            }
         }
+    }
+
+    /**
+     * Validasi kelayakan sebelum lanjut ke tahap QC (Step 2)
+     */
+    public function proceedToQc()
+    {
+        if (!$this->selected_model_name) {
+            $this->dispatch('toast', title: 'Pilih Model', message: 'Silakan pilih model perangkat terlebih dahulu.', type: 'warning');
+            return;
+        }
+
+        if ((float) $this->base_price <= 0) {
+            $this->dispatch('toast', 
+                title: 'Tidak Bisa Lanjut ke QC', 
+                message: 'Harga beli untuk model ini belum disetting di sistem/Accurate (Rp 0). Silakan hubungi Purchasing/Admin terlebih dahulu.', 
+                type: 'error'
+            );
+            return;
+        }
+
+        if (empty($this->device_rules)) {
+            $this->dispatch('toast', 
+                title: 'Tidak Bisa Lanjut ke QC', 
+                message: 'Model ini belum masuk ke dalam Tier Buyback atau belum memiliki rumus pengurangan kondisi.', 
+                type: 'error'
+            );
+            return;
+        }
+
+        $this->dispatch('go-to-step', step: 2);
+    }
+
+    #[Computed]
+    public function isModelReady(): bool
+    {
+        return !empty($this->selected_model_name) 
+            && (float) $this->base_price > 0 
+            && count($this->device_rules) > 0;
     }
 
     public function updatedSelectedRules()
@@ -502,6 +568,7 @@ class SellPhone extends Component
             'selected_categoryName'     => 'required',
             'selected_proyek'           => 'required',
             'selected_model_name'       => 'required',
+            'base_price'                => 'required|numeric|min:1',
             'imei' => [
                 'required',
                 'string',
@@ -557,6 +624,8 @@ class SellPhone extends Component
         'selected_sales_id.required'    => 'Silakan pilih tenaga penjualan (sales).',
         'selected_sales_id.exists'      => 'Tenaga penjualan yang dipilih tidak valid.',
         'selected_model_name.required'  => 'Silakan pilih model perangkat terlebih dahulu.',
+        'base_price.required'           => 'Harga beli dasar perangkat tidak valid.',
+        'base_price.min'                => 'Harga beli dasar untuk perangkat ini belum disetting di sistem (Rp 0). Transaksi tidak dapat dilanjutkan.',
         'imei.required'                 => 'IMEI perangkat wajib diisi saat proses QC.',
         'selected_rules.required'       => 'Silakan pilih kondisi perangkat Anda.',
         'selected_rules.min'            => 'Setidaknya satu kondisi harus dipilih.',

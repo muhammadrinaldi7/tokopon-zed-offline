@@ -209,7 +209,22 @@
                     <label class="block text-xs font-bold text-gray-700 mb-1.5">
                         Harga Disetujui (Rp)
                     </label>
-                    <input type="number" wire:model="adjustedPrice" class="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition mb-3">
+                    <div class="relative mb-3" wire:key="approval-adjusted-price" x-data="{
+                        rawVal: @entangle('adjustedPrice'),
+                        get maskedVal() {
+                            if (!this.rawVal && this.rawVal !== 0) return '';
+                            return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                        },
+                        set maskedVal(val) {
+                            this.rawVal = val ? parseInt(val.replace(/\D/g, '')) || 0 : 0;
+                        }
+                    }">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">Rp</span>
+                        <input type="text" x-model="maskedVal"
+                            @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
+                            class="w-full pl-11 pr-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition font-mono"
+                            placeholder="0">
+                    </div>
                     
                     <label class="block text-xs font-bold text-gray-700 mb-1.5">
                         Alasan Perubahan Harga <span class="text-xs font-normal text-gray-500">(Wajib jika harga diubah)</span>

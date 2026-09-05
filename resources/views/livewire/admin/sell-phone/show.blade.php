@@ -608,8 +608,22 @@
                             class="mt-3 text-left bg-white p-4 rounded-xl border border-emerald-200 shadow-sm">
                             <label class="block text-xs font-bold text-emerald-900 mb-2">Nominal Harga Baru
                                 (Rp)</label>
-                            <input type="number" wire:model="appraisedValue"
-                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm bg-white font-mono mb-3 outline-none transition-all">
+                            <div class="relative mb-3" wire:key="edit-appraised-value-container" x-data="{
+                                rawVal: @entangle('appraisedValue'),
+                                get maskedVal() {
+                                    if (!this.rawVal && this.rawVal !== 0) return '';
+                                    return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                },
+                                set maskedVal(val) {
+                                    this.rawVal = val ? parseInt(val.replace(/\D/g, '')) || 0 : 0;
+                                }
+                            }">
+                                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">Rp</span>
+                                <input type="text" x-model="maskedVal"
+                                    @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
+                                    class="w-full pl-11 pr-3.5 p-3 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm bg-white font-mono outline-none transition-all font-bold"
+                                    placeholder="0">
+                            </div>
                             <div class="flex gap-2">
                                 <button type="button" wire:click="updatePrice" @click="editingPrice = false"
                                     class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-bold shadow-sm transition-colors">Simpan</button>
@@ -675,8 +689,22 @@
                                 <div>
                                     <label class="block text-sm font-bold text-amber-900 mb-1">Harga Penawaran Baru
                                         (Rp)</label>
-                                    <input type="number" wire:model="revisedAppraisedValue"
-                                        class="w-full rounded-lg border-amber-200 focus:ring-amber-500 focus:border-amber-500 bg-white">
+                                    <div class="relative" wire:key="revised-appraised-value-container" x-data="{
+                                        rawVal: @entangle('revisedAppraisedValue'),
+                                        get maskedVal() {
+                                            if (!this.rawVal && this.rawVal !== 0) return '';
+                                            return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                                        },
+                                        set maskedVal(val) {
+                                            this.rawVal = val ? parseInt(val.replace(/\D/g, '')) || 0 : 0;
+                                        }
+                                    }">
+                                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">Rp</span>
+                                        <input type="text" x-model="maskedVal"
+                                            @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
+                                            class="w-full pl-11 pr-3.5 py-2.5 rounded-lg border-amber-200 focus:ring-amber-500 focus:border-amber-500 bg-white font-mono font-bold text-sm"
+                                            placeholder="0">
+                                    </div>
                                     @error('revisedAppraisedValue')
                                         <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span>
                                     @enderror

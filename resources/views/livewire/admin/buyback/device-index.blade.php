@@ -226,20 +226,27 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Harga Beli (Buy Price)</label>
-                        <div class="relative">
+                        <div class="relative" wire:key="device-edit-buy-price-{{ $editingDeviceId }}" x-data="{
+                            rawVal: @entangle('editBuyPrice'),
+                            get maskedVal() {
+                                if (!this.rawVal && this.rawVal !== 0) return '';
+                                return this.rawVal.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                            },
+                            set maskedVal(val) {
+                                this.rawVal = val ? parseInt(val.replace(/\D/g, '')) || 0 : 0;
+                            }
+                        }">
                             <span
                                 class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">Rp</span>
-                            <input type="number" wire:model="editBuyPrice" min="0" step="1000"
-                                class="w-full text-[15px] bg-white border border-gray-300 focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/10 rounded-lg pl-10 pr-4 py-3 shadow-sm transition-all text-gray-900 font-bold"
+                            <input type="text" x-model="maskedVal"
+                                @keydown="if (!/[0-9]|Backspace|Delete|Tab|Arrow/.test($event.key)) $event.preventDefault()"
+                                class="w-full text-[15px] bg-white border border-gray-300 focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/10 rounded-lg pl-11 pr-4 py-3 shadow-sm transition-all text-gray-900 font-bold font-mono"
+                                placeholder="0"
                                 required>
                         </div>
                         @error('editBuyPrice')
                             <span class="text-xs text-rose-500 font-medium mt-1 block">{{ $message }}</span>
                         @enderror
-                        @if ($editBuyPrice > 0)
-                            <p class="text-xs text-gray-500 mt-1.5 ml-1">= Rp
-                                {{ number_format($editBuyPrice, 0, ',', '.') }}</p>
-                        @endif
                     </div>
 
                     {{-- Actions --}}

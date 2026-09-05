@@ -40,6 +40,14 @@ class Index extends Component
     public $adjustedPrice = 0;
     public $priceAdjustmentReason = '';
 
+    public function updatedAdjustedPrice($value)
+    {
+        if (is_string($value)) {
+            $cleaned = preg_replace('/[^0-9]/', '', $value);
+            $this->adjustedPrice = $cleaned !== '' ? (int) $cleaned : 0;
+        }
+    }
+
     public function mount()
     {
         $user = Auth::user();
@@ -139,7 +147,7 @@ class Index extends Component
             if ($this->confirmingRequestType === 'SELL_PHONE_APPROVAL' && $this->editingPriceId) {
                 $request = ApprovalRequest::with('approvable')->find($this->confirmingApprovalId);
                 $originalPrice = (float) ($request?->approvable?->appraised_value ?? 0);
-                $newPrice = (float) $this->adjustedPrice;
+                $newPrice = (float) preg_replace('/[^0-9]/', '', (string)$this->adjustedPrice);
                 $isPriceChanged = $newPrice > 0 && abs($newPrice - $originalPrice) > 0.01;
 
                 if ($isPriceChanged && empty(trim($this->priceAdjustmentReason))) {
@@ -182,7 +190,7 @@ class Index extends Component
         }
 
         $originalPrice = (float) ($request->approvable?->appraised_value ?? 0);
-        $newPrice = (float) $this->adjustedPrice;
+        $newPrice = (float) preg_replace('/[^0-9]/', '', (string)$this->adjustedPrice);
         $isPriceChanged = $request->request_type === 'SELL_PHONE_APPROVAL'
             && $this->editingPriceId
             && $newPrice > 0

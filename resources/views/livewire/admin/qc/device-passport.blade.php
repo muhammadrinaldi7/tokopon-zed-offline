@@ -277,7 +277,7 @@
                                 @endforeach
 
                                 {{-- Notes --}}
-                                <tr class="bg-neutral-50/50 border-t-2 border-neutral-100">
+                                {{-- <tr class="bg-neutral-50/50 border-t-2 border-neutral-100">
                                     <td
                                         class="px-6 py-5 font-black text-neutral-500 uppercase tracking-widest text-xs align-top">
                                         Catatan Inspektor</td>
@@ -289,7 +289,7 @@
                                         class="px-6 py-5 text-sm font-medium text-neutral-600 border-l border-neutral-100 align-top bg-white leading-relaxed">
                                         {{ $this->qc2->notes ?? ($this->qc2->inspector_notes ?? '-') }}
                                     </td>
-                                </tr>
+                                </tr> --}}
 
                                 {{-- Photos --}}
                                 <tr class="border-t-2 border-neutral-100">
