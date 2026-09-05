@@ -80,10 +80,14 @@ class SellPhone extends Component
 
     public function mount()
     {
-        // Cache brands sekali saja saat halaman pertama kali dimuat
+        // Cache brands yang memiliki produk selain proyek ACCESSORIES
         $accurateBrands = \App\Models\ProductAccurate::where('business_unit_id', 2)
             ->whereNotNull('brandName')
             ->where('brandName', '!=', '')
+            ->where(function ($query) {
+                $query->whereNull('proyek')
+                    ->orWhereRaw("UPPER(proyek) NOT LIKE '%ACCESSORIES%'");
+            })
             ->select('brandName')
             ->distinct()
             ->orderBy('brandName')
@@ -199,6 +203,10 @@ class SellPhone extends Component
                 ->where('brandName', $this->selected_brand_id)
                 ->whereNotNull('categoryName')
                 ->where('categoryName', '!=', '')
+                ->where(function ($query) {
+                    $query->whereNull('proyek')
+                        ->orWhereRaw("UPPER(proyek) NOT LIKE '%ACCESSORIES%'");
+                })
                 ->select('categoryName')
                 ->distinct()
                 ->orderBy('categoryName')
@@ -222,6 +230,7 @@ class SellPhone extends Component
                 ->where('categoryName', $this->selected_categoryName)
                 ->whereNotNull('proyek')
                 ->where('proyek', '!=', '')
+                ->whereRaw("UPPER(proyek) NOT LIKE '%ACCESSORIES%'")
                 ->select('proyek')
                 ->distinct()
                 ->orderBy('proyek')
