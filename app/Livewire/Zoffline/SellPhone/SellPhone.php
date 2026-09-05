@@ -223,6 +223,12 @@ class SellPhone extends Component
         $this->available_proyek = [];
         $this->available_models = [];
         $this->base_price = 0;
+        $this->device_rules = [];
+        $this->selected_rules = [];
+        $this->final_price = 0;
+        $this->qc_template = null;
+        $this->qc_results = [];
+        $this->qc_notes = '';
 
         if ($this->selected_brand_id && $this->selected_categoryName) {
             $this->available_proyek = \App\Models\ProductAccurate::where('business_unit_id', 2)
@@ -245,6 +251,12 @@ class SellPhone extends Component
 
         $this->available_models = [];
         $this->base_price = 0;
+        $this->device_rules = [];
+        $this->selected_rules = [];
+        $this->final_price = 0;
+        $this->qc_template = null;
+        $this->qc_results = [];
+        $this->qc_notes = '';
 
         if ($this->selected_brand_id && $this->selected_categoryName && $this->selected_proyek) {
             $this->available_models = \App\Models\ProductAccurate::where('business_unit_id', 2)
@@ -369,9 +381,22 @@ class SellPhone extends Component
         $this->qc_max_weight_threshold = 3;
 
         if ($this->selected_model_name) {
-            $productAccurate = \App\Models\ProductAccurate::where('business_unit_id', 2)
-                ->where('name', $this->selected_model_name)
-                ->first();
+            $query = \App\Models\ProductAccurate::where('business_unit_id', 2)
+                ->where('name', $this->selected_model_name);
+
+            if ($this->selected_brand_id) {
+                $query->where('brandName', $this->selected_brand_id);
+            }
+
+            if ($this->selected_categoryName) {
+                $query->where('categoryName', $this->selected_categoryName);
+            }
+
+            if ($this->selected_proyek) {
+                $query->where('proyek', $this->selected_proyek);
+            }
+
+            $productAccurate = $query->first();
 
             if ($productAccurate) {
                 $this->base_price = $productAccurate->buy_price ?? 0;
@@ -638,9 +663,22 @@ class SellPhone extends Component
         // PROSES INSERT DATA DEVICE & TRANSMISI KE ACCURATE
         // -------------------------------------------------------------
 
-        $productAccurate = \App\Models\ProductAccurate::where('business_unit_id', 2)
-            ->where('name', $this->selected_model_name)
-            ->first();
+        $productAccurateQuery = \App\Models\ProductAccurate::where('business_unit_id', 2)
+            ->where('name', $this->selected_model_name);
+
+        if ($this->selected_brand_id) {
+            $productAccurateQuery->where('brandName', $this->selected_brand_id);
+        }
+
+        if ($this->selected_categoryName) {
+            $productAccurateQuery->where('categoryName', $this->selected_categoryName);
+        }
+
+        if ($this->selected_proyek) {
+            $productAccurateQuery->where('proyek', $this->selected_proyek);
+        }
+
+        $productAccurate = $productAccurateQuery->first();
 
         if (!$productAccurate) {
             $this->dispatch('toast', title: 'Gagal', message: 'Data perangkat tidak valid.', type: 'error');
