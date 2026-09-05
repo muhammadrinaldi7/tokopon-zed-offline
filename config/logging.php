@@ -136,6 +136,15 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Channel khusus untuk memantau transaksi Pembelian HP / Buyback (SellPhone)
+        'sell_phone' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/sell_phone.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 30,
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

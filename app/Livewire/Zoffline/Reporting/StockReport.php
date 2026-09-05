@@ -113,6 +113,7 @@ class StockReport extends Component
             'NAMA PRODUK',
             'MEREK',
             'KATEGORI',
+            'PRYOEK',
             'GUDANG',
             'STOK GUDANG',
             'SN',
@@ -133,6 +134,7 @@ class StockReport extends Component
                     $item['name'],
                     $item['brand'],
                     $item['category'],
+                    $item['proyek'],
                     $item['warehouse_name'],
                     $item['stock'],
                     $item['sn'],
@@ -150,15 +152,15 @@ class StockReport extends Component
 
     private function getStockData()
     {
-        $query = ProductAccurate::select('id', 'item_no', 'name', 'categoryName', 'brandName', 'vendor_name', 'base_cost', 'base_price', 'created_at', 'updated_at', 'stock', 'business_unit_id')
+        $query = ProductAccurate::select('id', 'item_no', 'name', 'categoryName', 'brandName', 'vendor_name', 'base_cost', 'base_price', 'created_at', 'updated_at', 'stock', 'business_unit_id', 'proyek')
             ->with([
                 'warehouseStocks.warehouse:id,name',
                 'businessUnit:id,name',
-                'productSerialNumbers' => function($q) {
+                'productSerialNumbers' => function ($q) {
                     $q->select('serial_number', 'warehouse_id', 'product_accurate_id')->where('status', 'Available');
                 }
             ]);
-        
+
         $validWarehouseIds = [];
         if (!empty($this->filterBU)) {
             $query->where('business_unit_id', $this->filterBU);
@@ -168,10 +170,10 @@ class StockReport extends Component
         // DB Level Filter: Search
         if (!empty($this->search)) {
             $searchTerm = '%' . $this->search . '%';
-            $query->where(function($q) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('item_no', 'like', $searchTerm)
-                  ->orWhere('name', 'like', $searchTerm)
-                  ->orWhere('brandName', 'like', $searchTerm);
+                    ->orWhere('name', 'like', $searchTerm)
+                    ->orWhere('brandName', 'like', $searchTerm);
             });
         }
 
@@ -195,7 +197,7 @@ class StockReport extends Component
             if ($this->filterWarehouse === 'Belum Dialokasikan') {
                 $query->doesntHave('warehouseStocks');
             } else {
-                $query->whereHas('warehouseStocks.warehouse', function($q) {
+                $query->whereHas('warehouseStocks.warehouse', function ($q) {
                     $q->where('name', $this->filterWarehouse);
                 });
             }
@@ -211,6 +213,7 @@ class StockReport extends Component
                     'brand' => $variant->brandName ?? '-',
                     'vendor_name' => $variant->vendor_name ?? '-',
                     'category' => $variant->categoryName ?? 'Lainnya',
+                    'proyek' => $variant->proyek ?? '-',
                     'base_cost' => $variant->base_cost ?? 0,
                     'base_price' => $variant->base_price ?? 0,
                     'age_days' => $variant->created_at ? round($variant->created_at->diffInDays(now())) : 0,
@@ -232,9 +235,9 @@ class StockReport extends Component
                         if (!empty($this->filterBU) && !in_array($ws->warehouse_id, $validWarehouseIds)) {
                             continue;
                         }
-                        
+
                         $whName = $ws->warehouse->name ?? 'Unknown';
-                        
+
                         if (!empty($this->filterWarehouse) && $whName !== $this->filterWarehouse) {
                             continue;
                         }
@@ -262,14 +265,14 @@ class StockReport extends Component
         $catQuery = ProductAccurate::query();
         $proyekQuery = ProductAccurate::query();
         $whQuery = \App\Models\Warehouse::query();
-        
+
         if (!empty($this->filterBU)) {
             $brandQuery->where('business_unit_id', $this->filterBU);
             $catQuery->where('business_unit_id', $this->filterBU);
             $proyekQuery->where('business_unit_id', $this->filterBU);
             $whQuery->where('business_unit_id', $this->filterBU);
         }
-        
+
         $availableBrands = $brandQuery->whereNotNull('brandName')->where('brandName', '!=', '')->distinct()->pluck('brandName')->filter()->sort()->values();
         $availableCategories = $catQuery->whereNotNull('categoryName')->where('categoryName', '!=', '')->distinct()->pluck('categoryName')->filter()->sort()->values();
         $availableProyeks = $proyekQuery->whereNotNull('proyek')->where('proyek', '!=', '')->distinct()->pluck('proyek')->filter()->sort()->values();

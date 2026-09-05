@@ -1333,6 +1333,22 @@
                     Edit Data
                 </button>
                 <div class="w-full md:w-auto">
+                    @if ($errors->any())
+                        <div class="mb-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs shadow-xs text-left">
+                            <div class="flex items-center gap-1.5 font-bold mb-1">
+                                <svg class="w-4 h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span>Data belum lengkap / ada kesalahan:</span>
+                            </div>
+                            <ul class="list-disc list-inside space-y-0.5 pl-1">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
                     <button type="button" wire:click="submit" wire:loading.attr="disabled"
                         class="w-full md:w-auto bg-linear-to-r from-[#D3AD7B] to-[#A28153] hover:from-[#C39D6B] hover:to-[#927143] text-white px-10 py-4 rounded-2xl font-black text-lg transition-all active:scale-[0.97] shadow-xl shadow-[#A28153]/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:pointer-events-none">
 

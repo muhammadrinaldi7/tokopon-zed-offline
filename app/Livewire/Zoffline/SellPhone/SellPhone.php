@@ -5,6 +5,9 @@ namespace App\Livewire\Zoffline\SellPhone;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Computed;
@@ -607,301 +610,391 @@ class SellPhone extends Component
     {
         // Cek Autentikasi Utama
         if (!Auth::check()) {
+            Log::channel('sell_phone')->warning("Submit SellPhone ditolak: Pengguna belum login.");
             return redirect()->to('/login');
         }
 
         $currentUser = Auth::user(); // Cache user sekali, hindari query berulang
         $userIdToSave = $currentUser->id;
 
-        // Jalankan Validasi
-        $this->validate();
-
-        if ($this->isNewCustomer) {
-            // Buat User Baru untuk Customer
-            $customer = User::create([
-                'name'         => $this->name,
-                'email'        => $this->email,
-                'identity'     => null, // NIK
-                'npwp'         => null,
-                'password'     => \Illuminate\Support\Facades\Hash::make($this->mobilePhone),
-            ]);
-            if ($customer) {
-                $customer->assignRole('user');
-                $customer->profile()->create([
-                    'user_id'      => $customer->id,
-                    'full_name'    => $this->name,
-                    'phone_number' => $this->mobilePhone,
-                    'domisili'     => $this->domisili,
-                ]);
-
-                $customer->bankAccounts()->create([
-                    'account_number' => $this->account_number,
-                    'account_name'   => $this->account_name,
-                    'bank_name'      => $this->bank_name,
-                ]);
-            }
-            event(new Registered($customer));
-
-            $userIdToSave = $customer->id;
-            $userForAccurate = $customer;
-        } else {
-            $customer = User::findOrFail($this->selectedCustomerId);
-            $userIdToSave = $customer->id;
-            $userForAccurate = $customer;
-
-            if ($this->needsBankInfo) {
-                $customer->bankAccounts()->create([
-                    'account_number' => $this->account_number,
-                    'account_name'   => $this->account_name,
-                    'bank_name'      => $this->bank_name,
-                ]);
-                $this->needsBankInfo = false;
-            }
-        }
-
-        // -------------------------------------------------------------
-        // PROSES INSERT DATA DEVICE & TRANSMISI KE ACCURATE
-        // -------------------------------------------------------------
-
-        $productAccurateQuery = \App\Models\ProductAccurate::where('business_unit_id', 2)
-            ->where('name', $this->selected_model_name);
-
-        if ($this->selected_brand_id) {
-            $productAccurateQuery->where('brandName', $this->selected_brand_id);
-        }
-
-        if ($this->selected_categoryName) {
-            $productAccurateQuery->where('categoryName', $this->selected_categoryName);
-        }
-
-        if ($this->selected_proyek) {
-            $productAccurateQuery->where('proyek', $this->selected_proyek);
-        }
-
-        $productAccurate = $productAccurateQuery->first();
-
-        if (!$productAccurate) {
-            $this->dispatch('toast', title: 'Gagal', message: 'Data perangkat tidak valid.', type: 'error');
-            return;
-        }
-
-        $rulesByKey = collect($this->device_rules)->keyBy('key');
-
-        // Array baru untuk menampung data yang sudah dikelompokkan per kategori
-        $groupedSelections = [];
-
-        foreach ($this->selected_rules as $key => $value) {
-            $ruleId = null;
-
-            // Logika pembacaan nilai dari checkbox (boolean) atau radio (string)
-            if (is_bool($value) && $value) {
-                $ruleId = $key;
-            } elseif (is_string($value) && !empty($value)) {
-                $ruleId = $value;
-            }
-
-            if ($ruleId) {
-                $rule = $rulesByKey->get($ruleId);
-                if ($rule) {
-                    $categoryName = $rule['category']; // Ambil nama kategori (misal: "Kondisi Fisik", "Kelengkapan")
-
-                    // Masukkan nama kondisi ke dalam kelompok kategorinya
-                    $groupedSelections[$categoryName][] = $rule['name'];
-                }
-            }
-        }
-
-        // Merakit array kelompok menjadi string kalimat yang rapi
-        $formattedConditions = [];
-        foreach ($groupedSelections as $category => $items) {
-            // Gabungkan item-item dalam satu kategori dengan koma. Contoh: "Lecet Wajar, Layar Retak"
-            $joinedItems = implode(', ', $items);
-
-            // Gabungkan dengan nama kategorinya. Contoh: "Kondisi Fisik: Lecet Wajar, Layar Retak"
-            $formattedConditions[] = "{$category}: {$joinedItems}";
-        }
-
-        // Gabungkan semua kategori yang sudah diformat dengan tanda pemisah " | " atau ", "
-        $kondisi = !empty($formattedConditions)
-            ? implode(' | ', $formattedConditions)
-            : 'Mulus / Normal';
-
-        $catatanText = $this->old_phone_additional_note
-            ? ". Catatan Tambahan: {$this->old_phone_additional_note}"
-            : "";
-
-        // Hasil akhir: "Kondisi Fisik: Lecet Wajar | Kelengkapan: Fullset. Catatan Tambahan: Casing belakang agak kotor"
-        $minusDesc = "{$kondisi}{$catatanText}";
-        // Hit API Accurate dengan data user/customer yang sesuai
-        try {
-            $buId = Auth::user()->getActiveBusinessUnitId();
-            $bu = \App\Models\BusinessUnit::find($buId);
-            $dbSource = $bu ? $bu->code : 'syihab';
-
-            app(\App\Services\AccurateService::class)->syncVendor($userForAccurate, $dbSource);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to sync vendor to Accurate: ' . $e->getMessage());
-        }
-
-        $finalStatus = $this->qc_verdict === 'fail' ? 'CANCELLED' : 'PAYING';
-        $activeBuId = $currentUser->getActiveBusinessUnitId() ?? 2;
-        $requiredLevel = app(\App\Services\ApprovalService::class)->getRequiredLevel('SELL_PHONE_APPROVAL', $activeBuId, (float) $this->final_price, Auth::user()->branch_id);
-        if ($requiredLevel <= 0) {
-            $requiredLevel = 1;
-        }
-        $needsApproval = false;
-
-        // WAJIB APPROVAL UNTUK SEMUA TRANSAKSI SELLPHONE (Jika tidak cancelled)
-        if ($finalStatus === 'PAYING') {
-            $finalStatus = 'PENDING_APPROVAL';
-            $needsApproval = true;
-        }
-
-        // Simpan ke Database
-        $sellPhone = \App\Models\SellPhone::create([
-            'user_id'           => $userIdToSave,
-            'sales_id'          => $this->selected_sales_id,
-            'product_accurate_id' => $productAccurate->id,
-            'phone_brand'       => $productAccurate->brandName,
-            'phone_model'       => $productAccurate->name,
-            'phone_ram'         => null,
-            'phone_storage'     => null,
-            'imei'              => $this->imei,
-            'minus_desc'        => $minusDesc,
-            'appraised_value'   => $this->final_price,
-            'original_appraised_value' => $this->calculated_price,
-            'is_price_adjusted' => false, // Set false karena kasir tidak bisa mengubah harga lagi
-            'status'            => $finalStatus,
-            'handled_by'        => $currentUser->id,
-            'business_unit_id'  => $currentUser->getActiveBusinessUnitId(),
-            'branch_id'         => Auth::user()->branch_id,
+        Log::channel('sell_phone')->info("=== [START SUBMIT PEMBELIAN HP (SELLPHONE)] ===", [
+            'submitted_by' => [
+                'id' => $currentUser->id,
+                'name' => $currentUser->name,
+                'email' => $currentUser->email,
+                'branch_id' => $currentUser->branch_id,
+                'business_unit_id' => $currentUser->getActiveBusinessUnitId(),
+            ],
+            'device_info' => [
+                'brand' => $this->selected_brand_id,
+                'category' => $this->selected_categoryName,
+                'proyek' => $this->selected_proyek,
+                'model' => $this->selected_model_name,
+                'imei' => $this->imei,
+                'calculated_price' => $this->calculated_price,
+                'final_price' => $this->final_price,
+                'sales_id' => $this->selected_sales_id,
+                'qc_verdict' => $this->qc_verdict,
+            ],
+            'customer_info' => [
+                'is_new' => $this->isNewCustomer,
+                'selected_id' => $this->selectedCustomerId,
+                'name' => $this->name,
+                'phone' => $this->mobilePhone,
+                'email' => $this->email,
+                'bank' => $this->bank_name,
+                'account_number' => $this->account_number,
+                'account_name' => $this->account_name,
+            ],
         ]);
 
-        // Simpan Data QC Kelayakan (Device Inspection)
-        if ($this->qc_template) {
-            $inspection = new \App\Models\DeviceInspection([
+        // Jalankan Validasi dengan tangkapan error detail
+        try {
+            $this->validate();
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $errors = $e->validator->errors()->all();
+            $errorMap = $e->validator->errors()->toArray();
+
+            Log::channel('sell_phone')->warning("Validasi Gagal saat Submit Pembelian HP (SellPhone):", [
+                'errors' => $errorMap,
+                'user_id' => $currentUser->id,
                 'imei' => $this->imei,
-                'qc_template_id' => $this->qc_template->id,
-                'inspectable_type' => \App\Models\SellPhone::class,
-                'inspectable_id' => $sellPhone->id,
-                'label' => 'QC Kelayakan Buyback',
-                'checklist_results' => $this->qc_results,
-                'verdict' => $this->qc_verdict ?: 'pass',
-                'inspector_notes' => $this->qc_notes ?: 'QC Kelayakan dilakukan di depan pelanggan (Step 2).',
-                'inspected_by' => Auth::id(),
+                'model' => $this->selected_model_name,
             ]);
-            $inspection->calculateCounts();
-            $inspection->save();
+
+            $firstError = $errors[0] ?? 'Silakan lengkapi formulir dengan benar.';
+            $this->dispatch('toast', title: 'Validasi Gagal', message: $firstError, type: 'error');
+            throw $e;
         }
 
-        // 1. Petakan semua properti slot ke dalam array beserta label custom-nya
-        $slots = [
-            'photo_depan' => 'Tampak Depan',
-            'photo_belakang' => 'Tampak Belakang',
-            'photo_kiri' => 'Samping Kiri',
-            'photo_kanan' => 'Samping Kanan',
-            'photo_atas' => 'Tampak Atas',
-            'photo_bawah' => 'Tampak Bawah',
-            'photo_box' => 'Box Belakang',
-            'photo_kelengkapan' => 'Kelengkapan / Box',
-        ];
+        // Mulai Transaksi Database
+        DB::beginTransaction();
 
-        // 2. Loop tiap slot dan upload jika filenya ada
-        foreach ($slots as $propertyName => $label) {
-            if ($this->$propertyName) {
-                $photo = $this->$propertyName;
+        try {
+            if ($this->isNewCustomer) {
+                // Buat User Baru untuk Customer
+                $customer = User::create([
+                    'name'         => $this->name,
+                    'email'        => $this->email,
+                    'identity'     => null, // NIK
+                    'npwp'         => null,
+                    'password'     => \Illuminate\Support\Facades\Hash::make($this->mobilePhone),
+                ]);
 
-                // Menggunakan addMediaFromString untuk membaca file secara aman melalui Flysystem Livewire
-                // sehingga terhindar dari error 'Unable to retrieve file_size'
-                $sellPhone->addMediaFromString($photo->get())
-                    ->usingFileName($photo->getClientOriginalName())
-                    // Menyimpan info posisi foto ke dalam custom property Spatie
-                    ->withCustomProperties([
-                        'position' => str_replace('photo_', '', $propertyName), // Hasilnya: 'depan', 'belakang', dll
-                        'label' => $label
-                    ])
-                    ->toMediaCollection('photos');
-            }
-        }
+                if ($customer) {
+                    $customer->assignRole('user');
+                    $customer->profile()->create([
+                        'user_id'      => $customer->id,
+                        'full_name'    => $this->name,
+                        'phone_number' => $this->mobilePhone,
+                        'domisili'     => $this->domisili,
+                    ]);
 
-        if ($needsApproval) {
-            $qcList = [];
-            foreach ($this->qc_results as $qc) {
-                if ($qc['type'] === 'boolean') {
-                    $status = ($qc['value'] === '1' || $qc['value'] === true || $qc['value'] === 1) ? '✅ Normal' : '❌ Bermasalah';
-                } else {
-                    $status = $qc['value'] ? $qc['value'] : '-';
+                    $customer->bankAccounts()->create([
+                        'account_number' => $this->account_number,
+                        'account_name'   => $this->account_name,
+                        'bank_name'      => $this->bank_name,
+                    ]);
                 }
-                $qcList[] = "- " . $qc['name'] . ': ' . $status;
-            }
-            $qcListText = implode("\n", $qcList);
+                event(new Registered($customer));
 
-            $salesInfo = $sellPhone->salesBy ? "\nSales: " . $sellPhone->salesBy->name . ($sellPhone->salesBy->employee_no ? " ({$sellPhone->salesBy->employee_no})" : "") : "";
+                $userIdToSave = $customer->id;
+                $userForAccurate = $customer;
 
-            $reasonText = 'Pembelian: ' . $sellPhone->phone_brand . ' ' . $sellPhone->phone_model . " (Rp " . number_format($sellPhone->appraised_value, 0, ',', '.') . ")" . $salesInfo . "\n\n" .
-                "IMEI: " . $sellPhone->imei . "\n\n" .
-                "List QC:\n" . $qcListText . "\n\n" .
-                "Minus:\n" . str_replace(" | ", "\n", $sellPhone->minus_desc);
-
-            // Peringatan Nego Harga (sudah tidak bisa di-trigger dari kasir, tapi disisakan logikanya kalau diperlukan)
-            if ($sellPhone->is_price_adjusted) {
-                $difference = $sellPhone->appraised_value - $sellPhone->original_appraised_value;
-                $diffText = "Rp " . number_format(abs($difference), 0, ',', '.');
-                $originalPriceText = "Rp " . number_format($sellPhone->original_appraised_value, 0, ',', '.');
-
-                $reasonText .= "\n\n⚠️ *Peringatan Nego Harga!*\n";
-                if ($difference > 0) {
-                    $reasonText .= "Harga dinaikkan sebesar *$diffText* dari taksiran sistem ($originalPriceText).";
-                } else {
-                    $reasonText .= "Harga diturunkan sebesar *$diffText* dari taksiran sistem ($originalPriceText).";
-                }
-            }
-
-            // 2. Analisa Persediaan Historis
-            $historyStats = \App\Models\SellPhone::where('phone_brand', $sellPhone->phone_brand)
-                ->where('phone_model', $sellPhone->phone_model)
-                ->where('phone_storage', $sellPhone->phone_storage)
-                ->whereIn('status', ['COMPLETED', 'PAYING'])
-                ->selectRaw('AVG(appraised_value) as average_price, COUNT(id) as total_count')
-                ->first();
-
-            if ($historyStats && $historyStats->total_count > 0) {
-                $averagePrice = $historyStats->average_price;
-                $historyCount = $historyStats->total_count;
-
-                $avgDiff = $sellPhone->appraised_value - $averagePrice;
-                $avgDiffText = "Rp " . number_format(abs($avgDiff), 0, ',', '.');
-                $avgPriceText = "Rp " . number_format($averagePrice, 0, ',', '.');
-
-                $reasonText .= "\n\n📊 *Analisa Persediaan (Data Historis ZED):*\n";
-                $reasonText .= "Rata-rata beli: *$avgPriceText*\n";
-                if ($avgDiff > 0) {
-                    $reasonText .= "Pengajuan kali ini *LEBIH MAHAL $avgDiffText* dari rata-rata historis.\n";
-                } elseif ($avgDiff < 0) {
-                    $reasonText .= "Pengajuan kali ini *LEBIH MURAH $avgDiffText* dari rata-rata historis.\n";
-                } else {
-                    $reasonText .= "Pengajuan kali ini *SAMA* dengan rata-rata historis.\n";
-                }
-                $reasonText .= "*(Dari total $historyCount transaksi sebelumnya)*";
+                Log::channel('sell_phone')->info("Customer baru berhasil didaftarkan: ID {$customer->id} ({$customer->name})");
             } else {
-                $reasonText .= "\n\n📊 *Analisa Persediaan (Data Historis ZED):*\n";
-                $reasonText .= "Belum ada riwayat transaksi sukses untuk tipe HP ini.";
+                $customer = User::findOrFail($this->selectedCustomerId);
+                $userIdToSave = $customer->id;
+                $userForAccurate = $customer;
+
+                if ($this->needsBankInfo) {
+                    $customer->bankAccounts()->create([
+                        'account_number' => $this->account_number,
+                        'account_name'   => $this->account_name,
+                        'bank_name'      => $this->bank_name,
+                    ]);
+                    $this->needsBankInfo = false;
+                    Log::channel('sell_phone')->info("Rekening bank baru ditambahkan untuk customer ID {$customer->id}");
+                }
             }
 
-            $requestApproval = app(\App\Services\ApprovalService::class)->createRequest([
-                'approvable'       => $sellPhone,
-                'request_type'     => 'SELL_PHONE_APPROVAL',
-                'requested_by'     => Auth::id(),
-                'business_unit_id' => $sellPhone->business_unit_id,
-                'branch_id'        => $sellPhone->branch_id,
-                'total_amount'     => $sellPhone->appraised_value,
-                'reason'           => $reasonText,
-                'required_level'   => $requiredLevel,
+            // -------------------------------------------------------------
+            // PROSES INSERT DATA DEVICE & TRANSMISI KE ACCURATE
+            // -------------------------------------------------------------
+
+            $productAccurateQuery = \App\Models\ProductAccurate::where('business_unit_id', 2)
+                ->where('name', $this->selected_model_name);
+
+            if ($this->selected_brand_id) {
+                $productAccurateQuery->where('brandName', $this->selected_brand_id);
+            }
+
+            if ($this->selected_categoryName) {
+                $productAccurateQuery->where('categoryName', $this->selected_categoryName);
+            }
+
+            if ($this->selected_proyek) {
+                $productAccurateQuery->where('proyek', $this->selected_proyek);
+            }
+
+            $productAccurate = $productAccurateQuery->first();
+
+            if (!$productAccurate) {
+                DB::rollBack();
+                Log::channel('sell_phone')->error("Data perangkat ProductAccurate tidak ditemukan di database:", [
+                    'model' => $this->selected_model_name,
+                    'brand' => $this->selected_brand_id,
+                    'category' => $this->selected_categoryName,
+                    'proyek' => $this->selected_proyek,
+                ]);
+                $this->dispatch('toast', title: 'Gagal', message: 'Data perangkat (' . $this->selected_model_name . ') tidak valid di database Accurate.', type: 'error');
+                return;
+            }
+
+            $rulesByKey = collect($this->device_rules)->keyBy('key');
+
+            // Array baru untuk menampung data yang sudah dikelompokkan per kategori
+            $groupedSelections = [];
+
+            foreach ($this->selected_rules as $key => $value) {
+                $ruleId = null;
+
+                // Logika pembacaan nilai dari checkbox (boolean) atau radio (string)
+                if (is_bool($value) && $value) {
+                    $ruleId = $key;
+                } elseif (is_string($value) && !empty($value)) {
+                    $ruleId = $value;
+                }
+
+                if ($ruleId) {
+                    $rule = $rulesByKey->get($ruleId);
+                    if ($rule) {
+                        $categoryName = $rule['category']; // Ambil nama kategori (misal: "Kondisi Fisik", "Kelengkapan")
+
+                        // Masukkan nama kondisi ke dalam kelompok kategorinya
+                        $groupedSelections[$categoryName][] = $rule['name'];
+                    }
+                }
+            }
+
+            // Merakit array kelompok menjadi string kalimat yang rapi
+            $formattedConditions = [];
+            foreach ($groupedSelections as $category => $items) {
+                // Gabungkan item-item dalam satu kategori dengan koma. Contoh: "Lecet Wajar, Layar Retak"
+                $joinedItems = implode(', ', $items);
+
+                // Gabungkan dengan nama kategorinya. Contoh: "Kondisi Fisik: Lecet Wajar, Layar Retak"
+                $formattedConditions[] = "{$category}: {$joinedItems}";
+            }
+
+            // Gabungkan semua kategori yang sudah diformat dengan tanda pemisah " | " atau ", "
+            $kondisi = !empty($formattedConditions)
+                ? implode(' | ', $formattedConditions)
+                : 'Mulus / Normal';
+
+            $catatanText = $this->old_phone_additional_note
+                ? ". Catatan Tambahan: {$this->old_phone_additional_note}"
+                : "";
+
+            // Hasil akhir: "Kondisi Fisik: Lecet Wajar | Kelengkapan: Fullset. Catatan Tambahan: Casing belakang agak kotor"
+            $minusDesc = "{$kondisi}{$catatanText}";
+
+            // Hit API Accurate dengan data user/customer yang sesuai
+            try {
+                $buId = Auth::user()->getActiveBusinessUnitId();
+                $bu = \App\Models\BusinessUnit::find($buId);
+                $dbSource = $bu ? $bu->code : 'syihab';
+
+                Log::channel('sell_phone')->info("Sinkronisasi Vendor ke Accurate untuk customer ID {$userForAccurate->id} (db: {$dbSource})");
+                app(\App\Services\AccurateService::class)->syncVendor($userForAccurate, $dbSource);
+            } catch (\Exception $e) {
+                Log::channel('sell_phone')->warning('Gagal sync vendor ke Accurate (transaksi tetap dilanjutkan): ' . $e->getMessage());
+            }
+
+            $finalStatus = $this->qc_verdict === 'fail' ? 'CANCELLED' : 'PAYING';
+            $activeBuId = $currentUser->getActiveBusinessUnitId() ?? 2;
+            $requiredLevel = app(\App\Services\ApprovalService::class)->getRequiredLevel('SELL_PHONE_APPROVAL', $activeBuId, (float) $this->final_price, Auth::user()->branch_id);
+            if ($requiredLevel <= 0) {
+                $requiredLevel = 1;
+            }
+            $needsApproval = false;
+
+            // WAJIB APPROVAL UNTUK SEMUA TRANSAKSI SELLPHONE (Jika tidak cancelled)
+            if ($finalStatus === 'PAYING') {
+                $finalStatus = 'PENDING_APPROVAL';
+                $needsApproval = true;
+            }
+
+            // Simpan ke Database
+            $sellPhone = \App\Models\SellPhone::create([
+                'user_id'           => $userIdToSave,
+                'sales_id'          => $this->selected_sales_id,
+                'product_accurate_id' => $productAccurate->id,
+                'phone_brand'       => $productAccurate->brandName,
+                'phone_model'       => $productAccurate->name,
+                'phone_ram'         => null,
+                'phone_storage'     => null,
+                'imei'              => $this->imei,
+                'minus_desc'        => $minusDesc,
+                'appraised_value'   => $this->final_price,
+                'original_appraised_value' => $this->calculated_price,
+                'is_price_adjusted' => false, // Set false karena kasir tidak bisa mengubah harga lagi
+                'status'            => $finalStatus,
+                'handled_by'        => $currentUser->id,
+                'business_unit_id'  => $currentUser->getActiveBusinessUnitId(),
+                'branch_id'         => Auth::user()->branch_id,
             ]);
 
-            $this->dispatch('toast', title: 'Menunggu Persetujuan', message: 'Transaksi berhasil disimpan dan sedang menunggu approval Pusat.', type: 'info');
-        } else {
-            $this->dispatch('toast', title: 'Transaksi berhasil diproses!', message: 'Data berhasil disimpan.', type: 'success');
+            Log::channel('sell_phone')->info("SellPhone berhasil disimpan ke DB. ID: {$sellPhone->id}, IMEI: {$sellPhone->imei}, Status: {$sellPhone->status}");
+
+            // Simpan Data QC Kelayakan (Device Inspection)
+            if ($this->qc_template) {
+                $inspection = new \App\Models\DeviceInspection([
+                    'imei' => $this->imei,
+                    'qc_template_id' => $this->qc_template->id,
+                    'inspectable_type' => \App\Models\SellPhone::class,
+                    'inspectable_id' => $sellPhone->id,
+                    'label' => 'QC Kelayakan Buyback',
+                    'checklist_results' => $this->qc_results,
+                    'verdict' => $this->qc_verdict ?: 'pass',
+                    'inspector_notes' => $this->qc_notes ?: 'QC Kelayakan dilakukan di depan pelanggan (Step 2).',
+                    'inspected_by' => Auth::id(),
+                ]);
+                $inspection->calculateCounts();
+                $inspection->save();
+                Log::channel('sell_phone')->info("DeviceInspection berhasil disimpan. ID: {$inspection->id}, Verdict: {$inspection->verdict}");
+            }
+
+            // 1. Petakan semua properti slot ke dalam array beserta label custom-nya
+            $slots = [
+                'photo_depan' => 'Tampak Depan',
+                'photo_belakang' => 'Tampak Belakang',
+                'photo_kiri' => 'Samping Kiri',
+                'photo_kanan' => 'Samping Kanan',
+                'photo_atas' => 'Tampak Atas',
+                'photo_bawah' => 'Tampak Bawah',
+                'photo_box' => 'Box Belakang',
+                'photo_kelengkapan' => 'Kelengkapan / Box',
+            ];
+
+            // 2. Loop tiap slot dan upload jika filenya ada
+            foreach ($slots as $propertyName => $label) {
+                if ($this->$propertyName) {
+                    $photo = $this->$propertyName;
+
+                    try {
+                        $sellPhone->addMediaFromString($photo->get())
+                            ->usingFileName($photo->getClientOriginalName())
+                            ->withCustomProperties([
+                                'position' => str_replace('photo_', '', $propertyName),
+                                'label' => $label
+                            ])
+                            ->toMediaCollection('photos');
+                        Log::channel('sell_phone')->debug("Foto '{$label}' berhasil diunggah untuk SellPhone ID: {$sellPhone->id}");
+                    } catch (\Throwable $photoEx) {
+                        Log::channel('sell_phone')->warning("Gagal mengunggah foto [{$label}] untuk SellPhone ID {$sellPhone->id}: " . $photoEx->getMessage());
+                    }
+                }
+            }
+
+            if ($needsApproval) {
+                $qcList = [];
+                foreach ($this->qc_results as $qc) {
+                    if ($qc['type'] === 'boolean') {
+                        $status = ($qc['value'] === '1' || $qc['value'] === true || $qc['value'] === 1) ? '✅ Normal' : '❌ Bermasalah';
+                    } else {
+                        $status = $qc['value'] ? $qc['value'] : '-';
+                    }
+                    $qcList[] = "- " . $qc['name'] . ': ' . $status;
+                }
+                $qcListText = implode("\n", $qcList);
+
+                $salesInfo = $sellPhone->salesBy ? "\nSales: " . $sellPhone->salesBy->name . ($sellPhone->salesBy->employee_no ? " ({$sellPhone->salesBy->employee_no})" : "") : "";
+
+                $reasonText = 'Pembelian: ' . $sellPhone->phone_brand . ' ' . $sellPhone->phone_model . " (Rp " . number_format($sellPhone->appraised_value, 0, ',', '.') . ")" . $salesInfo . "\n\n" .
+                    "IMEI: " . $sellPhone->imei . "\n\n" .
+                    "List QC:\n" . $qcListText . "\n\n" .
+                    "Minus:\n" . str_replace(" | ", "\n", $sellPhone->minus_desc);
+
+                // Peringatan Nego Harga
+                if ($sellPhone->is_price_adjusted) {
+                    $difference = $sellPhone->appraised_value - $sellPhone->original_appraised_value;
+                    $diffText = "Rp " . number_format(abs($difference), 0, ',', '.');
+                    $originalPriceText = "Rp " . number_format($sellPhone->original_appraised_value, 0, ',', '.');
+
+                    $reasonText .= "\n\n⚠️ *Peringatan Nego Harga!*\n";
+                    if ($difference > 0) {
+                        $reasonText .= "Harga dinaikkan sebesar *$diffText* dari taksiran sistem ($originalPriceText).";
+                    } else {
+                        $reasonText .= "Harga diturunkan sebesar *$diffText* dari taksiran sistem ($originalPriceText).";
+                    }
+                }
+
+                // 2. Analisa Persediaan Historis
+                $historyStats = \App\Models\SellPhone::where('phone_brand', $sellPhone->phone_brand)
+                    ->where('phone_model', $sellPhone->phone_model)
+                    ->where('phone_storage', $sellPhone->phone_storage)
+                    ->whereIn('status', ['COMPLETED', 'PAYING'])
+                    ->selectRaw('AVG(appraised_value) as average_price, COUNT(id) as total_count')
+                    ->first();
+
+                if ($historyStats && $historyStats->total_count > 0) {
+                    $averagePrice = $historyStats->average_price;
+                    $historyCount = $historyStats->total_count;
+
+                    $avgDiff = $sellPhone->appraised_value - $averagePrice;
+                    $avgDiffText = "Rp " . number_format(abs($avgDiff), 0, ',', '.');
+                    $avgPriceText = "Rp " . number_format($averagePrice, 0, ',', '.');
+
+                    $reasonText .= "\n\n📊 *Analisa Persediaan (Data Historis ZED):*\n";
+                    $reasonText .= "Rata-rata beli: *$avgPriceText*\n";
+                    if ($avgDiff > 0) {
+                        $reasonText .= "Pengajuan kali ini *LEBIH MAHAL $avgDiffText* dari rata-rata historis.\n";
+                    } elseif ($avgDiff < 0) {
+                        $reasonText .= "Pengajuan kali ini *LEBIH MURAH $avgDiffText* dari rata-rata historis.\n";
+                    } else {
+                        $reasonText .= "Pengajuan kali ini *SAMA* dengan rata-rata historis.\n";
+                    }
+                    $reasonText .= "*(Dari total $historyCount transaksi sebelumnya)*";
+                } else {
+                    $reasonText .= "\n\n📊 *Analisa Persediaan (Data Historis ZED):*\n";
+                    $reasonText .= "Belum ada riwayat transaksi sukses untuk tipe HP ini.";
+                }
+
+                $requestApproval = app(\App\Services\ApprovalService::class)->createRequest([
+                    'approvable'       => $sellPhone,
+                    'request_type'     => 'SELL_PHONE_APPROVAL',
+                    'requested_by'     => Auth::id(),
+                    'business_unit_id' => $sellPhone->business_unit_id,
+                    'branch_id'        => $sellPhone->branch_id,
+                    'total_amount'     => $sellPhone->appraised_value,
+                    'reason'           => $reasonText,
+                    'required_level'   => $requiredLevel,
+                ]);
+
+                Log::channel('sell_phone')->info("Approval Request berhasil dibuat. Request ID: {$requestApproval->id}, Required Level: {$requiredLevel}");
+
+                $this->dispatch('toast', title: 'Menunggu Persetujuan', message: 'Transaksi berhasil disimpan dan sedang menunggu approval Pusat.', type: 'info');
+            } else {
+                $this->dispatch('toast', title: 'Transaksi berhasil diproses!', message: 'Data berhasil disimpan.', type: 'success');
+            }
+
+            DB::commit();
+            Log::channel('sell_phone')->info("=== [SELESAI SUBMIT PEMBELIAN HP - SUKSES] === SellPhone ID: {$sellPhone->id}, Status: {$sellPhone->status}");
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::channel('sell_phone')->error("=== [ERROR SUBMIT PEMBELIAN HP] === " . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $currentUser->id ?? null,
+                'imei' => $this->imei,
+                'model' => $this->selected_model_name,
+            ]);
+
+            $this->dispatch('toast', title: 'Gagal Menyimpan Transaksi', message: 'Terjadi kesalahan sistem: ' . $e->getMessage(), type: 'error');
+            return;
         }
 
         // Reset semua form input termasuk input data user FL
@@ -948,6 +1041,7 @@ class SellPhone extends Component
 
         return $this->redirect(route('zoffline.sell-phone-history'), navigate: true);
     }
+
     public function render()
     {
         return view('livewire.zoffline.sell-phone.sell-phone');

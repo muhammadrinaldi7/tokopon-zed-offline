@@ -7,6 +7,9 @@ use App\Models\SellPhone as SellPhoneModel;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Computed;
@@ -259,16 +262,32 @@ class SellPhone extends Component
     {
         // Cek Autentikasi Utama
         if (!Auth::check()) {
+            Log::channel('sell_phone')->warning("Submit SellPhone (Online) ditolak: User belum login.");
             return redirect()->to('/login');
         }
 
         $userIdToSave = Auth::id(); // Default user login (untuk user online)
 
+        Log::channel('sell_phone')->info("=== [START SUBMIT SELLPHONE (ONLINE/PAGES)] ===", [
+            'user_id' => $userIdToSave,
+            'buyback_device_id' => $this->buyback_device_id,
+            'final_price' => $this->final_price,
+            'is_fl' => User::findOrFail(Auth::user()->id)->hasRole('fl'),
+        ]);
+
         // LOGIKA DIVIDASI BERDASARKAN ROLE
         if (User::findOrFail(Auth::user()->id)->hasRole('fl')) {
 
             // 1. Jalankan Validasi (Otomatis memuat rules tambahan milik FL)
-            $this->validate();
+            try {
+                $this->validate();
+            } catch (ValidationException $e) {
+                Log::channel('sell_phone')->warning("Validasi Gagal di Pages/SellPhone (FL):", [
+                    'errors' => $e->validator->errors()->toArray()
+                ]);
+                $this->dispatch('show-toast', type: 'error', message: $e->validator->errors()->first());
+                throw $e;
+            }
 
             if ($this->isNewCustomer) {
                 // 2. Buat User Baru untuk Customer Offline
