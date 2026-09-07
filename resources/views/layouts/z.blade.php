@@ -55,7 +55,7 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            const isImage = file.type.startsWith('image/');
+            const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif|bmp)$/i.test(file.name);
             const maxSize = 1 * 1024 * 1024; // 1 MB
 
             // PERBAIKAN DINAMIS: Mencari container Livewire terdekat secara otomatis dari DOM Element
@@ -65,20 +65,17 @@
                 return;
             }
             const component = window.Livewire.find(livewireElement.getAttribute('wire:id'));
+            if (!component) {
+                console.error('[Compress Error] Instance Livewire component tidak ditemukan.');
+                return;
+            }
 
             // Log awal deteksi file masuk
             console.log(`%c[Global Compressor] Target Field: ${wirePropertyName}`,
                 'color: #4e44db; font-weight: bold; font-size: 11px;');
             console.log(`• Nama File   : ${file.name}`);
+            console.log(`• Tipe File   : ${file.type || 'unknown'}`);
             console.log(`• Ukuran Asli : ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
-
-            // Fix for iOS Safari: Generate unique filename to prevent Livewire upload conflicts
-            const ext = isImage ? 'webp' : (file.name.split('.').pop() || 'tmp');
-            const randomStr = Math.random().toString(36).substring(2, 8);
-            const uniqueName = `${wirePropertyName}_${Date.now()}_${randomStr}.${ext}`;
-            const uniqueFile = new File([file], uniqueName, {
-                type: isImage ? 'image/webp' : file.type
-            });
 
             // PENANGANAN FILE NON-GAMBAR
             if (!isImage) {
@@ -86,7 +83,11 @@
                     console.log('%c[Info] File non-gambar (<= 1MB). Langsung mengunggah file asli...',
                         'color: #65a30d; font-weight: bold;');
 
-                    // Memanggil fungsi upload dinamis melalui instance component yang ditemukan
+                    const ext = file.name.split('.').pop() || 'tmp';
+                    const randomStr = Math.random().toString(36).substring(2, 8);
+                    const uniqueName = `${wirePropertyName}_${Date.now()}_${randomStr}.${ext}`;
+                    const uniqueFile = new File([file], uniqueName, { type: file.type });
+
                     component.upload(wirePropertyName, uniqueFile,
                         (uploadedName) => console.log(`%c[Upload Success] File asli "${uniqueName}" terunggah!`,
                             'color: #16a34a; font-weight: bold;'),
@@ -100,68 +101,105 @@
                 return;
             }
 
-            // PENANGANAN GAMBAR: SELALU KONVERSI KE WEBP
-            if (file.size > maxSize) {
-                console.log('%c[Warning] Gambar besar (> 1MB). Memulai kompresi & konversi WebP di sisi browser...',
-                    'color: #ea580c; font-weight: bold;');
-            } else {
-                console.log('%c[Info] Gambar (<= 1MB). Memulai konversi WebP di sisi browser...',
-                    'color: #65a30d; font-weight: bold;');
-            }
+            // PENANGANAN GAMBAR: KOMPRESI DI SISI BROWSER MENGGUNAKAN JPEG
+            // Menggunakan JPEG karena didukung 100% di semua browser (iOS Safari, Android, WebView).
+            // WebP pada Canvas di iOS sering kali fallback ke PNG (lossless) yang menyebabkan ukuran membengkak > 4MB.
+            console.log('%c[Info] Memulai kompresi gambar di sisi browser (Format: JPEG)...',
+                'color: #65a30d; font-weight: bold;');
 
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = function(eventReader) {
-                const img = new Image();
-                img.src = eventReader.target.result;
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
+            const blobUrl = URL.createObjectURL(file);
+            const img = new Image();
 
-                    const maxResolution = 1920;
-                    if (width > maxResolution || height > maxResolution) {
-                        if (width > height) {
-                            height *= maxResolution / width;
-                            width = maxResolution;
-                        } else {
-                            width *= maxResolution / height;
-                            height = maxResolution;
-                        }
-                        console.log(`[Resizing] Dimensi disesuaikan menjadi: ${width}px x ${Math.round(height)}px`);
+            img.onload = function() {
+                URL.revokeObjectURL(blobUrl);
+
+                let width = img.width;
+                let height = img.height;
+                const maxResolution = 1600; // 1600px sangat tajam untuk inspeksi HP dan hemat memori
+
+                if (width > maxResolution || height > maxResolution) {
+                    if (width > height) {
+                        height = Math.round(height * (maxResolution / width));
+                        width = maxResolution;
+                    } else {
+                        width = Math.round(width * (maxResolution / height));
+                        height = maxResolution;
+                    }
+                    console.log(`[Resizing] Dimensi disesuaikan menjadi: ${width}px x ${height}px`);
+                } else {
+                    width = Math.round(width);
+                    height = Math.round(height);
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+
+                // Isi background putih agar area transparan tidak menjadi hitam saat dikonversi ke JPEG
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // JPEG 0.75 menghasilkan kualitas tinggi dengan ukuran stabil 150KB - 350KB
+                const quality = file.size > maxSize ? 0.75 : 0.82;
+                const randomStr = Math.random().toString(36).substring(2, 8);
+                const uniqueName = `${wirePropertyName}_${Date.now()}_${randomStr}.jpg`;
+
+                canvas.toBlob(function(blob) {
+                    if (!blob) {
+                        console.error('[Compress Error] Canvas toBlob menghasilkan null.');
+                        alert('Gagal memproses gambar kamera. Silakan coba ambil ulang.');
+                        return;
                     }
 
-                    canvas.width = width;
-                    canvas.height = height;
+                    const compressedFile = new File([blob], uniqueName, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    });
 
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
+                    console.log(
+                        `%c[Done] Ukuran Baru: ${(compressedFile.size / (1024 * 1024)).toFixed(2)} MB (${Math.round(compressedFile.size / 1024)} KB)`,
+                        'color: #16a34a; font-weight: bold;');
 
-                    const quality = file.size > maxSize ? 0.75 : 0.85; // Kualitas kompresi dinamis
-
-                    canvas.toBlob(function(blob) {
-                        const compressedFile = new File([blob], uniqueName, {
-                            type: 'image/webp',
-                            lastModified: Date.now()
-                        });
-
-                        console.log(
-                            `%c[Done] Ukuran Baru: ${(compressedFile.size / (1024 * 1024)).toFixed(2)} MB`,
-                            'color: #16a34a; font-weight: bold;');
-
-                        // Mengunggah file hasil kompresi lewat instance component
-                        component.upload(wirePropertyName, compressedFile,
-                            () => console.log(
-                                `%c[Upload Success] File kompresi "${wirePropertyName}" terunggah!`,
-                                'color: #16a34a; font-weight: bold;'),
-                            () => console.error(
-                                `[Upload Error] Gagal mengunggah file kompresi pada: ${wirePropertyName}`
-                            ),
-                            (progress) => {}
-                        );
-                    }, 'image/webp', quality);
-                };
+                    // Mengunggah file hasil kompresi lewat instance component
+                    component.upload(wirePropertyName, compressedFile,
+                        () => console.log(
+                            `%c[Upload Success] File kompresi "${wirePropertyName}" terunggah!`,
+                            'color: #16a34a; font-weight: bold;'),
+                        () => console.error(
+                            `[Upload Error] Gagal mengunggah file kompresi pada: ${wirePropertyName}`
+                        ),
+                        (progress) => {}
+                    );
+                }, 'image/jpeg', quality);
             };
+
+            img.onerror = function() {
+                URL.revokeObjectURL(blobUrl);
+                console.error('[Compress Error] Gagal merender gambar ke browser.');
+
+                // Fallback untuk file kamera yang tidak dapat di-decode langsung oleh Image objek (misal HEIC di Safari lama)
+                if (file.size <= 5 * 1024 * 1024) {
+                    console.warn('[Compress Fallback] Mengunggah file asli (<= 5MB)...');
+                    const randomStr = Math.random().toString(36).substring(2, 8);
+                    const ext = file.name.split('.').pop() || 'jpg';
+                    const fallbackFile = new File([file], `${wirePropertyName}_${Date.now()}_${randomStr}.${ext}`, {
+                        type: file.type
+                    });
+
+                    component.upload(wirePropertyName, fallbackFile,
+                        () => console.log(`%c[Upload Success] File asli fallback terunggah!`, 'color: #16a34a; font-weight: bold;'),
+                        () => console.error(`[Upload Error] Gagal mengunggah file fallback pada: ${wirePropertyName}`),
+                        (progress) => {}
+                    );
+                } else {
+                    alert('Format foto kamera tidak dapat diproses browser dan ukurannya melebihi 5MB. Silakan gunakan format JPG/PNG.');
+                }
+            };
+
+            img.src = blobUrl;
         }
     </script>
     {{-- Tambahkan atribut data-navigate-once di sini --}}
