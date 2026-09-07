@@ -53,7 +53,7 @@
                         class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700 w-full text-center">
                 </div>
             @endif
-
+            {{-- 
             <button wire:click="exportCsv" wire:loading.attr="disabled"
                 class="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors w-full h-full min-h-[40px] {{ $dateRange === 'custom' ? 'md:col-span-1 lg:col-span-5' : 'md:col-span-1 lg:col-span-2' }}">
                 <svg wire:loading.remove wire:target="exportCsv" class="w-4 h-4 shrink-0" fill="none"
@@ -70,7 +70,7 @@
                     </path>
                 </svg>
                 Export CSV
-            </button>
+            </button> --}}
         </div>
     </div>
 
@@ -214,6 +214,7 @@
                         <th class="px-6 py-4 bg-gray-50 text-right">Promo</th>
                         <th class="px-6 py-4 bg-gray-50 text-right text-blue-600">Tunai</th>
                         <th class="px-6 py-4 bg-gray-50 text-right text-purple-600">Non-Tunai</th>
+                        <th class="px-6 py-4 bg-gray-50 text-right text-amber-600">Piutang Toko</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -240,10 +241,12 @@
                                 {{ number_format($cData['tunai'], 0, ',', '.') }}</td>
                             <td class="px-6 py-4 text-sm font-bold text-purple-600 text-right">Rp
                                 {{ number_format($cData['non_tunai'], 0, ',', '.') }}</td>
+                            <td class="px-6 py-4 text-sm font-bold text-amber-600 text-right">Rp
+                                {{ number_format($cData['piutang'], 0, ',', '.') }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">
+                            <td colspan="8" class="px-6 py-8 text-center text-sm text-gray-500">
                                 Belum ada data transaksi kasir pada rentang waktu ini.
                             </td>
                         </tr>
@@ -251,13 +254,22 @@
                 </tbody>
                 <tfoot class="bg-blue-50/50 border-t-2 border-gray-200 font-bold">
                     <tr>
-                        <td class="px-6 py-4 text-right text-gray-700 uppercase tracking-wider text-xs">Total Keseluruhan</td>
-                        <td class="px-6 py-4 text-sm text-gray-800 text-center">{{ collect($cashierData)->sum('qty') }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-800 text-right">Rp {{ number_format(collect($cashierData)->sum('amount'), 0, ',', '.') }}</td>
-                        <td class="px-6 py-4 text-sm text-red-600 text-right">Rp {{ number_format(collect($cashierData)->sum('cashback'), 0, ',', '.') }}</td>
-                        <td class="px-6 py-4 text-sm text-green-600 text-right">Rp {{ number_format(collect($cashierData)->sum('promo'), 0, ',', '.') }}</td>
-                        <td class="px-6 py-4 text-sm text-blue-600 text-right">Rp {{ number_format(collect($cashierData)->sum('tunai'), 0, ',', '.') }}</td>
-                        <td class="px-6 py-4 text-sm text-purple-600 text-right">Rp {{ number_format(collect($cashierData)->sum('non_tunai'), 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 text-right text-gray-700 uppercase tracking-wider text-xs">Total
+                            Keseluruhan</td>
+                        <td class="px-6 py-4 text-sm text-gray-800 text-center">
+                            {{ collect($cashierData)->sum('qty') }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-800 text-right">Rp
+                            {{ number_format(collect($cashierData)->sum('amount'), 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 text-sm text-red-600 text-right">Rp
+                            {{ number_format(collect($cashierData)->sum('cashback'), 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 text-sm text-green-600 text-right">Rp
+                            {{ number_format(collect($cashierData)->sum('promo'), 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 text-sm text-blue-600 text-right">Rp
+                            {{ number_format(collect($cashierData)->sum('tunai'), 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 text-sm text-purple-600 text-right">Rp
+                            {{ number_format(collect($cashierData)->sum('non_tunai'), 0, ',', '.') }}</td>
+                        <td class="px-6 py-4 text-sm text-amber-600 text-right">Rp
+                            {{ number_format(collect($cashierData)->sum('piutang'), 0, ',', '.') }}</td>
                     </tr>
                 </tfoot>
             </table>
@@ -455,136 +467,7 @@
     --}}
 
 
-    {{-- SECTION 4: MONTH-TO-DATE (MTD) ANALYTICS --}}
-    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center border-t pt-8">
-        <svg class="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-        </svg>
-        Analisis Month-To-Date (MTD)
-    </h2>
-    <p class="text-sm text-gray-500 mb-4">Membandingkan capaian mutlak dari tanggal 1 hingga hari ini di bulan
-        berjalan, versus tanggal 1 hingga hari yang sama di bulan lalu.</p>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pb-8">
-        {{-- MTD Net Sales --}}
-        <div class="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
-            <div>
-                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">MTD Omzet (Net)</p>
-                <h3 class="text-xl font-bold text-gray-800">Rp
-                    {{ number_format($mtdData['net_sales']['current'], 0, ',', '.') }}</h3>
-            </div>
-            <div class="text-right">
-                @if ($mtdData['net_sales']['growth'] >= 0)
-                    <span
-                        class="inline-flex items-center text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
-                        </svg>
-                        +{{ $mtdData['net_sales']['growth'] }}%
-                    </span>
-                @else
-                    <span class="inline-flex items-center text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                        </svg>
-                        {{ $mtdData['net_sales']['growth'] }}%
-                    </span>
-                @endif
-            </div>
-        </div>
-
-        {{-- MTD Transactions --}}
-        <div class="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
-            <div>
-                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">MTD Transaksi</p>
-                <h3 class="text-xl font-bold text-gray-800">
-                    {{ number_format($mtdData['transactions']['current'], 0, ',', '.') }}</h3>
-            </div>
-            <div class="text-right">
-                @if ($mtdData['transactions']['growth'] >= 0)
-                    <span
-                        class="inline-flex items-center text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
-                        </svg>
-                        +{{ $mtdData['transactions']['growth'] }}%
-                    </span>
-                @else
-                    <span class="inline-flex items-center text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                        </svg>
-                        {{ $mtdData['transactions']['growth'] }}%
-                    </span>
-                @endif
-            </div>
-        </div>
-
-        {{-- MTD QTY --}}
-        <div class="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
-            <div>
-                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">MTD Qty Terjual</p>
-                <h3 class="text-xl font-bold text-gray-800">
-                    {{ number_format($mtdData['qty']['current'], 0, ',', '.') }}</h3>
-            </div>
-            <div class="text-right">
-                @if ($mtdData['qty']['growth'] >= 0)
-                    <span
-                        class="inline-flex items-center text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
-                        </svg>
-                        +{{ $mtdData['qty']['growth'] }}%
-                    </span>
-                @else
-                    <span class="inline-flex items-center text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                        </svg>
-                        {{ $mtdData['qty']['growth'] }}%
-                    </span>
-                @endif
-            </div>
-        </div>
-
-        {{-- MTD Discount --}}
-        <div class="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
-            <div>
-                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">MTD Total Diskon</p>
-                <h3 class="text-xl font-bold text-red-500">Rp
-                    {{ number_format($mtdData['discount']['current'], 0, ',', '.') }}</h3>
-            </div>
-            <div class="text-right">
-                @if ($mtdData['discount']['growth'] >= 0)
-                    {{-- Pertumbuhan diskon (biaya) mungkin dianggap negatif secara finansial, tapi kita tampilkan growth riil saja --}}
-                    <span
-                        class="inline-flex items-center text-xs font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
-                        </svg>
-                        +{{ $mtdData['discount']['growth'] }}%
-                    </span>
-                @else
-                    <span
-                        class="inline-flex items-center text-xs font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                        </svg>
-                        {{ $mtdData['discount']['growth'] }}%
-                    </span>
-                @endif
-            </div>
-        </div>
-    </div>
 
 
     {{-- Alpine Component Logic for ApexCharts --}}
