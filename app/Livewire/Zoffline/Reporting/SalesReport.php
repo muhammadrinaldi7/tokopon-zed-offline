@@ -284,14 +284,21 @@ class SalesReport extends Component
                     $category = $variant?->categoryName ?? $variant?->accurateData?->categoryName ?? 'Unknown';
                     $snList = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
                     $vendor = '-';
+                    $itemModal = 0;
 
                     if (!empty($snList)) {
                         $vendorNames = [];
                         foreach ($snList as $sn) {
-                            $vendorNames[] = $snVendors->get($sn)?->vendor?->vendor_name ?? '-';
+                            $snModel = $snVendors->get($sn);
+                            $vendorNames[] = $snModel?->vendor?->vendor_name ?? '-';
+                            $itemModal += (float)($snModel?->hpp ?? 0);
                         }
                         $vendorNames = array_unique($vendorNames);
                         $vendor = implode(', ', $vendorNames);
+                    } else {
+                        // Non-SN: ambil base_cost dari variant / ProductAccurate
+                        $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                        $itemModal = $baseCost * (float)$item->qty;
                     }
 
                     $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
@@ -326,6 +333,7 @@ class SalesReport extends Component
                         $itemPromosTotal,
                         $item->subtotal,
                         $penjualanBersih,
+                        $itemModal,
                     ];
 
                     $itemTotalPembayaranKotor = 0;
@@ -400,6 +408,7 @@ class SalesReport extends Component
                     $itemPromosTotal,
                     0, // Subtotal
                     0, // Penjualan Bersih
+                    0, // Modal
                 ];
 
                 $itemTotalPembayaranKotor = 0;
@@ -472,6 +481,7 @@ class SalesReport extends Component
                 'DISKON PROMO (Rp)',
                 'SUBTOTAL ITEM (Rp)',
                 'PENJUALAN BERSIH',
+                'MODAL (Rp)',
                 'METODE 1',
                 'NOMINAL 1 (Rp)',
                 'MDR 1 (%)',
@@ -566,12 +576,17 @@ class SalesReport extends Component
                 $penjualanBersih = round($actualItemSubtotal / 1.11);
 
                 $vendorNames = [];
+                $itemModal = 0;
                 if ($item->serial_number) {
                     $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
                     foreach ($sns as $sn) {
                         $vendorModel = $snVendors->get($sn)?->vendor;
                         $vendorNames[] = $vendorModel?->vendor_name ?? 'Tanpa Vendor / Unknown';
+                        $itemModal += (float)($snVendors->get($sn)?->hpp ?? 0);
                     }
+                } else {
+                    $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                    $itemModal = $baseCost * (float)$item->qty;
                 }
 
                 $vendorDisplay = !empty($vendorNames) ? implode(', ', array_unique($vendorNames)) : 'Tanpa Vendor / Unknown';
@@ -602,7 +617,8 @@ class SalesReport extends Component
                     $item->discount_amount ?? 0,
                     $itemPromosTotal,
                     $actualItemSubtotal,
-                    $penjualanBersih
+                    $penjualanBersih,
+                    $itemModal,
                 ];
             }
         }
@@ -637,7 +653,8 @@ class SalesReport extends Component
                 'DISKON ITEM (Rp)',
                 'DISKON PROMO (Rp)',
                 'SUBTOTAL ITEM (Rp)',
-                'PENJUALAN BERSIH (Rp)'
+                'PENJUALAN BERSIH (Rp)',
+                'MODAL (Rp)'
             ], $separator);
 
             foreach ($rows as $row) {

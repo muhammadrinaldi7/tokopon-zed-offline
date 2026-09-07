@@ -43,7 +43,8 @@ class SalesVendorReportExport implements FromArray, WithHeadings, ShouldAutoSize
             'DISKON ITEM (Rp)',
             'DISKON PROMO (Rp)',
             'SUBTOTAL ITEM (Rp)',
-            'PENJUALAN BERSIH (Rp)'
+            'PENJUALAN BERSIH (Rp)',
+            'MODAL (Rp)'
         ];
     }
 

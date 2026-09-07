@@ -52,6 +52,7 @@ class SalesReportExport implements FromArray, WithHeadings, ShouldAutoSize, With
             'DISKON PROMO (Rp)',
             'SUBTOTAL ITEM (Rp)',
             'PENJUALAN BERSIH',
+            'MODAL (Rp)',
             'METODE 1',
             'NOMINAL 1 (Rp)',
             'MDR 1 (%)',
