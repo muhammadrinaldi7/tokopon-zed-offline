@@ -229,9 +229,16 @@ class SalesReport extends Component
                     $orderPayments[$key]['mdr_amount'] += $mdrAmt;
                 }
             } else {
-                $key = 'Unknown Payment|0|-';
+                $defaultPaymentName = 'Unknown Payment';
+                if (str_starts_with($order->order_number, 'RET-')) {
+                    $defaultPaymentName = 'Sales Return (Accurate)';
+                } elseif (str_starts_with($order->order_number, 'WR-')) {
+                    $defaultPaymentName = 'Ganti Unit (Accurate)';
+                }
+
+                $key = $defaultPaymentName . '|0|-';
                 $orderPayments[$key] = [
-                    'name' => 'Unknown Payment',
+                    'name' => $defaultPaymentName,
                     'amount' => $order->grand_total,
                     'mdr_pct' => 0,
                     'mdr_amount' => 0,
@@ -291,7 +298,8 @@ class SalesReport extends Component
                         foreach ($snList as $sn) {
                             $snModel = $snVendors->get($sn);
                             $vendorNames[] = $snModel?->vendor?->vendor_name ?? '-';
-                            $itemModal += (float)($snModel?->hpp ?? 0);
+                            $snHpp = (float)($snModel?->hpp ?? 0);
+                            $itemModal += ($item->qty < 0) ? -$snHpp : $snHpp;
                         }
                         $vendorNames = array_unique($vendorNames);
                         $vendor = implode(', ', $vendorNames);
@@ -532,7 +540,7 @@ class SalesReport extends Component
 
         $orders = Order::with(['items.variant', 'items.promos', 'user', 'salesBy', 'handledBy'])
             ->whereBetween('orders.order_date', [$start, $end])
-            ->whereIn('orders.order_status', ['COMPLETED'])
+            ->whereIn('orders.order_status', ['COMPLETED', 'piutang'])
             ->where('orders.business_unit_id', Auth::user()->getActiveBusinessUnitId())
             ->when($this->branchFilter, function ($query) {
                 $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
@@ -582,7 +590,8 @@ class SalesReport extends Component
                     foreach ($sns as $sn) {
                         $vendorModel = $snVendors->get($sn)?->vendor;
                         $vendorNames[] = $vendorModel?->vendor_name ?? 'Tanpa Vendor / Unknown';
-                        $itemModal += (float)($snVendors->get($sn)?->hpp ?? 0);
+                        $snHpp = (float)($snVendors->get($sn)?->hpp ?? 0);
+                        $itemModal += ($item->qty < 0) ? -$snHpp : $snHpp;
                     }
                 } else {
                     $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
