@@ -211,7 +211,7 @@ class InvoiceReport extends Component
                         $projectAmounts = [];
                         foreach ($projectTotals as $pName => $pTotal) {
                             $proportion = $pTotal / $denominator;
-                            $projectAmounts[$pName] = round($amount * $proportion, 2);
+                            $projectAmounts[$pName] = round(($amount - $mdr) * $proportion, 2);
                         }
 
                         $rows[] = [
@@ -237,7 +237,7 @@ class InvoiceReport extends Component
                     foreach ($projectTotals as $pName => $pTotal) {
                         $emptyProjectAmounts[$pName] = 0;
                     }
-                    
+
                     $rows[] = [
                         'created_at' => $order->created_at ? $order->created_at->format('Y-m-d') : null,
                         'nama_kasir' => $order->handledBy->name ?? '-',
@@ -402,17 +402,17 @@ class InvoiceReport extends Component
         return 'BANK';
     }
 
-    #[Layout('layouts.admin')]
+    #[Layout('layouts.z')]
     public function render()
     {
         $orders = $this->ordersQuery->paginate(20);
-        
+
         $branchQuery = \App\Models\Branch::orderBy('name');
         if ($this->businessUnitFilter) {
             $branchQuery->where('business_unit_id', $this->businessUnitFilter);
         }
         $availableBranches = $branchQuery->pluck('name');
-        
+
         $businessUnits = \App\Models\BusinessUnit::orderBy('name')->get();
 
         $totalGross = $this->ordersQuery->sum('orders.total_amount');
@@ -431,6 +431,7 @@ class InvoiceReport extends Component
         return view('livewire.zoffline.reporting.invoice-report', [
             'orders' => $orders,
             'availableBranches' => $availableBranches,
+            'businessUnits' => $businessUnits,
             'summary' => [
                 'count' => $orders->total(),
                 'gross' => $totalGross,
