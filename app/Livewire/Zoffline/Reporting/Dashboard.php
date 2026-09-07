@@ -53,7 +53,8 @@ class Dashboard extends Component
     { /* Automatically triggers render */
     }
     public function updatedBusinessUnitFilter()
-    { /* Automatically triggers render */
+    {
+        $this->branchFilter = '';
     }
 
     private function setDateRange()
@@ -98,7 +99,7 @@ class Dashboard extends Component
         $end = Carbon::parse($this->endDate)->endOfDay();
 
         $query = Order::whereBetween('created_at', [$start, $end])
-            ->where('order_status', 'COMPLETED')
+            ->whereIn('order_status', ['COMPLETED', 'PIUTANG'])
             ->when($this->branchFilter, function ($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
             })
@@ -136,7 +137,7 @@ class Dashboard extends Component
         $startOfLastMonth = $now->copy()->subMonth()->startOfMonth();
         $sameDayLastMonth = $now->copy()->subMonth();
 
-        $mtdQuery = Order::where('order_status', 'COMPLETED')
+        $mtdQuery = Order::whereIn('order_status', ['COMPLETED', 'PIUTANG'])
             ->whereBetween('created_at', [$startOfThisMonth, $now])
             ->when($this->branchFilter, function ($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
@@ -150,7 +151,7 @@ class Dashboard extends Component
                 }
             });
 
-        $lastMtdQuery = Order::where('order_status', 'COMPLETED')
+        $lastMtdQuery = Order::whereIn('order_status', ['COMPLETED', 'PIUTANG'])
             ->whereBetween('created_at', [$startOfLastMonth, $sameDayLastMonth])
             ->when($this->branchFilter, function ($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
@@ -353,7 +354,18 @@ class Dashboard extends Component
         })->sortByDesc($this->topPerformerSortBy === 'qty' ? 'total_transactions' : 'total_revenue')->take($this->topPerformerLimit)->values()->toArray();
 
 
-        $availableBranches = Branch::orderBy('name')->pluck('name');
+        $availableBranches = Branch::when($this->businessUnitFilter, function ($q) {
+                $q->where('business_unit_id', $this->businessUnitFilter);
+            }, function ($q) {
+                $user = \Illuminate\Support\Facades\Auth::user();
+                if ($user && !$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
+                    $q->where('business_unit_id', $user->business_unit_id);
+                }
+            })
+            ->orderBy('name')
+            ->pluck('name')
+            ->unique()
+            ->values();
 
         // Update charts dynamically via event
         $this->dispatch('update-charts', [
@@ -372,6 +384,7 @@ class Dashboard extends Component
             $promo = 0;
             $tunai = 0;
             $nonTunai = 0;
+            $piutang = 0;
 
             foreach ($group as $order) {
                 $amount += $order->grand_total;
@@ -382,12 +395,16 @@ class Dashboard extends Component
                     $promo += $item->promo_discount_amount;
                 }
 
-                foreach ($order->payments as $payment) {
-                    $bankName = strtolower($payment->paymentMethod->bank_name ?? '');
-                    if (str_contains($bankName, 'finance') || $bankName === 'finance') {
-                        $nonTunai += $payment->amount;
-                    } else {
-                        $tunai += $payment->amount;
+                if ($order->order_status === 'PIUTANG') {
+                    $piutang += $order->grand_total;
+                } else {
+                    foreach ($order->payments as $payment) {
+                        $bankName = strtolower($payment->paymentMethod->bank_name ?? '');
+                        if (str_contains($bankName, 'finance') || $bankName === 'finance') {
+                            $nonTunai += $payment->amount;
+                        } else {
+                            $tunai += $payment->amount;
+                        }
                     }
                 }
             }
@@ -400,6 +417,7 @@ class Dashboard extends Component
                 'promo' => $promo,
                 'tunai' => $tunai,
                 'non_tunai' => $nonTunai,
+                'piutang' => $piutang,
             ];
         })->sortByDesc('amount')->values()->toArray();
 
