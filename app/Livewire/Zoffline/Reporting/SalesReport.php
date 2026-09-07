@@ -585,16 +585,16 @@ class SalesReport extends Component
         try {
             $syncService = app(\App\Services\AccurateReturnSyncService::class);
             $result = $syncService->syncAllReturns($this->syncStartDate, $this->syncEndDate, $this->syncBuCode, Auth::id());
-            
+
             $syncedCount = $result['synced_count'];
             $totalAmountFormatted = number_format($result['total_synced_amount'], 0, ',', '.');
-            
+
             $this->syncResultMessage = "Berhasil menyinkronkan {$syncedCount} transaksi retur (Total Nilai: Rp {$totalAmountFormatted}). Laporan penjualan diperbarui!";
             $this->syncResultType = 'success';
-            
+
             // Reload preview data to show synced state
             $this->syncPreviewData = $syncService->previewReturns($this->syncStartDate, $this->syncEndDate, $this->syncBuCode);
-            
+
             // Reset pagination for main table
             $this->resetPage();
         } catch (\Exception $e) {
