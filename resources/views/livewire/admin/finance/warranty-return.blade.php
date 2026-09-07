@@ -97,20 +97,25 @@
                                     </td>
                                     <td class="px-6 py-4">
                                         @php
-                                            $variant = $claim->warranty->orderItem->variant ?? null;
+                                            $orderItem = $claim->warranty?->orderItem;
+                                            $variant = $orderItem?->variant;
                                             $productName = '-';
-                                            if ($variant) {
+                                            if (!empty($claim->replacement_product_name)) {
+                                                $productName = $claim->replacement_product_name;
+                                            } elseif (!empty($orderItem?->product_name)) {
+                                                $productName = $orderItem->product_name;
+                                            } elseif ($variant) {
                                                 if (isset($variant->secondProduct)) {
                                                     $productName = ($variant->secondProduct->name ?? '') . ' ' . ($variant->storage ?? '');
                                                 } elseif (isset($variant->product)) {
-                                                    $productName = ($variant->product->name ?? '') . ' ' . ($variant->variant_name ?? '');
+                                                    $productName = ($variant->product->name ?? '') . ' ' . ($variant->variant_name ?? $variant->name ?? '');
                                                 } else {
                                                     $productName = $variant->name ?? '-';
                                                 }
                                             }
                                         @endphp
                                         <div class="font-bold text-neutral-700 text-sm">{{ trim($productName) }}</div>
-                                        <div class="text-[11px] font-black text-neutral-400 uppercase tracking-wider mt-0.5">{{ $claim->resolution_type === 'replacement_different' ? 'Upgrade/Downgrade' : 'Sama' }}</div>
+                                        <div class="text-[11px] font-black text-neutral-400 uppercase tracking-wider mt-0.5">{{ ($claim->resolution_type === 'replacement_different' || $claim->resolution === 'replaced_different') ? 'Upgrade/Downgrade' : 'Sama' }}</div>
                                     </td>
                                     <td class="px-6 py-4 text-right">
                                         <div class="font-black text-lg {{ $activeTab === 'waiting_refund' ? 'text-rose-600' : 'text-emerald-600' }}">

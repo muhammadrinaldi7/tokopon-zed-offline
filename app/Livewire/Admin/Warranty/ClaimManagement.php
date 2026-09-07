@@ -95,7 +95,11 @@ class ClaimManagement extends Component
     public function updatedSearchProductQuery()
     {
         if (strlen($this->search_product_query) > 2) {
-            $query = \App\Models\ProductAccurate::where('name', 'like', '%' . $this->search_product_query . '%');
+            $searchTerm = $this->search_product_query;
+            $query = \App\Models\ProductAccurate::where(function ($q) use ($searchTerm) {
+                $q->where('name', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('item_no', 'like', '%' . $searchTerm . '%');
+            });
 
             if ($this->selectedClaimId) {
                 $claim = WarrantyClaim::with('warranty.policy.businessUnit')->find($this->selectedClaimId);
@@ -109,6 +113,16 @@ class ClaimManagement extends Component
             $this->product_results = $query->limit(10)->get()->toArray();
         } else {
             $this->product_results = [];
+        }
+    }
+
+    public function updatedReplacementType()
+    {
+        $this->replacement_imei = '';
+        $this->search_imei_query = '';
+        $this->imei_results = [];
+        if ($this->replacement_type === 'same') {
+            $this->cancelReplacementProduct();
         }
     }
 
@@ -261,7 +275,7 @@ class ClaimManagement extends Component
             'selected_sales_id.required' => 'Mohon pilih Salesperson untuk unit pengganti.'
         ]);
 
-        $claim = WarrantyClaim::with(['warranty.orderItem.order', 'warranty.orderItem.variant'])->findOrFail($this->selectedClaimId);
+        $claim = WarrantyClaim::with(['warranty.orderItem.order', 'warranty.orderItem.variant', 'warranty.policy'])->findOrFail($this->selectedClaimId);
 
         // Cek apakah sudah ada request approval yang pending
         $existing = \App\Models\ApprovalRequest::where('approvable_type', WarrantyClaim::class)
@@ -280,28 +294,16 @@ class ClaimManagement extends Component
         if ($this->replacement_type === 'different') {
             $targetItemNo = $this->replacement_item_no;
         } else {
-            $variant = $claim->warranty->orderItem->variant ?? null;
-            if ($variant) {
-                if (isset($variant->item_no)) {
-                    $targetItemNo = $variant->item_no;
-                } elseif ($variant->accurateData) {
-                    $targetItemNo = $variant->accurateData->item_no;
-                } elseif (method_exists($variant, 'accurateData') && $variant->accurateData()->first()) {
-                    $targetItemNo = $variant->accurateData()->first()->item_no;
-                }
-            }
+            $targetItemNo = $this->getOriginalItemNo($claim);
         }
 
         // Validasi ketersediaan Unit/IMEI di sistem dan lokasinya
-        $userWarehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
-        $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() ?? 1;
+        $buId = $claim->warranty?->policy?->business_unit_id ?? (Auth::user()->getActiveBusinessUnitId() ?? 1);
 
         $imeiQuery = \App\Models\ProductSerialNumber::where('serial_number', $this->replacement_imei)
             ->where('status', 'Available');
         
-        if ($userWarehouseId) {
-            $imeiQuery->where('warehouse_id', $userWarehouseId);
-        } else {
+        if ($buId) {
             $imeiQuery->where('business_unit_id', $buId);
         }
 
@@ -316,20 +318,19 @@ class ClaimManagement extends Component
             return;
         }
 
-
         $payload = [
             'replacement_imei' => $this->replacement_imei,
             'replacement_type' => $this->replacement_type,
-            'replacement_item_no' => $this->replacement_item_no,
-            'replacement_price' => $this->replacement_price,
+            'replacement_item_no' => $this->replacement_type === 'different' ? $this->replacement_item_no : ($targetItemNo ?? $validImei->item_no),
+            'replacement_price' => $this->replacement_type === 'different' ? $this->replacement_price : $this->original_price,
             'bank_no' => $this->bank_no,
             'original_price' => $this->original_price,
             'selected_sales_id' => $this->selected_sales_id,
             'manual_note' => $this->manual_note,
             'resolution_notes' => $this->resolution_notes,
-            'replacement_product_name' => $this->replacement_product_name,
+            'replacement_product_name' => $this->replacement_type === 'different' ? $this->replacement_product_name : ($claim->warranty?->orderItem?->product_name ?? $validImei->product_name ?? 'Unit Pengganti Sama'),
             'branch_id' => Auth::user()->branch_id,
-            'business_unit_id' => Auth::user()->getActiveBusinessUnitId() ?? 1,
+            'business_unit_id' => $buId,
             'branch_name' => Auth::user()->branch->name ?? 'Toko'
         ];
 
@@ -478,46 +479,73 @@ class ClaimManagement extends Component
         $this->closeRejectForm();
     }
 
+    protected function getOriginalItemNo($claim)
+    {
+        if (!$claim) {
+            return null;
+        }
+
+        // 1. Cek dari relasi variant orderItem (accurateData atau item_no)
+        $variant = $claim->warranty?->orderItem?->variant;
+        if ($variant) {
+            if (!empty($variant->item_no)) {
+                return $variant->item_no;
+            }
+            if (isset($variant->accurateData->item_no)) {
+                return $variant->accurateData->item_no;
+            }
+            if (method_exists($variant, 'accurateData') && $variant->accurateData()->first()) {
+                return $variant->accurateData()->first()->item_no;
+            }
+        }
+
+        // 2. Cek langsung dari ProductSerialNumber berdasarkan serial_number klaim
+        if (!empty($claim->serial_number)) {
+            $snItemNo = \App\Models\ProductSerialNumber::where('serial_number', $claim->serial_number)->value('item_no');
+            if ($snItemNo) {
+                return $snItemNo;
+            }
+        }
+
+        // 3. Cek dari ProductAccurate yang namanya persis sama dengan product_name di orderItem
+        $productName = $claim->warranty?->orderItem?->product_name;
+        if ($productName) {
+            $paItemNo = \App\Models\ProductAccurate::where('name', $productName)->value('item_no');
+            if ($paItemNo) {
+                return $paItemNo;
+            }
+        }
+
+        return null;
+    }
+
     public function updatedSearchImeiQuery()
     {
         if (strlen($this->search_imei_query) > 2) {
+            $claim = null;
+            if ($this->selectedClaimId) {
+                $claim = \App\Models\WarrantyClaim::with(['warranty.orderItem.variant.accurateData', 'warranty.policy.businessUnit'])->find($this->selectedClaimId);
+            }
+
             // Tentukan Target SKU/Item No
             $targetItemNo = null;
-
             if ($this->replacement_type === 'different') {
                 $targetItemNo = $this->replacement_item_no;
             } else {
-                // Untuk "same", kita cari SKU dari produk asli
-                if ($this->selectedClaimId) {
-                    $claim = \App\Models\WarrantyClaim::with('warranty.orderItem.variant')->find($this->selectedClaimId);
-                    if ($claim && $claim->warranty && $claim->warranty->orderItem) {
-                        $variant = $claim->warranty->orderItem->variant;
-                        if ($variant) {
-                            if (isset($variant->item_no)) {
-                                $targetItemNo = $variant->item_no;
-                            } elseif ($variant->accurateData) {
-                                $targetItemNo = $variant->accurateData->item_no;
-                            } elseif (method_exists($variant, 'accurateData') && $variant->accurateData()->first()) {
-                                $targetItemNo = $variant->accurateData()->first()->item_no;
-                            }
-                        }
-                    }
-                }
+                $targetItemNo = $this->getOriginalItemNo($claim);
             }
 
             $userWarehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
-            $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() ?? 1;
+            $buId = $claim?->warranty?->policy?->business_unit_id ?? (\Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId() ?? 1);
 
-            $query = \App\Models\ProductSerialNumber::with('productAccurate')
+            $query = \App\Models\ProductSerialNumber::with(['productAccurate', 'warehouse'])
                 ->where('serial_number', 'like', '%' . $this->search_imei_query . '%')
                 ->where('status', 'Available')
                 ->whereNotIn('serial_number', function ($q) {
                     $q->select('serial_number')->from('warranties')->where('status', 'active')->whereNotNull('serial_number');
                 });
 
-            if ($userWarehouseId) {
-                $query->where('warehouse_id', $userWarehouseId);
-            } else {
+            if ($buId) {
                 $query->where('business_unit_id', $buId);
             }
 
@@ -525,13 +553,25 @@ class ClaimManagement extends Component
                 $query->where('item_no', $targetItemNo);
             }
 
-            $this->imei_results = $query->limit(5)
+            if ($userWarehouseId) {
+                $query->orderByRaw('CASE WHEN warehouse_id = ? THEN 0 ELSE 1 END', [$userWarehouseId]);
+            }
+
+            $this->imei_results = $query->limit(10)
                 ->get()
-                ->map(function ($sn) {
+                ->map(function ($sn) use ($userWarehouseId) {
+                    $productName = $sn->product_name;
+                    if (empty($productName) || $productName === '-') {
+                        $productName = $sn->productAccurate->name ?? 'Produk Tidak Ditemukan';
+                    }
+
                     return [
                         'serial_number' => $sn->serial_number,
-                        'product_name' => $sn->productAccurate->name ?? 'Produk Tidak Ditemukan',
+                        'product_name' => $productName,
                         'item_no' => $sn->item_no,
+                        'warehouse_name' => $sn->warehouse->name ?? 'Gudang Utama / -',
+                        'warehouse_id' => $sn->warehouse_id,
+                        'is_current_warehouse' => $userWarehouseId ? ($sn->warehouse_id == $userWarehouseId) : true,
                     ];
                 })
                 ->toArray();

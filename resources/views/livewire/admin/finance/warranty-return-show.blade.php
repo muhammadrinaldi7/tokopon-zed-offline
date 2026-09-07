@@ -59,7 +59,7 @@
                             </p>
                             <p class="font-black text-neutral-800 text-lg">
                                 {{ $claim->warranty->policy->businessUnit->name ?? 'Default' }}</p>
-                            <p class="text-sm font-medium text-neutral-500">{{ $claim->claimedBy->branch->name }}</p>
+                            <p class="text-sm font-medium text-neutral-500">{{ $claim->claimedBy->branch->name ?? ($claim->claimedBy->name ?? 'Cabang Toko') }}</p>
                         </div>
                     </div>
                 </div>
@@ -69,18 +69,23 @@
                     <h2 class="text-xl font-black text-neutral-800 mb-6">Unit Pengganti</h2>
 
                     @php
-                        $variant = $claim->warranty->orderItem->variant ?? null;
+                        $orderItem = $claim->warranty?->orderItem;
+                        $variant = $orderItem?->variant;
                         $productName = '-';
-                        if ($variant) {
-                            $productName = "{$variant->product->brand} {$variant->product->name} {$variant->ram}/{$variant->storage} - {$variant->color}";
-                            if (isset($variant->name)) {
+                        
+                        if (!empty($claim->replacement_product_name)) {
+                            $productName = $claim->replacement_product_name;
+                        } elseif (!empty($orderItem?->product_name)) {
+                            $productName = $orderItem->product_name;
+                        } elseif ($variant) {
+                            if (isset($variant->secondProduct)) {
+                                $productName = trim(($variant->secondProduct->name ?? '') . ' ' . ($variant->storage ?? '') . ' ' . ($variant->color ?? ''));
+                            } elseif (isset($variant->product)) {
+                                $brandName = is_object($variant->product->brand ?? null) ? ($variant->product->brand->name ?? '') : ($variant->product->brand ?? '');
+                                $productName = trim("{$brandName} {$variant->product->name} " . ($variant->ram ? "{$variant->ram}/{$variant->storage}" : '') . ($variant->color ? " - {$variant->color}" : ''));
+                            } else {
                                 $productName = $variant->name ?? '-';
                             }
-                        }
-
-                        // Jika ada barang pengganti (upgrade/downgrade), gunakan nama produk pengganti
-                        if ($claim->resolution_type === 'replacement_different' && $claim->replacement_product_name) {
-                            $productName = $claim->replacement_product_name;
                         }
                     @endphp
 
@@ -94,13 +99,13 @@
                         <div>
                             <p class="font-black text-blue-900 text-lg">
                                 {{ $productName }}
-                                @if ($claim->resolution_type === 'replacement_different' && $claim->replacement_item_no)
+                                @if (($claim->resolution_type === 'replacement_different' || !empty($claim->replacement_item_no)) && $claim->replacement_item_no)
                                     <span
                                         class="text-xs font-bold text-white bg-blue-500 px-2 py-1 rounded ml-2">{{ $claim->replacement_item_no }}</span>
                                 @endif
                             </p>
                             <p class="text-sm font-medium text-blue-700 mt-0.5">Tipe Resolusi:
-                                {{ $claim->resolution_type === 'replacement_different' ? 'Upgrade/Downgrade' : 'Sama' }}
+                                {{ ($claim->resolution_type === 'replacement_different' || $claim->resolution === 'replaced_different') ? 'Upgrade/Downgrade' : 'Ganti Unit Sama' }}
                             </p>
                         </div>
                     </div>
@@ -109,12 +114,12 @@
                         <div class="p-4 rounded-xl border border-neutral-100">
                             <p class="text-xs font-bold text-neutral-400 mb-1">IMEI LAMA (Rusak)</p>
                             <p class="font-mono font-bold text-neutral-700">
-                                {{ $claim->warranty->original_serial_number }}</p>
+                                {{ $claim->serial_number ?? $claim->warranty?->original_serial_number ?? $claim->warranty?->serial_number ?? '-' }}</p>
                         </div>
                         <div class="p-4 rounded-xl border border-neutral-100 bg-neutral-50">
                             <p class="text-xs font-bold text-neutral-400 mb-1">IMEI BARU (Pengganti)</p>
                             <p class="font-mono font-bold text-neutral-900">
-                                {{ $claim->warranty->serial_number ?? 'Belum ditentukan' }}</p>
+                                {{ $claim->replacement_imei ?? $claim->warranty?->serial_number ?? 'Belum ditentukan' }}</p>
                         </div>
                     </div>
                 </div>

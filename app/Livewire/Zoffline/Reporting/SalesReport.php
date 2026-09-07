@@ -110,7 +110,7 @@ class SalesReport extends Component
 
         return Order::with(['user', 'salesBy', 'payments.paymentMethod', 'payments.paymentMethodRate', 'items.variant', 'promos'])
             ->whereBetween('orders.order_date', [$start, $end])
-            ->whereIn('orders.order_status', ['COMPLETED'])
+            ->whereIn('orders.order_status', ['COMPLETED', 'piutang'])
             ->when($this->search, function ($query) {
                 if ($this->activeTab === 'transactions') {
                     $query->where(function ($q) {

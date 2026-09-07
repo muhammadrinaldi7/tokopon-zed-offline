@@ -230,7 +230,7 @@
                                         </div>
                                         <input type="text"
                                             wire:model.live.debounce.300ms="search_product_query"
-                                            placeholder="Ketik nama produk pengganti..."
+                                            placeholder="Ketik nama atau SKU produk pengganti..."
                                             class="w-full bg-white border-gray-300 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-amber-500 focus:border-amber-500 transition-colors">
 
                                         @if (count($product_results) > 0)
@@ -431,11 +431,24 @@
                                         @foreach ($imei_results as $res)
                                             <button type="button"
                                                 wire:click="selectImei('{{ $res['serial_number'] }}')"
-                                                class="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-gray-100 last:border-0">
-                                                <div class="font-bold text-gray-800 font-mono text-sm">
-                                                    {{ $res['serial_number'] }}</div>
-                                                <div class="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                                                    {{ $res['product_name'] }} (SKU: {{ $res['item_no'] }})</div>
+                                                class="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-gray-100 last:border-0 flex items-center justify-between">
+                                                <div>
+                                                    <div class="font-bold text-gray-800 font-mono text-sm">
+                                                        {{ $res['serial_number'] }}</div>
+                                                    <div class="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                                                        {{ $res['product_name'] }} (SKU: {{ $res['item_no'] }})</div>
+                                                </div>
+                                                <div class="text-right shrink-0 ml-2">
+                                                    @if(!empty($res['is_current_warehouse']))
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800">
+                                                            {{ $res['warehouse_name'] }} (Lokasi Anda)
+                                                        </span>
+                                                    @else
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-700">
+                                                            {{ $res['warehouse_name'] }}
+                                                        </span>
+                                                    @endif
+                                                </div>
                                             </button>
                                         @endforeach
                                     </div>
