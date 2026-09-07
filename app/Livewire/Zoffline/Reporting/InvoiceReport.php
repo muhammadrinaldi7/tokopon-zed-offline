@@ -20,6 +20,7 @@ class InvoiceReport extends Component
     public $endDate;
     public $search = '';
     public $branchFilter = '';
+    public $businessUnitFilter = '';
     public $csvSeparator = ';';
 
     public function mount()
@@ -51,6 +52,12 @@ class InvoiceReport extends Component
     }
     public function updatedBranchFilter()
     {
+        $this->resetPage();
+    }
+
+    public function updatedBusinessUnitFilter()
+    {
+        $this->branchFilter = ''; // Reset branch when BU changes
         $this->resetPage();
     }
 
@@ -100,6 +107,9 @@ class InvoiceReport extends Component
                             $qs->where('name', 'like', '%' . $this->search . '%');
                         });
                 });
+            })
+            ->when($this->businessUnitFilter, function ($query) {
+                $query->where('orders.business_unit_id', $this->businessUnitFilter);
             })
             ->when($this->branchFilter, function ($query) {
                 $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
@@ -396,7 +406,14 @@ class InvoiceReport extends Component
     public function render()
     {
         $orders = $this->ordersQuery->paginate(20);
-        $availableBranches = \App\Models\Branch::orderBy('name')->pluck('name');
+        
+        $branchQuery = \App\Models\Branch::orderBy('name');
+        if ($this->businessUnitFilter) {
+            $branchQuery->where('business_unit_id', $this->businessUnitFilter);
+        }
+        $availableBranches = $branchQuery->pluck('name');
+        
+        $businessUnits = \App\Models\BusinessUnit::orderBy('name')->get();
 
         $totalGross = $this->ordersQuery->sum('orders.total_amount');
 

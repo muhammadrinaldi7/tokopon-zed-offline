@@ -119,17 +119,31 @@ class Index extends Component
         $user = Auth::user();
         $nextLevel = $request->current_level + 1;
 
-        // Validasi Role menggunakan resolusi dinamis BU
-        $rule = app(ApprovalService::class)->getRuleForLevel($request->request_type, $nextLevel, $request->business_unit_id);
-
-        if ($rule && $rule->role) {
-            if (!$user->hasRole($rule->role->name) && !$user->hasRole('superadmin')) {
-                $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki role (' . $rule->role->name . ') untuk menyetujui Level ' . $nextLevel, type: 'error');
-                return;
+        // Validasi Role (Bypass Support)
+        $rules = app(ApprovalService::class)->resolveRules($request->request_type, $request->business_unit_id, $request->total_amount, $request->branch_id);
+        
+        $hasAccess = $user->hasRole('superadmin');
+        $highestMatchedLevel = 0;
+        
+        if (!$hasAccess) {
+            foreach ($rules as $r) {
+                if ($r->level >= $nextLevel && $r->role && $user->hasRole($r->role->name)) {
+                    $hasAccess = true;
+                    if ($r->level > $highestMatchedLevel) {
+                        $highestMatchedLevel = $r->level;
+                    }
+                }
             }
+        } else {
+            $highestMatchedLevel = $request->required_level;
         }
 
-        if ($nextLevel >= $request->required_level) {
+        if (!$hasAccess) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki role untuk menyetujui request ini.', type: 'error');
+            return;
+        }
+
+        if ($highestMatchedLevel >= $request->required_level) {
             $this->confirmingApprovalId = $id;
             $this->confirmingRequestType = $request->request_type;
 
@@ -182,14 +196,28 @@ class Index extends Component
         $user = Auth::user();
         $nextLevel = $request->current_level + 1;
 
-        // Validasi Role
-        $rule = app(ApprovalService::class)->getRuleForLevel($request->request_type, $nextLevel, $request->business_unit_id);
-
-        if ($rule && $rule->role) {
-            if (!$user->hasRole($rule->role->name) && !$user->hasRole('superadmin')) {
-                $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki role yang diizinkan untuk menyetujui Level ' . $nextLevel, type: 'error');
-                return;
+        // Validasi Role (Bypass Support)
+        $rules = app(ApprovalService::class)->resolveRules($request->request_type, $request->business_unit_id, $request->total_amount, $request->branch_id);
+        
+        $hasAccess = $user->hasRole('superadmin');
+        $highestMatchedLevel = 0;
+        
+        if (!$hasAccess) {
+            foreach ($rules as $r) {
+                if ($r->level >= $nextLevel && $r->role && $user->hasRole($r->role->name)) {
+                    $hasAccess = true;
+                    if ($r->level > $highestMatchedLevel) {
+                        $highestMatchedLevel = $r->level;
+                    }
+                }
             }
+        } else {
+            $highestMatchedLevel = $request->required_level;
+        }
+
+        if (!$hasAccess) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki role yang diizinkan untuk menyetujui request ini.', type: 'error');
+            return;
         }
 
         $originalPrice = (float) ($request->approvable?->appraised_value ?? 0);
@@ -200,6 +228,10 @@ class Index extends Component
             && abs($newPrice - $originalPrice) > 0.01;
 
         $historyNote = 'Approved by ' . $user->name;
+        if ($highestMatchedLevel > $nextLevel) {
+            $historyNote .= " (Bypassed to Level {$highestMatchedLevel})";
+        }
+        
         if ($isPriceChanged && $this->priceAdjustmentReason) {
             $historyNote .= " (Adjusted Price: Rp " . number_format($newPrice, 0, ',', '.') . " - {$this->priceAdjustmentReason})";
         }
@@ -209,11 +241,11 @@ class Index extends Component
             'acted_by'      => $user->id,
             'role_snapshot' => $user->roles->pluck('name')->join(', '),
             'action'        => 'APPROVED',
-            'level'         => $nextLevel,
+            'level'         => $highestMatchedLevel,
             'notes'         => $historyNote
         ]);
 
-        $request->current_level += 1;
+        $request->current_level = $highestMatchedLevel;
 
         if ($request->current_level >= $request->required_level) {
             $request->status = 'APPROVED';
