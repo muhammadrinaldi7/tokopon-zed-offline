@@ -73,6 +73,7 @@ Route::middleware(['auth'])->group(function () {
     // Reporting
     Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
         Route::get('/sales', \App\Livewire\Zoffline\Reporting\SalesReport::class)->name('sales');
+        Route::get('/sales-management', \App\Livewire\Zoffline\Reporting\ManagementSalesReport::class)->name('sales-management');
         Route::get('/promo', \App\Livewire\Zoffline\Reporting\PromoReport::class)->name('promo');
         Route::get('/products', \App\Livewire\Zoffline\Reporting\ProductReport::class)->name('products');
         Route::get('/stock', \App\Livewire\Zoffline\Reporting\StockReport::class)->name('stock');
