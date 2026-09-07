@@ -366,49 +366,63 @@
                             $proyek = $variant?->proyek ?? '-';
                             $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
 
+                            // Cek apakah item pesanan merupakan transaksi retur
+                            $isReturn = $this->isReturnItem($item, $order);
+
                             // Kalkulasi Penjualan Bersih
                             $itemPromosTotal = $item->promos->sum('pivot.discount_amount');
                             $actualSubtotal = $item->subtotal - ($item->discount_amount ?? 0) - $itemPromosTotal;
                             $penjualanBersih = round($actualSubtotal);
 
-                            // Kalkulasi HPP (SN vs Non-SN HPP rata-rata)
+                            // Kalkulasi HPP (SN vs Non-SN HPP rata-rata) - Hanya jika BUKAN retur
                             $snList = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
                             $itemHpp = 0;
                             $hasSn = !empty($snList);
+                            $margin = 0;
+                            $marginPct = 0;
 
-                            if ($hasSn) {
-                                foreach ($snList as $sn) {
-                                    $snModel = $snDataMap->get($sn);
-                                    $snHpp = (float)($snModel?->hpp ?? 0);
-                                    if ($snHpp <= 0) {
-                                        $snHpp = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                            if (!$isReturn) {
+                                if ($hasSn) {
+                                    foreach ($snList as $sn) {
+                                        $snModel = $snDataMap->get($sn);
+                                        $snHpp = (float)($snModel?->hpp ?? 0);
+                                        if ($snHpp <= 0) {
+                                            $snHpp = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                                        }
+                                        $itemHpp += $snHpp;
                                     }
-                                    $itemHpp += $snHpp;
+                                } else {
+                                    $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                                    $itemHpp = $baseCost * (float)$item->qty;
                                 }
-                            } else {
-                                $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
-                                $itemHpp = $baseCost * (float)$item->qty;
-                            }
 
-                            $itemHpp = round($itemHpp);
-                            $margin = $penjualanBersih - $itemHpp;
-                            $marginPct = $penjualanBersih > 0 ? round(($margin / $penjualanBersih) * 100, 2) : 0;
+                                $itemHpp = round($itemHpp);
+                                $margin = $penjualanBersih - $itemHpp;
+                                $marginPct = $penjualanBersih > 0 ? round(($margin / $penjualanBersih) * 100, 2) : 0;
+                            }
                         @endphp
                         <tr class="hover:bg-gray-50/60 transition-colors">
                             {{-- Tanggal & Nota --}}
                             <td class="px-4 py-3 align-top">
                                 <p class="font-semibold text-gray-800">{{ $order->order_date ? $order->order_date->format('d M Y') : $order->created_at->format('d M Y') }}</p>
                                 <p class="text-[11px] text-gray-500 font-mono mt-0.5">{{ $order->order_number }}</p>
-                                @if ($order->accurate_invoice_no)
-                                    <span class="inline-block mt-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold">
-                                        Inv: {{ $order->accurate_invoice_no }}
-                                    </span>
-                                @endif
-                                @if ($order->accurate_so_number)
-                                    <span class="inline-block mt-1 px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px]">
-                                        SO: {{ $order->accurate_so_number }}
-                                    </span>
-                                @endif
+                                <div class="flex flex-wrap gap-1 mt-1">
+                                    @if ($isReturn)
+                                        <span class="inline-block px-1.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded text-[10px] font-bold">
+                                            Retur
+                                        </span>
+                                    @endif
+                                    @if ($order->accurate_invoice_no)
+                                        <span class="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold">
+                                            Inv: {{ $order->accurate_invoice_no }}
+                                        </span>
+                                    @endif
+                                    @if ($order->accurate_so_number)
+                                        <span class="inline-block px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px]">
+                                            SO: {{ $order->accurate_so_number }}
+                                        </span>
+                                    @endif
+                                </div>
                             </td>
 
                             {{-- Produk & SKU & SN --}}
@@ -475,22 +489,32 @@
 
                             {{-- HPP --}}
                             <td class="px-4 py-3 text-right align-top">
-                                <p class="font-bold text-gray-700">Rp {{ number_format($itemHpp, 0, ',', '.') }}</p>
-                                <span class="inline-block text-[9px] font-semibold px-1 py-0.2 rounded {{ $hasSn ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500' }}">
-                                    {{ $hasSn ? 'HPP SN' : 'HPP Avg' }}
-                                </span>
+                                @if ($isReturn)
+                                    <span class="text-gray-400 font-medium">-</span>
+                                @else
+                                    <p class="font-bold text-gray-700">Rp {{ number_format($itemHpp, 0, ',', '.') }}</p>
+                                    <span class="inline-block text-[9px] font-semibold px-1 py-0.2 rounded {{ $hasSn ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500' }}">
+                                        {{ $hasSn ? 'HPP SN' : 'HPP Avg' }}
+                                    </span>
+                                @endif
                             </td>
 
                             {{-- Margin (Rp) --}}
                             <td class="px-4 py-3 text-right align-top">
-                                <p class="font-bold {{ $margin >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
-                                    Rp {{ number_format($margin, 0, ',', '.') }}
-                                </p>
+                                @if ($isReturn)
+                                    <span class="text-gray-400 font-medium">-</span>
+                                @else
+                                    <p class="font-bold {{ $margin >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
+                                        Rp {{ number_format($margin, 0, ',', '.') }}
+                                    </p>
+                                @endif
                             </td>
 
                             {{-- Margin (%) --}}
                             <td class="px-4 py-3 text-center align-top">
-                                @if ($marginPct >= 15)
+                                @if ($isReturn)
+                                    <span class="text-gray-400 font-medium">-</span>
+                                @elseif ($marginPct >= 15)
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                         {{ number_format($marginPct, 1) }}%
                                     </span>

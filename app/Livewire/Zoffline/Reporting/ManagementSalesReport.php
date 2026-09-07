@@ -288,6 +288,31 @@ class ManagementSalesReport extends Component
         ->orderBy('order_items.id', 'desc');
     }
 
+    public function isReturnItem($item, $order = null): bool
+    {
+        $order = $order ?? $item->order;
+        if ($order) {
+            if (str_starts_with($order->order_number ?? '', 'RET-')) {
+                return true;
+            }
+            if (!empty($order->shipping_address_snapshot['is_warranty_return'])) {
+                return true;
+            }
+            if (!empty($order->accurate_invoice_no) && str_starts_with($order->accurate_invoice_no, 'SRT')) {
+                return true;
+            }
+            if ((float)($order->total_amount ?? 0) < 0) {
+                return true;
+            }
+        }
+
+        if ((float)($item->qty ?? 0) < 0 || (float)($item->subtotal ?? 0) < 0) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function generateManagementData(): array
     {
         $items = $this->buildItemsQuery()->get();
@@ -339,6 +364,7 @@ class ManagementSalesReport extends Component
             $snList = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
             $vendor = '-';
             $itemHpp = 0;
+            $isReturn = $this->isReturnItem($item, $order);
 
             if (!empty($snList)) {
                 // Sesuai Aturan: Jika produk ber-SN, ambil HPP dari product_serial_numbers
@@ -348,27 +374,37 @@ class ManagementSalesReport extends Component
                     if ($snModel?->vendor?->vendor_name) {
                         $vendorNames[] = $snModel->vendor->vendor_name;
                     }
-                    $snHpp = (float)($snModel?->hpp ?? 0);
-                    // Fallback jika HPP SN belum terisi / 0: ambil HPP rata-rata base_cost
-                    if ($snHpp <= 0) {
-                        $snHpp = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                    if (!$isReturn) {
+                        $snHpp = (float)($snModel?->hpp ?? 0);
+                        // Fallback jika HPP SN belum terisi / 0: ambil HPP rata-rata base_cost
+                        if ($snHpp <= 0) {
+                            $snHpp = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                        }
+                        $itemHpp += $snHpp;
                     }
-                    $itemHpp += $snHpp;
                 }
                 $vendorNames = array_unique($vendorNames);
                 $vendor = !empty($vendorNames) ? implode(', ', $vendorNames) : '-';
             } else {
-                // Sesuai Aturan: Jika non-SN, ambil HPP rata-rata (base_cost dari ProductAccurate) * qty
-                $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
-                $itemHpp = $baseCost * (float)$item->qty;
                 if (!empty($variant?->vendor_name)) {
                     $vendor = $variant->vendor_name;
                 }
+                if (!$isReturn) {
+                    // Sesuai Aturan: Jika non-SN, ambil HPP rata-rata (base_cost dari ProductAccurate) * qty
+                    $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                    $itemHpp = $baseCost * (float)$item->qty;
+                }
             }
 
-            $itemHpp = round($itemHpp);
-            $margin = $penjualanBersih - $itemHpp;
-            $marginPct = $penjualanBersih > 0 ? round(($margin / $penjualanBersih) * 100, 2) : 0;
+            if ($isReturn) {
+                $itemHpp = 0;
+                $margin = 0;
+                $marginPct = 0;
+            } else {
+                $itemHpp = round($itemHpp);
+                $margin = $penjualanBersih - $itemHpp;
+                $marginPct = $penjualanBersih > 0 ? round(($margin / $penjualanBersih) * 100, 2) : 0;
+            }
 
             $businessUnitName = $order->businessUnit?->name ?? '-';
 
@@ -398,9 +434,9 @@ class ManagementSalesReport extends Component
                 $itemPromosTotal,
                 $item->subtotal,
                 $penjualanBersih,
-                $itemHpp,
-                $margin,
-                $marginPct . '%'
+                $isReturn ? '-' : $itemHpp,
+                $isReturn ? '-' : $margin,
+                $isReturn ? '-' : ($marginPct . '%')
             ];
         }
 
@@ -514,26 +550,30 @@ class ManagementSalesReport extends Component
         }
 
         foreach ($allMatchingItems as $item) {
+            $isReturn = $this->isReturnItem($item, $item->order);
+
             $itemPromosTotal = $item->promos->sum('pivot.discount_amount');
             $actualItemSubtotal = $item->subtotal - ($item->discount_amount ?? 0) - $itemPromosTotal;
             $penjualanBersihItem = round($actualItemSubtotal);
             $totalPenjualanBersih += $penjualanBersihItem;
 
-            $itemHpp = 0;
-            if (!empty($item->serial_number)) {
-                $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
-                foreach ($sns as $sn) {
-                    $snHpp = isset($summarySnMap[$sn]) ? (float)$summarySnMap[$sn] : 0;
-                    if ($snHpp <= 0) {
-                        $snHpp = (float)($item->variant?->base_cost ?? $item->variant?->accurateData?->base_cost ?? 0);
+            if (!$isReturn) {
+                $itemHpp = 0;
+                if (!empty($item->serial_number)) {
+                    $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                    foreach ($sns as $sn) {
+                        $snHpp = isset($summarySnMap[$sn]) ? (float)$summarySnMap[$sn] : 0;
+                        if ($snHpp <= 0) {
+                            $snHpp = (float)($item->variant?->base_cost ?? $item->variant?->accurateData?->base_cost ?? 0);
+                        }
+                        $itemHpp += $snHpp;
                     }
-                    $itemHpp += $snHpp;
+                } else {
+                    $baseCost = (float)($item->variant?->base_cost ?? $item->variant?->accurateData?->base_cost ?? 0);
+                    $itemHpp = $baseCost * (float)$item->qty;
                 }
-            } else {
-                $baseCost = (float)($item->variant?->base_cost ?? $item->variant?->accurateData?->base_cost ?? 0);
-                $itemHpp = $baseCost * (float)$item->qty;
+                $totalHpp += round($itemHpp);
             }
-            $totalHpp += round($itemHpp);
         }
 
         $totalMargin = $totalPenjualanBersih - $totalHpp;
