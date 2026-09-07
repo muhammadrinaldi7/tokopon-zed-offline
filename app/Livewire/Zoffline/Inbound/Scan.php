@@ -27,8 +27,9 @@ class Scan extends Component
     public $scannedImei = '';
     public $activeItemId = null;
 
-    // Warehouse Selection
+    // Warehouse Selection & Confirmation Modal
     public $selectedWarehouseId = null;
+    public $showConfirmModal = false;
 
     public function mount(PurchaseOrder $po)
     {
@@ -140,6 +141,43 @@ class Scan extends Component
         }
     }
 
+    public function openConfirmModal()
+    {
+        $this->errorMessage = '';
+        $this->successMessage = '';
+
+        $received = $this->po->items->sum('quantity_received');
+        if ($received === 0) {
+            $this->dispatch('toast', title: 'Peringatan', message: 'Belum ada item yang di-scan untuk diterima.', type: 'warning');
+            return;
+        }
+
+        $hasUnpushed = false;
+        foreach ($this->po->items as $item) {
+            if (($item->quantity_received - $item->quantity_pushed) > 0) {
+                $hasUnpushed = true;
+                break;
+            }
+        }
+
+        if (!$hasUnpushed) {
+            $this->dispatch('toast', title: 'Info', message: 'Semua item yang discan sudah berhasil dikirim ke Accurate sebelumnya.', type: 'info');
+            return;
+        }
+
+        if (!$this->selectedWarehouseId) {
+            $this->selectedWarehouseId = Auth::user()->warehouse_id 
+                ?? \App\Models\Warehouse::where('business_unit_id', Auth::user()->getActiveBusinessUnitId() ?? 2)->first()?->id;
+        }
+
+        $this->showConfirmModal = true;
+    }
+
+    public function closeConfirmModal()
+    {
+        $this->showConfirmModal = false;
+    }
+
     public function completeReceiveItem()
     {
         // Validasi
@@ -148,6 +186,7 @@ class Scan extends Component
 
         if ($received === 0) {
             $this->dispatch('admin-alert', type: 'error', message: 'Tidak ada item yang di-scan.');
+            $this->showConfirmModal = false;
             return;
         }
 
@@ -201,6 +240,7 @@ class Scan extends Component
 
             if (empty($detailItem)) {
                 $this->dispatch('toast', title: 'Info', message: 'Semua item yang discan sudah berhasil dikirim ke Accurate sebelumnya.', type: 'info');
+                $this->showConfirmModal = false;
                 return;
             }
 
@@ -249,6 +289,7 @@ class Scan extends Component
                     }
                 }
 
+                $this->showConfirmModal = false;
                 $this->dispatch('toast', title: 'Berhasil', message: 'Sinkronisasi Penerimaan Barang ke Accurate berhasil.', type: 'success');
             } else {
                 $errorMsg = 'Terjadi kesalahan tidak terduga dari Accurate.';

@@ -1,9 +1,21 @@
 <div class="p-6 bg-[#f7f7f7] min-h-screen">
-    <div class="flex flex-col items-start mb-6 gap-4">
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-800 tracking-tight">Laporan Penjualan</h1>
             <p class="text-sm text-gray-500 mt-1">Rekapitulasi transaksi dan performa penjualan per vendor untuk seluruh cabang</p>
         </div>
+        <div class="flex items-center gap-2">
+            <button wire:click="openSyncModal" 
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Sinkronkan Retur Accurate</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="flex flex-col items-start mb-6 gap-4">
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3 w-full">
             {{-- Separator CSV --}}
@@ -520,4 +532,219 @@
             </div>
         @endif
     </div>
+
+    {{-- Modal Sinkronisasi Retur Accurate --}}
+    @if ($showSyncModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-150">
+                
+                {{-- Modal Header --}}
+                <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold">Sinkronisasi Retur Penjualan Accurate</h3>
+                            <p class="text-xs text-slate-400">Tarik dokumen Sales Return untuk menyeimbangkan laporan penjualan POS</p>
+                        </div>
+                    </div>
+                    <button wire:click="closeSyncModal" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Modal Filter Bar --}}
+                <div class="p-4 bg-slate-50 border-b border-gray-200">
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-bold text-gray-600 mb-1">Unit Usaha Accurate</label>
+                            <select wire:model="syncBuCode" class="w-full text-xs font-semibold rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white py-2">
+                                <option value="syihab">Syihab (Utama)</option>
+                                <option value="second">GSK Second</option>
+                                <option value="distri">GSK Distri</option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-bold text-gray-600 mb-1">Dari Tanggal</label>
+                            <input type="date" wire:model="syncStartDate" class="w-full text-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white py-1.5 text-center">
+                        </div>
+
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-bold text-gray-600 mb-1">Sampai Tanggal</label>
+                            <input type="date" wire:model="syncEndDate" class="w-full text-xs rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white py-1.5 text-center">
+                        </div>
+
+                        <div class="md:col-span-3">
+                            <button wire:click="loadSyncPreview" wire:loading.attr="disabled"
+                                class="w-full bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50">
+                                <svg wire:loading.remove wire:target="loadSyncPreview" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <svg wire:loading wire:target="loadSyncPreview" class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Cek Data Retur</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Alert Notification --}}
+                @if ($syncResultMessage)
+                    <div class="p-3 mx-4 mt-3 rounded-xl text-xs font-semibold flex items-center gap-2 {{ $syncResultType === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200' }}">
+                        @if ($syncResultType === 'success')
+                            <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                        @else
+                            <svg class="w-4 h-4 text-rose-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                        @endif
+                        <span>{{ $syncResultMessage }}</span>
+                    </div>
+                @endif
+
+                {{-- Modal Body: Preview Results --}}
+                <div class="p-4 flex-1 overflow-y-auto min-h-[300px]">
+                    @if ($isSyncLoading)
+                        <div class="h-64 flex flex-col items-center justify-center gap-3 text-slate-500">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                            <span class="text-xs font-medium">Menghubungi server Accurate Online & memproses data...</span>
+                        </div>
+                    @elseif ($syncPreviewData)
+                        {{-- Summary Cards --}}
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Total di Accurate</span>
+                                <span class="text-lg font-black text-slate-800">{{ $syncPreviewData['summary']['total_count'] }}</span>
+                                <span class="text-[10px] text-slate-400 block">Dokumen</span>
+                            </div>
+
+                            <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+                                <span class="text-[10px] text-emerald-700 font-bold uppercase tracking-wider block">Sudah Ada di POS</span>
+                                <span class="text-lg font-black text-emerald-700">{{ $syncPreviewData['summary']['already_synced_count'] }}</span>
+                                <span class="text-[10px] text-emerald-600 block">Tersinkron</span>
+                            </div>
+
+                            <div class="bg-amber-50 p-3 rounded-xl border border-amber-200">
+                                <span class="text-[10px] text-amber-700 font-bold uppercase tracking-wider block">Belum Ada di POS</span>
+                                <span class="text-lg font-black text-amber-700">{{ $syncPreviewData['summary']['ready_to_sync_count'] }}</span>
+                                <span class="text-[10px] text-amber-600 block">Siap Ditarik</span>
+                            </div>
+
+                            <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-200">
+                                <span class="text-[10px] text-indigo-700 font-bold uppercase tracking-wider block">Nilai Pengurang Omset</span>
+                                <span class="text-base font-black text-indigo-700 truncate block" title="Rp {{ number_format($syncPreviewData['summary']['ready_to_sync_total_amount'], 0, ',', '.') }}">
+                                    Rp {{ number_format($syncPreviewData['summary']['ready_to_sync_total_amount'], 0, ',', '.') }}
+                                </span>
+                                <span class="text-[10px] text-indigo-600 block">Total Selisih</span>
+                            </div>
+                        </div>
+
+                        {{-- Returns Table --}}
+                        <div class="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100 text-slate-700 text-[11px] font-bold uppercase border-b border-gray-200">
+                                        <th class="px-3 py-2.5">No. Dokumen Accurate</th>
+                                        <th class="px-3 py-2.5">Tanggal</th>
+                                        <th class="px-3 py-2.5">Pelanggan</th>
+                                        <th class="px-3 py-2.5">Cabang</th>
+                                        <th class="px-3 py-2.5 text-right">Nilai Retur</th>
+                                        <th class="px-3 py-2.5 text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 text-xs">
+                                    @forelse ($syncPreviewData['items'] as $item)
+                                        <tr class="hover:bg-slate-50/80 transition-colors {{ $item['status'] === 'READY_TO_SYNC' ? 'bg-amber-50/20' : '' }}">
+                                            <td class="px-3 py-2.5 font-bold text-slate-800">
+                                                {{ $item['number'] }}
+                                                @if (!empty($item['description']))
+                                                    <span class="block text-[10px] text-slate-400 font-normal truncate max-w-xs">{{ $item['description'] }}</span>
+                                                @endif
+                                            </td>
+                                            <td class="px-3 py-2.5 text-slate-600 whitespace-nowrap">{{ $item['trans_date'] }}</td>
+                                            <td class="px-3 py-2.5 text-slate-700 font-medium truncate max-w-[150px]">{{ $item['customer_name'] }}</td>
+                                            <td class="px-3 py-2.5 text-slate-600 truncate max-w-[120px]">{{ $item['branch_name'] }}</td>
+                                            <td class="px-3 py-2.5 text-right font-black text-rose-600 whitespace-nowrap">
+                                                - Rp {{ number_format($item['total_amount'], 0, ',', '.') }}
+                                            </td>
+                                            <td class="px-3 py-2.5 text-center whitespace-nowrap">
+                                                @if ($item['status'] === 'ALREADY_SYNCED')
+                                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                        <span>✓ Sudah Ada</span>
+                                                        @if (!empty($item['pos_order_number']))
+                                                            <span class="text-[9px] text-emerald-600 font-normal">({{ $item['pos_order_number'] }})</span>
+                                                        @endif
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 animate-pulse">
+                                                        ★ Siap Ditarik
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="6" class="px-4 py-8 text-center text-slate-400 text-xs italic">
+                                                Tidak ada transaksi Sales Return ditemukan di Accurate pada periode ini.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="h-64 flex flex-col items-center justify-center gap-2 text-slate-400">
+                            <svg class="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span class="text-xs">Klik tombol <strong>"Cek Data Retur"</strong> untuk memuat daftar retur dari Accurate Online.</span>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Modal Footer --}}
+                <div class="p-4 bg-slate-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 text-[11px] text-slate-500">
+                        <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        <span>Proteksi Data: Sinkronisasi retur hanya memotong omset & HPP laporan, tanpa mengubah stok fisik opname.</span>
+                    </div>
+
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <button type="button" wire:click="closeSyncModal" 
+                            class="flex-1 sm:flex-none px-4 py-2 bg-white border border-gray-300 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-50 transition-colors">
+                            Tutup
+                        </button>
+                        
+                        @if ($syncPreviewData && $syncPreviewData['summary']['ready_to_sync_count'] > 0)
+                            <button type="button" wire:click="executeSyncReturns" wire:loading.attr="disabled"
+                                class="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                <svg wire:loading.remove wire:target="executeSyncReturns" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                <svg wire:loading wire:target="executeSyncReturns" class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Proses Sinkronisasi ({{ $syncPreviewData['summary']['ready_to_sync_count'] }} Dokumen)</span>
+                            </button>
+                        @endif
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    @endif
 </div>
+

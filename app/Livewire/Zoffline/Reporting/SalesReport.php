@@ -25,6 +25,16 @@ class SalesReport extends Component
     public $proyekFilter = [];
     public $csvSeparator = ';';
 
+    // Accurate Return Sync Modal Properties
+    public $showSyncModal = false;
+    public $syncBuCode = 'syihab';
+    public $syncStartDate;
+    public $syncEndDate;
+    public $syncPreviewData = null;
+    public $isSyncLoading = false;
+    public $syncResultMessage = null;
+    public $syncResultType = 'success';
+
     public function mount()
     {
         $this->setDateRange();
@@ -531,6 +541,68 @@ class SalesReport extends Component
         $excelFileName = 'laporan_penjualan_' . $this->startDate . '_sd_' . $this->endDate . '.xlsx';
 
         return Excel::download(new SalesReportExport($rows), $excelFileName);
+    }
+
+    public function openSyncModal()
+    {
+        $bu = \App\Models\BusinessUnit::find(Auth::user()->getActiveBusinessUnitId());
+        $this->syncBuCode = $bu?->code ?? 'syihab';
+        $this->syncStartDate = $this->startDate;
+        $this->syncEndDate = $this->endDate;
+        $this->syncPreviewData = null;
+        $this->syncResultMessage = null;
+        $this->showSyncModal = true;
+        $this->loadSyncPreview();
+    }
+
+    public function closeSyncModal()
+    {
+        $this->showSyncModal = false;
+        $this->syncPreviewData = null;
+        $this->syncResultMessage = null;
+    }
+
+    public function loadSyncPreview()
+    {
+        $this->isSyncLoading = true;
+        $this->syncResultMessage = null;
+        try {
+            $syncService = app(\App\Services\AccurateReturnSyncService::class);
+            $this->syncPreviewData = $syncService->previewReturns($this->syncStartDate, $this->syncEndDate, $this->syncBuCode);
+        } catch (\Exception $e) {
+            $this->syncResultMessage = "Gagal memuat pratinjau dari Accurate: " . $e->getMessage();
+            $this->syncResultType = 'error';
+            $this->syncPreviewData = null;
+        } finally {
+            $this->isSyncLoading = false;
+        }
+    }
+
+    public function executeSyncReturns()
+    {
+        $this->isSyncLoading = true;
+        $this->syncResultMessage = null;
+        try {
+            $syncService = app(\App\Services\AccurateReturnSyncService::class);
+            $result = $syncService->syncAllReturns($this->syncStartDate, $this->syncEndDate, $this->syncBuCode, Auth::id());
+            
+            $syncedCount = $result['synced_count'];
+            $totalAmountFormatted = number_format($result['total_synced_amount'], 0, ',', '.');
+            
+            $this->syncResultMessage = "Berhasil menyinkronkan {$syncedCount} transaksi retur (Total Nilai: Rp {$totalAmountFormatted}). Laporan penjualan diperbarui!";
+            $this->syncResultType = 'success';
+            
+            // Reload preview data to show synced state
+            $this->syncPreviewData = $syncService->previewReturns($this->syncStartDate, $this->syncEndDate, $this->syncBuCode);
+            
+            // Reset pagination for main table
+            $this->resetPage();
+        } catch (\Exception $e) {
+            $this->syncResultMessage = "Terjadi kesalahan saat sinkronisasi: " . $e->getMessage();
+            $this->syncResultType = 'error';
+        } finally {
+            $this->isSyncLoading = false;
+        }
     }
 
     private function generateVendorData(): array

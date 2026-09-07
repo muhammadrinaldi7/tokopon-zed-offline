@@ -827,6 +827,95 @@ class AccurateService
         }
     }
 
+    public function getSalesReturns($startDate = null, $endDate = null, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $allReturns = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $timestamp = now()->toIso8601String();
+            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+            $params = [
+                'sp.pageSize' => 100,
+                'sp.page' => $page,
+                'sp.sort' => 'id|desc',
+                'fields' => 'id,number,transDate,customer,totalAmount,description,branch,detailItem'
+            ];
+
+            if ($startDate && $endDate) {
+                $startFormatted = \Carbon\Carbon::parse($startDate)->format('d/m/Y');
+                $endFormatted = \Carbon\Carbon::parse($endDate)->format('d/m/Y');
+                $params['filter.transDate.op'] = 'BETWEEN';
+                $params['filter.transDate.val'] = [$startFormatted, $endFormatted];
+            } elseif ($startDate) {
+                $startFormatted = \Carbon\Carbon::parse($startDate)->format('d/m/Y');
+                $params['filter.transDate.op'] = 'GREATER_EQUAL_THAN';
+                $params['filter.transDate.val'] = $startFormatted;
+            }
+
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ])->get($host . '/sales-return/list.do', $params);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data['s']) && $data['s'] === true) {
+                    $chunk = $data['d'] ?? [];
+                    $allReturns = array_merge($allReturns, $chunk);
+
+                    $pageCount = $data['sp']['pageCount'] ?? 1;
+                    if ($page >= $pageCount || count($chunk) < 100) {
+                        $hasMore = false;
+                    } else {
+                        $page++;
+                    }
+                } else {
+                    Log::error("Accurate API Get Sales Return List Error ({$databaseSource}): " . json_encode($data));
+                    break;
+                }
+            } else {
+                Log::error("Accurate API Get Sales Return List Failed ({$databaseSource}): " . $response->body());
+                $hasMore = false;
+            }
+        }
+
+        return $allReturns;
+    }
+
+    public function getSalesReturnDetail($id, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/sales-return/detail.do', [
+            'id' => $id,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? null;
+            }
+        }
+
+        Log::error("Accurate API Get Sales Return Detail Failed ({$databaseSource}): " . $response->body());
+        return null;
+    }
+
     public function getEmployees($databaseSource = 'syihab')
     {
         list($host, $token, $secretKey) = $this->getCredentials($databaseSource);

@@ -47,7 +47,7 @@
                 $isPartial = $received > 0 && $received < $ordered;
             @endphp
 
-            <button wire:click="completeReceiveItem"
+            <button wire:click="openConfirmModal"
                 class="px-6 py-3 font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 {{ $isComplete || $isPartial ? 'bg-emerald-600 hover:bg-emerald-700 text-white hover:shadow-md' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed' }}"
                 {{ $isComplete || $isPartial ? '' : 'disabled' }}>
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,4 +375,156 @@
             </div>
         </div>
     @endif
+
+    <!-- Modal Konfirmasi Selesaikan Penerimaan (Sync Accurate) -->
+    @if ($showConfirmModal)
+        @php
+            $ordered = $po->items->sum('quantity_ordered');
+            $received = $po->items->sum('quantity_received');
+            $pushed = $po->items->sum('quantity_pushed');
+            $toPush = $received - $pushed;
+            $isComplete = $ordered > 0 && $received === $ordered;
+            $selectedWh = \App\Models\Warehouse::find($selectedWarehouseId) ?? Auth::user()->warehouse;
+        @endphp
+        <div class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-150">
+                
+                <!-- Header -->
+                <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold">Konfirmasi Penerimaan Barang (Sync Accurate)</h3>
+                            <p class="text-xs text-slate-400">PO: <span class="text-white font-mono font-bold">{{ $po->po_number }}</span> &bull; Vendor: <span class="text-slate-200">{{ $po->vendor->vendor_name ?? '-' }}</span></p>
+                        </div>
+                    </div>
+                    <button wire:click="closeConfirmModal" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Body -->
+                <div class="p-6 overflow-y-auto space-y-4">
+                    
+                    <!-- Warehouse Selection Card -->
+                    <div class="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                Gudang Tujuan Penerimaan
+                            </span>
+                            <span class="text-xs font-semibold text-slate-500">Cabang: <strong class="text-slate-700">{{ Auth::user()->branch->name ?? 'Pusat' }}</strong></span>
+                        </div>
+                        
+                        <div class="relative">
+                            <select wire:model.live="selectedWarehouseId" 
+                                class="w-full text-sm font-bold text-blue-900 bg-white border border-blue-300 rounded-xl px-3.5 py-2.5 shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer">
+                                @foreach ($availableWarehouses as $w)
+                                    <option value="{{ $w->id }}">{{ $w->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <p class="text-[11px] text-blue-700/80 mt-1.5 flex items-center gap-1">
+                            <span>ℹ️ Stok barang yang diterima akan otomatis masuk ke gudang <strong>{{ $selectedWh->name ?? '-' }}</strong> di Accurate.</span>
+                        </p>
+                    </div>
+
+                    <!-- Status Banner -->
+                    @if ($isComplete)
+                        <div class="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                                <span class="font-bold text-emerald-900">Status PO: Penerimaan Lengkap (100% COMPLETED)</span>
+                            </div>
+                            <span class="font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg">{{ $received }} / {{ $ordered }} Unit</span>
+                        </div>
+                    @else
+                        <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs space-y-1">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                                    <span class="font-bold text-amber-900">Status PO: Penerimaan Sebagian (PARTIAL)</span>
+                                </div>
+                                <span class="font-mono font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-lg">{{ $received }} / {{ $ordered }} Unit</span>
+                            </div>
+                            <p class="text-[11px] text-amber-700">
+                                Sisa <strong>{{ $ordered - $received }} unit</strong> belum di-scan dan dapat disinkronkan kembali pada sesi inbound berikutnya.
+                            </p>
+                        </div>
+                    @endif
+
+                    <!-- Items Summary to Push -->
+                    <div class="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+                        <div class="px-4 py-2.5 bg-slate-100 border-b border-gray-200 flex items-center justify-between text-xs font-bold text-slate-700">
+                            <span>Rincian Barang yang akan Dikirim ke Accurate:</span>
+                            <span class="text-blue-600">{{ $toPush }} Unit Siap Sync</span>
+                        </div>
+                        <div class="divide-y divide-gray-100 max-h-48 overflow-y-auto text-xs">
+                            @foreach ($po->items as $item)
+                                @php
+                                    $itemToPush = $item->quantity_received - $item->quantity_pushed;
+                                @endphp
+                                @if ($itemToPush > 0)
+                                    <div class="px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                        <div>
+                                            <div class="font-bold text-slate-800">{{ $item->item_name }}</div>
+                                            <div class="text-[11px] text-slate-500 font-mono">SKU: {{ $item->item_no }}</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="font-bold text-emerald-600 text-sm">+{{ $itemToPush }} Unit</div>
+                                            @if ($item->inspections->where('is_pushed', false)->count() > 0)
+                                                <span class="text-[10px] text-blue-600 font-medium">({{ $item->inspections->where('is_pushed', false)->count() }} SN/IMEI)</span>
+                                            @else
+                                                <span class="text-[10px] text-slate-400 font-medium">Non-SN</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Safety Notice -->
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-2 text-[11px] text-slate-600">
+                        <svg class="w-4 h-4 text-slate-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Sistem akan membuat Surat Jalan (Receive Item) baru di Accurate Online dan meng-update saldo kuantitas terkirim pada Purchase Order ini.</span>
+                    </div>
+
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="p-4 bg-slate-50 border-t border-gray-200 flex items-center justify-between gap-3">
+                    <button type="button" wire:click="closeConfirmModal" 
+                        class="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-100 transition-colors">
+                        Batal / Cek Lagi
+                    </button>
+
+                    <button type="button" wire:click="completeReceiveItem" wire:loading.attr="disabled"
+                        class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50">
+                        <svg wire:loading.remove wire:target="completeReceiveItem" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <svg wire:loading wire:target="completeReceiveItem" class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Ya, Selesaikan & Kirim ke Accurate</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    @endif
 </div>
+
