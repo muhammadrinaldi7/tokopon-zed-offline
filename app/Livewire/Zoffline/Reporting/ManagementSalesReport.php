@@ -32,6 +32,7 @@ class ManagementSalesReport extends Component
 
     public function mount()
     {
+        $this->businessUnitFilter = (string)(Auth::user()->getActiveBusinessUnitId() ?? '');
         $this->setDateRange();
     }
 
@@ -112,25 +113,101 @@ class ManagementSalesReport extends Component
         }
     }
 
-    public function getOrdersBaseQueryProperty()
+    public function getOrdersQueryProperty()
     {
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
+        $buId = $this->businessUnitFilter ?: Auth::user()->getActiveBusinessUnitId();
 
-        return Order::whereBetween('orders.order_date', [$start, $end])
-            ->whereIn('orders.order_status', ['COMPLETED'])
-            ->when($this->businessUnitFilter, function ($query) {
-                $query->where('orders.business_unit_id', $this->businessUnitFilter);
-            })
-            ->when($this->branchFilter, function ($query) {
-                $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
+        return Order::with([
+            'user',
+            'salesBy',
+            'handledBy',
+            'businessUnit',
+            'items.variant',
+            'items.promos',
+            'promos'
+        ])
+        ->whereBetween('orders.order_date', [$start, $end])
+        ->whereIn('orders.order_status', ['COMPLETED'])
+        ->when($buId && $buId !== 'all', function ($query) use ($buId) {
+            $query->where('orders.business_unit_id', $buId);
+        })
+        ->when($this->branchFilter, function ($query) {
+            $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
+        })
+        ->when($this->vendorFilter, function ($query) {
+            if ($this->vendorFilter === 'unknown') {
+                $query->whereHas('items', function ($qi) {
+                    $qi->whereNull('serial_number')->orWhere('serial_number', '');
+                });
+            } else {
+                $snList = ProductSerialNumber::whereHas('vendor', function ($qv) {
+                    $qv->where('vendor_name', $this->vendorFilter);
+                })->pluck('serial_number')->toArray();
+
+                if (!empty($snList)) {
+                    $query->whereHas('items', function ($qi) use ($snList) {
+                        $qi->where(function ($qSub) use ($snList) {
+                            $qSub->whereHas('serialNumbers', function ($qsn) use ($snList) {
+                                $qsn->whereIn('serial_number', $snList);
+                            });
+                            foreach (array_chunk($snList, 50) as $chunk) {
+                                $qSub->orWhere(function ($qc) use ($chunk) {
+                                    foreach ($chunk as $sn) {
+                                        $qc->orWhere('order_items.serial_number', 'like', '%' . $sn . '%');
+                                    }
+                                });
+                            }
+                        });
+                    });
+                }
+            }
+        })
+        ->when(!empty($this->proyekFilter), function ($query) {
+            $query->whereHas('items', function ($iq) {
+                $iq->whereHasMorph('variant', [ProductAccurate::class], function ($vq) {
+                    $vq->whereIn('proyek', $this->proyekFilter);
+                });
             });
+        })
+        ->when($this->search, function ($query) {
+            $query->where(function ($q) {
+                $q->where('orders.order_number', 'like', '%' . $this->search . '%')
+                    ->orWhere('orders.accurate_invoice_no', 'like', '%' . $this->search . '%')
+                    ->orWhere('orders.accurate_so_number', 'like', '%' . $this->search . '%')
+                    ->orWhereHas('user', function ($qc) {
+                        $qc->where('name', 'like', '%' . $this->search . '%');
+                    })
+                    ->orWhereHas('salesBy', function ($qs) {
+                        $qs->where('name', 'like', '%' . $this->search . '%');
+                    })
+                    ->orWhereHas('handledBy', function ($qh) {
+                        $qh->where('name', 'like', '%' . $this->search . '%');
+                    })
+                    ->orWhereHas('items', function ($qi) {
+                        $qi->where('product_name', 'like', '%' . $this->search . '%')
+                            ->orWhere('serial_number', 'like', '%' . $this->search . '%')
+                            ->orWhereHasMorph('variant', [ProductAccurate::class], function ($vq) {
+                                $vq->where('item_no', 'like', '%' . $this->search . '%')
+                                    ->orWhere('name', 'like', '%' . $this->search . '%');
+                            });
+                    });
+            });
+        })
+        ->latest('orders.order_date');
     }
 
     public function getItemsQueryProperty()
     {
+        return $this->buildItemsQuery();
+    }
+
+    public function buildItemsQuery()
+    {
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
+        $buId = $this->businessUnitFilter ?: Auth::user()->getActiveBusinessUnitId();
 
         return OrderItem::with([
             'order.user.profile',
@@ -140,11 +217,11 @@ class ManagementSalesReport extends Component
             'variant',
             'promos'
         ])
-        ->whereHas('order', function ($oq) use ($start, $end) {
+        ->whereHas('order', function ($oq) use ($start, $end, $buId) {
             $oq->whereBetween('order_date', [$start, $end])
                 ->whereIn('order_status', ['COMPLETED'])
-                ->when($this->businessUnitFilter, function ($bq) {
-                    $bq->where('business_unit_id', $this->businessUnitFilter);
+                ->when($buId && $buId !== 'all', function ($bq) use ($buId) {
+                    $bq->where('business_unit_id', $buId);
                 })
                 ->when($this->branchFilter, function ($bq) {
                     $bq->where('shipping_address_snapshot->store', $this->branchFilter);
@@ -152,8 +229,8 @@ class ManagementSalesReport extends Component
         })
         ->when($this->search, function ($sq) {
             $sq->where(function ($q) {
-                $q->where('product_name', 'like', '%' . $this->search . '%')
-                    ->orWhere('serial_number', 'like', '%' . $this->search . '%')
+                $q->where('order_items.product_name', 'like', '%' . $this->search . '%')
+                    ->orWhere('order_items.serial_number', 'like', '%' . $this->search . '%')
                     ->orWhereHas('order', function ($qo) {
                         $qo->where('order_number', 'like', '%' . $this->search . '%')
                             ->orWhere('accurate_invoice_no', 'like', '%' . $this->search . '%')
@@ -205,12 +282,15 @@ class ManagementSalesReport extends Component
                 $vq->whereIn('proyek', $this->proyekFilter);
             });
         })
-        ->latest('created_at');
+        ->join('orders', 'order_items.order_id', '=', 'orders.id')
+        ->select('order_items.*')
+        ->orderBy('orders.order_date', 'desc')
+        ->orderBy('order_items.id', 'desc');
     }
 
     public function generateManagementData(): array
     {
-        $items = $this->itemsQuery->get();
+        $items = $this->buildItemsQuery()->get();
 
         // Kumpulkan semua serial number untuk prefetch HPP & Vendor sekaligus
         $allSns = [];
@@ -386,7 +466,7 @@ class ManagementSalesReport extends Component
 
     public function render()
     {
-        $paginatedItems = $this->itemsQuery->paginate(20);
+        $paginatedItems = $this->buildItemsQuery()->paginate(20);
 
         // Pre-fetch SN data khusus halaman aktif untuk performa cepat di Blade UI
         $pageSns = [];
@@ -409,8 +489,8 @@ class ManagementSalesReport extends Component
         }
 
         // Hitung metrik ringkasan (Summary Cards)
-        $allMatchingItems = $this->itemsQuery->get();
-        $totalOrdersCount = $allMatchingItems->pluck('order_id')->unique()->count();
+        $allMatchingItems = $this->buildItemsQuery()->get();
+        $totalOrdersCount = $this->ordersQuery->count();
         $totalPenjualanBersih = 0;
         $totalHpp = 0;
 
@@ -461,8 +541,10 @@ class ManagementSalesReport extends Component
 
         $businessUnits = BusinessUnit::where('is_active', true)->orderBy('name')->get();
 
-        $availableBranches = Branch::when($this->businessUnitFilter, function ($q) {
-                $q->where('business_unit_id', $this->businessUnitFilter);
+        $buId = $this->businessUnitFilter ?: Auth::user()->getActiveBusinessUnitId();
+
+        $availableBranches = Branch::when($buId && $buId !== 'all', function ($q) use ($buId) {
+                $q->where('business_unit_id', $buId);
             })
             ->orderBy('name')
             ->pluck('name')
@@ -475,8 +557,8 @@ class ManagementSalesReport extends Component
             ->unique()
             ->values();
 
-        $availableProjects = ProductAccurate::when($this->businessUnitFilter, function ($q) {
-                $q->where('business_unit_id', $this->businessUnitFilter);
+        $availableProjects = ProductAccurate::when($buId && $buId !== 'all', function ($q) use ($buId) {
+                $q->where('business_unit_id', $buId);
             })
             ->whereNotNull('proyek')
             ->where('proyek', '!=', '')

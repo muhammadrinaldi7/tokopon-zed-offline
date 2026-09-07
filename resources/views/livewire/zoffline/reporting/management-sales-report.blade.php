@@ -36,7 +36,7 @@
             <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
                 <select wire:model.live="businessUnitFilter"
                     class="border-none text-sm font-bold text-gray-800 focus:ring-0 bg-transparent p-0 cursor-pointer w-full truncate">
-                    <option value="">Semua Bisnis Unit</option>
+                    <option value="all">Semua Bisnis Unit</option>
                     @foreach ($businessUnits as $bu)
                         <option value="{{ $bu->id }}">{{ $bu->name }}</option>
                     @endforeach
