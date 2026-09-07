@@ -20,6 +20,10 @@ class CekStock extends Component
     public $selectedProduct = '';
     public $selectedProductId = null;
     public $selectedProductType = null;
+    public $selectedProductPrice = 0;
+    public $selectedProductCost = 0;
+    public $selectedProductHasSn = false;
+    public $selectedProductSku = '';
     // Tambahkan properti ini di bagian atas class controller
     public $showSnModal = false;
     public $modalWarehouseName = '';
@@ -147,6 +151,10 @@ class CekStock extends Component
         if ($accurate) {
             $buName = $accurate->businessUnit->name ?? 'Unknown BU';
             $this->selectedProduct = ($accurate->name ?? 'Unknown') . " [" . $buName . "]";
+            $this->selectedProductPrice = $accurate->base_price ?? 0;
+            $this->selectedProductCost = $accurate->base_cost ?? 0;
+            $this->selectedProductHasSn = (bool)($accurate->has_sn ?? false);
+            $this->selectedProductSku = $accurate->item_no ?? '';
 
             // =========================================================================
             // AMBIL DAN KELOMPOKKAN SN BERDASARKAN WAREHOUSE_ID
@@ -198,6 +206,10 @@ class CekStock extends Component
         } else {
             $this->stockData = [];
             $this->selectedProduct = '';
+            $this->selectedProductPrice = 0;
+            $this->selectedProductCost = 0;
+            $this->selectedProductHasSn = false;
+            $this->selectedProductSku = '';
             $this->dispatch('toast', title: 'Gagal', message: 'Data produk tidak ditemukan.', type: 'error');
         }
     }
@@ -210,6 +222,10 @@ class CekStock extends Component
         $this->selectedProduct = '';
         $this->selectedProductId = null;
         $this->selectedProductType = null;
+        $this->selectedProductPrice = 0;
+        $this->selectedProductCost = 0;
+        $this->selectedProductHasSn = false;
+        $this->selectedProductSku = '';
     }
 
     public function render()

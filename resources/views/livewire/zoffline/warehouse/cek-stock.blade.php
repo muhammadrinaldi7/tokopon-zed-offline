@@ -117,6 +117,32 @@
                                 <p class="text-blue-100 text-xs uppercase tracking-wider font-bold mb-1">Informasi Stok
                                     Global</p>
                                 <h3 class="text-xl font-bold leading-tight">{{ $selectedProduct }}</h3>
+                                <div class="flex flex-wrap items-center gap-2 mt-2">
+                                    @if ($selectedProductSku)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-white/20 text-white backdrop-blur-sm">
+                                            SKU: {{ $selectedProductSku }}
+                                        </span>
+                                    @endif
+                                    @if ($selectedProductPrice > 0)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-white/20 text-white backdrop-blur-sm">
+                                            Jual: {{ \App\Utils\Format::rupiah($selectedProductPrice) }}
+                                        </span>
+                                    @endif
+                                    @can('view_modal_vendor')
+                                        @if (!$selectedProductHasSn && $selectedProductCost > 0)
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-black bg-amber-400 text-slate-900 shadow-sm" title="Harga Modal / HPP Satuan">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                HPP Modal: {{ \App\Utils\Format::rupiah($selectedProductCost) }}
+                                            </span>
+                                        @elseif($selectedProductHasSn)
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-white/20 text-white backdrop-blur-sm">
+                                                HPP: Bervariasi per SN
+                                            </span>
+                                        @endif
+                                    @endcan
+                                </div>
                             </div>
                             <button wire:click="resetCheck"
                                 class="p-2 bg-white/20 hover:bg-white/30 rounded-lg backdrop-blur-sm transition"
@@ -184,7 +210,7 @@
                                             </div>
                                         </div>
 
-                                        {{-- GANTI DARI SINI: List Serial Number per Gudang --}}
+                                        {{-- GANTI DARI SINI: List Serial Number per Gudang ATAU Info Modal Non-SN --}}
                                         @if (!empty($data['sns']) && count($data['sns']) > 0)
                                             <div
                                                 class="mt-3 pt-3 border-t border-dashed {{ $data['is_current_user_warehouse'] ? 'border-blue-200' : 'border-gray-100' }} flex justify-end">
@@ -206,6 +232,27 @@
                                                     Cek SN
                                                 </button>
                                             </div>
+                                        @else
+                                            @can('view_modal_vendor')
+                                                @if (!$selectedProductHasSn && $selectedProductCost > 0)
+                                                    <div
+                                                        class="mt-3 pt-3 border-t border-dashed {{ $data['is_current_user_warehouse'] ? 'border-blue-200' : 'border-gray-100' }} flex items-center justify-between text-xs">
+                                                        <span class="text-gray-500 flex items-center gap-1.5">
+                                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase">Non-SN</span>
+                                                            <span>Harga Modal (HPP):</span>
+                                                        </span>
+                                                        <span class="font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                                                            <svg class="w-3.5 h-3.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            {{ \App\Utils\Format::rupiah($selectedProductCost) }}
+                                                            @if ($data['stock'] > 0)
+                                                                <span class="text-gray-400 font-normal">/ unit (Total: {{ \App\Utils\Format::rupiah($selectedProductCost * $data['stock']) }})</span>
+                                                            @endif
+                                                        </span>
+                                                    </div>
+                                                @endif
+                                            @endcan
                                         @endif
 
                                     </li>
