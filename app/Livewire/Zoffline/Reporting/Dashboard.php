@@ -98,7 +98,13 @@ class Dashboard extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        $query = Order::whereBetween('created_at', [$start, $end])
+        $query = Order::where(function ($q) use ($start, $end) {
+                $q->whereBetween('order_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+                    ->orWhere(function ($sub) use ($start, $end) {
+                        $sub->whereNull('order_date')
+                            ->whereBetween('created_at', [$start, $end]);
+                    });
+            })
             ->whereIn('order_status', ['COMPLETED', 'PIUTANG'])
             ->when($this->branchFilter, function ($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
@@ -138,7 +144,13 @@ class Dashboard extends Component
         $sameDayLastMonth = $now->copy()->subMonth();
 
         $mtdQuery = Order::whereIn('order_status', ['COMPLETED', 'PIUTANG'])
-            ->whereBetween('created_at', [$startOfThisMonth, $now])
+            ->where(function ($q) use ($startOfThisMonth, $now) {
+                $q->whereBetween('order_date', [$startOfThisMonth->format('Y-m-d'), $now->format('Y-m-d')])
+                    ->orWhere(function ($sub) use ($startOfThisMonth, $now) {
+                        $sub->whereNull('order_date')
+                            ->whereBetween('created_at', [$startOfThisMonth, $now]);
+                    });
+            })
             ->when($this->branchFilter, function ($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
             })
@@ -152,7 +164,13 @@ class Dashboard extends Component
             });
 
         $lastMtdQuery = Order::whereIn('order_status', ['COMPLETED', 'PIUTANG'])
-            ->whereBetween('created_at', [$startOfLastMonth, $sameDayLastMonth])
+            ->where(function ($q) use ($startOfLastMonth, $sameDayLastMonth) {
+                $q->whereBetween('order_date', [$startOfLastMonth->format('Y-m-d'), $sameDayLastMonth->format('Y-m-d')])
+                    ->orWhere(function ($sub) use ($startOfLastMonth, $sameDayLastMonth) {
+                        $sub->whereNull('order_date')
+                            ->whereBetween('created_at', [$startOfLastMonth, $sameDayLastMonth]);
+                    });
+            })
             ->when($this->branchFilter, function ($q) {
                 $q->where('shipping_address_snapshot->store', $this->branchFilter);
             })
@@ -222,8 +240,9 @@ class Dashboard extends Component
 
         $trendDataRaw = $orders->groupBy(function ($order) use ($isSingleDay, $isYearly) {
             if ($isSingleDay) return $order->created_at->format('H:00');
-            if ($isYearly) return $order->created_at->format('M Y');
-            return $order->created_at->format('d M');
+            $date = $order->order_date ? Carbon::parse($order->order_date) : $order->created_at;
+            if ($isYearly) return $date->format('M Y');
+            return $date->format('d M');
         })->map(function ($group) {
             return $group->sum('grand_total');
         })->toArray();
