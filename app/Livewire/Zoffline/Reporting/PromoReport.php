@@ -53,6 +53,7 @@ class PromoReport extends Component
     }
     public function updatedBusinessUnitFilter()
     {
+        $this->brandFilter = '';
         $this->resetPage();
     }
 
@@ -127,13 +128,6 @@ class PromoReport extends Component
             })
             ->when($this->businessUnitFilter, function ($query) {
                 $query->where('business_unit_id', $this->businessUnitFilter);
-            })
-            ->when(!$this->businessUnitFilter, function ($query) {
-                $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
-                $query->where(function ($q) use ($buId) {
-                    $q->where('business_unit_id', $buId)
-                      ->orWhereNull('business_unit_id');
-                });
             })
             ->latest();
     }
@@ -239,6 +233,10 @@ class PromoReport extends Component
 
         // Ambil list brand yang unik dari order-order yang ada (untuk filter)
         $availableBrands = \App\Models\ProductAccurate::whereNotNull('brandName')
+            ->where('brandName', '!=', '')
+            ->when($this->businessUnitFilter, function ($q) {
+                $q->where('business_unit_id', $this->businessUnitFilter);
+            })
             ->distinct()
             ->pluck('brandName')
             ->unique(fn($brand) => strtolower(trim($brand)))
