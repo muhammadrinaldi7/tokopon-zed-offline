@@ -13,6 +13,11 @@ class Home extends Component
         return $this->redirectRoute('zoffline.monitoring-kasir', navigate: true);
     }
 
+    public function navigateToStockOpname()
+    {
+        return $this->redirectRoute('zoffline.stock-opname.index', navigate: true);
+    }
+
     public function navigateToTradeIn()
     {
         return $this->redirectRoute('zoffline.trade-in', navigate: true);

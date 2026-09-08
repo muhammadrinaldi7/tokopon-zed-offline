@@ -382,10 +382,22 @@
 
                 <div>
                     <h1 class="text-2xl ">Penerimaan <br> Barang (PO)</h1>
-                    <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Pindai dan terima barang dari Accurate</p>
+        {{-- Card: Stock Opname Cabang --}}
+        @if(auth()->user()->hasAnyRole(['bm', 'bm_gsk', 'admin', 'superadmin', 'manager_operasional_gsk']) || auth()->user()->can('manage-stock-opname'))
+            <div wire:click="navigateToStockOpname"
+                class="md:nth-[3n+1]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
+                <div class="rounded-full w-20 h-20 bg-[#E0E7FF] flex items-center justify-center text-[#4E44DB]">
+                    <svg class="w-10 h-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl ">Stock Opname <br> Cabang</h1>
+                    <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Pencatatan fisik riil dan berita acara audit stok</p>
                 </div>
             </div>
-        @endcan --}}
+        @endif
 
         @can('view-riwayat-kasir')
             {{-- Card 5: shift --}}

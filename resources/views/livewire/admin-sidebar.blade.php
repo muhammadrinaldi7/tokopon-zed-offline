@@ -138,6 +138,18 @@
                         x-show="sidebarCollapsed" style="display:none;" x-cloak>Cek Stock</span>
                 </a>
             @endcan
+
+            <a href="{{ route('zoffline.stock-opname.index') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.stock-opname.*') ? $activeClass : $inactiveClass }} group relative">
+                <svg class="w-5 h-5 flex-shrink-0 {{ request()->routeIs('zoffline.stock-opname.*') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Stock Opname</span>
+                <span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Stock Opname</span>
+            </a>
             {{-- @can('view-warehouse-stocks')
                 <a href="{{ route('admin.check-serial-number') }}" wire:navigate
                     class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.check-serial-number') ? $activeClass : $inactiveClass }}">

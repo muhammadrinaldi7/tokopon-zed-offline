@@ -80,6 +80,12 @@
                                 @if($req->request_type === 'CUSTOM_CASHBACK')
                                     Item: {{ $req->payload['product_name'] ?? '-' }}<br>
                                     Nominal: Rp {{ number_format($req->payload['amount'] ?? 0, 0, ',', '.') }}
+                                @elseif($req->request_type === 'STOCK_OPNAME_REPORT' || $req->approvable_type === 'App\Models\StockOpname' || $req->approvable instanceof \App\Models\StockOpname)
+                                    SO: {{ $req->approvable->opname_number ?? ($req->payload['opname_number'] ?? '-') }}<br>
+                                    Selisih: <span class="font-bold {{ ($req->payload['total_difference'] ?? 0) != 0 ? 'text-red-600' : 'text-green-600' }}">{{ $req->payload['total_difference'] ?? 0 }} Unit</span>
+                                    @if(!empty($req->payload['total_loss_value']))
+                                        <br><span class="text-red-600 font-bold">Loss: Rp {{ number_format($req->payload['total_loss_value'], 0, ',', '.') }}</span>
+                                    @endif
                                 @elseif($req->approvable_type === 'App\Models\Order' || $req->approvable instanceof \App\Models\Order)
                                     Order: {{ $req->approvable->order_number ?? '-' }}
                                 @elseif($req->approvable_type === 'App\Models\SellPhone' || $req->approvable instanceof \App\Models\SellPhone)
@@ -248,6 +254,18 @@
                         <p class="text-rose-600 text-[11px] mt-1 font-medium">{{ $message }}</p>
                     @enderror
                 </div>
+                @elseif($confirmingRequestType === 'STOCK_OPNAME_REPORT')
+                <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4 border-4 border-blue-50">
+                    <svg class="w-8 h-8 text-[#4E44DB]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                
+                <h3 class="mb-2 text-xl font-bold text-gray-900">Pengesahan Berita Acara Stock Opname</h3>
+                <p class="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
+                    Anda akan mengesahkan hasil audit Berita Acara Stock Opname cabang ini.
+                    <br><br>Apakah Anda yakin ingin menyetujui dan mengesahkan laporan audit ini?
+                </p>
                 @else
                 <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 border-4 border-red-50">
                     <svg class="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -266,7 +284,11 @@
                     <button wire:click="cancelApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-blue-700 focus:ring-4 focus:ring-gray-100 transition-colors cursor-pointer">
                         Batal
                     </button>
-                    @if($confirmingRequestType === 'WARRANTY_EXTENSION')
+                    @if($confirmingRequestType === 'STOCK_OPNAME_REPORT')
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-[#4E44DB] rounded-xl hover:bg-[#3d34b3] focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20 cursor-pointer">
+                        Sahkan Laporan Opname
+                    </button>
+                    @elseif($confirmingRequestType === 'WARRANTY_EXTENSION')
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20 cursor-pointer">
                         Setujui Perpanjangan
                     </button>

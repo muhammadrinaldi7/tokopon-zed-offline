@@ -66,6 +66,16 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/zoffline/inbound/{po}/scan', \App\Livewire\Zoffline\Inbound\Scan::class)->name('zoffline.inbound.scan');
     });
 
+    // Zoffline Stock Opname Cabang
+    Route::prefix('zoffline/stock-opname')->name('zoffline.stock-opname.')->group(function () {
+        Route::get('/', \App\Livewire\Zoffline\StockOpname\Index::class)->name('index');
+        Route::get('/create', \App\Livewire\Zoffline\StockOpname\Create::class)->name('create');
+        Route::get('/{opname}/count', \App\Livewire\Zoffline\StockOpname\Count::class)->name('count');
+        Route::get('/{opname}/summary', \App\Livewire\Zoffline\StockOpname\Summary::class)->name('summary');
+        Route::get('/{opname}/pdf', [\App\Http\Controllers\StockOpnamePdfController::class, 'export'])->name('pdf');
+        Route::get('/{opname}/export-excel', [\App\Http\Controllers\StockOpnamePdfController::class, 'exportExcel'])->name('export-excel');
+    });
+
     // Zoffline Approvals & Settings
     Route::get('/zoffline/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('zoffline.approvals.index');
     Route::get('/zoffline/approval-rules', \App\Livewire\Admin\Settings\ApprovalRule\Index::class)->name('zoffline.approval-rules.index')->middleware('can:manage-settings');
