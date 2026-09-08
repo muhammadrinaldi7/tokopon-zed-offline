@@ -71,7 +71,7 @@
             </button>
 
             {{-- Export CSV --}}
-            <button wire:click="exportCsvClaim" wire:loading.attr="disabled"
+            {{-- <button wire:click="exportCsvClaim" wire:loading.attr="disabled"
                 class="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-75 disabled:cursor-wait text-white text-sm font-bold py-2 px-4 rounded-xl shadow-sm transition-colors">
                 <svg wire:loading.remove wire:target="exportCsvClaim" class="w-4 h-4" fill="none"
                     stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -88,7 +88,7 @@
                 </svg>
                 <span wire:loading.remove wire:target="exportCsvClaim">Export CSV</span>
                 <span wire:loading wire:target="exportCsvClaim">Memproses...</span>
-            </button>
+            </button> --}}
         </div>
     </div>
 
@@ -103,7 +103,7 @@
             </div>
             <input wire:model.live.debounce.500ms="search" type="text"
                 class="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-purple-500 focus:border-purple-500 sm:text-sm transition-shadow"
-                placeholder="Cari No Order atau No Invoice Accurate...">
+                placeholder="Cari No Order, No Invoice, atau Serial Number (SN)...">
         </div>
     </div>
 
@@ -164,11 +164,13 @@
                                 <div class="flex flex-col gap-1">
                                     @foreach ($order->items as $item)
                                         @foreach ($item->promos as $promo)
-                                            <div class="text-sm font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded">
-                                                @if(!empty($promo->pivot->serial_number))
-                                                    <span class="font-bold text-xs text-purple-800">[SN: {{ $promo->pivot->serial_number }}]</span> 
+                                            <div
+                                                class="text-sm font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                                                @if (!empty($promo->pivot->serial_number))
+                                                    <span class="font-bold text-xs text-purple-800">[SN:
+                                                        {{ $promo->pivot->serial_number }}]</span>
                                                 @endif
-                                                {{ $promo->name }} 
+                                                {{ $promo->name }}
                                                 - Rp {{ number_format($promo->pivot->discount_amount, 0, ',', '.') }}
                                             </div>
                                         @endforeach

@@ -61,32 +61,32 @@ class PromoReport extends Component
         $now = now();
         switch ($this->dateRange) {
             case 'today':
-                $this->startDate = $now->startOfDay()->format('Y-m-d');
-                $this->endDate = $now->endOfDay()->format('Y-m-d');
+                $this->startDate = $now->copy()->startOfDay()->format('Y-m-d');
+                $this->endDate = $now->copy()->endOfDay()->format('Y-m-d');
                 break;
             case 'yesterday':
-                $this->startDate = $now->subDay()->startOfDay()->format('Y-m-d');
-                $this->endDate = clone $now->endOfDay()->format('Y-m-d');
+                $this->startDate = $now->copy()->subDay()->startOfDay()->format('Y-m-d');
+                $this->endDate = $now->copy()->subDay()->endOfDay()->format('Y-m-d');
                 break;
             case 'this_week':
-                $this->startDate = $now->startOfWeek()->format('Y-m-d');
-                $this->endDate = $now->endOfWeek()->format('Y-m-d');
+                $this->startDate = $now->copy()->startOfWeek()->format('Y-m-d');
+                $this->endDate = $now->copy()->endOfWeek()->format('Y-m-d');
                 break;
             case 'last_week':
-                $this->startDate = clone $now->subWeek()->startOfWeek()->format('Y-m-d');
-                $this->endDate = clone $now->endOfWeek()->format('Y-m-d');
+                $this->startDate = $now->copy()->subWeek()->startOfWeek()->format('Y-m-d');
+                $this->endDate = $now->copy()->subWeek()->endOfWeek()->format('Y-m-d');
                 break;
             case 'this_month':
-                $this->startDate = $now->startOfMonth()->format('Y-m-d');
-                $this->endDate = $now->endOfMonth()->format('Y-m-d');
+                $this->startDate = $now->copy()->startOfMonth()->format('Y-m-d');
+                $this->endDate = $now->copy()->endOfMonth()->format('Y-m-d');
                 break;
             case 'last_month':
-                $this->startDate = clone $now->subMonth()->startOfMonth()->format('Y-m-d');
-                $this->endDate = clone $now->endOfMonth()->format('Y-m-d');
+                $this->startDate = $now->copy()->subMonth()->startOfMonth()->format('Y-m-d');
+                $this->endDate = $now->copy()->subMonth()->endOfMonth()->format('Y-m-d');
                 break;
             case 'this_year':
-                $this->startDate = clone $now->startOfYear()->format('Y-m-d');
-                $this->endDate = clone $now->endOfYear()->format('Y-m-d');
+                $this->startDate = $now->copy()->startOfYear()->format('Y-m-d');
+                $this->endDate = $now->copy()->endOfYear()->format('Y-m-d');
                 break;
         }
     }
@@ -100,9 +100,19 @@ class PromoReport extends Component
             ])
             ->whereHas('promos') // Hanya ambil order yang pakai promo
             ->when($this->search, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('order_number', 'like', '%' . $this->search . '%')
-                        ->orWhere('accurate_invoice_no', 'like', '%' . $this->search . '%');
+                $search = trim($this->search);
+                $query->where(function ($q) use ($search) {
+                    $q->where('order_number', 'like', '%' . $search . '%')
+                        ->orWhere('accurate_invoice_no', 'like', '%' . $search . '%')
+                        ->orWhereHas('items', function ($itemQuery) use ($search) {
+                            $itemQuery->where('serial_number', 'like', '%' . $search . '%')
+                                ->orWhereHas('serialNumbers', function ($snQuery) use ($search) {
+                                    $snQuery->where('serial_number', 'like', '%' . $search . '%');
+                                })
+                                ->orWhereHas('promos', function ($promoQuery) use ($search) {
+                                    $promoQuery->where('order_item_promos.serial_number', 'like', '%' . $search . '%');
+                                });
+                        });
                 });
             })
             ->when($this->brandFilter, function ($query) {
