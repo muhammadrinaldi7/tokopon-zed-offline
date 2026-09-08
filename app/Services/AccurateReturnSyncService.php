@@ -100,6 +100,16 @@ class AccurateReturnSyncService
             ];
         }
 
+        Log::info("[AccurateReturnSync] previewReturns selesai diproses", [
+            'bu_code' => $buCode,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'total_from_accurate' => $totalCount,
+            'ready_to_sync_count' => $readyToSyncCount,
+            'already_synced_count' => $alreadySyncedCount,
+            'ready_to_sync_total_amount' => $readyToSyncTotalAmount,
+        ]);
+
         return [
             'summary' => [
                 'business_unit' => $bu->name ?? $buCode,
@@ -144,6 +154,11 @@ class AccurateReturnSyncService
             ->first();
 
         if ($existingDoc) {
+            Log::info("[AccurateReturnSync] Lewati Sales Return {$srNumber} karena sudah ada di OrderAccurateDoc", [
+                'doc_number' => $srNumber,
+                'order_id' => $existingDoc->order_id,
+                'order_number' => $existingDoc->order?->order_number,
+            ]);
             return [
                 'status' => 'skipped',
                 'reason' => 'Already synced in OrderAccurateDoc',
@@ -156,6 +171,11 @@ class AccurateReturnSyncService
             ->first();
 
         if ($existingOrder) {
+            Log::info("[AccurateReturnSync] Lewati Sales Return {$srNumber} karena Order sudah ada di POS", [
+                'doc_number' => $srNumber,
+                'order_id' => $existingOrder->id,
+                'order_number' => $existingOrder->order_number,
+            ]);
             // Re-link OrderAccurateDoc if missing
             OrderAccurateDoc::firstOrCreate(
                 [
@@ -227,6 +247,7 @@ class AccurateReturnSyncService
         $salesEmploye = null;
         if ($salespersonNo) {
             $salesEmploye = \App\Models\Employe::where('accurate_employee_id', $salespersonNo)
+                ->orWhere('employee_no', $salespersonNo)
                 ->orWhere('name', 'like', '%' . $salespersonNo . '%')
                 ->first();
         }
@@ -311,15 +332,38 @@ class AccurateReturnSyncService
 
                     // Extract Serial Number if present
                     $snList = [];
-                    if (!empty($item['detailSerialNumber'])) {
+                    if (!empty($item['detailSerialNumber']) && is_array($item['detailSerialNumber'])) {
                         foreach ($item['detailSerialNumber'] as $dsn) {
-                            if (!empty($dsn['serialNumber'])) {
-                                $snList[] = $dsn['serialNumber'];
+                            if (is_array($dsn)) {
+                                if (isset($dsn['serialNumber'])) {
+                                    if (is_array($dsn['serialNumber'])) {
+                                        $snVal = $dsn['serialNumber']['number'] ?? ($dsn['serialNumber']['serialNumber'] ?? null);
+                                        if ($snVal && is_string($snVal)) {
+                                            $snList[] = trim($snVal);
+                                        }
+                                    } elseif (is_string($dsn['serialNumber'])) {
+                                        $snList[] = trim($dsn['serialNumber']);
+                                    }
+                                } elseif (!empty($dsn['number']) && is_string($dsn['number'])) {
+                                    $snList[] = trim($dsn['number']);
+                                }
+                            } elseif (is_string($dsn)) {
+                                $snList[] = trim($dsn);
                             }
                         }
                     } elseif (!empty($item['serialNumber'])) {
-                        $snList[] = $item['serialNumber'];
+                        if (is_array($item['serialNumber'])) {
+                            $snVal = $item['serialNumber']['number'] ?? ($item['serialNumber']['serialNumber'] ?? null);
+                            if ($snVal && is_string($snVal)) {
+                                $snList[] = trim($snVal);
+                            }
+                        } elseif (is_string($item['serialNumber'])) {
+                            $snList[] = trim($item['serialNumber']);
+                        }
                     }
+
+                    // Filter only non-empty string values and remove duplicates
+                    $snList = array_unique(array_filter($snList, fn($v) => is_string($v) && strlen(trim($v)) > 0));
                     $snString = !empty($snList) ? implode(', ', $snList) : null;
 
                     // Attempt product/variant matching (read-only lookup)
@@ -328,8 +372,19 @@ class AccurateReturnSyncService
                     $variantId = null;
                     $productId = null;
 
-                    if ($itemNo) {
-                        $productAccurate = ProductAccurate::where('no', $itemNo)->first();
+                    $accurateItemId = $item['item']['id'] ?? ($item['itemId'] ?? ($item['id'] ?? null));
+
+                    if ($itemNo || $accurateItemId) {
+                        $productAccurate = null;
+                        if ($itemNo) {
+                            $productAccurate = ProductAccurate::where('item_no', $itemNo)
+                                ->orWhere('accurate_id', (string)$itemNo)
+                                ->first();
+                        }
+                        if (!$productAccurate && $accurateItemId) {
+                            $productAccurate = ProductAccurate::where('accurate_id', (string)$accurateItemId)->first();
+                        }
+
                         if ($productAccurate) {
                             $variantType = ProductAccurate::class;
                             $variantId = $productAccurate->id;
@@ -405,7 +460,17 @@ class AccurateReturnSyncService
                 'paid_at' => $orderDate,
             ]);
 
-            Log::info("Successfully synced Sales Return {$srNumber} to POS Order {$targetOrderNumber}");
+            Log::info("[AccurateReturnSync] Berhasil membuat Order Retur POS untuk SR {$srNumber}", [
+                'sr_number' => $srNumber,
+                'target_order_number' => $targetOrderNumber,
+                'order_id' => $order->id,
+                'order_date' => $orderDate->toDateString(),
+                'business_unit_id' => $bu->id,
+                'business_unit_name' => $bu->name,
+                'branch_id' => $branch?->id,
+                'branch_name' => $branchName,
+                'total_amount' => -$totalAmount,
+            ]);
 
             return [
                 'status' => 'synced',
@@ -455,13 +520,27 @@ class AccurateReturnSyncService
                     ];
                 }
             } catch (\Exception $e) {
-                Log::error("Failed to sync SR {$item['number']}: " . $e->getMessage());
+                Log::error("[AccurateReturnSync] Gagal menyinkronkan SR {$item['number']}: " . $e->getMessage(), [
+                    'item' => $item,
+                    'exception' => $e
+                ]);
                 $failed[] = [
                     'number' => $item['number'],
                     'error' => $e->getMessage(),
                 ];
             }
         }
+
+        Log::info("[AccurateReturnSync] syncAllReturns selesai", [
+            'bu_code' => $buCode,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'total_found' => count($preview['items']),
+            'synced_count' => count($synced),
+            'skipped_count' => count($skipped),
+            'failed_count' => count($failed),
+            'total_synced_amount' => $totalSyncedAmount,
+        ]);
 
         return [
             'success' => true,

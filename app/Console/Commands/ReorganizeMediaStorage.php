@@ -78,18 +78,16 @@ class ReorganizeMediaStorage extends Command
             $progressBar
         ) {
             foreach ($mediaItems as $media) {
-                $targetPath = $pathGenerator->getPath($media);
-                $oldLegacyPath = $media->id . '/';
+                $targetPath = $pathGenerator->getPath($media); // e.g. device_inspections/15/76/
                 $fileName = $media->file_name;
-
                 $targetFilePath = $targetPath . $fileName;
-                $legacyFilePath = $oldLegacyPath . $fileName;
 
-                // 1. Cek apakah file sudah berada di folder target baru
+                // 1. Cek apakah file sudah berada di folder target baru yang rapi
                 if ($storage->exists($targetFilePath)) {
                     $alreadyOrganized++;
                     
-                    // Jika file sudah di target baru, dan folder legacy masih ada & kosong, bersihkan
+                    // Bersihkan folder legacy lama jika ada dan kosong
+                    $oldLegacyPath = $media->id . '/';
                     if (!$isDryRun && $storage->exists($oldLegacyPath)) {
                         $filesInLegacy = $storage->allFiles($oldLegacyPath);
                         if (empty($filesInLegacy)) {
@@ -100,14 +98,50 @@ class ReorganizeMediaStorage extends Command
                     continue;
                 }
 
-                // 2. Cek apakah file berada di folder legacy lama ({media_id}/{file_name})
-                if ($storage->exists($legacyFilePath)) {
+                // 2. Tentukan kemungkinan lokasi file saat ini (legacy {id}/ atau intermediate 1-level {model}/{model_id}/)
+                $possibleSourceDirs = [
+                    $media->id . '/', // Legacy Spatie default
+                ];
+
+                // Tambahkan kemungkinan folder 1-level sebelumnya
+                if ($media->model_type && $media->model_id) {
+                    $modelClass = $media->model_type;
+                    if ($modelClass === 'App\Models\TradeIn') {
+                        $possibleSourceDirs[] = 'tradein/' . $media->model_id . '/';
+                    } elseif ($modelClass === 'App\Models\SellPhone') {
+                        $possibleSourceDirs[] = 'sellphone/' . $media->model_id . '/';
+                    } elseif ($modelClass === 'App\Models\DeviceInspection') {
+                        $possibleSourceDirs[] = 'device_inspections/' . $media->model_id . '/';
+                    } elseif ($modelClass === 'App\Models\User') {
+                        $possibleSourceDirs[] = 'users/' . $media->model_id . '/';
+                    } elseif ($modelClass === 'App\Models\Product' || $modelClass === 'App\Models\ProductAccurate') {
+                        $possibleSourceDirs[] = 'products/' . $media->model_id . '/';
+                    } else {
+                        $folderName = \Illuminate\Support\Str::snake(\Illuminate\Support\Str::plural(class_basename($modelClass)));
+                        $possibleSourceDirs[] = $folderName . '/' . $media->model_id . '/';
+                    }
+                }
+
+                $foundSourceDir = null;
+                $foundSourceFile = null;
+
+                foreach ($possibleSourceDirs as $srcDir) {
+                    $srcFile = $srcDir . $fileName;
+                    if ($storage->exists($srcFile)) {
+                        $foundSourceDir = $srcDir;
+                        $foundSourceFile = $srcFile;
+                        break;
+                    }
+                }
+
+                // 3. Jika file sumber ditemukan, pindahkan ke target baru
+                if ($foundSourceFile) {
                     if ($isDryRun) {
                         $movedCount++;
                         $movedList[] = [
                             'id' => $media->id,
                             'model' => class_basename($media->model_type) . " ({$media->model_id})",
-                            'from' => $legacyFilePath,
+                            'from' => $foundSourceFile,
                             'to' => $targetFilePath,
                         ];
                     } else {
@@ -116,10 +150,10 @@ class ReorganizeMediaStorage extends Command
                             $storage->makeDirectory($targetPath);
 
                             // Pindahkan file utama
-                            $storage->move($legacyFilePath, $targetFilePath);
+                            $storage->move($foundSourceFile, $targetFilePath);
 
                             // Pindahkan conversions jika ada
-                            $legacyConvPath = $oldLegacyPath . 'conversions/';
+                            $legacyConvPath = $foundSourceDir . 'conversions/';
                             $targetConvPath = $targetPath . 'conversions/';
                             if ($storage->exists($legacyConvPath)) {
                                 $storage->makeDirectory($targetConvPath);
@@ -130,7 +164,7 @@ class ReorganizeMediaStorage extends Command
                             }
 
                             // Pindahkan responsive images jika ada
-                            $legacyRespPath = $oldLegacyPath . 'responsive/';
+                            $legacyRespPath = $foundSourceDir . 'responsive/';
                             $targetRespPath = $targetPath . 'responsive/';
                             if ($storage->exists($legacyRespPath)) {
                                 $storage->makeDirectory($targetRespPath);
@@ -140,8 +174,13 @@ class ReorganizeMediaStorage extends Command
                                 }
                             }
 
-                            // Hapus folder angka lama jika sudah kosong
-                            $storage->deleteDirectory($oldLegacyPath);
+                            // Hapus folder sumber jika itu folder angka murni dan sudah kosong
+                            if (is_numeric(rtrim($foundSourceDir, '/'))) {
+                                $remaining = $storage->allFiles($foundSourceDir);
+                                if (empty($remaining)) {
+                                    $storage->deleteDirectory($foundSourceDir);
+                                }
+                            }
 
                             $movedCount++;
                         } catch (\Exception $e) {
@@ -150,13 +189,13 @@ class ReorganizeMediaStorage extends Command
                         }
                     }
                 } else {
-                    // File tidak ditemukan di folder legacy maupun target
+                    // File tidak ditemukan di lokasi manapun
                     $missingCount++;
                     $missingList[] = [
                         'id' => $media->id,
                         'model' => class_basename($media->model_type) . " ({$media->model_id})",
                         'file' => $fileName,
-                        'expected_at' => $legacyFilePath . ' / ' . $targetFilePath,
+                        'expected_at' => implode(' OR ', $possibleSourceDirs),
                     ];
                 }
 

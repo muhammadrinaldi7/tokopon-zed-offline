@@ -4,9 +4,11 @@ namespace App\Livewire\Zoffline\Reporting;
 
 use App\Exports\SalesReportExport;
 use App\Exports\SalesVendorReportExport;
+use App\Models\BusinessUnit;
 use App\Models\Order;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Maatwebsite\Excel\Facades\Excel;
@@ -566,10 +568,31 @@ class SalesReport extends Component
     {
         $this->isSyncLoading = true;
         $this->syncResultMessage = null;
+
+        Log::info("[SalesReport] Memulai loadSyncPreview Accurate", [
+            'user_id' => Auth::id(),
+            'user_name' => Auth::user()?->name,
+            'active_bu_id' => Auth::user()?->getActiveBusinessUnitId(),
+            'selected_bu_code' => $this->syncBuCode,
+            'sync_start_date' => $this->syncStartDate,
+            'sync_end_date' => $this->syncEndDate,
+        ]);
+
         try {
             $syncService = app(\App\Services\AccurateReturnSyncService::class);
             $this->syncPreviewData = $syncService->previewReturns($this->syncStartDate, $this->syncEndDate, $this->syncBuCode);
+
+            Log::info("[SalesReport] loadSyncPreview Accurate Berhasil", [
+                'total_count' => $this->syncPreviewData['summary']['total_count'] ?? 0,
+                'ready_to_sync_count' => $this->syncPreviewData['summary']['ready_to_sync_count'] ?? 0,
+                'already_synced_count' => $this->syncPreviewData['summary']['already_synced_count'] ?? 0,
+                'ready_to_sync_total_amount' => $this->syncPreviewData['summary']['ready_to_sync_total_amount'] ?? 0,
+            ]);
         } catch (\Exception $e) {
+            Log::error("[SalesReport] loadSyncPreview Accurate Gagal: " . $e->getMessage(), [
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             $this->syncResultMessage = "Gagal memuat pratinjau dari Accurate: " . $e->getMessage();
             $this->syncResultType = 'error';
             $this->syncPreviewData = null;
@@ -582,14 +605,51 @@ class SalesReport extends Component
     {
         $this->isSyncLoading = true;
         $this->syncResultMessage = null;
+
+        Log::info("[SalesReport] Memulai eksekusi executeSyncReturns Accurate", [
+            'user_id' => Auth::id(),
+            'user_name' => Auth::user()?->name,
+            'active_bu_id' => Auth::user()?->getActiveBusinessUnitId(),
+            'selected_bu_code' => $this->syncBuCode,
+            'sync_start_date' => $this->syncStartDate,
+            'sync_end_date' => $this->syncEndDate,
+        ]);
+
         try {
             $syncService = app(\App\Services\AccurateReturnSyncService::class);
             $result = $syncService->syncAllReturns($this->syncStartDate, $this->syncEndDate, $this->syncBuCode, Auth::id());
 
             $syncedCount = $result['synced_count'];
+            $skippedCount = $result['skipped_count'] ?? 0;
+            $failedCount = $result['failed_count'] ?? 0;
             $totalAmountFormatted = number_format($result['total_synced_amount'], 0, ',', '.');
 
-            $this->syncResultMessage = "Berhasil menyinkronkan {$syncedCount} transaksi retur (Total Nilai: Rp {$totalAmountFormatted}). Laporan penjualan diperbarui!";
+            Log::info("[SalesReport] Eksekusi executeSyncReturns Accurate Selesai", [
+                'synced_count' => $syncedCount,
+                'skipped_count' => $skippedCount,
+                'failed_count' => $failedCount,
+                'total_synced_amount' => $result['total_synced_amount'],
+                'synced_items' => $result['synced_items'],
+                'skipped_items' => $result['skipped_items'],
+                'failed_items' => $result['failed_items'],
+            ]);
+
+            // Otomatis sesuaikan filter tanggal tabel utama agar data retur yang baru ditarik langsung terlihat
+            $this->startDate = $this->syncStartDate;
+            $this->endDate = $this->syncEndDate;
+            $this->dateRange = 'custom';
+
+            $bu = BusinessUnit::where('code', $this->syncBuCode)->first();
+            $activeBuId = Auth::user()?->getActiveBusinessUnitId();
+
+            $msg = "Berhasil menyinkronkan {$syncedCount} transaksi retur (Total Nilai: Rp {$totalAmountFormatted}) untuk periode {$this->syncStartDate} s/d {$this->syncEndDate}. Filter tabel otomatis disesuaikan!";
+            
+            if ($bu && $activeBuId != $bu->id) {
+                $msg .= " (Perhatian: Unit Usaha aktif Anda saat ini berbeda dengan '{$bu->name}'. Silakan beralih ke Unit Usaha '{$bu->name}' untuk melihat data ini pada tabel).";
+                Log::warning("[SalesReport] Unit Usaha aktif user (ID: {$activeBuId}) tidak sama dengan Unit Usaha yang disinkronkan (ID: {$bu->id} - {$bu->name})");
+            }
+
+            $this->syncResultMessage = $msg;
             $this->syncResultType = 'success';
 
             // Reload preview data to show synced state
@@ -598,6 +658,10 @@ class SalesReport extends Component
             // Reset pagination for main table
             $this->resetPage();
         } catch (\Exception $e) {
+            Log::error("[SalesReport] Error saat executeSyncReturns Accurate: " . $e->getMessage(), [
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             $this->syncResultMessage = "Terjadi kesalahan saat sinkronisasi: " . $e->getMessage();
             $this->syncResultType = 'error';
         } finally {
