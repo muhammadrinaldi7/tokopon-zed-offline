@@ -22,6 +22,7 @@ class SalesReport extends Component
     public $startDate;
     public $endDate;
     public $search = '';
+    public $businessUnitFilter = '';
     public $branchFilter = '';
     public $vendorFilter = '';
     public $proyekFilter = [];
@@ -39,7 +40,14 @@ class SalesReport extends Component
 
     public function mount()
     {
+        $this->businessUnitFilter = (string)(Auth::user()->getActiveBusinessUnitId() ?? '');
         $this->setDateRange();
+    }
+
+    public function updatedBusinessUnitFilter()
+    {
+        $this->branchFilter = '';
+        $this->resetPage();
     }
 
     public function updatedActiveTab()
@@ -175,7 +183,9 @@ class SalesReport extends Component
                     });
                 });
             })
-            ->where('orders.business_unit_id', Auth::user()->getActiveBusinessUnitId())
+            ->when($this->businessUnitFilter && $this->businessUnitFilter !== 'all', function ($query) {
+                $query->where('orders.business_unit_id', $this->businessUnitFilter);
+            })
             ->latest('orders.order_date');
     }
 
@@ -677,7 +687,9 @@ class SalesReport extends Component
         $orders = Order::with(['items.variant', 'items.promos', 'user', 'salesBy', 'handledBy'])
             ->whereBetween('orders.order_date', [$start, $end])
             ->whereIn('orders.order_status', ['COMPLETED', 'piutang'])
-            ->where('orders.business_unit_id', Auth::user()->getActiveBusinessUnitId())
+            ->when($this->businessUnitFilter && $this->businessUnitFilter !== 'all', function ($query) {
+                $query->where('orders.business_unit_id', $this->businessUnitFilter);
+            })
             ->when($this->branchFilter, function ($query) {
                 $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
             })
@@ -827,7 +839,9 @@ class SalesReport extends Component
         $orders = Order::with(['items.variant', 'items.promos'])
             ->whereBetween('orders.order_date', [$start, $end])
             ->whereIn('orders.order_status', ['COMPLETED'])
-            ->where('orders.business_unit_id', Auth::user()->getActiveBusinessUnitId())
+            ->when($this->businessUnitFilter && $this->businessUnitFilter !== 'all', function ($query) {
+                $query->where('orders.business_unit_id', $this->businessUnitFilter);
+            })
             ->when($this->branchFilter, function ($query) {
                 $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
             })
@@ -961,9 +975,12 @@ class SalesReport extends Component
     public function render()
     {
         $orders = $this->ordersQuery->paginate(20);
-        $availableBranches = \App\Models\Branch::where('business_unit_id', Auth::user()->getActiveBusinessUnitId())
-            ->orderBy('name')
-            ->pluck('name');
+
+        $branchQuery = \App\Models\Branch::query();
+        if ($this->businessUnitFilter && $this->businessUnitFilter !== 'all') {
+            $branchQuery->where('business_unit_id', $this->businessUnitFilter);
+        }
+        $availableBranches = $branchQuery->orderBy('name')->pluck('name');
 
         $availableVendors = \App\Models\Vendor::orderBy('vendor_name')
             ->pluck('vendor_name')
@@ -978,6 +995,8 @@ class SalesReport extends Component
             ->unique()
             ->values();
 
+        $businessUnits = \App\Models\BusinessUnit::orderBy('name')->get();
+
         $totalGross = $this->ordersQuery->sum('total_amount');
         $netQuery = clone $this->ordersQuery;
         $totalNet = $netQuery->get()->sum(function ($order) {
@@ -987,6 +1006,7 @@ class SalesReport extends Component
         return view('livewire.zoffline.reporting.sales-report', [
             'orders' => $orders,
             'vendorSummary' => $this->vendorSummary,
+            'businessUnits' => $businessUnits,
             'availableBranches' => $availableBranches,
             'availableVendors' => $availableVendors,
             'availableProjects' => $availableProjects,

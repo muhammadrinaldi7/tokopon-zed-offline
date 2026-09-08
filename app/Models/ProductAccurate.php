@@ -53,4 +53,20 @@ class ProductAccurate extends Model
     {
         return $this->hasOne(BuybackDevice::class, 'product_accurate_id', 'id');
     }
+
+    /**
+     * Self-referencing relationship for polymorphic compatibility with ProductVariant/SecondProductVariant
+     */
+    public function accurateData()
+    {
+        return $this->belongsTo(self::class, 'id', 'id');
+    }
+
+    /**
+     * Accessor fallback so $variant->accurateData always returns self when variant is ProductAccurate
+     */
+    public function getAccurateDataAttribute()
+    {
+        return $this;
+    }
 }

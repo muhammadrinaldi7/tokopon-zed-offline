@@ -27,9 +27,117 @@ class Scan extends Component
     public $scannedImei = '';
     public $activeItemId = null;
 
+    // Inline Editing IMEI State
+    public $editingInspectionId = null;
+    public $editingImei = '';
+    public $editErrorMessage = '';
+
     // Warehouse Selection & Confirmation Modal
     public $selectedWarehouseId = null;
     public $showConfirmModal = false;
+
+    /**
+     * Validasi format IMEI atau Serial Number dengan Luhn Checksum Algorithm
+     */
+    public static function validateImeiOrSn(string $input): array
+    {
+        $clean = strtoupper(trim(preg_replace('/[\s\-\.]/', '', $input)));
+        if (empty($clean)) {
+            return [
+                'valid' => false,
+                'clean' => '',
+                'type' => 'empty',
+                'message' => 'IMEI atau Serial Number tidak boleh kosong.'
+            ];
+        }
+
+        if (!preg_match('/^[A-Z0-9]+$/', $clean)) {
+            return [
+                'valid' => false,
+                'clean' => $clean,
+                'type' => 'invalid_chars',
+                'message' => 'Karakter tidak valid. Hanya angka dan huruf kapital tanpa simbol yang diperbolehkan.'
+            ];
+        }
+
+        $length = strlen($clean);
+
+        // Jika angka murni (Standar IMEI GSM)
+        if (ctype_digit($clean)) {
+            // Standar IMEI GSM Internasional: 15 digit (dengan Luhn Check Digit di digit ke-15)
+            if ($length === 15) {
+                $sum = 0;
+                $parity = $length % 2;
+                for ($i = 0; $i < $length; $i++) {
+                    $digit = (int)$clean[$i];
+                    if ($i % 2 === $parity) {
+                        $digit *= 2;
+                        if ($digit > 9) $digit -= 9;
+                    }
+                    $sum += $digit;
+                }
+
+                if ($sum % 10 !== 0) {
+                    return [
+                        'valid' => false,
+                        'clean' => $clean,
+                        'type' => 'imei_invalid_luhn',
+                        'message' => "Format IMEI 15 digit tidak valid (Luhn Checksum gagal). Ada kemungkinan angka salah ketik atau tertukar. Mohon periksa kembali fisik HP."
+                    ];
+                }
+
+                return [
+                    'valid' => true,
+                    'clean' => $clean,
+                    'type' => 'imei_valid',
+                    'message' => 'IMEI 15 Digit Valid (Luhn Passed)'
+                ];
+            }
+
+            if ($length === 14) {
+                // 14 digit IMEI tanpa check digit
+                return [
+                    'valid' => true,
+                    'clean' => $clean,
+                    'type' => 'imei_14_digit',
+                    'message' => 'IMEI 14 Digit (Tanpa Check Digit)'
+                ];
+            }
+
+            if ($length < 8 || $length > 18) {
+                return [
+                    'valid' => false,
+                    'clean' => $clean,
+                    'type' => 'invalid_length',
+                    'message' => "Panjang Serial Number/IMEI tidak wajar ({$length} digit). Standar IMEI adalah 15 digit angka."
+                ];
+            }
+
+            return [
+                'valid' => true,
+                'clean' => $clean,
+                'type' => 'numeric_sn',
+                'message' => "Serial Number Numerik ({$length} digit)"
+            ];
+        }
+
+        // Alfanumerik (misal Apple SN, laptop, aksesoris)
+        if ($length >= 6 && $length <= 20) {
+            return [
+                'valid' => true,
+                'clean' => $clean,
+                'type' => 'alphanumeric_sn',
+                'message' => "Serial Number Alfanumerik ({$length} karakter)"
+            ];
+        }
+
+        return [
+            'valid' => false,
+            'clean' => $clean,
+            'type' => 'invalid_sn',
+            'message' => "Panjang Serial Number alfanumerik ({$length} karakter) tidak wajar (standar 6-20 karakter)."
+        ];
+    }
 
     public function mount(PurchaseOrder $po)
     {
@@ -72,13 +180,13 @@ class Scan extends Component
     {
         $this->errorMessage = '';
         $this->successMessage = '';
-        $barcode = trim($this->barcodeInput);
-        if (empty($barcode)) return;
+        $rawBarcode = trim($this->barcodeInput);
+        if (empty($rawBarcode)) return;
 
         // 1. Cek apakah ini barcode SKU (Item No)
-        $item = $this->po->items->where('item_no', $barcode)->first();
+        $item = $this->po->items->where('item_no', $rawBarcode)->first();
         if ($item) {
-            $this->setActiveItem($barcode);
+            $this->setActiveItem($rawBarcode);
             return;
         }
 
@@ -89,7 +197,16 @@ class Scan extends Component
             return;
         }
 
-        // 3. Proses IMEI
+        // 3. Validasi Format & Luhn Checksum IMEI/SN
+        $validation = self::validateImeiOrSn($rawBarcode);
+        if (!$validation['valid']) {
+            $this->errorMessage = $validation['message'];
+            return;
+        }
+
+        $barcode = $validation['clean'];
+
+        // 4. Proses IMEI
         $activeItem = $this->po->items->where('item_no', $this->activeItemNo)->first();
         if (!$activeItem) return;
 
@@ -126,7 +243,74 @@ class Scan extends Component
         $this->activeItemId = null;
     }
 
+    public function startEditImei($inspectionId)
+    {
+        $this->errorMessage = '';
+        $this->editErrorMessage = '';
+        $inspection = DeviceInspection::find($inspectionId);
+        if ($inspection) {
+            if ($inspection->is_pushed) {
+                $this->dispatch('toast', title: 'Peringatan', message: 'Item ini sudah disinkronkan ke Accurate dan tidak dapat diedit di sini.', type: 'warning');
+                return;
+            }
+            $this->editingInspectionId = $inspectionId;
+            $this->editingImei = $inspection->imei;
+        }
+    }
 
+    public function cancelEditImei()
+    {
+        $this->editingInspectionId = null;
+        $this->editingImei = '';
+        $this->editErrorMessage = '';
+    }
+
+    public function saveEditImei()
+    {
+        $this->editErrorMessage = '';
+        if (!$this->editingInspectionId) return;
+
+        $inspection = DeviceInspection::find($this->editingInspectionId);
+        if (!$inspection) {
+            $this->cancelEditImei();
+            return;
+        }
+
+        if ($inspection->is_pushed) {
+            $this->dispatch('toast', title: 'Peringatan', message: 'Item ini sudah disinkronkan ke Accurate.', type: 'warning');
+            $this->cancelEditImei();
+            return;
+        }
+
+        $validation = self::validateImeiOrSn($this->editingImei);
+        if (!$validation['valid']) {
+            $this->editErrorMessage = $validation['message'];
+            return;
+        }
+
+        $newImei = $validation['clean'];
+
+        // Cek duplikasi jika nomor berubah
+        if ($newImei !== $inspection->imei) {
+            $exists = DeviceInspection::where('imei', $newImei)
+                ->where('inspectable_type', PurchaseOrderItem::class)
+                ->where('id', '!=', $inspection->id)
+                ->exists();
+
+            if ($exists) {
+                $this->editErrorMessage = "IMEI {$newImei} sudah terdaftar pada data inspeksi lain.";
+                return;
+            }
+        }
+
+        $oldImei = $inspection->imei;
+        $inspection->imei = $newImei;
+        $inspection->save();
+
+        $this->cancelEditImei();
+        $this->po->refresh();
+        $this->dispatch('toast', title: 'Berhasil', message: "IMEI {$oldImei} berhasil dikoreksi menjadi {$newImei}.", type: 'success');
+    }
 
     public function deleteQc($inspectionId)
     {
@@ -315,7 +499,8 @@ class Scan extends Component
             ->get();
 
         return view('livewire.zoffline.inbound.scan', [
-            'availableWarehouses' => $availableWarehouses
+            'availableWarehouses' => $availableWarehouses,
+            'po' => $this->po
         ]);
     }
 }

@@ -34,6 +34,7 @@ class LaporanStokExport implements FromCollection, WithHeadings, ShouldAutoSize,
             'Brand',
             'Kategori',
             'Lokasi Gudang',
+            'Qty',
             'Harga Pokok (HPP)',
             'Vendor',
             'Tanggal Masuk',
@@ -44,8 +45,8 @@ class LaporanStokExport implements FromCollection, WithHeadings, ShouldAutoSize,
 
     public function map($item): array
     {
-        $umur = $item->receipt_date 
-            ? intval(\Carbon\Carbon::parse($item->receipt_date)->startOfDay()->diffInDays(now()->startOfDay())) . ' Hari' 
+        $umur = $item->receipt_date
+            ? intval(\Carbon\Carbon::parse($item->receipt_date)->startOfDay()->diffInDays(now()->startOfDay())) . ' Hari'
             : '-';
 
         return [
@@ -55,6 +56,7 @@ class LaporanStokExport implements FromCollection, WithHeadings, ShouldAutoSize,
             $item->productAccurate->brandName ?? '-',
             $item->productAccurate->categoryName ?? '-',
             $item->warehouse->name ?? 'Belum Dialokasikan',
+            1,
             round($item->hpp ?? 0),
             $item->vendor->vendor_name ?? '-',
             $item->receipt_date ? \Carbon\Carbon::parse($item->receipt_date)->format('Y-m-d') : '-',

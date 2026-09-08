@@ -524,7 +524,16 @@ class ClaimManagement extends Component
         if (strlen($this->search_imei_query) > 2) {
             $claim = null;
             if ($this->selectedClaimId) {
-                $claim = \App\Models\WarrantyClaim::with(['warranty.orderItem.variant.accurateData', 'warranty.policy.businessUnit'])->find($this->selectedClaimId);
+                $claim = \App\Models\WarrantyClaim::with([
+                    'warranty.orderItem.variant' => function (\Illuminate\Database\Eloquent\Relations\MorphTo $morphTo) {
+                        $morphTo->morphWith([
+                            \App\Models\ProductVariant::class => ['accurateData'],
+                            \App\Models\SecondProductVariant::class => ['accurateData'],
+                            \App\Models\ProductAccurate::class => [],
+                        ]);
+                    },
+                    'warranty.policy.businessUnit'
+                ])->find($this->selectedClaimId);
             }
 
             // Tentukan Target SKU/Item No
