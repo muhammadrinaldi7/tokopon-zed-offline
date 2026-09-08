@@ -42,7 +42,12 @@ class MonitoringKasir extends Component
             })
             ->where('business_unit_id', 2)
             ->where('handled_by', $this->selectedKasirId)
-            ->whereDate('order_date', today());
+            ->where(function ($q) {
+                $q->whereDate('order_date', today())
+                  ->orWhere(function ($sub) {
+                      $sub->whereNull('order_date')->whereDate('created_at', today());
+                  });
+            });
 
         if (Auth::user()->branch_id) {
             $query->where('branch_id', Auth::user()->branch_id);
@@ -124,7 +129,12 @@ class MonitoringKasir extends Component
                   ->orWhere('category', 'like', '%CASH%');
             })
             ->where('business_unit_id', 2)
-            ->whereDate('created_at', today());
+            ->where(function ($q) {
+                $q->whereDate('order_date', today())
+                  ->orWhere(function ($sub) {
+                      $sub->whereNull('order_date')->whereDate('created_at', today());
+                  });
+            });
 
         if (Auth::user()->branch_id) {
             $query->where('branch_id', Auth::user()->branch_id);
