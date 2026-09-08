@@ -129,7 +129,7 @@ class ManagementSalesReport extends Component
             'promos'
         ])
         ->whereBetween('orders.order_date', [$start, $end])
-        ->whereIn('orders.order_status', ['COMPLETED'])
+        ->whereIn('orders.order_status', ['COMPLETED', 'PIUTANG'])
         ->when($buId && $buId !== 'all', function ($query) use ($buId) {
             $query->where('orders.business_unit_id', $buId);
         })
@@ -219,7 +219,7 @@ class ManagementSalesReport extends Component
         ])
         ->whereHas('order', function ($oq) use ($start, $end, $buId) {
             $oq->whereBetween('order_date', [$start, $end])
-                ->whereIn('order_status', ['COMPLETED'])
+                ->whereIn('order_status', ['COMPLETED', 'PIUTANG'])
                 ->when($buId && $buId !== 'all', function ($bq) use ($buId) {
                     $bq->where('business_unit_id', $buId);
                 })
