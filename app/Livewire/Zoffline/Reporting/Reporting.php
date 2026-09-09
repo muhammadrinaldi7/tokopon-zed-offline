@@ -18,6 +18,11 @@ class Reporting extends Component
         return $this->redirectRoute('reporting.sales-management', navigate: true);
     }
 
+    public function navigateToSalesProject()
+    {
+        return $this->redirectRoute('reporting.sales-project', navigate: true);
+    }
+
     public function navigateToStock()
     {
         return $this->redirectRoute('reporting.stock', navigate: true);

@@ -42,6 +42,20 @@
             </div>
         @endcan
 
+        <!-- Card: Penjualan Per Proyek -->
+        <div wire:click="navigateToSalesProject"
+            class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out border border-sky-100">
+            <div class="rounded-full w-16 h-16 bg-sky-50 flex items-center justify-center text-sky-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M3 14h18m-9-4v8m-7 4h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Penjualan Per Proyek</h2>
+                <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Matriks pivot ringkasan performa penjualan harian per kategori proyek.</p>
+            </div>
+        </div>
+
         <!-- Card 2: Stok -->
         <div wire:click="navigateToStock"
             class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">

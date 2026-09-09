@@ -5,8 +5,16 @@
             <p class="text-sm text-gray-500 mt-1">Rekapitulasi transaksi dan performa penjualan per vendor untuk seluruh
                 cabang</p>
         </div>
-        @can('sinkron-retur-accurate')
-            <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2">
+            <a href="{{ route('reporting.sales-project') }}" wire:navigate
+                class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all">
+                <svg class="w-4 h-4 text-[#1c69d4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 10h18M3 14h18m-9-4v8m-7 4h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>Matriks Penjualan Proyek</span>
+            </a>
+            @can('sinkron-retur-accurate')
                 <button wire:click="openSyncModal"
                     class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -15,8 +23,8 @@
                     </svg>
                     <span>Sinkronkan Retur Accurate</span>
                 </button>
-            </div>
-        @endcan
+            @endcan
+        </div>
     </div>
 
     <div class="flex flex-col items-start mb-6 gap-4">
