@@ -42,6 +42,7 @@ class ClaimManagement extends Component
     public $replacement_price = 0;
     public $original_price = 0;
     public $replacement_product_name = '';
+    public $replacement_proyek = '';
     public $search_product_query = '';
     public $product_results = [];
     public $bank_no = '10.02.103';
@@ -98,7 +99,8 @@ class ClaimManagement extends Component
             $searchTerm = $this->search_product_query;
             $query = \App\Models\ProductAccurate::where(function ($q) use ($searchTerm) {
                 $q->where('name', 'like', '%' . $searchTerm . '%')
-                    ->orWhere('item_no', 'like', '%' . $searchTerm . '%');
+                    ->orWhere('item_no', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('proyek', 'like', '%' . $searchTerm . '%');
             });
 
             if ($this->selectedClaimId) {
@@ -126,11 +128,12 @@ class ClaimManagement extends Component
         }
     }
 
-    public function selectReplacementProduct($itemNo, $name, $price)
+    public function selectReplacementProduct($itemNo, $name, $price, $proyek = null)
     {
         $this->replacement_item_no = $itemNo;
         $this->replacement_product_name = $name;
         $this->replacement_price = $price;
+        $this->replacement_proyek = $proyek ?: (\App\Models\ProductAccurate::where('item_no', $itemNo)->value('proyek') ?? '');
         $this->search_product_query = '';
         $this->product_results = [];
     }
@@ -140,6 +143,7 @@ class ClaimManagement extends Component
         $this->replacement_item_no = null;
         $this->replacement_product_name = '';
         $this->replacement_price = 0;
+        $this->replacement_proyek = '';
         $this->search_product_query = '';
         $this->product_results = [];
     }
@@ -578,6 +582,7 @@ class ClaimManagement extends Component
                         'serial_number' => $sn->serial_number,
                         'product_name' => $productName,
                         'item_no' => $sn->item_no,
+                        'proyek' => $sn->productAccurate->proyek ?? null,
                         'warehouse_name' => $sn->warehouse->name ?? 'Gudang Utama / -',
                         'warehouse_id' => $sn->warehouse_id,
                         'is_current_warehouse' => $userWarehouseId ? ($sn->warehouse_id == $userWarehouseId) : true,

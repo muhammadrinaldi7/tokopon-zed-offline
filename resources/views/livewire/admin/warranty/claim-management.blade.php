@@ -237,17 +237,35 @@
                                             <div
                                                 class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
                                                 @foreach ($product_results as $prod)
+                                                    @php
+                                                        $prodProyek = $prod['proyek'] ?? null;
+                                                        $upperProyek = strtoupper($prodProyek ?? '');
+                                                        $isResmi = str_contains($upperProyek, 'RESMI') || str_contains($upperProyek, 'IBOX') || str_contains($upperProyek, 'TAM');
+                                                        $isInter = str_contains($upperProyek, 'INTER') || str_contains($upperProyek, 'GLOBAL');
+                                                    @endphp
                                                     <button type="button"
-                                                        wire:click="selectReplacementProduct('{{ $prod['item_no'] }}', '{{ $prod['name'] }}', {{ $prod['base_price'] ?? 0 }})"
-                                                        class="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-gray-100 last:border-0 flex justify-between items-center">
-                                                        <div>
-                                                            <div
-                                                                class="font-bold text-gray-800 text-sm line-clamp-1">
-                                                                {{ $prod['name'] }}</div>
-                                                            <div class="text-xs text-gray-500 mt-0.5">SKU:
-                                                                {{ $prod['item_no'] }}</div>
+                                                        wire:click="selectReplacementProduct('{{ $prod['item_no'] }}', '{{ addslashes($prod['name']) }}', {{ $prod['base_price'] ?? 0 }}, '{{ addslashes($prodProyek ?? '') }}')"
+                                                        class="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-gray-100 last:border-0 flex justify-between items-center gap-3">
+                                                        <div class="flex-1 min-w-0">
+                                                            <div class="flex flex-wrap items-center gap-2">
+                                                                <span class="font-bold text-gray-800 text-sm line-clamp-1">
+                                                                    {{ $prod['name'] }}
+                                                                </span>
+                                                                @if (!empty($prodProyek))
+                                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider border {{ $isResmi ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ($isInter ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200') }}">
+                                                                        📁 Proyek: {{ $prodProyek }}
+                                                                    </span>
+                                                                @endif
+                                                            </div>
+                                                            <div class="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
+                                                                <span>SKU: {{ $prod['item_no'] }}</span>
+                                                                @if(!empty($prod['categoryName']))
+                                                                    <span class="text-gray-300">•</span>
+                                                                    <span>{{ $prod['categoryName'] }}</span>
+                                                                @endif
+                                                            </div>
                                                         </div>
-                                                        <div class="text-amber-600 font-bold text-sm">
+                                                        <div class="text-amber-600 font-bold text-sm whitespace-nowrap">
                                                             Rp
                                                             {{ number_format($prod['base_price'] ?? 0, 0, ',', '.') }}
                                                         </div>
@@ -282,8 +300,22 @@
                                         <p
                                             class="text-[11px] text-gray-500 uppercase font-bold tracking-wider mb-1">
                                             Produk Pengganti Terpilih</p>
-                                        <p class="font-bold text-gray-900 text-sm pr-6">
-                                            {{ $replacement_product_name }}</p>
+                                        <div class="flex flex-wrap items-center gap-2 pr-6">
+                                            <p class="font-bold text-gray-900 text-sm">
+                                                {{ $replacement_product_name }}
+                                            </p>
+                                            @if (!empty($replacement_proyek))
+                                                @php
+                                                    $upperSelProyek = strtoupper($replacement_proyek);
+                                                    $isSelResmi = str_contains($upperSelProyek, 'RESMI') || str_contains($upperSelProyek, 'IBOX') || str_contains($upperSelProyek, 'TAM');
+                                                    $isSelInter = str_contains($upperSelProyek, 'INTER') || str_contains($upperSelProyek, 'GLOBAL');
+                                                @endphp
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider border {{ $isSelResmi ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ($isSelInter ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200') }}">
+                                                    📁 Proyek: {{ $replacement_proyek }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <p class="text-xs text-gray-500 mt-0.5">SKU: {{ $replacement_item_no }}</p>
 
                                         @php
                                             $oldPrice = (float) ($original_price ?? 0);
@@ -429,14 +461,29 @@
                                     <div
                                         class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
                                         @foreach ($imei_results as $res)
+                                            @php
+                                                $resProyek = $res['proyek'] ?? null;
+                                                $upperResProyek = strtoupper($resProyek ?? '');
+                                                $isResResmi = str_contains($upperResProyek, 'RESMI') || str_contains($upperResProyek, 'IBOX') || str_contains($upperResProyek, 'TAM');
+                                                $isResInter = str_contains($upperResProyek, 'INTER') || str_contains($upperResProyek, 'GLOBAL');
+                                            @endphp
                                             <button type="button"
                                                 wire:click="selectImei('{{ $res['serial_number'] }}')"
-                                                class="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-gray-100 last:border-0 flex items-center justify-between">
-                                                <div>
-                                                    <div class="font-bold text-gray-800 font-mono text-sm">
-                                                        {{ $res['serial_number'] }}</div>
+                                                class="w-full text-left px-4 py-3 hover:bg-amber-50 transition-colors border-b border-gray-100 last:border-0 flex items-center justify-between gap-3">
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="flex flex-wrap items-center gap-2">
+                                                        <span class="font-bold text-gray-800 font-mono text-sm">
+                                                            {{ $res['serial_number'] }}
+                                                        </span>
+                                                        @if (!empty($resProyek))
+                                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border {{ $isResResmi ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ($isResInter ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200') }}">
+                                                                📁 {{ $resProyek }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
                                                     <div class="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                                                        {{ $res['product_name'] }} (SKU: {{ $res['item_no'] }})</div>
+                                                        {{ $res['product_name'] }} (SKU: {{ $res['item_no'] }})
+                                                    </div>
                                                 </div>
                                                 <div class="text-right shrink-0 ml-2">
                                                     @if(!empty($res['is_current_warehouse']))

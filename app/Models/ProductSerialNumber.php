@@ -68,4 +68,17 @@ class ProductSerialNumber extends Model
 
         return null;
     }
+
+    public function getProyekAttribute()
+    {
+        if ($this->relationLoaded('productAccurate') && $this->productAccurate) {
+            return $this->productAccurate->proyek;
+        }
+
+        if ($this->product_accurate_id && $this->productAccurate) {
+            return $this->productAccurate->proyek;
+        }
+
+        return \App\Models\ProductAccurate::where('item_no', $this->item_no)->value('proyek');
+    }
 }

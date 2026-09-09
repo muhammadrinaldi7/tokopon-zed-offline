@@ -12,7 +12,20 @@
             <p class="text-gray-500 text-sm mt-1">Perjalanan masuk dan keluar barang untuk SN/IMEI: <span
                     class="font-mono font-bold text-gray-800">{{ $sn }}</span>
                 @if ($productSn && $productSn->product_name)
-                    <span class="block mt-1 font-semibold text-gray-800 text-base">{{ $productSn->product_name }}</span>
+                    <div class="flex flex-wrap items-center gap-2 mt-1">
+                        <span class="font-semibold text-gray-800 text-base">{{ $productSn->product_name }}</span>
+                        @if (!empty($productSn->proyek))
+                            @php
+                                $histProyek = $productSn->proyek;
+                                $upperHistProyek = strtoupper($histProyek);
+                                $isHistResmi = str_contains($upperHistProyek, 'RESMI') || str_contains($upperHistProyek, 'IBOX') || str_contains($upperHistProyek, 'TAM');
+                                $isHistInter = str_contains($upperHistProyek, 'INTER') || str_contains($upperHistProyek, 'GLOBAL');
+                            @endphp
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-extrabold uppercase tracking-wider border {{ $isHistResmi ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ($isHistInter ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200') }}">
+                                📁 Proyek: {{ $histProyek }}
+                            </span>
+                        @endif
+                    </div>
                 @endif
             </p>
         </div>

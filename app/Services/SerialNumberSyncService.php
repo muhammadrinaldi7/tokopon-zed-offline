@@ -305,11 +305,22 @@ class SerialNumberSyncService
                 $qcStatus = $databaseSource === 'second' ? 'Pending Inbound' : null;
 
                 if ($existingSn) {
-                    $existingSn->update([
+                    $updatePayload = [
                         'hpp' => $hpp,
                         'vendor_id' => $localVendorId,
                         'receipt_date' => $receiptDate,
-                    ]);
+                        'business_unit_id' => $bu->id,
+                    ];
+                    if ($localWarehouseId) {
+                        $updatePayload['warehouse_id'] = $localWarehouseId;
+                    }
+                    if ($productAccurateId) {
+                        $updatePayload['product_accurate_id'] = $productAccurateId;
+                    }
+                    if ($sku) {
+                        $updatePayload['item_no'] = $sku;
+                    }
+                    $existingSn->update($updatePayload);
                     $updatedCount++;
                 } else {
                     $isAlreadySold = \App\Models\OrderItemSerialNumber::where('serial_number', $sn)->exists();
@@ -449,7 +460,7 @@ class SerialNumberSyncService
     }
 
     /**
-     * Sinkronisasi presisi untuk 1 Serial Number (HPP dari Nearest Cost & inferensi Vendor)
+     * Sinkronisasi presisi untuk 1 Serial Number (HPP & Vendor lintas Unit Usaha)
      * 
      * @param int|string $snId
      * @return array
@@ -468,8 +479,87 @@ class SerialNumberSyncService
         $vendorUpdated = false;
         $oldHpp = (float)$sn->hpp;
 
-        // 1. Tarik HPP jika belum ada atau 0
-        if (empty($sn->hpp) || (float)$sn->hpp <= 0) {
+        $newHpp = null;
+        $newVendorId = null;
+        $newReceiptDate = null;
+
+        // -------------------------------------------------------------
+        // TIER 1: Cari dari transaksi lokal SellPhone / Buyback
+        // (Khususnya jika perangkat dibeli dari customer oleh GSK / Second)
+        // -------------------------------------------------------------
+        $sellPhone = \App\Models\SellPhone::where('imei', $sn->serial_number)
+            ->when($sn->business_unit_id, function ($q) use ($sn) {
+                $q->where('business_unit_id', $sn->business_unit_id);
+            })
+            ->latest()
+            ->first();
+
+        if ($sellPhone) {
+            if ($sellPhone->appraised_value > 0) {
+                $newHpp = (float)$sellPhone->appraised_value;
+            }
+            $newReceiptDate = $sellPhone->created_at ? $sellPhone->created_at->format('Y-m-d') : null;
+
+            // 1. Cek apakah ada vendor customer di tabel vendors untuk database_source ini
+            $customerVendor = \App\Models\Vendor::where('database_source', $dbSource)
+                ->where(function ($q) {
+                    $q->where('vendor_name', 'like', '%CUSTOMER%')
+                      ->orWhere('vendor_no', 'like', '%CUSTOMER%');
+                })
+                ->first();
+
+            // 2. Jika user_id memiliki accurate vendor spesifik
+            if ($sellPhone->user_id) {
+                $uav = \App\Models\UserAccurateVendor::where('user_id', $sellPhone->user_id)
+                    ->where('business_unit_id', $sn->business_unit_id)
+                    ->first();
+                if ($uav && $uav->accurate_vendor_id) {
+                    $directVendor = \App\Models\Vendor::where('accurate_vendor_id', $uav->accurate_vendor_id)
+                        ->where('database_source', $dbSource)
+                        ->first();
+                    if ($directVendor) {
+                        $customerVendor = $directVendor;
+                    }
+                }
+            }
+
+            if ($customerVendor) {
+                $newVendorId = $customerVendor->id;
+            }
+        }
+
+        // -------------------------------------------------------------
+        // TIER 2: Cari dari transaksi lokal Inbound PO (DeviceInspection -> PurchaseOrderItem -> PurchaseOrder)
+        // -------------------------------------------------------------
+        if ($newHpp === null || $newVendorId === null) {
+            $inspection = \App\Models\DeviceInspection::where('imei', $sn->serial_number)
+                ->where('inspectable_type', \App\Models\PurchaseOrderItem::class)
+                ->latest()
+                ->first();
+
+            if ($inspection && $inspection->inspectable) {
+                /** @var \App\Models\PurchaseOrderItem $poItem */
+                $poItem = $inspection->inspectable;
+                $po = $poItem->purchaseOrder;
+
+                if ($po && (!$sn->business_unit_id || $po->database_source === $dbSource)) {
+                    if ($newHpp === null && (float)$poItem->unit_price > 0) {
+                        $newHpp = (float)$poItem->unit_price;
+                    }
+                    if ($newVendorId === null && $po->vendor_id) {
+                        $newVendorId = $po->vendor_id;
+                    }
+                    if ($newReceiptDate === null && $po->po_date) {
+                        $newReceiptDate = \Carbon\Carbon::parse($po->po_date)->format('Y-m-d');
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // TIER 3: Tarik dari Accurate API (Nearest Cost) untuk Business Unit ini jika HPP belum ditemukan
+        // -------------------------------------------------------------
+        if ($newHpp === null) {
             try {
                 $costData = $this->accurateService->getNearestCost($sn->item_no, $dbSource);
                 $cost = 0;
@@ -480,30 +570,79 @@ class SerialNumberSyncService
                 }
 
                 if ($cost > 0) {
-                    $sn->update(['hpp' => $cost]);
-                    $hppUpdated = true;
+                    $newHpp = $cost;
                 }
             } catch (\Exception $e) {
-                Log::warning("Gagal ambil nearestCost untuk SN {$sn->serial_number}: " . $e->getMessage());
+                Log::warning("Gagal ambil nearestCost untuk SN {$sn->serial_number} (source: {$dbSource}): " . $e->getMessage());
             }
         }
 
-        // 2. Inferensi Vendor jika vendor_id masih null
-        if (empty($sn->vendor_id)) {
-            // Coba ambil vendor dari SN lain dengan SKU dan BU yang sama yang sudah punya vendor
-            $siblingWithVendor = ProductSerialNumber::where('item_no', $sn->item_no)
-                ->where('business_unit_id', $sn->business_unit_id)
-                ->whereNotNull('vendor_id')
-                ->latest()
-                ->first();
-
-            if ($siblingWithVendor) {
-                $sn->update([
-                    'vendor_id' => $siblingWithVendor->vendor_id,
-                    'receipt_date' => $sn->receipt_date ?: $siblingWithVendor->receipt_date
-                ]);
-                $vendorUpdated = true;
+        // -------------------------------------------------------------
+        // TIER 4: Inferensi Vendor dari Sibling SN pada BU yang sama (atau Vendor Default BU) jika belum ditemukan
+        // -------------------------------------------------------------
+        // Cek apakah vendor saat ini valid untuk BU aktif (database_source harus sama dengan $dbSource)
+        $currentVendorValid = false;
+        if ($sn->vendor_id) {
+            $currentVendor = \App\Models\Vendor::find($sn->vendor_id);
+            if ($currentVendor && $currentVendor->database_source === $dbSource) {
+                $currentVendorValid = true;
             }
+        }
+
+        if ($newVendorId === null) {
+            if (!$currentVendorValid) {
+                // Cari sibling SN di BU yang sama yang punya vendor valid di database_source ini
+                $siblingWithVendor = ProductSerialNumber::where('item_no', $sn->item_no)
+                    ->where('business_unit_id', $sn->business_unit_id)
+                    ->whereHas('vendor', function ($q) use ($dbSource) {
+                        $q->where('database_source', $dbSource);
+                    })
+                    ->latest()
+                    ->first();
+
+                if ($siblingWithVendor) {
+                    $newVendorId = $siblingWithVendor->vendor_id;
+                    if ($newReceiptDate === null) {
+                        $newReceiptDate = $siblingWithVendor->receipt_date;
+                    }
+                } elseif ($dbSource === 'second') {
+                    // Default fallback untuk GSK Second: "CUSTOMER GSK"
+                    $defaultGskVendor = \App\Models\Vendor::where('database_source', 'second')
+                        ->where(function ($q) {
+                            $q->where('vendor_name', 'like', '%CUSTOMER%')
+                              ->orWhere('vendor_no', 'like', '%CUSTOMER%');
+                        })
+                        ->first();
+                    if ($defaultGskVendor) {
+                        $newVendorId = $defaultGskVendor->id;
+                    }
+                }
+            } else {
+                $newVendorId = $sn->vendor_id;
+            }
+        }
+
+        // Eksekusi Update jika ada perubahan data
+        $updateData = [];
+        if ($newHpp !== null && (float)$newHpp != (float)$sn->hpp) {
+            $updateData['hpp'] = $newHpp;
+            $hppUpdated = true;
+        }
+        if ($newVendorId !== null && $newVendorId != $sn->vendor_id) {
+            $updateData['vendor_id'] = $newVendorId;
+            $vendorUpdated = true;
+        } elseif (!$currentVendorValid && $newVendorId === null && $sn->vendor_id !== null) {
+            // Jika vendor lama berasal dari BU lain dan tidak ada vendor valid, kosongkan agar tidak salah asosiasi
+            $updateData['vendor_id'] = null;
+            $vendorUpdated = true;
+        }
+
+        if ($newReceiptDate !== null && $newReceiptDate != $sn->receipt_date) {
+            $updateData['receipt_date'] = $newReceiptDate;
+        }
+
+        if (!empty($updateData)) {
+            $sn->update($updateData);
         }
 
         $sn->refresh();

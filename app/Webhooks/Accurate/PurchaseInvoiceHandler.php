@@ -58,6 +58,4 @@ class PurchaseInvoiceHandler implements WebhookHandlerInterface
             }
         }
     }
-
-
 }

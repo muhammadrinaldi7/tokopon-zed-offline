@@ -78,10 +78,22 @@
                                     ];
                                     $colorClass =
                                         $statusColors[$result->status] ?? 'bg-gray-100 text-gray-800 border-gray-200';
+
+                                    $proyek = $result->proyek;
+                                    $upperProyek = strtoupper($proyek ?? '');
+                                    $isResmi = str_contains($upperProyek, 'RESMI') || str_contains($upperProyek, 'IBOX') || str_contains($upperProyek, 'TAM');
+                                    $isInter = str_contains($upperProyek, 'INTER') || str_contains($upperProyek, 'GLOBAL');
                                 @endphp
-                                <span class="px-3 py-1 text-xs font-bold rounded-full border {{ $colorClass }}">
-                                    {{ strtoupper($result->status) }}
-                                </span>
+                                <div class="flex items-center gap-2">
+                                    @if (!empty($proyek))
+                                        <span class="px-2.5 py-1 text-xs font-extrabold rounded-lg uppercase tracking-wider border {{ $isResmi ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ($isInter ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200') }}">
+                                            📁 {{ $proyek }}
+                                        </span>
+                                    @endif
+                                    <span class="px-3 py-1 text-xs font-bold rounded-full border {{ $colorClass }}">
+                                        {{ strtoupper($result->status) }}
+                                    </span>
+                                </div>
                             </div>
                             <div class="p-6">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -94,7 +106,25 @@
 
                                     <div>
                                         <p class="text-sm text-gray-500 font-medium mb-1">Nomor Item (SKU)</p>
-                                        <p class="text-lg font-medium text-gray-800">{{ $result->item_no }}</p>
+                                        <p class="text-lg font-medium text-gray-800 font-mono">{{ $result->item_no }}</p>
+                                    </div>
+
+                                    <div>
+                                        <p class="text-sm text-gray-500 font-medium mb-1">Proyek Item</p>
+                                        @if (!empty($proyek))
+                                            <span class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-extrabold uppercase tracking-wider border {{ $isResmi ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ($isInter ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200') }}">
+                                                📁 Proyek: {{ $proyek }}
+                                            </span>
+                                        @else
+                                            <span class="text-sm text-gray-400 font-medium italic">- Tidak ada proyek -</span>
+                                        @endif
+                                    </div>
+
+                                    <div>
+                                        <p class="text-sm text-gray-500 font-medium mb-1">Unit Bisnis</p>
+                                        <p class="text-base font-bold text-gray-800">
+                                            {{ $result->businessUnit?->name ?? ($result->business_unit_id == 2 ? 'GSK Second' : 'Syihab Store') }}
+                                        </p>
                                     </div>
 
                                     <div class="md:col-span-2">
