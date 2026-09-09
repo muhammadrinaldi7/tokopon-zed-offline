@@ -24,6 +24,7 @@ class SerialNumberSyncService
      */
     public function syncFromAccurate($sku, $databaseSource = null)
     {
+        $sku = (string) $sku;
         try {
             $sources = [];
             if ($databaseSource) {
@@ -75,6 +76,7 @@ class SerialNumberSyncService
      */
     private function processSnData($sku, $accurateData, $databaseSource = 'syihab')
     {
+        $sku = (string) $sku;
         $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
         if (!$bu) return 0;
         
@@ -348,6 +350,7 @@ class SerialNumberSyncService
 
     public function syncHppFromNearestCost($itemNo, $databaseSource = null)
     {
+        $itemNo = (string) $itemNo;
         try {
             $sources = [];
             if ($databaseSource) {
@@ -415,6 +418,7 @@ class SerialNumberSyncService
      */
     public function syncPriceFromAccurate($sku, $databaseSource = null)
     {
+        $sku = (string) $sku;
         $sources = [];
         if ($databaseSource) {
             $sources[] = $databaseSource;

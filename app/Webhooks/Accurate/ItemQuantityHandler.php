@@ -34,7 +34,7 @@ class ItemQuantityHandler implements WebhookHandlerInterface
             $syncService = app(\App\Services\SerialNumberSyncService::class);
             foreach (array_keys($skusToSyncSn) as $sku) {
                 try {
-                    $syncService->syncFromAccurate($sku, $log->database_source);
+                    $syncService->syncFromAccurate((string) $sku, $log->database_source);
                     \Illuminate\Support\Facades\Log::info("Webhook SN Sync sukses untuk SKU: {$sku}");
                 } catch (\Exception $e) {
                     \Illuminate\Support\Facades\Log::error("Webhook SN Sync failed for SKU {$sku}: " . $e->getMessage());
@@ -51,7 +51,7 @@ class ItemQuantityHandler implements WebhookHandlerInterface
         $warehouse = Warehouse::where('name', $warehouseName)->first();
         if (!$warehouse) return false;
 
-        $productAccurate = \App\Models\ProductAccurate::where('item_no', $itemNo)
+        $productAccurate = \App\Models\ProductAccurate::where('item_no', (string) $itemNo)
             ->where('database_source', $databaseSource)
             ->first();
 
