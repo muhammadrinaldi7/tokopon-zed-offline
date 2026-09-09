@@ -123,6 +123,13 @@ class SellPhone extends Model implements HasMedia
         return $this->morphMany(ApprovalRequest::class, 'approvable');
     }
 
+    public function latestApprovalRequest()
+    {
+        return $this->morphOne(ApprovalRequest::class, 'approvable')
+            ->where('request_type', 'SELL_PHONE_APPROVAL')
+            ->latestOfMany();
+    }
+
     public function issues()
     {
         return $this->hasMany(SellPhoneIssue::class)->latest();

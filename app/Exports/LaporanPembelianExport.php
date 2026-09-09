@@ -34,7 +34,14 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
     public function query()
     {
         $query = SellPhone::query()
-            ->with(['user', 'handledBy', 'salesBy', 'branch', 'productAccurate'])
+            ->with([
+                'user',
+                'handledBy',
+                'salesBy',
+                'branch',
+                'productAccurate',
+                'latestApprovalRequest.histories.actedBy'
+            ])
             ->where('business_unit_id', 2);
 
         if (!empty($this->search)) {
@@ -97,6 +104,7 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
             'Harga Dasar',
             'Harga Sistem',
             'Harga Beli Aktual',
+            'Catatan Approval',
         ];
     }
 
@@ -107,6 +115,30 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
         $kategori = $sellPhone->productAccurate ? $sellPhone->productAccurate->categoryName : '-';
         $proyek = $sellPhone->productAccurate ? $sellPhone->productAccurate->proyek : '-';
         $hargaDasar = $sellPhone->productAccurate ? $sellPhone->productAccurate->buy_price : 0;
+
+        $approval = $sellPhone->latestApprovalRequest;
+
+        // Ambil note dari approval history
+        $historyNotes = [];
+        if ($approval && $approval->histories && $approval->histories->isNotEmpty()) {
+            foreach ($approval->histories as $history) {
+                if (!empty($history->notes)) {
+                    $historyNotes[] = $history->notes;
+                }
+            }
+        }
+
+        // Fallback jika tidak tercatat di history tapi ada di kolom SellPhone
+        if (empty($historyNotes)) {
+            if ($sellPhone->price_adjustment_reason) {
+                $historyNotes[] = "Penyesuaian Harga: " . $sellPhone->price_adjustment_reason;
+            }
+            if ($sellPhone->reject_reason) {
+                $historyNotes[] = "Alasan Reject: " . $sellPhone->reject_reason;
+            }
+        }
+
+        $catatanApproval = !empty($historyNotes) ? implode("\n", $historyNotes) : '-';
 
         return [
             $this->rowNumber,
@@ -124,11 +156,17 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
             $hargaDasar,
             $sellPhone->original_appraised_value ?? 0,
             $sellPhone->appraised_value ?? 0,
+            $catatanApproval,
         ];
     }
 
     public function styles(Worksheet $sheet)
     {
+        // Wrap text & atur lebar kolom untuk Catatan Approval agar rapi
+        $sheet->getColumnDimension('P')->setAutoSize(false);
+        $sheet->getColumnDimension('P')->setWidth(40);
+        $sheet->getStyle('P')->getAlignment()->setWrapText(true);
+
         return [
             1 => ['font' => ['bold' => true]],
         ];

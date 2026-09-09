@@ -19,42 +19,22 @@ class CategoryandBrand extends Seeder
             'slug' => 'smartphone',
         ]);
 
-        $brand = Brand::firstOrCreate([
-            'name' => 'Xiaomi',
-            'slug' => 'xiaomi',
-        ]);
-        $brand = Brand::firstOrCreate([
-            'name' => 'Apple',
-            'slug' => 'apple',
-        ]);
-        $brand = Brand::firstOrCreate([
-            'name' => 'Samsung',
-            'slug' => 'samsung',
-        ]);
-        $brand = Brand::firstOrCreate([
-            'name' => 'Oppo',
-            'slug' => 'oppo',
-        ]);
-        $brand = Brand::firstOrCreate([
-            'name' => 'Vivo',
-            'slug' => 'vivo',
-        ]);
-        $brand = Brand::firstOrCreate([
-            'name' => 'Realme',
-            'slug' => 'realme',
-        ]);
-        $brand = Brand::firstOrCreate([
-            'name' => 'Infinix',
-            'slug' => 'infinix',
-        ]);
-        $brand = Brand::firstOrCreate([
-            'name' => 'Xiaomi',
-            'slug' => 'xiaomi',
-        ]);
-        $brand = Brand::firstOrCreate([
-            'name' => 'Tecno',
-            'slug' => 'tecno',
-        ]);
+        $brands = [
+            'Xiaomi',
+            'Apple',
+            'Samsung',
+            'Oppo',
+            'Vivo',
+            'Realme',
+            'Infinix',
+            'Tecno',
+        ];
+
+        foreach ($brands as $brandName) {
+            Brand::firstOrCreate([
+                'name' => $brandName,
+            ]);
+        }
         $this->command->info('Category and brand seeded successfully');
     }
 }
