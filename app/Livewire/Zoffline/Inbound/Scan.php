@@ -36,6 +36,14 @@ class Scan extends Component
     public $selectedWarehouseId = null;
     public $showConfirmModal = false;
 
+    // Migration / Copy from Another PO State
+    public $showMigrateModal = false;
+    public $sourcePoId = null;
+    public $itemMappings = []; // [target_item_id => source_item_id]
+    public $migrateOption = 'move'; // 'move' or 'copy'
+    public $resetPushedStatus = true;
+    public $migrateErrorMessage = '';
+
     /**
      * Validasi format IMEI atau Serial Number dengan Luhn Checksum Algorithm
      */
@@ -247,7 +255,8 @@ class Scan extends Component
     {
         $this->errorMessage = '';
         $this->editErrorMessage = '';
-        $inspection = DeviceInspection::find($inspectionId);
+        /** @var DeviceInspection|null $inspection */
+        $inspection = DeviceInspection::where('id', $inspectionId)->first();
         if ($inspection) {
             if ($inspection->is_pushed) {
                 $this->dispatch('toast', title: 'Peringatan', message: 'Item ini sudah disinkronkan ke Accurate dan tidak dapat diedit di sini.', type: 'warning');
@@ -270,7 +279,8 @@ class Scan extends Component
         $this->editErrorMessage = '';
         if (!$this->editingInspectionId) return;
 
-        $inspection = DeviceInspection::find($this->editingInspectionId);
+        /** @var DeviceInspection|null $inspection */
+        $inspection = DeviceInspection::where('id', $this->editingInspectionId)->first();
         if (!$inspection) {
             $this->cancelEditImei();
             return;
@@ -314,9 +324,11 @@ class Scan extends Component
 
     public function deleteQc($inspectionId)
     {
-        $inspection = DeviceInspection::find($inspectionId);
+        /** @var DeviceInspection|null $inspection */
+        $inspection = DeviceInspection::where('id', $inspectionId)->first();
         if ($inspection) {
-            $item = PurchaseOrderItem::find($inspection->inspectable_id);
+            /** @var PurchaseOrderItem|null $item */
+            $item = PurchaseOrderItem::where('id', $inspection->inspectable_id)->first();
             $inspection->delete();
             if ($item) {
                 $item->decrement('quantity_received');
@@ -490,6 +502,169 @@ class Scan extends Component
         }
     }
 
+    public function openMigrateModal()
+    {
+        $this->migrateErrorMessage = '';
+        $this->sourcePoId = null;
+        $this->itemMappings = [];
+        $this->migrateOption = 'move';
+        $this->resetPushedStatus = true;
+        $this->showMigrateModal = true;
+    }
+
+    public function closeMigrateModal()
+    {
+        $this->showMigrateModal = false;
+        $this->sourcePoId = null;
+        $this->itemMappings = [];
+        $this->migrateErrorMessage = '';
+    }
+
+    public function updatedSourcePoId($poId)
+    {
+        $this->migrateErrorMessage = '';
+        $this->itemMappings = [];
+
+        if (!$poId) {
+            return;
+        }
+
+        /** @var PurchaseOrder|null $sourcePo */
+        $sourcePo = PurchaseOrder::with(['items.inspections', 'items.productAccurate'])->where('id', $poId)->first();
+        if (!$sourcePo) {
+            return;
+        }
+
+        // Smart Auto-Matching
+        foreach ($this->po->items as $targetItem) {
+            $bestMatchId = null;
+
+            // 1. Coba cari yang nama item persis sama
+            $exactMatch = $sourcePo->items->first(function ($sItem) use ($targetItem) {
+                return strtolower(trim($sItem->item_name)) === strtolower(trim($targetItem->item_name)) && $sItem->inspections->count() > 0;
+            });
+
+            if ($exactMatch) {
+                $bestMatchId = $exactMatch->id;
+            } else {
+                // 2. Coba cari yang mengandung kata kunci sama dan punya data inspeksi
+                $cleanTargetName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $targetItem->item_name));
+                $fuzzyMatch = $sourcePo->items->first(function ($sItem) use ($cleanTargetName) {
+                    $cleanSourceName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $sItem->item_name));
+                    return $sItem->inspections->count() > 0 && (
+                        str_contains($cleanTargetName, $cleanSourceName) || str_contains($cleanSourceName, $cleanTargetName)
+                    );
+                });
+
+                if ($fuzzyMatch) {
+                    $bestMatchId = $fuzzyMatch->id;
+                }
+            }
+
+            $this->itemMappings[$targetItem->id] = $bestMatchId;
+        }
+    }
+
+    public function executeMigration()
+    {
+        $this->migrateErrorMessage = '';
+
+        if (!$this->sourcePoId) {
+            $this->migrateErrorMessage = 'Silakan pilih PO asal yang akan disalin.';
+            return;
+        }
+
+        /** @var PurchaseOrder|null $sourcePo */
+        $sourcePo = PurchaseOrder::with(['items.inspections'])->where('id', $this->sourcePoId)->first();
+        if (!$sourcePo) {
+            $this->migrateErrorMessage = 'PO asal tidak ditemukan.';
+            return;
+        }
+
+        // Validasi minimal ada 1 mapping yang dipilih
+        $validMappings = array_filter($this->itemMappings, function ($sourceItemId) {
+            return !empty($sourceItemId);
+        });
+
+        if (empty($validMappings)) {
+            $this->migrateErrorMessage = 'Pilih minimal satu item sumber untuk dipindahkan.';
+            return;
+        }
+
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($sourcePo, $validMappings) {
+                $totalMigrated = 0;
+
+                foreach ($validMappings as $targetItemId => $sourceItemId) {
+                    /** @var PurchaseOrderItem|null $targetItem */
+                    $targetItem = PurchaseOrderItem::where('id', $targetItemId)->first();
+                    /** @var PurchaseOrderItem|null $sourceItem */
+                    $sourceItem = PurchaseOrderItem::with('inspections')->where('id', $sourceItemId)->first();
+
+                    if (!$targetItem || !$sourceItem) {
+                        continue;
+                    }
+
+                    $inspections = $sourceItem->inspections;
+                    if ($inspections->isEmpty()) {
+                        continue;
+                    }
+
+                    foreach ($inspections as $ins) {
+                        if ($this->migrateOption === 'move') {
+                            $ins->inspectable_id = $targetItem->id;
+                            if ($this->resetPushedStatus) {
+                                $ins->is_pushed = false;
+                            }
+                            $ins->save();
+                            $totalMigrated++;
+                        } else {
+                            // Copy mode
+                            DeviceInspection::create([
+                                'inspectable_type'          => PurchaseOrderItem::class,
+                                'inspectable_id'            => $targetItem->id,
+                                'second_product_variant_id' => $ins->second_product_variant_id,
+                                'qc_template_id'            => $ins->qc_template_id,
+                                'imei'                      => $ins->imei,
+                                'label'                     => $ins->label ?? 'QC Inbound PO Grosir',
+                                'checklist_results'         => $ins->checklist_results,
+                                'passed_count'              => $ins->passed_count,
+                                'failed_count'              => $ins->failed_count,
+                                'total_items'               => $ins->total_items,
+                                'verdict'                   => $ins->verdict,
+                                'notes'                     => $ins->notes,
+                                'is_pushed'                 => false,
+                                'inspected_by'              => Auth::id() ?? $ins->inspected_by,
+                                'inspected_at'              => now(),
+                            ]);
+                            $totalMigrated++;
+                        }
+                    }
+
+                    // Update quantity_received
+                    $targetItem->quantity_received = $targetItem->inspections()->count();
+                    $targetItem->save();
+
+                    if ($this->migrateOption === 'move') {
+                        $sourceItem->quantity_received = $sourceItem->inspections()->count();
+                        $sourceItem->save();
+                    }
+                }
+
+                $this->po->refresh();
+                if ($this->migrateOption === 'move') {
+                    $sourcePo->refresh();
+                }
+            });
+
+            $this->closeMigrateModal();
+            $this->dispatch('toast', title: 'Berhasil Migrasi Data', message: 'Data hasil scan IMEI berhasil dipindahkan ke PO ini dan siap dipush ke Accurate.', type: 'success');
+        } catch (\Exception $e) {
+            Log::error('Inbound PO Migration Error: ' . $e->getMessage());
+            $this->migrateErrorMessage = 'Terjadi kesalahan saat migrasi data: ' . $e->getMessage();
+        }
+    }
+
     public function render()
     {
         $buId = Auth::user()->getActiveBusinessUnitId() ?? Auth::user()->business_unit_id ?? 2;
@@ -498,9 +673,22 @@ class Scan extends Component
             ->orderBy('name')
             ->get();
 
+        $availableSourcePos = PurchaseOrder::where('id', '!=', $this->po->id)
+            ->whereHas('items.inspections')
+            ->orderBy('id', 'desc')
+            ->take(30)
+            ->get();
+
+        /** @var PurchaseOrder|null $sourcePoObj */
+        $sourcePoObj = $this->sourcePoId 
+            ? PurchaseOrder::with(['items.inspections', 'items.productAccurate'])->where('id', $this->sourcePoId)->first() 
+            : null;
+
         return view('livewire.zoffline.inbound.scan', [
             'availableWarehouses' => $availableWarehouses,
-            'po' => $this->po
+            'availableSourcePos'  => $availableSourcePos,
+            'sourcePoObj'         => $sourcePoObj,
+            'po'                  => $this->po
         ]);
     }
 }

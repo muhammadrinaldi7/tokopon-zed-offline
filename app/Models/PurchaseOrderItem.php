@@ -24,4 +24,14 @@ class PurchaseOrderItem extends Model
     {
         return $this->morphMany(DeviceInspection::class, 'inspectable');
     }
+
+    public function productAccurate()
+    {
+        return $this->belongsTo(ProductAccurate::class, 'item_no', 'item_no');
+    }
+
+    public function getProyekAttribute()
+    {
+        return $this->productAccurate?->proyek ?? '-';
+    }
 }
