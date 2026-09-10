@@ -93,6 +93,7 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
             'Tanggal Transaksi',
             'No. Invoice',
             'Merek & Model HP',
+            'Deskripsi',
             'Kategori',
             'Proyek',
             'Handled By (Frontliner)',
@@ -145,6 +146,7 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
             $sellPhone->created_at->format('Y-m-d H:i:s'),
             $sellPhone->invoice_number ?: '-',
             $sellPhone->phone_brand . ' - ' . $sellPhone->phone_model,
+            $sellPhone->minus_desc ?: '-',
             $kategori,
             $proyek,
             $sellPhone->handledBy ? $sellPhone->handledBy->name : '-',
@@ -162,10 +164,15 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
 
     public function styles(Worksheet $sheet)
     {
-        // Wrap text & atur lebar kolom untuk Catatan Approval agar rapi
-        $sheet->getColumnDimension('P')->setAutoSize(false);
-        $sheet->getColumnDimension('P')->setWidth(40);
-        $sheet->getStyle('P')->getAlignment()->setWrapText(true);
+        // Wrap text & atur lebar kolom Deskripsi (Kolom E)
+        $sheet->getColumnDimension('E')->setAutoSize(false);
+        $sheet->getColumnDimension('E')->setWidth(45);
+        $sheet->getStyle('E')->getAlignment()->setWrapText(true);
+
+        // Wrap text & atur lebar kolom Catatan Approval (bergeser ke Kolom Q)
+        $sheet->getColumnDimension('Q')->setAutoSize(false);
+        $sheet->getColumnDimension('Q')->setWidth(48);
+        $sheet->getStyle('Q')->getAlignment()->setWrapText(true);
 
         return [
             1 => ['font' => ['bold' => true]],
