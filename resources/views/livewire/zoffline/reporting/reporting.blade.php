@@ -33,28 +33,35 @@
                                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
                     </div>
-                    <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-purple-100 text-purple-800">Management</span>
+                    <span
+                        class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-purple-100 text-purple-800">Management</span>
                 </div>
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">Penjualan Management</h2>
-                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Laporan penjualan bersih, HPP riil/rata-rata, dan analisa margin laba.</p>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Laporan penjualan bersih, HPP riil/rata-rata, dan
+                        analisa margin laba.</p>
                 </div>
             </div>
         @endcan
 
         <!-- Card: Penjualan Per Proyek -->
-        <div wire:click="navigateToSalesProject"
-            class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out border border-sky-100">
-            <div class="rounded-full w-16 h-16 bg-sky-50 flex items-center justify-center text-sky-600">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M3 14h18m-9-4v8m-7 4h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+        @can('laporan-penjualan-perproyek')
+            <div wire:click="navigateToSalesProject"
+                class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out border border-sky-100">
+                <div class="rounded-full w-16 h-16 bg-sky-50 flex items-center justify-center text-sky-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M3 10h18M3 14h18m-9-4v8m-7 4h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Penjualan Per Proyek</h2>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Matriks pivot ringkasan performa penjualan harian
+                        per kategori proyek.</p>
+                </div>
             </div>
-            <div>
-                <h2 class="text-xl font-bold text-gray-800">Penjualan Per Proyek</h2>
-                <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Matriks pivot ringkasan performa penjualan harian per kategori proyek.</p>
-            </div>
-        </div>
+        @endcan
 
         <!-- Card 2: Stok -->
         <div wire:click="navigateToStock"
@@ -100,7 +107,8 @@
             </div>
             <div>
                 <h2 class="text-xl font-bold text-gray-800">Laporan Pembelian</h2>
-                <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Data pembelian barang dari pelanggan (Tukar Tambah & Jual HP).</p>
+                <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Data pembelian barang dari pelanggan (Tukar Tambah
+                    & Jual HP).</p>
             </div>
         </div>
 
@@ -173,7 +181,8 @@
                 class="w-full h-64 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out text-white">
                 <div class="rounded-full w-16 h-16 bg-blue-500/30 flex items-center justify-center text-white">
                     <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
                 <div>
@@ -280,7 +289,7 @@
                     <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau performa promotor/inspektur garansi</p>
                 </div>
             </div>
-            
+
             <div wire:click="navigateToReturnReport"
                 class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
                 <div class="rounded-full w-16 h-16 bg-fuchsia-50 flex items-center justify-center text-fuchsia-600">
@@ -307,7 +316,8 @@
                 </div>
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">Laporan Kendala Pesanan</h2>
-                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau, tindak lanjuti, dan rekap seluruh catatan kendala transaksi pesanan pelanggan.</p>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau, tindak lanjuti, dan rekap seluruh catatan
+                        kendala transaksi pesanan pelanggan.</p>
                 </div>
             </div>
         @endcan
@@ -323,7 +333,8 @@
                 </div>
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">Kendala Penjualan HP</h2>
-                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau dan tindak lanjuti catatan kendala penjualan HP bekas (salah norek, nominal, QC, dll).</p>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Pantau dan tindak lanjuti catatan kendala
+                        penjualan HP bekas (salah norek, nominal, QC, dll).</p>
                 </div>
             </div>
         @endcan

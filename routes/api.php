@@ -39,3 +39,20 @@ Route::post('/sign-qz', function (Request $request) {
     // Kembalikan ke frontend dalam format base64
     return base64_encode($signature);
 });
+
+// ============================================
+// PUBLIC READ-ONLY TRADE-IN & PRICING API
+// ============================================
+Route::prefix('v1/public/trade-in')->middleware('throttle:60,1')->group(function () {
+    Route::get('/brands', [\App\Http\Controllers\Api\PublicTradeInController::class, 'getBrands'])
+        ->name('api.public.trade-in.brands');
+    Route::get('/old-devices', [\App\Http\Controllers\Api\PublicTradeInController::class, 'getOldDevices'])
+        ->name('api.public.trade-in.old-devices');
+    Route::get('/target-devices', [\App\Http\Controllers\Api\PublicTradeInController::class, 'getTargetDevices'])
+        ->name('api.public.trade-in.target-devices');
+    Route::post('/calculate', [\App\Http\Controllers\Api\PublicTradeInController::class, 'calculate'])
+        ->name('api.public.trade-in.calculate');
+    Route::get('/device/{id}', [\App\Http\Controllers\Api\PublicTradeInController::class, 'getSingleDevicePrice'])
+        ->name('api.public.trade-in.device');
+});
+

@@ -269,7 +269,7 @@
                 <p class="text-xs text-gray-400 mt-0.5">Klik angka pada sel untuk melihat rincian nota transaksi</p>
             </div>
             <div class="text-xs text-gray-500 font-medium">
-                Periode: <span class="font-bold text-gray-700">{{ Carbon::parse($startDate)->format('d/m/Y') }}</span> s/d <span class="font-bold text-gray-700">{{ Carbon::parse($endDate)->format('d/m/Y') }}</span>
+                Periode: <span class="font-bold text-gray-700">{{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }}</span> s/d <span class="font-bold text-gray-700">{{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }}</span>
             </div>
         </div>
 

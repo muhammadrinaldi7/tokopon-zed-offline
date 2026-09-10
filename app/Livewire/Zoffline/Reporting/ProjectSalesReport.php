@@ -129,14 +129,18 @@ class ProjectSalesReport extends Component
         }
 
         // Query orders within period
-        $orders = Order::with(['items.variant', 'items.promos', 'shippingAddress'])
+        $orders = Order::with(['items.variant', 'items.promos', 'branch'])
             ->whereBetween('orders.order_date', [$start, $end])
             ->whereIn('orders.order_status', ['COMPLETED', 'piutang', 'PIUTANG'])
             ->when($buId && $buId !== 'all', function ($query) use ($buId) {
                 $query->where('orders.business_unit_id', $buId);
             })
             ->when($this->branchFilter, function ($query) {
-                $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
+                $query->where(function ($q) {
+                    $q->whereHas('branch', function ($qb) {
+                        $qb->where('name', $this->branchFilter);
+                    })->orWhere('orders.shipping_address_snapshot->store', $this->branchFilter);
+                });
             })
             ->get();
 
@@ -266,6 +270,7 @@ class ProjectSalesReport extends Component
             'user',
             'salesBy',
             'handledBy',
+            'branch',
             'payments.paymentMethod',
             'items.variant',
             'items.promos'
@@ -276,14 +281,18 @@ class ProjectSalesReport extends Component
             $query->where('orders.business_unit_id', $buId);
         })
         ->when($this->branchFilter, function ($query) {
-            $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
+            $query->where(function ($q) {
+                $q->whereHas('branch', function ($qb) {
+                    $qb->where('name', $this->branchFilter);
+                })->orWhere('orders.shipping_address_snapshot->store', $this->branchFilter);
+            });
         })
         ->get();
 
         $items = collect();
 
         foreach ($orders as $order) {
-            $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
+            $branch = $order->branch?->name ?? ($order->shipping_address_snapshot['store'] ?? 'Unknown');
 
             foreach ($order->items as $item) {
                 $variant = $item->variant;
