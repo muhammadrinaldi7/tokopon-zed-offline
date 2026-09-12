@@ -100,19 +100,44 @@ class SyncPurchaseOrders extends Command
 
                     // Sync items
                     if (isset($detailPo['detailItem']) && is_array($detailPo['detailItem'])) {
+                        // Don't group by unitPrice because we want to preserve the actual lines in PO.
+                        // We use the ID from Accurate directly.
                         $existingItemIds = [];
                         foreach ($detailPo['detailItem'] as $item) {
-                            $poItem = PurchaseOrderItem::updateOrCreate(
-                                [
-                                    'purchase_order_id' => $po->id,
-                                    'item_no' => $item['item']['no'] ?? $item['itemNo'],
-                                ],
-                                [
-                                    'item_name' => $item['item']['name'] ?? $item['itemName'],
-                                    'unit_price' => $item['unitPrice'] ?? 0,
-                                    'quantity_ordered' => $item['quantity'] ?? 0,
-                                ]
-                            );
+                            $itemNo = $item['item']['no'] ?? $item['itemNo'];
+                            $unitPrice = $item['unitPrice'] ?? 0;
+                            $itemName = $item['item']['name'] ?? $item['itemName'];
+                            $quantity = $item['quantity'] ?? 0;
+                            $detailId = $item['id'] ?? null;
+
+                            // We use accurate_detail_id as unique identifier if available
+                            if ($detailId) {
+                                $poItem = PurchaseOrderItem::updateOrCreate(
+                                    [
+                                        'purchase_order_id' => $po->id,
+                                        'accurate_detail_id' => $detailId,
+                                    ],
+                                    [
+                                        'item_no' => $itemNo,
+                                        'unit_price' => $unitPrice,
+                                        'item_name' => $itemName,
+                                        'quantity_ordered' => $quantity,
+                                    ]
+                                );
+                            } else {
+                                // Fallback for older Accurate structures without detail ID
+                                $poItem = PurchaseOrderItem::updateOrCreate(
+                                    [
+                                        'purchase_order_id' => $po->id,
+                                        'item_no' => $itemNo,
+                                        'unit_price' => $unitPrice,
+                                    ],
+                                    [
+                                        'item_name' => $itemName,
+                                        'quantity_ordered' => $quantity,
+                                    ]
+                                );
+                            }
                             $existingItemIds[] = $poItem->id;
                         }
 

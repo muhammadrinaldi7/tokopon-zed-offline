@@ -19,11 +19,13 @@ class Scan extends Component
 
     // UI States
     public $activeItemNo = null; // Item yang sedang discan SKU nya
+    public $activeItemRowId = null; // ID item yang sedang discan
     public $barcodeInput = '';
     public $errorMessage = '';
     public $successMessage = '';
 
     // Detailed QC State
+
     public $scannedImei = '';
     public $activeItemId = null;
 
@@ -158,13 +160,22 @@ class Scan extends Component
         $this->errorMessage = '';
         $this->successMessage = '';
 
-        $item = $this->po->items->where('item_no', $itemNo)->first();
-        if (!$item) return;
+        // Cari item yang belum penuh
+        $item = $this->po->items->where('item_no', $itemNo)
+            ->filter(function ($i) {
+                return $i->quantity_received < $i->quantity_ordered;
+            })->first();
 
-        if ($item->quantity_received >= $item->quantity_ordered) {
-            $this->errorMessage = "Item {$item->item_name} sudah mencapai kuantitas pesanan.";
-            return;
+        // Jika semua sudah penuh, ambil yang pertama untuk tampilkan error
+        if (!$item) {
+            $item = $this->po->items->where('item_no', $itemNo)->first();
+            if ($item && $item->quantity_received >= $item->quantity_ordered) {
+                $this->errorMessage = "Item {$item->item_name} sudah mencapai kuantitas pesanan.";
+                return;
+            }
         }
+
+        if (!$item) return;
 
         // Cek apakah produk ini membutuhkan SN
         $productAccurate = \App\Models\ProductAccurate::where('item_no', $itemNo)
@@ -181,6 +192,39 @@ class Scan extends Component
         }
 
         $this->activeItemNo = $itemNo;
+        $this->activeItemRowId = $item->id;
+        $this->barcodeInput = '';
+    }
+
+    public function setActiveItemByRow($id)
+    {
+        $this->errorMessage = '';
+        $this->successMessage = '';
+
+        $item = $this->po->items->where('id', $id)->first();
+        if (!$item) return;
+
+        if ($item->quantity_received >= $item->quantity_ordered) {
+            $this->errorMessage = "Item {$item->item_name} sudah mencapai kuantitas pesanan.";
+            return;
+        }
+
+        // Cek apakah produk ini membutuhkan SN
+        $productAccurate = \App\Models\ProductAccurate::where('item_no', $item->item_no)
+            ->where('database_source', $this->po->database_source)
+            ->first();
+
+        $hasSn = $productAccurate ? $productAccurate->has_sn : true; // Default true jika tidak ada data
+
+        if (!$hasSn) {
+            $item->increment('quantity_received');
+            $this->po->refresh();
+            $this->successMessage = "1 {$item->item_name} berhasil ditambahkan.";
+            return;
+        }
+
+        $this->activeItemNo = $item->item_no;
+        $this->activeItemRowId = $item->id;
         $this->barcodeInput = '';
     }
 
@@ -215,13 +259,17 @@ class Scan extends Component
         $barcode = $validation['clean'];
 
         // 4. Proses IMEI
-        $activeItem = $this->po->items->where('item_no', $this->activeItemNo)->first();
+        $activeItem = $this->po->items->where('id', $this->activeItemRowId)->first();
+        if (!$activeItem) {
+            $activeItem = $this->po->items->where('item_no', $this->activeItemNo)->first();
+        }
         if (!$activeItem) return;
 
         if ($activeItem->quantity_received >= $activeItem->quantity_ordered) {
             $this->errorMessage = "Target kuantitas sudah terpenuhi. Silakan scan SKU produk lain.";
             $this->barcodeInput = '';
             $this->activeItemNo = null;
+            $this->activeItemRowId = null;
             return;
         }
 
@@ -242,7 +290,10 @@ class Scan extends Component
     #[On('qc-inspection-saved')]
     public function handleQcSaved($verdict = 'pass')
     {
-        $activeItem = $this->po->items->where('item_no', $this->activeItemNo)->first();
+        $activeItem = $this->po->items->where('id', $this->activeItemRowId)->first();
+        if (!$activeItem) {
+            $activeItem = $this->po->items->where('item_no', $this->activeItemNo)->first();
+        }
         if ($activeItem) {
             $activeItem->increment('quantity_received');
             $this->po->refresh();
@@ -401,15 +452,16 @@ class Scan extends Component
             }
             $targetWarehouseName = $targetWarehouse->name;
 
-            $detailItem = [];
+            // Kita tidak perlu memisahkan item menjadi chunk yang berbeda (chunking) 
+            // karena kita sekarang mengirimkan purchaseOrderDetailId.
+            $detailItems = [];
+
             foreach ($this->po->items as $item) {
-                // Hitung selisih kuantitas yang belum di-push
                 $qtyToPush = $item->quantity_received - $item->quantity_pushed;
 
                 if ($qtyToPush > 0) {
                     $serialNumbers = [];
                     foreach ($item->inspections as $ins) {
-                        // Hanya push inspection yang belum pernah di-push
                         if (!$ins->is_pushed) {
                             $serialNumbers[] = [
                                 'serialNumberNo' => $ins->imei,
@@ -418,7 +470,7 @@ class Scan extends Component
                         }
                     }
 
-                    $detailItemData = [
+                    $detailData = [
                         'itemNo' => $item->item_no,
                         'unitPrice' => (float)$item->unit_price,
                         'quantity' => (float)$qtyToPush,
@@ -426,34 +478,38 @@ class Scan extends Component
                         'warehouseName' => $targetWarehouseName
                     ];
 
-                    if (!empty($serialNumbers)) {
-                        $detailItemData['detailSerialNumber'] = $serialNumbers;
+                    if ($item->accurate_detail_id) {
+                        $detailData['purchaseOrderDetailId'] = $item->accurate_detail_id;
                     }
 
-                    $detailItem[] = $detailItemData;
+                    if (!empty($serialNumbers)) {
+                        $detailData['detailSerialNumber'] = $serialNumbers;
+                    }
+
+                    $detailItems[] = $detailData;
                 }
             }
 
-            if (empty($detailItem)) {
+            if (empty($detailItems)) {
                 $this->dispatch('toast', title: 'Info', message: 'Semua item yang discan sudah berhasil dikirim ke Accurate sebelumnya.', type: 'info');
                 $this->showConfirmModal = false;
                 return;
             }
 
             $baseSj = 'SJ-' . $this->po->po_number;
-            $suffix = '-' . date('His');
+            $successCount = 0;
+            $errorMessages = [];
+            $allSuccess = true;
 
-            // Maksimal karakter di Accurate adalah 30.
-            // Potong string base agar tidak melampaui batas saat digabung dengan suffix
+            $suffix = '-' . date('His');
             $maxBaseLen = 30 - strlen($suffix);
             $receiveNumber = substr($baseSj, 0, $maxBaseLen) . $suffix;
 
             $payload = [
-                // Gunakan timestamp (His) untuk mencegah bentrok SJ ganda di hari yang sama
                 'receiveNumber' => $receiveNumber,
                 'vendorNo' => $this->po->vendor->vendor_no ?? '',
                 'warehouseName' => $targetWarehouseName,
-                'detailItem' => $detailItem,
+                'detailItem' => $detailItems,
                 'branchName' => Auth::user()->branch->name ?? null
             ];
 
@@ -468,9 +524,20 @@ class Scan extends Component
             ])->post($host . '/receive-item/save.do', $payload);
 
             if ($response->successful() && isset($response->json()['s']) && $response->json()['s'] === true) {
-                $this->po->update(['status' => $status]);
+                $successCount++;
+            } else {
+                $allSuccess = false;
+                $err = 'Error dari Accurate.';
+                if (isset($response->json()['d']) && is_array($response->json()['d'])) {
+                    $err = implode(', ', $response->json()['d']);
+                }
+                $errorMessages[] = $err;
+                Log::error('Accurate Receive Item Error: ' . $response->body());
+            }
 
-                // Update tracking
+            if ($successCount > 0) {
+                // Update tracking status loka
+                $this->po->update(['status' => $status]);
                 foreach ($this->po->items as $item) {
                     if ($item->quantity_received > $item->quantity_pushed) {
                         $item->quantity_pushed = $item->quantity_received;
@@ -484,17 +551,16 @@ class Scan extends Component
                         }
                     }
                 }
+            }
 
-                $this->showConfirmModal = false;
+            $this->showConfirmModal = false;
+
+            if ($allSuccess) {
                 $this->dispatch('toast', title: 'Berhasil', message: 'Sinkronisasi Penerimaan Barang ke Accurate berhasil.', type: 'success');
+            } else if ($successCount > 0) {
+                $this->dispatch('toast', title: 'Berhasil Sebagian', message: 'Sebagian data berhasil dikirim, namun ada error: ' . implode(' | ', $errorMessages), type: 'warning');
             } else {
-                $errorMsg = 'Terjadi kesalahan tidak terduga dari Accurate.';
-                if (isset($response->json()['d']) && is_array($response->json()['d'])) {
-                    $errorMsg = implode(', ', $response->json()['d']);
-                }
-
-                Log::error('Accurate Receive Item Error: ' . $response->body());
-                $this->dispatch('toast', title: 'Gagal', message: 'Gagal kirim ke Accurate: ' . $errorMsg, type: 'error');
+                $this->dispatch('toast', title: 'Gagal', message: 'Gagal kirim ke Accurate: ' . implode(' | ', $errorMessages), type: 'error');
             }
         } catch (\Exception $e) {
             $this->errorMessage = "Error: " . $e->getMessage();

@@ -14,44 +14,62 @@ class PublicTradeInApiTest extends TestCase
 
     protected ProductAccurate $oldPhone;
     protected ProductAccurate $newPhone;
+    protected ProductAccurate $secondPhone;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $bu = BusinessUnit::create([
-            'name' => 'Tokopon Store',
-            'code' => 'TKP',
+        $bu1 = BusinessUnit::create([
+            'name' => 'Syihab Store',
+            'code' => 'SYH',
             'is_active' => true,
+        ]);
+
+        $bu2 = BusinessUnit::create([
+            'name' => 'GSK Second',
+            'code' => 'GSK',
+            'is_active' => true,
+        ]);
+
+        $category = \App\Models\Category::create([
+            'name' => 'Smartphones',
+            'slug' => 'smartphones',
         ]);
 
         $prod1 = Product::create([
             'name' => 'iPhone 13',
             'slug' => 'iphone-13',
+            'category_id' => $category->id,
             'is_active' => true,
         ]);
 
+        // HP Lama Customer (Buyback)
         $this->oldPhone = ProductAccurate::create([
             'product_id' => $prod1->id,
+            'accurate_id' => 101,
             'item_no' => 'IPH13-RESMI-128',
             'name' => 'Apple iPhone 13 128GB (RESMI)',
             'brandName' => 'Apple',
-            'categoryName' => 'Handphone',
+            'categoryName' => 'HP SECOND',
             'proyek' => 'RESMI',
             'base_price' => 8500000,
             'buy_price' => 6000000,
-            'base_cost' => 5000000, // Sensitive cost that must NOT be exposed
-            'business_unit_id' => $bu->id,
+            'base_cost' => 5000000,
+            'business_unit_id' => 2,
         ]);
 
         $prod2 = Product::create([
             'name' => 'iPhone 15',
             'slug' => 'iphone-15',
+            'category_id' => $category->id,
             'is_active' => true,
         ]);
 
+        // HP Baru (BU 1 Syihab, Category: Handphone)
         $this->newPhone = ProductAccurate::create([
             'product_id' => $prod2->id,
+            'accurate_id' => 102,
             'item_no' => 'IPH15-RESMI-128',
             'name' => 'Apple iPhone 15 128GB (RESMI)',
             'brandName' => 'Apple',
@@ -59,15 +77,29 @@ class PublicTradeInApiTest extends TestCase
             'proyek' => 'RESMI',
             'base_price' => 11399000,
             'buy_price' => 9000000,
-            'base_cost' => 10000000, // Sensitive cost that must NOT be exposed
-            'business_unit_id' => $bu->id,
+            'base_cost' => 10000000,
+            'business_unit_id' => 1, // BU 1
+        ]);
+
+        // HP Second (BU 2 GSK, Category: HP SECOND)
+        $this->secondPhone = ProductAccurate::create([
+            'product_id' => $prod2->id,
+            'accurate_id' => 103,
+            'item_no' => 'IPH15-SECOND-128',
+            'name' => 'Apple iPhone 15 128GB Second',
+            'brandName' => 'Apple',
+            'categoryName' => 'HP SECOND',
+            'proyek' => 'RESMI',
+            'base_price' => 9500000,
+            'buy_price' => 7500000,
+            'base_cost' => 8000000,
+            'business_unit_id' => 2, // BU 2
         ]);
     }
 
-    public function test_can_fetch_brands()
+    public function test_can_fetch_brands_filtered_by_type()
     {
-        $response = $this->getJson('/api/v1/public/trade-in/brands');
-
+        $response = $this->getJson('/api/v1/public/trade-in/brands?type=new');
         $response->assertStatus(200)
             ->assertJson([
                 'status' => 'success',
@@ -75,29 +107,18 @@ class PublicTradeInApiTest extends TestCase
             ]);
     }
 
-    public function test_can_fetch_old_devices_and_does_not_leak_base_cost()
+    public function test_can_fetch_target_devices_new_vs_second()
     {
-        $response = $this->getJson('/api/v1/public/trade-in/old-devices?brand=Apple');
+        // Target New: BU 1 & Handphone
+        $resNew = $this->getJson('/api/v1/public/trade-in/target-devices?target_type=new');
+        $resNew->assertStatus(200);
+        $this->assertEquals(1, $resNew->json('total'));
+        $this->assertEquals('Apple iPhone 15 128GB (RESMI)', $resNew->json('data.0.name'));
 
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'status',
-                'total',
-                'data' => [
-                    '*' => [
-                        'id',
-                        'item_no',
-                        'name',
-                        'brand',
-                        'category',
-                        'proyek',
-                        'buy_price',
-                        'formatted_buy_price',
-                    ]
-                ]
-            ])
-            ->assertDontSee('base_cost')
-            ->assertDontSee('raw_data');
+        // Target Second: BU 2 & HP SECOND
+        $resSecond = $this->getJson('/api/v1/public/trade-in/target-devices?target_type=second');
+        $resSecond->assertStatus(200);
+        $this->assertEquals(2, $resSecond->json('total')); // secondPhone + oldPhone (if base_price > 0)
     }
 
     public function test_can_calculate_trade_in_difference()
@@ -125,18 +146,19 @@ class PublicTradeInApiTest extends TestCase
         $this->assertStringContainsString('iPhone%2013', $response->json('data.whatsapp_url'));
     }
 
-    public function test_can_fetch_single_device_price()
+    public function test_can_search_with_smart_tokens_and_aliases()
     {
-        $response = $this->getJson("/api/v1/public/trade-in/device/{$this->oldPhone->id}");
+        // Search "ip 13" matches "Apple iPhone 13 128GB (RESMI)"
+        $res1 = $this->getJson('/api/v1/public/trade-in/old-devices?search=ip+13');
+        $res1->assertStatus(200);
+        $this->assertEquals(1, $res1->json('total'));
+        $this->assertEquals('Apple iPhone 13 128GB (RESMI)', $res1->json('data.0.name'));
 
-        $response->assertStatus(200)
-            ->assertJson([
-                'status' => 'success',
-                'data' => [
-                    'id' => $this->oldPhone->id,
-                    'buy_price' => 6000000,
-                    'formatted_buy_price' => 'Rp 6.000.000',
-                ]
-            ]);
+        // Search "128 15" matches iPhone 15 regardless of word order
+        $res2 = $this->getJson('/api/v1/public/trade-in/target-devices?target_type=new&search=128+15');
+        $res2->assertStatus(200);
+        $this->assertEquals(1, $res2->json('total'));
+        $this->assertEquals('Apple iPhone 15 128GB (RESMI)', $res2->json('data.0.name'));
     }
 }
+

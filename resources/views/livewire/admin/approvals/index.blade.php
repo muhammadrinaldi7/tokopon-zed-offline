@@ -79,7 +79,9 @@
                             <div class="text-xs text-gray-500 mt-1 font-mono">
                                 @if($req->request_type === 'CUSTOM_CASHBACK')
                                     Item: {{ $req->payload['product_name'] ?? '-' }}<br>
-                                    Nominal: Rp {{ number_format($req->payload['amount'] ?? 0, 0, ',', '.') }}
+                                    Harga Asli: Rp {{ number_format($req->payload['item_price'] ?? 0, 0, ',', '.') }}<br>
+                                    Cashback: <span class="text-emerald-600 font-bold">-Rp {{ number_format($req->payload['amount'] ?? 0, 0, ',', '.') }}</span><br>
+                                    Harga Akhir: <span class="font-bold text-blue-600">Rp {{ number_format(($req->payload['item_price'] ?? 0) - ($req->payload['amount'] ?? 0), 0, ',', '.') }}</span>
                                 @elseif($req->request_type === 'STOCK_OPNAME_REPORT' || $req->approvable_type === 'App\Models\StockOpname' || $req->approvable instanceof \App\Models\StockOpname)
                                     SO: {{ $req->approvable->opname_number ?? ($req->payload['opname_number'] ?? '-') }}<br>
                                     Selisih: <span class="font-bold {{ ($req->payload['total_difference'] ?? 0) != 0 ? 'text-red-600' : 'text-green-600' }}">{{ $req->payload['total_difference'] ?? 0 }} Unit</span>

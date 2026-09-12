@@ -279,13 +279,21 @@
                                 </h4>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-white p-3 rounded-lg border border-blue-100">
                                     @if($detailRequest->request_type === 'CUSTOM_CASHBACK')
-                                        <div>
+                                        <div class="col-span-1 sm:col-span-2">
                                             <span class="text-gray-400 block text-[10px]">Nama Item / Produk</span>
                                             <span class="font-bold text-gray-800">{{ $detailRequest->payload['product_name'] ?? '-' }}</span>
                                         </div>
                                         <div>
+                                            <span class="text-gray-400 block text-[10px]">Harga Asli</span>
+                                            <span class="font-semibold text-gray-800">Rp {{ number_format($detailRequest->payload['item_price'] ?? 0, 0, ',', '.') }}</span>
+                                        </div>
+                                        <div>
                                             <span class="text-gray-400 block text-[10px]">Nominal Cashback</span>
-                                            <span class="font-black text-emerald-600 text-sm">Rp {{ number_format($detailRequest->payload['amount'] ?? 0, 0, ',', '.') }}</span>
+                                            <span class="font-bold text-emerald-600">-Rp {{ number_format($detailRequest->payload['amount'] ?? 0, 0, ',', '.') }}</span>
+                                        </div>
+                                        <div class="col-span-1 sm:col-span-2 mt-1 border-t border-blue-100 pt-2">
+                                            <span class="text-gray-500 block text-[10px] font-bold">HARGA SETELAH CASHBACK</span>
+                                            <span class="font-black text-blue-700 text-base">Rp {{ number_format(($detailRequest->payload['item_price'] ?? 0) - ($detailRequest->payload['amount'] ?? 0), 0, ',', '.') }}</span>
                                         </div>
                                     @else
                                         @foreach($detailRequest->payload as $key => $val)

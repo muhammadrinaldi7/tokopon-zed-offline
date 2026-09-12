@@ -158,7 +158,7 @@
             @foreach ($po->items as $item)
                 @php
                     $isDone = $item->quantity_received >= $item->quantity_ordered;
-                    $isActive = $activeItemNo === $item->item_no;
+                    $isActive = $activeItemRowId === $item->id;
                     $proyek = $item->proyek ?? '-';
                     $upperProyek = strtoupper($proyek);
                     $isResmi =
@@ -219,7 +219,7 @@
                                 </div>
                             </div>
                             @if (!$isDone)
-                                <button wire:click="setActiveItem('{{ $item->item_no }}')"
+                                <button wire:click="setActiveItemByRow({{ $item->id }})"
                                     class="px-5 py-2.5 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-600 hover:text-white transition-all text-sm font-bold shadow-sm border border-blue-200 hover:border-blue-600 flex items-center gap-2 group shrink-0">
                                     <svg class="w-5 h-5 text-blue-500 group-hover:text-white transition-colors"
                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -430,7 +430,7 @@
                 <!-- Modal Header Strip -->
                 <div class="h-2 bg-gradient-to-r from-blue-500 to-indigo-600 w-full absolute top-0 left-0"></div>
 
-                <button wire:click="$set('activeItemNo', null)" @click="stopCamera()"
+                <button wire:click="$set('activeItemNo', null); $set('activeItemRowId', null)" @click="stopCamera()"
                     class="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-full bg-neutral-100 text-neutral-500 hover:bg-rose-100 hover:text-rose-600 transition-colors z-20">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -453,7 +453,10 @@
 
                     <!-- Target Product Card -->
                     @php
-                        $activeItem = $po->items->where('item_no', $activeItemNo)->first();
+                        $activeItem = $po->items->where('id', $activeItemRowId)->first();
+                        if (!$activeItem) {
+                            $activeItem = $po->items->where('item_no', $activeItemNo)->first();
+                        }
                         $activeProyek = $activeItem->proyek ?? '-';
                         $upperActiveProyek = strtoupper($activeProyek);
                         $isActiveResmi =
@@ -602,7 +605,7 @@
 
                     <!-- Submit & Cancel Buttons -->
                     <div class="flex items-center justify-between gap-3 pt-2 border-t border-neutral-100">
-                        <button type="button" wire:click="$set('activeItemNo', null)" @click="stopCamera()"
+                        <button type="button" wire:click="$set('activeItemNo', null); $set('activeItemRowId', null)" @click="stopCamera()"
                             class="px-4 py-2.5 text-xs font-bold text-neutral-500 hover:text-neutral-800 transition-colors">
                             Batal
                         </button>
