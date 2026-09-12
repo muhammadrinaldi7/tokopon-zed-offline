@@ -3,6 +3,8 @@
 namespace App\Livewire\Admin\Promo;
 
 use App\Models\Promo;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
@@ -24,6 +26,75 @@ class Index extends Component
     {
         $promo->update(['is_active' => !$promo->is_active]);
         $this->dispatch('toast', title: 'Berhasil', message: 'Status promo diperbarui.', type: 'success');
+    }
+
+    public function duplicate(Promo $promo)
+    {
+        try {
+            DB::transaction(function () use ($promo) {
+                // Eager load relasi jika belum ter-load
+                $promo->loadMissing(['skus', 'bundleSkus', 'branches', 'paymentMethods']);
+
+                $newPromo = Promo::create([
+                    'name'                   => Str::limit($promo->name . ' (Salinan)', 255, ''),
+                    'business_unit_id'       => $promo->business_unit_id ?? \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId(),
+                    'description'            => $promo->description,
+                    'code'                   => null, // Dikosongkan agar dapat diatur ulang saat promo digunakan
+                    'category'               => $promo->category,
+                    'brand_id'               => $promo->category === 'brand' ? $promo->brand_id : null,
+                    'accurate_account_no'    => $promo->accurate_account_no,
+                    'discount_type'          => $promo->discount_type,
+                    'discount_value'         => $promo->discount_value,
+                    'max_discount'           => $promo->max_discount,
+                    'start_date'             => $promo->start_date,
+                    'end_date'               => $promo->end_date,
+                    'is_active'              => false, // Langsung non-aktif untuk template
+                    'is_multiply'            => $promo->is_multiply,
+                    'is_combinable'          => $promo->is_combinable,
+                    'quota'                  => $promo->quota,
+                    'min_transaction_amount' => $promo->min_transaction_amount,
+                    'min_qty'                => $promo->min_qty,
+                    'max_qty'                => $promo->max_qty,
+                    'apply_to_all_items'     => $promo->apply_to_all_items,
+                    'is_bundle'              => $promo->is_bundle,
+                    'bundle_discount_type'   => $promo->bundle_discount_type,
+                    'bundle_discount_value'  => $promo->bundle_discount_value,
+                    'bundle_max_discount'    => $promo->bundle_max_discount,
+                    'bundle_max_qty'         => $promo->bundle_max_qty,
+                ]);
+
+                // Salin relasi Target SKUs (jika tidak berlaku untuk semua barang)
+                if (!$promo->apply_to_all_items && $promo->skus->isNotEmpty()) {
+                    $skusData = $promo->skus->map(fn($s) => ['sku' => $s->sku])->toArray();
+                    $newPromo->skus()->createMany($skusData);
+                }
+
+                // Salin relasi Bundle SKUs (jika promo bundling)
+                if ($promo->is_bundle && $promo->bundleSkus->isNotEmpty()) {
+                    $bundleSkusData = $promo->bundleSkus->map(fn($b) => [
+                        'sku'            => $b->sku,
+                        'discount_type'  => $b->discount_type,
+                        'discount_value' => $b->discount_value,
+                        'max_discount'   => $b->max_discount,
+                    ])->toArray();
+                    $newPromo->bundleSkus()->createMany($bundleSkusData);
+                }
+
+                // Salin relasi cabang (branches pivot)
+                if ($promo->branches->isNotEmpty()) {
+                    $newPromo->branches()->sync($promo->branches->pluck('id')->toArray());
+                }
+
+                // Salin relasi metode pembayaran (payment methods pivot)
+                if ($promo->paymentMethods->isNotEmpty()) {
+                    $newPromo->paymentMethods()->sync($promo->paymentMethods->pluck('id')->toArray());
+                }
+            });
+
+            $this->dispatch('toast', title: 'Berhasil', message: 'Promo berhasil disalin sebagai template (status non-aktif).', type: 'success');
+        } catch (\Throwable $th) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal menduplikasi promo: ' . $th->getMessage(), type: 'error');
+        }
     }
 
     public function delete(Promo $promo)
