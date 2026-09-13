@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\SellPhoneReceiptMail;
+use App\Services\MessageDispatchService;
 use Mike42\Escpos\PrintConnectors\DummyPrintConnector;
 use Mike42\Escpos\Printer;
 
@@ -258,28 +259,6 @@ class History extends Component
             return;
         }
 
-        $phone = preg_replace('/[^0-9]/', '', $phone);
-        if (str_starts_with($phone, '0')) {
-            $phone = '62' . substr($phone, 1);
-        } elseif (str_starts_with($phone, '8')) {
-            $phone = '62' . $phone;
-        }
-
-        $fullUrl = config('services.qontak.api_url');
-        if (empty($fullUrl)) {
-            $this->dispatch('toast', title: 'Gagal', message: 'URL Qontak tidak ditemukan di konfigurasi (.env).', type: 'error');
-            return;
-        }
-        if (!preg_match("~^(?:f|ht)tps?://~i", $fullUrl)) {
-            $fullUrl = "https://" . $fullUrl;
-        }
-
-        $method = 'POST';
-        $parsedUrl = parse_url($fullUrl);
-        $endpoint = $parsedUrl['path'] ?? '';
-        $clientId = config('services.qontak.client_id');
-        $clientSecret = config('services.qontak.client_secret');
-
         try {
             $pdf = $this->generateReceiptPdf($sellPhone);
             $filename = 'Tanda_Terima_SPL-' . $sellPhone->id . '.pdf';
@@ -288,58 +267,15 @@ class History extends Component
 
             \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf->output());
             $pdfPublicUrl = asset('storage/' . $path);
-        } catch (\Exception $e) {
-            $this->dispatch('toast', title: 'Gagal', message: 'Gagal menyimpan file PDF struk ke server.', type: 'error');
-            return;
-        }
 
-        $dateString = gmdate('D, d M Y H:i:s') . ' GMT';
-        $requestLine = "{$method} {$endpoint} HTTP/1.1";
-        $stringToSign = "date: {$dateString}\n{$requestLine}";
-        $digest = hash_hmac('sha256', $stringToSign, $clientSecret, true);
-        $signature = base64_encode($digest);
-        $hmacHeader = "hmac username=\"{$clientId}\", algorithm=\"hmac-sha256\", headers=\"date request-line\", signature=\"{$signature}\"";
-        $idempotencyKey = (string) \Illuminate\Support\Str::uuid();
+            $result = app(MessageDispatchService::class)->sendSellPhoneWhatsApp($sellPhone, $pdfPublicUrl, $filename, $userAktif);
 
-        $templateId = config('services.qontak.sellphone_template_id') ?: config('services.qontak.template_id');
+            $this->selectedSell->refresh();
 
-        $payload = [
-            'to_name' => $sellPhone->user->name ?? 'Customer',
-            'to_number' => $phone,
-            'channel_integration_id' =>  config('services.qontak.integration_id'),
-            'message_template_id' => $templateId,
-            'language' => ['code' => 'id'],
-            'parameters' => [
-                'header' => [
-                    'format' => 'DOCUMENT',
-                    'params' => [
-                        ['key' => 'url', 'value' => $pdfPublicUrl],
-                        ['key' => 'filename', 'value' => $filename]
-                    ]
-                ],
-                'body' => [
-                    ['key' => '1', 'value' => 'nama', 'value_text' => $sellPhone->user->name ?? 'Customer'],
-                    ['key' => '2', 'value' => 'no_invoice', 'value_text' => 'SPL-' . $sellPhone->id],
-                    ['key' => '3', 'value' => 'total_tagihan', 'value_text' => 'Rp ' . number_format($sellPhone->appraised_value, 0, ',', '.')]
-                ]
-            ]
-        ];
-
-        try {
-            $response = Http::withHeaders([
-                'Authorization'     => $hmacHeader,
-                'Date'              => $dateString,
-                'X-Idempotency-Key' => $idempotencyKey,
-                'Content-Type'      => 'application/json',
-                'Accept'            => 'application/json',
-            ])->post($fullUrl, $payload);
-
-            if ($response->successful()) {
-                $sellPhone->update(['is_wa_sent' => true]);
-                $this->selectedSell->refresh();
-                $this->dispatch('toast', title: 'Berhasil', message: 'Struk WA berhasil dikirim!', type: 'success');
+            if ($result['success']) {
+                $this->dispatch('toast', title: 'Berhasil', message: $result['message'], type: 'success');
             } else {
-                $this->dispatch('toast', title: 'Gagal API', message: 'Mekari: Code ' . $response->status(), type: 'error');
+                $this->dispatch('toast', title: 'Gagal API', message: $result['message'], type: 'error');
             }
         } catch (\Exception $e) {
             $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
@@ -375,13 +311,15 @@ class History extends Component
             $pdfContent = $pdf->output();
             $filename = 'Tanda_Terima_SPL-' . $sellPhone->id . '.pdf';
 
-            Mail::mailer('pos_sales')
-                ->to($email)
-                ->send(new SellPhoneReceiptMail($sellPhone, $pdfContent, $filename));
+            $result = app(MessageDispatchService::class)->sendSellPhoneEmail($sellPhone, $pdfContent, $filename, $userAktif);
 
-            $sellPhone->update(['is_email_sent' => true]);
             $this->selectedSell->refresh();
-            $this->dispatch('toast', title: 'Berhasil', message: 'Struk digital telah dikirim ke ' . $email, type: 'success');
+
+            if ($result['success']) {
+                $this->dispatch('toast', title: 'Berhasil', message: $result['message'], type: 'success');
+            } else {
+                $this->dispatch('toast', title: 'Gagal', message: $result['message'], type: 'error');
+            }
         } catch (\Exception $e) {
             Log::error('POS Email Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Koneksi SMTP bermasalah: ' . $e->getMessage(), type: 'error');

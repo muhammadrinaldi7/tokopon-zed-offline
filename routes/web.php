@@ -102,6 +102,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/laporan-pembayaran', \App\Livewire\Zoffline\Reporting\InvoiceReport::class)->name('pembayaran');
         Route::get('/order-issues', \App\Livewire\Admin\Orders\OrderIssuesIndex::class)->name('order-issues');
         Route::get('/sell-phone-issues', \App\Livewire\Admin\SellPhone\SellPhoneIssuesIndex::class)->name('sell-phone-issues');
+        Route::get('/message-logs', \App\Livewire\Zoffline\Reporting\MessageLogReport::class)->name('message-logs')->middleware('can:view-message-logs');
+        Route::get('/message-logs/{id}/attachment', [\App\Http\Controllers\MessageLogAttachmentController::class, 'show'])->name('message-logs.attachment')->middleware('can:view-message-logs');
     });
 });
 

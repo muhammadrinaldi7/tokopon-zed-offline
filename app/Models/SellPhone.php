@@ -139,4 +139,9 @@ class SellPhone extends Model implements HasMedia
     {
         return $this->hasMany(SellPhoneIssue::class)->where('status', 'OPEN');
     }
+
+    public function messageLogs()
+    {
+        return $this->morphMany(MessageLog::class, 'source')->latest();
+    }
 }

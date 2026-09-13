@@ -108,6 +108,11 @@ class Reporting extends Component
         return $this->redirectRoute('reporting.sell-phone-issues', navigate: true);
     }
 
+    public function navigateToMessageLogs()
+    {
+        return $this->redirectRoute('reporting.message-logs', navigate: true);
+    }
+
     public function render()
     {
         return view('livewire.zoffline.reporting.reporting');

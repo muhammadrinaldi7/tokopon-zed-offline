@@ -152,4 +152,9 @@ class Order extends Model
     {
         return $this->order_channel === 'POS';
     }
+
+    public function messageLogs()
+    {
+        return $this->morphMany(MessageLog::class, 'source')->latest();
+    }
 }

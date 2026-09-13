@@ -47,6 +47,11 @@ class OrderItem extends Model
         return $this->morphTo(__FUNCTION__, 'product_variant_type', 'product_variant_id');
     }
 
+    public function productVariant()
+    {
+        return $this->variant();
+    }
+
     public function review()
     {
         return $this->hasOne(ProductReview::class);

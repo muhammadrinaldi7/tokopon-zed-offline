@@ -16,6 +16,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\SellPhonePaymentReceiptMail;
+use App\Services\MessageDispatchService;
 
 class SellPhoneDetail extends Component
 {
@@ -82,48 +83,9 @@ class SellPhoneDetail extends Component
             return;
         }
 
-        $phone = $this->sellPhone->user->profile->phone_number ?? null;
-
-        if (!$phone) {
-            $this->dispatch('toast', title: 'Gagal', message: 'Nomor HP customer tidak ditemukan.', type: 'warning');
-            return;
-        }
-
-        $phone = preg_replace('/[^0-9]/', '', $phone);
-        if (str_starts_with($phone, '0')) {
-            $phone = '62' . substr($phone, 1);
-        } elseif (str_starts_with($phone, '8')) {
-            $phone = '62' . $phone;
-        }
-
-        $fullUrl = config('services.qontak.api_url');
-        if (empty($fullUrl)) {
-            $this->dispatch('toast', title: 'Gagal', message: 'URL Qontak tidak ditemukan di konfigurasi (.env).', type: 'error');
-            return;
-        }
-        if (!preg_match("~^(?:f|ht)tps?://~i", $fullUrl)) {
-            $fullUrl = "https://" . $fullUrl;
-        }
-
-        $method = 'POST';
-        $parsedUrl = parse_url($fullUrl);
-        $endpoint = $parsedUrl['path'] ?? '';
-        $clientId = config('services.qontak.client_id');
-        $clientSecret = config('services.qontak.client_secret');
-
-        $dateString = gmdate('D, d M Y H:i:s') . ' GMT';
-        $requestLine = "{$method} {$endpoint} HTTP/1.1";
-        $stringToSign = "date: {$dateString}\n{$requestLine}";
-        $digest = hash_hmac('sha256', $stringToSign, $clientSecret, true);
-        $signature = base64_encode($digest);
-        $hmacHeader = "hmac username=\"{$clientId}\", algorithm=\"hmac-sha256\", headers=\"date request-line\", signature=\"{$signature}\"";
-        $idempotencyKey = (string) \Illuminate\Support\Str::uuid();
-
         $extension = pathinfo($this->sellPhone->payment_receipt_path, PATHINFO_EXTENSION);
-        
-        // Qontak expects a DOCUMENT (e.g., pdf) because of the template header.
-        // We will wrap the uploaded image into a PDF file on the fly.
         $imagePath = storage_path('app/public/' . $this->sellPhone->payment_receipt_path);
+        
         if (file_exists($imagePath)) {
             $imageData = base64_encode(file_get_contents($imagePath));
             $mimeType = mime_content_type($imagePath) ?: 'image/jpeg';
@@ -144,51 +106,16 @@ class SellPhoneDetail extends Component
             $documentUrl = asset('storage/' . $pdfPath);
             $filename = 'Bukti_Transfer_SPL' . $this->sellPhone->id . '.pdf';
         } else {
-            // Fallback if file doesn't exist locally for some reason
             $documentUrl = asset('storage/' . $this->sellPhone->payment_receipt_path);
             $filename = 'Bukti_Transfer_SPL' . $this->sellPhone->id . '.' . ($extension ?: 'jpg');
         }
 
-        $payload = [
-            'to_name' => $this->sellPhone->user->name ?? 'Customer',
-            'to_number' => $phone,
-            'channel_integration_id' =>  config('services.qontak.integration_id'),
-            'message_template_id' => config('services.qontak.template_id'),
-            'language' => ['code' => 'id'],
-            'parameters' => [
-                'header' => [
-                    'format' => 'DOCUMENT',
-                    'params' => [
-                        ['key' => 'url', 'value' => $documentUrl],
-                        ['key' => 'filename', 'value' => $filename]
-                    ]
-                ],
-                'body' => [
-                    ['key' => '1', 'value' => 'nama', 'value_text' => $this->sellPhone->user->name ?? 'Customer'],
-                    ['key' => '2', 'value' => 'no_invoice', 'value_text' => 'SPL-' . $this->sellPhone->id],
-                    ['key' => '3', 'value' => 'total_tagihan', 'value_text' => 'Rp ' . number_format($this->sellPhone->appraised_value, 0, ',', '.')]
-                ]
-            ]
-        ];
+        $result = app(MessageDispatchService::class)->sendSellPhonePaymentProofWhatsApp($this->sellPhone, $documentUrl, $filename, Auth::user());
 
-        try {
-            $response = Http::withHeaders([
-                'Authorization'     => $hmacHeader,
-                'Date'              => $dateString,
-                'X-Idempotency-Key' => $idempotencyKey,
-                'Content-Type'      => 'application/json',
-                'Accept'            => 'application/json',
-            ])->post($fullUrl, $payload);
-
-            if ($response->successful()) {
-                $this->dispatch('toast', title: 'Berhasil', message: 'Bukti pembayaran berhasil dikirim via WA!', type: 'success');
-            } else {
-                Log::error('Mekari API Error: ' . $response->status() . ' - ' . $response->body());
-                $this->dispatch('toast', title: 'Gagal API', message: 'Mekari: Code ' . $response->status(), type: 'error');
-            }
-        } catch (\Exception $e) {
-            Log::error('Mekari API Exception: ' . $e->getMessage());
-            $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
+        if ($result['success']) {
+            $this->dispatch('toast', title: 'Berhasil', message: 'Bukti pembayaran berhasil dikirim via WA!', type: 'success');
+        } else {
+            $this->dispatch('toast', title: 'Gagal', message: $result['message'], type: 'error');
         }
     }
 
@@ -229,28 +156,15 @@ class SellPhoneDetail extends Component
             'recipientEmail.email' => 'Format email tidak valid.'
         ]);
 
-        $fileExists = Storage::disk('public')->exists($this->sellPhone->payment_receipt_path)
-            || file_exists(storage_path('app/public/' . $this->sellPhone->payment_receipt_path))
-            || file_exists(public_path('storage/' . $this->sellPhone->payment_receipt_path));
+        $result = app(MessageDispatchService::class)->sendSellPhonePaymentProofEmail($this->sellPhone, $this->recipientEmail, Auth::user());
 
-        if (!$fileExists) {
-            Log::warning("Bukti transfer file not found on disk: {$this->sellPhone->payment_receipt_path}");
-        }
+        $this->sellPhone->refresh();
 
-        try {
-            $mailer = config('mail.mailers.pos_sales.host') ? Mail::mailer('pos_sales') : Mail::mailer();
-
-            $mailer->to($this->recipientEmail)
-                ->send(new SellPhonePaymentReceiptMail($this->sellPhone));
-
-            $this->sellPhone->update(['is_email_sent' => true]);
-            $this->sellPhone->refresh();
-
+        if ($result['success']) {
             $this->isEmailModalOpen = false;
-            $this->dispatch('toast', title: 'Berhasil', message: 'Bukti pembayaran berhasil dikirim ke ' . $this->recipientEmail, type: 'success');
-        } catch (\Exception $e) {
-            Log::error('Send Payment Receipt Email Error: ' . $e->getMessage());
-            $this->dispatch('toast', title: 'Gagal Kirim Email', message: 'SMTP Error: ' . $e->getMessage(), type: 'error');
+            $this->dispatch('toast', title: 'Berhasil', message: $result['message'], type: 'success');
+        } else {
+            $this->dispatch('toast', title: 'Gagal', message: $result['message'], type: 'error');
         }
     }
 

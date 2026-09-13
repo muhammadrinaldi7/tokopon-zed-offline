@@ -8,6 +8,7 @@ use App\Models\OrderItem;
 use App\Models\OrderPayment;
 use App\Models\User;
 use App\Services\AccurateService;
+use App\Services\MessageDispatchService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
@@ -1094,7 +1095,7 @@ trait WithCheckoutAndReceipt
         }
 
         // Validasi jika email kosong atau merupakan email dummy sistem POS
-        if (!$email || str_contains($email, '@pos.tokopun.com')) {
+        if (!$email || str_contains($email, '@pos.tokopun.com') || str_contains($email, '@tokopon.com')) {
             $this->dispatch('toast', title: 'Gagal Kirim', message: 'Email customer tidak valid atau kosong.', type: 'warning');
             return;
         }
@@ -1105,18 +1106,17 @@ trait WithCheckoutAndReceipt
             $pdfContent = $pdf->output();
             $filename = 'Struk_' . $order->order_number . '.pdf';
 
-            // Mengirim email menggunakan Mailable yang sudah dibuat
-            Mail::mailer('pos_sales')
-                ->to($email)
-                ->send(new SalesReceiptMail($order, $pdfContent, $filename));
+            // Kirim email & simpan log ke message_logs via MessageDispatchService
+            $result = app(MessageDispatchService::class)->sendOrderEmail($order, $pdfContent, $filename, $userAktif);
 
-            // 1. Update ke database menggunakan instance fresh
-            $order->update(['is_email_sent' => true]);
-
-            // 2. PAKSA REFRESH STATE LIVEWIRE UTAMA
+            // PAKSA REFRESH STATE LIVEWIRE UTAMA
             $this->completedOrder->refresh();
 
-            $this->dispatch('toast', title: 'Berhasil', message: 'Struk digital telah dikirim ke ' . $email, type: 'success');
+            if ($result['success']) {
+                $this->dispatch('toast', title: 'Berhasil', message: $result['message'], type: 'success');
+            } else {
+                $this->dispatch('toast', title: 'Gagal', message: $result['message'], type: 'error');
+            }
         } catch (\Exception $e) {
             Log::channel('pos_accurate')->error('POS Email Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Koneksi SMTP bermasalah: ' . $e->getMessage(), type: 'error');
@@ -1134,8 +1134,6 @@ trait WithCheckoutAndReceipt
         $order = Order::with('user.profile')->find($orderId);
         $phone = $order->user->profile->phone_number ?? null;
 
-        Log::channel('pos_accurate')->error('=== DEBUG PHONE QONTAK ===');
-        Log::channel('pos_accurate')->error('RAW PHONE: ' . var_export($phone, true));
         // ─── VALIDASI PEMBATASAN AKSES UTK FRONT-LINER (FL) ───
         $userAktif = Auth::user();
         if (!$userAktif->hasRole('admin') && $order->is_wa_sent) {
@@ -1148,144 +1146,33 @@ trait WithCheckoutAndReceipt
             return;
         }
 
-        // Sanitize phone number (remove non-numeric characters like spaces, dashes, +)
-        $phone = preg_replace('/[^0-9]/', '', $phone);
-
-        // Standardisasi nomor HP (08xx -> 628xx)
-        if (str_starts_with($phone, '0')) {
-            $phone = '62' . substr($phone, 1);
-        } elseif (str_starts_with($phone, '8')) {
-            $phone = '62' . $phone;
-        }
-
-        Log::channel('pos_accurate')->error('PROCESSED PHONE TO QONTAK: ' . var_export($phone, true));
-
-        // 2. Tarik variabel dari env untuk Qontak
-        $fullUrl = config('services.qontak.api_url');
-        if (empty($fullUrl)) {
-            $this->dispatch('toast', title: 'Gagal', message: 'URL Qontak tidak ditemukan di konfigurasi (.env).', type: 'error');
-            return;
-        }
-
-        if (!preg_match("~^(?:f|ht)tps?://~i", $fullUrl)) {
-            $fullUrl = "https://" . $fullUrl;
-        }
-
-        $method = 'POST';
-        $parsedUrl = parse_url($fullUrl);
-        $baseUrl = ($parsedUrl['scheme'] ?? 'https') . '://' . ($parsedUrl['host'] ?? '');
-        $endpoint = $parsedUrl['path'] ?? '';
-        $clientId = config('services.qontak.client_id');
-        $clientSecret = config('services.qontak.client_secret');
-
-        // ─── 3. PROSES GENERATE PDF & SIMPAN KE STORAGE PUBLIK ────
+        // ─── 2. PROSES GENERATE PDF & SIMPAN KE STORAGE PUBLIK ────
         try {
             // Panggil helper terpusat untuk generate instance PDF
             $pdf = $this->generateReceiptPdf($order);
-
-            // Buat nama file unik berdasarkan nomor invoice
             $filename = 'Struk_' . $order->order_number . '.pdf';
-
-            // Tentukan path folder di dalam storage/app/public/
             $folderPath = 'receipts';
             $path = $folderPath . '/' . $filename;
 
             // Simpan output binary PDF ke disk 'public'
             \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf->output());
 
-            // Ambil URL Publik asset (Menggunakan konfigurasi APP_URL di .env)
+            // Ambil URL Publik asset
             $pdfPublicUrl = asset('storage/' . $path);
-        } catch (\Exception $e) {
-            Log::channel('pos_accurate')->error('Qontak PDF Storage Error: ' . $e->getMessage());
-            $this->dispatch('toast', title: 'Gagal', message: 'Gagal menyimpan file PDF struk ke server.', type: 'error');
-            return;
-        }
 
-        // ─── 4. PROSES GENERATE HMAC SIGNATURE ────
-        $dateString = gmdate('D, d M Y H:i:s') . ' GMT';
-        $requestLine = "{$method} {$endpoint} HTTP/1.1";
+            // Kirim via WhatsApp Qontak & simpan log ke message_logs via MessageDispatchService
+            $result = app(MessageDispatchService::class)->sendOrderWhatsApp($order, $pdfPublicUrl, $filename, $userAktif);
 
-        $stringToSign = "date: {$dateString}\n{$requestLine}";
+            // REFRESH STATE LIVEWIRE UTAMA
+            $this->completedOrder->refresh();
 
-        $digest = hash_hmac('sha256', $stringToSign, $clientSecret, true);
-        $signature = base64_encode($digest);
-
-        $hmacHeader = "hmac username=\"{$clientId}\", algorithm=\"hmac-sha256\", headers=\"date request-line\", signature=\"{$signature}\"";
-        $idempotencyKey = (string) \Illuminate\Support\Str::uuid();
-
-        // ─── 5. STRUKTUR PAYLOAD BODY JSON (DENGAN HEADER ATTACHMENT) ────
-        $payload = [
-            'to_name' => $order->user->name ?? 'Customer',
-            'to_number' => $phone,
-            'channel_integration_id' =>  config('services.qontak.integration_id'),
-            'message_template_id' => config('services.qontak.template_id'),
-            'language' => [
-                'code' => 'id'
-            ],
-            'parameters' => [
-                // Disuntikkan object header khusus DOCUMENT/PDF sesuai Postman kamu
-                'header' => [
-                    'format' => 'DOCUMENT',
-                    'params' => [
-                        [
-                            'key' => 'url',
-                            'value' => $pdfPublicUrl
-                        ],
-                        [
-                            'key' => 'filename',
-                            'value' => $filename
-                        ]
-                    ]
-                ],
-                'body' => [
-                    [
-                        'key' => '1',
-                        'value' => 'nama',
-                        'value_text' => $order->user->name ?? 'Customer'
-                    ],
-                    [
-                        'key' => '2',
-                        'value' => 'no_invoice',
-                        'value_text' => $order->order_number
-                    ],
-                    [
-                        'key' => '3',
-                        'value' => 'total_tagihan',
-                        'value_text' => 'Rp ' . number_format($order->subtotal, 0, ',', '.')
-                    ]
-                ]
-            ]
-        ];
-
-        // ─── 6. EXECUTE API CALL KE QONTAK VIA HTTP CLIENT ────────────────
-        try {
-            $response = Http::withHeaders([
-                'Authorization'     => $hmacHeader,
-                'Date'              => $dateString,
-                'X-Idempotency-Key' => $idempotencyKey,
-                'Content-Type'      => 'application/json',
-                'Accept'            => 'application/json',
-            ])->post($fullUrl, $payload);
-
-            if ($response->successful()) {
-                // Update status di database menggunakan instance fresh
-                $order->update(['is_wa_sent' => true]);
-
-                // REFRESH STATE LIVEWIRE UTAMA
-                $this->completedOrder->refresh();
-
-                $this->dispatch('toast', title: 'Berhasil', message: 'Struk WA dengan PDF berhasil dikirim!', type: 'success');
+            if ($result['success']) {
+                $this->dispatch('toast', title: 'Berhasil', message: $result['message'], type: 'success');
             } else {
-                Log::channel('pos_accurate')->error('=== DEBUG MEKARI QONTAK ERROR ===');
-                Log::channel('pos_accurate')->error('Status Code: ' . $response->status());
-                Log::channel('pos_accurate')->error('Response Body: ' . $response->body());
-                Log::channel('pos_accurate')->error('Generated URL PDF: ' . $pdfPublicUrl);
-                Log::channel('pos_accurate')->error('=================================');
-
-                $this->dispatch('toast', title: 'Gagal API', message: 'Mekari: Code ' . $response->status(), type: 'error');
+                $this->dispatch('toast', title: 'Gagal API', message: $result['message'], type: 'error');
             }
         } catch (\Exception $e) {
-            Log::channel('pos_accurate')->error('Qontak HMAC Integration Crash: ' . $e->getMessage());
+            Log::channel('pos_accurate')->error('Qontak Process Error: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
         }
     }

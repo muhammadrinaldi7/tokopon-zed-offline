@@ -339,5 +339,25 @@
             </div>
         @endcan
 
+        {{-- Card: Laporan Pesan (WA & Email) --}}
+        @can('view-message-logs')
+            <div wire:click="navigateToMessageLogs"
+                class="w-full h-64 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out border border-emerald-100">
+                <div class="flex items-center justify-between">
+                    <div class="rounded-full w-16 h-16 bg-emerald-50 flex items-center justify-center text-emerald-600">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        </svg>
+                    </div>
+                    <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800">Tracking is_sent</span>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Laporan Pesan WA & Email</h2>
+                    <p class="text-neutral-500 text-sm mt-2 line-clamp-2">Tracking status terkirim (is_sent), riwayat pengiriman struk/bukti bayar, dan rincian konten pesan yang dikirim.</p>
+                </div>
+            </div>
+        @endcan
+
     </div>
 </div>

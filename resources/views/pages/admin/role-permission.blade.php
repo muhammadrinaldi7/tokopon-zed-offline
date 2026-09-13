@@ -49,6 +49,7 @@ new #[Layout('layouts.admin', ['title' => 'Kelola Role & Akses - TokoPun'])] cla
     private function groupPermissions()
     {
         $groups = [
+            'Laporan' => ['icon' => '📊', 'items' => []],
             'Katalog Pusat' => ['icon' => '📦', 'items' => []],
             'Transaksi & Komunikasi' => ['icon' => '🛒', 'items' => []],
             'Master & Pengaturan' => ['icon' => '⚙️', 'items' => []],
@@ -57,7 +58,9 @@ new #[Layout('layouts.admin', ['title' => 'Kelola Role & Akses - TokoPun'])] cla
 
         foreach ($this->permissions as $p) {
             $name = $p->name;
-            if (str_contains($name, 'catalog') || str_contains($name, 'product') || str_contains($name, 'categories') || str_contains($name, 'brands') || str_contains($name, 'accurate') || str_contains($name, 'stock')) {
+            if (str_contains($name, 'report') || str_contains($name, 'laporan') || str_contains($name, 'closing') || str_contains($name, 'message') || str_contains($name, 'laba-rugi')) {
+                $groups['Laporan']['items'][] = $p;
+            } elseif (str_contains($name, 'catalog') || str_contains($name, 'product') || str_contains($name, 'categories') || str_contains($name, 'brands') || str_contains($name, 'accurate') || str_contains($name, 'stock')) {
                 $groups['Katalog Pusat']['items'][] = $p;
             } elseif (str_contains($name, 'pos') || str_contains($name, 'order') || str_contains($name, 'chat') || str_contains($name, 'promo')) {
                 $groups['Transaksi & Komunikasi']['items'][] = $p;
