@@ -84,6 +84,7 @@ class ProcessAccurateWebhookJob implements ShouldQueue
         return match ($eventType) {
             'CUSTOMER' => \App\Webhooks\Accurate\CustomerSaveHandler::class,
             'ITEM', 'ITEM_SAVE' => \App\Webhooks\Accurate\ItemSaveHandler::class,
+            'ITEM_DELETE' => \App\Webhooks\Accurate\ItemDeleteHandler::class,
 
             // EVENT DETAIL STOK: 
             // Membawa key "quantity" secara absolut

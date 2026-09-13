@@ -25,8 +25,8 @@ class ItemSaveHandler implements WebhookHandlerInterface
                         // Jika dibuat/diupdate, sinkronisasi detailnya
                         $this->syncItemDetail($itemNo, $dbSource);
                     } elseif ($action === 'DELETE') {
-                        // (Opsional) Jika barang dihapus di Accurate, Anda bisa menonaktifkannya di POS
-                        $this->handleDeletedItem($itemNo);
+                        // Delegasikan ke ItemDeleteHandler
+                        app(ItemDeleteHandler::class)->deleteItem($itemNo, $dbSource);
                     }
                 }
             }
@@ -116,12 +116,5 @@ class ItemSaveHandler implements WebhookHandlerInterface
         // (Langkah 5 dihapus karena data POS sekarang murni menggunakan ProductAccurate)
     }
 
-    private function handleDeletedItem($itemNo)
-    {
-        $accurateItem = ProductAccurate::where('item_no', $itemNo)->first();
-        if ($accurateItem) {
-            $accurateItem->update(['is_active' => false]);
-            Log::info("Item Dihapus/Dinonaktifkan di Accurate: SKU {$itemNo}");
-        }
-    }
+
 }
