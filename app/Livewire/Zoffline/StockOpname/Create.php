@@ -20,7 +20,9 @@ class Create extends Component
 {
     public $branchId;
     public $warehouseId;
-    public $type = 'ALL'; // ALL, SERIALIZED_ONLY, NON_SERIALIZED_ONLY, CATEGORY
+    public $type = 'ALL'; // ALL, SERIALIZED_ONLY, NON_SERIALIZED_ONLY, BRAND, PROYEK, CATEGORY
+    public $brandFilter = '';
+    public $projectFilter = '';
     public $categoryFilter = '';
     public $notes = '';
 
@@ -30,12 +32,25 @@ class Create extends Component
 
     public $totalAvailableSns = 0;
     public $totalNonSerialSkus = 0;
+
+    public $brandList = [];
+    public $projectList = [];
     public $categoryList = [];
+
+    // Informasi sesi yang sudah aktif berjalan di cabang ini
+    public $activeOpname = null;
 
     public function mount()
     {
         $user = Auth::user();
         $buId = $user->getActiveBusinessUnitId();
+        $isGlobal = $user->hasAnyRole(['superadmin', 'admin', 'director', 'direktur', 'manager_operasional', 'manager_operasional_gsk']);
+        $isBm = $user->hasAnyRole(['bm', 'bm_gsk']);
+
+        // Hak akses: hanya BM di cabang tersebut atau manajemen pusat
+        if (!$isGlobal && !$isBm) {
+            abort(403, 'Akses ditolak: Hanya Branch Manager (BM) yang berwenang membuka sesi Stock Opname di cabang.');
+        }
 
         $this->branchId = $user->branch_id;
         $this->warehouseId = $user->warehouse_id;
@@ -62,18 +77,57 @@ class Create extends Component
         $this->warehouseName = $warehouse ? $warehouse->name : 'Gudang Utama';
         $this->businessUnitName = $bu ? $bu->name : 'Unit Bisnis';
 
-        $this->loadEstimates();
+        // Cek apakah sudah ada sesi opname berstatus COUNTING pada cabang & gudang ini
+        if ($this->warehouseId) {
+            $this->activeOpname = StockOpname::with('user')
+                ->where('warehouse_id', $this->warehouseId)
+                ->where('status', 'COUNTING')
+                ->latest()
+                ->first();
+        }
 
-        // Kategori / Proyek produk untuk filter kategori
-        $this->categoryList = ProductAccurate::where('business_unit_id', $buId)
+        // Ambil daftar Brand, Proyek, dan Kategori sesuai Unit Bisnis aktif
+        $this->brandList = ProductAccurate::where('business_unit_id', $buId)
+            ->whereNotNull('brandName')
+            ->where('brandName', '!=', '')
+            ->distinct()
+            ->orderBy('brandName')
+            ->pluck('brandName')
+            ->toArray();
+
+        $this->projectList = ProductAccurate::where('business_unit_id', $buId)
             ->whereNotNull('proyek')
             ->where('proyek', '!=', '')
             ->distinct()
+            ->orderBy('proyek')
             ->pluck('proyek')
             ->toArray();
+
+        $this->categoryList = ProductAccurate::where('business_unit_id', $buId)
+            ->whereNotNull('categoryName')
+            ->where('categoryName', '!=', '')
+            ->distinct()
+            ->orderBy('categoryName')
+            ->pluck('categoryName')
+            ->toArray();
+
+        $this->loadEstimates();
     }
 
     public function updatedType()
+    {
+        $this->brandFilter = '';
+        $this->projectFilter = '';
+        $this->categoryFilter = '';
+        $this->loadEstimates();
+    }
+
+    public function updatedBrandFilter()
+    {
+        $this->loadEstimates();
+    }
+
+    public function updatedProjectFilter()
     {
         $this->loadEstimates();
     }
@@ -81,6 +135,32 @@ class Create extends Component
     public function updatedCategoryFilter()
     {
         $this->loadEstimates();
+    }
+
+    /**
+     * Ambil daftar SKU yang memenuhi cakupan filter (jika scoped)
+     */
+    protected function getFilteredTargetSkus()
+    {
+        $user = Auth::user();
+        $buId = $user->getActiveBusinessUnitId();
+
+        $query = ProductAccurate::where('business_unit_id', $buId);
+
+        if ($this->type === 'BRAND') {
+            if (empty($this->brandFilter)) return collect();
+            $query->where('brandName', $this->brandFilter);
+        } elseif ($this->type === 'PROYEK') {
+            if (empty($this->projectFilter)) return collect();
+            $query->where('proyek', $this->projectFilter);
+        } elseif ($this->type === 'CATEGORY') {
+            if (empty($this->categoryFilter)) return collect();
+            $query->where('categoryName', $this->categoryFilter);
+        } else {
+            return null; // ALL / Full scope
+        }
+
+        return $query->pluck('item_no');
     }
 
     public function loadEstimates()
@@ -94,24 +174,47 @@ class Create extends Component
             return;
         }
 
-        // Estimasi SN Aktif
-        $snQuery = ProductSerialNumber::where('warehouse_id', $this->warehouseId)
-            ->where('business_unit_id', $buId)
-            ->where('status', 'Available');
+        $targetSkus = $this->getFilteredTargetSkus();
 
-        if ($this->type === 'CATEGORY' && $this->categoryFilter) {
-            $snQuery->whereHas('productAccurate', function ($q) {
-                $q->where('proyek', $this->categoryFilter);
-            });
+        // 1. Estimasi SN Aktif (Handphone)
+        if (in_array($this->type, ['ALL', 'SERIALIZED_ONLY', 'BRAND', 'PROYEK', 'CATEGORY'])) {
+            if (in_array($this->type, ['BRAND', 'PROYEK', 'CATEGORY']) && ($targetSkus === null || $targetSkus->isEmpty())) {
+                $this->totalAvailableSns = 0;
+            } else {
+                $snQuery = ProductSerialNumber::where('warehouse_id', $this->warehouseId)
+                    ->where('business_unit_id', $buId)
+                    ->where('status', 'Available');
+
+                if ($targetSkus !== null) {
+                    $snQuery->whereIn('item_no', $targetSkus);
+                }
+
+                $this->totalAvailableSns = $snQuery->count();
+            }
+        } else {
+            $this->totalAvailableSns = 0;
         }
 
-        $this->totalAvailableSns = $snQuery->count();
+        // 2. Estimasi SKU Aksesoris (Non-Serial)
+        if (in_array($this->type, ['ALL', 'NON_SERIALIZED_ONLY', 'BRAND', 'PROYEK', 'CATEGORY'])) {
+            if (in_array($this->type, ['BRAND', 'PROYEK', 'CATEGORY']) && ($targetSkus === null || $targetSkus->isEmpty())) {
+                $this->totalNonSerialSkus = 0;
+            } else {
+                $accQuery = ProductAccurate::where('business_unit_id', $buId)
+                    ->where('has_sn', false)
+                    ->whereHas('warehouseStocks', function ($q) {
+                        $q->where('warehouse_id', $this->warehouseId)->where('stock', '>', 0);
+                    });
 
-        // Estimasi Aksesoris (Non-Serial)
-        $whStockQuery = WarehouseStock::where('warehouse_id', $this->warehouseId)
-            ->where('stock', '>', 0);
+                if ($targetSkus !== null) {
+                    $accQuery->whereIn('item_no', $targetSkus);
+                }
 
-        $this->totalNonSerialSkus = $whStockQuery->count();
+                $this->totalNonSerialSkus = $accQuery->count();
+            }
+        } else {
+            $this->totalNonSerialSkus = 0;
+        }
     }
 
     public function startOpname()
@@ -124,15 +227,30 @@ class Create extends Component
             return;
         }
 
+        // Proteksi: cegah pembuatan sesi ganda jika sudah ada sesi yang masih COUNTING
+        $existingActive = StockOpname::where('warehouse_id', $this->warehouseId)
+            ->where('status', 'COUNTING')
+            ->latest()
+            ->first();
+
+        if ($existingActive) {
+            $this->dispatch('toast', title: 'Sesi Sudah Berjalan', message: "Terdapat sesi opname aktif ({$existingActive->opname_number}) di cabang ini. Anda dialihkan untuk bergabung scan bersama.", type: 'warning');
+            return $this->redirectRoute('zoffline.stock-opname.count', $existingActive->id, navigate: true);
+        }
+
         $this->validate([
-            'type' => 'required|in:ALL,SERIALIZED_ONLY,NON_SERIALIZED_ONLY,CATEGORY',
-            'notes' => 'nullable|string|max:500',
+            'type'           => 'required|in:ALL,SERIALIZED_ONLY,NON_SERIALIZED_ONLY,BRAND,PROYEK,CATEGORY',
+            'brandFilter'    => 'required_if:type,BRAND|nullable|string',
+            'projectFilter'  => 'required_if:type,PROYEK|nullable|string',
+            'categoryFilter' => 'required_if:type,CATEGORY|nullable|string',
+            'notes'          => 'nullable|string|max:500',
+        ], [
+            'brandFilter.required_if'    => 'Silakan pilih Brand produk terlebih dahulu.',
+            'projectFilter.required_if'  => 'Silakan pilih Proyek produk terlebih dahulu.',
+            'categoryFilter.required_if' => 'Silakan pilih Kategori produk terlebih dahulu.',
         ]);
 
-        if ($this->type === 'CATEGORY' && empty($this->categoryFilter)) {
-            $this->addError('categoryFilter', 'Silakan pilih kategori/proyek terlebih dahulu.');
-            return;
-        }
+        $targetSkus = $this->getFilteredTargetSkus();
 
         DB::beginTransaction();
         try {
@@ -148,22 +266,22 @@ class Create extends Component
                 'user_id'          => $user->id,
                 'status'           => 'COUNTING',
                 'type'             => $this->type,
+                'brand_filter'     => $this->type === 'BRAND' ? $this->brandFilter : null,
+                'project_filter'   => $this->type === 'PROYEK' ? $this->projectFilter : null,
                 'category_filter'  => $this->type === 'CATEGORY' ? $this->categoryFilter : null,
                 'start_time'       => now(),
                 'notes'            => $this->notes,
             ]);
 
             // 3. Snapshot Barang Serialized (IMEI / Handphone)
-            if (in_array($this->type, ['ALL', 'SERIALIZED_ONLY', 'CATEGORY'])) {
+            if (in_array($this->type, ['ALL', 'SERIALIZED_ONLY', 'BRAND', 'PROYEK', 'CATEGORY'])) {
                 $snQuery = ProductSerialNumber::with(['productAccurate', 'vendor'])
                     ->where('warehouse_id', $this->warehouseId)
                     ->where('business_unit_id', $buId)
                     ->where('status', 'Available');
 
-                if ($this->type === 'CATEGORY' && $this->categoryFilter) {
-                    $snQuery->whereHas('productAccurate', function ($q) {
-                        $q->where('proyek', $this->categoryFilter);
-                    });
+                if ($targetSkus !== null) {
+                    $snQuery->whereIn('item_no', $targetSkus);
                 }
 
                 $availableSns = $snQuery->get();
@@ -212,24 +330,25 @@ class Create extends Component
             }
 
             // 4. Snapshot Barang Non-Serialized (Aksesoris)
-            if (in_array($this->type, ['ALL', 'NON_SERIALIZED_ONLY', 'CATEGORY'])) {
-                // Ambil stok dari ProductAccurate yang tidak berserial (has_sn = false)
-                $accStocks = ProductAccurate::with(['warehouseStocks' => function ($q) {
+            if (in_array($this->type, ['ALL', 'NON_SERIALIZED_ONLY', 'BRAND', 'PROYEK', 'CATEGORY'])) {
+                $accQuery = ProductAccurate::with(['warehouseStocks' => function ($q) {
                     $q->where('warehouse_id', $this->warehouseId);
                 }])
                     ->where('business_unit_id', $buId)
-                    ->where('has_sn', false)
-                    ->when($this->type === 'CATEGORY' && $this->categoryFilter, function ($q) {
-                        $q->where('proyek', $this->categoryFilter);
-                    })
-                    ->get();
+                    ->where('has_sn', false);
+
+                if ($targetSkus !== null) {
+                    $accQuery->whereIn('item_no', $targetSkus);
+                }
+
+                $accStocks = $accQuery->get();
 
                 foreach ($accStocks as $prod) {
                     $whStock = $prod->warehouseStocks->first();
                     $systemQty = $whStock ? (int) $whStock->stock : 0;
 
-                    // Catat hanya jika ada stok sistem atau jika type khusus aksesoris
-                    if ($systemQty > 0 || $this->type === 'NON_SERIALIZED_ONLY') {
+                    // Catat jika ada stok sistem atau jika filter khusus aksesoris/kategori
+                    if ($systemQty > 0 || $this->type === 'NON_SERIALIZED_ONLY' || in_array($this->type, ['BRAND', 'PROYEK', 'CATEGORY'])) {
                         $unitCost = (float) ($prod->base_cost ?? 0);
                         StockOpnameItem::create([
                             'stock_opname_id'  => $opname->id,

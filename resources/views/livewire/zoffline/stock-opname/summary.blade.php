@@ -17,10 +17,13 @@
                         {{ $opname->opname_number }}
                     </span>
                 </div>
-                <p class="text-xs text-neutral-500 mt-0.5">
-                    Cabang: <span class="font-bold text-neutral-700">{{ $opname->branch->name }}</span> | 
-                    Gudang: <span class="font-bold text-neutral-700">{{ $opname->warehouse->name }}</span> | 
-                    Pelaksana: <span class="font-bold text-neutral-700">{{ $opname->user->name }}</span>
+                <p class="text-xs text-neutral-500 mt-0.5 flex flex-wrap items-center gap-1.5">
+                    <span>Cabang: <strong class="text-neutral-700">{{ $opname->branch->name }}</strong></span> | 
+                    <span>Gudang: <strong class="text-neutral-700">{{ $opname->warehouse->name }}</strong></span> | 
+                    <span>Inisiator Sesi: <strong class="text-neutral-700">{{ $opname->user->name ?? 'BM Cabang' }}</strong></span> |
+                    <span class="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-bold rounded-lg border border-purple-200">
+                        Cakupan: {{ $opname->scope_label }}
+                    </span>
                 </p>
             </div>
         </div>
@@ -163,6 +166,48 @@
                 Rp {{ number_format($opname->total_surplus_value, 0, ',', '.') }}
             </span>
             <span class="text-[11px] text-neutral-400 block mt-0.5">HPP barang nyasar/lebih</span>
+        </div>
+    </div>
+
+    {{-- Tim BM Pelaksana & Kontribusi Scan --}}
+    <div class="bg-white p-4.5 rounded-2xl border border-neutral-200 shadow-2xs mb-6">
+        <div class="flex items-center justify-between mb-3 border-b border-neutral-100 pb-2.5">
+            <div class="flex items-center gap-2">
+                <div class="p-1.5 bg-blue-50 text-[#4E44DB] rounded-lg">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                </div>
+                <div>
+                    <h4 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Tim BM Pelaksana Audit</h4>
+                    <span class="text-[11px] text-neutral-400">Inisiator: <strong>{{ $opname->user->name ?? 'BM Cabang' }}</strong></span>
+                </div>
+            </div>
+            <span class="px-2.5 py-1 bg-neutral-100 text-neutral-700 font-bold text-xs rounded-lg">
+                {{ count($scannersSummary) }} Personil Berkontribusi Scan
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            @forelse($scannersSummary as $scanner)
+                <div class="p-3 bg-neutral-50 rounded-xl border border-neutral-200/80 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-full bg-blue-100 text-[#4E44DB] font-bold text-xs flex items-center justify-center shrink-0">
+                            {{ strtoupper(substr($scanner['user_name'], 0, 1)) }}
+                        </div>
+                        <div>
+                            <span class="text-xs font-bold text-gray-900 block leading-tight">{{ $scanner['user_name'] }}</span>
+                            <span class="text-[10px] text-neutral-500">Branch Manager</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs font-mono font-bold text-gray-900 block">{{ $scanner['total'] }} Unit</span>
+                        <span class="text-[10px] text-emerald-600">{{ $scanner['matched'] }} Cocok</span>
+                    </div>
+                </div>
+            @empty
+                <p class="text-xs text-neutral-400 py-2 col-span-3">Belum ada rincian scan nomor seri.</p>
+            @endforelse
         </div>
     </div>
 
@@ -309,8 +354,8 @@
                                 <tr class="bg-neutral-50 text-[10px] uppercase font-bold text-neutral-500 border-b border-neutral-200">
                                     <th class="px-5 py-2.5">Nomor IMEI / Seri</th>
                                     <th class="px-5 py-2.5">Produk</th>
-                                    <th class="px-5 py-2.5">SKU</th>
-                                    <th class="px-5 py-2.5">HPP Estimasi</th>
+                                    <th class="px-5 py-2.5">Discan Oleh</th>
+                                    <th class="px-5 py-2.5">HPP Unit</th>
                                     <th class="px-5 py-2.5">Catatan Investigasi</th>
                                 </tr>
                             </thead>
@@ -319,7 +364,15 @@
                                     <tr class="hover:bg-amber-50/30">
                                         <td class="px-5 py-2.5 font-bold text-amber-800">{{ $uSn->serial_number }}</td>
                                         <td class="px-5 py-2.5 font-sans text-gray-800">{{ $uSn->stockOpnameItem->product_name ?? '-' }}</td>
-                                        <td class="px-5 py-2.5 text-neutral-500">{{ $uSn->item_no }}</td>
+                                        <td class="px-5 py-2.5 font-sans">
+                                            @if($uSn->scannedByUser)
+                                                <span class="px-2 py-0.5 bg-blue-50 text-[#4E44DB] border border-blue-200 text-[10px] font-bold rounded">
+                                                    👤 {{ $uSn->scannedByUser->name }}
+                                                </span>
+                                            @else
+                                                <span class="text-neutral-400 text-xs">-</span>
+                                            @endif
+                                        </td>
                                         <td class="px-5 py-2.5 text-amber-700 font-bold">Rp {{ number_format($uSn->hpp, 0, ',', '.') }}</td>
                                         <td class="px-5 py-2.5 font-sans text-neutral-600 text-[11px]">{{ $uSn->notes ?? 'Fisik ditemukan saat audit' }}</td>
                                     </tr>

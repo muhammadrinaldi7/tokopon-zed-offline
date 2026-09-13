@@ -11,16 +11,22 @@
                     </svg>
                 </a>
                 <div>
-                    <h2 class="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight flex items-center gap-2">
-                        Workstation Penghitungan Fisik
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight">
+                            Workstation Stock Opname
+                        </h2>
                         <span class="px-2.5 py-0.5 bg-blue-100 text-[#4E44DB] text-xs font-bold rounded-lg font-mono">
                             {{ $opname->opname_number }}
                         </span>
-                    </h2>
+                        <span class="px-2.5 py-0.5 bg-purple-100 text-purple-800 text-xs font-bold rounded-lg border border-purple-200">
+                            Cakupan: {{ $opname->scope_label }}
+                        </span>
+                    </div>
                     <p class="text-xs text-neutral-500 mt-0.5">
                         Cabang: <span class="font-bold text-neutral-700">{{ $opname->branch->name }}</span> | 
                         Gudang: <span class="font-bold text-neutral-700">{{ $opname->warehouse->name }}</span> | 
-                        Dimulai: <span class="text-neutral-600">{{ $opname->start_time->format('d M Y, H:i') }}</span>
+                        Inisiator Sesi: <span class="font-bold text-neutral-700">{{ $opname->user->name ?? 'BM' }}</span> | 
+                        Mulai: <span class="text-neutral-600">{{ $opname->start_time->format('d M Y, H:i') }}</span>
                     </p>
                 </div>
             </div>
@@ -77,7 +83,7 @@
         <div class="max-w-2xl mx-auto text-center">
             <div class="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs text-blue-200 mb-2">
                 <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                Scanner Aktif & Siap Menerima Input
+                Scanner Aktif & Siap Menerima Input (User: <strong class="text-white">{{ auth()->user()->name }}</strong>)
             </div>
             <h3 class="text-lg font-bold mb-3">Pindai Barcode / Input IMEI Handphone</h3>
 
@@ -112,8 +118,104 @@
                 <div class="mt-2 text-xs text-blue-200">
                     Terakhir discan: <span class="font-bold text-white">{{ $lastScannedItem['name'] }}</span> (<span class="font-mono">{{ $lastScannedItem['sn'] }}</span>) - 
                     <span class="font-bold {{ $lastScannedItem['status'] === 'MATCHED' ? 'text-emerald-400' : 'text-red-400' }}">{{ $lastScannedItem['status_label'] }}</span>
+                    <span class="text-blue-300 ml-1.5">• Discan oleh: <strong class="text-white">{{ $lastScannedItem['scanned_by'] ?? 'Anda' }}</strong> ({{ $lastScannedItem['scanned_at'] ?? 'Barusan' }})</span>
                 </div>
             @endif
+        </div>
+    </div>
+
+    {{-- Widget Kolaborasi Multi-Scanner BM (Live Sync Feed & Rekap Kontributor) --}}
+    <div wire:poll.5s class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+        {{-- Rekap Personil BM Scanner --}}
+        <div class="bg-white p-4.5 rounded-2xl border border-neutral-200 shadow-2xs">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <div class="p-1.5 bg-blue-50 text-[#4E44DB] rounded-lg">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                    </div>
+                    <h4 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Tim BM Pelaksana Scan</h4>
+                </div>
+                <span class="text-[11px] text-neutral-400 font-medium">{{ count($scannersSummary) }} Personil</span>
+            </div>
+
+            <div class="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                @forelse($scannersSummary as $scanner)
+                    <div class="flex items-center justify-between p-2.5 bg-neutral-50 rounded-xl border border-neutral-100 hover:border-neutral-200 transition">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-7 h-7 rounded-full bg-blue-100 text-[#4E44DB] font-bold text-xs flex items-center justify-center shrink-0">
+                                {{ strtoupper(substr($scanner['user_name'], 0, 1)) }}
+                            </div>
+                            <div>
+                                <span class="text-xs font-bold text-gray-900 block leading-tight">
+                                    {{ $scanner['user_name'] }}
+                                    @if($scanner['user_id'] === auth()->id())
+                                        <span class="text-[10px] text-[#4E44DB] font-bold">(Anda)</span>
+                                    @endif
+                                </span>
+                                <span class="text-[10px] text-neutral-400">Branch Manager</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs font-bold font-mono text-gray-800">{{ $scanner['total'] }} Unit</span>
+                            <span class="text-[10px] text-emerald-600 block">{{ $scanner['matched'] }} Cocok</span>
+                        </div>
+                    </div>
+                @empty
+                    <p class="text-xs text-neutral-400 py-3 text-center">Belum ada pemindaian IMEI oleh tim BM.</p>
+                @endforelse
+            </div>
+        </div>
+
+        {{-- Live Feed: Aktivitas Pemindaian Terkini --}}
+        <div class="lg:col-span-2 bg-white p-4.5 rounded-2xl border border-neutral-200 shadow-2xs">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <div class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <h4 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Aktivitas Pemindaian Terkini (Live Feed)</h4>
+                </div>
+                <div class="flex items-center gap-1.5 text-[11px] text-neutral-400">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Sinkronisasi Otomatis</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                @forelse($recentScans as $recent)
+                    <div class="p-2.5 bg-neutral-50 rounded-xl border border-neutral-100 flex items-center justify-between gap-2">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-mono font-bold text-xs text-gray-900 truncate">{{ $recent->serial_number }}</span>
+                                @if($recent->status === 'MATCHED')
+                                    <span class="px-1.5 py-0.2 bg-emerald-100 text-emerald-700 font-bold text-[9px] rounded">Cocok</span>
+                                @else
+                                    <span class="px-1.5 py-0.2 bg-amber-100 text-amber-700 font-bold text-[9px] rounded">Nyasar</span>
+                                @endif
+                            </div>
+                            <span class="text-[11px] text-neutral-500 truncate block mt-0.5">
+                                {{ $recent->stockOpnameItem->product_name ?? $recent->item_no }}
+                            </span>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <span class="text-[11px] font-bold text-[#4E44DB] block">
+                                {{ $recent->scannedByUser->name ?? 'BM' }}
+                            </span>
+                            <span class="text-[10px] text-neutral-400 font-mono">
+                                {{ $recent->scanned_at ? $recent->scanned_at->format('H:i:s') : '-' }}
+                            </span>
+                        </div>
+                    </div>
+                @empty
+                    <div class="sm:col-span-2 py-6 text-center text-xs text-neutral-400">
+                        Belum ada item yang dipindai pada sesi ini. Mulai pindai barcode di atas!
+                    </div>
+                @endforelse
+            </div>
         </div>
     </div>
 
@@ -162,7 +264,7 @@
                         <th class="px-5 py-3.5 text-center">Buku (Snapshot)</th>
                         <th class="px-5 py-3.5 text-center">Fisik Riil</th>
                         <th class="px-5 py-3.5 text-center">Selisih Qty</th>
-                        <th class="px-5 py-3.5 text-center">Rincian Fisik / Aksi</th>
+                        <th class="px-5 py-3.5 text-center">Rincian Fisik / Pelaksana</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-neutral-100 text-neutral-700">
@@ -228,7 +330,13 @@
                                         </span>
                                     </button>
                                 @else
-                                    <span class="text-[11px] text-neutral-400">Input Kuantitas</span>
+                                    @if($item->lastCountedBy)
+                                        <span class="text-[10px] text-neutral-500 block">
+                                            Dihitung: <strong class="text-neutral-700">{{ $item->lastCountedBy->name }}</strong>
+                                        </span>
+                                    @else
+                                        <span class="text-[11px] text-neutral-400">Input Kuantitas</span>
+                                    @endif
                                 @endif
                             </td>
                         </tr>
@@ -244,12 +352,12 @@
         </div>
     </div>
 
-    {{-- Serial Numbers Detail Modal --}}
+    {{-- Serial Numbers Detail Modal (Lengkap dengan Penandaan Siapa User Yang Scan) --}}
     @if($showSerialModal && $selectedItemForSerials)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="fixed inset-0 bg-black/50 backdrop-blur-xs" wire:click="closeSerialModal"></div>
 
-            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden border border-neutral-200 z-10">
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden border border-neutral-200 z-10">
                 <div class="p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
                     <div>
                         <h3 class="font-bold text-gray-900 text-base">{{ $selectedItemForSerials->product_name }}</h3>
@@ -268,6 +376,7 @@
                             <tr class="bg-neutral-50 text-[10px] uppercase font-bold text-neutral-500 border-b border-neutral-200">
                                 <th class="px-3 py-2">Nomor IMEI / Seri</th>
                                 <th class="px-3 py-2 text-center">Status Verifikasi</th>
+                                <th class="px-3 py-2">Discan Oleh (User BM)</th>
                                 <th class="px-3 py-2">Waktu Scan</th>
                                 <th class="px-3 py-2">Catatan</th>
                             </tr>
@@ -276,19 +385,28 @@
                             @forelse($selectedItemForSerials->serials as $sn)
                                 <tr>
                                     <td class="px-3 py-2.5 font-bold text-gray-900">{{ $sn->serial_number }}</td>
-                                    <td class="px-3 py-2.5 text-center">
+                                    <td class="px-3 py-2.5 text-center font-sans">
                                         @if($sn->status === 'MATCHED')
                                             <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded">
                                                 ✓ Cocok
                                             </span>
                                         @elseif($sn->status === 'MISSING')
                                             <span class="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 text-[10px] font-bold rounded">
-                                                Belum Discan (Missing)
+                                                Belum Discan
                                             </span>
                                         @else
                                             <span class="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold rounded">
                                                 ⚠ Barang Nyasar
                                             </span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2.5 font-sans">
+                                        @if($sn->scannedByUser)
+                                            <span class="px-2 py-0.5 bg-blue-50 text-[#4E44DB] border border-blue-200 rounded font-bold text-[10px]">
+                                                👤 {{ $sn->scannedByUser->name }}
+                                            </span>
+                                        @else
+                                            <span class="text-neutral-400 text-[11px]">-</span>
                                         @endif
                                     </td>
                                     <td class="px-3 py-2.5 text-neutral-500 text-[11px]">
@@ -300,7 +418,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="4" class="py-4 text-center text-neutral-400">Belum ada serial number tercatat.</td>
+                                    <td colspan="5" class="py-4 text-center text-neutral-400">Belum ada serial number tercatat.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -316,7 +434,7 @@
         </div>
     @endif
 
-    {{-- Script Audio Feedback Synthesizer (Tanpa file audio eksternal) --}}
+    {{-- Script Audio Feedback Synthesizer --}}
     <script>
         document.addEventListener('livewire:initialized', () => {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -326,12 +444,11 @@
                 const now = audioCtx.currentTime;
 
                 if (type === 'success') {
-                    // Beep nada tinggi ganda (ting-ting)
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
                     osc.type = 'sine';
-                    osc.frequency.setValueAtTime(880, now); // A5
-                    osc.frequency.setValueAtTime(1174.66, now + 0.08); // D6
+                    osc.frequency.setValueAtTime(880, now);
+                    osc.frequency.setValueAtTime(1174.66, now + 0.08);
                     gain.gain.setValueAtTime(0.15, now);
                     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
                     osc.connect(gain);
@@ -339,7 +456,6 @@
                     osc.start(now);
                     osc.stop(now + 0.2);
                 } else if (type === 'warning') {
-                    // Beep nada sedang datar
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
                     osc.type = 'triangle';
@@ -351,7 +467,6 @@
                     osc.start(now);
                     osc.stop(now + 0.3);
                 } else if (type === 'error') {
-                    // Buzzer nada rendah ganda (tet-tet)
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
                     osc.type = 'sawtooth';
@@ -365,7 +480,6 @@
                     osc.stop(now + 0.35);
                 }
 
-                // Kembalikan fokus ke input scanner otomatis
                 setTimeout(() => {
                     const input = document.getElementById('barcodeScannerInput');
                     if (input) input.focus();

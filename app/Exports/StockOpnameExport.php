@@ -23,7 +23,7 @@ class StockOpnameExport implements FromCollection, WithHeadings, ShouldAutoSize,
     public function __construct(StockOpname $opname)
     {
         $this->opname = $opname;
-        $this->items = $opname->items()->orderBy('difference_qty', 'asc')->get();
+        $this->items = $opname->items()->with('lastCountedBy')->orderBy('difference_qty', 'asc')->get();
     }
 
     public function collection(): Collection
@@ -42,6 +42,7 @@ class StockOpnameExport implements FromCollection, WithHeadings, ShouldAutoSize,
             'Selisih Kuantitas',
             'HPP Satuan (Rp)',
             'Total Nilai Selisih (Rp)',
+            'Pelaksana Hitung / Scanner',
             'Catatan Khusus',
         ];
     }
@@ -57,6 +58,7 @@ class StockOpnameExport implements FromCollection, WithHeadings, ShouldAutoSize,
             $item->difference_qty,
             (float) $item->unit_cost,
             (float) $item->difference_value,
+            $item->lastCountedBy ? $item->lastCountedBy->name : ($item->is_serialized ? 'Tim BM Cabang' : '-'),
             $item->notes ?? '-',
         ];
     }

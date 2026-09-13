@@ -97,15 +97,9 @@
                                 <span class="text-[10px] text-gray-500">{{ $opname->warehouse->name ?? '-' }}</span>
                             </td>
                             <td class="px-5 py-4 whitespace-nowrap">
-                                @if($opname->type === 'ALL')
-                                    <span class="px-2 py-0.5 bg-neutral-100 text-neutral-700 text-[10px] font-bold rounded">Semua Barang</span>
-                                @elseif($opname->type === 'SERIALIZED_ONLY')
-                                    <span class="px-2 py-0.5 bg-purple-50 text-purple-700 text-[10px] font-bold rounded">Khusus HP (IMEI)</span>
-                                @elseif($opname->type === 'NON_SERIALIZED_ONLY')
-                                    <span class="px-2 py-0.5 bg-orange-50 text-orange-700 text-[10px] font-bold rounded">Aksesoris</span>
-                                @else
-                                    <span class="px-2 py-0.5 bg-teal-50 text-teal-700 text-[10px] font-bold rounded">{{ $opname->category_filter ?? 'Kategori' }}</span>
-                                @endif
+                                <span class="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold rounded">
+                                    {{ $opname->scope_label }}
+                                </span>
                             </td>
                             <td class="px-5 py-4 whitespace-nowrap">
                                 <span class="font-semibold text-gray-800 text-xs">{{ $opname->user->name ?? '-' }}</span>

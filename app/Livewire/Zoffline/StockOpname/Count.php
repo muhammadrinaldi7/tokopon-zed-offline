@@ -32,15 +32,20 @@ class Count extends Component
     {
         $user = Auth::user();
         $buId = $user->getActiveBusinessUnitId();
-        $isGlobal = $user->hasAnyRole(['superadmin', 'admin', 'director']);
+        $isGlobal = $user->hasAnyRole(['superadmin', 'admin', 'director', 'direktur', 'manager_operasional', 'manager_operasional_gsk']);
+        $isBm = $user->hasAnyRole(['bm', 'bm_gsk']);
 
-        // Proteksi akses cabang
+        // Proteksi hak akses BM di cabang tersebut
+        if (!$isGlobal && !$isBm) {
+            abort(403, 'Akses ditolak: Hanya Branch Manager (BM) yang berhak melakukan pemindaian stock opname.');
+        }
+
         if ($opname->business_unit_id !== $buId) {
             abort(403, 'Akses ditolak: Unit bisnis tidak sesuai.');
         }
 
         if (!$isGlobal && $user->branch_id && $opname->branch_id !== $user->branch_id) {
-            abort(403, 'Akses ditolak: Anda hanya dapat mengakses opname cabang Anda sendiri.');
+            abort(403, 'Akses ditolak: Anda hanya dapat mengakses dan memindai opname cabang Anda sendiri.');
         }
 
         // Jika sudah selesai atau menunggu approval, arahkan ke summary
@@ -52,7 +57,7 @@ class Count extends Component
     }
 
     /**
-     * Proses Pemindaian Barcode / Input IMEI Cepat
+     * Proses Pemindaian Barcode / Input IMEI Cepat (Kolaborasi Multi-BM)
      */
     public function processScan()
     {
@@ -61,11 +66,14 @@ class Count extends Component
             return;
         }
 
+        $user = Auth::user();
+        $scannerName = $user->name;
+
         $this->scanAlert = null;
         $this->lastScannedItem = null;
 
         // 1. Cek apakah nomor seri ini ada di daftar snapshot opname cabang ini
-        $opnameSerial = StockOpnameSerial::with('stockOpnameItem')
+        $opnameSerial = StockOpnameSerial::with(['stockOpnameItem', 'scannedByUser'])
             ->where('stock_opname_id', $this->opname->id)
             ->where('serial_number', $cleanSn)
             ->first();
@@ -73,9 +81,12 @@ class Count extends Component
         if ($opnameSerial) {
             // Kasus A: Sudah discan sebelumnya (Duplikat)
             if ($opnameSerial->status === 'MATCHED') {
+                $previouslyScannedBy = $opnameSerial->scannedByUser->name ?? 'BM Lain';
+                $time = $opnameSerial->scanned_at ? $opnameSerial->scanned_at->format('H:i:s') : '-';
+
                 $this->scanAlert = [
                     'type'    => 'warning',
-                    'message' => "Nomor Seri/IMEI [{$cleanSn}] SUDAH discan sebelumnya!",
+                    'message' => "Nomor Seri/IMEI [{$cleanSn}] SUDAH discan sebelumnya oleh {$previouslyScannedBy} pada pukul {$time}!",
                 ];
                 $this->dispatch('play-scan-sound', type: 'warning');
                 $this->barcodeScan = '';
@@ -86,13 +97,14 @@ class Count extends Component
             $opnameSerial->update([
                 'status'     => 'MATCHED',
                 'scanned_at' => now(),
-                'scanned_by' => Auth::id(),
+                'scanned_by' => $user->id,
             ]);
 
             // Update kuantitas fisik pada item terkait
             $item = $opnameSerial->stockOpnameItem;
             if ($item) {
                 $item->increment('physical_qty');
+                $item->update(['last_counted_by' => $user->id]);
                 $item->recalculateDifference();
             }
 
@@ -103,11 +115,13 @@ class Count extends Component
                 'name'         => $item->product_name ?? $opnameSerial->item_no,
                 'status'       => 'MATCHED',
                 'status_label' => 'Cocok (Terverifikasi)',
+                'scanned_by'   => $scannerName,
+                'scanned_at'   => now()->format('H:i:s'),
             ];
 
             $this->scanAlert = [
                 'type'    => 'success',
-                'message' => "IMEI [{$cleanSn}] berhasil diverifikasi!",
+                'message' => "IMEI [{$cleanSn}] berhasil diverifikasi oleh {$scannerName}!",
             ];
             $this->dispatch('play-scan-sound', type: 'success');
 
@@ -121,7 +135,7 @@ class Count extends Component
             $productName = 'Produk Tidak Dikenal';
             $itemNo = 'UNKNOWN';
             $hpp = 0;
-            $originNote = 'Fisik ditemukan saat opname, tidak terdaftar di sistem cabang ini.';
+            $originNote = 'Fisik ditemukan saat opname, di luar cakupan snapshot sesi ini.';
 
             if ($existingSn) {
                 $itemNo = $existingSn->item_no;
@@ -145,6 +159,7 @@ class Count extends Component
                     'difference_qty'   => 0,
                     'unit_cost'        => $hpp,
                     'difference_value' => 0,
+                    'last_counted_by'  => $user->id,
                 ]
             );
 
@@ -157,11 +172,12 @@ class Count extends Component
                 'status'               => 'UNEXPECTED',
                 'hpp'                  => $hpp,
                 'scanned_at'           => now(),
-                'scanned_by'           => Auth::id(),
+                'scanned_by'           => $user->id,
                 'notes'                => $originNote,
             ]);
 
             $item->increment('physical_qty');
+            $item->update(['last_counted_by' => $user->id]);
             $item->recalculateDifference();
 
             $this->opname->calculateTotals();
@@ -170,12 +186,14 @@ class Count extends Component
                 'sn'           => $cleanSn,
                 'name'         => $productName,
                 'status'       => 'UNEXPECTED',
-                'status_label' => 'Barang Nyasar / Tidak Terdaftar di Cabang',
+                'status_label' => 'Barang Nyasar / Di Luar Cakupan Sesi',
+                'scanned_by'   => $scannerName,
+                'scanned_at'   => now()->format('H:i:s'),
             ];
 
             $this->scanAlert = [
                 'type'    => 'error',
-                'message' => "PERINGATAN: IMEI [{$cleanSn}] adalah Barang Nyasar! {$originNote}",
+                'message' => "PERINGATAN: IMEI [{$cleanSn}] adalah Barang Nyasar! Dicatat oleh {$scannerName}.",
             ];
             $this->dispatch('play-scan-sound', type: 'error');
         }
@@ -195,7 +213,10 @@ class Count extends Component
             ->first();
 
         if ($item && !$item->is_serialized) {
-            $item->update(['physical_qty' => $newQty]);
+            $item->update([
+                'physical_qty'    => $newQty,
+                'last_counted_by' => Auth::id(),
+            ]);
             $item->recalculateDifference();
             $this->opname->calculateTotals();
         }
@@ -226,12 +247,12 @@ class Count extends Component
     }
 
     /**
-     * Buka modal untuk melihat serials suatu item
+     * Buka modal untuk melihat serials suatu item (lengkap dengan info scanner)
      */
     public function openSerialModal(int $itemId)
     {
         $this->selectedItemForSerials = StockOpnameItem::with(['serials' => function ($q) {
-            $q->orderBy('status', 'asc');
+            $q->with('scannedByUser')->orderBy('status', 'asc')->orderBy('scanned_at', 'desc');
         }])
             ->where('stock_opname_id', $this->opname->id)
             ->find($itemId);
@@ -257,17 +278,18 @@ class Count extends Component
     {
         $this->opname->refresh();
 
-        $query = StockOpnameItem::withCount([
-            'serials as matched_count' => function ($q) {
-                $q->where('status', 'MATCHED');
-            },
-            'serials as missing_count' => function ($q) {
-                $q->where('status', 'MISSING');
-            },
-            'serials as unexpected_count' => function ($q) {
-                $q->where('status', 'UNEXPECTED');
-            }
-        ])
+        $query = StockOpnameItem::with('lastCountedBy')
+            ->withCount([
+                'serials as matched_count' => function ($q) {
+                    $q->where('status', 'MATCHED');
+                },
+                'serials as missing_count' => function ($q) {
+                    $q->where('status', 'MISSING');
+                },
+                'serials as unexpected_count' => function ($q) {
+                    $q->where('status', 'UNEXPECTED');
+                }
+            ])
             ->where('stock_opname_id', $this->opname->id)
             ->when($this->activeTab === 'SERIALIZED', function ($q) {
                 $q->where('is_serialized', true);
@@ -297,9 +319,22 @@ class Count extends Component
             'unexpected' => StockOpnameSerial::where('stock_opname_id', $this->opname->id)->where('status', 'UNEXPECTED')->count(),
         ];
 
+        // 8 Riwayat Scan Terkini oleh Tim BM
+        $recentScans = StockOpnameSerial::with(['scannedByUser', 'stockOpnameItem'])
+            ->where('stock_opname_id', $this->opname->id)
+            ->whereNotNull('scanned_at')
+            ->orderBy('scanned_at', 'desc')
+            ->take(8)
+            ->get();
+
+        // Rekap personil BM yang berkontribusi scan pada sesi ini
+        $scannersSummary = $this->opname->getScannersSummary();
+
         return view('livewire.zoffline.stock-opname.count', [
-            'items'       => $items,
-            'serialStats' => $serialStats,
+            'items'           => $items,
+            'serialStats'     => $serialStats,
+            'recentScans'     => $recentScans,
+            'scannersSummary' => $scannersSummary,
         ]);
     }
 }

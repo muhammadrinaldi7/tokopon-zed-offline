@@ -123,30 +123,33 @@ class Summary extends Component
         $this->opname->refresh();
 
         // Ambil item yang memiliki selisih fisik
-        $discrepancyItems = StockOpnameItem::where('stock_opname_id', $this->opname->id)
+        $discrepancyItems = StockOpnameItem::with('lastCountedBy')
+            ->where('stock_opname_id', $this->opname->id)
             ->where('difference_qty', '!=', 0)
             ->orderBy('difference_qty', 'asc')
             ->get();
 
         // Ambil serial number yang Missing (hilang)
-        $missingSerials = StockOpnameSerial::with('stockOpnameItem')
+        $missingSerials = StockOpnameSerial::with(['stockOpnameItem', 'scannedByUser'])
             ->where('stock_opname_id', $this->opname->id)
             ->where('status', 'MISSING')
             ->get();
 
         // Ambil serial number yang Unexpected (nyasar)
-        $unexpectedSerials = StockOpnameSerial::with('stockOpnameItem')
+        $unexpectedSerials = StockOpnameSerial::with(['stockOpnameItem', 'scannedByUser'])
             ->where('stock_opname_id', $this->opname->id)
             ->where('status', 'UNEXPECTED')
             ->get();
 
         $latestApproval = $this->opname->latestApprovalRequest;
+        $scannersSummary = $this->opname->getScannersSummary();
 
         return view('livewire.zoffline.stock-opname.summary', [
             'discrepancyItems'  => $discrepancyItems,
             'missingSerials'    => $missingSerials,
             'unexpectedSerials' => $unexpectedSerials,
             'latestApproval'    => $latestApproval,
+            'scannersSummary'   => $scannersSummary,
         ]);
     }
 }

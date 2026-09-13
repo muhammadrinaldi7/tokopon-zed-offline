@@ -35,6 +35,11 @@ class StockOpnameItem extends Model
         return $this->belongsTo(ProductAccurate::class, 'item_no', 'item_no');
     }
 
+    public function lastCountedBy()
+    {
+        return $this->belongsTo(User::class, 'last_counted_by');
+    }
+
     /**
      * Hitung ulang selisih kuantitas dan nominal selisih
      */

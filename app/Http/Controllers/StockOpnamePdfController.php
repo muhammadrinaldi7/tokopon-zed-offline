@@ -29,17 +29,19 @@ class StockOpnamePdfController extends Controller
             abort(403, 'Akses ditolak: Anda hanya dapat mengakses opname cabang Anda sendiri.');
         }
 
-        $opname->load(['branch', 'warehouse', 'user', 'businessUnit', 'items', 'serials.stockOpnameItem']);
+        $opname->load(['branch', 'warehouse', 'user', 'businessUnit', 'items.lastCountedBy', 'serials.stockOpnameItem', 'serials.scannedByUser']);
 
         $discrepancyItems = $opname->items->filter(fn($i) => $i->difference_qty != 0);
         $missingSerials = $opname->serials->where('status', 'MISSING');
         $unexpectedSerials = $opname->serials->where('status', 'UNEXPECTED');
+        $scannersSummary = $opname->getScannersSummary();
 
         $pdf = Pdf::loadView('pdf.stock-opname', [
             'opname'            => $opname,
             'discrepancyItems'  => $discrepancyItems,
             'missingSerials'    => $missingSerials,
             'unexpectedSerials' => $unexpectedSerials,
+            'scannersSummary'   => $scannersSummary,
         ])->setPaper('a4', 'portrait');
 
         $filename = "Berita_Acara_SO_{$opname->opname_number}.pdf";

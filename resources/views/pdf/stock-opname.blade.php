@@ -214,13 +214,7 @@
         <tr>
             <td class="label">Cakupan Audit</td>
             <td class="colon">:</td>
-            <td class="value">
-                @if($opname->type === 'ALL') Semua Produk (HP & Aksesoris)
-                @elseif($opname->type === 'SERIALIZED_ONLY') Khusus Unit HP (IMEI)
-                @elseif($opname->type === 'NON_SERIALIZED_ONLY') Khusus Aksesoris
-                @else Kategori: {{ $opname->category_filter }}
-                @endif
-            </td>
+            <td class="value font-bold">{{ $opname->scope_label }}</td>
 
             <td class="label">Status Pengesahan</td>
             <td class="colon">:</td>
@@ -338,8 +332,9 @@
                 <tr>
                     <th style="width: 5%;">No</th>
                     <th style="width: 25%;">Nomor IMEI / Seri</th>
-                    <th style="width: 35%;">Nama Produk</th>
-                    <th style="width: 35%;">Catatan Asal / Investigasi</th>
+                    <th style="width: 30%;">Nama Produk</th>
+                    <th style="width: 20%;">Discan Oleh</th>
+                    <th style="width: 20%;">Catatan Investigasi</th>
                 </tr>
             </thead>
             <tbody>
@@ -348,6 +343,7 @@
                         <td class="text-center">{{ $uIdx + 1 }}</td>
                         <td class="font-mono font-bold text-amber">{{ $uSn->serial_number }}</td>
                         <td>{{ $uSn->stockOpnameItem->product_name ?? '-' }}</td>
+                        <td>{{ $uSn->scannedByUser->name ?? 'BM Cabang' }}</td>
                         <td>{{ $uSn->notes ?? 'Fisik ada saat scan, tidak terdaftar di cabang ini.' }}</td>
                     </tr>
                 @endforeach
@@ -360,6 +356,16 @@
     <div class="notes-box">
         {!! nl2br(e($opname->notes ?: 'Tidak ada catatan keterangan khusus. Hasil audit stok telah diverifikasi oleh pelaksana.')) !!}
     </div>
+
+    {{-- Tim BM Pelaksana Scan (Jika Ada) --}}
+    @if(isset($scannersSummary) && $scannersSummary->isNotEmpty())
+        <div style="font-size: 8pt; margin-bottom: 15px; color: #444; border: 1px dashed #ccc; padding: 6px 10px; border-radius: 4px; background: #fcfcfc;">
+            <strong>Tim BM Pelaksana Scan:</strong>
+            @foreach($scannersSummary as $s)
+                {{ $s['user_name'] }} ({{ $s['total'] }} unit discan){{ !$loop->last ? ', ' : '' }}
+            @endforeach
+        </div>
+    @endif
 
     {{-- Kolom Tanda Tangan --}}
     <table class="signatures">
