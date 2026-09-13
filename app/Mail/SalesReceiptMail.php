@@ -30,8 +30,8 @@ class SalesReceiptMail extends Mailable
     {
         return new Envelope(
             from: new \Illuminate\Mail\Mailables\Address(
-                env('MAIL_POS_FROM_ADDRESS', 'noreply@syihabstore.id'),
-                env('MAIL_POS_FROM_NAME', 'TOKOPON Sales')
+                config('mail.mailers.pos_sales.from.address', env('MAIL_POS_FROM_ADDRESS', 'noreply@zedpos.syihabstore.id')),
+                config('mail.mailers.pos_sales.from.name', env('MAIL_POS_FROM_NAME', 'TOKOPON Sales'))
             ),
             subject: 'Struk Transaksi Syihabstore #' . $this->order->order_number,
         );

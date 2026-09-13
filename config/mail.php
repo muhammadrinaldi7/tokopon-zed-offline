@@ -49,16 +49,38 @@ return [
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
-        // ─── TAMBAHKAN MAILER POS DISINI CUY ───────────────────
+        // ─── MAILER POS DISINI (MAILTRAP LIVE SMTP) ───────────
         'pos_sales' => [
             'transport' => 'smtp',
-            'host' => env('MAIL_POS_HOST'),
-            'port' => env('MAIL_POS_PORT', 587), // Default ke 587 jika di .env lupa diisi
+            'scheme' => env('MAIL_POS_SCHEME'),
+            'url' => env('MAIL_POS_URL'),
+            'host' => env('MAIL_POS_HOST', 'live.smtp.mailtrap.io'),
+            'port' => env('MAIL_POS_PORT', 587),
             'encryption' => env('MAIL_POS_ENCRYPTION', 'tls'),
-            'username' => env('MAIL_POS_USERNAME'),
+            'username' => env('MAIL_POS_USERNAME', 'api'),
             'password' => env('MAIL_POS_PASSWORD'),
-            'timeout' => 30, // Ditambahkan timeout 30 detik agar kasir tidak lag terlalu lama jika SMTP down
+            'timeout' => 30, // Timeout 30 detik agar kasir tidak lag jika SMTP down
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+            'from' => [
+                'address' => env('MAIL_POS_FROM_ADDRESS', 'noreply@zedpos.syihabstore.id'),
+                'name' => env('MAIL_POS_FROM_NAME', env('APP_NAME', 'TOKOPON POS')),
+            ],
+        ],
+
+        // ─── ALIAS MAILER MAILTRAP ─────────────────────────────
+        'mailtrap' => [
+            'transport' => 'smtp',
+            'scheme' => env('MAIL_TRAP_SCHEME'),
+            'host' => env('MAIL_POS_HOST', 'live.smtp.mailtrap.io'),
+            'port' => env('MAIL_POS_PORT', 587),
+            'username' => env('MAIL_POS_USERNAME', 'api'),
+            'password' => env('MAIL_POS_PASSWORD'),
+            'timeout' => 30,
+            'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+            'from' => [
+                'address' => env('MAIL_POS_FROM_ADDRESS', 'noreply@zedpos.syihabstore.id'),
+                'name' => env('MAIL_POS_FROM_NAME', env('APP_NAME', 'TOKOPON POS')),
+            ],
         ],
 
         'ses' => [

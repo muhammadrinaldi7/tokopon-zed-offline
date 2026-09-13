@@ -24,8 +24,8 @@ class SellPhonePaymentReceiptMail extends Mailable
 
     public function envelope(): Envelope
     {
-        $storeName = $this->sellPhone->businessUnit->store_title ?? env('MAIL_POS_FROM_NAME', 'TOKOPON');
-        $fromAddress = env('MAIL_POS_FROM_ADDRESS', config('mail.from.address', 'noreply@syihabstore.id'));
+        $storeName = $this->sellPhone->businessUnit->store_title ?? config('mail.mailers.pos_sales.from.name', env('MAIL_POS_FROM_NAME', 'TOKOPON'));
+        $fromAddress = config('mail.mailers.pos_sales.from.address', env('MAIL_POS_FROM_ADDRESS', 'noreply@zedpos.syihabstore.id'));
 
         return new Envelope(
             from: new Address($fromAddress, $storeName),
