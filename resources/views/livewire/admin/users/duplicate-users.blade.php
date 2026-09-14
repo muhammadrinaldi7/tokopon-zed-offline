@@ -33,7 +33,7 @@
                 </div>
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900">Audit & Duplikat Pengguna</h1>
-                    <p class="text-sm text-gray-500 mt-0.5">Analisa nomor telepon ganda, cek riwayat pesanan (orders), serta integrasi pelanggan Accurate.</p>
+                    <p class="text-sm text-gray-500 mt-0.5">Analisa nomor telepon ganda, cek riwayat pesanan (orders), riwayat pembelian HP (sell phones), serta integrasi pelanggan Accurate.</p>
                 </div>
             </div>
         </div>
@@ -66,37 +66,17 @@
                 </div>
             </div>
             <div class="mt-3 pt-3 border-t border-gray-50 flex items-center text-xs text-amber-700 font-medium">
-                <span>Perlu diaudit / ditinjau</span>
+                <span>{{ number_format($stats['totalDuplicateAccounts'] ?? 0) }} akun teridentifikasi</span>
             </div>
         </div>
 
-        <!-- Card 2: Total Akun Terlibat -->
+        <!-- Card 2: Punya Riwayat Orders (Penjualan) -->
         <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">Total Akun Terduplikasi</p>
-                    <h3 class="text-2xl font-bold text-gray-900 mt-1.5">{{ number_format($stats['totalDuplicateAccounts'] ?? 0) }}</h3>
-                    <p class="text-xs text-gray-500 mt-1">User akun terdeteksi kembar</p>
-                </div>
-                <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 border border-blue-100 shrink-0">
-                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                </div>
-            </div>
-            <div class="mt-3 pt-3 border-t border-gray-50 flex items-center text-xs text-blue-700 font-medium">
-                <span>Rata-rata ~{{ $stats['totalDuplicatePhones'] > 0 ? round($stats['totalDuplicateAccounts'] / $stats['totalDuplicatePhones'], 1) : 0 }} akun / nomor</span>
-            </div>
-        </div>
-
-        <!-- Card 3: Punya Order -->
-        <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">Memiliki Riwayat Order</p>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">Riwayat Pesanan (Orders)</p>
                     <h3 class="text-2xl font-bold text-emerald-600 mt-1.5">{{ number_format($stats['phonesWithOrdersCount'] ?? 0) }}</h3>
-                    <p class="text-xs text-gray-500 mt-1">Grup nomor dengan pesanan</p>
+                    <p class="text-xs text-gray-500 mt-1">Grup nomor dengan pesanan toko</p>
                 </div>
                 <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -106,17 +86,37 @@
                 </div>
             </div>
             <div class="mt-3 pt-3 border-t border-gray-50 flex items-center text-xs text-emerald-700 font-medium">
-                <span>Ada transaksi aktif belanja</span>
+                <span>Pelanggan membeli dari toko</span>
             </div>
         </div>
 
-        <!-- Card 4: Tanpa Order -->
+        <!-- Card 3: Punya Riwayat Pembelian HP (Sell Phone) -->
         <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">Semua Tanpa Order</p>
-                    <h3 class="text-2xl font-bold text-gray-600 mt-1.5">{{ number_format($stats['phonesWithoutOrdersCount'] ?? 0) }}</h3>
-                    <p class="text-xs text-gray-500 mt-1">Grup dengan 0 pesanan</p>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">Riwayat Pembelian HP</p>
+                    <h3 class="text-2xl font-bold text-indigo-600 mt-1.5">{{ number_format($stats['phonesWithSellPhonesCount'] ?? 0) }}</h3>
+                    <p class="text-xs text-gray-500 mt-1">Grup nomor menjual HP ke toko</p>
+                </div>
+                <div class="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 border border-indigo-100 shrink-0">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-gray-50 flex items-center text-xs text-indigo-700 font-medium">
+                <span>Layanan Beli HP / Tukar Tambah</span>
+            </div>
+        </div>
+
+        <!-- Card 4: Tanpa Transaksi Sama Sekali -->
+        <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm relative overflow-hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">Tanpa Transaksi Sama Sekali</p>
+                    <h3 class="text-2xl font-bold text-gray-600 mt-1.5">{{ number_format($stats['phonesWithoutTransactionsCount'] ?? 0) }}</h3>
+                    <p class="text-xs text-gray-500 mt-1">0 Order & 0 Pembelian HP</p>
                 </div>
                 <div class="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-gray-500 border border-gray-200 shrink-0">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -126,7 +126,7 @@
                 </div>
             </div>
             <div class="mt-3 pt-3 border-t border-gray-50 flex items-center text-xs text-gray-500 font-medium">
-                <span>Akun belum pernah belanja</span>
+                <span>Akun pasif / tanpa riwayat</span>
             </div>
         </div>
     </div>
@@ -155,16 +155,18 @@
                 @endif
             </div>
 
-            <!-- Filter Status Order -->
+            <!-- Filter Status Transaksi -->
             <div class="flex flex-wrap items-center gap-3">
                 <div class="flex items-center gap-2">
-                    <span class="text-xs font-semibold text-gray-500 whitespace-nowrap">Filter Status:</span>
+                    <span class="text-xs font-semibold text-gray-500 whitespace-nowrap">Filter Transaksi:</span>
                     <select wire:model.live="orderFilter"
                         class="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-gray-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer">
                         <option value="all">Semua Nomor Duplikat</option>
-                        <option value="has_orders">Punya Riwayat Order (Ada Pesanan)</option>
-                        <option value="no_orders">Belum Pernah Order (0 Pesanan)</option>
-                        <option value="conflict_orders">Konflik: Banyak Akun Punya Order</option>
+                        <option value="has_transactions">Ada Transaksi (Pesanan / Pembelian HP)</option>
+                        <option value="has_orders">Hanya Riwayat Pesanan (Orders)</option>
+                        <option value="has_sell_phones">Hanya Riwayat Pembelian HP (Sell Phone)</option>
+                        <option value="no_transactions">Tanpa Transaksi Sama Sekali (0 Order & 0 Beli HP)</option>
+                        <option value="conflict_transactions">Konflik: Banyak Akun Punya Transaksi</option>
                     </select>
                 </div>
 
@@ -189,9 +191,12 @@
                 $phone = $group->phone_number;
                 $userList = $usersByPhone->get($phone, collect());
                 $hasOrdersInGroup = $userList->contains(fn($u) => $u->orders_count > 0);
-                $accountsWithOrdersCount = $userList->filter(fn($u) => $u->orders_count > 0)->count();
+                $hasSellPhonesInGroup = $userList->contains(fn($u) => $u->sell_phones_count > 0);
+                $accountsWithTransactionsCount = $userList->filter(fn($u) => $u->orders_count > 0 || $u->sell_phones_count > 0)->count();
                 $totalOrdersInGroup = $userList->sum('orders_count');
-                $totalSpentInGroup = $userList->sum('orders_total_amount');
+                $totalOrdersSpentInGroup = $userList->sum('orders_total_amount');
+                $totalSellPhonesInGroup = $userList->sum('sell_phones_count');
+                $totalSellPhonesSpentInGroup = $userList->sum('sell_phones_total_amount');
             @endphp
 
             <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden hover:border-blue-300 transition-all">
@@ -219,26 +224,39 @@
 
                     <!-- Summary Badges in Group Header -->
                     <div class="flex flex-wrap items-center gap-2">
-                        @if ($accountsWithOrdersCount > 1)
+                        @if ($accountsWithTransactionsCount > 1)
                             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
-                                Konflik: {{ $accountsWithOrdersCount }} Akun Sama-Sama Punya Order
+                                Konflik: {{ $accountsWithTransactionsCount }} Akun Sama-Sama Punya Transaksi
                             </span>
-                        @elseif ($hasOrdersInGroup)
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        @endif
+
+                        @if ($hasOrdersInGroup)
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                                 </svg>
-                                Total {{ $totalOrdersInGroup }} Pesanan (Rp {{ number_format($totalSpentInGroup, 0, ',', '.') }})
+                                {{ $totalOrdersInGroup }} Pesanan (Rp {{ number_format($totalOrdersSpentInGroup, 0, ',', '.') }})
                             </span>
-                        @else
+                        @endif
+
+                        @if ($hasSellPhonesInGroup)
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                {{ $totalSellPhonesInGroup }} Beli HP (Rp {{ number_format($totalSellPhonesSpentInGroup, 0, ',', '.') }})
+                            </span>
+                        @endif
+
+                        @if (!$hasOrdersInGroup && !$hasSellPhonesInGroup)
                             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
                                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
                                 </svg>
-                                Semua 0 Pesanan (Belum Pernah Belanja)
+                                Semua 0 Transaksi (Belum Pernah Belanja / Jual HP)
                             </span>
                         @endif
                     </div>
@@ -253,21 +271,23 @@
                                 <th class="py-3 px-6">Email Terdaftar</th>
                                 <th class="py-3 px-6">Tanggal Dibuat</th>
                                 <th class="py-3 px-6">Pelanggan Accurate</th>
-                                <th class="py-3 px-6">Status Pesanan (Orders)</th>
+                                <th class="py-3 px-6">Pesanan Toko (Orders)</th>
+                                <th class="py-3 px-6">Pembelian HP (Sell Phone)</th>
                                 <th class="py-3 px-6 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             @foreach ($userList as $index => $u)
                                 @php
-                                    $isPrimaryCandidate = ($index === 0 && $u->orders_count > 0);
-                                    $isEmptyDuplicate = ($u->orders_count == 0 && $u->accurateCustomers->isEmpty());
+                                    $hasAnyTx = ($u->orders_count > 0 || $u->sell_phones_count > 0);
+                                    $isPrimaryCandidate = ($index === 0 && $hasAnyTx);
+                                    $isEmptyDuplicate = (!$hasAnyTx && $u->accurateCustomers->isEmpty());
                                 @endphp
                                 <tr class="hover:bg-blue-50/30 transition-colors {{ $isPrimaryCandidate ? 'bg-emerald-50/20' : '' }}">
                                     <!-- User Column -->
                                     <td class="py-3.5 px-6">
                                         <div class="flex items-center gap-3">
-                                            <div class="w-9 h-9 rounded-lg {{ $u->orders_count > 0 ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-700' }} flex items-center justify-center font-bold text-xs shrink-0">
+                                            <div class="w-9 h-9 rounded-lg {{ $hasAnyTx ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-700' }} flex items-center justify-center font-bold text-xs shrink-0">
                                                 {{ strtoupper(substr($u->name ?? 'U', 0, 2)) }}
                                             </div>
                                             <div>
@@ -329,13 +349,13 @@
                                     <!-- Orders Status Column -->
                                     <td class="py-3.5 px-6 whitespace-nowrap">
                                         @if ($u->orders_count > 0)
-                                            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
-                                                <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+                                                <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                                                 </svg>
                                                 <div>
                                                     <span class="font-bold text-xs">{{ $u->orders_count }} Pesanan</span>
-                                                    <span class="text-[11px] text-emerald-700 block">Rp {{ number_format($u->orders_total_amount ?? 0, 0, ',', '.') }}</span>
+                                                    <span class="text-[10px] text-emerald-700 block">Rp {{ number_format($u->orders_total_amount ?? 0, 0, ',', '.') }}</span>
                                                 </div>
                                             </div>
                                         @else
@@ -348,20 +368,55 @@
                                         @endif
                                     </td>
 
+                                    <!-- Sell Phone Status Column -->
+                                    <td class="py-3.5 px-6 whitespace-nowrap">
+                                        @if ($u->sell_phones_count > 0)
+                                            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-800">
+                                                <svg class="w-3.5 h-3.5 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                </svg>
+                                                <div>
+                                                    <span class="font-bold text-xs">{{ $u->sell_phones_count }} Unit HP</span>
+                                                    <span class="text-[10px] text-indigo-700 block">Rp {{ number_format($u->sell_phones_total_amount ?? 0, 0, ',', '.') }}</span>
+                                                </div>
+                                            </div>
+                                        @else
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-500">
+                                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
+                                                </svg>
+                                                0 Beli HP
+                                            </span>
+                                        @endif
+                                    </td>
+
                                     <!-- Actions Column -->
                                     <td class="py-3.5 px-6 text-right whitespace-nowrap">
-                                        @if ($u->orders_count > 0)
-                                            <button wire:click="openOrdersModal({{ $u->id }})"
-                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-blue-600/20 cursor-pointer">
-                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                </svg>
-                                                Lihat Pesanan
-                                            </button>
-                                        @else
-                                            <span class="text-xs text-gray-400 italic">Tidak ada order</span>
-                                        @endif
+                                        <div class="flex items-center justify-end gap-2">
+                                            @if ($u->orders_count > 0)
+                                                <button wire:click="openOrdersModal({{ $u->id }})"
+                                                    class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-blue-600/20 cursor-pointer">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                                    </svg>
+                                                    Lihat Pesanan
+                                                </button>
+                                            @endif
+
+                                            @if ($u->sell_phones_count > 0)
+                                                <button wire:click="openSellPhonesModal({{ $u->id }})"
+                                                    class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-indigo-600/20 cursor-pointer">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                    </svg>
+                                                    Lihat Pembelian HP
+                                                </button>
+                                            @endif
+
+                                            @if ($u->orders_count == 0 && $u->sell_phones_count == 0)
+                                                <span class="text-xs text-gray-400 italic">Tidak ada transaksi</span>
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach
@@ -400,7 +455,7 @@
         {{ $paginatedGroups->links() }}
     </div>
 
-    <!-- Modal Rincian Pesanan (Orders Modal) -->
+    <!-- Modal 1: Rincian Pesanan Penjualan (Orders Modal) -->
     @if ($isOrdersModalOpen)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <!-- Background overlay / Backdrop -->
@@ -415,7 +470,7 @@
                             <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                             </svg>
-                            Riwayat Pesanan: {{ $selectedUserName }}
+                            Riwayat Pesanan Toko: {{ $selectedUserName }}
                         </h3>
                         <p class="text-xs text-gray-500 mt-0.5">
                             User ID: <span class="font-mono font-bold text-gray-700">{{ $selectedUserId }}</span> • Email: <span class="font-mono text-gray-700">{{ $selectedUserEmail }}</span> • Telp: <span class="font-mono text-gray-700">{{ $selectedUserPhone }}</span>
@@ -480,6 +535,117 @@
                 <!-- Modal Footer -->
                 <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end shrink-0">
                     <button wire:click="closeOrdersModal"
+                        class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs rounded-xl transition-all cursor-pointer">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Modal 2: Rincian Pembelian HP (Sell Phones Modal) -->
+    @if ($isSellPhonesModalOpen)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" aria-labelledby="modal-title-sellphones" role="dialog" aria-modal="true">
+            <!-- Background overlay / Backdrop -->
+            <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm transition-opacity" wire:click="closeSellPhonesModal"></div>
+
+            <!-- Modal Panel Box -->
+            <div class="relative z-10 bg-white rounded-2xl text-left shadow-2xl overflow-hidden sm:max-w-4xl w-full max-h-[90vh] flex flex-col border border-gray-100 animate-in fade-in zoom-in duration-200">
+                <!-- Modal Header -->
+                <div class="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 flex items-center justify-between shrink-0">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            Riwayat Pembelian HP (Pelanggan Menjual HP): {{ $selectedUserName }}
+                        </h3>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            User ID: <span class="font-mono font-bold text-gray-700">{{ $selectedUserId }}</span> • Email: <span class="font-mono text-gray-700">{{ $selectedUserEmail }}</span> • Telp: <span class="font-mono text-gray-700">{{ $selectedUserPhone }}</span>
+                        </p>
+                    </div>
+                    <button wire:click="closeSellPhonesModal"
+                        class="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body: Sell Phones Table -->
+                <div class="p-6 overflow-y-auto flex-1">
+                    @if (count($selectedUserSellPhones) > 0)
+                        <div class="overflow-x-auto rounded-xl border border-gray-200">
+                            <table class="w-full text-left text-sm text-gray-600">
+                                <thead class="bg-gray-50 text-gray-500 uppercase text-[11px] font-bold tracking-wider border-b border-gray-200">
+                                    <tr>
+                                        <th class="py-3 px-4">No. Invoice / ID</th>
+                                        <th class="py-3 px-4">Perangkat HP</th>
+                                        <th class="py-3 px-4">Spesifikasi</th>
+                                        <th class="py-3 px-4">Unit Usaha</th>
+                                        <th class="py-3 px-4">Nilai Taksiran</th>
+                                        <th class="py-3 px-4">Status</th>
+                                        <th class="py-3 px-4">Tanggal Transaksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    @foreach ($selectedUserSellPhones as $item)
+                                        <tr class="hover:bg-gray-50/50 transition-colors">
+                                            <td class="py-3 px-4 font-mono font-bold text-xs text-indigo-600">
+                                                {{ $item['invoice_number'] }}
+                                            </td>
+                                            <td class="py-3 px-4">
+                                                <span class="text-xs font-semibold text-gray-800 uppercase block">{{ $item['phone_brand'] }}</span>
+                                                <span class="text-xs text-gray-600">{{ $item['phone_model'] }}</span>
+                                            </td>
+                                            <td class="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">
+                                                <span>{{ $item['phone_specs'] }}</span>
+                                                @if (!empty($item['imei']) && $item['imei'] !== '-')
+                                                    <span class="block text-[11px] font-mono text-gray-400">IMEI: {{ $item['imei'] }}</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-3 px-4 text-xs text-gray-700 font-medium">
+                                                {{ $item['business_unit'] }}
+                                            </td>
+                                            <td class="py-3 px-4 text-xs font-bold text-gray-900 whitespace-nowrap">
+                                                Rp {{ number_format($item['appraised_value'], 0, ',', '.') }}
+                                            </td>
+                                            <td class="py-3 px-4 whitespace-nowrap">
+                                                @php
+                                                    $st = strtoupper($item['status']);
+                                                    $badgeClass = 'bg-gray-100 text-gray-700';
+                                                    if (in_array($st, ['COMPLETED', 'PAID', 'SELESAI', 'APPROVED'])) {
+                                                        $badgeClass = 'bg-emerald-100 text-emerald-800';
+                                                    } elseif (in_array($st, ['PAYING', 'PROCESSING', 'INSPECTING'])) {
+                                                        $badgeClass = 'bg-blue-100 text-blue-800';
+                                                    } elseif (in_array($st, ['REJECTED', 'CANCELLED', 'BATAL'])) {
+                                                        $badgeClass = 'bg-red-100 text-red-800';
+                                                    } elseif (in_array($st, ['SUBMITTED', 'PENDING'])) {
+                                                        $badgeClass = 'bg-amber-100 text-amber-800';
+                                                    }
+                                                @endphp
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold {{ $badgeClass }}">
+                                                    {{ $st }}
+                                                </span>
+                                            </td>
+                                            <td class="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">
+                                                {{ $item['created_at'] }}
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="text-center py-8 text-gray-400 text-sm">
+                            Pengguna ini belum memiliki riwayat penjualan HP ke toko.
+                        </div>
+                    @endif
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end shrink-0">
+                    <button wire:click="closeSellPhonesModal"
                         class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs rounded-xl transition-all cursor-pointer">
                         Tutup
                     </button>
