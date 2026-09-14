@@ -9,6 +9,7 @@ use App\Livewire\Admin\Employe\EmployeManage;
 use App\Livewire\Admin\Vendor\VendorManage;
 // use App\Livewire\Admin\Pos\CekStock;
 use App\Livewire\Admin\Reporting\Dashboard;
+use App\Livewire\Admin\Users\DuplicateUsers;
 use App\Livewire\Admin\Users\UserOperational;
 use App\Livewire\Pages\SellPhone;
 use App\Livewire\Pages\SellPhoneHistory;
@@ -133,6 +134,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Administrator
     Route::livewire('/users', 'pages::admin.user-management')->name('users')->middleware('can:manage-users');
+    Route::get('/users/duplicates', DuplicateUsers::class)->name('users.duplicates')->middleware('can:manage-users');
     Route::livewire('/roles', 'pages::admin.role-permission')->name('roles')->middleware('can:manage-users');
     Route::get('/user/operational', UserOperational::class)->name('user.operational')->middleware('can:manage-users');
     Route::get('/user/employes', EmployeManage::class)->name('user.employes')->middleware('can:manage-users');
