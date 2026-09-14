@@ -177,10 +177,16 @@ class MessageLogReport extends Component
         return Excel::download(new MessageLogExport($data), $filename);
     }
 
+    public function isAdmin(): bool
+    {
+        $user = Auth::user();
+        return (bool) ($user && $user->hasAnyRole(['superadmin', 'admin', 'director']));
+    }
+
     public function canSync(): bool
     {
         $user = Auth::user();
-        return $user && ($user->can('sync-message-logs') || $user->hasRole('admin') || $user->hasRole('superadmin'));
+        return (bool) ($user && ($user->can('sync-message-logs') || $this->isAdmin()));
     }
 
     public function syncHistoricalLogs()
@@ -228,7 +234,7 @@ class MessageLogReport extends Component
                 'failed' => $totalFailed,
             ],
             'canSync' => $this->canSync(),
-            'isAdmin' => $this->canSync(),
+            'isAdmin' => $this->isAdmin(),
         ]);
     }
 }
