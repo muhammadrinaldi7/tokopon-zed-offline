@@ -1,8 +1,10 @@
 <div class="px-6 py-8 w-full max-w-7xl mx-auto" x-data="{ alert: null }"
     @admin-alert.window="
-        alert = $event.detail;
-        setTimeout(() => alert = null, 4000);
-    ">
+        let d = Array.isArray($event.detail) ? $event.detail[0] : $event.detail;
+        alert = d;
+        setTimeout(() => alert = null, 5000);
+    "
+    @trigger-next-cleaner-batch.window="$wire.processNextBulkCleanerBatch()">
 
     <!-- Alpine Notification Setup -->
     <div x-show="alert" x-transition.opacity.duration.300ms style="display: none;"
@@ -32,12 +34,33 @@
                     </svg>
                 </div>
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Audit & Duplikat Pengguna</h1>
-                    <p class="text-sm text-gray-500 mt-0.5">Analisa nomor telepon ganda, cek riwayat pesanan (orders), riwayat pembelian HP (sell phones), serta integrasi pelanggan Accurate.</p>
+                    <div class="flex items-center gap-2.5">
+                        <h1 class="text-2xl font-bold text-gray-900">Audit & Duplikat Pengguna</h1>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <svg class="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                            Akun Staf/Karyawan Dikecualikan
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-0.5">Analisa nomor telepon ganda pelanggan, cek riwayat pesanan (orders), riwayat jual HP (sell phones), serta integrasi pelanggan Accurate. Akun staf toko otomatis diproteksi & tidak dimasukkan ke daftar ini.</p>
                 </div>
             </div>
         </div>
         <div class="flex items-center gap-2">
+            @can('manage-users')
+                <button wire:click="openBulkCleanerModal"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold transition shadow-sm shadow-emerald-600/20 cursor-pointer shrink-0">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Pembersihan Massal (0 Transaksi)
+                    <span class="px-1.5 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-mono">
+                        {{ number_format($stats['phonesWithoutTransactionsCount'] ?? 0, 0, ',', '.') }}
+                    </span>
+                </button>
+            @endcan
+
             <div wire:loading class="flex items-center gap-2 text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
                 <svg class="animate-spin w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -186,6 +209,33 @@
 
     <!-- Duplicate Groups List -->
     <div class="space-y-5">
+        @if ($paginatedGroups->count() > 0 && auth()->user()->can('manage-users'))
+            <!-- Bulk Selection Bar on Top of List -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 bg-gray-50/90 border border-gray-200/80 rounded-2xl text-xs">
+                <label class="inline-flex items-center gap-2.5 cursor-pointer select-none font-semibold text-gray-700">
+                    <input type="checkbox"
+                        wire:click="toggleSelectAllOnPage(@js($activePagePhoneNumbers))"
+                        @checked($selectAllOnPage)
+                        class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer">
+                    <span>Pilih Semua di Halaman Ini ({{ count($activePagePhoneNumbers) }} kelompok)</span>
+                </label>
+
+                <div class="flex items-center gap-3">
+                    @if (count($selectedPhones) > 0)
+                        <span class="font-bold text-indigo-600 flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
+                            {{ count($selectedPhones) }} kelompok dipilih
+                        </span>
+                        <button wire:click="clearSelectedPhones" class="text-gray-500 hover:text-gray-700 underline text-xs cursor-pointer">
+                            Batalkan Pilihan
+                        </button>
+                    @else
+                        <span class="text-gray-400 text-[11px]">Centang kelompok yang ingin digabungkan sekaligus</span>
+                    @endif
+                </div>
+            </div>
+        @endif
+
         @forelse ($paginatedGroups as $group)
             @php
                 $phone = $group->phone_number;
@@ -203,6 +253,11 @@
                 <!-- Group Header Bar -->
                 <div class="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div class="flex items-center gap-3.5">
+                        @can('manage-users')
+                            <input type="checkbox" wire:model.live="selectedPhones" value="{{ $phone }}"
+                                class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 cursor-pointer shrink-0">
+                        @endcan
+
                         <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold shrink-0">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -259,6 +314,16 @@
                                 Semua 0 Transaksi (Belum Pernah Belanja / Jual HP)
                             </span>
                         @endif
+
+                        @can('manage-users')
+                            <button wire:click="openMergeModal('{{ $phone }}')"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-indigo-600/20 cursor-pointer shrink-0 ml-1">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                                Gabungkan Akun
+                            </button>
+                        @endcan
                     </div>
                 </div>
 
@@ -649,6 +714,348 @@
                         class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs rounded-xl transition-all cursor-pointer">
                         Tutup
                     </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Modal 3: Penggabungan Akun Duplikat (Merge Modal) -->
+    @if ($isMergeModalOpen)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" aria-labelledby="modal-title-merge" role="dialog" aria-modal="true">
+            <!-- Background overlay / Backdrop -->
+            <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm transition-opacity" wire:click="closeMergeModal"></div>
+
+            <!-- Modal Panel Box -->
+            <div class="relative z-10 bg-white rounded-2xl text-left shadow-2xl overflow-hidden sm:max-w-3xl w-full max-h-[90vh] flex flex-col border border-gray-100 animate-in fade-in zoom-in duration-200">
+                <!-- Modal Header -->
+                <div class="px-6 py-5 bg-gradient-to-r from-indigo-50 via-white to-white border-b border-gray-100 flex items-center justify-between shrink-0">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                            </span>
+                            Penggabungan Akun Duplikat (Merge Accounts)
+                        </h3>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Nomor Telepon: <span class="font-mono font-bold text-indigo-700">{{ $selectedMergePhone }}</span> • Terdeteksi {{ count($mergeCandidateUsers) }} Akun
+                        </p>
+                    </div>
+                    <button wire:click="closeMergeModal"
+                        class="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 overflow-y-auto flex-1 space-y-5">
+                    <!-- Penjelasan & Panduan -->
+                    <div class="p-4 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-blue-900 flex items-start gap-3">
+                        <svg class="w-5 h-5 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div class="leading-relaxed">
+                            <p class="font-bold mb-1">Panduan Penggabungan Akun:</p>
+                            <p>
+                                Pilih 1 (satu) akun di bawah sebagai <strong class="text-blue-950">Akun Utama (Target)</strong>. Seluruh riwayat transaksi pesanan, riwayat jual HP, klaim garansi, deposit, alamat, buku rekening, keranjang belanja, serta relasi Accurate dari akun duplikat lainnya akan <strong>dipindahkan secara otomatis</strong> ke akun utama ini. Akun duplikat lainnya kemudian akan dihapus secara bersih.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Pilihan Kandidat Akun -->
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-2.5">
+                            Pilih Akun Yang Akan Dijadikan Akun Utama (Master):
+                        </label>
+                        <div class="space-y-3">
+                            @foreach ($mergeCandidateUsers as $idx => $cand)
+                                @php
+                                    $isSelected = ($targetUserId == $cand['id']);
+                                @endphp
+                                <label class="relative flex items-start gap-3.5 p-4 rounded-xl border-2 transition-all cursor-pointer select-none
+                                    {{ $isSelected ? 'border-indigo-600 bg-indigo-50/40 shadow-sm' : 'border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50/60' }}">
+                                    
+                                    <div class="flex items-center h-5 mt-0.5">
+                                        <input type="radio" wire:model.live="targetUserId" value="{{ $cand['id'] }}"
+                                            class="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 cursor-pointer">
+                                    </div>
+
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-bold {{ $isSelected ? 'text-indigo-950' : 'text-gray-900' }}">
+                                                    {{ $cand['name'] }}
+                                                </span>
+                                                <span class="font-mono text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-semibold">
+                                                    ID: {{ $cand['id'] }}
+                                                </span>
+                                                @if ($idx === 0)
+                                                    <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                                        Saran Utama
+                                                    </span>
+                                                @endif
+                                            </div>
+
+                                            <span class="text-[11px] text-gray-500">
+                                                Terdaftar: {{ $cand['created_at'] }}
+                                            </span>
+                                        </div>
+
+                                        <p class="text-xs text-gray-500 font-mono mb-2.5">
+                                            {{ $cand['email'] }}
+                                        </p>
+
+                                        <!-- Badge Rincian Transaksi & Accurate -->
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium {{ $cand['orders_count'] > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold' : 'bg-gray-100 text-gray-500' }}">
+                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                                                {{ $cand['orders_count'] }} Pesanan (Rp {{ number_format($cand['orders_total_amount'], 0, ',', '.') }})
+                                            </span>
+
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium {{ $cand['sell_phones_count'] > 0 ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold' : 'bg-gray-100 text-gray-500' }}">
+                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                                {{ $cand['sell_phones_count'] }} Jual HP (Rp {{ number_format($cand['sell_phones_total_amount'], 0, ',', '.') }})
+                                            </span>
+
+                                            @if (!empty($cand['accurate_customers']))
+                                                @foreach ($cand['accurate_customers'] as $ac)
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                                                        Cust: {{ $ac['no'] }} ({{ $ac['bu'] }})
+                                                    </span>
+                                                @endforeach
+                                            @endif
+
+                                            @if (!empty($cand['accurate_vendors']))
+                                                @foreach ($cand['accurate_vendors'] as $av)
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-cyan-50 text-cyan-800 border border-cyan-200">
+                                                        Vend: {{ $av['no'] }} ({{ $av['bu'] }})
+                                                    </span>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <!-- Ringkasan Dampak Penggabungan (Impact Summary) -->
+                    @php
+                        $chosenTarget = collect($mergeCandidateUsers)->firstWhere('id', $targetUserId);
+                        $sourceAccounts = collect($mergeCandidateUsers)->where('id', '!=', $targetUserId);
+                    @endphp
+                    @if ($chosenTarget)
+                        <div class="p-4 rounded-xl bg-neutral-900 text-white text-xs space-y-2">
+                            <div class="flex items-center justify-between text-neutral-300 font-bold uppercase tracking-wider text-[11px] border-b border-neutral-700 pb-2">
+                                <span>Ringkasan Dampak Aksi</span>
+                                <span class="text-indigo-400 font-mono">1 Target &bull; {{ $sourceAccounts->count() }} Sumber</span>
+                            </div>
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                                <div>
+                                    <span class="text-neutral-400 block text-[11px]">Akun yang dipertahankan (Utama):</span>
+                                    <span class="font-bold text-emerald-400 text-sm">{{ $chosenTarget['name'] }}</span>
+                                    <span class="text-neutral-400 text-[11px] font-mono">(ID: {{ $chosenTarget['id'] }} &bull; {{ $chosenTarget['email'] }})</span>
+                                </div>
+                                <div class="text-right sm:text-right">
+                                    <span class="text-neutral-400 block text-[11px]">Akun yang akan dilebur & dihapus:</span>
+                                    <span class="text-rose-300 font-medium">
+                                        {{ $sourceAccounts->pluck('name')->join(', ') }}
+                                        ({{ $sourceAccounts->pluck('id')->map(fn($id) => '#'.$id)->join(', ') }})
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between shrink-0">
+                    <button wire:click="closeMergeModal"
+                        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs rounded-xl transition-all cursor-pointer">
+                        Batal
+                    </button>
+
+                    <button wire:click="executeMerge"
+                        wire:loading.attr="disabled"
+                        wire:confirm="Apakah Anda yakin ingin menggabungkan akun-akun ini? Tindakan ini bersifat PERMANEN dan akan memindahkan semua data transaksi, profil, dan accurate mapping ke Akun Utama."
+                        class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-sm shadow-indigo-600/30 cursor-pointer">
+                        <span wire:loading.remove wire:target="executeMerge" class="inline-flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Konfirmasi & Gabungkan Sekarang
+                        </span>
+                        <span wire:loading wire:target="executeMerge" class="inline-flex items-center gap-1.5">
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Memproses Penggabungan...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Floating Action Bar for Selected Checkboxes -->
+    @if (count($selectedPhones) > 0)
+        <div class="fixed bottom-6 inset-x-0 z-40 max-w-xl mx-auto px-4 animate-in slide-in-from-bottom-5 duration-200">
+            <div class="bg-neutral-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center justify-between border border-neutral-700 backdrop-blur-md">
+                <div class="flex items-center gap-3">
+                    <span class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
+                        {{ count($selectedPhones) }}
+                    </span>
+                    <div>
+                        <p class="text-xs font-bold">{{ count($selectedPhones) }} Kelompok Terpilih</p>
+                        <p class="text-[11px] text-neutral-400">Siap digabungkan otomatis secara aman</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button wire:click="clearSelectedPhones"
+                        class="px-3 py-1.5 text-xs text-neutral-300 hover:text-white hover:bg-neutral-800 rounded-xl transition cursor-pointer">
+                        Batal
+                    </button>
+                    <button wire:click="executeSelectedBulkMerge"
+                        wire:confirm="Gabungkan seluruh {{ count($selectedPhones) }} kelompok yang dipilih? Akun utama akan dipilih otomatis secara aman (kelompok berkonflik akan otomatis dilewati)."
+                        wire:loading.attr="disabled"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-indigo-600/30 cursor-pointer">
+                        <span wire:loading.remove wire:target="executeSelectedBulkMerge" class="inline-flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            Gabungkan Terpilih
+                        </span>
+                        <span wire:loading wire:target="executeSelectedBulkMerge">
+                            Memproses...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Modal 4: Pembersihan Massal (0 Transaksi) -->
+    @if ($isBulkCleanerModalOpen)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" aria-labelledby="modal-title-cleaner" role="dialog" aria-modal="true">
+            <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm transition-opacity"
+                @if (!$bulkCleanerRunning) wire:click="closeBulkCleanerModal" @endif></div>
+
+            <div class="relative z-10 bg-white rounded-2xl text-left shadow-2xl overflow-hidden sm:max-w-xl w-full flex flex-col border border-gray-100 animate-in fade-in zoom-in duration-200">
+                <!-- Header -->
+                <div class="px-6 py-5 bg-gradient-to-r from-emerald-50 via-white to-white border-b border-gray-100 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-gray-900">Pembersihan Massal Akun 0 Transaksi</h3>
+                            <p class="text-xs text-gray-500">Otomatisasi penggabungan akun kembar tanpa riwayat transaksi</p>
+                        </div>
+                    </div>
+                    @if (!$bulkCleanerRunning)
+                        <button wire:click="closeBulkCleanerModal" class="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition cursor-pointer">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    @endif
+                </div>
+
+                <!-- Body -->
+                <div class="p-6 space-y-4">
+                    <!-- Penjelasan Safety -->
+                    <div class="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-emerald-900 space-y-1">
+                        <p class="font-bold flex items-center gap-1.5 text-emerald-950">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            100% Aman dari Risiko Data Transaksi Toko
+                        </p>
+                        <p class="text-[11px] leading-relaxed">
+                            Proses ini <strong>hanya menyasar kelompok nomor telepon yang 0 pesanan & 0 jual HP</strong>. Akun terdaftar tertua dipertahankan sebagai Akun Utama, data profil digabungkan, dan akun kembaran kosong dihapus.
+                        </p>
+                    </div>
+
+                    <!-- Progress Status -->
+                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-200/80 space-y-3">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-gray-700">Kemajuan Proses</span>
+                            @php
+                                $pct = $bulkTotalCleanGroups > 0 ? round(($bulkProcessedCount / $bulkTotalCleanGroups) * 100, 1) : 0;
+                            @endphp
+                            <span class="font-mono font-bold text-emerald-700">{{ $pct }}%</span>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                            <div class="bg-emerald-600 h-3 rounded-full transition-all duration-300 {{ $bulkCleanerRunning ? 'animate-pulse' : '' }}"
+                                style="width: {{ $pct }}%"></div>
+                        </div>
+
+                        <!-- Counter Badges -->
+                        <div class="grid grid-cols-3 gap-2 pt-1 text-center">
+                            <div class="bg-white p-2 rounded-lg border border-gray-200">
+                                <span class="block text-[10px] text-gray-500 uppercase font-semibold">Total Target</span>
+                                <span class="text-xs font-bold font-mono text-gray-800">{{ number_format($bulkTotalCleanGroups, 0, ',', '.') }}</span>
+                            </div>
+                            <div class="bg-white p-2 rounded-lg border border-emerald-200">
+                                <span class="block text-[10px] text-emerald-600 uppercase font-semibold">Berhasil</span>
+                                <span class="text-xs font-bold font-mono text-emerald-700">{{ number_format($bulkSuccessCount, 0, ',', '.') }}</span>
+                            </div>
+                            <div class="bg-white p-2 rounded-lg border border-gray-200">
+                                <span class="block text-[10px] text-gray-500 uppercase font-semibold">Dilewati</span>
+                                <span class="text-xs font-bold font-mono text-gray-600">{{ number_format($bulkSkippedCount, 0, ',', '.') }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Opsi Batch Size -->
+                    @if (!$bulkCleanerRunning)
+                        <div class="flex items-center justify-between text-xs pt-1">
+                            <label class="text-gray-600 font-medium">Kecepatan Pemrosesan per Batch:</label>
+                            <select wire:model.live="bulkBatchSize" class="text-xs font-semibold rounded-lg border-gray-300 py-1 px-2.5 bg-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <option value="50">50 kelompok / batch (Sangat Aman)</option>
+                                <option value="100">100 kelompok / batch (Direkomendasikan)</option>
+                                <option value="200">200 kelompok / batch (Cepat)</option>
+                            </select>
+                        </div>
+                    @endif
+                </div>
+
+                <!-- Footer -->
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+                    @if ($bulkCleanerRunning)
+                        <button wire:click="stopBulkCleaner"
+                            class="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            Jeda / Berhenti
+                        </button>
+                        <span class="text-xs text-emerald-600 font-medium flex items-center gap-1.5">
+                            <svg class="animate-spin w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Sedang memproses batch...
+                        </span>
+                    @else
+                        <button wire:click="closeBulkCleanerModal"
+                            class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs rounded-xl transition cursor-pointer">
+                            Tutup
+                        </button>
+
+                        <button wire:click="startBulkCleaner"
+                            class="inline-flex items-center gap-1.5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-xl transition shadow-sm shadow-emerald-600/30 cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Mulai Pembersihan Otomatis
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>
