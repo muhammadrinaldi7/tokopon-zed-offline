@@ -1,4 +1,5 @@
-<div class="max-w-7xl mx-auto p-2 md:p-6 min-h-screen" x-data="{ step: 1 }" @go-to-step.window="step = $event.detail.step" x-cloak>
+<div class="max-w-7xl mx-auto p-2 md:p-6 min-h-screen" x-data="{ step: 1 }"
+    @go-to-step.window="step = $event.detail.step" x-cloak>
     {{-- Header Navigation --}}
     <div class="flex gap-2">
         <a href="/"
@@ -377,82 +378,104 @@
             </div>
 
             {{-- Card Validasi Status Harga Beli & Tier Buyback --}}
-            @if($selected_model_name)
+            @if ($selected_model_name)
                 @php
                     $isPriceValid = (float) $base_price > 0;
                     $isTierValid = count($device_rules) > 0;
                     $isReady = $isPriceValid && $isTierValid;
                 @endphp
 
-                <div class="rounded-3xl p-5 md:p-6 transition-all duration-300 {{ $isReady ? 'bg-emerald-50/80 border-2 border-emerald-200/80 shadow-xs' : 'bg-rose-50/80 border-2 border-rose-200 shadow-xs' }}">
+                <div
+                    class="rounded-3xl p-5 md:p-6 transition-all duration-300 {{ $isReady ? 'bg-emerald-50/80 border-2 border-emerald-200/80 shadow-xs' : 'bg-rose-50/80 border-2 border-rose-200 shadow-xs' }}">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-5">
                         <div class="flex items-start gap-4">
-                            <div class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs {{ $isReady ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white animate-pulse' }}">
-                                @if($isReady)
-                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <div
+                                class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs {{ $isReady ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white animate-pulse' }}">
+                                @if ($isReady)
+                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="2.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                                     </svg>
                                 @else
-                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                     </svg>
                                 @endif
                             </div>
 
                             <div class="space-y-1.5">
                                 <div class="flex items-center gap-2.5 flex-wrap">
-                                    <h4 class="font-black text-sm md:text-base {{ $isReady ? 'text-emerald-950' : 'text-rose-950' }}">
+                                    <h4
+                                        class="font-black text-sm md:text-base {{ $isReady ? 'text-emerald-950' : 'text-rose-950' }}">
                                         {{ $isReady ? 'Model Terverifikasi & Siap Lanjut QC' : 'Perhatian: Pengaturan Pembelian Belum Lengkap' }}
                                     </h4>
-                                    @if($isReady)
-                                        <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-200 text-emerald-900 border border-emerald-300/60">
+                                    @if ($isReady)
+                                        <span
+                                            class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-200 text-emerald-900 border border-emerald-300/60">
                                             ✓ Siap Dibeli
                                         </span>
                                     @else
-                                        <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-rose-200 text-rose-900 border border-rose-300/60">
+                                        <span
+                                            class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-rose-200 text-rose-900 border border-rose-300/60">
                                             ⚠️ Butuh Setting Admin
                                         </span>
                                     @endif
                                 </div>
 
-                                @if($isReady)
+                                @if ($isReady)
                                     <p class="text-xs text-emerald-800 font-medium leading-relaxed">
-                                        Harga beli dasar dan aturan pengurangan kondisi fisik/layar telah siap. Silakan lanjutkan ke tahap pemeriksaan QC fisik & fungsi.
+                                        Harga beli dasar dan aturan pengurangan kondisi fisik/layar telah siap. Silakan
+                                        lanjutkan ke tahap pemeriksaan QC fisik & fungsi.
                                     </p>
                                 @else
                                     <div class="space-y-1 mt-1 text-xs font-medium text-rose-800">
-                                        @if(!$isPriceValid)
+                                        @if (!$isPriceValid)
                                             <div class="flex items-center gap-2">
                                                 <span class="w-2 h-2 rounded-full bg-rose-600 shrink-0"></span>
-                                                <span><strong>Harga Beli Dasar Kosong (Rp 0):</strong> Belum disetting di sistem Accurate. Hubungi Tim Purchasing/Admin.</span>
+                                                <span><strong>Harga Beli Dasar Kosong (Rp 0):</strong> Belum disetting
+                                                    di sistem Accurate. Hubungi Tim Purchasing/Admin.</span>
                                             </div>
                                         @endif
-                                        @if(!$isTierValid)
+                                        @if (!$isTierValid)
                                             <div class="flex items-center gap-2">
                                                 <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                                                <span><strong>Tier Buyback Belum Ditemukan:</strong> Model ini belum dipetakan ke rumus pengurangan kondisi fisik/layar. Hubungi Admin Master Data.</span>
+                                                <span><strong>Tier Buyback Belum Ditemukan:</strong> Model ini belum
+                                                    dipetakan ke rumus pengurangan kondisi fisik/layar. Hubungi Admin
+                                                    Master Data.</span>
                                             </div>
                                         @endif
                                     </div>
                                     <p class="text-[11px] text-rose-600 italic mt-1 font-semibold">
-                                        * Tahap QC dikunci sementara agar Anda tidak membuang waktu mengambil 8 foto dan ceklis fisik sebelum harga tersedia.
+                                        * Tahap QC dikunci sementara agar Anda tidak membuang waktu mengambil 8 foto dan
+                                        ceklis fisik sebelum harga tersedia.
                                     </p>
                                 @endif
                             </div>
                         </div>
 
                         {{-- Ringkasan Info Parameter Harga & Tier --}}
-                        <div class="flex items-center gap-3 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-neutral-200/70">
-                            <div class="bg-white/90 px-4 py-2.5 rounded-2xl border {{ $isReady ? 'border-emerald-200 shadow-2xs' : 'border-rose-200 shadow-2xs' }} text-right min-w-[130px]">
-                                <span class="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Harga Dasar (Mulus)</span>
-                                <span class="text-sm md:text-base font-black {{ $isPriceValid ? 'text-neutral-900' : 'text-rose-600' }}">
+                        <div
+                            class="flex items-center gap-3 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-neutral-200/70">
+                            <div
+                                class="bg-white/90 px-4 py-2.5 rounded-2xl border {{ $isReady ? 'border-emerald-200 shadow-2xs' : 'border-rose-200 shadow-2xs' }} text-right min-w-[130px]">
+                                <span
+                                    class="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Harga
+                                    Dasar (Mulus)</span>
+                                <span
+                                    class="text-sm md:text-base font-black {{ $isPriceValid ? 'text-neutral-900' : 'text-rose-600' }}">
                                     {{ $isPriceValid ? 'Rp ' . number_format($base_price, 0, ',', '.') : 'Rp 0' }}
                                 </span>
                             </div>
 
-                            <div class="bg-white/90 px-4 py-2.5 rounded-2xl border {{ $isReady ? 'border-emerald-200 shadow-2xs' : 'border-rose-200 shadow-2xs' }} text-right min-w-[120px]">
-                                <span class="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Tier Pengurangan</span>
-                                <span class="text-xs md:text-sm font-bold {{ $isTierValid ? 'text-neutral-800' : 'text-amber-600' }}">
+                            <div
+                                class="bg-white/90 px-4 py-2.5 rounded-2xl border {{ $isReady ? 'border-emerald-200 shadow-2xs' : 'border-rose-200 shadow-2xs' }} text-right min-w-[120px]">
+                                <span
+                                    class="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Tier
+                                    Pengurangan</span>
+                                <span
+                                    class="text-xs md:text-sm font-bold {{ $isTierValid ? 'text-neutral-800' : 'text-amber-600' }}">
                                     {{ $selected_tier_name ?? ($isTierValid ? 'Terhubung' : 'Belum Ada') }}
                                 </span>
                             </div>
@@ -468,12 +491,10 @@
                     $canProceed = !empty($selected_model_name) && $isPriceValid && $isTierValid;
                 @endphp
 
-                <button type="button" 
-                    wire:click="proceedToQc"
-                    {{ $canProceed ? '' : 'disabled' }}
+                <button type="button" wire:click="proceedToQc" {{ $canProceed ? '' : 'disabled' }}
                     class="px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-2 shadow-lg active:scale-95 select-none {{ $canProceed ? 'bg-linear-to-r from-[#D3AD7B] to-[#A28153] hover:from-[#C39D6B] hover:to-[#927143] text-white shadow-[#A28153]/30 cursor-pointer' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed pointer-events-none' }}">
-                    
-                    @if(empty($selected_model_name))
+
+                    @if (empty($selected_model_name))
                         <span>Pilih Model Terlebih Dahulu</span>
                     @elseif(!$isPriceValid)
                         <span>⚠️ Harga Beli Belum Disetting</span>
@@ -909,11 +930,13 @@
                                     <label class="cursor-pointer block group">
                                         @if ($rule['is_multiple'])
                                             <input type="checkbox"
-                                                wire:model.live.debounce.300ms="selected_rules.{{ $rule['key'] }}" class="hidden">
+                                                wire:model.live.debounce.300ms="selected_rules.{{ $rule['key'] }}"
+                                                class="hidden">
                                         @else
                                             <input type="radio" name="{{ $category }}"
                                                 value="{{ $rule['key'] }}"
-                                                wire:model.live.debounce.300ms="selected_rules.{{ $category }}" class="hidden">
+                                                wire:model.live.debounce.300ms="selected_rules.{{ $category }}"
+                                                class="hidden">
                                         @endif
 
                                         <div
@@ -1065,47 +1088,91 @@
 
                                 @if ($selectedCustomerId)
                                     @php
-                                        $selectedUser = \App\Models\User::find($selectedCustomerId);
-                                        $firstBank = $selectedUser ? $selectedUser->bankAccounts()->first() : null;
+                                        $selectedUser = \App\Models\User::with(['profile', 'bankAccounts'])->find(
+                                            $selectedCustomerId,
+                                        );
+                                        $userBanks = $selectedUser ? $selectedUser->bankAccounts : collect();
                                     @endphp
                                     <div
-                                        class="p-4 bg-[#D3AD7B]/10 border border-[#D3AD7B]/30 rounded-2xl flex flex-col gap-4">
-                                        <div class="flex items-center justify-between">
+                                        class="p-4 md:p-5 bg-[#D3AD7B]/10 border border-[#D3AD7B]/30 rounded-2xl flex flex-col gap-4 shadow-2xs">
+                                        <div class="flex items-start justify-between gap-3">
                                             <div>
                                                 <p
                                                     class="text-[10px] font-black text-[#A28153] uppercase tracking-widest mb-1">
-                                                    Pelanggan Terpilih</p>
-                                                <h3 class="font-bold text-neutral-800">{{ $selectedUser->name }}</h3>
-                                                <p class="text-xs text-neutral-500">{{ $selectedUser->email }} •
-                                                    {{ $selectedUser->profile->phone_number ?? '-' }}</p>
+                                                    Pelanggan Terpilih
+                                                </p>
+                                                <h3 class="font-bold text-neutral-800 text-base">
+                                                    {{ $selectedUser->name }}</h3>
+                                                <p class="text-xs text-neutral-500 mt-0.5">
+                                                    {{ $selectedUser->email }} &bull;
+                                                    {{ $selectedUser->profile->phone_number ?? '-' }}
+                                                </p>
+                                                <p
+                                                    class="text-xs text-neutral-600 font-medium mt-1 flex items-center gap-1.5">
+                                                    <span
+                                                        class="text-neutral-400 font-bold uppercase text-[10px] tracking-wider">Domisili
+                                                        Terdaftar:</span>
+                                                    <span
+                                                        class="text-neutral-800 font-bold">{{ $selectedUser->profile->domisili ?? '-' }}</span>
+                                                </p>
                                             </div>
                                             <button type="button" wire:click="clearSelectedCustomer"
-                                                class="text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-colors font-bold text-sm">
-                                                Batal
+                                                class="text-rose-500 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-colors font-bold text-sm shrink-0">
+                                                Ganti Pelanggan
                                             </button>
                                         </div>
 
-                                        @if ($firstBank && !$needsBankInfo)
-                                            <div class="pt-3 border-t border-[#D3AD7B]/30">
+                                        {{-- Jika ada daftar rekening tersimpan --}}
+                                        @if ($userBanks->isNotEmpty())
+                                            <div class="pt-3 border-t border-[#D3AD7B]/30 space-y-2">
                                                 <p
-                                                    class="text-[10px] font-black text-[#A28153] uppercase tracking-widest mb-2">
-                                                    Data Rekening Tersimpan</p>
-                                                <div class="flex items-center gap-3">
-                                                    <div
-                                                        class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-bold text-[#A28153] text-xs border border-[#D3AD7B]/30 shadow-sm uppercase">
-                                                        {{ substr($firstBank->bank_name, 0, 3) }}
-                                                    </div>
-                                                    <div>
-                                                        <p class="text-sm font-bold text-neutral-800">
-                                                            {{ $firstBank->account_number }}</p>
-                                                        <p class="text-xs text-neutral-600 font-medium">a.n
-                                                            {{ $firstBank->account_name }} <span
-                                                                class="text-neutral-400">•</span>
-                                                            {{ $firstBank->bank_name }}</p>
-                                                    </div>
+                                                    class="text-[10px] font-black text-[#A28153] uppercase tracking-widest">
+                                                    Pilih Rekening Tersimpan (Klik untuk Memuat ke Form):
+                                                </p>
+                                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    @foreach ($userBanks as $bankItem)
+                                                        @php
+                                                            $isSelectedBank =
+                                                                $bank_name === $bankItem->bank_name &&
+                                                                $account_number == $bankItem->account_number;
+                                                        @endphp
+                                                        <button type="button"
+                                                            wire:click="selectBankAccount({{ $bankItem->id }})"
+                                                            class="p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2 {{ $isSelectedBank ? 'bg-[#A28153] text-black border-[#A28153] shadow-xs' : 'bg-white hover:bg-neutral-50 text-neutral-800 border-neutral-200/80' }}">
+                                                            <div class="truncate">
+                                                                <span
+                                                                    class="font-bold text-xs uppercase block">{{ $bankItem->bank_name }}
+                                                                    - {{ $bankItem->account_number }}</span>
+                                                                <span class="text-[11px] block truncate opacity-85">a.n
+                                                                    {{ $bankItem->account_name }}</span>
+                                                            </div>
+                                                            @if ($isSelectedBank)
+                                                                <svg class="w-4 h-4 text-black shrink-0"
+                                                                    fill="none" viewBox="0 0 24 24"
+                                                                    stroke="currentColor" stroke-width="3">
+                                                                    <path stroke-linecap="round"
+                                                                        stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                                                </svg>
+                                                            @endif
+                                                        </button>
+                                                    @endforeach
                                                 </div>
                                             </div>
                                         @endif
+
+                                        {{-- Kolom Edit Domisili --}}
+                                        <div class="pt-3 border-t border-[#D3AD7B]/30">
+                                            <label for="domisili_old"
+                                                class="text-[10px] font-black text-neutral-600 uppercase tracking-widest block mb-1">
+                                                Domisili (Alamat Singkat) <span class="text-rose-500">*</span>
+                                            </label>
+                                            <input type="text" id="domisili_old" wire:model="domisili" required
+                                                class="w-full px-4 py-2.5 text-sm bg-white border @error('domisili') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors font-medium text-neutral-800"
+                                                placeholder="Contoh: Jakarta Selatan">
+                                            @error('domisili')
+                                                <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                            @enderror
+                                        </div>
                                     </div>
                                     <input type="hidden" wire:model="selectedCustomerId"
                                         value="{{ $selectedCustomerId }}">
@@ -1154,16 +1221,118 @@
                         @else
                             {{-- Mode: Registrasi Pelanggan Baru --}}
                             <div class="mb-8 p-6 bg-neutral-50 rounded-3xl border border-neutral-100 space-y-4">
-                                <p class="text-xs font-black text-neutral-400 uppercase tracking-widest mb-2">
-                                    Informasi Tambahan
-                                </p>
+                                <div class="flex items-center justify-between">
+                                    <p class="text-xs font-black text-neutral-400 uppercase tracking-widest">
+                                        Informasi Tambahan
+                                    </p>
+                                    @if ($isExistingUserFound)
+                                        <span
+                                            class="text-[10px] font-bold text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded-lg border border-amber-300/60 flex items-center gap-1.5">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                            Pelanggan Terdaftar
+                                        </span>
+                                    @endif
+                                </div>
+
+                                {{-- Card Preview Data Pelanggan Lama --}}
+                                @if ($isExistingUserFound && $existingUserPreview)
+                                    <div
+                                        class="p-4 md:p-5 bg-linear-to-r from-amber-50 via-[#D3AD7B]/10 to-amber-50 border-2 border-[#D3AD7B]/50 rounded-2xl flex flex-col gap-3 shadow-xs transition-all animate-fadeIn">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div class="flex items-center gap-3">
+                                                <div
+                                                    class="w-9 h-9 rounded-xl bg-linear-to-br from-[#D3AD7B] to-[#A28153] text-black flex items-center justify-center shrink-0 shadow-xs font-bold text-sm">
+                                                    {{ strtoupper(substr($existingUserPreview['name'], 0, 2)) }}
+                                                </div>
+                                                <div>
+                                                    <div class="flex items-center gap-2 flex-wrap">
+                                                        <h4 class="font-bold text-neutral-900 text-sm md:text-base">
+                                                            {{ $existingUserPreview['name'] }}
+                                                        </h4>
+                                                        <span
+                                                            class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#A28153] text-black">
+                                                            User Terdaftar
+                                                        </span>
+                                                    </div>
+                                                    <p class="text-xs text-neutral-600 font-medium mt-0.5">
+                                                        {{ $existingUserPreview['email'] }} &bull;
+                                                        {{ $existingUserPreview['phone'] }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button type="button" wire:click="resetExistingCustomer"
+                                                class="text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg transition-colors shrink-0">
+                                                Reset Form
+                                            </button>
+                                        </div>
+
+                                        <div
+                                            class="text-xs text-neutral-700 bg-white/90 p-3 rounded-xl border border-[#D3AD7B]/30 space-y-1.5">
+                                            <p class="text-[11px] text-[#A28153] font-bold flex items-center gap-1.5">
+                                                <svg class="w-4 h-4 text-[#A28153] shrink-0" fill="none"
+                                                    viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                Data pelanggan lama telah dimuat otomatis. Anda dapat langsung
+                                                menggunakannya atau mengedit formulir di bawah jika ada perubahan data
+                                                (seperti nomor rekening atau domisili baru).
+                                            </p>
+                                            @if (!empty($existingUserPreview['banks']))
+                                                <div
+                                                    class="pt-1.5 border-t border-neutral-100 flex items-center gap-2 flex-wrap text-[11px] text-neutral-600">
+                                                    <span class="font-bold text-neutral-700">Rekening Terdaftar
+                                                        Sebelumnya:</span>
+                                                    @foreach ($existingUserPreview['banks'] as $bankItem)
+                                                        <span
+                                                            class="bg-neutral-100 px-2 py-0.5 rounded-md font-mono text-neutral-800 border border-neutral-200">
+                                                            {{ $bankItem['bank_name'] }} -
+                                                            {{ $bankItem['account_number'] }} (a.n
+                                                            {{ $bankItem['account_name'] }})
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {{-- Input Mobile Phone (Ditaruh Pertama Agar Deteksi Berjalan Cepat) --}}
+                                    <div class="flex flex-col gap-1">
+                                        <div class="flex items-center justify-between">
+                                            <label for="mobilePhone"
+                                                class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nomor
+                                                HP <span class="text-rose-500">*</span></label>
+                                            <span wire:loading wire:target="mobilePhone"
+                                                class="text-[10px] text-[#A28153] font-bold flex items-center gap-1">
+                                                <svg class="animate-spin h-3 w-3 text-[#A28153]"
+                                                    xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                    </path>
+                                                </svg>
+                                                Mengecek No HP...
+                                            </span>
+                                        </div>
+                                        <input type="tel" id="mobilePhone"
+                                            wire:model.live.debounce.400ms="mobilePhone" required
+                                            class="w-full px-4 py-3 text-sm bg-white border @error('mobilePhone') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors"
+                                            placeholder="Contoh: 08123456789">
+                                        @error('mobilePhone')
+                                            <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
+                                        @enderror
+                                    </div>
+
                                     {{-- Input Nama --}}
                                     <div class="flex flex-col gap-1">
                                         <label for="name"
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
-                                            Lengkap</label>
+                                            Lengkap <span class="text-rose-500">*</span></label>
                                         <input type="text" id="name" wire:model="name" required
                                             class="w-full px-4 py-3 text-sm bg-white border @error('name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors"
                                             placeholder="Masukkan nama lengkap">
@@ -1172,23 +1341,11 @@
                                         @enderror
                                     </div>
 
-                                    {{-- Input Mobile Phone --}}
-                                    <div class="flex flex-col gap-1">
-                                        <label for="mobilePhone"
-                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nomor
-                                            HP</label>
-                                        <input type="tel" id="mobilePhone" wire:model="mobilePhone" required
-                                            class="w-full px-4 py-3 text-sm bg-white border @error('mobilePhone') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors"
-                                            placeholder="Contoh: 08123456789">
-                                        @error('mobilePhone')
-                                            <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
-                                        @enderror
-                                    </div>
-
                                     {{-- Input Email --}}
                                     <div class="flex flex-col gap-1">
                                         <label for="email"
-                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Email</label>
+                                            class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Email
+                                            <span class="text-rose-500">*</span></label>
                                         <input type="email" id="email" wire:model="email" required
                                             class="w-full px-4 py-3 text-sm bg-white border @error('email') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors"
                                             placeholder="Contoh: user@email.com">
@@ -1198,10 +1355,10 @@
                                     </div>
 
                                     {{-- Input Domisili --}}
-                                    <div class="flex flex-col gap-1 md:col-span-2">
+                                    <div class="flex flex-col gap-1">
                                         <label for="domisili"
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Domisili
-                                            (Alamat Singkat)</label>
+                                            (Alamat Singkat) <span class="text-rose-500">*</span></label>
                                         <input type="text" id="domisili" wire:model="domisili" required
                                             class="w-full px-4 py-3 text-sm bg-white border @error('domisili') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors"
                                             placeholder="Contoh: Jakarta Selatan">
@@ -1213,7 +1370,8 @@
                             </div>
                         @endif
 
-                        @if ($isNewCustomer || $needsBankInfo)
+                        {{-- Section: Informasi Account Transfer User (Selalu Ditampilkan) --}}
+                        @if ($isNewCustomer || $selectedCustomerId)
                             @if (!$isNewCustomer && $needsBankInfo)
                                 <div
                                     class="p-4 bg-[#D3AD7B]/10 border border-[#D3AD7B]/30 text-[#A28153] rounded-2xl mb-4 text-xs font-bold flex items-start gap-3">
@@ -1230,16 +1388,23 @@
                             @endif
 
                             <div class="mb-8 p-6 bg-neutral-50 rounded-3xl border border-neutral-100 space-y-4">
-                                <p class="text-xs font-black text-neutral-400 uppercase tracking-widest mb-2">
-                                    Informasi Account Transfer User
-                                </p>
+                                <div class="flex items-center justify-between">
+                                    <p class="text-xs font-black text-neutral-400 uppercase tracking-widest">
+                                        Informasi Account Transfer User
+                                    </p>
+                                    @if (!$isNewCustomer && $selectedCustomerId)
+                                        <span class="text-[10px] font-bold text-neutral-500">
+                                            * Dapat diedit jika menggunakan nomor rekening baru
+                                        </span>
+                                    @endif
+                                </div>
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {{-- Input Nama --}}
+                                    {{-- Input Nama Bank --}}
                                     <div class="flex flex-col gap-1">
                                         <label for="bank_name"
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
-                                            Bank</label>
+                                            Bank <span class="text-rose-500">*</span></label>
                                         <input type="text" id="bank_name" wire:model="bank_name" required
                                             class="w-full px-4 py-3 text-sm bg-white border @error('bank_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors"
                                             placeholder="Masukkan Nama Bank">
@@ -1248,11 +1413,11 @@
                                         @enderror
                                     </div>
 
-                                    {{-- Input Mobile Phone --}}
+                                    {{-- Input Nomor Rekening --}}
                                     <div class="flex flex-col gap-1">
                                         <label for="account_number"
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nomor
-                                            Rekening</label>
+                                            Rekening <span class="text-rose-500">*</span></label>
                                         <input type="number" id="account_number" wire:model="account_number"
                                             required
                                             class="w-full px-4 py-3 text-sm bg-white border @error('account_number') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors"
@@ -1262,14 +1427,14 @@
                                         @enderror
                                     </div>
 
-                                    {{-- Input Email --}}
-                                    <div class="flex flex-col gap-1">
+                                    {{-- Input Nama Pemilik Rekening --}}
+                                    <div class="flex flex-col gap-1 md:col-span-2">
                                         <label for="account_name"
                                             class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Nama
-                                            Pemilik Rekening</label>
+                                            Pemilik Rekening <span class="text-rose-500">*</span></label>
                                         <input type="text" id="account_name" wire:model="account_name" required
                                             class="w-full px-4 py-3 text-sm bg-white border @error('account_name') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors"
-                                            placeholder="Contoh: user">
+                                            placeholder="Contoh: Nama Pemilik Rekening">
                                         @error('account_name')
                                             <span class="text-red-500 text-xs mt-0.5">{{ $message }}</span>
                                         @enderror
@@ -1284,7 +1449,8 @@
                                 <p class="text-xs font-black text-neutral-400 uppercase tracking-widest">
                                     Tenaga Penjual (Sales)
                                 </p>
-                                <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/60">
+                                <span
+                                    class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200/60">
                                     Wajib Dipilih
                                 </span>
                             </div>
@@ -1293,17 +1459,21 @@
                                 @php
                                     $salesObj = \App\Models\Employe::with('branch')->find($selected_sales_id);
                                 @endphp
-                                <div class="p-4 bg-[#D3AD7B]/10 border border-[#D3AD7B]/30 rounded-2xl flex items-center justify-between gap-4">
+                                <div
+                                    class="p-4 bg-[#D3AD7B]/10 border border-[#D3AD7B]/30 rounded-2xl flex items-center justify-between gap-4">
                                     <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-xl bg-linear-to-br from-[#D3AD7B] to-[#A28153] text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                                        <div
+                                            class="w-10 h-10 rounded-xl bg-linear-to-br from-[#D3AD7B] to-[#A28153] text-black flex items-center justify-center font-bold text-sm shadow-sm">
                                             {{ strtoupper(substr($salesObj->name ?? 'S', 0, 2)) }}
                                         </div>
                                         <div>
-                                            <p class="text-[10px] font-black text-[#A28153] uppercase tracking-widest">Sales Terpilih</p>
-                                            <h4 class="font-bold text-neutral-800 text-sm md:text-base">{{ $salesObj->name ?? '-' }}</h4>
+                                            <p class="text-[10px] font-black text-[#A28153] uppercase tracking-widest">
+                                                Sales Terpilih</p>
+                                            <h4 class="font-bold text-neutral-800 text-sm md:text-base">
+                                                {{ $salesObj->name ?? '-' }}</h4>
                                             <p class="text-xs text-neutral-500 font-mono">
-                                                No. Karyawan: {{ $salesObj->employee_no ?? 'N/A' }} 
-                                                @if($salesObj && $salesObj->branch)
+                                                No. Karyawan: {{ $salesObj->employee_no ?? 'N/A' }}
+                                                @if ($salesObj && $salesObj->branch)
                                                     &bull; Cabang: {{ $salesObj->branch->name }}
                                                 @endif
                                             </p>
@@ -1315,21 +1485,30 @@
                                     </button>
                                 </div>
                             @else
-                                <div class="relative" x-data="{ openSalesDropdown: true }" @click.outside="openSalesDropdown = false">
+                                <div class="relative" x-data="{ openSalesDropdown: true }"
+                                    @click.outside="openSalesDropdown = false">
                                     <div class="relative flex items-center">
-                                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-neutral-400">
-                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />
+                                        <div
+                                            class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-neutral-400">
+                                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />
                                             </svg>
                                         </div>
                                         <input type="text" wire:model.live.debounce.300ms="searchSales"
                                             @focus="openSalesDropdown = true"
                                             class="w-full pl-11 pr-12 py-3 text-sm bg-white border @error('selected_sales_id') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors"
                                             placeholder="Ketik nama sales atau nomor karyawan (min. 2 karakter)...">
-                                        <div wire:loading wire:target="searchSales" class="absolute right-4 text-[#A28153]">
-                                            <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        <div wire:loading wire:target="searchSales"
+                                            class="absolute right-4 text-[#A28153]">
+                                            <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg"
+                                                fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                    stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                </path>
                                             </svg>
                                         </div>
                                     </div>
@@ -1341,22 +1520,25 @@
                                                 <div wire:click="selectSales({{ $salesEmp->id }})"
                                                     class="p-4 hover:bg-[#D3AD7B]/10 cursor-pointer transition-colors flex justify-between items-center group">
                                                     <div class="flex items-center gap-3">
-                                                        <div class="w-8 h-8 rounded-lg bg-neutral-100 group-hover:bg-white text-neutral-700 flex items-center justify-center font-bold text-xs">
+                                                        <div
+                                                            class="w-8 h-8 rounded-lg bg-neutral-100 group-hover:bg-white text-neutral-700 flex items-center justify-center font-bold text-xs">
                                                             {{ strtoupper(substr($salesEmp->name, 0, 2)) }}
                                                         </div>
                                                         <div>
-                                                            <h4 class="font-bold text-neutral-800 text-sm group-hover:text-[#A28153] transition-colors">
+                                                            <h4
+                                                                class="font-bold text-neutral-800 text-sm group-hover:text-[#A28153] transition-colors">
                                                                 {{ $salesEmp->name }}
                                                             </h4>
                                                             <p class="text-xs text-neutral-500 font-mono">
-                                                                {{ $salesEmp->employee_no ?? 'N/A' }} 
-                                                                @if($salesEmp->branch)
+                                                                {{ $salesEmp->employee_no ?? 'N/A' }}
+                                                                @if ($salesEmp->branch)
                                                                     &bull; {{ $salesEmp->branch->name }}
                                                                 @endif
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <span class="text-[#A28153] font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity bg-white px-2.5 py-1 rounded-md border border-[#D3AD7B]/30">
+                                                    <span
+                                                        class="text-[#A28153] font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity bg-white px-2.5 py-1 rounded-md border border-[#D3AD7B]/30">
                                                         Pilih
                                                     </span>
                                                 </div>
@@ -1381,7 +1563,8 @@
                         <div class="flex flex-col gap-1 border-b border-neutral-200 pb-5 mb-5">
                             <span class="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Model
                                 Perangkat</span>
-                            <span class="text-2xl font-bold text-neutral-800">{{ $selected_model_name ?? '-' }}</span>
+                            <span
+                                class="text-2xl font-bold text-neutral-800">{{ $selected_model_name ?? '-' }}</span>
                         </div>
 
                         <div class="grid grid-cols-2 gap-6">
@@ -1433,10 +1616,13 @@
                 </button>
                 <div class="w-full md:w-auto">
                     @if ($errors->any())
-                        <div class="mb-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs shadow-xs text-left">
+                        <div
+                            class="mb-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs shadow-xs text-left">
                             <div class="flex items-center gap-1.5 font-bold mb-1">
-                                <svg class="w-4 h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                <svg class="w-4 h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                                 <span>Data belum lengkap / ada kesalahan:</span>
                             </div>
@@ -1449,7 +1635,7 @@
                     @endif
 
                     <button type="button" wire:click="submit" wire:loading.attr="disabled"
-                        class="w-full md:w-auto bg-linear-to-r from-[#D3AD7B] to-[#A28153] hover:from-[#C39D6B] hover:to-[#927143] text-white px-10 py-4 rounded-2xl font-black text-lg transition-all active:scale-[0.97] shadow-xl shadow-[#A28153]/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:pointer-events-none">
+                        class="w-full md:w-auto bg-linear-to-r from-[#D3AD7B] to-[#A28153] hover:from-[#C39D6B] hover:to-[#927143] text-black px-10 py-4 rounded-2xl font-black text-lg transition-all active:scale-[0.97] shadow-xl shadow-[#A28153]/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:pointer-events-none">
 
                         {{-- Kondisi 1: Teks Normal (Akan hilang/tersembunyi saat loading) --}}
                         <span wire:loading.remove wire:target="submit">
@@ -1458,7 +1644,7 @@
 
                         {{-- Kondisi 2: Konten Loading (Hanya muncul saat method submit berjalan) --}}
                         <span wire:loading.flex wire:target="submit" class="items-center justify-center gap-2">
-                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg"
+                            <svg class="animate-spin h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg"
                                 fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10"
                                     stroke="currentColor" stroke-width="4"></circle>
