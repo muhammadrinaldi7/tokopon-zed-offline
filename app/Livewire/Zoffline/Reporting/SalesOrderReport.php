@@ -41,7 +41,7 @@ class SalesOrderReport extends Component
 
         // Outstanding SOs
         $outstandingQuery = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending', 'paid']);
-        $outstandingOrders = $outstandingQuery->with(['items.variant', 'user'])->latest()->paginate(20);
+        $outstandingOrders = $outstandingQuery->with(['items.variant', 'user.profile'])->latest()->paginate(20);
 
         // Metrics
         $totalOutstanding = (clone $outstandingQuery)->count();
@@ -83,7 +83,10 @@ class SalesOrderReport extends Component
                 Carbon::parse($this->dateTo)->endOfDay(),
             ]);
 
-        $outstandingOrders = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending', 'paid'])->latest()->get();
+        $outstandingOrders = (clone $baseQuery)->whereIn('order_status', ['down_payment', 'pending', 'paid'])
+            ->with(['items.variant', 'user.profile', 'branch', 'handledBy', 'salesBy'])
+            ->latest()
+            ->get();
 
         $headers = [
             "Content-type"        => "text/csv",
@@ -109,6 +112,7 @@ class SalesOrderReport extends Component
                 'Nama Pelanggan',
                 'No HP',
                 'Item (Barang)',
+                'Qty',
                 'Total Tagihan (Rp)',
                 'DP Masuk (Rp)',
                 'Sisa Tagihan (Rp)'
@@ -128,15 +132,16 @@ class SalesOrderReport extends Component
                         $order->handledBy->name ?? '-',
                         $order->salesBy->name ?? '-',
                         $order->user->name ?? '-',
-                        $order->user->profile->phone_number ?? '-',
+                        $order->user->profile->phone_number ?? $order->user->phone ?? '-',
                         '-',
+                        0,
                         $order->grand_total,
                         $dpPaid,
                         $sisaTagihan
                     ]);
                 } else {
                     foreach ($order->items as $item) {
-                        $itemName = ($item->variant->name ?? $item->product_name ?? 'Item') . ' (x' . $item->qty . ')';
+                        $itemName = $item->variant->name ?? $item->product_name ?? 'Item';
                         fputcsv($file, [
                             $order->created_at->format('Y-m-d H:i:s'),
                             $umurHari,
@@ -145,8 +150,9 @@ class SalesOrderReport extends Component
                             $order->handledBy->name ?? '-',
                             $order->salesBy->name ?? '-',
                             $order->user->name ?? '-',
-                            $order->user->profile->phone_number ?? '-',
+                            $order->user->profile->phone_number ?? $order->user->phone ?? '-',
                             $itemName,
+                            $item->qty,
                             $order->grand_total,
                             $dpPaid,
                             $sisaTagihan

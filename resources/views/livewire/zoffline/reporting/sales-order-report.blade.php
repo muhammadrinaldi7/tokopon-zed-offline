@@ -76,6 +76,7 @@
                             <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-neutral-500 uppercase tracking-wider">No SO</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-neutral-500 uppercase tracking-wider">Pelanggan</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-neutral-500 uppercase tracking-wider">Item (Barang)</th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-neutral-500 uppercase tracking-wider">Qty</th>
                             <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-neutral-500 uppercase tracking-wider">Total</th>
                             <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-emerald-600 uppercase tracking-wider">DP Masuk</th>
                             <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-red-600 uppercase tracking-wider">Sisa Tagihan</th>
@@ -100,16 +101,28 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="text-sm font-bold text-neutral-900">{{ $order->user->name ?? '-' }}</div>
-                                    <div class="text-xs text-neutral-500">{{ $order->user->phone ?? '-' }}</div>
+                                    <div class="text-xs text-neutral-500">{{ $order->user->profile->phone_number ?? $order->user->phone ?? '-' }}</div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <div class="flex flex-col gap-1">
-                                        @foreach($order->items as $item)
-                                            <div class="text-xs">
-                                                <span class="font-bold text-neutral-800">{{ $item->variant->name ?? $item->product_name ?? 'Item' }}</span>
-                                                <span class="text-neutral-500">x{{ $item->qty }}</span>
+                                    <div class="flex flex-col gap-1.5">
+                                        @forelse($order->items as $item)
+                                            <div class="text-xs font-semibold text-neutral-800">
+                                                {{ $item->variant->name ?? $item->product_name ?? 'Item' }}
                                             </div>
-                                        @endforeach
+                                        @empty
+                                            <span class="text-xs text-neutral-400 italic">-</span>
+                                        @endforelse
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
+                                    <div class="flex flex-col gap-1.5 items-center">
+                                        @forelse($order->items as $item)
+                                            <span class="inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 text-xs font-bold bg-neutral-100 text-neutral-700 rounded-md border border-neutral-200">
+                                                {{ $item->qty }}
+                                            </span>
+                                        @empty
+                                            <span class="text-xs text-neutral-400">-</span>
+                                        @endforelse
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-neutral-900">
@@ -124,7 +137,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-6 py-12 text-center text-neutral-500">
+                                <td colspan="8" class="px-6 py-12 text-center text-neutral-500">
                                     <div class="mx-auto w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mb-3">
                                         <svg class="h-8 w-8 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
