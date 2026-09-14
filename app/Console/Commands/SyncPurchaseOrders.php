@@ -110,20 +110,44 @@ class SyncPurchaseOrders extends Command
                             $quantity = $item['quantity'] ?? 0;
                             $detailId = $item['id'] ?? null;
 
-                            // We use accurate_detail_id as unique identifier if available
+                            $poItem = null;
+
                             if ($detailId) {
-                                $poItem = PurchaseOrderItem::updateOrCreate(
-                                    [
-                                        'purchase_order_id' => $po->id,
+                                // Try to find by accurate_detail_id first
+                                $poItem = PurchaseOrderItem::where('purchase_order_id', $po->id)
+                                    ->where('accurate_detail_id', $detailId)
+                                    ->first();
+
+                                // If not found, try to find an existing old item (where accurate_detail_id is null) 
+                                // that matches item_no and unit_price
+                                if (!$poItem) {
+                                    $poItem = PurchaseOrderItem::where('purchase_order_id', $po->id)
+                                        ->whereNull('accurate_detail_id')
+                                        ->where('item_no', $itemNo)
+                                        ->where('unit_price', $unitPrice)
+                                        ->first();
+                                }
+
+                                if ($poItem) {
+                                    // Update existing
+                                    $poItem->update([
                                         'accurate_detail_id' => $detailId,
-                                    ],
-                                    [
                                         'item_no' => $itemNo,
                                         'unit_price' => $unitPrice,
                                         'item_name' => $itemName,
                                         'quantity_ordered' => $quantity,
-                                    ]
-                                );
+                                    ]);
+                                } else {
+                                    // Create new
+                                    $poItem = PurchaseOrderItem::create([
+                                        'purchase_order_id' => $po->id,
+                                        'accurate_detail_id' => $detailId,
+                                        'item_no' => $itemNo,
+                                        'unit_price' => $unitPrice,
+                                        'item_name' => $itemName,
+                                        'quantity_ordered' => $quantity,
+                                    ]);
+                                }
                             } else {
                                 // Fallback for older Accurate structures without detail ID
                                 $poItem = PurchaseOrderItem::updateOrCreate(
