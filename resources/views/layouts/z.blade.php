@@ -280,8 +280,50 @@
         }
     </script>
     <script>
+        // Setup QZ Security (Certificate & Signature Promises)
+        function setupQzSecurity() {
+            if (typeof qz === 'undefined') return;
+
+            // 1. Set Certificate Promise (Public Certificate)
+            qz.security.setCertificatePromise(function(resolve, reject) {
+                fetch('/qz/digital-certificate.txt?_t=' + Date.now(), { cache: 'no-store' })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Gagal memuat /qz/digital-certificate.txt');
+                        return response.text();
+                    })
+                    .then(resolve)
+                    .catch(err => {
+                        console.error('[QZ Security] Error memuat sertifikat:', err);
+                        reject(err);
+                    });
+            });
+
+            // 2. Set Signature Algorithm & Promise (SHA512 signed via Laravel backend)
+            qz.security.setSignatureAlgorithm("SHA512");
+            qz.security.setSignaturePromise(function(toSign) {
+                return function(resolve, reject) {
+                    fetch('/qz/sign?request=' + encodeURIComponent(toSign))
+                        .then(response => {
+                            if (!response.ok) throw new Error('Gagal mendapatkan signature dari server');
+                            return response.text();
+                        })
+                        .then(resolve)
+                        .catch(err => {
+                            console.error('[QZ Security] Error mendapatkan signature:', err);
+                            reject(err);
+                        });
+                };
+            });
+        }
+
+        // Jalankan setup security saat halaman siap
+        if (typeof qz !== 'undefined') {
+            setupQzSecurity();
+        }
+
         document.addEventListener('livewire:initialized', () => {
 
+            // Handler tombol cetak bawaan
             Livewire.on('print-receipt', (event) => {
                 console.log('Event cetak diterima:', event);
 
@@ -314,18 +356,41 @@
                     cetakDenganQZ(base64Data);
                 }
             });
+
+            // Handler TOMBOL UJI COBA QZ SILENT PRINT
+            Livewire.on('print-receipt-silent', (event) => {
+                console.log('%c[QZ Silent Test] Event cetak diterima:', 'color: #9333ea; font-weight: bold;', event);
+
+                let payload = event[0] || event.detail || event;
+                let base64Data = payload?.base64Data || payload?.base64;
+                let orderNumber = payload?.orderNumber || 'terbaru';
+
+                if (!base64Data) {
+                    console.error("[QZ Silent Test] Gagal! Data base64 tidak ditemukan.", payload);
+                    alert("Data struk gagal dibuat.");
+                    return;
+                }
+
+                console.log("%c[QZ Silent Test] Menjalankan cetak dengan validasi sertifikat...", 'color: #9333ea;');
+                cetakDenganQZ(base64Data);
+            });
         });
 
         function cetakDenganQZ(base64Data) {
             // Pastikan library QZ sudah dimuat sebelumnya
             if (typeof qz === 'undefined') {
                 console.error("Library QZ Tray belum dimuat!");
+                alert("Library QZ Tray belum dimuat di browser.");
                 return;
             }
 
+            // Pastikan konfigurasi security telah terdaftar
+            setupQzSecurity();
+
             if (!qz.websocket.isActive()) {
+                console.log("[QZ Tray] Menghubungkan ke WebSocket QZ Tray...");
                 qz.websocket.connect().then(function() {
-                    console.log("Berhasil terhubung ke QZ Tray!");
+                    console.log("%c[QZ Tray] Berhasil terhubung ke QZ Tray (Secured)!", "color: green; font-weight: bold;");
                     prosesPrintBase64(base64Data);
                 }).catch(function(err) {
                     console.error("Gagal terhubung ke QZ.", err);
@@ -352,7 +417,7 @@
 
                 return qz.print(config, dataStruk);
             }).then(function() {
-                console.log("Struk berhasil dicetak!");
+                console.log("%c[QZ Tray] Struk berhasil dicetak tanpa dialog!", "color: green; font-weight: bold;");
             }).catch(function(err) {
                 console.error("Gagal mencetak: ", err);
                 alert("Gagal mencetak struk. Cek koneksi printer atau konsol browser.");

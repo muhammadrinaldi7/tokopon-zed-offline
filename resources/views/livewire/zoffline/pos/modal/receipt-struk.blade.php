@@ -77,6 +77,34 @@
                                Print
                            </span>
                        </button>
+
+                       {{-- ─── TOMBOL UJI COBA QZ SILENT PRINT ─── --}}
+                       <button wire:click="getEscposBase64QzSilent" wire:loading.attr="disabled"
+                           class="group relative text-purple-600 hover:text-purple-800 font-bold text-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                           title="Test QZ Silent Print">
+
+                           <svg wire:loading.remove wire:target="getEscposBase64QzSilent" class="w-7 h-auto"
+                               fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                               <path stroke-linecap="round" stroke-linejoin="round"
+                                   d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                           </svg>
+
+                           <svg wire:loading wire:target="getEscposBase64QzSilent"
+                               class="animate-spin w-5 h-auto text-purple-600" xmlns="http://www.w3.org/2000/svg"
+                               fill="none" viewBox="0 0 24 24">
+                               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                   stroke-width="4"></circle>
+                               <path class="opacity-75" fill="currentColor"
+                                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                               </path>
+                           </svg>
+
+                           <span
+                               class="absolute right-full top-1/2 -translate-y-1/2 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gray-800 text-white text-[10px] font-normal py-1 px-2 rounded whitespace-nowrap pointer-events-none">
+                               Test QZ Silent
+                           </span>
+                       </button>
+
                        {{-- ─── TOMBOL WHATSAPP MEKARI QONTAK ─── --}}
                        @if (Auth::user()->hasRole('admin') || !$completedOrder->is_wa_sent)
                            {{-- Aktif jika Admin ATAU jika WA belum pernah dikirim --}}
@@ -155,8 +183,8 @@
                            <button disabled
                                class="text-gray-300 cursor-not-allowed font-bold text-xs flex items-center gap-1"
                                title="Sudah dikirim oleh kasir">
-                               <svg class="w-4 h-4 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                   stroke-width="2">
+                               <svg class="w-4 h-4 opacity-40" fill="none" viewBox="0 0 24 24"
+                                   stroke="currentColor" stroke-width="2">
                                    <path stroke-linecap="round" stroke-linejoin="round"
                                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                </svg>
@@ -177,7 +205,8 @@
                {{-- Receipt Preview --}}
                <div id="receipt-content" class="p-5 font-mono text-xs leading-relaxed overflow-y-auto h-125">
                    <div class="text-center mb-3">
-                       <p class="font-bold text-sm">{{ optional($completedOrder->businessUnit)->store_title ?? 'Z-POS STORE' }}</p>
+                       <p class="font-bold text-sm">
+                           {{ optional($completedOrder->businessUnit)->store_title ?? 'Z-POS STORE' }}</p>
                        <p class="text-[10px] text-gray-500">
                            {{ $completedOrder->shipping_address_snapshot['store'] ?? 'Toko' }}</p>
                        <p class="text-[10px] text-gray-400">{{ $completedOrder->created_at->format('d/m/Y H:i') }}
@@ -211,7 +240,11 @@
                                $color = $v ? $v->color ?? '' : '';
                            }
                            // Bersihkan awalan nama
-                           $itemName = preg_replace('/^(?:DS\s*-\s*HP\s*|DS\s*-\s*|HP\s*-\s*|HP\s*)/i', '', trim($itemName));
+                           $itemName = preg_replace(
+                               '/^(?:DS\s*-\s*HP\s*|DS\s*-\s*|HP\s*-\s*|HP\s*)/i',
+                               '',
+                               trim($itemName),
+                           );
                        @endphp
                        <div class="mb-1">
                            <p class="font-bold">{{ $itemName }}
@@ -232,15 +265,18 @@
                    @endforeach
                    <div class="border-t border-dashed border-gray-300 my-2"></div>
                    <div class="flex justify-between">
-                       <span>Subtotal</span><span>Rp {{ number_format($completedOrder->total_amount, 0, ',', '.') }}</span>
+                       <span>Subtotal</span><span>Rp
+                           {{ number_format($completedOrder->total_amount, 0, ',', '.') }}</span>
                    </div>
                    @if ($completedOrder->discount_amount > 0)
                        <div class="flex justify-between text-rose-600">
-                           <span>Diskon</span><span>-Rp {{ number_format($completedOrder->discount_amount, 0, ',', '.') }}</span>
+                           <span>Diskon</span><span>-Rp
+                               {{ number_format($completedOrder->discount_amount, 0, ',', '.') }}</span>
                        </div>
                    @endif
                    <div class="border-t border-dashed border-gray-300 my-1"></div>
-                   <div class="flex justify-between font-bold text-sm"><span>TOTAL</span><span>Rp {{ number_format($completedOrder->grand_total, 0, ',', '.') }}</span></div>
+                   <div class="flex justify-between font-bold text-sm"><span>TOTAL</span><span>Rp
+                           {{ number_format($completedOrder->grand_total, 0, ',', '.') }}</span></div>
                    <div class="border-t border-dashed border-gray-300 my-2"></div>
                    <div class="space-y-0.5 mb-2">
                        @foreach ($completedOrder->payments as $payment)

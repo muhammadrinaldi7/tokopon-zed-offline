@@ -3,6 +3,7 @@
 use App\Ai\Agents\DatabaseAnalyzerAgent;
 use App\Http\Controllers\AiReportController;
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\QzTrayController;
 use App\Http\Controllers\WarrantyReportPdfController;
 use App\Livewire\Admin\Accurate\AccurateInvoiceExport;
 use App\Livewire\Admin\Employe\EmployeManage;
@@ -25,6 +26,9 @@ use App\Livewire\Zoffline\Warranty\WarrantyClaim;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
+
+// ─── QZ Tray Silent Print Signing Route ─────────────────────────────
+Route::get('/qz/sign', [QzTrayController::class, 'sign'])->name('qz.sign');
 
 // ─── POS Landing Page (requires auth + admin role) ──────────────
 // Route::get('/tesrenaldi', \App\Livewire\Admin\Pos\PointOfSale::class)->middleware(['auth', 'admin'])->name('/');

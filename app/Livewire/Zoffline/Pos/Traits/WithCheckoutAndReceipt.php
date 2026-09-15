@@ -1355,6 +1355,38 @@ trait WithCheckoutAndReceipt
         }
     }
 
+    /**
+     * Method uji coba khusus QZ Tray Silent Print
+     * Mendispatch event 'print-receipt-silent' ke frontend
+     */
+    public function getEscposBase64QzSilent()
+    {
+        if (!$this->completedOrder) {
+            $this->dispatch('toast', title: 'Error', message: 'Tidak ada transaksi aktif untuk dicetak.', type: 'error');
+            return;
+        }
+
+        try {
+            $connector = new \Mike42\Escpos\PrintConnectors\DummyPrintConnector();
+            $printer = new \Mike42\Escpos\Printer($connector);
+            $printer->initialize();
+
+            $this->generateEscposContent($printer);
+            $printer->feed(1);
+            $printer->cut();
+            $data = $connector->getData();
+            $base64 = base64_encode($data);
+
+            $printer->close();
+
+            $orderNumber = $this->completedOrder->order_number ?? 'terbaru';
+            $this->dispatch('print-receipt-silent', base64Data: $base64, orderNumber: $orderNumber);
+        } catch (\Exception $e) {
+            Log::channel('pos_accurate')->error('ESCPOS Base64 QZ Silent Generation Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
 
 
     private function formatLine($left, $right, $width = 58)
