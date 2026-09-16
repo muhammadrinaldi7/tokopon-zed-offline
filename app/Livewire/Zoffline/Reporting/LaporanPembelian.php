@@ -22,6 +22,32 @@ class LaporanPembelian extends Component
     public $filterStatus = '';
     public $filterSalesId = '';
 
+    public $selectedPurchase = null;
+    public $showDescModal = false;
+
+    public function showDescription($id)
+    {
+        $this->selectedPurchase = SellPhone::with([
+            'user.profile',
+            'handledBy',
+            'salesBy',
+            'branch',
+            'inspections.inspector',
+            'media',
+            'latestApprovalRequest.histories.actedBy'
+        ])->find($id);
+
+        if ($this->selectedPurchase) {
+            $this->showDescModal = true;
+        }
+    }
+
+    public function closeDescModal()
+    {
+        $this->showDescModal = false;
+        $this->selectedPurchase = null;
+    }
+
     public function updatingSearch()
     {
         $this->resetPage();
