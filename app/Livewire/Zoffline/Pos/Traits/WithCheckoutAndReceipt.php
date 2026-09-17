@@ -1095,7 +1095,7 @@ trait WithCheckoutAndReceipt
         }
 
         // Validasi jika email kosong atau merupakan email dummy sistem POS
-        if (!$email || str_contains($email, '@pos.tokopun.com') || str_contains($email, '@tokopon.com')) {
+        if (!$email || str_contains($email, '@pos.tokopun.com') || str_contains($email, '@tokopon.com') || str_contains($email, '@zpos.com')) {
             $this->dispatch('toast', title: 'Gagal Kirim', message: 'Email customer tidak valid atau kosong.', type: 'warning');
             return;
         }
@@ -1415,30 +1415,62 @@ trait WithCheckoutAndReceipt
         }
 
         if ($this->isNewCustomer) {
-            if (preg_match('/^0+$/', (string) $this->customerPhone)) {
-                $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP tidak boleh hanya berisi angka 0.', type: 'error');
+            $rawPhone = (string) $this->customerPhone;
+            if (str_contains($rawPhone, '/')) {
+                $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP tidak boleh mengandung tanda garis miring (/).', type: 'error');
                 return null;
             }
 
-            $emailToValidate = $this->customerEmail ?: ($this->customerPhone . rand(1000, 9999) . '@zpos.com');
+            $cleanPhone = preg_replace('/[^0-9]/', '', $rawPhone);
+            if (empty($cleanPhone) || preg_match('/^0+$/', $cleanPhone) || strlen($cleanPhone) < 9 || strlen($cleanPhone) > 16) {
+                $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Nomor HP customer tidak valid (minimal 9 hingga 16 digit angka).', type: 'error');
+                return null;
+            }
+
+            // Sanitasi & Validasi Email jika diisi
+            $trimmedEmail = !empty(trim((string) $this->customerEmail)) ? strtolower(trim((string) $this->customerEmail)) : null;
+            if ($trimmedEmail && !filter_var($trimmedEmail, FILTER_VALIDATE_EMAIL)) {
+                $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: 'Format email customer tidak valid (contoh: nama@domain.com).', type: 'error');
+                return null;
+            }
+
+            // Cek apakah nomor HP sudah terdaftar (termasuk variasi 0 / 62)
+            $phoneVariations = [$cleanPhone];
+            if (str_starts_with($cleanPhone, '0')) {
+                $phoneVariations[] = '62' . substr($cleanPhone, 1);
+            } elseif (str_starts_with($cleanPhone, '62')) {
+                $phoneVariations[] = '0' . substr($cleanPhone, 2);
+            }
+
+            $existingProfile = \App\Models\UserProfile::with('user')
+                ->whereIn('phone_number', $phoneVariations)
+                ->first();
+
+            if ($existingProfile && $existingProfile->user) {
+                $this->selectedCustomerId = $existingProfile->user->id;
+                return $this->selectedCustomerId;
+            }
+
+            $emailToValidate = $trimmedEmail ?: ($cleanPhone . '_' . rand(1000, 9999) . '@zpos.com');
 
             $validator = \Illuminate\Support\Facades\Validator::make(
                 [
-                    'customerName'  => $this->customerName,
-                    'customerPhone' => $this->customerPhone,
+                    'customerName'  => trim((string) $this->customerName),
+                    'customerPhone' => $cleanPhone,
                     'customerEmail' => $emailToValidate,
                 ],
                 [
                     'customerName'  => 'required|string|max:255',
-                    'customerPhone' => 'required|string|max:20|unique:user_profiles,phone_number',
-                    'customerEmail' => 'nullable|email|unique:users,email',
+                    'customerPhone' => 'required|string|min:9|max:16',
+                    'customerEmail' => 'required|email:rfc,filter|unique:users,email',
                 ],
                 [
                     'customerName.required'  => 'Nama customer wajib diisi.',
                     'customerPhone.required' => 'Nomor HP customer wajib diisi.',
-                    'customerPhone.unique'   => 'Nomor HP ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                    'customerPhone.min'      => 'Nomor HP minimal 9 digit.',
+                    'customerPhone.max'      => 'Nomor HP maksimal 16 digit.',
                     'customerEmail.email'    => 'Format email tidak valid.',
-                    'customerEmail.unique'   => 'Email ini sudah terdaftar. Silakan pilih customer dari daftar pencarian.',
+                    'customerEmail.unique'   => 'Email ini sudah terdaftar. Silakan gunakan email lain.',
                 ]
             );
 
@@ -1447,36 +1479,35 @@ trait WithCheckoutAndReceipt
                 $failedRules = $validator->failed();
                 $firstErrorMessage = $errors->first();
 
-                if (isset($failedRules['customerPhone']['Unique'])) {
-                    $existingProfile = \Illuminate\Support\Facades\DB::table('user_profiles')
-                        ->where('phone_number', $this->customerPhone)
-                        ->first();
-
-                    if ($existingProfile) {
-                        $namaCustomer = $existingProfile->full_name ?? 'Customer Lain';
-                        $firstErrorMessage = "Nomor HP sudah terdaftar atas nama: {$namaCustomer}. Silakan pilih customer dari daftar pencarian.";
-                    }
+                // Jika fallback dummy email bentrok, gunakan token unik
+                if (isset($failedRules['customerEmail']['Unique']) && empty($trimmedEmail)) {
+                    $emailToValidate = $cleanPhone . '_' . uniqid() . '@zpos.com';
+                } else {
+                    $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
+                    return null;
                 }
+            }
 
-                $this->dispatch('toast', title: 'Data Customer Tidak Valid', message: $firstErrorMessage, type: 'error');
+            try {
+                $newUser = User::create([
+                    'name'     => trim((string) $this->customerName),
+                    'email'    => $emailToValidate,
+                    'password' => bcrypt('tokopun' . rand(1000, 9999)),
+                ]);
+                $newUser->assignRole('user');
+
+                $newUser->profile()->create([
+                    'full_name'    => trim((string) $this->customerName),
+                    'phone_number' => $cleanPhone,
+                ]);
+
+                $this->selectedCustomerId = $newUser->id;
+                return $newUser->id;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("Gagal membuat customer baru di POS: " . $e->getMessage());
+                $this->dispatch('toast', title: 'Gagal Daftar Customer', message: 'Terjadi kesalahan saat menyimpan data customer baru: ' . $e->getMessage(), type: 'error');
                 return null;
             }
-
-            $newUser = User::create([
-                'name'     => $this->customerName,
-                'email'    => $emailToValidate,
-                'password' => bcrypt('tokopun' . rand(1000, 9999)),
-            ]);
-            $newUser->assignRole('user');
-
-            if ($this->customerPhone) {
-                $newUser->profile()->create([
-                    'full_name'    => $this->customerName,
-                    'phone_number' => $this->customerPhone,
-                ]);
-            }
-
-            return $newUser->id;
         }
 
         return null;

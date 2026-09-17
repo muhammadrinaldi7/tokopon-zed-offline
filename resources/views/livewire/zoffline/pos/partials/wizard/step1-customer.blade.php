@@ -245,6 +245,7 @@
                     @else
                         {{-- Input Field --}}
                         <input type="text" wire:model="customerPhone"
+                            @input="$event.target.value = $event.target.value.replace(/[^0-9+]/g, '')"
                             class="w-full bg-transparent pl-14 pr-6 py-3 text-lg font-normal text-gray-700 placeholder-gray-400 outline-none"
                             placeholder="0812...">
                     @endif

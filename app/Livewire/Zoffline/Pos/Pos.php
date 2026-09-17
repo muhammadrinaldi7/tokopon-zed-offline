@@ -63,19 +63,84 @@ class Pos extends Component
         if ($this->currentStep == 1) {
             // Validasi Step 1: Customer dan Sales
             if (!$this->selectedCustomerId) {
-                // Auto set new customer if they filled the search and phone
-                if (strlen($this->searchCustomer) >= 2 && !empty($this->customerPhone)) {
-                    $this->isNewCustomer = true;
-                    $this->customerName = $this->searchCustomer;
-                }
+                $trimmedSearch = trim((string) $this->searchCustomer);
+                $rawPhone = (string) $this->customerPhone;
+                $rawEmail = (string) $this->customerEmail;
 
-                if ($this->isNewCustomer) {
-                    $existingProfile = \App\Models\UserProfile::with('user')->where('phone_number', $this->customerPhone)->first();
-                    if ($existingProfile) {
+                // Jika kasir menginput nama atau nomor HP (indikasi mendaftarkan pelanggan baru)
+                if (strlen($trimmedSearch) >= 2 || !empty($rawPhone) || !empty($rawEmail)) {
+                    // 1. Validasi Nama
+                    if (strlen($trimmedSearch) < 2) {
+                        $this->dispatch('toast', title: 'Nama Tidak Lengkap', message: 'Ketik nama pelanggan minimal 2 karakter.', type: 'warning');
+                        return;
+                    }
+
+                    // 2. Validasi & Sanitasi Nomor HP
+                    if (empty(trim($rawPhone))) {
+                        $this->dispatch('toast', title: 'Nomor HP Wajib Diisi', message: 'Nomor WhatsApp wajib diisi untuk pelanggan baru.', type: 'warning');
+                        return;
+                    }
+
+                    if (str_contains($rawPhone, '/')) {
+                        $this->dispatch('toast', title: 'Nomor HP Tidak Valid', message: 'Nomor HP tidak boleh mengandung tanda garis miring (/). Masukkan 1 nomor WhatsApp yang valid.', type: 'error');
+                        return;
+                    }
+
+                    $cleanPhone = preg_replace('/[^0-9]/', '', $rawPhone);
+
+                    if (empty($cleanPhone) || preg_match('/^0+$/', $cleanPhone)) {
+                        $this->dispatch('toast', title: 'Nomor HP Tidak Valid', message: 'Nomor HP tidak boleh hanya berisi angka 0.', type: 'error');
+                        return;
+                    }
+
+                    if (strlen($cleanPhone) < 9 || strlen($cleanPhone) > 16) {
+                        $this->dispatch('toast', title: 'Nomor HP Tidak Valid', message: 'Nomor HP tidak valid. Masukkan nomor HP dengan panjang 9 hingga 16 digit angka.', type: 'error');
+                        return;
+                    }
+
+                    $this->customerPhone = $cleanPhone;
+
+                    // 3. Validasi Email (Opsional, tapi jika diisi harus valid)
+                    $trimmedEmail = trim($rawEmail);
+                    if (!empty($trimmedEmail)) {
+                        $cleanEmail = strtolower($trimmedEmail);
+                        if (!filter_var($cleanEmail, FILTER_VALIDATE_EMAIL)) {
+                            $this->dispatch('toast', title: 'Email Tidak Valid', message: 'Format email tidak valid (contoh: nama@domain.com). Kosongkan jika pelanggan tidak memiliki email.', type: 'error');
+                            return;
+                        }
+                        $this->customerEmail = $cleanEmail;
+
+                        // Cek apakah email sudah digunakan pelanggan lain
+                        $existingUserWithEmail = \App\Models\User::where('email', $cleanEmail)->first();
+                        if ($existingUserWithEmail) {
+                            $this->dispatch('toast', title: 'Email Sudah Terdaftar', message: "Email sudah terdaftar atas nama pelanggan '{$existingUserWithEmail->name}'. Silakan gunakan email lain atau cari pelanggan tersebut.", type: 'warning');
+                            return;
+                        }
+                    } else {
+                        $this->customerEmail = '';
+                    }
+
+                    // 4. Cek apakah nomor HP sudah terdaftar di database (termasuk variasi awalan 0 / 62)
+                    $phoneVariations = [$cleanPhone];
+                    if (str_starts_with($cleanPhone, '0')) {
+                        $phoneVariations[] = '62' . substr($cleanPhone, 1);
+                    } elseif (str_starts_with($cleanPhone, '62')) {
+                        $phoneVariations[] = '0' . substr($cleanPhone, 2);
+                    }
+
+                    $existingProfile = \App\Models\UserProfile::with('user')
+                        ->whereIn('phone_number', $phoneVariations)
+                        ->first();
+
+                    if ($existingProfile && $existingProfile->user) {
                         $this->existingCustomerToUpdate = $existingProfile->user;
+                        $this->customerName = $trimmedSearch;
                         $this->showConfirmUpdateCustomerModal = true;
                         return;
                     }
+
+                    $this->isNewCustomer = true;
+                    $this->customerName = $trimmedSearch;
                 }
 
                 if (!$this->isNewCustomer) {
@@ -166,26 +231,58 @@ class Pos extends Component
 
     public function confirmUpdateCustomer()
     {
-        // 1. Update nama dan email di tabel users
         $user = $this->existingCustomerToUpdate;
-        $user->name = $this->customerName;
+        if (!$user) {
+            $this->showConfirmUpdateCustomerModal = false;
+            return;
+        }
 
-        if (!empty($this->customerEmail)) {
-            $user->email = $this->customerEmail;
+        $trimmedName = trim((string) $this->customerName);
+        if (empty($trimmedName)) {
+            $this->dispatch('toast', title: 'Nama Tidak Valid', message: 'Nama pelanggan tidak boleh kosong.', type: 'error');
+            return;
+        }
+
+        // 1. Validasi & Update Email jika diisi
+        $cleanEmail = !empty(trim((string) $this->customerEmail)) ? strtolower(trim((string) $this->customerEmail)) : null;
+        if ($cleanEmail) {
+            if (!filter_var($cleanEmail, FILTER_VALIDATE_EMAIL)) {
+                $this->dispatch('toast', title: 'Email Tidak Valid', message: 'Format email tidak valid (contoh: nama@domain.com).', type: 'error');
+                return;
+            }
+
+            $emailConflict = \App\Models\User::where('email', $cleanEmail)->where('id', '!=', $user->id)->exists();
+            if ($emailConflict) {
+                $this->dispatch('toast', title: 'Email Sudah Terdaftar', message: 'Email tersebut sudah digunakan oleh akun pelanggan lain.', type: 'error');
+                return;
+            }
+            $user->email = $cleanEmail;
         } else {
             $this->customerEmail = $user->email ?? '';
         }
 
+        $user->name = $trimmedName;
         $user->save();
 
-        // 2. Update nama di user_profiles jika ada fieldnya, misal full_name
+        // 2. Update nomor HP & profil
+        $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->customerPhone);
         if ($user->profile) {
-            $user->profile->full_name = $this->customerName;
+            $user->profile->full_name = $trimmedName;
+            if (!empty($cleanPhone) && !preg_match('/^0+$/', $cleanPhone) && strlen($cleanPhone) >= 9 && strlen($cleanPhone) <= 16) {
+                $user->profile->phone_number = $cleanPhone;
+            }
             $user->profile->save();
         }
 
         // 3. Update di Accurate (Background Job)
-        \App\Jobs\SyncAccurateCustomerJob::dispatch($user, $this->databaseSource);
+        try {
+            $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
+            $bu = \App\Models\BusinessUnit::find($buId);
+            $dbSource = $bu ? $bu->code : ($this->databaseSource ?: 'syihab');
+            \App\Jobs\SyncAccurateCustomerJob::dispatch($user, $dbSource);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("SyncAccurateCustomerJob dispatch failed: " . $e->getMessage());
+        }
 
         // 4. Pilih customer ini untuk transaksi saat ini
         $this->selectedCustomerId = $user->id;
