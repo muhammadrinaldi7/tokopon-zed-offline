@@ -6,6 +6,9 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
 use App\Models\Order;
+use App\Models\User;
+use App\Models\Branch;
+use App\Models\BusinessUnit;
 use App\Services\MessageDispatchService;
 use Illuminate\Support\Facades\Auth;
 
@@ -21,6 +24,9 @@ class RiwayatPenjualan extends Component
     public $filterEndDate = '';
     public $filterStatus = '';
     public $filterPaymentMethod = '';
+    public $filterKasir = '';
+    public $filterBranchId = '';
+    public $filterBuId = '';
 
     public $showReceiptModal = false;
     public $completedOrder = null;
@@ -34,6 +40,15 @@ class RiwayatPenjualan extends Component
     public $showDirectCancelModal = false;
     public $directCancelOrderId = null;
     public $directCancelReason = '';
+
+    public function mount()
+    {
+        $user = Auth::user();
+        $canViewAllBranches = (bool) ($user && ($user->can('view-all-branches') || $user->hasRole('superadmin')));
+        if (!$canViewAllBranches && $user && $user->branch_id) {
+            $this->filterBranchId = (string) $user->branch_id;
+        }
+    }
 
     public function reprintOrder($orderId)
     {
@@ -71,25 +86,164 @@ class RiwayatPenjualan extends Component
     {
         $this->resetPage();
     }
+    public function updatedFilterKasir()
+    {
+        $this->resetPage();
+    }
+    public function updatedFilterBranchId()
+    {
+        $this->filterKasir = '';
+        $this->resetPage();
+    }
+    public function updatedFilterBuId()
+    {
+        $user = Auth::user();
+        $canViewAllBranches = (bool) ($user && ($user->can('view-all-branches') || $user->hasRole('superadmin')));
+        if (!$canViewAllBranches && $user && $user->branch_id) {
+            $this->filterBranchId = (string) $user->branch_id;
+        } else {
+            $this->filterBranchId = '';
+        }
+        $this->filterKasir = '';
+        $this->resetPage();
+    }
+
+    public function setStatusFilter($status)
+    {
+        $this->filterStatus = $status;
+        $this->resetPage();
+    }
 
     public function clearFilters()
     {
-        $this->reset(['search', 'filterStartDate', 'filterEndDate', 'filterStatus', 'filterPaymentMethod']);
+        $this->reset(['search', 'filterStartDate', 'filterEndDate', 'filterStatus', 'filterPaymentMethod', 'filterKasir', 'filterBuId', 'filterBranchId']);
+        $user = Auth::user();
+        $canViewAllBranches = (bool) ($user && ($user->can('view-all-branches') || $user->hasRole('superadmin')));
+        if (!$canViewAllBranches && $user && $user->branch_id) {
+            $this->filterBranchId = (string) $user->branch_id;
+        }
         $this->resetPage();
     }
 
     public function render()
     {
         $user = Auth::user();
-        $userBranchId = $user->branch_id ?? null;
+        $canViewAllBu = (bool) ($user && ($user->can('view-all-bu') || $user->hasRole('superadmin')));
+        $canViewAllBranches = (bool) ($user && ($user->can('view-all-branches') || $user->hasRole('superadmin')));
 
-        $orders = Order::with(['user', 'items', 'payments', 'salesBy', 'approvalRequests' => function ($q) {
-            $q->where('request_type', 'ORDER_CANCELLATION');
-        }])
-            ->whereIn('order_channel', ['POS', 'SO'])
+        $businessUnits = $canViewAllBu ? BusinessUnit::where('is_active', true)->get() : collect();
+
+        // Determine active BU: if permitted, use $this->filterBuId (empty string means Semua BU)
+        if ($canViewAllBu) {
+            $activeBuId = $this->filterBuId !== '' ? (int)$this->filterBuId : null;
+        } else {
+            $activeBuId = $user ? $user->getActiveBusinessUnitId() : 1;
+        }
+
+        // Branch determination: if permitted, user can choose branch or view all; otherwise locked to user's branch
+        if ($canViewAllBranches) {
+            $activeBranchId = $this->filterBranchId !== '' ? $this->filterBranchId : null;
+            $branchQuery = Branch::with('businessUnit')->orderBy('business_unit_id')->orderBy('name');
+            if ($activeBuId) {
+                $branchQuery->where('business_unit_id', $activeBuId);
+            }
+            $branches = $branchQuery->get();
+        } else {
+            $activeBranchId = $user->branch_id ?? null;
+            $branches = collect();
+        }
+
+        // Cashiers query according to active branch or active BU
+        if ($activeBranchId) {
+            $cashierIdsInBranch = Order::where('branch_id', $activeBranchId)
+                ->whereNotNull('handled_by')
+                ->distinct()
+                ->pluck('handled_by')
+                ->toArray();
+
+            $cashiers = User::where(function ($query) use ($activeBranchId, $cashierIdsInBranch) {
+                $query->where(function ($q) use ($activeBranchId) {
+                    $q->where('branch_id', $activeBranchId)
+                        ->whereHas('roles', function ($rq) {
+                            $rq->where('name', 'like', '%kasir%');
+                        });
+                })->orWhereIn('id', $cashierIdsInBranch);
+            })
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        } else {
+            $orderCashierQuery = Order::whereNotNull('handled_by');
+            if ($activeBuId) {
+                $orderCashierQuery->where('business_unit_id', $activeBuId);
+            }
+            $cashierIds = $orderCashierQuery->distinct()->pluck('handled_by')->toArray();
+
+            $cashiers = User::where(function ($q) use ($cashierIds, $activeBuId) {
+                $q->whereHas('roles', function ($rq) {
+                    $rq->where('name', 'like', '%kasir%');
+                })->orWhereIn('id', $cashierIds);
+            })
+                ->when($activeBuId, function ($q) use ($activeBuId) {
+                    $q->where('business_unit_id', $activeBuId);
+                })
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
+
+        // Base query for counts and orders
+        $baseQuery = Order::whereIn('order_channel', ['POS', 'SO'])
             ->where('order_status', '!=', 'DRAFT')
-            ->where('business_unit_id', $user->getActiveBusinessUnitId())
-            ->where('branch_id', $userBranchId)
+            ->when($activeBuId, function ($q) use ($activeBuId) {
+                $q->where('business_unit_id', $activeBuId);
+            })
+            ->when($activeBranchId, function ($q) use ($activeBranchId) {
+                $q->where('branch_id', $activeBranchId);
+            })
+            ->when($this->filterKasir, function ($query) {
+                $query->where('handled_by', $this->filterKasir);
+            })
+            ->when($this->filterStartDate, function ($query) {
+                $query->whereDate('created_at', '>=', $this->filterStartDate);
+            })
+            ->when($this->filterEndDate, function ($query) {
+                $query->whereDate('created_at', '<=', $this->filterEndDate);
+            });
+
+        // Quick status counts (for summary tabs/cards)
+        $statusCounts = [
+            'ALL' => (clone $baseQuery)->count(),
+            'COMPLETED' => (clone $baseQuery)->where('order_status', 'COMPLETED')
+                ->where(function ($q) {
+                    $q->where(function ($aq) {
+                        $aq->whereNotNull('accurate_invoice_no')->where('accurate_invoice_no', '!=', '');
+                    })->orWhere(function ($aq) {
+                        $aq->whereNotNull('accurate_receipt_no')->where('accurate_receipt_no', '!=', '');
+                    });
+                })->count(),
+            'PIUTANG' => (clone $baseQuery)->whereIn('order_status', ['PIUTANG', 'piutang'])->count(),
+            'PENDING' => (clone $baseQuery)->where(function ($q) {
+                $q->whereIn('order_status', ['pending', 'PENDING', 'down_payment'])
+                    ->orWhere(function ($sub) {
+                        $sub->whereNotIn('order_status', ['CANCELLED', 'DELETED', 'PIUTANG', 'piutang', 'DRAFT'])
+                            ->where(function ($aq) {
+                                $aq->whereNull('accurate_invoice_no')->orWhere('accurate_invoice_no', '');
+                            })
+                            ->where(function ($aq) {
+                                $aq->whereNull('accurate_receipt_no')->orWhere('accurate_receipt_no', '');
+                            });
+                    })
+                    ->orWhereHas('approvalRequests', function ($aq) {
+                        $aq->where('request_type', 'ORDER_CANCELLATION')->where('status', 'PENDING');
+                    });
+            })->count(),
+            'CANCELLED' => (clone $baseQuery)->where('order_status', 'CANCELLED')->count(),
+        ];
+
+        // Orders query with search and filters applied
+        $orders = (clone $baseQuery)
+            ->with(['user', 'items', 'payments', 'salesBy', 'handledBy', 'businessUnit', 'branch', 'approvalRequests' => function ($q) {
+                $q->where('request_type', 'ORDER_CANCELLATION');
+            }])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('order_number', 'like', '%' . $this->search . '%')
@@ -102,14 +256,39 @@ class RiwayatPenjualan extends Component
                         });
                 });
             })
-            ->when($this->filterStartDate, function ($query) {
-                $query->whereDate('created_at', '>=', $this->filterStartDate);
-            })
-            ->when($this->filterEndDate, function ($query) {
-                $query->whereDate('created_at', '<=', $this->filterEndDate);
-            })
             ->when($this->filterStatus, function ($query) {
-                $query->where('order_status', $this->filterStatus);
+                if ($this->filterStatus === 'PIUTANG') {
+                    $query->whereIn('order_status', ['PIUTANG', 'piutang']);
+                } elseif ($this->filterStatus === 'PENDING') {
+                    $query->where(function ($q) {
+                        $q->whereIn('order_status', ['pending', 'PENDING', 'down_payment'])
+                            ->orWhere(function ($sub) {
+                                $sub->whereNotIn('order_status', ['CANCELLED', 'DELETED', 'PIUTANG', 'piutang', 'DRAFT'])
+                                    ->where(function ($aq) {
+                                        $aq->whereNull('accurate_invoice_no')->orWhere('accurate_invoice_no', '');
+                                    })
+                                    ->where(function ($aq) {
+                                        $aq->whereNull('accurate_receipt_no')->orWhere('accurate_receipt_no', '');
+                                    });
+                            })
+                            ->orWhereHas('approvalRequests', function ($aq) {
+                                $aq->where('request_type', 'ORDER_CANCELLATION')->where('status', 'PENDING');
+                            });
+                    });
+                } elseif ($this->filterStatus === 'COMPLETED') {
+                    $query->where('order_status', 'COMPLETED')
+                        ->where(function ($q) {
+                            $q->where(function ($aq) {
+                                $aq->whereNotNull('accurate_invoice_no')->where('accurate_invoice_no', '!=', '');
+                            })->orWhere(function ($aq) {
+                                $aq->whereNotNull('accurate_receipt_no')->where('accurate_receipt_no', '!=', '');
+                            });
+                        });
+                } elseif ($this->filterStatus === 'CANCELLED') {
+                    $query->where('order_status', 'CANCELLED');
+                } else {
+                    $query->where('order_status', $this->filterStatus);
+                }
             })
             ->when($this->filterPaymentMethod, function ($query) {
                 $query->whereHas('payments', function ($pq) {
@@ -119,13 +298,43 @@ class RiwayatPenjualan extends Component
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
-        $paymentMethods = \App\Models\PaymentMethod::where('business_unit_id', $user->getActiveBusinessUnitId())
-            ->where('is_active', true)
-            ->get();
+        $paymentMethodsQuery = \App\Models\PaymentMethod::where('is_active', true);
+        if ($activeBuId) {
+            $paymentMethodsQuery->where('business_unit_id', $activeBuId);
+        }
+        $paymentMethods = $paymentMethodsQuery->get();
+
+        $activeBranchName = null;
+        if ($activeBranchId) {
+            $activeBranchName = Branch::find($activeBranchId)?->name;
+        }
 
         return view('livewire.zoffline.reporting.riwayat-penjualan', [
             'orders' => $orders,
-            'paymentMethods' => $paymentMethods
+            'paymentMethods' => $paymentMethods,
+            'cashiers' => $cashiers,
+            'branches' => $branches,
+            'businessUnits' => $businessUnits,
+            'canViewAllBu' => $canViewAllBu,
+            'canViewAllBranches' => $canViewAllBranches,
+            'statusCounts' => $statusCounts,
+            'activeBranchId' => $activeBranchId,
+            'activeBranchName' => $activeBranchName,
+            'activeBuId' => $activeBuId,
+            'filterStatus' => $this->filterStatus,
+            'filterKasir' => $this->filterKasir,
+            'filterBranchId' => $this->filterBranchId,
+            'filterBuId' => $this->filterBuId,
+            'search' => $this->search,
+            'filterStartDate' => $this->filterStartDate,
+            'filterEndDate' => $this->filterEndDate,
+            'filterPaymentMethod' => $this->filterPaymentMethod,
+            'showCancelModal' => $this->showCancelModal,
+            'cancelReason' => $this->cancelReason,
+            'showDirectCancelModal' => $this->showDirectCancelModal,
+            'directCancelReason' => $this->directCancelReason,
+            'showReceiptModal' => $this->showReceiptModal,
+            'completedOrder' => $this->completedOrder,
         ]);
     }
 
