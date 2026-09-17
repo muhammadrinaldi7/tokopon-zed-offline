@@ -40,6 +40,11 @@ class SellPhone extends Component
     public $isExistingUserFound = false;
     public $existingUserPreview = null;
 
+    // Customer Update Confirmation Modal
+    public $showConfirmUpdateCustomerModal = false;
+    public $customerDiff = [];
+    public $isCustomerUpdateConfirmed = false;
+
     // Tenaga Penjualan (Sales)
     public $selected_sales_id = null;
     public $searchSales = '';
@@ -215,22 +220,25 @@ class SellPhone extends Component
         $this->account_number = '';
         $this->account_name = '';
         $this->needsBankInfo = false;
+        $this->showConfirmUpdateCustomerModal = false;
+        $this->customerDiff = [];
+        $this->isCustomerUpdateConfirmed = false;
     }
 
     /**
-     * Real-time deteksi nomor HP pelanggan lama di tab Pelanggan Baru
+     * Pengecekan nomor HP pelanggan lama (Model B: Tombol Cek No HP / Enter)
      */
-    public function updatedMobilePhone()
+    public function searchCustomerByPhone()
     {
         $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->mobilePhone);
 
-        // Jika nomor HP kosong atau kurang dari 9 digit, reset deteksi
+        // Jika nomor HP kosong atau kurang dari 9 digit, beri peringatan
         if (strlen($cleanPhone) < 9) {
-            if ($this->isExistingUserFound) {
-                $this->existingUserId = null;
-                $this->isExistingUserFound = false;
-                $this->existingUserPreview = null;
-            }
+            $this->dispatch('toast', 
+                title: 'Nomor Tidak Valid', 
+                message: 'Silakan masukkan nomor HP minimal 9 digit terlebih dahulu.', 
+                type: 'warning'
+            );
             return;
         }
 
@@ -259,6 +267,7 @@ class SellPhone extends Component
         if ($user) {
             $this->existingUserId = $user->id;
             $this->isExistingUserFound = true;
+            $this->isCustomerUpdateConfirmed = false;
 
             // Muat data lama ke form
             $this->name = $user->name;
@@ -290,13 +299,22 @@ class SellPhone extends Component
 
             $this->dispatch('toast', 
                 title: 'Pelanggan Terdaftar Ditemukan', 
-                message: "Nomor HP terdaftar atas nama {$user->name}. Data lama telah dimuat, silakan periksa atau ubah jika ada perubahan data.", 
+                message: "Nomor HP terdaftar atas nama {$user->name}. Data lama telah dimuat otomatis.", 
                 type: 'info'
             );
         } else {
             $this->existingUserId = null;
             $this->isExistingUserFound = false;
             $this->existingUserPreview = null;
+            $this->isCustomerUpdateConfirmed = false;
+            $this->customerDiff = [];
+            $this->showConfirmUpdateCustomerModal = false;
+
+            $this->dispatch('toast', 
+                title: 'Pelanggan Baru', 
+                message: 'Nomor HP belum terdaftar. Silakan lengkapi formulir untuk mendaftarkan pelanggan baru.', 
+                type: 'info'
+            );
         }
     }
 
@@ -315,6 +333,106 @@ class SellPhone extends Component
         $this->bank_name = '';
         $this->account_number = '';
         $this->account_name = '';
+        $this->showConfirmUpdateCustomerModal = false;
+        $this->customerDiff = [];
+        $this->isCustomerUpdateConfirmed = false;
+    }
+
+    /**
+     * Cek apakah ada perbedaan antara data lama pelanggan di DB dengan data input baru di form
+     */
+    private function getExistingCustomerWithDiff()
+    {
+        $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->mobilePhone);
+        $phoneVariations = [];
+        if (!empty($cleanPhone)) {
+            $phoneVariations[] = $cleanPhone;
+            if (str_starts_with($cleanPhone, '0')) {
+                $phoneVariations[] = '62' . substr($cleanPhone, 1);
+            } elseif (str_starts_with($cleanPhone, '62')) {
+                $phoneVariations[] = '0' . substr($cleanPhone, 2);
+            }
+        }
+
+        $existingUser = null;
+        if ($this->existingUserId) {
+            $existingUser = User::with(['profile', 'bankAccounts'])->find($this->existingUserId);
+        } elseif ($this->selectedCustomerId) {
+            $existingUser = User::with(['profile', 'bankAccounts'])->find($this->selectedCustomerId);
+        } elseif (!empty($phoneVariations)) {
+            $existingUser = User::with(['profile', 'bankAccounts'])->whereHas('profile', function ($q) use ($phoneVariations) {
+                $q->whereIn('phone_number', $phoneVariations);
+            })->first();
+        }
+
+        if (!$existingUser) {
+            return null;
+        }
+
+        $nameChanged = !empty($this->name) && trim((string) $existingUser->name) !== trim((string) $this->name);
+        $emailChanged = !empty($this->email) && trim((string) $existingUser->email) !== trim((string) $this->email);
+        
+        $oldDomisili = trim((string) ($existingUser->profile?->domisili ?? ''));
+        $newDomisili = trim((string) $this->domisili);
+        $domisiliChanged = !empty($newDomisili) && $oldDomisili !== $newDomisili;
+
+        $hasDiff = $nameChanged || $emailChanged || $domisiliChanged;
+
+        return [
+            'user' => $existingUser,
+            'has_diff' => $hasDiff,
+            'diff' => [
+                'name_changed' => $nameChanged,
+                'old_name' => $existingUser->name,
+                'new_name' => $this->name,
+
+                'email_changed' => $emailChanged,
+                'old_email' => $existingUser->email ?: '(Belum ada)',
+                'new_email' => $this->email ?: '(Belum ada)',
+
+                'domisili_changed' => $domisiliChanged,
+                'old_domisili' => $oldDomisili ?: '(Belum ada)',
+                'new_domisili' => $newDomisili ?: '(Belum ada)',
+
+                'phone' => $existingUser->profile?->phone_number ?? $this->mobilePhone,
+            ]
+        ];
+    }
+
+    /**
+     * Konfirmasi perbarui data master pelanggan & lanjutkan submit
+     */
+    public function confirmUpdateCustomerAndSubmit()
+    {
+        $this->isCustomerUpdateConfirmed = true;
+        $this->showConfirmUpdateCustomerModal = false;
+        $this->submit();
+    }
+
+    /**
+     * Tolak update data master: kembalikan ke data lama & lanjutkan submit
+     */
+    public function cancelUpdateCustomerAndSubmit()
+    {
+        if ($this->existingUserId) {
+            $existingUser = User::with('profile')->find($this->existingUserId);
+            if ($existingUser) {
+                $this->name = $existingUser->name;
+                $this->email = $existingUser->email;
+                $this->domisili = $existingUser->profile?->domisili ?? '';
+            }
+        }
+        $this->isCustomerUpdateConfirmed = true;
+        $this->showConfirmUpdateCustomerModal = false;
+        $this->submit();
+    }
+
+    /**
+     * Tutup modal konfirmasi pelanggan
+     */
+    public function closeConfirmCustomerModal()
+    {
+        $this->showConfirmUpdateCustomerModal = false;
     }
 
     public function updatedSelectedBrandId()
@@ -583,14 +701,14 @@ class SellPhone extends Component
                 );
             } elseif (empty($this->device_rules)) {
                 $this->dispatch('toast', 
-                    title: 'Tier Belum Dikonfigurasi', 
-                    message: 'Model ini belum memiliki pengaturan Tier Buyback / aturan pengurangan kondisi. Harap hubungi Admin Master Data.', 
+                    title: 'Kualifikasi Belum Dikonfigurasi', 
+                    message: 'Model ini belum memiliki standar kualifikasi unit. Harap hubungi Admin Master Data.', 
                     type: 'warning'
                 );
             } else {
                 $this->dispatch('toast', 
-                    title: 'Model Siap Dibeli', 
-                    message: 'Harga dasar: Rp ' . number_format($this->base_price, 0, ',', '.') . ' (Tier: ' . ($this->selected_tier_name ?? 'Aktif') . ')', 
+                    title: 'Model Siap Diproses', 
+                    message: 'Harga acuan: Rp ' . number_format($this->base_price, 0, ',', '.') . ' (Kualifikasi: ' . ($this->selected_tier_name ?? 'Aktif') . ')', 
                     type: 'success'
                 );
             }
@@ -619,7 +737,7 @@ class SellPhone extends Component
         if (empty($this->device_rules)) {
             $this->dispatch('toast', 
                 title: 'Tidak Bisa Lanjut ke QC', 
-                message: 'Model ini belum masuk ke dalam Tier Buyback atau belum memiliki rumus pengurangan kondisi.', 
+                message: 'Model ini belum memiliki standar kualifikasi kondisi unit.', 
                 type: 'error'
             );
             return;
@@ -734,39 +852,31 @@ class SellPhone extends Component
             // Jika kamu masih memakai BH atau RAM secara manual, tambahkan di sini. 
             // Tapi jika sudah include di selected_rules, ini sudah cukup.
         ];
-        // Validasi data customer (selalu aktif karena FL sudah tidak dicek lagi)
+        // Validasi data customer & rekening transfer
         if (Auth::check()) {
-            if ($this->isNewCustomer) {
-                $rules['name']        = 'required|string|max:255';
-                $rules['mobilePhone'] = [
-                    'required',
-                    'string',
-                    'min:9',
-                    'max:20',
-                    function ($attribute, $value, $fail) {
-                        if (preg_match('/^0+$/', (string) $value)) {
-                            $fail('Nomor HP tidak boleh hanya berisi angka 0.');
-                        }
-                    },
-                ];
+            $rules['name']        = 'required|string|max:255';
+            $rules['mobilePhone'] = [
+                'required',
+                'string',
+                'min:9',
+                'max:20',
+                function ($attribute, $value, $fail) {
+                    if (preg_match('/^0+$/', (string) $value)) {
+                        $fail('Nomor HP tidak boleh hanya berisi angka 0.');
+                    }
+                },
+            ];
 
-                if ($this->existingUserId) {
-                    $rules['email'] = 'required|email|unique:users,email,' . $this->existingUserId;
-                } else {
-                    $rules['email'] = 'required|email|unique:users,email';
-                }
-
-                $rules['domisili']       = 'required|string|max:500';
-                $rules['account_number'] = 'required|string|max:30';
-                $rules['account_name']   = 'required|string|max:100';
-                $rules['bank_name']      = 'required|string|max:50';
+            if ($this->existingUserId) {
+                $rules['email'] = 'required|email|unique:users,email,' . $this->existingUserId;
             } else {
-                $rules['selectedCustomerId'] = 'required|exists:users,id';
-                $rules['domisili']           = 'required|string|max:500';
-                $rules['account_number']     = 'required|string|max:30';
-                $rules['account_name']       = 'required|string|max:100';
-                $rules['bank_name']          = 'required|string|max:50';
+                $rules['email'] = 'required|email|unique:users,email';
             }
+
+            $rules['domisili']       = 'required|string|max:500';
+            $rules['account_number'] = 'required|string|max:30';
+            $rules['account_name']   = 'required|string|max:100';
+            $rules['bank_name']      = 'required|string|max:50';
         }
         return $rules;
     }
@@ -869,6 +979,28 @@ class SellPhone extends Component
             ],
         ]);
 
+        // Auto-resolve existing user by phone/email jika kasir lupa menekan tombol 'Cek No HP'
+        if (!$this->existingUserId && !empty($this->mobilePhone)) {
+            $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->mobilePhone);
+            if (strlen($cleanPhone) >= 9) {
+                $phoneVariations = [$cleanPhone];
+                if (str_starts_with($cleanPhone, '0')) {
+                    $phoneVariations[] = '62' . substr($cleanPhone, 1);
+                } elseif (str_starts_with($cleanPhone, '62')) {
+                    $phoneVariations[] = '0' . substr($cleanPhone, 2);
+                }
+
+                $foundUser = User::whereHas('profile', function ($q) use ($phoneVariations) {
+                    $q->whereIn('phone_number', $phoneVariations);
+                })->first();
+
+                if ($foundUser) {
+                    $this->existingUserId = $foundUser->id;
+                    $this->isExistingUserFound = true;
+                }
+            }
+        }
+
         // Jalankan Validasi dengan tangkapan error detail
         try {
             $this->validate();
@@ -888,121 +1020,60 @@ class SellPhone extends Component
             throw $e;
         }
 
+        // Cek apakah ada perubahan data pada pelanggan lama sebelum eksekusi transaksi
+        if (!$this->isCustomerUpdateConfirmed) {
+            $check = $this->getExistingCustomerWithDiff();
+            if ($check && $check['has_diff']) {
+                $this->customerDiff = $check['diff'];
+                $this->existingUserId = $check['user']->id;
+                $this->showConfirmUpdateCustomerModal = true;
+                return;
+            }
+        }
+
         // Mulai Transaksi Database
         DB::beginTransaction();
 
         try {
-            if ($this->isNewCustomer) {
-                $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->mobilePhone);
+            $cleanPhone = preg_replace('/[^0-9]/', '', (string) $this->mobilePhone);
 
-                // Cek apakah user sudah terdaftar (baik via existingUserId atau query database langsung)
-                $existingUser = null;
-                if ($this->existingUserId) {
-                    $existingUser = User::find($this->existingUserId);
+            // Cek apakah user sudah terdaftar (baik via existingUserId atau query database langsung)
+            $existingUser = null;
+            if ($this->existingUserId) {
+                $existingUser = User::find($this->existingUserId);
+            }
+
+            if (!$existingUser) {
+                $phoneVariations = [$cleanPhone];
+                if (str_starts_with($cleanPhone, '0')) {
+                    $phoneVariations[] = '62' . substr($cleanPhone, 1);
+                } elseif (str_starts_with($cleanPhone, '62')) {
+                    $phoneVariations[] = '0' . substr($cleanPhone, 2);
                 }
 
-                if (!$existingUser) {
-                    $existingUser = User::where('email', $this->email)
-                        ->orWhereHas('profile', function ($q) use ($cleanPhone) {
-                            $q->where('phone_number', $cleanPhone);
-                        })
-                        ->first();
-                }
+                $existingUser = User::where('email', $this->email)
+                    ->orWhereHas('profile', function ($q) use ($phoneVariations) {
+                        $q->whereIn('phone_number', $phoneVariations);
+                    })
+                    ->first();
+            }
 
-                if ($existingUser) {
-                    // Gunakan user yang sudah ada
-                    $customer = $existingUser;
+            if ($existingUser) {
+                // Gunakan user yang sudah ada
+                $customer = $existingUser;
 
-                    // Update data nama & profil/domisili jika ada perubahan
-                    $customer->update(['name' => $this->name]);
-                    if ($customer->profile) {
-                        $customer->profile->update([
-                            'full_name' => $this->name,
-                            'domisili'  => $this->domisili,
-                        ]);
-                    } else {
-                        $customer->profile()->create([
-                            'user_id'      => $customer->id,
-                            'full_name'    => $this->name,
-                            'phone_number' => $cleanPhone,
-                            'domisili'     => $this->domisili,
-                        ]);
-                    }
-
-                    // Cek data rekening bank: jika belum ada nomor rekening ini, tambahkan sebagai rekening baru
-                    $existingBank = $customer->bankAccounts()
-                        ->where('account_number', $this->account_number)
-                        ->first();
-
-                    if (!$existingBank) {
-                        $customer->bankAccounts()->create([
-                            'account_number' => $this->account_number,
-                            'account_name'   => $this->account_name,
-                            'bank_name'      => $this->bank_name,
-                        ]);
-                        Log::channel('sell_phone')->info("Rekening baru berhasil ditambahkan untuk user lama ID {$customer->id}: {$this->bank_name} - {$this->account_number}");
-                    } else {
-                        $existingBank->update([
-                            'account_name' => $this->account_name,
-                            'bank_name'    => $this->bank_name,
-                        ]);
-                    }
-
-                    $userIdToSave = $customer->id;
-                    $userForAccurate = $customer;
-
-                    Log::channel('sell_phone')->info("Menggunakan akun customer eksisting: ID {$customer->id} ({$customer->name}) untuk transaksi SellPhone.");
-                } else {
-                    // Buat User Baru untuk Customer
-                    $customer = User::create([
-                        'name'         => $this->name,
-                        'email'        => $this->email,
-                        'identity'     => null, // NIK
-                        'npwp'         => null,
-                        'password'     => \Illuminate\Support\Facades\Hash::make($cleanPhone),
-                    ]);
-
-                    if ($customer) {
-                        $customer->assignRole('user');
-                        $customer->profile()->create([
-                            'user_id'      => $customer->id,
-                            'full_name'    => $this->name,
-                            'phone_number' => $cleanPhone,
-                            'domisili'     => $this->domisili,
-                        ]);
-
-                        $customer->bankAccounts()->create([
-                            'account_number' => $this->account_number,
-                            'account_name'   => $this->account_name,
-                            'bank_name'      => $this->bank_name,
-                        ]);
-                    }
-                    event(new Registered($customer));
-
-                    $userIdToSave = $customer->id;
-                    $userForAccurate = $customer;
-
-                    Log::channel('sell_phone')->info("Customer baru berhasil didaftarkan: ID {$customer->id} ({$customer->name})");
-                }
-            } else {
-                $customer = User::findOrFail($this->selectedCustomerId);
-                $userIdToSave = $customer->id;
-                $userForAccurate = $customer;
-
-                // Update domisili / nama jika ada perubahan dari kasir
-                if (!empty($this->name)) {
-                    $customer->update(['name' => $this->name]);
-                }
+                // Update data nama & profil/domisili jika ada perubahan
+                $customer->update(['name' => $this->name]);
                 if ($customer->profile) {
                     $customer->profile->update([
-                        'full_name' => $this->name ?: $customer->name,
+                        'full_name' => $this->name,
                         'domisili'  => $this->domisili,
                     ]);
                 } else {
                     $customer->profile()->create([
                         'user_id'      => $customer->id,
-                        'full_name'    => $this->name ?: $customer->name,
-                        'phone_number' => $this->mobilePhone,
+                        'full_name'    => $this->name,
+                        'phone_number' => $cleanPhone,
                         'domisili'     => $this->domisili,
                     ]);
                 }
@@ -1018,13 +1089,49 @@ class SellPhone extends Component
                         'account_name'   => $this->account_name,
                         'bank_name'      => $this->bank_name,
                     ]);
-                    Log::channel('sell_phone')->info("Rekening baru berhasil ditambahkan untuk customer lama ID {$customer->id}: {$this->bank_name} - {$this->account_number}");
+                    Log::channel('sell_phone')->info("Rekening baru berhasil ditambahkan untuk user lama ID {$customer->id}: {$this->bank_name} - {$this->account_number}");
                 } else {
                     $existingBank->update([
                         'account_name' => $this->account_name,
                         'bank_name'    => $this->bank_name,
                     ]);
                 }
+
+                $userIdToSave = $customer->id;
+                $userForAccurate = $customer;
+
+                Log::channel('sell_phone')->info("Menggunakan akun customer eksisting: ID {$customer->id} ({$customer->name}) untuk transaksi SellPhone.");
+            } else {
+                // Buat User Baru untuk Customer
+                $customer = User::create([
+                    'name'         => $this->name,
+                    'email'        => $this->email,
+                    'identity'     => null, // NIK
+                    'npwp'         => null,
+                    'password'     => \Illuminate\Support\Facades\Hash::make($cleanPhone),
+                ]);
+
+                if ($customer) {
+                    $customer->assignRole('user');
+                    $customer->profile()->create([
+                        'user_id'      => $customer->id,
+                        'full_name'    => $this->name,
+                        'phone_number' => $cleanPhone,
+                        'domisili'     => $this->domisili,
+                    ]);
+
+                    $customer->bankAccounts()->create([
+                        'account_number' => $this->account_number,
+                        'account_name'   => $this->account_name,
+                        'bank_name'      => $this->bank_name,
+                    ]);
+                }
+                event(new Registered($customer));
+
+                $userIdToSave = $customer->id;
+                $userForAccurate = $customer;
+
+                Log::channel('sell_phone')->info("Customer baru berhasil didaftarkan: ID {$customer->id} ({$customer->name})");
             }
 
             // -------------------------------------------------------------
@@ -1348,7 +1455,10 @@ class SellPhone extends Component
             'photo_kelengkapan',
             'available_categories',
             'available_proyek',
-            'available_models'
+            'available_models',
+            'showConfirmUpdateCustomerModal',
+            'customerDiff',
+            'isCustomerUpdateConfirmed',
         ]);
 
         return $this->redirect(route('zoffline.sell-phone-history'), navigate: true);

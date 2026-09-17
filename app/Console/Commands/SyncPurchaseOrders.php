@@ -58,18 +58,75 @@ class SyncPurchaseOrders extends Command
                     $detailPo = $accurateService->getPurchaseOrderDetail($poData['id'], $bu->code);
                     if (!$detailPo) continue;
 
-                    // Sync Vendor
+                    // 1. Filter item persediaan (INVENTORY) dari Accurate terlebih dahulu
+                    $inventoryDetailItems = [];
+                    if (isset($detailPo['detailItem']) && is_array($detailPo['detailItem'])) {
+                        foreach ($detailPo['detailItem'] as $item) {
+                            $itemType = $item['item']['itemType'] ?? $item['itemType'] ?? null;
+                            $itemTypeName = $item['item']['itemTypeName'] ?? $item['itemTypeName'] ?? null;
+                            $itemNo = $item['item']['no'] ?? $item['itemNo'] ?? '';
+
+                            // Fallback jika itemType belum ada di payload detail PO, cek master ProductAccurate
+                            if (!$itemType && $itemNo !== '') {
+                                $pa = \App\Models\ProductAccurate::where('item_no', $itemNo)
+                                    ->where('database_source', $bu->code)
+                                    ->first();
+                                if (!$pa) {
+                                    $pa = \App\Models\ProductAccurate::where('item_no', $itemNo)->first();
+                                }
+                                if ($pa) {
+                                    $itemType = $pa->itemType;
+                                }
+                            }
+
+                            // Verifikasi tipe item: hanya izinkan INVENTORY / Persediaan
+                            $isInventory = false;
+                            if ($itemType && strtoupper($itemType) === 'INVENTORY') {
+                                $isInventory = true;
+                            } elseif ($itemTypeName && (stripos($itemTypeName, 'persediaan') !== false || stripos($itemTypeName, 'inventory') !== false)) {
+                                $isInventory = true;
+                            } elseif (!$itemType && !$itemTypeName) {
+                                if (!str_contains(strtoupper($itemNo), '.ADM.') && !str_starts_with(strtoupper($itemNo), 'ADM')) {
+                                    $isInventory = true;
+                                }
+                            }
+
+                            if ($isInventory) {
+                                $inventoryDetailItems[] = $item;
+                            }
+                        }
+                    }
+
+                    // 2. JIKA TIDAK ADA SATUPUN ITEM PERSEDIAAN (100% Administrasi / Non-Inventory), LEWATI PO INI
+                    if (empty($inventoryDetailItems)) {
+                        // Jika PO sebelumnya sempat tersimpan di database lokal ZED dan belum pernah discan, bersihkan
+                        $existingPo = PurchaseOrder::where('accurate_po_id', $detailPo['id'] ?? $poData['id'])
+                            ->where('database_source', $bu->code)
+                            ->first();
+                        if ($existingPo) {
+                            $hasInspections = \App\Models\DeviceInspection::whereIn('inspectable_id', $existingPo->items()->pluck('id'))
+                                ->where('inspectable_type', PurchaseOrderItem::class)
+                                ->exists();
+                            if (!$hasInspections) {
+                                $existingPo->items()->delete();
+                                $existingPo->delete();
+                            }
+                        }
+                        continue;
+                    }
+
+                    // 3. Sync Vendor untuk PO Persediaan
                     $vendorId = null;
                     if (isset($detailPo['vendor']['id'])) {
                         $poVendorNo = $detailPo['vendor']['vendorNo'] ?? '';
                         if ($poVendorNo !== '') {
-                            $vendor = Vendor::firstOrCreate(
-                                [
-                                    'accurate_vendor_id' => $detailPo['vendor']['id'],
-                                    'database_source' => $bu->code
-                                ],
+                            $vendor = Vendor::updateOrCreate(
                                 [
                                     'vendor_no' => $poVendorNo,
+                                ],
+                                [
+                                    'accurate_vendor_id' => $detailPo['vendor']['id'],
+                                    'database_source' => $bu->code,
                                     'vendor_name' => $detailPo['vendor']['name'] ?? 'Unknown',
                                 ]
                             );
@@ -77,18 +134,15 @@ class SyncPurchaseOrders extends Command
                         }
                     }
 
+                    // 4. Create atau Update Purchase Order
                     $po = PurchaseOrder::updateOrCreate(
                         [
-                            'accurate_po_id' => $detailPo['id'] ?? $poData['id'], // Lebih aman
+                            'accurate_po_id' => $detailPo['id'] ?? $poData['id'],
                             'database_source' => $bu->code,
                         ],
                         [
-                            // UBAH $poData MENJADI $detailPo di sini
                             'po_number' => $detailPo['number'] ?? $detailPo['no'] ?? 'PO-' . ($poData['id']),
-
                             'vendor_id' => $vendorId,
-
-                            // Gunakan juga $detailPo untuk tanggal agar lebih akurat
                             'po_date' => isset($detailPo['transDate'])
                                 ? (str_contains($detailPo['transDate'], '/')
                                     ? \Carbon\Carbon::createFromFormat('d/m/Y', $detailPo['transDate'])->format('Y-m-d')
@@ -98,77 +152,82 @@ class SyncPurchaseOrders extends Command
                         ]
                     );
 
-                    // Sync items
-                    if (isset($detailPo['detailItem']) && is_array($detailPo['detailItem'])) {
-                        // Don't group by unitPrice because we want to preserve the actual lines in PO.
-                        // We use the ID from Accurate directly.
-                        $existingItemIds = [];
-                        foreach ($detailPo['detailItem'] as $item) {
-                            $itemNo = $item['item']['no'] ?? $item['itemNo'];
-                            $unitPrice = $item['unitPrice'] ?? 0;
-                            $itemName = $item['item']['name'] ?? $item['itemName'];
-                            $quantity = $item['quantity'] ?? 0;
-                            $detailId = $item['id'] ?? null;
+                    // 5. Sync items persediaan saja
+                    $existingItemIds = [];
+                    foreach ($inventoryDetailItems as $item) {
+                        $itemNo = $item['item']['no'] ?? $item['itemNo'];
+                        $unitPrice = $item['unitPrice'] ?? 0;
+                        $itemName = $item['item']['name'] ?? $item['itemName'];
+                        $quantity = $item['quantity'] ?? 0;
+                        $detailId = $item['id'] ?? null;
 
-                            $poItem = null;
+                        $poItem = null;
 
-                            if ($detailId) {
-                                // Try to find by accurate_detail_id first
+                        if ($detailId) {
+                            // Try to find by accurate_detail_id first
+                            $poItem = PurchaseOrderItem::where('purchase_order_id', $po->id)
+                                ->where('accurate_detail_id', $detailId)
+                                ->first();
+
+                            // If not found, try to find an existing old item (where accurate_detail_id is null) 
+                            // that matches item_no and unit_price
+                            if (!$poItem) {
                                 $poItem = PurchaseOrderItem::where('purchase_order_id', $po->id)
-                                    ->where('accurate_detail_id', $detailId)
+                                    ->whereNull('accurate_detail_id')
+                                    ->where('item_no', $itemNo)
+                                    ->where('unit_price', $unitPrice)
                                     ->first();
-
-                                // If not found, try to find an existing old item (where accurate_detail_id is null) 
-                                // that matches item_no and unit_price
-                                if (!$poItem) {
-                                    $poItem = PurchaseOrderItem::where('purchase_order_id', $po->id)
-                                        ->whereNull('accurate_detail_id')
-                                        ->where('item_no', $itemNo)
-                                        ->where('unit_price', $unitPrice)
-                                        ->first();
-                                }
-
-                                if ($poItem) {
-                                    // Update existing
-                                    $poItem->update([
-                                        'accurate_detail_id' => $detailId,
-                                        'item_no' => $itemNo,
-                                        'unit_price' => $unitPrice,
-                                        'item_name' => $itemName,
-                                        'quantity_ordered' => $quantity,
-                                    ]);
-                                } else {
-                                    // Create new
-                                    $poItem = PurchaseOrderItem::create([
-                                        'purchase_order_id' => $po->id,
-                                        'accurate_detail_id' => $detailId,
-                                        'item_no' => $itemNo,
-                                        'unit_price' => $unitPrice,
-                                        'item_name' => $itemName,
-                                        'quantity_ordered' => $quantity,
-                                    ]);
-                                }
-                            } else {
-                                // Fallback for older Accurate structures without detail ID
-                                $poItem = PurchaseOrderItem::updateOrCreate(
-                                    [
-                                        'purchase_order_id' => $po->id,
-                                        'item_no' => $itemNo,
-                                        'unit_price' => $unitPrice,
-                                    ],
-                                    [
-                                        'item_name' => $itemName,
-                                        'quantity_ordered' => $quantity,
-                                    ]
-                                );
                             }
-                            $existingItemIds[] = $poItem->id;
-                        }
 
-                        // Delete items that are no longer in PO
-                        PurchaseOrderItem::where('purchase_order_id', $po->id)
-                            ->whereNotIn('id', $existingItemIds)
-                            ->delete();
+                            if ($poItem) {
+                                // Update existing
+                                $poItem->update([
+                                    'accurate_detail_id' => $detailId,
+                                    'item_no' => $itemNo,
+                                    'unit_price' => $unitPrice,
+                                    'item_name' => $itemName,
+                                    'quantity_ordered' => $quantity,
+                                ]);
+                            } else {
+                                // Create new
+                                $poItem = PurchaseOrderItem::create([
+                                    'purchase_order_id' => $po->id,
+                                    'accurate_detail_id' => $detailId,
+                                    'item_no' => $itemNo,
+                                    'unit_price' => $unitPrice,
+                                    'item_name' => $itemName,
+                                    'quantity_ordered' => $quantity,
+                                ]);
+                            }
+                        } else {
+                            // Fallback for older Accurate structures without detail ID
+                            $poItem = PurchaseOrderItem::updateOrCreate(
+                                [
+                                    'purchase_order_id' => $po->id,
+                                    'item_no' => $itemNo,
+                                    'unit_price' => $unitPrice,
+                                ],
+                                [
+                                    'item_name' => $itemName,
+                                    'quantity_ordered' => $quantity,
+                                ]
+                            );
+                        }
+                        $existingItemIds[] = $poItem->id;
+                    }
+
+                    // 6. Delete items yang sudah tidak ada di PO (hanya jika belum ada riwayat inspeksi scan)
+                    $itemsToDelete = PurchaseOrderItem::where('purchase_order_id', $po->id)
+                        ->whereNotIn('id', $existingItemIds)
+                        ->get();
+
+                    foreach ($itemsToDelete as $itemDel) {
+                        $hasInsp = \App\Models\DeviceInspection::where('inspectable_id', $itemDel->id)
+                            ->where('inspectable_type', PurchaseOrderItem::class)
+                            ->exists();
+                        if (!$hasInsp) {
+                            $itemDel->delete();
+                        }
                     }
 
                     $count++;

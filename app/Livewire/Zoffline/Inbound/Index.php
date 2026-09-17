@@ -36,6 +36,7 @@ class Index extends Component
         $buCode = $bu ? $bu->code : 'syihab';
         $query = PurchaseOrder::with(['vendor', 'items'])
             ->where('database_source', $buCode)
+            ->whereHas('items')
             ->orderBy('id', 'desc');
 
         if ($this->search) {
