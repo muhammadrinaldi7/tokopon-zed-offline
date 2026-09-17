@@ -756,7 +756,27 @@ class SellPhone extends Component
 
     public function updatedSelectedRules()
     {
-        // dd($this->selected_rules);
+        $this->calculatePrice();
+    }
+
+    public function toggleRule(string $ruleKey, string $category, bool $isMultiple): void
+    {
+        if ($isMultiple) {
+            // Multi-select (Checkbox): jika sudah dipilih, hapus (unselect). Jika belum, pilih.
+            if (!empty($this->selected_rules[$ruleKey])) {
+                unset($this->selected_rules[$ruleKey]);
+            } else {
+                $this->selected_rules[$ruleKey] = true;
+            }
+        } else {
+            // Single-select (Radio): jika opsi yang sama diklik lagi, unselect. Jika opsi lain, pindah pilihan.
+            if (($this->selected_rules[$category] ?? null) === $ruleKey) {
+                unset($this->selected_rules[$category]);
+            } else {
+                $this->selected_rules[$category] = $ruleKey;
+            }
+        }
+
         $this->calculatePrice();
     }
 
@@ -768,7 +788,6 @@ class SellPhone extends Component
 
     public function calculatePrice()
     {
-
         $price = $this->base_price;
 
         // Convert flat rules array to key-based collection for easy lookup
@@ -779,7 +798,7 @@ class SellPhone extends Component
             if (is_bool($value) && $value) {
                 // Checkbox checked
                 $ruleId = $key;
-            } elseif (is_string($value) && !empty($value)) {
+            } elseif (is_string($value) && !empty($value) && $value !== 'false' && $value !== '0') {
                 // Radio button selected
                 $ruleId = $value;
             }
@@ -796,13 +815,7 @@ class SellPhone extends Component
                         ? $val
                         : ($this->base_price * ($val / 100));
 
-                    // CEK DISINI: Jika key mengandung kata 'kelengkapan', maka ditambah (+)
-                    // Selain itu (seperti layar/fisik), maka dikurangi (-)
-                    // if (str_contains($ruleId, 'kelengkapan')) {
-                    //     $price += $adjustment;
-                    // } else {
                     $price -= $adjustment;
-                    // }
                 }
             }
         }
@@ -1178,7 +1191,7 @@ class SellPhone extends Component
                 // Logika pembacaan nilai dari checkbox (boolean) atau radio (string)
                 if (is_bool($value) && $value) {
                     $ruleId = $key;
-                } elseif (is_string($value) && !empty($value)) {
+                } elseif (is_string($value) && !empty($value) && $value !== 'false' && $value !== '0') {
                     $ruleId = $value;
                 }
 

@@ -918,34 +918,33 @@
                     @endphp
 
                     @foreach ($groupedRules as $category => $rules)
-                        <div class="space-y-3 mb-8">
+                        <div class="space-y-3 mb-8" wire:key="rule-cat-{{ \Illuminate\Support\Str::slug($category) }}">
                             <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">
                                 {{ $category }}
                             </h1>
 
                             <div class="flex flex-wrap gap-3">
                                 @foreach ($rules as $rule)
-                                    <label class="cursor-pointer block group">
-                                        @if ($rule['is_multiple'])
-                                            <input type="checkbox"
-                                                wire:model.live.debounce.300ms="selected_rules.{{ $rule['key'] }}"
-                                                class="hidden">
-                                        @else
-                                            <input type="radio" name="{{ $category }}"
-                                                value="{{ $rule['key'] }}"
-                                                wire:model.live.debounce.300ms="selected_rules.{{ $category }}"
-                                                class="hidden">
+                                    @php
+                                        $isSelected = $rule['is_multiple']
+                                            ? !empty($selected_rules[$rule['key']])
+                                            : (($selected_rules[$category] ?? '') === $rule['key']);
+                                    @endphp
+                                    <button type="button"
+                                        wire:key="rule-btn-{{ $rule['key'] }}"
+                                        wire:click="toggleRule('{{ $rule['key'] }}', '{{ $category }}', {{ $rule['is_multiple'] ? 'true' : 'false' }})"
+                                        class="py-2.5 px-4 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none text-sm font-bold border-2
+                                        {{ $isSelected
+                                            ? 'border-[#D3AD7B] bg-[#D3AD7B]/15 text-[#A28153] shadow-xs ring-2 ring-[#D3AD7B]/20'
+                                            : 'border-transparent bg-white text-neutral-600 shadow-xs hover:border-[#D3AD7B]/40 hover:bg-neutral-50' }}">
+                                        
+                                        @if ($isSelected)
+                                            <svg class="w-4 h-4 mr-1.5 text-[#A28153] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+                                            </svg>
                                         @endif
-
-                                        <div
-                                            class="py-2.5 px-4 bg-white shadow-sm border-2 border-transparent rounded-xl flex flex-col items-center justify-center transition-all group-has-[:checked]:border-[#D3AD7B] group-has-[:checked]:bg-[#D3AD7B]/10 hover:border-[#D3AD7B]/50">
-
-                                            <span
-                                                class="text-sm font-bold text-neutral-600 group-has-[:checked]:text-[#A28153] transition-colors">
-                                                {{ $rule['name'] }}
-                                            </span>
-                                        </div>
-                                    </label>
+                                        <span>{{ $rule['name'] }}</span>
+                                    </button>
                                 @endforeach
                             </div>
 
