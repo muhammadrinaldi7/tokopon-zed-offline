@@ -1818,21 +1818,16 @@ class AccurateService
         return null;
     }
 
-    public function getPurchaseInvoiceDetail($id, $databaseSource = 'syihab')
+    public function getPurchaseInvoiceDetail($idOrNumber, $databaseSource = 'syihab')
     {
-        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+        $config = $this->getHeaders($databaseSource);
 
-        $timestamp = now()->toIso8601String();
-        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+        $param = is_numeric($idOrNumber) ? ['id' => $idOrNumber] : ['number' => $idOrNumber];
 
-        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
-            'Authorization'   => 'Bearer ' . $token,
-            'X-Api-Timestamp' => $timestamp,
-            'X-Api-Signature' => $signature,
-            'Content-Type'    => 'application/json',
-        ])->get($host . '/purchase-invoice/detail.do', [
-            'id' => $id,
-        ]);
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->get($config['host'] . '/purchase-invoice/detail.do', $param);
+
+        Log::info("API Accurate Get Purchase Invoice Detail ({$databaseSource}): " . $response->body());
 
         if ($response->successful()) {
             $data = $response->json();
@@ -2301,6 +2296,141 @@ class AccurateService
             Log::error("API Accurate Delete SO Error ({$databaseSource}): " . $response->body());
             throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
         }
+    }
+
+    /**
+     * Delete Purchase Payment in Accurate
+     * 
+     * @param int|string $id
+     * @param string $databaseSource
+     * @return array|bool
+     * @throws \Exception
+     */
+    public function deletePurchasePayment($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $payload = is_numeric($id) ? ['id' => $id] : ['number' => $id];
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->post($config['host'] . '/purchase-payment/delete.do', $payload);
+
+        Log::info("API Accurate Delete Purchase Payment ({$databaseSource}) Payload: " . json_encode($payload) . " Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete PP: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete PP Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
+     * Delete Purchase Invoice in Accurate
+     * 
+     * @param int|string $id
+     * @param string $databaseSource
+     * @return array|bool
+     * @throws \Exception
+     */
+    public function deletePurchaseInvoice($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $payload = is_numeric($id) ? ['id' => $id] : ['number' => $id];
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->post($config['host'] . '/purchase-invoice/delete.do', $payload);
+
+        Log::info("API Accurate Delete Purchase Invoice ({$databaseSource}) Payload: " . json_encode($payload) . " Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete PI: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete PI Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
+     * Rollback Purchase documents in Accurate (Delete Purchase Payment, then Delete Purchase Invoice).
+     * 
+     * @param \App\Models\SellPhone $sellPhone
+     * @return array
+     */
+    public function rollbackPurchaseDocuments(\App\Models\SellPhone $sellPhone)
+    {
+        $dbSource = $sellPhone->businessUnit ? strtolower($sellPhone->businessUnit->code) : 'gsk';
+        $invoiceNumber = $sellPhone->invoice_number;
+
+        if (!$invoiceNumber) {
+            return [
+                'success' => true,
+                'message' => 'Tidak ada nomor faktur Accurate yang terhubung.',
+                'deleted_docs' => [],
+            ];
+        }
+
+        $detail = $this->getPurchaseInvoiceDetail($invoiceNumber, $dbSource);
+        if (!$detail) {
+            Log::warning("Rollback Purchase: Faktur {$invoiceNumber} tidak ditemukan di Accurate atau sudah dihapus.");
+            return [
+                'success' => true,
+                'message' => "Faktur {$invoiceNumber} tidak ditemukan di Accurate.",
+                'deleted_docs' => [],
+            ];
+        }
+
+        $invoiceId = $detail['id'] ?? null;
+        $deletedDocs = [];
+
+        // 1. Hapus Purchase Payment yang terhubung jika ada
+        $paymentList = $detail['purchasePaymentList'] ?? ($detail['paymentList'] ?? ($detail['detailPayment'] ?? []));
+        if (!empty($paymentList)) {
+            foreach ($paymentList as $pmt) {
+                $paymentId = $pmt['id'] ?? ($pmt['purchasePaymentId'] ?? null);
+                $paymentNo = $pmt['number'] ?? ($pmt['purchasePaymentNo'] ?? null);
+                if ($paymentId || $paymentNo) {
+                    try {
+                        $this->deletePurchasePayment($paymentId ?: $paymentNo, $dbSource);
+                        $deletedDocs[] = ['type' => 'PURCHASE_PAYMENT', 'id' => $paymentId, 'number' => $paymentNo];
+                    } catch (\Exception $e) {
+                        Log::warning("Gagal hapus Purchase Payment ({$paymentNo}/{$paymentId}): " . $e->getMessage());
+                        if (!str_contains($e->getMessage(), 'tidak ditemukan atau sudah dihapus')) {
+                            throw $e;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Hapus Purchase Invoice
+        if ($invoiceId || $invoiceNumber) {
+            try {
+                $this->deletePurchaseInvoice($invoiceId ?: $invoiceNumber, $dbSource);
+                $deletedDocs[] = ['type' => 'PURCHASE_INVOICE', 'id' => $invoiceId, 'number' => $invoiceNumber];
+            } catch (\Exception $e) {
+                Log::warning("Gagal hapus Purchase Invoice ({$invoiceNumber}/{$invoiceId}): " . $e->getMessage());
+                if (!str_contains($e->getMessage(), 'tidak ditemukan atau sudah dihapus')) {
+                    throw $e;
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'deleted_docs' => $deletedDocs,
+        ];
     }
 
     /**

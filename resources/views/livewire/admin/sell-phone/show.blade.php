@@ -17,7 +17,29 @@
                 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-700 tracking-tight mt-1">
                 Detail Pembelian #SPL-{{ $sellPhone->id }}</h1>
         </div>
-        <div>
+        <div class="flex flex-wrap items-center gap-3">
+            @if (in_array($sellPhone->status, ['COMPLETED', 'PAYING']))
+                {{-- Tombol Koreksi SKU --}}
+                <button type="button" wire:click="openCorrectionModal"
+                    class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-sm font-bold transition flex items-center gap-2 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    Koreksi SKU / Model
+                </button>
+
+                {{-- Tombol Batal / Reset Transaksi --}}
+                <button type="button" wire:click="openCancelModal('RESET_TO_DRAFT')"
+                    class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-sm font-bold transition flex items-center gap-2 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Batal / Reset Pembelian
+                </button>
+            @endif
+
             @php
                 $statusColors = [
                     'PENDING' => 'bg-amber-100 text-amber-800',
@@ -48,9 +70,18 @@
                 <h3 class="font-bold text-lg text-gray-900 border-b border-gray-100 pb-3 mb-4">Informasi Perangkat</h3>
                 <div class="grid grid-cols-1 gap-4">
                     <div>
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Merek & Model</p>
-                        <p class="font-medium text-gray-900">{{ $sellPhone->phone_brand }} {{ $sellPhone->phone_model }}
-                        </p>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Merek & Model Terdaftar</p>
+                        <div class="flex flex-wrap items-center gap-2 mt-1">
+                            <p class="font-bold text-gray-900 text-base">{{ $sellPhone->phone_brand }} {{ $sellPhone->phone_model }}</p>
+                            @php
+                                $itemNo = $sellPhone->productAccurate?->item_no ?? ($sellPhone->buybackDevice?->productAccurate?->item_no ?? null);
+                            @endphp
+                            @if ($itemNo)
+                                <span class="px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-xs font-mono font-bold">
+                                    SKU: {{ $itemNo }}
+                                </span>
+                            @endif
+                        </div>
                     </div>
                     {{-- <div>
                         <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">Kapasitas</p>
@@ -576,6 +607,88 @@
                     </div>
                 @endif
             </div>
+
+            {{-- Riwayat Koreksi & Log Audit --}}
+            @if ($sellPhone->resetLogs->isNotEmpty())
+                <div class="bg-white/70 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <h3 class="font-bold text-base text-slate-900">Riwayat Koreksi & Audit Log</h3>
+                        </div>
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            {{ $sellPhone->resetLogs->count() }} Aktivitas
+                        </span>
+                    </div>
+
+                    <div class="space-y-3">
+                        @foreach ($sellPhone->resetLogs as $log)
+                            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 relative">
+                                <div class="flex items-start justify-between gap-2 mb-2">
+                                    <div class="flex items-center gap-2">
+                                        @if ($log->action_type === 'CORRECTION_SKU')
+                                            <span class="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                                Koreksi SKU
+                                            </span>
+                                        @elseif ($log->action_type === 'RESET_TO_DRAFT')
+                                            <span class="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                                Reset ke Draft
+                                            </span>
+                                        @else
+                                            <span class="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                                Dibatalkan (Cancel)
+                                            </span>
+                                        @endif
+                                        <span class="text-xs text-slate-500 font-medium">
+                                            oleh <b class="text-slate-800">{{ $log->resetBy->name ?? 'Admin' }}</b>
+                                        </span>
+                                    </div>
+                                    <span class="text-[11px] font-medium text-slate-400">
+                                        {{ $log->created_at->format('d M Y, H:i') }}
+                                    </span>
+                                </div>
+
+                                @if ($log->action_type === 'CORRECTION_SKU')
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 my-2 text-xs">
+                                        <div class="p-2 rounded bg-rose-50 border border-rose-100 text-rose-900">
+                                            <span class="text-[10px] font-bold text-rose-500 uppercase block">SKU / Model Lama:</span>
+                                            <span class="font-semibold">{{ $log->previous_phone_model }}</span>
+                                            @if ($log->previous_item_no)
+                                                <span class="block text-[11px] font-mono text-rose-700 font-bold">({{ $log->previous_item_no }})</span>
+                                            @endif
+                                        </div>
+                                        <div class="p-2 rounded bg-emerald-50 border border-emerald-100 text-emerald-900">
+                                            <span class="text-[10px] font-bold text-emerald-500 uppercase block">SKU / Model Baru:</span>
+                                            <span class="font-semibold">{{ $log->new_phone_model }}</span>
+                                            @if ($log->new_item_no)
+                                                <span class="block text-[11px] font-mono text-emerald-700 font-bold">({{ $log->new_item_no }})</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
+
+                                @if ($log->previous_invoice_number)
+                                    <div class="text-[11px] text-slate-600 bg-white p-2 rounded border border-slate-200 my-1">
+                                        <span class="text-slate-400">No. Faktur Sebelumnya:</span> <span class="font-mono font-bold text-slate-800">{{ $log->previous_invoice_number }}</span>
+                                        @if ($log->new_invoice_number && $log->new_invoice_number !== $log->previous_invoice_number)
+                                            <span class="text-slate-400 ml-2">&rarr; Baru:</span> <span class="font-mono font-bold text-emerald-700">{{ $log->new_invoice_number }}</span>
+                                        @endif
+                                    </div>
+                                @endif
+
+                                <div class="text-xs text-slate-700 font-medium mt-1">
+                                    <span class="text-slate-400 font-bold">Alasan:</span> {{ $log->reason }}
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
 
         {{-- Kolom Kanan: Aksi --}}
@@ -1030,6 +1143,236 @@
                         Ya, Tetap Lanjutkan
                     </button>
                 </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal Koreksi SKU / Model --}}
+    @if ($showCorrectionModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 animate-in zoom-in duration-200 border border-slate-100">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg text-slate-900">Koreksi SKU / Model Produk</h3>
+                            <p class="text-xs text-slate-500 font-medium">Ubah master produk unit pembelian & sinkronkan ulang ke Accurate</p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="closeCorrectionModal" class="text-slate-400 hover:text-slate-600">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Status Saat Ini --}}
+                <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl mb-4 text-xs">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-slate-400 font-bold uppercase">Data Saat Ini</span>
+                        <span class="font-mono font-bold text-slate-700">IMEI: {{ $sellPhone->imei ?? '-' }}</span>
+                    </div>
+                    <div class="font-bold text-slate-800 text-sm">{{ $sellPhone->phone_brand }} {{ $sellPhone->phone_model }}</div>
+                    @if ($sellPhone->invoice_number)
+                        <div class="text-slate-500 mt-1">Faktur Accurate: <span class="font-mono font-bold text-slate-700">{{ $sellPhone->invoice_number }}</span></div>
+                    @endif
+                </div>
+
+                <form wire:submit="executeSkuCorrection" class="space-y-4">
+                    {{-- Pencarian Master Produk Target --}}
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Cari Master Produk yang Benar (SKU Baru) <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <input type="text" wire:model.live.debounce.300ms="searchProductQuery"
+                                placeholder="Ketik nama produk atau kode SKU (misal: iPhone 11 64GB)..."
+                                class="w-full text-sm border-slate-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 bg-white pl-9 py-2.5">
+                            <div class="absolute left-3 top-3 text-slate-400">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        {{-- Dropdown Hasil Pencarian --}}
+                        @if (strlen($searchProductQuery) >= 2 && empty($targetProductAccurateId))
+                            <div class="mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto z-20 divide-y divide-slate-100">
+                                @forelse ($this->productSearchResults as $pa)
+                                    <button type="button" wire:click="selectTargetProduct({{ $pa->id }})"
+                                        class="w-full text-left p-2.5 hover:bg-indigo-50/70 transition flex items-center justify-between text-xs">
+                                        <div>
+                                            <div class="font-bold text-slate-900">{{ $pa->name }}</div>
+                                            <div class="font-mono text-[11px] text-slate-500">{{ $pa->item_no }} &bull; {{ $pa->brandName ?? '-' }}</div>
+                                        </div>
+                                        <span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-md font-bold text-[10px]">Pilih</span>
+                                    </button>
+                                @empty
+                                    <div class="p-3 text-center text-xs text-slate-400 font-medium">
+                                        Tidak ada produk master Accurate yang cocok.
+                                    </div>
+                                @endforelse
+                            </div>
+                        @endif
+
+                        @error('targetProductAccurateId')
+                            <span class="text-xs text-rose-500 mt-1 block font-medium">{{ $message }}</span>
+                        @enderror
+                    </div>
+
+                    {{-- Preview Produk yang Dipilih --}}
+                    @if ($this->targetProductAccurate)
+                        <div class="p-3.5 bg-indigo-50/60 border border-indigo-200 rounded-xl text-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-indigo-700 font-bold uppercase text-[10px]">Produk Target Terpilih</span>
+                                <button type="button" wire:click="$set('targetProductAccurateId', null); $set('searchProductQuery', '')" class="text-rose-500 hover:underline text-[11px] font-bold">Ganti</button>
+                            </div>
+                            <div class="font-bold text-slate-900 text-sm mt-0.5">{{ $this->targetProductAccurate->name }}</div>
+                            <div class="font-mono text-xs text-indigo-800 mt-0.5">SKU: {{ $this->targetProductAccurate->item_no }}</div>
+                        </div>
+                    @endif
+
+                    {{-- Alasan Koreksi --}}
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Alasan Koreksi <span class="text-rose-500">*</span>
+                        </label>
+                        <textarea wire:model="correctionReason" rows="2"
+                            placeholder="Contoh: FL salah pilih kapasitas storage, unit fisik adalah 64GB bukan 128GB."
+                            class="w-full text-xs border-slate-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 bg-white p-2.5"></textarea>
+                        @error('correctionReason')
+                            <span class="text-xs text-rose-500 mt-1 block font-medium">{{ $message }}</span>
+                        @enderror
+                    </div>
+
+                    {{-- Opsi Sinkronisasi Accurate --}}
+                    @if ($sellPhone->invoice_number)
+                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5">
+                            <input type="checkbox" id="syncAccurateCheckbox" wire:model="syncAccurateOnCorrection"
+                                class="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 border-amber-300">
+                            <label for="syncAccurateCheckbox" class="text-xs text-amber-900 font-medium cursor-pointer">
+                                <b>Otomatis Perbarui di Accurate Online</b><br>
+                                Sistem akan membatalkan pembayaran lama, memperbarui faktur ke SKU baru, dan membayar ulang secara otomatis.
+                            </label>
+                        </div>
+                    @endif
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button type="button" wire:click="closeCorrectionModal"
+                            class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200 transition">
+                            Batal
+                        </button>
+                        <button type="submit"
+                            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs transition flex items-center gap-2 shadow-sm">
+                            <svg wire:loading wire:target="executeSkuCorrection" class="animate-spin h-3.5 w-3.5"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Terapkan Koreksi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal Batal / Reset Transaksi Pembelian --}}
+    @if ($showCancelModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in zoom-in duration-200 border border-slate-100">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-900">Batal / Reset Transaksi Pembelian</h3>
+                        <p class="text-xs text-slate-500 font-medium">Batalkan dokumen Accurate, tarik kembali Serial Number, dan reset status</p>
+                    </div>
+                </div>
+
+                <form wire:submit="executeCancelOrReset" class="space-y-4">
+                    {{-- Tipe Aksi --}}
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                            Pilih Jenis Tindakan
+                        </label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <label class="p-3 rounded-xl border cursor-pointer flex flex-col justify-between {{ $cancelActionType === 'RESET_TO_DRAFT' ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/30' : 'bg-slate-50 border-slate-200' }}">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <input type="radio" wire:model.live="cancelActionType" value="RESET_TO_DRAFT" class="text-amber-600 focus:ring-amber-500">
+                                    <span class="font-bold text-slate-900">Reset ke Draft (PAYING)</span>
+                                </div>
+                                <span class="text-[11px] text-slate-500">Kembalikan ke status belum lunas agar bisa disubmit ulang.</span>
+                            </label>
+
+                            <label class="p-3 rounded-xl border cursor-pointer flex flex-col justify-between {{ $cancelActionType === 'CANCELLED' ? 'bg-rose-50/70 border-rose-300 ring-2 ring-rose-400/30' : 'bg-slate-50 border-slate-200' }}">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <input type="radio" wire:model.live="cancelActionType" value="CANCELLED" class="text-rose-600 focus:ring-rose-500">
+                                    <span class="font-bold text-slate-900">Batalkan Total (CANCELLED)</span>
+                                </div>
+                                <span class="text-[11px] text-slate-500">Batalkan transaksi secara permanen.</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {{-- Warning Box --}}
+                    <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-1">
+                        <div class="font-bold flex items-center gap-1.5 text-rose-900">
+                            <svg class="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            Peringatan Rollback:
+                        </div>
+                        <ul class="list-disc list-inside space-y-0.5 text-[11px] text-rose-700">
+                            @if ($sellPhone->invoice_number)
+                                <li>Pembayaran Pembelian & Faktur Pembelian (<b>{{ $sellPhone->invoice_number }}</b>) di Accurate akan otomatis dihapus via API.</li>
+                            @endif
+                            <li>Serial Number (IMEI: <b>{{ $sellPhone->imei }}</b>) dan Stok Gudang akan ditarik/dikurangi.</li>
+                        </ul>
+                    </div>
+
+                    {{-- Alasan Pembatalan --}}
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                            Alasan Pembatalan / Reset <span class="text-rose-500">*</span>
+                        </label>
+                        <textarea wire:model="cancelReason" rows="3"
+                            placeholder="Misal: Kesalahan input fatal dari FL, atau transaksi buyback dibatalkan oleh customer..."
+                            class="w-full text-xs border-slate-200 rounded-xl focus:ring-rose-500 focus:border-rose-500 bg-white p-2.5"></textarea>
+                        @error('cancelReason')
+                            <span class="text-xs text-rose-500 mt-1 block font-medium">{{ $message }}</span>
+                        @enderror
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button type="button" wire:click="closeCancelModal"
+                            class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200 transition">
+                            Batal
+                        </button>
+                        <button type="submit"
+                            class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs transition flex items-center gap-2 shadow-sm">
+                            <svg wire:loading wire:target="executeCancelOrReset" class="animate-spin h-3.5 w-3.5"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Konfirmasi Eksekusi
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     @endif

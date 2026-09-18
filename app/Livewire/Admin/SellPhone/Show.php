@@ -64,9 +64,21 @@ class Show extends Component
     public $forceProcessQc = false;
     public $latestQcVerdict = '';
 
+    // SKU Correction Modal
+    public bool $showCorrectionModal = false;
+    public ?int $targetProductAccurateId = null;
+    public string $searchProductQuery = '';
+    public string $correctionReason = '';
+    public bool $syncAccurateOnCorrection = true;
+
+    // Cancel / Reset Modal
+    public bool $showCancelModal = false;
+    public string $cancelActionType = 'RESET_TO_DRAFT'; // 'RESET_TO_DRAFT' | 'CANCELLED'
+    public string $cancelReason = '';
+
     public function mount(SellPhone $sellPhone)
     {
-        $this->sellPhone = $sellPhone->load(['user.bankAccounts', 'user.profile', 'buybackDevice.tier', 'businessUnit', 'issues.user']);
+        $this->sellPhone = $sellPhone->load(['user.bankAccounts', 'user.profile', 'buybackDevice.tier', 'businessUnit', 'issues.user', 'resetLogs.resetBy', 'productAccurate']);
         $this->appraisedValue = $this->sellPhone->appraised_value ?? 0;
         $this->qcPassed = $this->sellPhone->hasPassedQc();
 
@@ -559,8 +571,386 @@ class Show extends Component
         $this->dispatch('toast', title: 'Berhasil', message: $msg, type: 'success');
     }
 
-    // convertToProduct telah dihapus karena manajemen inventaris kini terpusat pada Accurate
-    // dan ditarik melalui fitur Sinkronisasi Master Data ProductAccurate
+    #[Computed]
+    public function productSearchResults()
+    {
+        if (strlen($this->searchProductQuery) < 2) {
+            return [];
+        }
+
+        $buId = $this->sellPhone->business_unit_id ?? 2;
+
+        return \App\Models\ProductAccurate::where('business_unit_id', $buId)
+            ->where(function ($q) {
+                $q->where('name', 'like', '%' . $this->searchProductQuery . '%')
+                  ->orWhere('item_no', 'like', '%' . $this->searchProductQuery . '%');
+            })
+            ->take(15)
+            ->get();
+    }
+
+    #[Computed]
+    public function targetProductAccurate()
+    {
+        if (!$this->targetProductAccurateId) return null;
+        return \App\Models\ProductAccurate::find($this->targetProductAccurateId);
+    }
+
+    public function selectTargetProduct($id)
+    {
+        $this->targetProductAccurateId = (int) $id;
+        $pa = \App\Models\ProductAccurate::find($id);
+        if ($pa) {
+            $this->searchProductQuery = $pa->name . ' (' . $pa->item_no . ')';
+        }
+    }
+
+    public function openCorrectionModal()
+    {
+        $this->showCorrectionModal = true;
+        $this->targetProductAccurateId = null;
+        $this->searchProductQuery = '';
+        $this->correctionReason = '';
+        $this->syncAccurateOnCorrection = true;
+    }
+
+    public function closeCorrectionModal()
+    {
+        $this->showCorrectionModal = false;
+        $this->targetProductAccurateId = null;
+        $this->searchProductQuery = '';
+        $this->correctionReason = '';
+    }
+
+    public function executeSkuCorrection()
+    {
+        if (!Auth::user()->can('manage-sell-phone') && !Auth::user()->can('manage-trade-in') && !Auth::user()->hasRole(['Admin', 'Super Admin'])) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki izin mengoreksi SKU pembelian.', type: 'error');
+            return;
+        }
+
+        $this->validate([
+            'targetProductAccurateId' => 'required|exists:product_accurates,id',
+            'correctionReason' => 'required|string|min:5',
+        ], [
+            'targetProductAccurateId.required' => 'Silakan cari dan pilih master produk target (SKU Baru).',
+            'targetProductAccurateId.exists' => 'Produk target tidak valid.',
+            'correctionReason.required' => 'Alasan koreksi wajib diisi.',
+            'correctionReason.min' => 'Alasan koreksi minimal 5 karakter.',
+        ]);
+
+        $newPa = \App\Models\ProductAccurate::find($this->targetProductAccurateId);
+        if (!$newPa) {
+            $this->dispatch('toast', title: 'Error', message: 'Master produk tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        // Cek status SN di ProductSerialNumber
+        if (!empty($this->sellPhone->imei)) {
+            $snRecord = \App\Models\ProductSerialNumber::where('serial_number', $this->sellPhone->imei)
+                ->where('business_unit_id', $this->sellPhone->business_unit_id)
+                ->first();
+
+            if ($snRecord && $snRecord->status !== 'Available') {
+                $this->dispatch('toast', title: 'Tidak Dapat Dikoreksi', message: "Unit dengan SN/IMEI {$this->sellPhone->imei} sudah berstatus '{$snRecord->status}' (kemungkinan sudah terjual di POS).", type: 'error');
+                return;
+            }
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $previousModel = $this->sellPhone->phone_model;
+            $previousItemNo = $this->sellPhone->buybackDevice?->productAccurate?->item_no ?? $this->sellPhone->productAccurate?->item_no;
+            $previousPaId = $this->sellPhone->product_accurate_id;
+            $previousInvoiceNo = $this->sellPhone->invoice_number;
+            $previousAppraisedValue = $this->sellPhone->appraised_value;
+            $dbSource = $this->sellPhone->businessUnit ? strtolower($this->sellPhone->businessUnit->code) : 'gsk';
+            $accurateService = app(AccurateService::class);
+
+            $accurateDocsSnapshot = [];
+            $paymentsSnapshot = [
+                'bank_no' => $this->sellPhone->store_bank_no,
+                'receipt_path' => $this->sellPhone->payment_receipt_path,
+                'amount' => $this->sellPhone->appraised_value,
+            ];
+
+            // 1. Rollback & Re-create di Accurate jika ada nomor faktur dan sync aktif
+            $newInvoiceNumber = $previousInvoiceNo;
+            if ($this->syncAccurateOnCorrection && $previousInvoiceNo) {
+                // Rollback dokumen lama di Accurate (Hapus Pembayaran & Faktur Lama)
+                $rollbackResult = $accurateService->rollbackPurchaseDocuments($this->sellPhone);
+                $accurateDocsSnapshot = $rollbackResult['deleted_docs'] ?? [];
+
+                // Susun ulang Purchase Invoice untuk SKU baru
+                $flUser = $this->sellPhone->handledBy;
+                $accurateBranchName = $flUser && $flUser->branch ? $flUser->branch->name : 'Banjarbaru';
+                $accurateWarehouseName = $flUser && $flUser->warehouse ? $flUser->warehouse->name : 'Head Office';
+
+                $namaProyek = trim(strtoupper($newPa->proyek ?? ''));
+                $projectNo = \App\Models\BusinessUnitProject::getProjectNoByBusinessUnit(
+                    $this->sellPhone->business_unit_id,
+                    $namaProyek,
+                    $namaProyek ?: null
+                );
+
+                $itemDetail = [
+                    'itemNo' => $newPa->item_no,
+                    'warehouseName' => $accurateWarehouseName,
+                    'unitPrice' => (int) $this->sellPhone->appraised_value,
+                    'quantity' => 1,
+                    'useTax1' => false,
+                    'detailSerialNumber' => [
+                        [
+                            'serialNumberNo' => $this->sellPhone->imei ?? 'NO-IMEI-' . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT),
+                            'quantity' => 1
+                        ]
+                    ]
+                ];
+
+                if ($projectNo) {
+                    $itemDetail['projectNo'] = $projectNo;
+                }
+
+                $customerUser = $this->sellPhone->user;
+                $vendorNoBaru = $customerUser ? ($customerUser->getAccurateVendorNo($dbSource) ?? 'V-CASH') : 'V-CASH';
+                $billNumber = 'TPD-' . date('dmY') . str_pad($this->sellPhone->id, 4, '0', STR_PAD_LEFT);
+
+                $piPayload = [
+                    'billNumber' => $billNumber,
+                    'vendorNo' => str_replace('"', '', $vendorNoBaru),
+                    'branchName' => $accurateBranchName,
+                    'inclusiveTax' => false,
+                    'transDate' => date('d/m/Y'),
+                    'currencyCode' => 'IDR',
+                    'description' => 'Pembelian HP (Koreksi SKU) - NIK:' . ($customerUser?->identity ?? '-'),
+                    'detailItem' => [$itemDetail],
+                ];
+
+                $accurateResponse = $accurateService->postPurchaseInvoice($piPayload, $dbSource);
+                if (isset($accurateResponse['r']['number'])) {
+                    $newInvoiceNumber = $accurateResponse['r']['number'];
+                }
+
+                // Buat ulang Pembayaran Pembelian
+                if ($this->sellPhone->store_bank_no) {
+                    $paymentData = [
+                        'bankNo' => $this->sellPhone->store_bank_no,
+                        'vendorNo' => str_replace('"', '', $vendorNoBaru),
+                        'paymentDate' => date('d/m/Y'),
+                        'chequeAmount' => (int) $this->sellPhone->appraised_value,
+                        'branchName' => $accurateBranchName,
+                        'charField1' => $namaProyek ?: 'UMUM',
+                        'detailInvoice' => [
+                            [
+                                'invoiceNo' => $newInvoiceNumber,
+                                'paymentAmount' => (int) $this->sellPhone->appraised_value,
+                            ]
+                        ],
+                    ];
+                    $accurateService->postPurchasePayment($paymentData, $dbSource);
+                }
+            }
+
+            // 2. Update ProductSerialNumber
+            if (!empty($this->sellPhone->imei)) {
+                \App\Models\ProductSerialNumber::where('serial_number', $this->sellPhone->imei)
+                    ->where('business_unit_id', $this->sellPhone->business_unit_id)
+                    ->update([
+                        'item_no' => $newPa->item_no,
+                        'product_accurate_id' => $newPa->id,
+                    ]);
+            }
+
+            // 3. Update WarehouseStock
+            $warehouseId = $this->sellPhone->handledBy?->warehouse_id;
+            if ($warehouseId) {
+                // Kurangi stok lama
+                if ($previousPaId) {
+                    $oldStock = \App\Models\WarehouseStock::where('warehouse_id', $warehouseId)
+                        ->where('variant_id', $previousPaId)
+                        ->where('variant_type', \App\Models\ProductAccurate::class)
+                        ->first();
+                    if ($oldStock && $oldStock->stock > 0) {
+                        $oldStock->decrement('stock', 1);
+                    }
+                }
+
+                // Tambah stok baru
+                $newStock = \App\Models\WarehouseStock::firstOrCreate([
+                    'warehouse_id' => $warehouseId,
+                    'variant_id' => $newPa->id,
+                    'variant_type' => \App\Models\ProductAccurate::class,
+                ], ['stock' => 0]);
+                $newStock->increment('stock', 1);
+            }
+
+            // 4. Update SellPhone
+            $matchingBuybackDevice = \App\Models\BuybackDevice::where('product_accurate_id', $newPa->id)->first();
+            $this->sellPhone->update([
+                'phone_model' => $newPa->name,
+                'product_accurate_id' => $newPa->id,
+                'buyback_device_id' => $matchingBuybackDevice?->id ?? $this->sellPhone->buyback_device_id,
+                'invoice_number' => $newInvoiceNumber,
+            ]);
+
+            // 5. Catat Snapshot ke SellPhoneResetLog
+            \App\Models\SellPhoneResetLog::create([
+                'sell_phone_id' => $this->sellPhone->id,
+                'action_type' => 'CORRECTION_SKU',
+                'reset_by' => Auth::id(),
+                'reason' => $this->correctionReason,
+                'previous_status' => $this->sellPhone->status,
+                'new_status' => $this->sellPhone->status,
+                'previous_phone_model' => $previousModel,
+                'new_phone_model' => $newPa->name,
+                'previous_item_no' => $previousItemNo,
+                'new_item_no' => $newPa->item_no,
+                'previous_product_accurate_id' => $previousPaId,
+                'new_product_accurate_id' => $newPa->id,
+                'previous_appraised_value' => $previousAppraisedValue,
+                'new_appraised_value' => $this->sellPhone->appraised_value,
+                'previous_invoice_number' => $previousInvoiceNo,
+                'new_invoice_number' => $newInvoiceNumber,
+                'previous_accurate_docs_snapshot' => $accurateDocsSnapshot,
+                'previous_payments_snapshot' => $paymentsSnapshot,
+            ]);
+
+            DB::commit();
+
+            $this->closeCorrectionModal();
+            $this->sellPhone->refresh();
+            $this->sellPhone->load(['buybackDevice.tier', 'productAccurate', 'resetLogs.resetBy']);
+
+            $this->dispatch('toast', title: 'Berhasil', message: "SKU berhasil dikoreksi menjadi {$newPa->name} ({$newPa->item_no}). Stok dan Accurate telah disinkronkan.", type: 'success');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Koreksi SKU Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Terjadi kesalahan saat mengoreksi SKU: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    public function openCancelModal($action = 'RESET_TO_DRAFT')
+    {
+        $this->cancelActionType = $action;
+        $this->cancelReason = '';
+        $this->showCancelModal = true;
+    }
+
+    public function closeCancelModal()
+    {
+        $this->showCancelModal = false;
+        $this->cancelReason = '';
+    }
+
+    public function executeCancelOrReset()
+    {
+        if (!Auth::user()->can('manage-sell-phone') && !Auth::user()->can('manage-trade-in') && !Auth::user()->hasRole(['Admin', 'Super Admin'])) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki izin membatalkan atau mereset transaksi.', type: 'error');
+            return;
+        }
+
+        $this->validate([
+            'cancelReason' => 'required|string|min:5',
+        ], [
+            'cancelReason.required' => 'Alasan wajib diisi.',
+            'cancelReason.min' => 'Alasan minimal 5 karakter.',
+        ]);
+
+        // Cek status SN
+        if (!empty($this->sellPhone->imei)) {
+            $snRecord = \App\Models\ProductSerialNumber::where('serial_number', $this->sellPhone->imei)
+                ->where('business_unit_id', $this->sellPhone->business_unit_id)
+                ->first();
+
+            if ($snRecord && $snRecord->status !== 'Available') {
+                $this->dispatch('toast', title: 'Tidak Dapat Dibatalkan', message: "Unit dengan SN/IMEI {$this->sellPhone->imei} sudah berstatus '{$snRecord->status}' (kemungkinan sudah terjual di POS).", type: 'error');
+                return;
+            }
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $accurateService = app(AccurateService::class);
+            $previousInvoiceNo = $this->sellPhone->invoice_number;
+            $previousStatus = $this->sellPhone->status;
+
+            // 1. Rollback Dokumen di Accurate
+            $rollbackResult = $accurateService->rollbackPurchaseDocuments($this->sellPhone);
+            $accurateDocsSnapshot = $rollbackResult['deleted_docs'] ?? [];
+
+            // 2. Hapus / Update ProductSerialNumber
+            if (!empty($this->sellPhone->imei)) {
+                \App\Models\ProductSerialNumber::where('serial_number', $this->sellPhone->imei)
+                    ->where('business_unit_id', $this->sellPhone->business_unit_id)
+                    ->delete();
+            }
+
+            // 3. Kurangi WarehouseStock
+            $warehouseId = $this->sellPhone->handledBy?->warehouse_id;
+            $paId = $this->sellPhone->product_accurate_id;
+            if ($warehouseId && $paId) {
+                $stock = \App\Models\WarehouseStock::where('warehouse_id', $warehouseId)
+                    ->where('variant_id', $paId)
+                    ->where('variant_type', \App\Models\ProductAccurate::class)
+                    ->first();
+                if ($stock && $stock->stock > 0) {
+                    $stock->decrement('stock', 1);
+                }
+            }
+
+            // 4. Update Status SellPhone
+            $newStatus = $this->cancelActionType === 'RESET_TO_DRAFT' ? 'PAYING' : 'CANCELLED';
+            $this->sellPhone->update([
+                'status' => $newStatus,
+                'invoice_number' => null,
+                'reject_reason' => $this->cancelActionType === 'CANCELLED' ? $this->cancelReason : $this->sellPhone->reject_reason,
+            ]);
+
+            // 5. Catat Snapshot ke SellPhoneResetLog
+            \App\Models\SellPhoneResetLog::create([
+                'sell_phone_id' => $this->sellPhone->id,
+                'action_type' => $this->cancelActionType,
+                'reset_by' => Auth::id(),
+                'reason' => $this->cancelReason,
+                'previous_status' => $previousStatus,
+                'new_status' => $newStatus,
+                'previous_phone_model' => $this->sellPhone->phone_model,
+                'new_phone_model' => $this->sellPhone->phone_model,
+                'previous_item_no' => $this->sellPhone->productAccurate?->item_no,
+                'new_item_no' => $this->sellPhone->productAccurate?->item_no,
+                'previous_product_accurate_id' => $this->sellPhone->product_accurate_id,
+                'new_product_accurate_id' => $this->sellPhone->product_accurate_id,
+                'previous_appraised_value' => $this->sellPhone->appraised_value,
+                'new_appraised_value' => $this->sellPhone->appraised_value,
+                'previous_invoice_number' => $previousInvoiceNo,
+                'new_invoice_number' => null,
+                'previous_accurate_docs_snapshot' => $accurateDocsSnapshot,
+                'previous_payments_snapshot' => [
+                    'bank_no' => $this->sellPhone->store_bank_no,
+                    'receipt_path' => $this->sellPhone->payment_receipt_path,
+                    'amount' => $this->sellPhone->appraised_value,
+                ],
+            ]);
+
+            DB::commit();
+
+            $this->closeCancelModal();
+            $this->sellPhone->refresh();
+            $this->sellPhone->load(['buybackDevice.tier', 'productAccurate', 'resetLogs.resetBy']);
+
+            $msg = $this->cancelActionType === 'RESET_TO_DRAFT'
+                ? "Transaksi berhasil direset ke status Belum Lunas (PAYING). Dokumen Accurate & Stok telah dibatalkan."
+                : "Transaksi Beli HP berhasil dibatalkan total (CANCELLED).";
+
+            $this->dispatch('toast', title: 'Berhasil', message: $msg, type: 'success');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Cancel/Reset Beli HP Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Terjadi kesalahan: ' . $e->getMessage(), type: 'error');
+        }
+    }
 
     #[Layout('layouts.z')]
     public function render()

@@ -144,4 +144,9 @@ class SellPhone extends Model implements HasMedia
     {
         return $this->morphMany(MessageLog::class, 'source')->latest();
     }
+
+    public function resetLogs()
+    {
+        return $this->hasMany(SellPhoneResetLog::class)->latest();
+    }
 }
