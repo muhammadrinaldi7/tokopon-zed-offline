@@ -19,9 +19,21 @@
                 </h3>
 
                 <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                    @if($canCheckAllBu)
+                    {{-- Dropdown Filter Business Unit --}}
+                    <div class="w-full sm:w-auto">
+                        <select wire:model.live="filterBusinessUnit" class="w-full sm:w-44 px-3 py-1.5 bg-indigo-50/70 border border-indigo-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-xs transition text-indigo-950 font-semibold shadow-sm">
+                            <option value="">Semua Unit Bisnis</option>
+                            @foreach($businessUnits as $bu)
+                                <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
+
                     {{-- Dropdown Filter Stok --}}
                     <div class="w-full sm:w-auto">
-                        <select wire:model.live="filterStock" class="w-full sm:w-40 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-xs transition text-gray-700 font-semibold">
+                        <select wire:model.live="filterStock" class="w-full sm:w-36 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-xs transition text-gray-700 font-semibold">
                             <option value="in_stock">Stok Ada (&#8805; 1)</option>
                             <option value="all">Semua Stok</option>
                             <option value="empty">Stok Habis (= 0)</option>
@@ -31,7 +43,7 @@
 
                     @if(count($listProyek) > 0)
                     <div class="w-full sm:w-auto">
-                        <select wire:model.live="filterProyek" class="w-full sm:w-44 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-xs transition text-gray-700 font-medium">
+                        <select wire:model.live="filterProyek" class="w-full sm:w-40 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-xs transition text-gray-700 font-medium">
                             <option value="">Semua Proyek</option>
                             @foreach($listProyek as $proyek)
                                 <option value="{{ $proyek }}">{{ $proyek }}</option>
@@ -118,6 +130,11 @@
                                     Global</p>
                                 <h3 class="text-xl font-bold leading-tight">{{ $selectedProduct }}</h3>
                                 <div class="flex flex-wrap items-center gap-2 mt-2">
+                                    @if ($selectedProductBu)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-white/20 text-white backdrop-blur-sm uppercase">
+                                            BU: {{ $selectedProductBu }}
+                                        </span>
+                                    @endif
                                     @if ($selectedProductSku)
                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-white/20 text-white backdrop-blur-sm">
                                             SKU: {{ $selectedProductSku }}

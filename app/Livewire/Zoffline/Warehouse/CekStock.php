@@ -24,6 +24,10 @@ class CekStock extends Component
     public $selectedProductCost = 0;
     public $selectedProductHasSn = false;
     public $selectedProductSku = '';
+    public $selectedProductBu = '';
+    public $canCheckAllBu = false;
+    public $filterBusinessUnit = '';
+    public $businessUnits = [];
     // Tambahkan properti ini di bagian atas class controller
     public $showSnModal = false;
     public $modalWarehouseName = '';
@@ -31,11 +35,32 @@ class CekStock extends Component
 
     public function mount()
     {
-        $activeBuId = Auth::user()->getActiveBusinessUnitId();
-        $this->listProyek = \App\Models\ProductAccurate::where('business_unit_id', $activeBuId)
-            ->whereNotNull('proyek')
-            ->where('proyek', '!=', '')
-            ->distinct()
+        $user = Auth::user();
+        $this->canCheckAllBu = (bool) ($user && ($user->can('cek-stock-all-bu') || $user->hasRole('superadmin')));
+
+        if ($this->canCheckAllBu) {
+            $this->businessUnits = \App\Models\BusinessUnit::where('is_active', true)->get();
+            $this->filterBusinessUnit = ''; // Default: Semua BU
+        } else {
+            $this->filterBusinessUnit = $user ? $user->getActiveBusinessUnitId() : 1;
+        }
+
+        $this->loadListProyek();
+    }
+
+    public function loadListProyek()
+    {
+        $query = \App\Models\ProductAccurate::whereNotNull('proyek')
+            ->where('proyek', '!=', '');
+
+        if (!$this->canCheckAllBu) {
+            $activeBuId = Auth::user() ? Auth::user()->getActiveBusinessUnitId() : 1;
+            $query->where('business_unit_id', $activeBuId);
+        } elseif (!empty($this->filterBusinessUnit)) {
+            $query->where('business_unit_id', $this->filterBusinessUnit);
+        }
+
+        $this->listProyek = $query->distinct()
             ->pluck('proyek')
             ->toArray();
     }
@@ -55,6 +80,14 @@ class CekStock extends Component
         $this->modalWarehouseName = '';
         $this->modalSns = [];
     }
+
+    public function updatedFilterBusinessUnit()
+    {
+        $this->filterProyek = '';
+        $this->loadListProyek();
+        $this->updatedSearchQuery();
+    }
+
     public function updatedFilterProyek()
     {
         $this->updatedSearchQuery();
@@ -74,23 +107,35 @@ class CekStock extends Component
 
         $term = '%' . $this->searchQuery . '%';
 
+        // Tentukan filter BU yang aktif
+        $activeBuId = Auth::user() ? Auth::user()->getActiveBusinessUnitId() : 1;
+        $filterBu = $this->canCheckAllBu ? $this->filterBusinessUnit : $activeBuId;
+
         // =========================================================================
-        // 1. CARI SKU BERDASARKAN SN DI TABEL LOCAL (Semua Warehouse)
+        // 1. CARI SKU BERDASARKAN SN DI TABEL LOCAL
         // =========================================================================
-        $snSkus = \Illuminate\Support\Facades\DB::table('product_serial_numbers')
+        $snQuery = \Illuminate\Support\Facades\DB::table('product_serial_numbers')
             ->where('serial_number', 'like', $term)
-            ->where('status', '!=', 'Unavailable')
-            ->pluck('item_no') // Mengambil SKU dari SN tanpa memandang milik gudang mana
+            ->where('status', '!=', 'Unavailable');
+
+        if (!empty($filterBu)) {
+            $snQuery->where('business_unit_id', $filterBu);
+        }
+
+        $snSkus = $snQuery->pluck('item_no')
             ->filter()
             ->unique()
             ->toArray();
         // =========================================================================
 
         // 2. Cari di ProductAccurate sebagai sumber kebenaran tunggal (Single Source of Truth)
-        $activeBuId = Auth::user()->getActiveBusinessUnitId();
+        $productsQuery = \App\Models\ProductAccurate::with('businessUnit');
 
-        $products = \App\Models\ProductAccurate::with('businessUnit')
-            ->where('business_unit_id', $activeBuId)
+        if (!empty($filterBu)) {
+            $productsQuery->where('business_unit_id', $filterBu);
+        }
+
+        $products = $productsQuery
             ->when($this->filterProyek, function ($query) {
                 $query->where('proyek', $this->filterProyek);
             })
@@ -137,7 +182,7 @@ class CekStock extends Component
 
     public function selectProduct($id, $type)
     {
-        $userWarehouseId = Auth::user()->warehouse_id;
+        $userWarehouseId = Auth::user() ? Auth::user()->warehouse_id : null;
         $this->selectedProductId = $id;
         $this->selectedProductType = $type;
 
@@ -150,6 +195,7 @@ class CekStock extends Component
 
         if ($accurate) {
             $buName = $accurate->businessUnit->name ?? 'Unknown BU';
+            $this->selectedProductBu = $buName;
             $this->selectedProduct = ($accurate->name ?? 'Unknown') . " [" . $buName . "]";
             $this->selectedProductPrice = $accurate->base_price ?? 0;
             $this->selectedProductCost = $accurate->base_cost ?? 0;
@@ -161,6 +207,7 @@ class CekStock extends Component
             // =========================================================================
             $groupedSns = \App\Models\ProductSerialNumber::with('vendor')
                 ->where('item_no', $accurate->item_no)
+                ->where('business_unit_id', $accurate->business_unit_id)
                 ->where('status', '!=', 'Unavailable')
                 ->get()
                 ->groupBy('warehouse_id'); // Menghasilkan array dengan key berupa warehouse_id
@@ -177,6 +224,13 @@ class CekStock extends Component
 
             $groupedStocks = $allStocks->groupBy('warehouse_id');
             $warehouses = \App\Models\Warehouse::where('business_unit_id', $accurate->business_unit_id)->get();
+
+            // Jika ada warehouse yang terkait pada stock atau SN tetapi belum ada di koleksi warehouse
+            $extraWhIds = $groupedStocks->keys()->merge($groupedSns->keys())->diff($warehouses->pluck('id'))->filter();
+            if ($extraWhIds->isNotEmpty()) {
+                $extraWarehouses = \App\Models\Warehouse::whereIn('id', $extraWhIds)->get();
+                $warehouses = $warehouses->merge($extraWarehouses);
+            }
 
             $this->stockData = [];
 
@@ -206,6 +260,7 @@ class CekStock extends Component
         } else {
             $this->stockData = [];
             $this->selectedProduct = '';
+            $this->selectedProductBu = '';
             $this->selectedProductPrice = 0;
             $this->selectedProductCost = 0;
             $this->selectedProductHasSn = false;
@@ -220,6 +275,7 @@ class CekStock extends Component
         $this->searchResults = [];
         $this->stockData = [];
         $this->selectedProduct = '';
+        $this->selectedProductBu = '';
         $this->selectedProductId = null;
         $this->selectedProductType = null;
         $this->selectedProductPrice = 0;
