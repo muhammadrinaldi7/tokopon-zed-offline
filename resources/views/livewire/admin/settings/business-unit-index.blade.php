@@ -1,30 +1,102 @@
-<div class="p-6 bg-gray-50 min-h-screen">
-    <div class="flex justify-between items-center mb-6">
+<div class="p-6 bg-gray-50 min-h-screen space-y-6">
+    {{-- Header --}}
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-gray-800">Manajemen Unit Usaha</h1>
-            <p class="text-sm text-gray-500">Kelola master data unit usaha dan pengaturan integrasi Accurate.</p>
+            <h1 class="text-2xl font-bold text-gray-800">Manajemen Unit Usaha & Webhook</h1>
+            <p class="text-sm text-gray-500">Kelola master data unit usaha, integrasi Accurate, dan perpanjangan webhook.</p>
         </div>
-        <button wire:click="openModal"
-            class="bg-neutral-800 hover:bg-neutral-900 transition-all text-white px-5 py-2.5 rounded-lg font-medium shadow-sm flex items-center gap-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-            Tambah Unit Usaha
-        </button>
+        <div class="flex items-center gap-3">
+            <button wire:click="renewWebhook"
+                wire:loading.attr="disabled"
+                class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-all text-white px-4 py-2.5 rounded-lg font-medium shadow-sm flex items-center gap-2 text-sm">
+                <svg wire:loading.remove wire:target="renewWebhook" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <svg wire:loading wire:target="renewWebhook" class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span wire:loading.remove wire:target="renewWebhook">Perpanjang Semua Webhook</span>
+                <span wire:loading wire:target="renewWebhook">Memproses...</span>
+            </button>
+            <button wire:click="openModal"
+                class="bg-neutral-800 hover:bg-neutral-900 transition-all text-white px-4 py-2.5 rounded-lg font-medium shadow-sm flex items-center gap-2 text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                Tambah Unit Usaha
+            </button>
+        </div>
     </div>
 
     @if (session()->has('message'))
-        <div class="bg-emerald-50 text-emerald-800 p-4 rounded-xl mb-6 border border-emerald-200 flex items-center gap-3">
+        <div class="bg-emerald-50 text-emerald-800 p-4 rounded-xl border border-emerald-200 flex items-center gap-3">
             <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             <span class="font-medium">{{ session('message') }}</span>
         </div>
     @endif
 
+    {{-- Panel Kontrol & Jadwal Webhook Accurate --}}
+    <div class="bg-gradient-to-r from-blue-900 via-indigo-900 to-neutral-900 rounded-2xl p-6 text-white shadow-md border border-indigo-800/50">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div class="space-y-2 max-w-xl">
+                <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/30 text-blue-200 border border-blue-400/30">
+                        Open API Accurate
+                    </span>
+                    <span class="text-xs text-blue-200 font-mono">GET /webhook-renew.do</span>
+                </div>
+                <h2 class="text-xl font-black tracking-tight">Otomatisasi & Perpanjangan Webhook</h2>
+                <p class="text-xs text-blue-100/80 leading-relaxed">
+                    Masa aktif webhook Accurate Online berlaku terbatas (biasanya 90 hari). Fitur ini memperpanjang masa aktif webhook agar transmisi data pesanan, stok, dan mutasi vendor tetap berjalan tanpa terputus.
+                </p>
+                <div class="pt-2 flex flex-wrap items-center gap-4 text-xs text-blue-200">
+                    <div class="flex items-center gap-1.5 bg-black/25 px-3 py-1.5 rounded-lg border border-white/10">
+                        <span class="text-neutral-400">Terakhir Diperpanjang:</span>
+                        <strong class="text-white font-mono">
+                            {{ $lastRenewedAt ? \Carbon\Carbon::parse($lastRenewedAt)->translatedFormat('d M Y, H:i') . ' WIB' : 'Belum pernah' }}
+                        </strong>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Form Pengaturan Jadwal --}}
+            <div class="bg-white/10 backdrop-blur-md p-5 rounded-xl border border-white/15 w-full lg:w-96 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-blue-200">Pengaturan Jadwal (Cron)</h3>
+                    <span class="w-2 h-2 rounded-full {{ $renewFrequency !== 'disabled' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400' }}"></span>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-blue-100 mb-1">Frekuensi Perpanjangan Otomatis</label>
+                        <select wire:model="renewFrequency"
+                            class="w-full bg-neutral-900/90 text-white text-xs rounded-lg px-3 py-2 border border-white/20 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none">
+                            <option value="monthly">Setiap Bulan (Monthly - Disarankan)</option>
+                            <option value="biweekly">Setiap 2 Minggu (Bi-Weekly)</option>
+                            <option value="weekly">Setiap Minggu (Weekly)</option>
+                            <option value="disabled">Nonaktifkan Otomatis (Manual Saja)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-[11px] text-blue-200/70">Dijalankan otomatis jam 02:00 WIB</span>
+                        <button wire:click="saveScheduleSettings"
+                            class="px-3.5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">
+                            Simpan Jadwal
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Tabel Unit Usaha --}}
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50/50">
                     <tr>
                         <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Nama & Kode</th>
-                        <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Accurate Info</th>
+                        <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Accurate Info & Status Webhook</th>
                         <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Prefix / Awalan</th>
                         <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                         <th scope="col" class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
@@ -32,6 +104,9 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-100">
                     @forelse ($units as $unit)
+                        @php
+                            $unitRenew = $lastRenewStatus[$unit->code] ?? null;
+                        @endphp
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="font-bold text-gray-900">{{ $unit->name }}</div>
@@ -39,7 +114,20 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-800 font-medium">{{ $unit->accurate_host ?: '-' }}</div>
-                                <div class="text-xs text-gray-500 mt-0.5">DB ID: <span class="font-mono">{{ $unit->accurate_database_id ?: '-' }}</span></div>
+                                <div class="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
+                                    <span>DB ID: <strong class="font-mono text-gray-700">{{ $unit->accurate_database_id ?: '-' }}</strong></span>
+                                    @if($unitRenew)
+                                        @if(($unitRenew['status'] ?? '') === 'success')
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800" title="{{ $unitRenew['message'] ?? '' }}">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Webhook Aktif
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800" title="{{ $unitRenew['message'] ?? '' }}">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Renew Gagal
+                                            </span>
+                                        @endif
+                                    @endif
+                                </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex flex-col gap-1">
@@ -59,7 +147,20 @@
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button wire:click="edit({{ $unit->id }})" class="text-indigo-600 hover:text-indigo-900 font-semibold px-3 py-1 rounded-md hover:bg-indigo-50 transition-colors">Edit</button>
+                                <div class="flex items-center justify-end gap-2">
+                                    <button wire:click="renewWebhook({{ $unit->id }})"
+                                        wire:loading.attr="disabled"
+                                        title="Perpanjang Webhook untuk Unit ini"
+                                        class="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        Renew Webhook
+                                    </button>
+                                    <button wire:click="edit({{ $unit->id }})" class="text-gray-600 hover:text-gray-900 font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors text-xs">
+                                        Edit
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     @empty

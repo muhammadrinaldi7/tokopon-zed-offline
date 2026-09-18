@@ -34,3 +34,30 @@ Artisan::command('mail:test-mailtrap {email=test@example.com}', function (string
         $this->line("Jika terjadi error otentikasi, periksa kembali API Token di MAIL_POS_PASSWORD pada file .env");
     }
 })->purpose('Menguji koneksi pengiriman email POS via Mailtrap SMTP');
+
+\Illuminate\Support\Facades\Schedule::command('accurate:renew-webhooks')->dailyAt('02:00')->when(function () {
+    $frequency = app(\App\Services\SettingService::class)->get('accurate_webhook_renew_frequency', 'monthly');
+    if ($frequency === 'disabled') {
+        return false;
+    }
+
+    $lastRenewedAt = app(\App\Services\SettingService::class)->get('accurate_webhook_last_renewed_at');
+    if (!$lastRenewedAt) {
+        return true;
+    }
+
+    try {
+        $lastDate = \Carbon\Carbon::parse($lastRenewedAt);
+        $daysDiff = $lastDate->diffInDays(now());
+
+        return match ($frequency) {
+            'weekly' => $daysDiff >= 7,
+            'biweekly' => $daysDiff >= 14,
+            'monthly' => $daysDiff >= 28,
+            default => false,
+        };
+    } catch (\Throwable $e) {
+        return true;
+    }
+});
+

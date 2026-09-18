@@ -2504,4 +2504,37 @@ class AccurateService
 
         return true;
     }
+
+    /**
+     * Renew Webhook Accurate Online
+     * 
+     * Endpoint: GET /webhook-renew.do
+     * Memperpanjang masa aktif webhook di Accurate Online agar tidak kedaluwarsa.
+     * 
+     * @param string $databaseSource
+     * @return array
+     * @throws \Exception
+     */
+    public function renewWebhookDo($databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $response = Http::timeout(30)->retry(2, 500)
+            ->withHeaders($config['headers'])
+            ->get($config['host'] . '/webhook-renew.do');
+
+        Log::info("API Accurate Renew Webhook ({$databaseSource}): " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : (is_string($data['d'] ?? null) ? $data['d'] : json_encode($data));
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            return $data ?? [];
+        } else {
+            Log::error("API Accurate Renew Webhook Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
 }

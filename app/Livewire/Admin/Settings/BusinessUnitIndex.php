@@ -4,11 +4,20 @@ namespace App\Livewire\Admin\Settings;
 
 use Livewire\Component;
 use App\Models\BusinessUnit;
+use App\Services\AccurateService;
+use App\Services\SettingService;
+use Illuminate\Support\Facades\Log;
 
 class BusinessUnitIndex extends Component
 {
     public $units = [];
     
+    // Webhook Renew & Schedule State
+    public $renewFrequency = 'monthly';
+    public $lastRenewedAt = null;
+    public $lastRenewStatus = [];
+    public $isRenewing = false;
+
     // Form fields
     public $unitId;
     public $name;
@@ -41,6 +50,10 @@ class BusinessUnitIndex extends Component
     public function loadData()
     {
         $this->units = BusinessUnit::all();
+        $settingService = app(SettingService::class);
+        $this->renewFrequency = $settingService->get('accurate_webhook_renew_frequency', 'monthly');
+        $this->lastRenewedAt = $settingService->get('accurate_webhook_last_renewed_at');
+        $this->lastRenewStatus = $settingService->get('accurate_webhook_last_renew_status', []);
     }
 
     public function resetFields()
@@ -155,6 +168,109 @@ class BusinessUnitIndex extends Component
         $unit = BusinessUnit::findOrFail($id);
         $unit->update(['is_active' => !$unit->is_active]);
         $this->loadData();
+    }
+
+    public function saveScheduleSettings()
+    {
+        $settingService = app(SettingService::class);
+        $settingService->set('accurate_webhook_renew_frequency', $this->renewFrequency);
+        $this->loadData();
+        $this->dispatch('toast', title: 'Berhasil', message: 'Pengaturan jadwal perpanjangan otomatis berhasil disimpan.', type: 'success');
+    }
+
+    public function renewWebhook($unitId = null)
+    {
+        $accurateService = app(AccurateService::class);
+        $settingService = app(SettingService::class);
+        $this->isRenewing = true;
+
+        try {
+            if ($unitId) {
+                $unit = BusinessUnit::find($unitId);
+                if (!$unit) {
+                    $this->dispatch('toast', title: 'Gagal', message: 'Unit usaha tidak ditemukan.', type: 'error');
+                    return;
+                }
+
+                if (empty($unit->accurate_token) || empty($unit->accurate_secret_key)) {
+                    $this->dispatch('toast', title: 'Kredensial Tidak Lengkap', message: "Unit {$unit->name} belum memiliki Accurate Token atau Secret Key.", type: 'warning');
+                    return;
+                }
+
+                $response = $accurateService->renewWebhookDo($unit->code);
+                $message = $response['d'] ?? 'Webhook berhasil diperpanjang.';
+                if (is_array($message)) {
+                    $message = json_encode($message);
+                }
+
+                $currentStatus = $this->lastRenewStatus ?: [];
+                $currentStatus[$unit->code] = [
+                    'status' => 'success',
+                    'message' => $message,
+                    'renewed_at' => now()->toDateTimeString(),
+                ];
+
+                $settingService->set('accurate_webhook_last_renewed_at', now()->toDateTimeString());
+                $settingService->set('accurate_webhook_last_renew_status', $currentStatus, 'json');
+
+                $this->loadData();
+                $this->dispatch('toast', title: 'Perpanjangan Berhasil', message: "Webhook untuk unit {$unit->name} berhasil diperpanjang: {$message}", type: 'success');
+            } else {
+                $units = BusinessUnit::where('is_active', true)
+                    ->whereNotNull('accurate_token')
+                    ->where('accurate_token', '!=', '')
+                    ->get();
+
+                if ($units->isEmpty()) {
+                    $this->dispatch('toast', title: 'Peringatan', message: 'Tidak ada unit usaha aktif dengan kredensial Accurate Token.', type: 'warning');
+                    return;
+                }
+
+                $successCount = 0;
+                $failCount = 0;
+                $currentStatus = [];
+
+                foreach ($units as $unit) {
+                    try {
+                        $response = $accurateService->renewWebhookDo($unit->code);
+                        $message = $response['d'] ?? 'Webhook berhasil diperpanjang.';
+                        if (is_array($message)) {
+                            $message = json_encode($message);
+                        }
+
+                        $currentStatus[$unit->code] = [
+                            'status' => 'success',
+                            'message' => $message,
+                            'renewed_at' => now()->toDateTimeString(),
+                        ];
+                        $successCount++;
+                    } catch (\Throwable $e) {
+                        $failCount++;
+                        $currentStatus[$unit->code] = [
+                            'status' => 'failed',
+                            'message' => $e->getMessage(),
+                            'failed_at' => now()->toDateTimeString(),
+                        ];
+                    }
+                }
+
+                $settingService->set('accurate_webhook_last_renewed_at', now()->toDateTimeString());
+                $settingService->set('accurate_webhook_last_renew_status', $currentStatus, 'json');
+
+                $this->loadData();
+
+                if ($failCount === 0) {
+                    $this->dispatch('toast', title: 'Perpanjangan Berhasil', message: "Semua webhook untuk {$successCount} unit usaha berhasil diperpanjang!", type: 'success');
+                } else {
+                    $this->dispatch('toast', title: 'Perpanjangan Sebagian Selesai', message: "{$successCount} unit berhasil, {$failCount} unit gagal diperpanjang. Periksa detail log.", type: 'warning');
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error("Manual Webhook Renew Error: " . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal Perpanjang Webhook', message: $e->getMessage(), type: 'error');
+        } finally {
+            $this->isRenewing = false;
+        }
     }
 
     public function render()
