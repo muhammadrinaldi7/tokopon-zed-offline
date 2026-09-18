@@ -19,6 +19,7 @@ class PermissionSeeder extends Seeder
             // Transaksi & Komunikasi
             'view-pos',
             'view-stock',
+            'cek-stock-all-bu',
             'manage-orders',
             'access-cs-chat',
 
