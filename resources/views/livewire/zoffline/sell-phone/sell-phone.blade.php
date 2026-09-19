@@ -448,7 +448,8 @@
                                         @endif
                                     </div>
                                     <p class="text-[11px] text-rose-600 italic mt-1 font-semibold">
-                                        * Tahap QC dikunci sementara agar proses inspeksi dan penentuan harga dapat berjalan akurat.
+                                        * Tahap QC dikunci sementara agar proses inspeksi dan penentuan harga dapat
+                                        berjalan akurat.
                                     </p>
                                 @endif
                             </div>
@@ -478,6 +479,47 @@
                                 </span>
                             </div>
                         </div>
+                    </div>
+                </div>
+            @endif
+
+            {{-- Warning Badge Khusus Produk Finance (OPPO, XIAOMI, VIVO) --}}
+            @if ($selected_model_name && $this->isFinanceRiskBrand)
+                @php
+                    $displayBrand = strtoupper(trim($selected_brand_id ?? ''));
+                    if (empty($displayBrand) && !empty($selected_model_name)) {
+                        $displayBrand = strtoupper(
+                            trim(
+                                \App\Models\ProductAccurate::where('business_unit_id', 2)
+                                    ->where('name', $selected_model_name)
+                                    ->value('brandName') ?? '',
+                            ),
+                        );
+                    }
+                @endphp
+                <div
+                    class="mt-4 rounded-3xl p-5 md:p-6 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-2 border-amber-400/80 shadow-xs flex items-start gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div
+                        class="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <div class="space-y-1.5">
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                            <h4 class="font-black text-sm md:text-base text-amber-950 uppercase tracking-tight">
+                                Peringatan Khusus Unit {{ $displayBrand ?: 'OPPO / SAMSUNG / VIVO' }}: Pastikan Bukan
+                                Produk Finance
+                            </h4>
+                            {{-- <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300 font-mono">
+                                Wajib Cek Finance Lock
+                            </span> --}}
+                        </div>
+                        {{-- <p class="text-xs md:text-sm text-amber-900 leading-relaxed font-medium">
+                            Pastikan perangkat <strong>tidak terkunci aplikasi pembiayaan / cicilan leasing</strong> (seperti <em>PayJoy, Kredivo, Home Credit, Akulaku, Mega Finance, Finance+, dll</em>) dan tidak ada aplikasi <em>Device Admin</em> yang mencurigakan sebelum melanjutkan ke tahap QC.
+                        </p> --}}
                     </div>
                 </div>
             @endif
@@ -918,7 +960,8 @@
                     @endphp
 
                     @foreach ($groupedRules as $category => $rules)
-                        <div class="space-y-3 mb-8" wire:key="rule-cat-{{ \Illuminate\Support\Str::slug($category) }}">
+                        <div class="space-y-3 mb-8"
+                            wire:key="rule-cat-{{ \Illuminate\Support\Str::slug($category) }}">
                             <h1 class="text-xs font-black text-neutral-500 uppercase ml-1 tracking-wider block">
                                 {{ $category }}
                             </h1>
@@ -928,19 +971,20 @@
                                     @php
                                         $isSelected = $rule['is_multiple']
                                             ? !empty($selected_rules[$rule['key']])
-                                            : (($selected_rules[$category] ?? '') === $rule['key']);
+                                            : ($selected_rules[$category] ?? '') === $rule['key'];
                                     @endphp
-                                    <button type="button"
-                                        wire:key="rule-btn-{{ $rule['key'] }}"
+                                    <button type="button" wire:key="rule-btn-{{ $rule['key'] }}"
                                         wire:click="toggleRule('{{ $rule['key'] }}', '{{ $category }}', {{ $rule['is_multiple'] ? 'true' : 'false' }})"
                                         class="py-2.5 px-4 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none text-sm font-bold border-2
                                         {{ $isSelected
                                             ? 'border-[#D3AD7B] bg-[#D3AD7B]/15 text-[#A28153] shadow-xs ring-2 ring-[#D3AD7B]/20'
                                             : 'border-transparent bg-white text-neutral-600 shadow-xs hover:border-[#D3AD7B]/40 hover:bg-neutral-50' }}">
-                                        
+
                                         @if ($isSelected)
-                                            <svg class="w-4 h-4 mr-1.5 text-[#A28153] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+                                            <svg class="w-4 h-4 mr-1.5 text-[#A28153] shrink-0" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    stroke-width="2.5" d="M5 13l4 4L19 7"></path>
                                             </svg>
                                         @endif
                                         <span>{{ $rule['name'] }}</span>
@@ -1119,7 +1163,8 @@
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
-                                            Data pelanggan lama telah dimuat otomatis. Anda dapat langsung menggunakannya atau mengedit formulir di bawah jika ada perubahan data.
+                                            Data pelanggan lama telah dimuat otomatis. Anda dapat langsung
+                                            menggunakannya atau mengedit formulir di bawah jika ada perubahan data.
                                         </p>
                                     </div>
                                 </div>
@@ -1139,28 +1184,34 @@
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <div class="relative flex-1">
-                                            <input type="tel" id="mobilePhone"
-                                                wire:model="mobilePhone"
-                                                wire:keydown.enter.prevent="searchCustomerByPhone"
-                                                required
+                                            <input type="tel" id="mobilePhone" wire:model="mobilePhone"
+                                                wire:keydown.enter.prevent="searchCustomerByPhone" required
                                                 class="w-full px-4 py-3 text-sm bg-white border @error('mobilePhone') border-red-500 @else border-neutral-200 @enderror rounded-xl focus:outline-none focus:border-[#D3AD7B] focus:ring-4 focus:ring-[#D3AD7B]/20 transition-colors"
                                                 placeholder="Contoh: 08123456789">
                                         </div>
-                                        <button type="button"
-                                            wire:click="searchCustomerByPhone"
-                                            wire:loading.attr="disabled"
-                                            wire:target="searchCustomerByPhone"
+                                        <button type="button" wire:click="searchCustomerByPhone"
+                                            wire:loading.attr="disabled" wire:target="searchCustomerByPhone"
                                             class="shrink-0 px-4 py-3 bg-[#D3AD7B] hover:bg-[#A28153] text-black font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-[0.98]">
-                                            <span wire:loading.remove wire:target="searchCustomerByPhone" class="flex items-center gap-1.5">
-                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                            <span wire:loading.remove wire:target="searchCustomerByPhone"
+                                                class="flex items-center gap-1.5">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2.5"
+                                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                                 </svg>
                                                 <span>Cek No HP</span>
                                             </span>
-                                            <span wire:loading wire:target="searchCustomerByPhone" class="flex items-center gap-1.5">
-                                                <svg class="animate-spin h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            <span wire:loading wire:target="searchCustomerByPhone"
+                                                class="flex items-center gap-1.5">
+                                                <svg class="animate-spin h-4 w-4 text-black"
+                                                    xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                    </path>
                                                 </svg>
                                                 <span>Mencari...</span>
                                             </span>
@@ -1234,18 +1285,25 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         @foreach ($existingUserPreview['banks'] as $bankItem)
                                             @php
-                                                $isSelectedBank = $bank_name === $bankItem['bank_name'] && $account_number == $bankItem['account_number'];
+                                                $isSelectedBank =
+                                                    $bank_name === $bankItem['bank_name'] &&
+                                                    $account_number == $bankItem['account_number'];
                                             @endphp
                                             <button type="button"
                                                 wire:click="$set('bank_name', '{{ $bankItem['bank_name'] }}'); $set('account_number', '{{ $bankItem['account_number'] }}'); $set('account_name', '{{ $bankItem['account_name'] }}');"
                                                 class="p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2 cursor-pointer {{ $isSelectedBank ? 'bg-[#A28153] text-black border-[#A28153] shadow-xs' : 'bg-white hover:bg-neutral-50 text-neutral-800 border-neutral-200/80' }}">
                                                 <div class="truncate">
-                                                    <span class="font-bold text-xs uppercase block">{{ $bankItem['bank_name'] }} - {{ $bankItem['account_number'] }}</span>
-                                                    <span class="text-[11px] block truncate opacity-85">a.n {{ $bankItem['account_name'] }}</span>
+                                                    <span
+                                                        class="font-bold text-xs uppercase block">{{ $bankItem['bank_name'] }}
+                                                        - {{ $bankItem['account_number'] }}</span>
+                                                    <span class="text-[11px] block truncate opacity-85">a.n
+                                                        {{ $bankItem['account_name'] }}</span>
                                                 </div>
                                                 @if ($isSelectedBank)
-                                                    <svg class="w-4 h-4 text-black shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                                    <svg class="w-4 h-4 text-black shrink-0" fill="none"
+                                                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            d="M5 13l4 4L19 7" />
                                                     </svg>
                                                 @endif
                                             </button>
@@ -1416,8 +1474,7 @@
                         <div class="flex flex-col gap-1 border-b border-neutral-200 pb-5 mb-5">
                             <span class="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Model
                                 Perangkat</span>
-                            <span
-                                class="text-2xl font-bold text-neutral-800">{{ $selected_model_name ?? '-' }}</span>
+                            <span class="text-2xl font-bold text-neutral-800">{{ $selected_model_name ?? '-' }}</span>
                         </div>
 
                         <div class="grid grid-cols-2 gap-6">
@@ -1520,18 +1577,25 @@
     {{-- Modal Konfirmasi Perubahan Data Pelanggan Terdaftar --}}
     @if ($showConfirmUpdateCustomerModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-sm">
-            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-neutral-100 transform transition-all animate-scale-up">
+            <div
+                class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-neutral-100 transform transition-all animate-scale-up">
                 {{-- Modal Header --}}
-                <div class="p-6 bg-gradient-to-r from-amber-500/10 via-[#D3AD7B]/20 to-amber-500/10 border-b border-[#D3AD7B]/30 flex items-start gap-4">
-                    <div class="w-12 h-12 rounded-2xl bg-[#A28153] text-white flex items-center justify-center shrink-0 shadow-md shadow-[#A28153]/30">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                <div
+                    class="p-6 bg-gradient-to-r from-amber-500/10 via-[#D3AD7B]/20 to-amber-500/10 border-b border-[#D3AD7B]/30 flex items-start gap-4">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-[#A28153] text-white flex items-center justify-center shrink-0 shadow-md shadow-[#A28153]/30">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                     </div>
                     <div>
                         <h3 class="text-lg font-black text-neutral-900">Perubahan Data Pelanggan Terdaftar</h3>
                         <p class="text-xs text-neutral-600 mt-0.5">
-                            Nomor HP <span class="font-bold text-neutral-900">{{ $customerDiff['phone'] ?? $mobilePhone }}</span> sudah terdaftar di database.
+                            Nomor HP <span
+                                class="font-bold text-neutral-900">{{ $customerDiff['phone'] ?? $mobilePhone }}</span>
+                            sudah terdaftar di database.
                         </p>
                     </div>
                 </div>
@@ -1539,16 +1603,20 @@
                 {{-- Modal Body --}}
                 <div class="p-6 space-y-4">
                     <p class="text-xs md:text-sm text-neutral-600 leading-relaxed">
-                        Terdapat perbedaan antara data yang tersimpan di sistem dengan data yang baru saja Anda masukkan di formulir:
+                        Terdapat perbedaan antara data yang tersimpan di sistem dengan data yang baru saja Anda masukkan
+                        di formulir:
                     </p>
 
                     <div class="space-y-2.5 bg-neutral-50 rounded-2xl p-4 border border-neutral-200/80 text-xs">
                         @if (!empty($customerDiff['name_changed']))
-                            <div class="flex items-start justify-between gap-3 pb-2.5 {{ !empty($customerDiff['email_changed']) || !empty($customerDiff['domisili_changed']) ? 'border-b border-neutral-200/60' : '' }}">
+                            <div
+                                class="flex items-start justify-between gap-3 pb-2.5 {{ !empty($customerDiff['email_changed']) || !empty($customerDiff['domisili_changed']) ? 'border-b border-neutral-200/60' : '' }}">
                                 <span class="font-bold text-neutral-500 shrink-0 w-20">Nama:</span>
                                 <div class="text-right">
-                                    <span class="text-neutral-400 line-through mr-1.5">{{ $customerDiff['old_name'] }}</span>
-                                    <span class="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 inline-block">
+                                    <span
+                                        class="text-neutral-400 line-through mr-1.5">{{ $customerDiff['old_name'] }}</span>
+                                    <span
+                                        class="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 inline-block">
                                         ➔ {{ $customerDiff['new_name'] }}
                                     </span>
                                 </div>
@@ -1556,11 +1624,14 @@
                         @endif
 
                         @if (!empty($customerDiff['email_changed']))
-                            <div class="flex items-start justify-between gap-3 pb-2.5 {{ !empty($customerDiff['domisili_changed']) ? 'border-b border-neutral-200/60' : '' }}">
+                            <div
+                                class="flex items-start justify-between gap-3 pb-2.5 {{ !empty($customerDiff['domisili_changed']) ? 'border-b border-neutral-200/60' : '' }}">
                                 <span class="font-bold text-neutral-500 shrink-0 w-20">Email:</span>
                                 <div class="text-right">
-                                    <span class="text-neutral-400 line-through mr-1.5">{{ $customerDiff['old_email'] }}</span>
-                                    <span class="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 inline-block">
+                                    <span
+                                        class="text-neutral-400 line-through mr-1.5">{{ $customerDiff['old_email'] }}</span>
+                                    <span
+                                        class="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 inline-block">
                                         ➔ {{ $customerDiff['new_email'] }}
                                     </span>
                                 </div>
@@ -1571,8 +1642,10 @@
                             <div class="flex items-start justify-between gap-3">
                                 <span class="font-bold text-neutral-500 shrink-0 w-20">Domisili:</span>
                                 <div class="text-right">
-                                    <span class="text-neutral-400 line-through mr-1.5">{{ $customerDiff['old_domisili'] }}</span>
-                                    <span class="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 inline-block">
+                                    <span
+                                        class="text-neutral-400 line-through mr-1.5">{{ $customerDiff['old_domisili'] }}</span>
+                                    <span
+                                        class="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 inline-block">
                                         ➔ {{ $customerDiff['new_domisili'] }}
                                     </span>
                                 </div>
@@ -1586,15 +1659,18 @@
 
                     {{-- Modal Buttons --}}
                     <div class="flex flex-col gap-2.5 pt-2">
-                        <button type="button" wire:click="confirmUpdateCustomerAndSubmit" wire:loading.attr="disabled"
+                        <button type="button" wire:click="confirmUpdateCustomerAndSubmit"
+                            wire:loading.attr="disabled"
                             class="w-full py-3.5 px-4 bg-linear-to-r from-[#D3AD7B] to-[#A28153] hover:from-[#C39D6B] hover:to-[#927143] text-black font-black rounded-xl shadow-lg shadow-[#A28153]/30 transition-all active:scale-[0.98] text-sm flex items-center justify-center gap-2 cursor-pointer">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                    d="M5 13l4 4L19 7" />
                             </svg>
                             <span>Ya, Perbarui Data Pelanggan & Lanjutkan</span>
                         </button>
 
-                        <button type="button" wire:click="cancelUpdateCustomerAndSubmit" wire:loading.attr="disabled"
+                        <button type="button" wire:click="cancelUpdateCustomerAndSubmit"
+                            wire:loading.attr="disabled"
                             class="w-full py-3 px-4 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 cursor-pointer">
                             <span>Tidak, Gunakan Data Lama</span>
                         </button>

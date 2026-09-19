@@ -113,6 +113,18 @@ class SellPhone extends Component
     }
 
     #[Computed]
+    public function isFinanceRiskBrand(): bool
+    {
+        $brand = strtoupper(trim($this->selected_brand_id ?? ''));
+        if (empty($brand) && !empty($this->selected_model_name)) {
+            $brand = strtoupper(trim(\App\Models\ProductAccurate::where('business_unit_id', 2)
+                ->where('name', $this->selected_model_name)
+                ->value('brandName') ?? ''));
+        }
+        return in_array($brand, ['OPPO', 'SAMSUNG', 'VIVO']);
+    }
+
+    #[Computed]
     public function salesResults()
     {
         if (strlen($this->searchSales) < 2) return [];
@@ -123,18 +135,18 @@ class SellPhone extends Component
         return \App\Models\Employe::active()
             ->where(function ($q) use ($businessUnitId) {
                 $q->where('business_unit_id', $businessUnitId)
-                  ->orWhereNull('business_unit_id');
+                    ->orWhereNull('business_unit_id');
             })
             ->with('branch')
             ->where(function ($q) {
                 if (Auth::user()?->branch_id) {
                     $q->where('branch_id', Auth::user()->branch_id)
-                      ->orWhereNull('branch_id');
+                        ->orWhereNull('branch_id');
                 }
             })
             ->where(function ($q) {
                 $q->where('name', 'like', '%' . $this->searchSales . '%')
-                  ->orWhere('employee_no', 'like', '%' . $this->searchSales . '%');
+                    ->orWhere('employee_no', 'like', '%' . $this->searchSales . '%');
             })->take(10)->get();
     }
 
@@ -234,9 +246,10 @@ class SellPhone extends Component
 
         // Jika nomor HP kosong atau kurang dari 9 digit, beri peringatan
         if (strlen($cleanPhone) < 9) {
-            $this->dispatch('toast', 
-                title: 'Nomor Tidak Valid', 
-                message: 'Silakan masukkan nomor HP minimal 9 digit terlebih dahulu.', 
+            $this->dispatch(
+                'toast',
+                title: 'Nomor Tidak Valid',
+                message: 'Silakan masukkan nomor HP minimal 9 digit terlebih dahulu.',
                 type: 'warning'
             );
             return;
@@ -245,7 +258,7 @@ class SellPhone extends Component
         // Cari user yang memiliki nomor telepon ini di user_profiles
         $user = User::with(['profile', 'bankAccounts'])->whereHas('profile', function ($q) use ($cleanPhone) {
             $q->where('phone_number', $cleanPhone)
-              ->orWhere('phone_number', 'like', '%' . $cleanPhone);
+                ->orWhere('phone_number', 'like', '%' . $cleanPhone);
         })->first();
 
         // Fallback cek format awalan 0 vs 62
@@ -297,9 +310,10 @@ class SellPhone extends Component
                 })->toArray(),
             ];
 
-            $this->dispatch('toast', 
-                title: 'Pelanggan Terdaftar Ditemukan', 
-                message: "Nomor HP terdaftar atas nama {$user->name}. Data lama telah dimuat otomatis.", 
+            $this->dispatch(
+                'toast',
+                title: 'Pelanggan Terdaftar Ditemukan',
+                message: "Nomor HP terdaftar atas nama {$user->name}. Data lama telah dimuat otomatis.",
                 type: 'info'
             );
         } else {
@@ -310,9 +324,10 @@ class SellPhone extends Component
             $this->customerDiff = [];
             $this->showConfirmUpdateCustomerModal = false;
 
-            $this->dispatch('toast', 
-                title: 'Pelanggan Baru', 
-                message: 'Nomor HP belum terdaftar. Silakan lengkapi formulir untuk mendaftarkan pelanggan baru.', 
+            $this->dispatch(
+                'toast',
+                title: 'Pelanggan Baru',
+                message: 'Nomor HP belum terdaftar. Silakan lengkapi formulir untuk mendaftarkan pelanggan baru.',
                 type: 'info'
             );
         }
@@ -371,7 +386,7 @@ class SellPhone extends Component
 
         $nameChanged = !empty($this->name) && trim((string) $existingUser->name) !== trim((string) $this->name);
         $emailChanged = !empty($this->email) && trim((string) $existingUser->email) !== trim((string) $this->email);
-        
+
         $oldDomisili = trim((string) ($existingUser->profile?->domisili ?? ''));
         $newDomisili = trim((string) $this->domisili);
         $domisiliChanged = !empty($newDomisili) && $oldDomisili !== $newDomisili;
@@ -694,21 +709,24 @@ class SellPhone extends Component
 
             // Beri notifikasi instan sesuai kondisi kelayakan
             if ($this->base_price <= 0) {
-                $this->dispatch('toast', 
-                    title: 'Harga Beli Belum Disetting', 
-                    message: 'Model ini belum memiliki harga pembelian di Accurate (Rp 0). Harap hubungi Admin/Purchasing sebelum melanjutkan QC.', 
+                $this->dispatch(
+                    'toast',
+                    title: 'Harga Beli Belum Disetting',
+                    message: 'Model ini belum memiliki harga pembelian di Accurate (Rp 0). Harap hubungi Admin/Purchasing sebelum melanjutkan QC.',
                     type: 'error'
                 );
             } elseif (empty($this->device_rules)) {
-                $this->dispatch('toast', 
-                    title: 'Kualifikasi Belum Dikonfigurasi', 
-                    message: 'Model ini belum memiliki standar kualifikasi unit. Harap hubungi Admin Master Data.', 
+                $this->dispatch(
+                    'toast',
+                    title: 'Kualifikasi Belum Dikonfigurasi',
+                    message: 'Model ini belum memiliki standar kualifikasi unit. Harap hubungi Admin Master Data.',
                     type: 'warning'
                 );
             } else {
-                $this->dispatch('toast', 
-                    title: 'Model Siap Diproses', 
-                    message: 'Harga acuan: Rp ' . number_format($this->base_price, 0, ',', '.') . ' (Kualifikasi: ' . ($this->selected_tier_name ?? 'Aktif') . ')', 
+                $this->dispatch(
+                    'toast',
+                    title: 'Model Siap Diproses',
+                    message: 'Harga acuan: Rp ' . number_format($this->base_price, 0, ',', '.') . ' (Kualifikasi: ' . ($this->selected_tier_name ?? 'Aktif') . ')',
                     type: 'success'
                 );
             }
@@ -726,18 +744,20 @@ class SellPhone extends Component
         }
 
         if ((float) $this->base_price <= 0) {
-            $this->dispatch('toast', 
-                title: 'Tidak Bisa Lanjut ke QC', 
-                message: 'Harga beli untuk model ini belum disetting di sistem/Accurate (Rp 0). Silakan hubungi Purchasing/Admin terlebih dahulu.', 
+            $this->dispatch(
+                'toast',
+                title: 'Tidak Bisa Lanjut ke QC',
+                message: 'Harga beli untuk model ini belum disetting di sistem/Accurate (Rp 0). Silakan hubungi Purchasing/Admin terlebih dahulu.',
                 type: 'error'
             );
             return;
         }
 
         if (empty($this->device_rules)) {
-            $this->dispatch('toast', 
-                title: 'Tidak Bisa Lanjut ke QC', 
-                message: 'Model ini belum memiliki standar kualifikasi kondisi unit.', 
+            $this->dispatch(
+                'toast',
+                title: 'Tidak Bisa Lanjut ke QC',
+                message: 'Model ini belum memiliki standar kualifikasi kondisi unit.',
                 type: 'error'
             );
             return;
@@ -749,8 +769,8 @@ class SellPhone extends Component
     #[Computed]
     public function isModelReady(): bool
     {
-        return !empty($this->selected_model_name) 
-            && (float) $this->base_price > 0 
+        return !empty($this->selected_model_name)
+            && (float) $this->base_price > 0
             && count($this->device_rules) > 0;
     }
 
@@ -1410,7 +1430,6 @@ class SellPhone extends Component
 
             DB::commit();
             Log::channel('sell_phone')->info("=== [SELESAI SUBMIT PEMBELIAN HP - SUKSES] === SellPhone ID: {$sellPhone->id}, Status: {$sellPhone->status}");
-
         } catch (\Throwable $e) {
             DB::rollBack();
             Log::channel('sell_phone')->error("=== [ERROR SUBMIT PEMBELIAN HP] === " . $e->getMessage(), [
