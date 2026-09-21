@@ -751,13 +751,18 @@ class ExecutiveMetricsService
             ->orderBy('name')
             ->get(['id', 'business_unit_id', 'name']);
 
-        // Distinct stores recorded in orders
-        $orderStores = Order::distinct()
-            ->whereNotNull('shipping_address_snapshot->store')
-            ->pluck('shipping_address_snapshot->store')
-            ->filter()
-            ->unique()
-            ->values();
+        // Distinct stores recorded in branches and recent orders (driver agnostic)
+        $branchStores = Branch::orderBy('name')->pluck('name');
+        $orderStoreNames = Order::whereNotNull('shipping_address_snapshot')
+            ->latest('id')
+            ->take(500)
+            ->get(['shipping_address_snapshot'])
+            ->map(function ($o) {
+                return $o->shipping_address_snapshot['store'] ?? null;
+            })
+            ->filter();
+
+        $orderStores = $branchStores->concat($orderStoreNames)->unique()->values();
 
         return [
             'business_units' => $businessUnits,
