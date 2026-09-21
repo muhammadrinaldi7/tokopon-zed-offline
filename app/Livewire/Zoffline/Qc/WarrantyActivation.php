@@ -76,17 +76,49 @@ class WarrantyActivation extends Component
             ->get();
 
         $search = strtolower(trim($this->searchQuery));
-        
-        // Cari OrderItem yang BELUM punya inspeksi (prioritas utama)
-        $item = $items->first(function ($i) use ($search) {
+
+        // Filter item yang benar-benar memuat serial number yang dicari
+        $matchingItems = $items->filter(function ($i) use ($search) {
             $sns = array_map(function($s) {
                 return strtolower(trim($s));
             }, explode(',', $i->serial_number));
-            
-            if (!in_array($search, $sns)) {
-                return false;
-            }
+            return in_array($search, $sns);
+        });
 
+        if ($matchingItems->isEmpty()) {
+            $this->errorMessage = 'Barang dengan Serial Number tersebut tidak ditemukan di sistem.';
+            return;
+        }
+
+        // Ambil transaksi paling baru untuk IMEI ini
+        $latestItem = $matchingItems->first();
+
+        // 1. Validasi jika transaksi terbaru masih berstatus DRAFT
+        if ($latestItem->order && $latestItem->order->order_status === 'DRAFT') {
+            $orderNo = $latestItem->order->order_number ?? '-';
+            $this->errorMessage = "Transaksi ({$orderNo}) untuk IMEI ini masih berstatus DRAFT. Harap selesaikan pembayaran di kasir terlebih dahulu sebelum melakukan aktivasi garansi.";
+            return;
+        }
+
+        // 2. Validasi jika transaksi terbaru dibatalkan atau diretur
+        if ($latestItem->order && in_array($latestItem->order->order_status, ['CANCELLED', 'RETURNED'])) {
+            $orderNo = $latestItem->order->order_number ?? '-';
+            $this->errorMessage = "Transaksi ({$orderNo}) untuk IMEI ini telah dibatalkan atau diretur.";
+            return;
+        }
+
+        // 3. Hanya proses OrderItem dari transaksi sah (COMPLETED atau PIUTANG)
+        $validItems = $matchingItems->filter(function ($i) {
+            return $i->order && in_array($i->order->order_status, ['COMPLETED', 'PIUTANG']);
+        });
+
+        if ($validItems->isEmpty()) {
+            $this->errorMessage = 'Tidak ada transaksi penjualan yang sah (COMPLETED / PIUTANG) untuk Serial Number ini.';
+            return;
+        }
+
+        // Cari OrderItem yang BELUM punya inspeksi (prioritas utama)
+        $item = $validItems->first(function ($i) use ($search) {
             // Cek apakah OrderItem ini BELUM diinspeksi
             $hasInspection = \App\Models\DeviceInspection::where('imei', $search)
                 ->where('inspectable_type', get_class($i))
@@ -97,13 +129,8 @@ class WarrantyActivation extends Component
         });
 
         if (!$item) {
-            // Fallback: jika semua sudah diinspeksi, cek apakah ini kasus garansi gantung
-            $anyMatch = $items->first(function ($i) use ($search) {
-                $sns = array_map(function($s) {
-                    return strtolower(trim($s));
-                }, explode(',', $i->serial_number));
-                return in_array($search, $sns);
-            });
+            // Fallback: jika semua transaksi valid sudah diinspeksi, cek apakah ini kasus garansi gantung
+            $anyMatch = $validItems->first();
             
             if ($anyMatch) {
                 if ($anyMatch->order->business_unit_id != $activeUnitId) {

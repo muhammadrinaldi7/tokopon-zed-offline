@@ -513,9 +513,10 @@
                                 Peringatan Khusus Unit {{ $displayBrand ?: 'OPPO / SAMSUNG / VIVO' }}: Pastikan Bukan
                                 Produk Finance
                             </h4>
-                            {{-- <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300 font-mono">
+                            <span
+                                class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300 font-mono">
                                 Wajib Cek Finance Lock
-                            </span> --}}
+                            </span>
                         </div>
                         {{-- <p class="text-xs md:text-sm text-amber-900 leading-relaxed font-medium">
                             Pastikan perangkat <strong>tidak terkunci aplikasi pembiayaan / cicilan leasing</strong> (seperti <em>PayJoy, Kredivo, Home Credit, Akulaku, Mega Finance, Finance+, dll</em>) dan tidak ada aplikasi <em>Device Admin</em> yang mencurigakan sebelum melanjutkan ke tahap QC.

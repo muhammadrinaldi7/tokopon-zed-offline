@@ -20,6 +20,8 @@ use Mike42\Escpos\Printer;
 
 trait WithCheckoutAndReceipt
 {
+    protected array $relinkData = ['inspections' => [], 'warranties' => []];
+
     // ─── Checkout ──────────────────────────────────────────────
 
     public function openCheckout()
@@ -1518,7 +1520,26 @@ trait WithCheckoutAndReceipt
      */
     private function restoreStockFromOldItems(Order $order): void
     {
+        $this->relinkData = ['inspections' => [], 'warranties' => []];
+
         foreach ($order->items as $oldItem) {
+            // Backup existing inspections attached to this old item
+            $inspections = \App\Models\DeviceInspection::where('inspectable_type', get_class($oldItem))
+                ->where('inspectable_id', $oldItem->id)
+                ->get(['id', 'imei']);
+            foreach ($inspections as $ins) {
+                $key = strtolower(trim($ins->imei));
+                $this->relinkData['inspections'][$key][] = $ins->id;
+            }
+
+            // Backup existing warranties attached to this old item
+            $warranties = \App\Models\Warranty::where('order_item_id', $oldItem->id)
+                ->get(['id', 'serial_number']);
+            foreach ($warranties as $w) {
+                $key = strtolower(trim($w->serial_number));
+                $this->relinkData['warranties'][$key][] = $w->id;
+            }
+
             $warehouseStock = \App\Models\WarehouseStock::where([
                 'warehouse_id' => Auth::user()->warehouse_id,
                 'variant_id' => $oldItem->product_variant_id,
@@ -1579,7 +1600,58 @@ trait WithCheckoutAndReceipt
 
             $this->attachPromoBreakdownToItem($orderItem, $item, $cleanSns);
             $this->reduceWarehouseStock($item);
+
+            // Re-link inspections & warranties if applicable (from previous draft/settlement)
+            if (!empty($cleanSns)) {
+                foreach ($cleanSns as $sn) {
+                    $key = strtolower(trim($sn));
+
+                    // 1. Relink DeviceInspection
+                    if (!empty($this->relinkData['inspections'][$key])) {
+                        \App\Models\DeviceInspection::whereIn('id', $this->relinkData['inspections'][$key])
+                            ->update([
+                                'inspectable_type' => get_class($orderItem),
+                                'inspectable_id' => $orderItem->id,
+                            ]);
+                    } else {
+                        // Fallback: relink inspeksi yatim jika ada
+                        $orphanedInspection = \App\Models\DeviceInspection::where('imei', $sn)
+                            ->where('inspectable_type', get_class($orderItem))
+                            ->whereNotExists(function ($q) {
+                                $q->select(\Illuminate\Support\Facades\DB::raw(1))
+                                    ->from('order_items')
+                                    ->whereColumn('order_items.id', 'device_inspections.inspectable_id');
+                            })
+                            ->latest()
+                            ->first();
+
+                        if ($orphanedInspection) {
+                            $orphanedInspection->update(['inspectable_id' => $orderItem->id]);
+                        }
+                    }
+
+                    // 2. Relink Warranty
+                    if (!empty($this->relinkData['warranties'][$key])) {
+                        \App\Models\Warranty::whereIn('id', $this->relinkData['warranties'][$key])
+                            ->update([
+                                'order_item_id' => $orderItem->id,
+                            ]);
+                    } else {
+                        // Fallback: relink garansi aktif yang order_item_id-nya NULL
+                        \App\Models\Warranty::where('serial_number', $sn)
+                            ->where('status', 'active')
+                            ->whereNull('order_item_id')
+                            ->where('customer_user_id', $order->user_id)
+                            ->update([
+                                'order_item_id' => $orderItem->id,
+                            ]);
+                    }
+                }
+            }
         }
+
+        // Reset relink buffer
+        $this->relinkData = ['inspections' => [], 'warranties' => []];
     }
 
     /**

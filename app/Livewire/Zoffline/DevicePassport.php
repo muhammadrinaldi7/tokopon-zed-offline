@@ -53,7 +53,8 @@ class DevicePassport extends Component
 
         foreach ($orderItemSns as $snRecord) {
             $item = $snRecord->orderItem;
-            if (!$item) continue;
+            if (!$item || !$item->order) continue;
+            if (in_array($item->order->order_status, ['DRAFT', 'CANCELLED'])) continue;
 
             $deviceModel = $item->product_name;
             $deviceSpecs = $item->variant ? $item->variant->name : '';
