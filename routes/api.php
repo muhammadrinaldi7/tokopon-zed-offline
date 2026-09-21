@@ -56,3 +56,50 @@ Route::prefix('v1/public/trade-in')->middleware('throttle:60,1')->group(function
         ->name('api.public.trade-in.device');
 });
 
+// ============================================
+// EXECUTIVE & DIRECTORS API (STAGE 1)
+// ============================================
+Route::prefix('v1/executive')->group(function () {
+    // Auth login endpoint (rate-limited)
+    Route::post('/login', [\App\Http\Controllers\Api\Executive\ExecutiveAuthController::class, 'login'])
+        ->middleware('throttle:10,1')
+        ->name('api.executive.login');
+
+    // Authenticated & role-guarded endpoints
+    Route::middleware(['auth:sanctum', 'role:superadmin|admin|director'])->group(function () {
+        Route::get('/me', [\App\Http\Controllers\Api\Executive\ExecutiveAuthController::class, 'me'])
+            ->name('api.executive.me');
+        Route::post('/logout', [\App\Http\Controllers\Api\Executive\ExecutiveAuthController::class, 'logout'])
+            ->name('api.executive.logout');
+
+        // Analytics & Metrics Endpoints
+        Route::get('/filters', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'filterOptions'])
+            ->name('api.executive.filters');
+        Route::get('/kpi-summary', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'kpiSummary'])
+            ->name('api.executive.kpi-summary');
+        Route::get('/branch-comparison', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'branchComparison'])
+            ->name('api.executive.branch-comparison');
+        Route::get('/sales-trend', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'salesTrend'])
+            ->name('api.executive.sales-trend');
+        Route::get('/top-products', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'topProducts'])
+            ->name('api.executive.top-products');
+        Route::get('/payment-breakdown', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'paymentBreakdown'])
+            ->name('api.executive.payment-breakdown');
+        Route::get('/overview', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'dashboardOverview'])
+            ->name('api.executive.overview');
+
+        // AI Executive Assistant Endpoints (Direct 9router Integration)
+        Route::prefix('ai')->group(function () {
+            Route::post('/chat', [\App\Http\Controllers\Api\Executive\ExecutiveAiController::class, 'chat'])
+                ->name('api.executive.ai.chat');
+            Route::get('/history', [\App\Http\Controllers\Api\Executive\ExecutiveAiController::class, 'history'])
+                ->name('api.executive.ai.history');
+            Route::post('/summarize', [\App\Http\Controllers\Api\Executive\ExecutiveAiController::class, 'summarize'])
+                ->name('api.executive.ai.summarize');
+            Route::delete('/history', [\App\Http\Controllers\Api\Executive\ExecutiveAiController::class, 'clearHistory'])
+                ->name('api.executive.ai.clear');
+        });
+    });
+});
+
+

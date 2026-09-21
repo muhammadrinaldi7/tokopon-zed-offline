@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "dev:executive": "npm --prefix executive-app run dev",
+        "build:executive": "npm --prefix executive-app run build"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

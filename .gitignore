@@ -22,3 +22,5 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+/executive-app/node_modules
+/executive-app/dist
