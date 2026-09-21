@@ -18,9 +18,11 @@ class WarrantyReturn extends Component
     #[Layout('layouts.z')]
     public function render()
     {
+        $status = in_array($this->activeTab, ['resolved', 'completed']) ? 'completed' : $this->activeTab;
+
         // Ambil klaim garansi yang butuh tindak lanjut finance
         $claims = WarrantyClaim::with(['warranty.orderItem.variant', 'customer'])
-            ->where('status', $this->activeTab)
+            ->where('status', $status)
             ->orderBy('updated_at', 'desc')
             ->get();
 

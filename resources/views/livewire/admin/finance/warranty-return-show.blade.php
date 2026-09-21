@@ -31,7 +31,15 @@
                             <p class="text-sm text-neutral-500 mt-1">Informasi pelanggan dan perangkat</p>
                         </div>
                         <div>
-                            @if ($isDowngrade)
+                            @if ($claim->status === 'completed')
+                                <span
+                                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-700 text-sm font-bold rounded-xl border border-indigo-100">
+                                    <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Selesai Diproses
+                                </span>
+                            @elseif ($isDowngrade)
                                 <span
                                     class="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-50 text-rose-700 text-sm font-bold rounded-xl border border-rose-100">
                                     <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
@@ -261,195 +269,241 @@
                     </p>
                 </div>
 
-                {{-- Form Eksekusi --}}
-                <div
-                    class="bg-white rounded-3xl shadow-xl shadow-neutral-200/40 border border-neutral-100 overflow-hidden">
-                    <div class="p-6 border-b border-neutral-100 bg-neutral-50/50">
-                        <h3 class="font-black text-lg text-neutral-800">Form Eksekusi</h3>
-                    </div>
-
-                    <form wire:submit.prevent="processTransaction" class="p-6 space-y-6">
-
-                        @if (session()->has('error'))
-                            <div
-                                class="p-4 bg-rose-50 text-rose-700 rounded-xl text-sm font-medium border border-rose-100">
-                                {{ session('error') }}
+                @if ($claim->status === 'completed')
+                    {{-- Detail Transaksi Selesai --}}
+                    <div class="bg-white rounded-3xl shadow-xl shadow-neutral-200/40 border border-neutral-100 overflow-hidden">
+                        <div class="p-6 border-b border-neutral-100 bg-neutral-50/50 flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
                             </div>
-                        @endif
-
-                        @error('general')
-                            <div
-                                class="p-4 bg-rose-50 text-rose-700 rounded-xl text-sm font-medium border border-rose-100">
-                                {{ $message }}
+                            <div>
+                                <h3 class="font-black text-lg text-neutral-800">Transaksi Telah Selesai</h3>
+                                <p class="text-xs text-neutral-500 font-medium">Transaksi klaim ini telah selesai diproses oleh finance.</p>
                             </div>
-                        @enderror
-
-                        <div>
-                            <label class="block text-sm font-bold text-neutral-700 mb-2">
-                                Bank Asal Toko <span class="text-rose-500">*</span>
-                            </label>
-                            <div x-data="{
-                                open: false,
-                                search: '',
-                                value: @entangle('selectedBankNo'),
-                                options: [
-                                    { id: '10.02.103', label: '10.02.103 - Kas Retur' },
-                                    @foreach ($banks as $account)
-                                        { id: '{{ $account->account_no }}', label: '{{ $account->account_no }} - {{ addslashes($account->name) }}' }, @endforeach
-                                ],
-                                get filteredOptions() {
-                                    if (this.search === '') return this.options;
-                                    return this.options.filter(i => i.label.toLowerCase().includes(this.search.toLowerCase()));
-                                },
-                                get selectedLabel() {
-                                    const selected = this.options.find(i => i.id == this.value);
-                                    return selected ? selected.label : '-- Pilih Bank --';
-                                }
-                            }" class="relative w-full" @click.away="open = false">
-                                <!-- Trigger -->
-                                <button type="button"
-                                    @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())"
-                                    class="flex items-center justify-between w-full p-3.5 text-sm font-mono text-left bg-neutral-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                                    :class="open ? 'border-emerald-500 ring-2 ring-emerald-100' :
-                                        'border-neutral-200 hover:border-neutral-300'">
-                                    <span x-text="selectedLabel"
-                                        :class="!value ? 'text-neutral-500' : 'text-neutral-900 font-bold'"
-                                        class="truncate pr-4"></span>
-                                    <svg class="w-4 h-4 text-neutral-400 transition-transform shrink-0"
-                                        :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M19 9l-7 7-7-7"></path>
-                                    </svg>
-                                </button>
-
-                                <!-- Dropdown -->
-                                <div x-show="open" x-transition.opacity
-                                    class="absolute z-50 w-full mt-1.5 bg-white border border-neutral-200 rounded-xl shadow-xl"
-                                    style="display: none;">
-                                    <div class="p-2 border-b border-neutral-100 bg-neutral-50/50 rounded-t-xl">
-                                        <div class="relative">
-                                            <svg class="absolute left-2.5 top-2.5 w-4 h-4 text-neutral-400"
-                                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                            </svg>
-                                            <input type="text" x-model="search"
-                                                placeholder="Cari nama atau nomor akun..."
-                                                class="w-full pl-9 pr-3 py-2 text-sm bg-white border border-neutral-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                                                @keydown.escape="open = false" x-ref="searchInput">
-                                        </div>
-                                    </div>
-                                    <ul class="max-h-56 overflow-y-auto py-1">
-                                        <li @click="value = ''; open = false; search = ''"
-                                            class="px-4 py-2.5 text-sm text-neutral-500 cursor-pointer hover:bg-neutral-50 transition-colors">
-                                            -- Pilih Bank --
-                                        </li>
-                                        <template x-for="option in filteredOptions" :key="option.id">
-                                            <li @click="value = option.id; open = false; search = ''"
-                                                class="px-4 py-2.5 text-sm font-mono cursor-pointer hover:bg-emerald-50 transition-colors border-l-2 border-transparent"
-                                                :class="value == option.id ?
-                                                    'bg-emerald-50 text-emerald-700 font-bold border-emerald-500' :
-                                                    'text-neutral-700 hover:border-emerald-200'">
-                                                <span x-text="option.label"></span>
-                                            </li>
-                                        </template>
-                                        <li x-show="filteredOptions.length === 0"
-                                            class="px-4 py-3 text-sm text-neutral-400 text-center italic bg-neutral-50/50">
-                                            Akun tidak ditemukan
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-                            <p class="text-[11px] text-neutral-400 mt-2 font-medium">Daftar bank di atas telah
-                                disesuaikan dengan Business Unit pesanan asli.</p>
-                            @error('selectedBankNo')
-                                <span class="text-xs text-rose-500 mt-1 block font-bold">{{ $message }}</span>
-                            @enderror
                         </div>
 
-                        {{-- Tampilkan upload file HANYA jika Refund (isDowngrade) --}}
-                        @if ($isDowngrade)
+                        <div class="p-6 space-y-4">
+                            <div class="flex justify-between items-center py-2.5 border-b border-neutral-100 text-sm">
+                                <span class="text-neutral-400 font-bold text-xs uppercase tracking-wider">Status Transaksi</span>
+                                <span class="px-3 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-lg border border-emerald-100">Selesai</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2.5 border-b border-neutral-100 text-sm">
+                                <span class="text-neutral-400 font-bold text-xs uppercase tracking-wider">Waktu Selesai</span>
+                                <span class="font-bold text-neutral-700 font-mono">{{ $claim->resolved_at ? \Carbon\Carbon::parse($claim->resolved_at)->format('d M Y, H:i') : '-' }}</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2.5 border-b border-neutral-100 text-sm">
+                                <span class="text-neutral-400 font-bold text-xs uppercase tracking-wider">Akun Bank Toko</span>
+                                <span class="font-bold text-neutral-700 font-mono">{{ $claim->store_bank_no ?: '-' }}</span>
+                            </div>
+                            @if ($claim->payment_receipt_path)
+                                <div class="pt-2">
+                                    <span class="text-neutral-400 font-bold text-xs uppercase tracking-wider block mb-2">Bukti Transfer</span>
+                                    <a href="{{ asset('storage/' . $claim->payment_receipt_path) }}" target="_blank" class="block group relative rounded-2xl overflow-hidden border border-neutral-200 hover:border-emerald-400 transition">
+                                        <img src="{{ asset('storage/' . $claim->payment_receipt_path) }}" alt="Bukti Transfer" class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300">
+                                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1.5">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                            </svg>
+                                            Buka Ukuran Penuh
+                                        </div>
+                                    </a>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @else
+                    {{-- Form Eksekusi --}}
+                    <div
+                        class="bg-white rounded-3xl shadow-xl shadow-neutral-200/40 border border-neutral-100 overflow-hidden">
+                        <div class="p-6 border-b border-neutral-100 bg-neutral-50/50">
+                            <h3 class="font-black text-lg text-neutral-800">Form Eksekusi</h3>
+                        </div>
+
+                        <form wire:submit.prevent="processTransaction" class="p-6 space-y-6">
+
+                            @if (session()->has('error'))
+                                <div
+                                    class="p-4 bg-rose-50 text-rose-700 rounded-xl text-sm font-medium border border-rose-100">
+                                    {{ session('error') }}
+                                </div>
+                            @endif
+
+                            @error('general')
+                                <div
+                                    class="p-4 bg-rose-50 text-rose-700 rounded-xl text-sm font-medium border border-rose-100">
+                                    {{ $message }}
+                                </div>
+                            @enderror
+
                             <div>
                                 <label class="block text-sm font-bold text-neutral-700 mb-2">
-                                    Upload Bukti Transfer <span class="text-rose-500">*</span>
+                                    Bank Asal Toko <span class="text-rose-500">*</span>
                                 </label>
-                                <div
-                                    class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-neutral-200 border-dashed rounded-2xl hover:border-emerald-400 hover:bg-emerald-50/50 transition-colors group relative {{ $paymentReceipt ? 'bg-emerald-50 border-emerald-400' : 'bg-neutral-50' }}">
-                                    <div class="space-y-2 text-center">
-                                        @if ($paymentReceipt)
-                                            <svg class="mx-auto h-10 w-10 text-emerald-500" fill="none"
-                                                viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            <div class="text-sm text-emerald-700 font-bold">File Terpilih</div>
-                                            <p class="text-xs text-emerald-500 font-medium truncate max-w-[200px]">
-                                                {{ $paymentReceipt->getClientOriginalName() }}</p>
-                                        @else
-                                            <svg class="mx-auto h-10 w-10 text-neutral-300 group-hover:text-emerald-400 transition-colors"
-                                                stroke="currentColor" fill="none" viewBox="0 0 48 48"
-                                                aria-hidden="true">
-                                                <path
-                                                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                                                    stroke-width="2" stroke-linecap="round"
-                                                    stroke-linejoin="round" />
-                                            </svg>
-                                            <div class="flex text-sm text-neutral-600 justify-center">
-                                                <label for="file-upload"
-                                                    class="relative cursor-pointer rounded-md font-bold text-emerald-600 hover:text-emerald-500 focus-within:outline-none">
-                                                    <span>Upload file</span>
-                                                    <input id="file-upload" wire:model="paymentReceipt"
-                                                        type="file" class="sr-only" accept="image/*">
-                                                </label>
-                                            </div>
-                                            <p class="text-xs text-neutral-400 font-medium">PNG, JPG, GIF up to 5MB
-                                            </p>
-                                        @endif
-                                    </div>
+                                <div x-data="{
+                                    open: false,
+                                    search: '',
+                                    value: @entangle('selectedBankNo'),
+                                    options: [
+                                        { id: '10.02.103', label: '10.02.103 - Kas Retur' },
+                                        @foreach ($banks as $account)
+                                            { id: '{{ $account->account_no }}', label: '{{ $account->account_no }} - {{ addslashes($account->name) }}' }, @endforeach
+                                    ],
+                                    get filteredOptions() {
+                                        if (this.search === '') return this.options;
+                                        return this.options.filter(i => i.label.toLowerCase().includes(this.search.toLowerCase()));
+                                    },
+                                    get selectedLabel() {
+                                        const selected = this.options.find(i => i.id == this.value);
+                                        return selected ? selected.label : '-- Pilih Bank --';
+                                    }
+                                }" class="relative w-full" @click.away="open = false">
+                                    <!-- Trigger -->
+                                    <button type="button"
+                                        @click="open = !open; if(open) $nextTick(() => $refs.searchInput.focus())"
+                                        class="flex items-center justify-between w-full p-3.5 text-sm font-mono text-left bg-neutral-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                                        :class="open ? 'border-emerald-500 ring-2 ring-emerald-100' :
+                                            'border-neutral-200 hover:border-neutral-300'">
+                                        <span x-text="selectedLabel"
+                                            :class="!value ? 'text-neutral-500' : 'text-neutral-900 font-bold'"
+                                            class="truncate pr-4"></span>
+                                        <svg class="w-4 h-4 text-neutral-400 transition-transform shrink-0"
+                                            :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </button>
 
-                                    {{-- Loading indicator --}}
-                                    <div wire:loading wire:target="paymentReceipt"
-                                        class="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-                                        <div class="flex items-center gap-2 text-emerald-600 font-bold">
-                                            <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg"
-                                                fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                    stroke="currentColor" stroke-width="4"></circle>
-                                                <path class="opacity-75" fill="currentColor"
-                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                                </path>
-                                            </svg>
-                                            Mengunggah...
+                                    <!-- Dropdown -->
+                                    <div x-show="open" x-transition.opacity
+                                        class="absolute z-50 w-full mt-1.5 bg-white border border-neutral-200 rounded-xl shadow-xl"
+                                        style="display: none;">
+                                        <div class="p-2 border-b border-neutral-100 bg-neutral-50/50 rounded-t-xl">
+                                            <div class="relative">
+                                                <svg class="absolute left-2.5 top-2.5 w-4 h-4 text-neutral-400"
+                                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                                </svg>
+                                                <input type="text" x-model="search"
+                                                    placeholder="Cari nama atau nomor akun..."
+                                                    class="w-full pl-9 pr-3 py-2 text-sm bg-white border border-neutral-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                                                    @keydown.escape="open = false" x-ref="searchInput">
+                                            </div>
                                         </div>
+                                        <ul class="max-h-56 overflow-y-auto py-1">
+                                            <li @click="value = ''; open = false; search = ''"
+                                                class="px-4 py-2.5 text-sm text-neutral-500 cursor-pointer hover:bg-neutral-50 transition-colors">
+                                                -- Pilih Bank --
+                                            </li>
+                                            <template x-for="option in filteredOptions" :key="option.id">
+                                                <li @click="value = option.id; open = false; search = ''"
+                                                    class="px-4 py-2.5 text-sm font-mono cursor-pointer hover:bg-emerald-50 transition-colors border-l-2 border-transparent"
+                                                    :class="value == option.id ?
+                                                        'bg-emerald-50 text-emerald-700 font-bold border-emerald-500' :
+                                                        'text-neutral-700 hover:border-emerald-200'">
+                                                    <span x-text="option.label"></span>
+                                                </li>
+                                            </template>
+                                            <li x-show="filteredOptions.length === 0"
+                                                class="px-4 py-3 text-sm text-neutral-400 text-center italic bg-neutral-50/50">
+                                                Akun tidak ditemukan
+                                            </li>
+                                        </ul>
                                     </div>
                                 </div>
-                                @error('paymentReceipt')
+                                <p class="text-[11px] text-neutral-400 mt-2 font-medium">Daftar bank di atas telah
+                                    disesuaikan dengan Business Unit pesanan asli.</p>
+                                @error('selectedBankNo')
                                     <span class="text-xs text-rose-500 mt-1 block font-bold">{{ $message }}</span>
                                 @enderror
                             </div>
-                        @endif
 
-                        <div class="pt-4 border-t border-neutral-100">
-                            <button type="submit" wire:loading.attr="disabled"
-                                class="w-full flex items-center justify-center px-6 py-3.5 border border-transparent text-sm font-black rounded-xl text-white {{ $isDowngrade ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700' }} shadow-md hover:shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 {{ $isDowngrade ? 'focus:ring-rose-500' : 'focus:ring-emerald-500' }} disabled:opacity-50 disabled:cursor-not-allowed">
-                                <span wire:loading.remove wire:target="processTransaction">Konfirmasi & Simpan
-                                    Transaksi</span>
-                                <span wire:loading wire:target="processTransaction" class="flex items-center gap-2">
-                                    <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg"
-                                        fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10"
-                                            stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor"
-                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                        </path>
-                                    </svg>
-                                    Memproses ke Accurate...
-                                </span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                            {{-- Tampilkan upload file HANYA jika Refund (isDowngrade) --}}
+                            @if ($isDowngrade)
+                                <div>
+                                    <label class="block text-sm font-bold text-neutral-700 mb-2">
+                                        Upload Bukti Transfer <span class="text-rose-500">*</span>
+                                    </label>
+                                    <div
+                                        class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-neutral-200 border-dashed rounded-2xl hover:border-emerald-400 hover:bg-emerald-50/50 transition-colors group relative {{ $paymentReceipt ? 'bg-emerald-50 border-emerald-400' : 'bg-neutral-50' }}">
+                                        <div class="space-y-2 text-center">
+                                            @if ($paymentReceipt)
+                                                <svg class="mx-auto h-10 w-10 text-emerald-500" fill="none"
+                                                    viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                <div class="text-sm text-emerald-700 font-bold">File Terpilih</div>
+                                                <p class="text-xs text-emerald-500 font-medium truncate max-w-[200px]">
+                                                    {{ $paymentReceipt->getClientOriginalName() }}</p>
+                                            @else
+                                                <svg class="mx-auto h-10 w-10 text-neutral-300 group-hover:text-emerald-400 transition-colors"
+                                                    stroke="currentColor" fill="none" viewBox="0 0 48 48"
+                                                    aria-hidden="true">
+                                                    <path
+                                                        d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                                                        stroke-width="2" stroke-linecap="round"
+                                                        stroke-linejoin="round" />
+                                                </svg>
+                                                <div class="flex text-sm text-neutral-600 justify-center">
+                                                    <label for="file-upload"
+                                                        class="relative cursor-pointer rounded-md font-bold text-emerald-600 hover:text-emerald-500 focus-within:outline-none">
+                                                        <span>Upload file</span>
+                                                        <input id="file-upload" wire:model="paymentReceipt"
+                                                            type="file" class="sr-only" accept="image/*">
+                                                    </label>
+                                                </div>
+                                                <p class="text-xs text-neutral-400 font-medium">PNG, JPG, GIF up to 5MB
+                                                </p>
+                                            @endif
+                                        </div>
+
+                                        {{-- Loading indicator --}}
+                                        <div wire:loading wire:target="paymentReceipt"
+                                            class="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                                            <div class="flex items-center gap-2 text-emerald-600 font-bold">
+                                                <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg"
+                                                    fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                        stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor"
+                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                    </path>
+                                                </svg>
+                                                Mengunggah...
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @error('paymentReceipt')
+                                        <span class="text-xs text-rose-500 mt-1 block font-bold">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                            @endif
+
+                            <div class="pt-4 border-t border-neutral-100">
+                                <button type="submit" wire:loading.attr="disabled"
+                                    class="w-full flex items-center justify-center px-6 py-3.5 border border-transparent text-sm font-black rounded-xl text-white {{ $isDowngrade ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700' }} shadow-md hover:shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 {{ $isDowngrade ? 'focus:ring-rose-500' : 'focus:ring-emerald-500' }} disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <span wire:loading.remove wire:target="processTransaction">Konfirmasi & Simpan
+                                        Transaksi</span>
+                                    <span wire:loading wire:target="processTransaction" class="flex items-center gap-2">
+                                        <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg"
+                                            fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10"
+                                                stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                            </path>
+                                        </svg>
+                                        Memproses ke Accurate...
+                                    </span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                @endif
 
             </div>
         </div>

@@ -118,8 +118,8 @@
                                         <div class="text-[11px] font-black text-neutral-400 uppercase tracking-wider mt-0.5">{{ ($claim->resolution_type === 'replacement_different' || $claim->resolution === 'replaced_different') ? 'Upgrade/Downgrade' : 'Sama' }}</div>
                                     </td>
                                     <td class="px-6 py-4 text-right">
-                                        <div class="font-black text-lg {{ $activeTab === 'waiting_refund' ? 'text-rose-600' : 'text-emerald-600' }}">
-                                            Rp {{ number_format($claim->refund_amount ?? 0, 0, ',', '.') }}
+                                        <div class="font-black text-lg {{ $activeTab === 'waiting_refund' ? 'text-rose-600' : ($activeTab === 'waiting_payment' ? 'text-emerald-600' : 'text-neutral-800') }}">
+                                            {{ $claim->refund_amount ? 'Rp ' . number_format($claim->refund_amount, 0, ',', '.') : '-' }}
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 text-center">
