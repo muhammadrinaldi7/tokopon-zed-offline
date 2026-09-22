@@ -15,6 +15,7 @@ class PurchaseOrderItem extends Model
         'unit_price',
         'quantity_ordered',
         'quantity_received',
+        'quantity_pushed',
     ];
 
     protected $casts = [

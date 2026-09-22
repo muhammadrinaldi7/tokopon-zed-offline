@@ -28,17 +28,34 @@
     </div>
 
     <div class="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden">
-        <div class="p-5 border-b border-neutral-100 bg-neutral-50/50">
-            <div class="relative max-w-md">
+        <div class="p-5 border-b border-neutral-100 bg-neutral-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <!-- Filter Tabs -->
+            <div class="flex items-center gap-1.5 bg-neutral-100/80 p-1 rounded-xl border border-neutral-200 text-xs font-bold">
+                <button type="button" wire:click="$set('statusFilter', 'all')"
+                    class="px-3.5 py-1.5 rounded-lg transition-all {{ $statusFilter === 'all' ? 'bg-white text-neutral-900 shadow-xs' : 'text-neutral-500 hover:text-neutral-700' }}">
+                    Semua ({{ $countAll }})
+                </button>
+                <button type="button" wire:click="$set('statusFilter', 'pending')"
+                    class="px-3.5 py-1.5 rounded-lg transition-all {{ $statusFilter === 'pending' ? 'bg-white text-amber-700 shadow-xs' : 'text-neutral-500 hover:text-neutral-700' }}">
+                    ⏳ Menunggu Inbound ({{ $countPending }})
+                </button>
+                <button type="button" wire:click="$set('statusFilter', 'completed')"
+                    class="px-3.5 py-1.5 rounded-lg transition-all {{ $statusFilter === 'completed' ? 'bg-white text-emerald-700 shadow-xs' : 'text-neutral-500 hover:text-neutral-700' }}">
+                    ✓ Selesai ({{ $countCompleted }})
+                </button>
+            </div>
+
+            <!-- Search -->
+            <div class="relative w-full md:w-72">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                 </div>
                 <input type="text" wire:model.live.debounce.300ms="search"
-                    placeholder="Cari No. PO atau Nama Vendor..."
-                    class="w-full pl-10 pr-4 py-2.5 bg-white border border-neutral-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none">
+                    placeholder="Cari No. PO / Vendor..."
+                    class="w-full pl-9 pr-4 py-2 bg-white border border-neutral-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none">
             </div>
         </div>
 
@@ -109,15 +126,26 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4 text-right whitespace-nowrap">
-                                <a href="{{ route('zoffline.inbound.scan', $po->id) }}"
-                                    class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-lg text-sm font-bold hover:bg-neutral-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm">
-                                    Mulai Pindai
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
-                                        </path>
-                                    </svg>
-                                </a>
+                                @if ($po->status === 'COMPLETED')
+                                    <a href="{{ route('zoffline.inbound.scan', $po->id) }}"
+                                        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-50 border border-neutral-200 text-neutral-600 rounded-lg text-xs font-bold hover:bg-neutral-100 hover:text-neutral-900 transition-all shadow-2xs">
+                                        <svg class="w-3.5 h-3.5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        Lihat Detail
+                                    </a>
+                                @else
+                                    <a href="{{ route('zoffline.inbound.scan', $po->id) }}"
+                                        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
+                                            </path>
+                                        </svg>
+                                        Pindai / Terima
+                                    </a>
+                                @endif
                             </td>
                         </tr>
                     @empty

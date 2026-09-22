@@ -15,8 +15,14 @@ class Index extends Component
     use WithPagination;
 
     public $search = '';
+    public $statusFilter = 'all'; // 'all', 'pending', 'completed'
 
     public function updatingSearch()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingStatusFilter()
     {
         $this->resetPage();
     }
@@ -34,10 +40,23 @@ class Index extends Component
     {
         $bu = Auth::user()->getActiveBusinessUnit();
         $buCode = $bu ? $bu->code : 'syihab';
+
+        $baseQuery = PurchaseOrder::where('database_source', $buCode)->whereHas('items');
+
+        $countAll = (clone $baseQuery)->count();
+        $countPending = (clone $baseQuery)->whereIn('status', ['PENDING', 'PARTIAL'])->count();
+        $countCompleted = (clone $baseQuery)->where('status', 'COMPLETED')->count();
+
         $query = PurchaseOrder::with(['vendor', 'items'])
             ->where('database_source', $buCode)
             ->whereHas('items')
             ->orderBy('id', 'desc');
+
+        if ($this->statusFilter === 'pending') {
+            $query->whereIn('status', ['PENDING', 'PARTIAL']);
+        } elseif ($this->statusFilter === 'completed') {
+            $query->where('status', 'COMPLETED');
+        }
 
         if ($this->search) {
             $query->where(function($q) {
@@ -49,7 +68,10 @@ class Index extends Component
         }
 
         return view('livewire.zoffline.inbound.index', [
-            'pos' => $query->paginate(15)
+            'pos' => $query->paginate(15),
+            'countAll' => $countAll,
+            'countPending' => $countPending,
+            'countCompleted' => $countCompleted,
         ]);
     }
 }

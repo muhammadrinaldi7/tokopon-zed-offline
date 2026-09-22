@@ -134,6 +134,19 @@ class SyncPurchaseOrders extends Command
                         }
                     }
 
+                    // Evaluasi status Accurate
+                    $accStatus = strtoupper($detailPo['status'] ?? '');
+                    $accStatusName = $detailPo['statusName'] ?? '';
+                    $isAccFullyReceived = in_array($accStatus, ['FULLRECEIVED', 'CLOSED']) 
+                        || (stripos($accStatusName, 'terproses') !== false && stripos($accStatusName, 'sebagian') === false);
+
+                    $initialStatus = 'PENDING';
+                    if ($isAccFullyReceived) {
+                        $initialStatus = 'COMPLETED';
+                    } elseif ($accStatus === 'WAITING' || stripos($accStatusName, 'sebagian') !== false) {
+                        $initialStatus = 'PARTIAL';
+                    }
+
                     // 4. Create atau Update Purchase Order
                     $po = PurchaseOrder::updateOrCreate(
                         [
@@ -143,6 +156,7 @@ class SyncPurchaseOrders extends Command
                         [
                             'po_number' => $detailPo['number'] ?? $detailPo['no'] ?? 'PO-' . ($poData['id']),
                             'vendor_id' => $vendorId,
+                            'status' => $initialStatus,
                             'po_date' => isset($detailPo['transDate'])
                                 ? (str_contains($detailPo['transDate'], '/')
                                     ? \Carbon\Carbon::createFromFormat('d/m/Y', $detailPo['transDate'])->format('Y-m-d')
@@ -158,7 +172,10 @@ class SyncPurchaseOrders extends Command
                         $itemNo = $item['item']['no'] ?? $item['itemNo'];
                         $unitPrice = $item['unitPrice'] ?? 0;
                         $itemName = $item['item']['name'] ?? $item['itemName'];
-                        $quantity = $item['quantity'] ?? 0;
+                        $quantity = (int) ($item['quantity'] ?? 0);
+                        $shipQuantity = (int) ($item['shipQuantity'] ?? 0);
+                        $remainingQuantity = (int) ($item['remainingQuantity'] ?? 0);
+                        $isItemClosed = (bool) ($item['closed'] ?? false);
                         $detailId = $item['id'] ?? null;
 
                         // Ekstrak status apakah barang membutuhkan nomor serial / IMEI (manageSN)
@@ -184,13 +201,10 @@ class SyncPurchaseOrders extends Command
                         $poItem = null;
 
                         if ($detailId) {
-                            // Try to find by accurate_detail_id first
                             $poItem = PurchaseOrderItem::where('purchase_order_id', $po->id)
                                 ->where('accurate_detail_id', $detailId)
                                 ->first();
 
-                            // If not found, try to find an existing old item (where accurate_detail_id is null) 
-                            // that matches item_no and unit_price
                             if (!$poItem) {
                                 $poItem = PurchaseOrderItem::where('purchase_order_id', $po->id)
                                     ->whereNull('accurate_detail_id')
@@ -198,48 +212,64 @@ class SyncPurchaseOrders extends Command
                                     ->where('unit_price', $unitPrice)
                                     ->first();
                             }
-
-                            if ($poItem) {
-                                // Update existing
-                                $poItem->update([
-                                    'accurate_detail_id' => $detailId,
-                                    'item_no' => $itemNo,
-                                    'unit_price' => $unitPrice,
-                                    'item_name' => $itemName,
-                                    'has_sn' => $hasSn,
-                                    'quantity_ordered' => $quantity,
-                                ]);
-                            } else {
-                                // Create new
-                                $poItem = PurchaseOrderItem::create([
-                                    'purchase_order_id' => $po->id,
-                                    'accurate_detail_id' => $detailId,
-                                    'item_no' => $itemNo,
-                                    'unit_price' => $unitPrice,
-                                    'item_name' => $itemName,
-                                    'has_sn' => $hasSn,
-                                    'quantity_ordered' => $quantity,
-                                ]);
-                            }
                         } else {
-                            // Fallback for older Accurate structures without detail ID
-                            $poItem = PurchaseOrderItem::updateOrCreate(
-                                [
-                                    'purchase_order_id' => $po->id,
-                                    'item_no' => $itemNo,
-                                    'unit_price' => $unitPrice,
-                                ],
-                                [
-                                    'item_name' => $itemName,
-                                    'has_sn' => $hasSn,
-                                    'quantity_ordered' => $quantity,
-                                ]
-                            );
+                            $poItem = PurchaseOrderItem::where('purchase_order_id', $po->id)
+                                ->where('item_no', $itemNo)
+                                ->where('unit_price', $unitPrice)
+                                ->first();
                         }
+
+                        // Hitung received dan pushed berdasarkan riwayat Accurate + lokal
+                        $currentReceived = $poItem ? (int) $poItem->quantity_received : 0;
+                        $currentPushed = $poItem ? (int) $poItem->quantity_pushed : 0;
+                        $inspectionCount = $poItem ? $poItem->inspections()->count() : 0;
+
+                        $newReceived = max($currentReceived, $inspectionCount, $shipQuantity);
+                        $newPushed = max($currentPushed, $shipQuantity);
+
+                        // Jika item atau PO di Accurate sudah berstatus selesai/terproses penuh:
+                        if ($isAccFullyReceived || $isItemClosed || ($shipQuantity >= $quantity && $quantity > 0)) {
+                            $newReceived = max($newReceived, $quantity);
+                            $newPushed = max($newPushed, $quantity);
+                        }
+
+                        $itemPayload = [
+                            'item_no' => $itemNo,
+                            'unit_price' => $unitPrice,
+                            'item_name' => $itemName,
+                            'has_sn' => $hasSn,
+                            'quantity_ordered' => $quantity,
+                            'quantity_received' => $newReceived,
+                            'quantity_pushed' => $newPushed,
+                        ];
+
+                        if ($detailId) {
+                            $itemPayload['accurate_detail_id'] = $detailId;
+                        }
+
+                        if ($poItem) {
+                            $poItem->update($itemPayload);
+                        } else {
+                            $itemPayload['purchase_order_id'] = $po->id;
+                            $poItem = PurchaseOrderItem::create($itemPayload);
+                        }
+
                         $existingItemIds[] = $poItem->id;
                     }
 
-                    // 6. Delete items yang sudah tidak ada di PO (hanya jika belum ada riwayat inspeksi scan)
+                    // 6. Evaluasi status akhir PO lokal berdasarkan total kuantitas
+                    $totalOrdered = PurchaseOrderItem::where('purchase_order_id', $po->id)->sum('quantity_ordered');
+                    $totalReceived = PurchaseOrderItem::where('purchase_order_id', $po->id)->sum('quantity_received');
+
+                    if ($isAccFullyReceived || ($totalOrdered > 0 && $totalReceived >= $totalOrdered)) {
+                        $po->update(['status' => 'COMPLETED']);
+                    } elseif ($totalReceived > 0) {
+                        $po->update(['status' => 'PARTIAL']);
+                    } else {
+                        $po->update(['status' => 'PENDING']);
+                    }
+
+                    // 7. Delete items yang sudah tidak ada di PO (hanya jika belum ada riwayat inspeksi scan)
                     $itemsToDelete = PurchaseOrderItem::where('purchase_order_id', $po->id)
                         ->whereNotIn('id', $existingItemIds)
                         ->get();

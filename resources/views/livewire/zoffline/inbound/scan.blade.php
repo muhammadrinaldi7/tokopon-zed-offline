@@ -43,32 +43,50 @@
             @php
                 $ordered = $po->items->sum('quantity_ordered');
                 $received = $po->items->sum('quantity_received');
-                $isComplete = $ordered > 0 && $received === $ordered;
+                $pushed = $po->items->sum('quantity_pushed');
+                $unpushed = max(0, $received - $pushed);
+                $isComplete = $ordered > 0 && $received >= $ordered;
                 $isPartial = $received > 0 && $received < $ordered;
+                $canSync = $unpushed > 0;
             @endphp
 
-            {{-- PERMISSION CHECK: Tambahkan @can('inbound.migrate-scan') atau check permission di sini jika diperlukan --}}
             @can('salin-imei-po')
                 <button wire:click="openMigrateModal"
-                    class="px-4 py-3 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 text-sm hover:shadow-md">
-                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 text-sm hover:shadow-md">
+                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2">
                         </path>
                     </svg>
-                    <span>Salin Scan dari PO Lain</span>
+                    <span>Salin Scan PO Lain</span>
                 </button>
             @endcan
 
-            <button wire:click="openConfirmModal"
-                class="px-6 py-3 font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 {{ $isComplete || $isPartial ? 'bg-emerald-600 hover:bg-emerald-700 text-white hover:shadow-md' : 'bg-neutral-200 text-neutral-400 cursor-not-allowed' }}"
-                {{ $isComplete || $isPartial ? '' : 'disabled' }}>
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span>Selesaikan Penerimaan (Sync)</span>
-            </button>
+            @if ($canSync)
+                <button wire:click="openConfirmModal"
+                    class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2 text-sm hover:shadow-lg">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Kirim ke Accurate ({{ $unpushed }} Siap Sync)</span>
+                </button>
+            @elseif ($isComplete && $pushed >= $ordered)
+                <div class="px-4 py-2.5 bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold rounded-xl flex items-center gap-2 text-sm shadow-xs">
+                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Semua Item Sudah Tersinkron ke Accurate</span>
+                </div>
+            @else
+                <button disabled
+                    class="px-5 py-2.5 bg-neutral-100 text-neutral-400 border border-neutral-200 font-semibold rounded-xl flex items-center gap-2 text-sm cursor-not-allowed">
+                    <svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Belum Ada Item Siap Sync</span>
+                </button>
+            @endif
         </div>
     </div>
 
@@ -137,19 +155,42 @@
             </div>
 
             <div class="bg-white rounded-2xl shadow-sm border border-neutral-200 p-6">
-                <h3 class="font-bold text-neutral-800 mb-4">Progress Keseluruhan</h3>
+                <h3 class="font-bold text-neutral-800 mb-3">Progress Penerimaan</h3>
                 @php
                     $totalPercent = $ordered > 0 ? min(100, round(($received / $ordered) * 100)) : 0;
+                    $syncPercent = $ordered > 0 ? min(100, round(($pushed / $ordered) * 100)) : 0;
                 @endphp
                 <div class="flex items-end justify-between mb-2">
-                    <div class="text-3xl font-black text-blue-600">{{ $received }}</div>
-                    <div class="text-sm font-bold text-neutral-500 mb-1">dari {{ $ordered }} Unit</div>
+                    <div>
+                        <span class="text-3xl font-black {{ $isComplete ? 'text-emerald-600' : 'text-blue-600' }}">{{ $received }}</span>
+                        <span class="text-sm font-bold text-neutral-500">/ {{ $ordered }} Unit</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-sm font-black {{ $isComplete ? 'text-emerald-600' : 'text-blue-600' }}">{{ $totalPercent }}%</span>
+                        <span class="text-xs text-neutral-400 block font-medium">Diterima</span>
+                    </div>
                 </div>
-                <div class="w-full bg-neutral-100 rounded-full h-3 mb-2 overflow-hidden">
-                    <div class="bg-blue-500 h-full rounded-full transition-all duration-1000"
+                <div class="w-full bg-neutral-100 rounded-full h-2.5 mb-4 overflow-hidden">
+                    <div class="h-full rounded-full transition-all duration-700 {{ $isComplete ? 'bg-emerald-500' : 'bg-blue-600' }}"
                         style="width: {{ $totalPercent }}%"></div>
                 </div>
-                <div class="text-right text-xs font-bold text-neutral-500">{{ $totalPercent }}% Selesai</div>
+
+                <div class="space-y-2 pt-3 border-t border-neutral-100 text-xs">
+                    <div class="flex items-center justify-between text-neutral-600">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            Tersinkron ke Accurate:
+                        </span>
+                        <span class="font-bold text-neutral-800">{{ $pushed }} Unit ({{ $syncPercent }}%)</span>
+                    </div>
+                    <div class="flex items-center justify-between text-neutral-600">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full {{ $unpushed > 0 ? 'bg-amber-500 animate-pulse' : 'bg-neutral-300' }}"></span>
+                            Menunggu Sync:
+                        </span>
+                        <span class="font-bold {{ $unpushed > 0 ? 'text-amber-600 font-mono' : 'text-neutral-500' }}">{{ $unpushed }} Unit</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -166,74 +207,93 @@
                         str_contains($upperProyek, 'IBOX') ||
                         str_contains($upperProyek, 'TAM');
                     $isInter = str_contains($upperProyek, 'INTER') || str_contains($upperProyek, 'GLOBAL');
+                    $itemPercent = $item->quantity_ordered > 0 ? min(100, round(($item->quantity_received / $item->quantity_ordered) * 100)) : 0;
+                    $remainingItem = max(0, $item->quantity_ordered - $item->quantity_received);
+                    $unpushedItem = max(0, $item->quantity_received - $item->quantity_pushed);
                 @endphp
-                <div
-                    class="bg-white rounded-2xl shadow-sm border {{ $isActive ? 'border-blue-400 ring-4 ring-blue-50' : 'border-neutral-200' }} overflow-hidden transition-all">
-                    <!-- Item Header -->
-                    <div
-                        class="p-5 {{ $isDone ? 'bg-emerald-50/50' : 'bg-white' }} flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100">
-                        <div>
-                            <div class="flex flex-wrap items-center gap-2 mb-1">
-                                <h4 class="font-bold text-neutral-800 text-lg">{{ $item->item_name }}</h4>
+                <div class="bg-white rounded-2xl shadow-sm border {{ $isDone ? 'border-emerald-200/80 bg-emerald-50/10' : ($isActive ? 'border-blue-400 ring-4 ring-blue-50' : 'border-neutral-200') }} overflow-hidden transition-all">
+                    <!-- Item Header & Actions -->
+                    <div class="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <!-- Item Info (Left) -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                                <h4 class="font-bold text-neutral-800 text-base leading-snug">{{ $item->item_name }}</h4>
 
                                 @if ($item->has_sn)
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
                                         📱 Wajib IMEI
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                        📦 Non-IMEI / Persediaan
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                                        📦 Non-IMEI
                                     </span>
                                 @endif
 
                                 @if ($proyek !== '-')
-                                    <span
-                                        class="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-extrabold uppercase tracking-wide border {{ $isResmi ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : ($isInter ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-blue-100 text-blue-800 border-blue-200') }}">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide border shrink-0 {{ $isResmi ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : ($isInter ? 'bg-amber-50 text-amber-900 border-amber-300' : 'bg-blue-50 text-blue-800 border-blue-200') }}">
                                         📁 Proyek: {{ $proyek }}
                                     </span>
                                 @endif
 
                                 @if ($isDone)
-                                    <span
-                                        class="bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-md font-bold flex items-center gap-1 border border-emerald-200">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
-                                                d="M5 13l4 4L19 7"></path>
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                                        <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
                                         </svg>
                                         Lengkap
                                     </span>
                                 @endif
                             </div>
-                            <div class="flex items-center gap-3 text-sm text-neutral-500">
-                                <span class="flex items-center gap-1.5"><svg class="w-4 h-4 text-neutral-400"
-                                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z">
-                                        </path>
-                                    </svg> <span
-                                        class="font-mono font-bold text-neutral-700">{{ $item->item_no }}</span></span>
+
+                            <!-- SKU, Harga, & Accurate Sync Status -->
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
+                                <span class="font-mono font-bold text-neutral-700">{{ $item->item_no }}</span>
                                 <span class="text-neutral-300">&bull;</span>
-                                <span class="font-semibold text-neutral-600">Rp
-                                    {{ number_format($item->unit_price, 0, ',', '.') }}</span>
+                                <span class="font-semibold text-neutral-600">Rp {{ number_format($item->unit_price, 0, ',', '.') }}</span>
+                                
+                                @if ($item->quantity_pushed > 0)
+                                    <span class="text-neutral-300">&bull;</span>
+                                    <span class="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[11px]">
+                                        <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        Tersinkron: {{ $item->quantity_pushed }}/{{ $item->quantity_ordered }}
+                                    </span>
+                                @endif
+                                @if ($unpushedItem > 0)
+                                    <span class="text-neutral-300">&bull;</span>
+                                    <span class="inline-flex items-center gap-1 text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[11px]">
+                                        ⏳ Menunggu Sync: {{ $unpushedItem }} unit
+                                    </span>
+                                @endif
+                                @if ($item->quantity_received == 0)
+                                    <span class="text-neutral-300">&bull;</span>
+                                    <span class="text-neutral-400 italic">Belum ada penerimaan</span>
+                                @endif
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-5 sm:justify-end">
+                        <!-- Progress Counter & Actions (Right) -->
+                        <div class="flex items-center gap-4 md:justify-end shrink-0">
+                            <!-- Counter -->
                             <div class="text-right">
-                                <div class="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-0.5">
-                                    Diterima</div>
+                                <div class="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Diterima</div>
                                 <div class="text-2xl font-black {{ $isDone ? 'text-emerald-600' : 'text-blue-600' }}">
-                                    {{ $item->quantity_received }}<span
-                                        class="text-base text-neutral-400 font-bold">/{{ $item->quantity_ordered }}</span>
+                                    {{ $item->quantity_received }}<span class="text-sm font-bold text-neutral-400">/{{ $item->quantity_ordered }}</span>
                                 </div>
                             </div>
-                            @if (!$isDone)
+
+                            <!-- Action Buttons -->
+                            @if ($isDone)
+                                <div class="px-3.5 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    <span>Selesai</span>
+                                </div>
+                            @else
                                 @if ($item->has_sn)
                                     <button wire:click="setActiveItemByRow({{ $item->id }})"
-                                        class="px-5 py-2.5 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-600 hover:text-white transition-all text-sm font-bold shadow-sm border border-blue-200 hover:border-blue-600 flex items-center gap-2 group shrink-0">
-                                        <svg class="w-5 h-5 text-blue-500 group-hover:text-white transition-colors"
-                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 hover:shadow">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
                                             </path>
@@ -241,44 +301,42 @@
                                         Scan IMEI
                                     </button>
                                 @else
-                                    <div class="flex items-center gap-2 shrink-0">
-                                        <button wire:click="openNonSnModal({{ $item->id }})"
-                                            class="px-4 py-2.5 bg-amber-50 hover:bg-amber-600 text-amber-800 hover:text-white rounded-xl transition-all text-xs font-bold shadow-sm border border-amber-200 hover:border-amber-600 flex items-center gap-1.5 group">
-                                            <svg class="w-4 h-4 text-amber-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                    <div class="flex items-center gap-1.5">
+                                        @if ($unpushedItem > 0)
+                                            <button type="button" wire:click="decrementNonSnReceive({{ $item->id }})"
+                                                title="Kurangi 1 unit belum sync"
+                                                class="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"></path>
+                                                </svg>
+                                            </button>
+                                        @endif
+                                        <button type="button" wire:click="openNonSnModal({{ $item->id }})"
+                                            class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 hover:shadow">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                             </svg>
                                             Input Qty
                                         </button>
-                                        <button wire:click="quickReceiveAllNonSn({{ $item->id }})"
-                                            class="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white rounded-xl transition-all text-xs font-bold shadow-sm border border-emerald-200 hover:border-emerald-600 flex items-center gap-1 group"
-                                            title="Terima Semua Sisa ({{ $item->quantity_ordered - $item->quantity_received }} unit)">
-                                            <svg class="w-4 h-4 text-emerald-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        <button type="button" wire:click="quickReceiveAllNonSn({{ $item->id }})"
+                                            class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1 hover:shadow"
+                                            title="Terima Semua Sisa ({{ $remainingItem }} unit)">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
                                             </svg>
-                                            Terima Semua
+                                            Terima Semua ({{ $remainingItem }})
                                         </button>
                                     </div>
                                 @endif
                             @endif
                         </div>
-                    <!-- Non-SN Item Info & Adjustment -->
-                    @if (!$item->has_sn)
-                        <div class="p-3.5 bg-neutral-50 border-t border-neutral-100 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-600">
-                            <div class="flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                                <span>Item Persediaan Non-IMEI (Aksesoris/Komponen). Penerimaan dicatat berdasarkan jumlah fisik (kuantitas).</span>
-                            </div>
-                            @if ($item->quantity_received > 0 && $item->quantity_received > $item->quantity_pushed)
-                                <button type="button" wire:click="decrementNonSnReceive({{ $item->id }})"
-                                    class="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-200 transition-colors">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
-                                    </svg>
-                                    Kurangi 1 Unit
-                                </button>
-                            @endif
-                        </div>
-                    @endif
+                    </div>
+
+                    <!-- Micro Progress Bar -->
+                    <div class="w-full bg-neutral-100 h-1 overflow-hidden">
+                        <div class="h-full {{ $isDone ? 'bg-emerald-500' : 'bg-blue-500' }} transition-all duration-500"
+                            style="width: {{ $itemPercent }}%"></div>
+                    </div>
 
                     <!-- Scanned IMEIs List -->
                     @if ($item->inspections->count() > 0)
@@ -1247,21 +1305,34 @@
                             </div>
                         </div>
 
-                        <!-- Quantity Input -->
+                        <!-- Quantity Input & Presets -->
                         <div>
                             <label class="block text-xs font-bold text-neutral-700 mb-2">
-                                Kuantitas Diterima Saat Ini:
+                                Kuantitas Diterima:
                             </label>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 mb-2.5">
                                 <input type="number" wire:model="nonSnQtyInput" min="1" max="{{ $remQty }}"
-                                    class="w-full text-center text-lg font-black py-2.5 px-4 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                    class="w-full text-center text-xl font-black py-2.5 px-4 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
                                     placeholder="Kuantitas...">
+                            </div>
+
+                            <!-- Preset Buttons -->
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="text-[11px] text-neutral-400 font-semibold mr-1">Cepat:</span>
+                                @foreach ([1, 5, 10, 50] as $preset)
+                                    @if ($preset <= $remQty)
+                                        <button type="button" wire:click="$set('nonSnQtyInput', {{ $preset }})"
+                                            class="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-bold rounded-lg transition-colors border border-neutral-200">
+                                            {{ $preset }}
+                                        </button>
+                                    @endif
+                                @endforeach
                                 <button type="button" wire:click="$set('nonSnQtyInput', {{ $remQty }})"
-                                    class="px-3.5 py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded-xl whitespace-nowrap transition-colors border border-amber-300">
-                                    Semua ({{ $remQty }})
+                                    class="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded-lg transition-colors border border-amber-300 ml-auto">
+                                    Semua Sisa ({{ $remQty }})
                                 </button>
                             </div>
-                            <p class="text-[11px] text-neutral-400 mt-1.5">Maksimal yang bisa diterima: {{ $remQty }} unit.</p>
+                            <p class="text-[11px] text-neutral-400 mt-2">Maksimal yang bisa diterima saat ini: <strong>{{ $remQty }} unit</strong>.</p>
                         </div>
                     @endif
                 </div>
