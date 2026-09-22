@@ -32,7 +32,7 @@ class ManagementSalesReport extends Component
 
     public function mount()
     {
-        $this->businessUnitFilter = (string)(Auth::user()->getActiveBusinessUnitId() ?? '');
+        $this->businessUnitFilter = (string)(Auth::user()?->getActiveBusinessUnitId() ?? '');
         $this->setDateRange();
     }
 
@@ -203,89 +203,97 @@ class ManagementSalesReport extends Component
         return $this->buildItemsQuery();
     }
 
-    public function buildItemsQuery()
+    public function buildBaseItemsQuery()
     {
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
-        $buId = $this->businessUnitFilter ?: Auth::user()->getActiveBusinessUnitId();
+        $buId = $this->businessUnitFilter ?: (Auth::user()?->getActiveBusinessUnitId() ?? '');
 
-        return OrderItem::with([
+        return OrderItem::query()
+            ->whereHas('order', function ($oq) use ($start, $end, $buId) {
+                $oq->whereBetween('order_date', [$start, $end])
+                    ->whereIn('order_status', ['COMPLETED', 'PIUTANG'])
+                    ->when($buId && $buId !== 'all', function ($bq) use ($buId) {
+                        $bq->where('business_unit_id', $buId);
+                    })
+                    ->when($this->branchFilter, function ($bq) {
+                        $bq->where('shipping_address_snapshot->store', $this->branchFilter);
+                    });
+            })
+            ->when($this->search, function ($sq) {
+                $sq->where(function ($q) {
+                    $q->where('order_items.product_name', 'like', '%' . $this->search . '%')
+                        ->orWhere('order_items.serial_number', 'like', '%' . $this->search . '%')
+                        ->orWhereHas('order', function ($qo) {
+                            $qo->where('order_number', 'like', '%' . $this->search . '%')
+                                ->orWhere('accurate_invoice_no', 'like', '%' . $this->search . '%')
+                                ->orWhere('accurate_so_number', 'like', '%' . $this->search . '%')
+                                ->orWhereHas('user', function ($qu) {
+                                    $qu->where('name', 'like', '%' . $this->search . '%');
+                                })
+                                ->orWhereHas('salesBy', function ($qs) {
+                                    $qs->where('name', 'like', '%' . $this->search . '%');
+                                })
+                                ->orWhereHas('handledBy', function ($qh) {
+                                    $qh->where('name', 'like', '%' . $this->search . '%');
+                                });
+                        })
+                        ->orWhereHasMorph('variant', [ProductAccurate::class], function ($vq) {
+                            $vq->where('item_no', 'like', '%' . $this->search . '%')
+                                ->orWhere('name', 'like', '%' . $this->search . '%');
+                        });
+                });
+            })
+            ->when($this->vendorFilter, function ($query) use ($buId) {
+                if ($this->vendorFilter === 'unknown') {
+                    $query->where(function ($qi) {
+                        $qi->whereNull('serial_number')->orWhere('serial_number', '');
+                    });
+                } else {
+                    $snList = ProductSerialNumber::when($buId && $buId !== 'all', function ($q) use ($buId) {
+                            $q->where('business_unit_id', $buId);
+                        })
+                        ->whereHas('vendor', function ($qv) {
+                            $qv->where('vendor_name', $this->vendorFilter);
+                        })->pluck('serial_number')->toArray();
+
+                    if (!empty($snList)) {
+                        $query->where(function ($qSub) use ($snList) {
+                            $qSub->whereHas('serialNumbers', function ($qsn) use ($snList) {
+                                $qsn->whereIn('serial_number', $snList);
+                            });
+                            foreach (array_chunk($snList, 50) as $chunk) {
+                                $qSub->orWhere(function ($qc) use ($chunk) {
+                                    foreach ($chunk as $sn) {
+                                        $qc->orWhere('order_items.serial_number', 'like', '%' . $sn . '%');
+                                    }
+                                });
+                            }
+                        });
+                    }
+                }
+            })
+            ->when(!empty($this->proyekFilter), function ($query) {
+                $query->whereHasMorph('variant', [ProductAccurate::class], function ($vq) {
+                    $vq->whereIn('proyek', $this->proyekFilter);
+                });
+            })
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->select('order_items.*')
+            ->orderBy('orders.order_date', 'desc')
+            ->orderBy('order_items.id', 'desc');
+    }
+
+    public function buildItemsQuery()
+    {
+        return $this->buildBaseItemsQuery()->with([
             'order.user.profile',
             'order.salesBy',
             'order.handledBy',
             'order.businessUnit',
             'variant',
             'promos'
-        ])
-        ->whereHas('order', function ($oq) use ($start, $end, $buId) {
-            $oq->whereBetween('order_date', [$start, $end])
-                ->whereIn('order_status', ['COMPLETED', 'PIUTANG'])
-                ->when($buId && $buId !== 'all', function ($bq) use ($buId) {
-                    $bq->where('business_unit_id', $buId);
-                })
-                ->when($this->branchFilter, function ($bq) {
-                    $bq->where('shipping_address_snapshot->store', $this->branchFilter);
-                });
-        })
-        ->when($this->search, function ($sq) {
-            $sq->where(function ($q) {
-                $q->where('order_items.product_name', 'like', '%' . $this->search . '%')
-                    ->orWhere('order_items.serial_number', 'like', '%' . $this->search . '%')
-                    ->orWhereHas('order', function ($qo) {
-                        $qo->where('order_number', 'like', '%' . $this->search . '%')
-                            ->orWhere('accurate_invoice_no', 'like', '%' . $this->search . '%')
-                            ->orWhere('accurate_so_number', 'like', '%' . $this->search . '%')
-                            ->orWhereHas('user', function ($qu) {
-                                $qu->where('name', 'like', '%' . $this->search . '%');
-                            })
-                            ->orWhereHas('salesBy', function ($qs) {
-                                $qs->where('name', 'like', '%' . $this->search . '%');
-                            })
-                            ->orWhereHas('handledBy', function ($qh) {
-                                $qh->where('name', 'like', '%' . $this->search . '%');
-                            });
-                    })
-                    ->orWhereHasMorph('variant', [ProductAccurate::class], function ($vq) {
-                        $vq->where('item_no', 'like', '%' . $this->search . '%')
-                            ->orWhere('name', 'like', '%' . $this->search . '%');
-                    });
-            });
-        })
-        ->when($this->vendorFilter, function ($query) {
-            if ($this->vendorFilter === 'unknown') {
-                $query->where(function ($qi) {
-                    $qi->whereNull('serial_number')->orWhere('serial_number', '');
-                });
-            } else {
-                $snList = ProductSerialNumber::whereHas('vendor', function ($qv) {
-                    $qv->where('vendor_name', $this->vendorFilter);
-                })->pluck('serial_number')->toArray();
-
-                if (!empty($snList)) {
-                    $query->where(function ($qSub) use ($snList) {
-                        $qSub->whereHas('serialNumbers', function ($qsn) use ($snList) {
-                            $qsn->whereIn('serial_number', $snList);
-                        });
-                        foreach (array_chunk($snList, 50) as $chunk) {
-                            $qSub->orWhere(function ($qc) use ($chunk) {
-                                foreach ($chunk as $sn) {
-                                    $qc->orWhere('order_items.serial_number', 'like', '%' . $sn . '%');
-                                }
-                            });
-                        }
-                    });
-                }
-            }
-        })
-        ->when(!empty($this->proyekFilter), function ($query) {
-            $query->whereHasMorph('variant', [ProductAccurate::class], function ($vq) {
-                $vq->whereIn('proyek', $this->proyekFilter);
-            });
-        })
-        ->join('orders', 'order_items.order_id', '=', 'orders.id')
-        ->select('order_items.*')
-        ->orderBy('orders.order_date', 'desc')
-        ->orderBy('order_items.id', 'desc');
+        ]);
     }
 
     public function isReturnItem($item, $order = null): bool
@@ -329,9 +337,13 @@ class ManagementSalesReport extends Component
         }
         $allSns = array_unique($allSns);
 
+        $buId = $this->businessUnitFilter ?: (Auth::user()?->getActiveBusinessUnitId() ?? '');
         $snMap = [];
         if (!empty($allSns)) {
-            $snMap = ProductSerialNumber::with('vendor')
+            $snMap = ProductSerialNumber::when($buId && $buId !== 'all', function ($q) use ($buId) {
+                    $q->where('business_unit_id', $buId);
+                })
+                ->with('vendor')
                 ->whereIn('serial_number', $allSns)
                 ->get()
                 ->keyBy('serial_number');
@@ -344,13 +356,17 @@ class ManagementSalesReport extends Component
             if (!$order) continue;
 
             $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
+            $isReturn = $this->isReturnItem($item, $order);
 
             // Hitung Penjualan Bersih Item
-            $itemPromosTotal = $item->promos->sum('pivot.discount_amount');
+            $itemPromosTotal = (float)$item->promos->sum('pivot.discount_amount');
             $promoNamesArray = $item->promos->pluck('name')->unique()->toArray();
             $promoNamesStr = !empty($promoNamesArray) ? implode(', ', $promoNamesArray) : '-';
 
-            $actualItemSubtotal = $item->subtotal - ($item->discount_amount ?? 0) - $itemPromosTotal;
+            $actualItemSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - $itemPromosTotal;
+            if ($isReturn && $actualItemSubtotal > 0) {
+                $actualItemSubtotal = -$actualItemSubtotal;
+            }
             $penjualanBersih = round($actualItemSubtotal);
 
             // Detail Varian Produk
@@ -364,7 +380,7 @@ class ManagementSalesReport extends Component
             $snList = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
             $vendor = '-';
             $itemHpp = 0;
-            $isReturn = $this->isReturnItem($item, $order);
+            $qty = (float)$item->qty;
 
             if (!empty($snList)) {
                 // Sesuai Aturan: Jika produk ber-SN, ambil HPP dari product_serial_numbers
@@ -374,13 +390,18 @@ class ManagementSalesReport extends Component
                     if ($snModel?->vendor?->vendor_name) {
                         $vendorNames[] = $snModel->vendor->vendor_name;
                     }
-                    if (!$isReturn) {
-                        $snHpp = (float)($snModel?->hpp ?? 0);
-                        // Fallback jika HPP SN belum terisi / 0: ambil HPP rata-rata base_cost
-                        if ($snHpp <= 0) {
-                            $snHpp = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
-                        }
-                        $itemHpp += $snHpp;
+                    $snHpp = (float)($snModel?->hpp ?? 0);
+                    // Fallback jika HPP SN belum terisi / 0: ambil HPP rata-rata base_cost
+                    if ($snHpp <= 0) {
+                        $snHpp = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                    }
+                    $itemHpp += $snHpp;
+                }
+                if ($isReturn) {
+                    if ($qty < 0 && $itemHpp > 0) {
+                        $itemHpp = -$itemHpp;
+                    } elseif ($qty > 0 && $itemHpp > 0) {
+                        $itemHpp = -$itemHpp;
                     }
                 }
                 $vendorNames = array_unique($vendorNames);
@@ -389,22 +410,17 @@ class ManagementSalesReport extends Component
                 if (!empty($variant?->vendor_name)) {
                     $vendor = $variant->vendor_name;
                 }
-                if (!$isReturn) {
-                    // Sesuai Aturan: Jika non-SN, ambil HPP rata-rata (base_cost dari ProductAccurate) * qty
-                    $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
-                    $itemHpp = $baseCost * (float)$item->qty;
+                // Sesuai Aturan: Jika non-SN, ambil HPP rata-rata (base_cost dari ProductAccurate) * qty
+                $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                $itemHpp = $baseCost * $qty;
+                if ($isReturn && $itemHpp > 0) {
+                    $itemHpp = -$itemHpp;
                 }
             }
 
-            if ($isReturn) {
-                $itemHpp = 0;
-                $margin = 0;
-                $marginPct = 0;
-            } else {
-                $itemHpp = round($itemHpp);
-                $margin = $penjualanBersih - $itemHpp;
-                $marginPct = $penjualanBersih > 0 ? round(($margin / $penjualanBersih) * 100, 2) : 0;
-            }
+            $itemHpp = round($itemHpp);
+            $margin = $penjualanBersih - $itemHpp;
+            $marginPct = $penjualanBersih != 0 ? round(($margin / abs($penjualanBersih)) * 100, 2) : 0;
 
             $businessUnitName = $order->businessUnit?->name ?? '-';
 
@@ -434,9 +450,9 @@ class ManagementSalesReport extends Component
                 $itemPromosTotal,
                 $item->subtotal,
                 $penjualanBersih,
-                $isReturn ? '-' : $itemHpp,
-                $isReturn ? '-' : $margin,
-                $isReturn ? '-' : ($marginPct . '%')
+                $itemHpp,
+                $margin,
+                $marginPct . '%'
             ];
         }
 
@@ -500,11 +516,109 @@ class ManagementSalesReport extends Component
         return Excel::download(new ManagementSalesReportExport($rows), $excelFileName);
     }
 
+    public function calculateSummaryMetrics(): array
+    {
+        $buId = $this->businessUnitFilter ?: (Auth::user()?->getActiveBusinessUnitId() ?? '');
+        $totalOrdersCount = $this->ordersQuery->count();
+
+        $items = $this->buildBaseItemsQuery()
+            ->with([
+                'order:id,order_number,accurate_invoice_no,shipping_address_snapshot,total_amount',
+                'variant'
+            ])
+            ->withSum('promos as item_promos_discount', 'order_item_promos.discount_amount')
+            ->get(['order_items.id', 'order_items.order_id', 'order_items.product_variant_type', 'order_items.product_variant_id', 'order_items.qty', 'order_items.subtotal', 'order_items.discount_amount', 'order_items.serial_number']);
+
+        $totalItemRows = $items->count();
+        $totalQty = 0;
+        $totalPenjualanBersih = 0;
+        $totalHpp = 0;
+
+        $summarySns = [];
+        foreach ($items as $item) {
+            $totalQty += (float)$item->qty;
+            if (!empty($item->serial_number)) {
+                $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                foreach ($sns as $sn) {
+                    $summarySns[] = $sn;
+                }
+            }
+        }
+        $summarySns = array_unique($summarySns);
+
+        $summarySnMap = [];
+        if (!empty($summarySns)) {
+            $summarySnMap = ProductSerialNumber::when($buId && $buId !== 'all', function ($q) use ($buId) {
+                    $q->where('business_unit_id', $buId);
+                })
+                ->whereIn('serial_number', $summarySns)
+                ->pluck('hpp', 'serial_number')
+                ->toArray();
+        }
+
+        foreach ($items as $item) {
+            $order = $item->order;
+            $isReturn = $this->isReturnItem($item, $order);
+
+            $itemPromosTotal = (float)($item->item_promos_discount ?? 0);
+            $actualItemSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - $itemPromosTotal;
+            if ($isReturn && $actualItemSubtotal > 0) {
+                $actualItemSubtotal = -$actualItemSubtotal;
+            }
+            $penjualanBersihItem = round($actualItemSubtotal);
+            $totalPenjualanBersih += $penjualanBersihItem;
+
+            $variant = $item->variant;
+            $itemHpp = 0;
+            $qty = (float)$item->qty;
+
+            if (!empty($item->serial_number)) {
+                $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                foreach ($sns as $sn) {
+                    $snHpp = isset($summarySnMap[$sn]) ? (float)$summarySnMap[$sn] : 0;
+                    if ($snHpp <= 0) {
+                        $snHpp = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                    }
+                    $itemHpp += $snHpp;
+                }
+                if ($isReturn) {
+                    if ($qty < 0 && $itemHpp > 0) {
+                        $itemHpp = -$itemHpp;
+                    } elseif ($qty > 0 && $itemHpp > 0) {
+                        $itemHpp = -$itemHpp;
+                    }
+                }
+            } else {
+                $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                $itemHpp = $baseCost * $qty;
+                if ($isReturn && $itemHpp > 0) {
+                    $itemHpp = -$itemHpp;
+                }
+            }
+
+            $totalHpp += round($itemHpp);
+        }
+
+        $totalMargin = $totalPenjualanBersih - $totalHpp;
+        $overallMarginPct = $totalPenjualanBersih > 0 ? round(($totalMargin / $totalPenjualanBersih) * 100, 2) : 0;
+
+        return [
+            'orders_count' => $totalOrdersCount,
+            'items_count' => $totalItemRows,
+            'total_qty' => $totalQty,
+            'net_sales' => $totalPenjualanBersih,
+            'total_hpp' => $totalHpp,
+            'total_margin' => $totalMargin,
+            'margin_pct' => $overallMarginPct,
+        ];
+    }
+
     public function render()
     {
+        $buId = $this->businessUnitFilter ?: (Auth::user()?->getActiveBusinessUnitId() ?? '');
         $paginatedItems = $this->buildItemsQuery()->paginate(20);
 
-        // Pre-fetch SN data khusus halaman aktif untuk performa cepat di Blade UI
+        // Pre-fetch SN data khusus halaman aktif untuk performa cepat di Blade UI (Tenant-Aware)
         $pageSns = [];
         foreach ($paginatedItems as $item) {
             if (!empty($item->serial_number)) {
@@ -518,70 +632,19 @@ class ManagementSalesReport extends Component
 
         $snDataMap = [];
         if (!empty($pageSns)) {
-            $snDataMap = ProductSerialNumber::with('vendor')
+            $snDataMap = ProductSerialNumber::when($buId && $buId !== 'all', function ($q) use ($buId) {
+                    $q->where('business_unit_id', $buId);
+                })
+                ->with('vendor')
                 ->whereIn('serial_number', $pageSns)
                 ->get()
                 ->keyBy('serial_number');
         }
 
-        // Hitung metrik ringkasan (Summary Cards)
-        $allMatchingItems = $this->buildItemsQuery()->get();
-        $totalOrdersCount = $this->ordersQuery->count();
-        $totalPenjualanBersih = 0;
-        $totalHpp = 0;
-
-        // Kumpulkan semua SN untuk summary total
-        $summarySns = [];
-        foreach ($allMatchingItems as $item) {
-            if (!empty($item->serial_number)) {
-                $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
-                foreach ($sns as $sn) {
-                    $summarySns[] = $sn;
-                }
-            }
-        }
-        $summarySns = array_unique($summarySns);
-
-        $summarySnMap = [];
-        if (!empty($summarySns)) {
-            $summarySnMap = ProductSerialNumber::whereIn('serial_number', $summarySns)
-                ->pluck('hpp', 'serial_number')
-                ->toArray();
-        }
-
-        foreach ($allMatchingItems as $item) {
-            $isReturn = $this->isReturnItem($item, $item->order);
-
-            $itemPromosTotal = $item->promos->sum('pivot.discount_amount');
-            $actualItemSubtotal = $item->subtotal - ($item->discount_amount ?? 0) - $itemPromosTotal;
-            $penjualanBersihItem = round($actualItemSubtotal);
-            $totalPenjualanBersih += $penjualanBersihItem;
-
-            if (!$isReturn) {
-                $itemHpp = 0;
-                if (!empty($item->serial_number)) {
-                    $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
-                    foreach ($sns as $sn) {
-                        $snHpp = isset($summarySnMap[$sn]) ? (float)$summarySnMap[$sn] : 0;
-                        if ($snHpp <= 0) {
-                            $snHpp = (float)($item->variant?->base_cost ?? $item->variant?->accurateData?->base_cost ?? 0);
-                        }
-                        $itemHpp += $snHpp;
-                    }
-                } else {
-                    $baseCost = (float)($item->variant?->base_cost ?? $item->variant?->accurateData?->base_cost ?? 0);
-                    $itemHpp = $baseCost * (float)$item->qty;
-                }
-                $totalHpp += round($itemHpp);
-            }
-        }
-
-        $totalMargin = $totalPenjualanBersih - $totalHpp;
-        $overallMarginPct = $totalPenjualanBersih > 0 ? round(($totalMargin / $totalPenjualanBersih) * 100, 2) : 0;
+        // Hitung metrik ringkasan (Summary Cards) secara optimal dan hemat memori
+        $summary = $this->calculateSummaryMetrics();
 
         $businessUnits = BusinessUnit::where('is_active', true)->orderBy('name')->get();
-
-        $buId = $this->businessUnitFilter ?: Auth::user()->getActiveBusinessUnitId();
 
         $availableBranches = Branch::when($buId && $buId !== 'all', function ($q) use ($buId) {
                 $q->where('business_unit_id', $buId);
@@ -614,14 +677,7 @@ class ManagementSalesReport extends Component
             'availableBranches' => $availableBranches,
             'availableVendors' => $availableVendors,
             'availableProjects' => $availableProjects,
-            'summary' => [
-                'orders_count' => $totalOrdersCount,
-                'items_count' => $allMatchingItems->count(),
-                'net_sales' => $totalPenjualanBersih,
-                'total_hpp' => $totalHpp,
-                'total_margin' => $totalMargin,
-                'margin_pct' => $overallMarginPct,
-            ]
+            'summary' => $summary,
         ])->layout('layouts.z');
     }
 }
