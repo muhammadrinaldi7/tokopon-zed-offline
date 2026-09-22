@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AiChatHistory;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -21,10 +22,10 @@ class ExecutiveAiService
         $this->metricsService = $metricsService;
 
         // 9router or any OpenAI-compatible gateway configuration
-        $this->apiBase = rtrim(env('NINEROUTER_API_BASE', env('OPENAI_URL', 'https://api.9router.com/v1')), '/');
-        $this->apiKey = env('NINEROUTER_API_KEY', env('OPENAI_API_KEY', ''));
-        $this->model = env('NINEROUTER_MODEL', 'claude-3-5-sonnet');
-        $this->timeout = (int) env('NINEROUTER_TIMEOUT', 90);
+        $this->apiBase = rtrim(config('services.ninerouter.base_url', 'https://api.9router.com/v1'), '/');
+        $this->apiKey = config('services.ninerouter.api_key', '');
+        $this->model = config('services.ninerouter.model', 'groq/openai/gpt-oss-120b');
+        $this->timeout = (int) config('services.ninerouter.timeout', 90);
     }
 
     /**
@@ -35,12 +36,28 @@ class ExecutiveAiService
         $now = now()->translatedFormat('l, d F Y H:i:s');
         $userName = $user ? $user->name : 'Bapak/Ibu Direksi';
 
+        if (empty($contextData)) {
+            $contextData = Cache::remember('executive_live_summary_context', 120, function () {
+                try {
+                    return [
+                        'period' => ['range' => 'this_month'],
+                        'summary' => $this->metricsService->getKpiSummary(['period' => 'this_month']),
+                        'branches' => $this->metricsService->getBranchComparison(['period' => 'this_month']),
+                    ];
+                } catch (\Throwable $e) {
+                    Log::warning('ExecutiveAiService fallback metrics error: ' . $e->getMessage());
+                    return null;
+                }
+            });
+        }
+
         $metricsContext = '';
         if ($contextData) {
             $period = $contextData['period']['range'] ?? 'this_month';
             $summary = $contextData['summary'] ?? ($contextData['kpi']['summary'] ?? null);
             $branches = $contextData['branches'] ?? null;
             $topProducts = $contextData['top_products'] ?? null;
+            $payments = $contextData['payments'] ?? null;
 
             if ($summary) {
                 $netSales = number_format($summary['net_sales'] ?? 0, 0, ',', '.');
@@ -60,23 +77,37 @@ class ExecutiveAiService
             }
 
             if (!empty($branches) && is_array($branches)) {
-                $metricsContext .= "\n[PERFORMA CABANG TOKO TOP]\n";
-                foreach (array_slice($branches, 0, 4) as $idx => $b) {
+                $metricsContext .= "\n[PERFORMA LENGKAP SELURUH CABANG]\n";
+                foreach ($branches as $idx => $b) {
                     $bName = $b['branch_name'] ?? '-';
                     $bNet = number_format($b['net_sales'] ?? 0, 0, ',', '.');
+                    $bProfit = number_format($b['gross_profit'] ?? 0, 0, ',', '.');
                     $bMargin = number_format($b['margin_percentage'] ?? 0, 1, ',', '.');
                     $bShare = $b['contribution_percentage'] ?? 0;
-                    $metricsContext .= "- #" . ($idx + 1) . " {$bName}: Omset Rp {$bNet} (Margin: {$bMargin}%, Kontribusi: {$bShare}%)\n";
+                    $bOrders = number_format($b['orders_count'] ?? 0, 0, ',', '.');
+                    $metricsContext .= "- #" . ($idx + 1) . " {$bName}: Omset Bersih Rp {$bNet} (Laba Kotor: Rp {$bProfit}, Margin: {$bMargin}%, Kontribusi: {$bShare}%, Transaksi: {$bOrders})\n";
                 }
             }
 
             if (!empty($topProducts) && is_array($topProducts)) {
-                $metricsContext .= "\n[TOP 3 PRODUK TERLARIS]\n";
-                foreach (array_slice($topProducts, 0, 3) as $p) {
+                $metricsContext .= "\n[TOP PRODUK TERLARIS]\n";
+                foreach (array_slice($topProducts, 0, 10) as $idx => $p) {
                     $pName = $p['name'] ?? '-';
                     $pQty = $p['qty_sold'] ?? 0;
                     $pRev = number_format($p['revenue'] ?? 0, 0, ',', '.');
-                    $metricsContext .= "- #{$p['rank']} {$pName} ({$pQty} unit, Rp {$pRev})\n";
+                    $rank = $p['rank'] ?? ($idx + 1);
+                    $metricsContext .= "- #{$rank} {$pName} ({$pQty} unit, Rp {$pRev})\n";
+                }
+            }
+
+            if (!empty($payments) && is_array($payments)) {
+                $metricsContext .= "\n[BREAKDOWN METODE PEMBAYARAN]\n";
+                foreach ($payments as $pay) {
+                    $mName = $pay['payment_method_name'] ?? '-';
+                    $mTotal = number_format($pay['total_amount'] ?? 0, 0, ',', '.');
+                    $mShare = $pay['share_percentage'] ?? 0;
+                    $mMdr = number_format($pay['total_mdr'] ?? 0, 0, ',', '.');
+                    $metricsContext .= "- {$mName}: Total Rp {$mTotal} (Porsi: {$mShare}%, Biaya MDR: Rp {$mMdr})\n";
                 }
             }
         }
@@ -150,8 +181,8 @@ PROMPT;
                 'model' => $this->model,
                 'messages' => $messages,
                 'stream' => false,
-                'temperature' => (float) env('NINEROUTER_TEMPERATURE', 0.4),
-                'max_tokens' => (int) env('NINEROUTER_MAX_TOKENS', 2000),
+                'temperature' => (float) config('services.ninerouter.temperature', 0.4),
+                'max_tokens' => (int) config('services.ninerouter.max_tokens', 2000),
             ];
 
             $response = $request->post($endpoint, $payload);
@@ -226,18 +257,26 @@ PROMPT;
      * handling standard JSON, reasoning/thinking models, content arrays, and SSE streams.
      */
     protected function extractReplyFromResponse(\Illuminate\Http\Client\Response $response): string
-
     {
-        $body = $response->body();
-        $json = $response->json();
+        $body = trim($response->body());
+        
+        // Strip trailing 'data: [DONE]' or streaming sentinel appended by some router gateways
+        $cleanedBody = preg_replace('/\s*data:\s*\[DONE\]\s*$/s', '', $body);
+        $json = json_decode($cleanedBody, true) ?? $response->json();
 
-        // 1. Standard OpenAI JSON format
+        // 1. Standard OpenAI / Groq JSON format
         if (is_array($json) && isset($json['choices'][0])) {
             $choice = $json['choices'][0];
 
             // Direct message content
             if (isset($choice['message']['content']) && is_string($choice['message']['content']) && trim($choice['message']['content']) !== '') {
                 return trim($choice['message']['content']);
+            }
+
+            // Reasoning models (Groq / DeepSeek / OpenAI reasoning)
+            $reasoning = $choice['message']['reasoning_content'] ?? ($choice['message']['reasoning'] ?? null);
+            if (!empty($reasoning) && is_string($reasoning) && trim($reasoning) !== '') {
+                return trim($reasoning);
             }
 
             // Message content as array of blocks (e.g. Claude format)
@@ -253,11 +292,6 @@ PROMPT;
                 if (!empty($textParts)) {
                     return trim(implode("\n", $textParts));
                 }
-            }
-
-            // Reasoning models (e.g. DeepSeek-R1 / O1 / O3 thinking)
-            if (!empty($choice['message']['reasoning_content'])) {
-                return trim($choice['message']['reasoning_content']);
             }
 
             // Legacy completions format (choices[0].text)

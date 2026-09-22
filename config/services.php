@@ -49,4 +49,17 @@ return [
         'sellphone_template_id' => env('QONTAK_SELLPHONE_TEMPLATE_ID', env('QONTAK_TEMPLATE_ID')),
     ],
 
+    'ninerouter' => [
+        'base_url' => env('NINEROUTER_API_BASE', env('OPENAI_URL', 'https://api.9router.com/v1')),
+        'api_key' => env('NINEROUTER_API_KEY', env('OPENAI_API_KEY', '')),
+        'model' => env('NINEROUTER_MODEL', 'groq/openai/gpt-oss-120b'),
+        'timeout' => (int) env('NINEROUTER_TIMEOUT', 90),
+        'temperature' => (float) env('NINEROUTER_TEMPERATURE', 0.4),
+        'max_tokens' => (int) env('NINEROUTER_MAX_TOKENS', 2000),
+    ],
+
+    'n8n' => [
+        'agent_token' => env('N8N_AGENT_TOKEN', 'zedpos-2026-banjarbaru'),
+    ],
+
 ];

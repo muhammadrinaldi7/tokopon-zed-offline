@@ -98,7 +98,7 @@ class Chat extends Component
             // 2. Ambil URL Webhook n8n dari tabel ai_settings
             $setting = AiSetting::where('provider', 'n8n')->first();
             $webhookUrl = $setting ? $setting->api_key : null;
-            $webhookToken = $setting ? $setting->model : env('N8N_AGENT_TOKEN', 'zedpos-2026-banjarbaru');
+            $webhookToken = $setting ? $setting->model : config('services.n8n.agent_token', 'zedpos-2026-banjarbaru');
 
             if (!$webhookUrl) {
                 throw new \Exception('URL Webhook n8n belum dikonfigurasi di pengaturan AI.');
