@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ApprovalRequest;
 use App\Models\Branch;
 use App\Models\BusinessUnit;
 use App\Models\Order;
@@ -10,6 +11,8 @@ use App\Models\OrderPayment;
 use App\Models\ProductAccurate;
 use App\Models\ProductSerialNumber;
 use App\Models\ProductVariant;
+use App\Models\Promo;
+use App\Models\SellPhone;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -780,6 +783,375 @@ class ExecutiveMetricsService
                 ['value' => 'this_year', 'label' => 'Tahun Ini'],
                 ['value' => 'custom', 'label' => 'Kustom (Tanggal)'],
             ],
+        ];
+    }
+
+    /**
+     * Get Staff KPI (Salespersons vs Cashiers performance).
+     */
+    public function getStaffKpi(array $filters): array
+    {
+        $orders = $this->baseOrderQuery($filters)->with(['salesBy', 'handledBy'])->get();
+
+        // 1. Salespersons Performance (sales_id)
+        $salesGrouped = $orders->groupBy('sales_id')->map(function ($group, $salesId) {
+            $sales = $group->first()->salesBy;
+            $salesName = $sales ? $sales->name : 'Walk-in / Tanpa Sales';
+            $totalOrders = $group->count();
+            $totalQty = $group->sum('total_qty');
+            $grossSales = $group->sum('total_amount');
+            $netSales = $group->sum('grand_total');
+            $aov = $totalOrders > 0 ? round($netSales / $totalOrders, 2) : 0;
+
+            return [
+                'sales_id' => $salesId ?: null,
+                'sales_name' => $salesName,
+                'position' => $sales?->position ?? 'Sales Staff',
+                'orders_count' => $totalOrders,
+                'total_qty' => (int)$totalQty,
+                'gross_sales' => round($grossSales, 2),
+                'net_sales' => round($netSales, 2),
+                'aov' => $aov,
+            ];
+        })->sortByDesc('net_sales')->values();
+
+        $totalSalesNet = $salesGrouped->sum('net_sales');
+        $salesData = $salesGrouped->map(function ($item, $idx) use ($totalSalesNet) {
+            $item['rank'] = $idx + 1;
+            $item['contribution_pct'] = $totalSalesNet > 0 ? round(($item['net_sales'] / $totalSalesNet) * 100, 1) : 0;
+            return $item;
+        })->toArray();
+
+        // 2. Cashiers Performance (handled_by)
+        $cashierGrouped = $orders->groupBy('handled_by')->map(function ($group, $handledBy) {
+            $cashier = $group->first()->handledBy;
+            $cashierName = $cashier ? $cashier->name : 'Sistem / Tidak Tercatat';
+            $totalOrders = $group->count();
+            $totalGross = $group->sum('total_amount');
+            $completedAmount = $group->where('order_status', 'COMPLETED')->sum('grand_total');
+            $aov = $totalOrders > 0 ? round($totalGross / $totalOrders, 2) : 0;
+
+            return [
+                'cashier_id' => $handledBy ?: null,
+                'cashier_name' => $cashierName,
+                'orders_count' => $totalOrders,
+                'total_gross' => round($totalGross, 2),
+                'completed_amount' => round($completedAmount, 2),
+                'aov' => $aov,
+            ];
+        })->sortByDesc('orders_count')->values();
+
+        $totalCashierOrders = $cashierGrouped->sum('orders_count');
+        $cashierData = $cashierGrouped->map(function ($item, $idx) use ($totalCashierOrders) {
+            $item['rank'] = $idx + 1;
+            $item['share_pct'] = $totalCashierOrders > 0 ? round(($item['orders_count'] / $totalCashierOrders) * 100, 1) : 0;
+            return $item;
+        })->toArray();
+
+        return [
+            'sales' => $salesData,
+            'cashiers' => $cashierData,
+            'summary' => [
+                'total_sales_count' => count($salesData),
+                'total_cashiers_count' => count($cashierData),
+                'total_orders' => $orders->count(),
+            ],
+        ];
+    }
+
+    /**
+     * Get Brand Analytics (Market share, revenue, and gross margins per brand).
+     */
+    public function getBrandAnalytics(array $filters): array
+    {
+        $orders = $this->baseOrderQuery($filters)->select('id')->get();
+        if ($orders->isEmpty()) {
+            return [
+                'brands' => [],
+                'summary' => [
+                    'total_revenue' => 0,
+                    'total_qty' => 0,
+                    'total_brands' => 0,
+                ],
+            ];
+        }
+
+        $orderIds = $orders->pluck('id');
+        $items = OrderItem::with(['variant.product.brand'])->whereIn('order_id', $orderIds)->get();
+
+        $grouped = $items->groupBy(function ($item) {
+            $variant = $item->variant;
+            if ($variant instanceof ProductAccurate && !empty($variant->brandName)) {
+                return trim($variant->brandName);
+            }
+            if ($variant && method_exists($variant, 'accurateData') && !empty($variant->accurateData?->brandName)) {
+                return trim($variant->accurateData->brandName);
+            }
+            if (!empty($variant?->product?->brand?->name)) {
+                return trim($variant->product->brand->name);
+            }
+            return 'Lainnya / Aksesoris';
+        })->map(function ($brandItems, $brandName) {
+            $totalQty = $brandItems->sum('qty');
+            $grossSales = $brandItems->sum('subtotal');
+
+            // HPP estimation from accurate_cogs or 80% fallback
+            $hpp = $brandItems->sum(function ($it) {
+                $cogs = $it->accurate_cogs ?? ($it->price * 0.8);
+                return $cogs * $it->qty;
+            });
+
+            $grossProfit = $grossSales - $hpp;
+            $margin = $grossSales > 0 ? round(($grossProfit / $grossSales) * 100, 1) : 0;
+
+            return [
+                'brand_name' => $brandName,
+                'qty_sold' => (int)$totalQty,
+                'gross_sales' => round($grossSales, 2),
+                'hpp' => round($hpp, 2),
+                'gross_profit' => round($grossProfit, 2),
+                'margin_pct' => $margin,
+            ];
+        })->sortByDesc('gross_sales')->values();
+
+        $totalRevenue = $grouped->sum('gross_sales');
+        $brands = $grouped->map(function ($item, $idx) use ($totalRevenue) {
+            $item['rank'] = $idx + 1;
+            $item['market_share_pct'] = $totalRevenue > 0 ? round(($item['gross_sales'] / $totalRevenue) * 100, 1) : 0;
+            return $item;
+        })->toArray();
+
+        return [
+            'brands' => $brands,
+            'summary' => [
+                'total_revenue' => round($totalRevenue, 2),
+                'total_qty' => $grouped->sum('qty_sold'),
+                'total_brands' => count($brands),
+            ],
+        ];
+    }
+
+    /**
+     * Get Cashier Audit:
+     * 1. Order Cancellations & Void analysis (human error tracking)
+     * 2. SellPhone Buyback Price Deviation (Cashier overpaying above system price)
+     */
+    public function getCashierAudit(array $filters): array
+    {
+        $start = Carbon::parse($filters['start_date'])->startOfDay();
+        $end = Carbon::parse($filters['end_date'])->endOfDay();
+        $branchFilter = $filters['branch'] ?? null;
+
+        // ─────────────────────────────────────────────────────────────
+        // 1. Audit Pembatalan Transaksi (Void & Cancellation)
+        // ─────────────────────────────────────────────────────────────
+        $cancelQuery = ApprovalRequest::with(['requestedBy', 'approvable.branch'])
+            ->where('request_type', 'ORDER_CANCELLATION')
+            ->whereBetween('created_at', [$start, $end]);
+
+        if ($branchFilter) {
+            $cancelQuery->whereHasMorph('approvable', [Order::class], function ($q) use ($branchFilter) {
+                $q->where('shipping_address_snapshot->store', $branchFilter);
+            });
+        }
+
+        $cancellations = $cancelQuery->latest()->get();
+
+        $cashierCancelLeaderboard = $cancellations->groupBy('requested_by')->map(function ($group) {
+            $reqUser = $group->first()->requestedBy;
+            $totalAmount = $group->sum(fn($r) => $r->approvable?->grand_total ?? 0);
+            return [
+                'cashier_id' => $reqUser?->id,
+                'cashier_name' => $reqUser?->name ?? 'Kasir Tidak Tercatat',
+                'cancellation_count' => $group->count(),
+                'total_amount' => round($totalAmount, 2),
+                'reasons' => $group->pluck('reason')->filter()->unique()->take(3)->values()->toArray(),
+            ];
+        })->sortByDesc('cancellation_count')->values()->toArray();
+
+        $recentCancellations = $cancellations->take(25)->map(function ($c) {
+            $order = $c->approvable;
+            return [
+                'id' => $c->id,
+                'date' => $c->created_at->format('Y-m-d H:i'),
+                'order_number' => $order?->order_number ?? '-',
+                'cashier_name' => $c->requestedBy?->name ?? '-',
+                'branch' => $order?->branch?->name ?? ($order?->shipping_address_snapshot['store'] ?? '-'),
+                'grand_total' => (float)($order?->grand_total ?? 0),
+                'reason' => $c->reason ?: 'Tidak ada keterangan',
+                'status' => $c->status,
+            ];
+        })->values()->toArray();
+
+        // ─────────────────────────────────────────────────────────────
+        // 2. Audit Pembelian HP Bekas (SellPhone Price Deviation)
+        // ─────────────────────────────────────────────────────────────
+        $sellPhoneQuery = SellPhone::with(['handledBy', 'branch'])
+            ->whereBetween('created_at', [$start, $end]);
+
+        if ($branchFilter) {
+            $sellPhoneQuery->whereHas('branch', function ($q) use ($branchFilter) {
+                $q->where('name', $branchFilter);
+            });
+        }
+
+        $sellPhones = $sellPhoneQuery->latest()->get();
+
+        $totalBoughtUnits = $sellPhones->count();
+        $totalBoughtAmount = $sellPhones->sum('appraised_value');
+        $totalSystemAmount = $sellPhones->sum('original_appraised_value');
+
+        // Filter overpay: kasir membeli di atas harga sistem
+        $overpayItems = $sellPhones->filter(function ($sp) {
+            return $sp->original_appraised_value > 0 && $sp->appraised_value > $sp->original_appraised_value;
+        });
+
+        $totalOverpayUnits = $overpayItems->count();
+        $totalOverpayAmount = $overpayItems->sum(function ($sp) {
+            return $sp->appraised_value - $sp->original_appraised_value;
+        });
+
+        // Cashier overpay leaderboard
+        $cashierOverpayLeaderboard = $overpayItems->groupBy('handled_by')->map(function ($group) {
+            $cashier = $group->first()->handledBy;
+            $overpaySum = $group->sum(fn($sp) => $sp->appraised_value - $sp->original_appraised_value);
+            $count = $group->count();
+            return [
+                'cashier_id' => $cashier?->id,
+                'cashier_name' => $cashier?->name ?? 'Kasir Tidak Tercatat',
+                'overpay_count' => $count,
+                'total_overpay_amount' => round($overpaySum, 2),
+                'avg_overpay' => $count > 0 ? round($overpaySum / $count, 2) : 0,
+            ];
+        })->sortByDesc('total_overpay_amount')->values()->toArray();
+
+        $recentSellPhones = $sellPhones->take(30)->map(function ($sp) {
+            $orig = (int)$sp->original_appraised_value;
+            $final = (int)$sp->appraised_value;
+            $diff = $orig > 0 ? ($final - $orig) : 0;
+            $diffPct = $orig > 0 ? round(($diff / $orig) * 100, 1) : 0;
+
+            return [
+                'id' => $sp->id,
+                'date' => $sp->created_at->format('Y-m-d H:i'),
+                'branch' => $sp->branch?->name ?? '-',
+                'brand' => $sp->phone_brand ?? '-',
+                'model' => $sp->phone_model ?? '-',
+                'ram_storage' => trim(($sp->phone_ram ?? '') . '/' . ($sp->phone_storage ?? ''), '/'),
+                'imei' => $sp->imei ?? '-',
+                'system_price' => $orig,
+                'final_price' => $final,
+                'diff_amount' => $diff,
+                'diff_pct' => $diffPct,
+                'is_overpay' => $diff > 0,
+                'cashier_name' => $sp->handledBy?->name ?? '-',
+                'reason' => $sp->price_adjustment_reason ?: '-',
+                'status' => $sp->status,
+            ];
+        })->values()->toArray();
+
+        return [
+            'cancellation_audit' => [
+                'total_cancellations' => $cancellations->count(),
+                'total_cancelled_amount' => round($cancellations->sum(fn($r) => $r->approvable?->grand_total ?? 0), 2),
+                'cashier_leaderboard' => $cashierCancelLeaderboard,
+                'recent_logs' => $recentCancellations,
+            ],
+            'sell_phone_audit' => [
+                'total_bought_units' => $totalBoughtUnits,
+                'total_bought_amount' => round($totalBoughtAmount, 2),
+                'total_system_amount' => round($totalSystemAmount, 2),
+                'total_overpay_units' => $totalOverpayUnits,
+                'total_overpay_amount' => round($totalOverpayAmount, 2),
+                'cashier_overpay_leaderboard' => $cashierOverpayLeaderboard,
+                'recent_logs' => $recentSellPhones,
+            ],
+        ];
+    }
+
+    /**
+     * Get Promo Claims & Vendor Subsidies Analytics.
+     */
+    public function getPromoClaims(array $filters): array
+    {
+        $orders = $this->baseOrderQuery($filters)
+            ->with(['promos', 'items.promos', 'branch'])
+            ->get();
+
+        $claimedRows = [];
+        $totalDiscountSum = 0;
+        $ordersWithPromoCount = 0;
+
+        foreach ($orders as $order) {
+            $hasPromo = false;
+            $branch = $order->shipping_address_snapshot['store'] ?? ($order->branch?->name ?? 'Unknown');
+            $date = $order->created_at->format('Y-m-d H:i');
+
+            // Order-level promos
+            foreach ($order->promos as $op) {
+                $hasPromo = true;
+                $disc = (float)($op->pivot->discount_applied ?? 0);
+                $totalDiscountSum += $disc;
+
+                $claimedRows[] = [
+                    'date' => $date,
+                    'order_number' => $order->order_number,
+                    'branch' => $branch,
+                    'brand' => 'Konsolidasi Order',
+                    'product_name' => 'Diskon Keranjang / Faktur',
+                    'promo_name' => $op->name,
+                    'vendor_name' => $op->vendor_name ?? 'Internal Store',
+                    'claim_amount' => $disc,
+                ];
+            }
+
+            // Item-level promos
+            foreach ($order->items as $item) {
+                $variant = $item->variant;
+                $pName = $variant?->name ?? $item->product_name ?? 'Produk';
+                $brand = $variant?->brandName ?? ($variant?->product?->brand?->name ?? 'Unknown');
+
+                foreach ($item->promos as $ip) {
+                    $hasPromo = true;
+                    $disc = (float)($ip->pivot->discount_amount ?? 0);
+                    $totalDiscountSum += $disc;
+
+                    $claimedRows[] = [
+                        'date' => $date,
+                        'order_number' => $order->order_number,
+                        'branch' => $branch,
+                        'brand' => $brand,
+                        'product_name' => $pName,
+                        'promo_name' => $ip->name,
+                        'vendor_name' => $ip->pivot->vendor_name ?? ($ip->vendor_name ?? $brand),
+                        'claim_amount' => $disc,
+                    ];
+                }
+            }
+
+            if ($hasPromo) {
+                $ordersWithPromoCount++;
+            }
+        }
+
+        // Promo leaderboard by total subsidy amount
+        $promoLeaderboard = collect($claimedRows)->groupBy('promo_name')->map(function ($group, $name) {
+            return [
+                'promo_name' => $name,
+                'times_used' => $group->count(),
+                'total_discount' => round($group->sum('claim_amount'), 2),
+            ];
+        })->sortByDesc('total_discount')->values()->toArray();
+
+        return [
+            'summary' => [
+                'total_discount_amount' => round($totalDiscountSum, 2),
+                'orders_with_promo_count' => $ordersWithPromoCount,
+                'total_promo_claims_count' => count($claimedRows),
+                'avg_discount_per_order' => $ordersWithPromoCount > 0 ? round($totalDiscountSum / $ordersWithPromoCount, 2) : 0,
+            ],
+            'promo_leaderboard' => $promoLeaderboard,
+            'recent_claims' => array_slice($claimedRows, 0, 40),
         ];
     }
 }

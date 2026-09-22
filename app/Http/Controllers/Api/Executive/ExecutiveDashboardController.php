@@ -170,4 +170,61 @@ class ExecutiveDashboardController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Get Staff KPI (Salespersons vs Cashiers performance).
+     */
+    public function staffKpi(Request $request): JsonResponse
+    {
+        $filters = $this->extractFilters($request);
+        $data = $this->metricsService->getStaffKpi($filters);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * Get Brand Analytics (Market share, revenue, and gross margins per brand).
+     */
+    public function brandAnalytics(Request $request): JsonResponse
+    {
+        $filters = $this->extractFilters($request);
+        $data = $this->metricsService->getBrandAnalytics($filters);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * Get Cashier Audit (Order cancellations & SellPhone buyback deviation).
+     */
+    public function cashierAudit(Request $request): JsonResponse
+    {
+        $filters = $this->extractFilters($request);
+        $data = $this->metricsService->getCashierAudit($filters);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * Get Promo Claims & Vendor Subsidies Analytics.
+     */
+    public function promoClaims(Request $request): JsonResponse
+    {
+        $filters = $this->extractFilters($request);
+        $data = $this->metricsService->getPromoClaims($filters);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
 }
+
