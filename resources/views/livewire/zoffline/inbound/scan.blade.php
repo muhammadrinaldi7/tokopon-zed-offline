@@ -176,6 +176,16 @@
                             <div class="flex flex-wrap items-center gap-2 mb-1">
                                 <h4 class="font-bold text-neutral-800 text-lg">{{ $item->item_name }}</h4>
 
+                                @if ($item->has_sn)
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                        📱 Wajib IMEI
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                        📦 Non-IMEI / Persediaan
+                                    </span>
+                                @endif
+
                                 @if ($proyek !== '-')
                                     <span
                                         class="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-extrabold uppercase tracking-wide border {{ $isResmi ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : ($isInter ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-blue-100 text-blue-800 border-blue-200') }}">
@@ -219,19 +229,56 @@
                                 </div>
                             </div>
                             @if (!$isDone)
-                                <button wire:click="setActiveItemByRow({{ $item->id }})"
-                                    class="px-5 py-2.5 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-600 hover:text-white transition-all text-sm font-bold shadow-sm border border-blue-200 hover:border-blue-600 flex items-center gap-2 group shrink-0">
-                                    <svg class="w-5 h-5 text-blue-500 group-hover:text-white transition-colors"
-                                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
-                                        </path>
+                                @if ($item->has_sn)
+                                    <button wire:click="setActiveItemByRow({{ $item->id }})"
+                                        class="px-5 py-2.5 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-600 hover:text-white transition-all text-sm font-bold shadow-sm border border-blue-200 hover:border-blue-600 flex items-center gap-2 group shrink-0">
+                                        <svg class="w-5 h-5 text-blue-500 group-hover:text-white transition-colors"
+                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
+                                            </path>
+                                        </svg>
+                                        Scan IMEI
+                                    </button>
+                                @else
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <button wire:click="openNonSnModal({{ $item->id }})"
+                                            class="px-4 py-2.5 bg-amber-50 hover:bg-amber-600 text-amber-800 hover:text-white rounded-xl transition-all text-xs font-bold shadow-sm border border-amber-200 hover:border-amber-600 flex items-center gap-1.5 group">
+                                            <svg class="w-4 h-4 text-amber-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                            </svg>
+                                            Input Qty
+                                        </button>
+                                        <button wire:click="quickReceiveAllNonSn({{ $item->id }})"
+                                            class="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white rounded-xl transition-all text-xs font-bold shadow-sm border border-emerald-200 hover:border-emerald-600 flex items-center gap-1 group"
+                                            title="Terima Semua Sisa ({{ $item->quantity_ordered - $item->quantity_received }} unit)">
+                                            <svg class="w-4 h-4 text-emerald-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            Terima Semua
+                                        </button>
+                                    </div>
+                                @endif
+                            @endif
+                        </div>
+                    <!-- Non-SN Item Info & Adjustment -->
+                    @if (!$item->has_sn)
+                        <div class="p-3.5 bg-neutral-50 border-t border-neutral-100 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-600">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                <span>Item Persediaan Non-IMEI (Aksesoris/Komponen). Penerimaan dicatat berdasarkan jumlah fisik (kuantitas).</span>
+                            </div>
+                            @if ($item->quantity_received > 0 && $item->quantity_received > $item->quantity_pushed)
+                                <button type="button" wire:click="decrementNonSnReceive({{ $item->id }})"
+                                    class="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-200 transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
                                     </svg>
-                                    Scan IMEI
+                                    Kurangi 1 Unit
                                 </button>
                             @endif
                         </div>
-                    </div>
+                    @endif
 
                     <!-- Scanned IMEIs List -->
                     @if ($item->inspections->count() > 0)
@@ -1143,4 +1190,98 @@
             </div>
         </div>
     @endif
+
+    <!-- Non-SN Batch/Manual Receiving Modal -->
+    @if ($showNonSnModal)
+        @php
+            $activeNonSnItem = $po->items->where('id', $receivingNonSnItemId)->first();
+            $remQty = $activeNonSnItem ? max(0, $activeNonSnItem->quantity_ordered - $activeNonSnItem->quantity_received) : 0;
+        @endphp
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+            <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-neutral-200 overflow-hidden transform transition-all">
+                <!-- Modal Header -->
+                <div class="p-5 bg-gradient-to-r from-amber-500 to-amber-600 text-white flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base">Terima Barang Non-IMEI</h3>
+                            <p class="text-xs text-amber-100">Input kuantitas fisik barang persediaan</p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="closeNonSnModal" class="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 space-y-4">
+                    @if ($activeNonSnItem)
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <h4 class="font-bold text-slate-800 text-sm mb-1">{{ $activeNonSnItem->item_name }}</h4>
+                            <div class="flex items-center gap-3 text-xs text-slate-500">
+                                <span>SKU: <strong class="text-slate-700 font-mono">{{ $activeNonSnItem->item_no }}</strong></span>
+                                <span>&bull;</span>
+                                <span>Harga: Rp {{ number_format($activeNonSnItem->unit_price, 0, ',', '.') }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Quantity Summary Grid -->
+                        <div class="grid grid-cols-3 gap-3 text-center">
+                            <div class="p-3 bg-neutral-50 rounded-xl border border-neutral-100">
+                                <span class="text-[11px] font-bold text-neutral-400 block">Dipesan</span>
+                                <span class="text-lg font-black text-neutral-800">{{ $activeNonSnItem->quantity_ordered }}</span>
+                            </div>
+                            <div class="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                <span class="text-[11px] font-bold text-blue-500 block">Diterima</span>
+                                <span class="text-lg font-black text-blue-700">{{ $activeNonSnItem->quantity_received }}</span>
+                            </div>
+                            <div class="p-3 bg-amber-50 rounded-xl border border-amber-100">
+                                <span class="text-[11px] font-bold text-amber-600 block">Sisa Pesanan</span>
+                                <span class="text-lg font-black text-amber-700">{{ $remQty }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Quantity Input -->
+                        <div>
+                            <label class="block text-xs font-bold text-neutral-700 mb-2">
+                                Kuantitas Diterima Saat Ini:
+                            </label>
+                            <div class="flex items-center gap-2">
+                                <input type="number" wire:model="nonSnQtyInput" min="1" max="{{ $remQty }}"
+                                    class="w-full text-center text-lg font-black py-2.5 px-4 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                    placeholder="Kuantitas...">
+                                <button type="button" wire:click="$set('nonSnQtyInput', {{ $remQty }})"
+                                    class="px-3.5 py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded-xl whitespace-nowrap transition-colors border border-amber-300">
+                                    Semua ({{ $remQty }})
+                                </button>
+                            </div>
+                            <p class="text-[11px] text-neutral-400 mt-1.5">Maksimal yang bisa diterima: {{ $remQty }} unit.</p>
+                        </div>
+                    @endif
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+                    <button type="button" wire:click="closeNonSnModal"
+                        class="px-5 py-2.5 bg-white border border-slate-300 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-100 transition-colors">
+                        Batal
+                    </button>
+                    <button type="button" wire:click="submitNonSnReceive"
+                        class="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Simpan Penerimaan</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
+

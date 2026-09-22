@@ -161,6 +161,26 @@ class SyncPurchaseOrders extends Command
                         $quantity = $item['quantity'] ?? 0;
                         $detailId = $item['id'] ?? null;
 
+                        // Ekstrak status apakah barang membutuhkan nomor serial / IMEI (manageSN)
+                        $hasSn = false;
+                        if (isset($item['item']['manageSN'])) {
+                            $hasSn = (bool) $item['item']['manageSN'];
+                        } elseif (isset($item['manageSN'])) {
+                            $hasSn = (bool) $item['manageSN'];
+                        } elseif (isset($item['item']['serialNumberType'])) {
+                            $hasSn = $item['item']['serialNumberType'] === 'UNIQUE';
+                        } else {
+                            $pa = \App\Models\ProductAccurate::where('item_no', $itemNo)
+                                ->where('database_source', $bu->code)
+                                ->first();
+                            if (!$pa) {
+                                $pa = \App\Models\ProductAccurate::where('item_no', $itemNo)->first();
+                            }
+                            if ($pa) {
+                                $hasSn = (bool) $pa->has_sn;
+                            }
+                        }
+
                         $poItem = null;
 
                         if ($detailId) {
@@ -186,6 +206,7 @@ class SyncPurchaseOrders extends Command
                                     'item_no' => $itemNo,
                                     'unit_price' => $unitPrice,
                                     'item_name' => $itemName,
+                                    'has_sn' => $hasSn,
                                     'quantity_ordered' => $quantity,
                                 ]);
                             } else {
@@ -196,6 +217,7 @@ class SyncPurchaseOrders extends Command
                                     'item_no' => $itemNo,
                                     'unit_price' => $unitPrice,
                                     'item_name' => $itemName,
+                                    'has_sn' => $hasSn,
                                     'quantity_ordered' => $quantity,
                                 ]);
                             }
@@ -209,6 +231,7 @@ class SyncPurchaseOrders extends Command
                                 ],
                                 [
                                     'item_name' => $itemName,
+                                    'has_sn' => $hasSn,
                                     'quantity_ordered' => $quantity,
                                 ]
                             );

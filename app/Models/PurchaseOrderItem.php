@@ -11,9 +11,14 @@ class PurchaseOrderItem extends Model
         'accurate_detail_id',
         'item_no',
         'item_name',
+        'has_sn',
         'unit_price',
         'quantity_ordered',
         'quantity_received',
+    ];
+
+    protected $casts = [
+        'has_sn' => 'boolean',
     ];
 
     public function purchaseOrder()

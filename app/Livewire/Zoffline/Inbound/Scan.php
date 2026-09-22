@@ -38,6 +38,11 @@ class Scan extends Component
     public $selectedWarehouseId = null;
     public $showConfirmModal = false;
 
+    // Non-SN Batch/Manual Receiving State
+    public $showNonSnModal = false;
+    public $receivingNonSnItemId = null;
+    public $nonSnQtyInput = 1;
+
     // Migration / Copy from Another PO State
     public $showMigrateModal = false;
     public $sourcePoId = null;
@@ -177,12 +182,8 @@ class Scan extends Component
 
         if (!$item) return;
 
-        // Cek apakah produk ini membutuhkan SN
-        $productAccurate = \App\Models\ProductAccurate::where('item_no', $itemNo)
-            ->where('database_source', $this->po->database_source)
-            ->first();
-
-        $hasSn = $productAccurate ? $productAccurate->has_sn : true; // Default true jika tidak ada data
+        // Cek apakah produk ini membutuhkan SN / IMEI langsung dari atribut item
+        $hasSn = (bool) ($item->has_sn ?? false);
 
         if (!$hasSn) {
             $item->increment('quantity_received');
@@ -209,23 +210,114 @@ class Scan extends Component
             return;
         }
 
-        // Cek apakah produk ini membutuhkan SN
-        $productAccurate = \App\Models\ProductAccurate::where('item_no', $item->item_no)
-            ->where('database_source', $this->po->database_source)
-            ->first();
-
-        $hasSn = $productAccurate ? $productAccurate->has_sn : true; // Default true jika tidak ada data
+        // Cek apakah produk ini membutuhkan SN / IMEI langsung dari atribut item
+        $hasSn = (bool) ($item->has_sn ?? false);
 
         if (!$hasSn) {
-            $item->increment('quantity_received');
-            $this->po->refresh();
-            $this->successMessage = "1 {$item->item_name} berhasil ditambahkan.";
+            // Untuk non-SN, buka modal input kuantitas penerimaan
+            $this->openNonSnModal($id);
             return;
         }
 
         $this->activeItemNo = $item->item_no;
         $this->activeItemRowId = $item->id;
         $this->barcodeInput = '';
+    }
+
+    /**
+     * Buka modal penerimaan manual untuk item persediaan non-IMEI (aksesoris, dsb)
+     */
+    public function openNonSnModal($itemId)
+    {
+        $this->errorMessage = '';
+        $this->successMessage = '';
+        $item = $this->po->items->where('id', $itemId)->first();
+        if (!$item) return;
+
+        $remaining = max(0, $item->quantity_ordered - $item->quantity_received);
+        if ($remaining <= 0) {
+            $this->dispatch('toast', title: 'Info', message: 'Item ini sudah lengkap diterima.', type: 'info');
+            return;
+        }
+
+        $this->receivingNonSnItemId = $itemId;
+        $this->nonSnQtyInput = $remaining; // default isi sisa pesanan
+        $this->showNonSnModal = true;
+    }
+
+    public function closeNonSnModal()
+    {
+        $this->showNonSnModal = false;
+        $this->receivingNonSnItemId = null;
+        $this->nonSnQtyInput = 1;
+    }
+
+    /**
+     * Simpan kuantitas penerimaan barang non-IMEI
+     */
+    public function submitNonSnReceive()
+    {
+        if (!$this->receivingNonSnItemId) return;
+        $item = $this->po->items->where('id', $this->receivingNonSnItemId)->first();
+        if (!$item) return;
+
+        $qty = (int) $this->nonSnQtyInput;
+        if ($qty <= 0) {
+            $this->dispatch('toast', title: 'Peringatan', message: 'Jumlah kuantitas yang diterima harus lebih dari 0.', type: 'warning');
+            return;
+        }
+
+        $remaining = max(0, $item->quantity_ordered - $item->quantity_received);
+        if ($qty > $remaining) {
+            $this->dispatch('toast', title: 'Peringatan', message: "Jumlah yang dimasukkan ({$qty}) melebihi sisa pesanan ({$remaining}).", type: 'warning');
+            return;
+        }
+
+        $item->increment('quantity_received', $qty);
+        $this->po->refresh();
+        $this->closeNonSnModal();
+        $this->dispatch('toast', title: 'Berhasil', message: "{$qty} unit {$item->item_name} berhasil diterima.", type: 'success');
+    }
+
+    /**
+     * Terima penuh seluruh sisa barang non-IMEI dengan 1 klik
+     */
+    public function quickReceiveAllNonSn($itemId)
+    {
+        $item = $this->po->items->where('id', $itemId)->first();
+        if (!$item) return;
+
+        $remaining = max(0, $item->quantity_ordered - $item->quantity_received);
+        if ($remaining <= 0) {
+            $this->dispatch('toast', title: 'Info', message: 'Item ini sudah lengkap diterima.', type: 'info');
+            return;
+        }
+
+        $item->increment('quantity_received', $remaining);
+        $this->po->refresh();
+        $this->dispatch('toast', title: 'Berhasil', message: "{$remaining} unit {$item->item_name} berhasil diterima penuh.", type: 'success');
+    }
+
+    /**
+     * Kurangi 1 unit penerimaan barang non-IMEI jika ada salah input sebelum push Accurate
+     */
+    public function decrementNonSnReceive($itemId)
+    {
+        $item = $this->po->items->where('id', $itemId)->first();
+        if (!$item) return;
+
+        if ($item->quantity_received <= 0) {
+            return;
+        }
+
+        if ($item->quantity_received <= $item->quantity_pushed) {
+            $this->dispatch('toast', title: 'Peringatan', message: 'Tidak dapat mengurangi karena kuantitas sudah disinkronkan ke Accurate.', type: 'warning');
+            return;
+        }
+
+        $item->decrement('quantity_received');
+        $this->po->refresh();
+        $this->dispatch('toast', title: 'Info', message: "1 unit {$item->item_name} dikurangi.", type: 'info');
     }
 
     public function processScan()
