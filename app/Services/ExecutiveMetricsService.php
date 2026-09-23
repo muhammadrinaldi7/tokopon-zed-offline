@@ -1041,14 +1041,19 @@ class ExecutiveMetricsService
      */
     public function getCashierAudit(array $filters): array
     {
-        $start = Carbon::parse($filters['start_date'])->startOfDay();
-        $end = Carbon::parse($filters['end_date'])->endOfDay();
+        [$start, $end] = $this->parseDateRange(
+            $filters['date_range'] ?? ($filters['period'] ?? null),
+            $filters['start_date'] ?? null,
+            $filters['end_date'] ?? null
+        );
+
         $branchFilter = $filters['branch'] ?? null;
+        $buFilter = $filters['business_unit_id'] ?? null;
 
         // ─────────────────────────────────────────────────────────────
         // 1. Audit Pembatalan Transaksi (Void & Cancellation)
         // ─────────────────────────────────────────────────────────────
-        $cancelQuery = ApprovalRequest::with(['requestedBy', 'approvable.branch'])
+        $cancelQuery = ApprovalRequest::with(['requestedBy', 'approvable.branch', 'approvable.handledBy', 'approvable.salesBy'])
             ->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])
             ->whereBetween('created_at', [$start, $end]);
 
@@ -1065,10 +1070,21 @@ class ExecutiveMetricsService
             });
         }
 
+        if ($buFilter) {
+            $cancelQuery->whereHasMorph('approvable', [Order::class], function ($q) use ($buFilter) {
+                if (is_array($buFilter)) {
+                    $q->whereIn('business_unit_id', $buFilter);
+                } else {
+                    $q->where('business_unit_id', $buFilter);
+                }
+            });
+        }
+
         $cancellations = $cancelQuery->latest()->get();
 
         $cashierCancelLeaderboard = $cancellations->groupBy('requested_by')->map(function ($group) {
-            $reqUser = $group->first()->requestedBy;
+            $first = $group->first();
+            $reqUser = $first->requestedBy ?? ($first->approvable?->handledBy ?? ($first->approvable?->salesBy ?? null));
             $totalAmount = $group->sum(fn($r) => $r->approvable?->grand_total ?? 0);
             return [
                 'cashier_id' => $reqUser?->id,
@@ -1085,7 +1101,7 @@ class ExecutiveMetricsService
                 'id' => $c->id,
                 'date' => $c->created_at->format('Y-m-d H:i'),
                 'order_number' => $order?->order_number ?? '-',
-                'cashier_name' => $c->requestedBy?->name ?? '-',
+                'cashier_name' => $c->requestedBy?->name ?? ($order?->handledBy?->name ?? ($order?->salesBy?->name ?? '-')),
                 'branch' => $order?->branch?->name ?? ($order?->shipping_address_snapshot['store'] ?? '-'),
                 'grand_total' => (float)($order?->grand_total ?? 0),
                 'reason' => $c->reason ?: 'Tidak ada keterangan',
@@ -1096,35 +1112,57 @@ class ExecutiveMetricsService
         // ─────────────────────────────────────────────────────────────
         // 2. Audit Pembelian HP Bekas (SellPhone Price Deviation)
         // ─────────────────────────────────────────────────────────────
-        $sellPhoneQuery = SellPhone::with(['handledBy', 'branch'])
+        $sellPhoneQuery = SellPhone::with(['handledBy', 'branch', 'buybackDevice'])
             ->whereBetween('created_at', [$start, $end]);
 
         if ($branchFilter) {
-            $sellPhoneQuery->whereHas('branch', function ($q) use ($branchFilter) {
-                $q->where('name', $branchFilter);
-            });
+            if (is_numeric($branchFilter)) {
+                $sellPhoneQuery->where('branch_id', $branchFilter);
+            } else {
+                $sellPhoneQuery->whereHas('branch', function ($q) use ($branchFilter) {
+                    $q->where('name', $branchFilter);
+                });
+            }
+        }
+
+        if ($buFilter) {
+            if (is_array($buFilter)) {
+                $sellPhoneQuery->whereIn('business_unit_id', $buFilter);
+            } else {
+                $sellPhoneQuery->where('business_unit_id', $buFilter);
+            }
         }
 
         $sellPhones = $sellPhoneQuery->latest()->get();
 
         $totalBoughtUnits = $sellPhones->count();
         $totalBoughtAmount = $sellPhones->sum('appraised_value');
-        $totalSystemAmount = $sellPhones->sum('original_appraised_value');
 
-        // Filter overpay: kasir membeli di atas harga sistem
+        // Safe price evaluation: fallback to buybackDevice base_price if original_appraised_value column not present/null
         $overpayItems = $sellPhones->filter(function ($sp) {
-            return $sp->original_appraised_value > 0 && $sp->appraised_value > $sp->original_appraised_value;
+            $orig = (float)($sp->original_appraised_value ?? ($sp->buybackDevice?->base_price ?? 0));
+            $final = (float)$sp->appraised_value;
+            return ($sp->is_price_adjusted && $orig > 0 && $final > $orig) || ($orig > 0 && $final > $orig);
+        });
+
+        $totalSystemAmount = $sellPhones->sum(function ($sp) {
+            return (float)($sp->original_appraised_value ?? ($sp->buybackDevice?->base_price ?? $sp->appraised_value));
         });
 
         $totalOverpayUnits = $overpayItems->count();
         $totalOverpayAmount = $overpayItems->sum(function ($sp) {
-            return $sp->appraised_value - $sp->original_appraised_value;
+            $orig = (float)($sp->original_appraised_value ?? ($sp->buybackDevice?->base_price ?? 0));
+            $final = (float)$sp->appraised_value;
+            return max(0, $final - $orig);
         });
 
         // Cashier overpay leaderboard
         $cashierOverpayLeaderboard = $overpayItems->groupBy('handled_by')->map(function ($group) {
             $cashier = $group->first()->handledBy;
-            $overpaySum = $group->sum(fn($sp) => $sp->appraised_value - $sp->original_appraised_value);
+            $overpaySum = $group->sum(function ($sp) {
+                $orig = (float)($sp->original_appraised_value ?? ($sp->buybackDevice?->base_price ?? 0));
+                return max(0, (float)$sp->appraised_value - $orig);
+            });
             $count = $group->count();
             return [
                 'cashier_id' => $cashier?->id,
@@ -1136,8 +1174,8 @@ class ExecutiveMetricsService
         })->sortByDesc('total_overpay_amount')->values()->toArray();
 
         $recentSellPhones = $sellPhones->take(30)->map(function ($sp) {
-            $orig = (int)$sp->original_appraised_value;
-            $final = (int)$sp->appraised_value;
+            $orig = (float)($sp->original_appraised_value ?? ($sp->buybackDevice?->base_price ?? $sp->appraised_value));
+            $final = (float)$sp->appraised_value;
             $diff = $orig > 0 ? ($final - $orig) : 0;
             $diffPct = $orig > 0 ? round(($diff / $orig) * 100, 1) : 0;
 
@@ -1149,13 +1187,13 @@ class ExecutiveMetricsService
                 'model' => $sp->phone_model ?? '-',
                 'ram_storage' => trim(($sp->phone_ram ?? '') . '/' . ($sp->phone_storage ?? ''), '/'),
                 'imei' => $sp->imei ?? '-',
-                'system_price' => $orig,
-                'final_price' => $final,
-                'diff_amount' => $diff,
+                'system_price' => (int)$orig,
+                'final_price' => (int)$final,
+                'diff_amount' => (int)$diff,
                 'diff_pct' => $diffPct,
                 'is_overpay' => $diff > 0,
                 'cashier_name' => $sp->handledBy?->name ?? '-',
-                'reason' => $sp->price_adjustment_reason ?: '-',
+                'reason' => $sp->price_adjustment_reason ?: ($sp->reject_reason ?: ($sp->minus_desc ?: '-')),
                 'status' => $sp->status,
             ];
         })->values()->toArray();
