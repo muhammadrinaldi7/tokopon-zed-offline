@@ -95,6 +95,10 @@ Route::prefix('v1/executive')->group(function () {
             ->name('api.executive.cashier-audit');
         Route::get('/promo-claims', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'promoClaims'])
             ->name('api.executive.promo-claims');
+        Route::get('/project-sales', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'projectSales'])
+            ->name('api.executive.project-sales');
+        Route::get('/project-sales/detail', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'projectSalesDetail'])
+            ->name('api.executive.project-sales.detail');
 
         // AI Executive Assistant Endpoints (Direct 9router Integration)
         Route::prefix('ai')->group(function () {

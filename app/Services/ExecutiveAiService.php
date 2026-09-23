@@ -110,6 +110,44 @@ class ExecutiveAiService
                     $metricsContext .= "- {$mName}: Total Rp {$mTotal} (Porsi: {$mShare}%, Biaya MDR: Rp {$mMdr})\n";
                 }
             }
+
+            $projects = $contextData['projects'] ?? ($contextData['project_breakdown'] ?? null);
+            if (!empty($projects) && is_array($projects)) {
+                $metricsContext .= "\n[PENJUALAN PER KATEGORI PROYEK (RESMI, INTER, NON-PROYEK)]\n";
+                foreach ($projects as $proj) {
+                    $pName = $proj['project'] ?? '-';
+                    $pSales = number_format($proj['net_sales'] ?? 0, 0, ',', '.');
+                    $pProfit = number_format($proj['gross_profit'] ?? 0, 0, ',', '.');
+                    $pMargin = number_format($proj['margin_percentage'] ?? 0, 1, ',', '.');
+                    $pShare = $proj['contribution_percentage'] ?? 0;
+                    $pQty = number_format($proj['total_qty'] ?? 0, 0, ',', '.');
+                    $metricsContext .= "- Proyek {$pName}: Omset Rp {$pSales} (Share: {$pShare}%, Laba: Rp {$pProfit}, Margin: {$pMargin}%, Qty: {$pQty} unit)\n";
+                }
+            }
+
+            // Provide comparative baseline between Today and Yesterday if relevant
+            $activePeriod = $contextData['period']['range'] ?? 'today';
+            if ($activePeriod === 'today') {
+                $yesterdayData = $this->getMetricsForPeriod('yesterday', $user);
+                $ySummary = $yesterdayData['summary'] ?? null;
+                if ($ySummary && ($ySummary['total_orders'] > 0 || $ySummary['net_sales'] > 0)) {
+                    $yNet = number_format($ySummary['net_sales'] ?? 0, 0, ',', '.');
+                    $yOrders = number_format($ySummary['total_orders'] ?? 0, 0, ',', '.');
+                    $yMargin = number_format($ySummary['profit_margin'] ?? 0, 1, ',', '.');
+                    $metricsContext .= "\n[KOMPARASI PERFORMA KEMARIN (YESTERDAY)]\n";
+                    $metricsContext .= "- Total Omset Kemarin: Rp {$yNet} (Transaksi: {$yOrders}, Margin: {$yMargin}%)\n";
+                }
+            } elseif ($activePeriod === 'yesterday') {
+                $todayData = $this->getMetricsForPeriod('today', $user);
+                $tSummary = $todayData['summary'] ?? null;
+                if ($tSummary && ($tSummary['total_orders'] > 0 || $tSummary['net_sales'] > 0)) {
+                    $tNet = number_format($tSummary['net_sales'] ?? 0, 0, ',', '.');
+                    $tOrders = number_format($tSummary['total_orders'] ?? 0, 0, ',', '.');
+                    $tMargin = number_format($tSummary['profit_margin'] ?? 0, 1, ',', '.');
+                    $metricsContext .= "\n[KOMPARASI PERFORMA HARI INI BERJALAN (TODAY)]\n";
+                    $metricsContext .= "- Total Omset Hari Ini (Berjalan): Rp {$tNet} (Transaksi: {$tOrders}, Margin: {$tMargin}%)\n";
+                }
+            }
         }
 
         return <<<PROMPT
@@ -119,15 +157,103 @@ Waktu saat ini: {$now}.
 
 Gaya Komunikasi & Standar Jawaban:
 1. SIKAP & NADA: Sangat profesional, lugas, berbasis data, ringkas, dan berorientasi pada keputusan strategis eksekutif (C-Level). Hindari basa-basi panjang.
-2. FORMATTING:
-   - Gunakan bullet points yang terstruktur.
-   - Format mata uang selalu Rupiah dengan titik pemisah ribuan (contoh: Rp 15.000.000).
-   - Berikan highlight tebal pada metrik kunci.
-   - Jika ada anomali atau risiko (misal margin cabang rendah, piutang tinggi, atau performa minus), berikan tanda perhatian (⚠️ PERHATIAN).
-3. KONTEKS DATA:
+2. PANDUAN FORMATTING TABEL (SANGAT KRUSIAL AGAR RAPI DI SEMUA LAYAR & MOBILE):
+   - JIKA MENAMPILKAN DATA CABANG ATAU PRODUK:
+     * TABEL HARUS KOMPAK MAKSIMAL 4-5 KOLOM (JANGAN buat 6 kolom lebar karena akan terpotong, wrapping berantakan, dan sulit dibaca di chat/mobile).
+     * Padatkan informasi dengan menggabungkan Omset & Share %, serta Margin & Laba:
+       | No | Cabang | Omset Bersih (Share) | Margin (Laba) | Trx |
+       |----|--------|----------------------|---------------|-----|
+       | 1  | Banjarbaru | Rp 288.918.693 (25,4%) | 5,8% (Rp 16,7 Jt) | 106 |
+     * DILARANG menggunakan tanda bintang ganda (**) di dalam sel data tabel! Tulis teks angka dan nama cabang polos bersih tanpa asterisks agar layout tabel tidak rusak. Bolding (**) hanya diperbolehkan untuk baris TOTAL di terbawah.
+     * Tulis persentase rapat tanpa spasi sebelum persen (contoh: 25,4% BUKAN 25,4 %).
+     * Baris TOTAL wajib disertakan di bagian bawah tabel.
+3. STRUKTUR LAPORAN EKSEKUTIF YANG MUDAH DI-SCAN:
+   - Awali dengan **📊 Highlight Singkat** (Total Omset, Total Laba Kotor, Rata-rata Margin, Total Transaksi).
+   - Tampilkan Tabel Ringkas Kompak.
+   - 🎯 **Top Performer & High Margin** (cabang kontributor omset & margin tertinggi).
+   - ⚠️ **Cabang Perlu Perhatian** (cabang dengan margin di bawah target <5% atau anomali transaksi).
+   - 💡 **Rekomendasi Tindakan C-Level** (langkah konkret yang dapat langsung dieksekusi).
+4. KONTEKS DATA:
 {$metricsContext}
-4. Jawab pertanyaan Direksi dengan menganalisis angka-angka di atas secara tajam, berikan 'Key Takeaways' dan 'Rekomendasi Tindakan' praktis jika relevan.
+5. Jawab pertanyaan Direksi dengan menganalisis angka-angka di atas secara tajam, berikan 'Key Takeaways' dan 'Rekomendasi Tindakan' praktis jika relevan.
 PROMPT;
+    }
+
+    /**
+     * Detect time-period intent from user query.
+     */
+    public function detectRequestedPeriod(string $message): ?string
+    {
+        $msg = strtolower($message);
+
+        if (preg_match('/\b(kemarin|yesterday|hari\s*kemarin)\b/i', $msg)) {
+            return 'yesterday';
+        }
+
+        if (preg_match('/\b(hari\s*ini|today)\b/i', $msg)) {
+            return 'today';
+        }
+
+        if (preg_match('/\b(bulan\s*lalu|last\s*month|bulan\s*kemarin)\b/i', $msg)) {
+            return 'last_month';
+        }
+
+        if (preg_match('/\b(minggu\s*lalu|last\s*week|pekan\s*lalu)\b/i', $msg)) {
+            return 'last_week';
+        }
+
+        if (preg_match('/\b(minggu\s*ini|this\s*week|pekan\s*ini)\b/i', $msg)) {
+            return 'this_week';
+        }
+
+        if (preg_match('/\b(bulan\s*ini|this\s*month)\b/i', $msg)) {
+            return 'this_month';
+        }
+
+        if (preg_match('/\b(7\s*hari|last\s*7\s*days)\b/i', $msg)) {
+            return 'last_7_days';
+        }
+
+        if (preg_match('/\b(tahun\s*ini|this\s*year)\b/i', $msg)) {
+            return 'this_year';
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch complete executive metrics package for a given period.
+     */
+    public function getMetricsForPeriod(string $period, ?User $user = null): array
+    {
+        $cacheKey = 'executive_metrics_auto_' . $period . '_' . ($user ? $user->id : 'all');
+
+        return Cache::remember($cacheKey, 60, function () use ($period, $user) {
+            $filters = ['date_range' => $period];
+            if ($user && !$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
+                $filters['business_unit_id'] = $user->business_unit_id;
+            }
+
+            try {
+                $kpi = $this->metricsService->getKpiSummary($filters);
+                $branches = $this->metricsService->getBranchComparison($filters);
+                $topProducts = $this->metricsService->getTopProducts($filters, 10);
+                $payments = $this->metricsService->getPaymentMethodBreakdown($filters);
+                $projectReport = $this->metricsService->getProjectSalesReport($filters);
+
+                return [
+                    'period' => ['range' => $period],
+                    'summary' => $kpi['summary'] ?? null,
+                    'branches' => $branches,
+                    'top_products' => $topProducts,
+                    'payments' => $payments,
+                    'projects' => $projectReport['project_breakdown'] ?? [],
+                ];
+            } catch (\Throwable $e) {
+                Log::warning("Failed to fetch metrics for period {$period}: " . $e->getMessage());
+                return ['period' => ['range' => $period]];
+            }
+        });
     }
 
     /**
@@ -135,7 +261,17 @@ PROMPT;
      */
     public function chat(string $message, string $sessionId, int $adminId, ?array $contextData = null, ?User $user = null): array
     {
-        // 1. Record user message
+        // 1. Detect if user is asking for a specific period (e.g. 'yesterday' or 'last_month')
+        $detectedPeriod = $this->detectRequestedPeriod($message);
+        $activeContextPeriod = $contextData['period']['range'] ?? null;
+
+        if ($detectedPeriod && $detectedPeriod !== $activeContextPeriod) {
+            $contextData = $this->getMetricsForPeriod($detectedPeriod, $user);
+        } elseif (empty($contextData)) {
+            $contextData = $this->getMetricsForPeriod($detectedPeriod ?: 'today', $user);
+        }
+
+        // 2. Record user message
         AiChatHistory::create([
             'admin_id' => $adminId,
             'session_id' => $sessionId,

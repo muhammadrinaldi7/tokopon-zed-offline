@@ -25,7 +25,7 @@ class ExecutiveDashboardController extends Controller
         $user = $request->user();
 
         $filters = [
-            'date_range' => $request->input('date_range', 'this_month'),
+            'date_range' => $request->input('date_range', $request->input('period', 'this_month')),
             'start_date' => $request->input('start_date'),
             'end_date' => $request->input('end_date'),
             'branch' => $request->input('branch'),
@@ -220,6 +220,39 @@ class ExecutiveDashboardController extends Controller
     {
         $filters = $this->extractFilters($request);
         $data = $this->metricsService->getPromoClaims($filters);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * Get Project Sales Report (Matrix & breakdown per project e.g. RESMI, INTER, etc.)
+     */
+    public function projectSales(Request $request): JsonResponse
+    {
+        $filters = $this->extractFilters($request);
+        $filters['projects'] = $request->input('projects', $request->input('project'));
+        $data = $this->metricsService->getProjectSalesReport($filters);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * Get Project Sales Transaction Drill-down Items for specific date & project.
+     */
+    public function projectSalesDetail(Request $request): JsonResponse
+    {
+        $filters = $this->extractFilters($request);
+        $filters['date'] = $request->input('date');
+        $filters['project'] = $request->input('project');
+        $filters['search'] = $request->input('search');
+
+        $data = $this->metricsService->getProjectSalesDetail($filters);
 
         return response()->json([
             'success' => true,

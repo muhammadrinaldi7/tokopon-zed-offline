@@ -15,6 +15,7 @@ use App\Models\Promo;
 use App\Models\SellPhone;
 use App\Models\User;
 use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -85,7 +86,7 @@ class ExecutiveMetricsService
     public function baseOrderQuery(array $filters): Builder
     {
         [$start, $end] = $this->parseDateRange(
-            $filters['date_range'] ?? null,
+            $filters['date_range'] ?? ($filters['period'] ?? null),
             $filters['start_date'] ?? null,
             $filters['end_date'] ?? null
         );
@@ -97,10 +98,10 @@ class ExecutiveMetricsService
 
         return Order::whereIn('order_status', $statuses)
             ->where(function ($q) use ($start, $end) {
-                $q->whereBetween('order_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+                $q->whereBetween('order_date', [$start->format('Y-m-d 00:00:00'), $end->format('Y-m-d 23:59:59')])
                     ->orWhere(function ($sub) use ($start, $end) {
                         $sub->whereNull('order_date')
-                            ->whereBetween('created_at', [$start, $end]);
+                            ->whereBetween('created_at', [$start->format('Y-m-d 00:00:00'), $end->format('Y-m-d 23:59:59')]);
                     });
             })
             ->when(!empty($filters['business_unit_id']), function ($q) use ($filters) {
@@ -327,7 +328,7 @@ class ExecutiveMetricsService
     public function getKpiSummary(array $filters): array
     {
         [$start, $end, $range] = $this->parseDateRange(
-            $filters['date_range'] ?? null,
+            $filters['date_range'] ?? ($filters['period'] ?? null),
             $filters['start_date'] ?? null,
             $filters['end_date'] ?? null
         );
@@ -505,7 +506,7 @@ class ExecutiveMetricsService
     public function getSalesTrend(array $filters): array
     {
         [$start, $end] = $this->parseDateRange(
-            $filters['date_range'] ?? null,
+            $filters['date_range'] ?? ($filters['period'] ?? null),
             $filters['start_date'] ?? null,
             $filters['end_date'] ?? null
         );
@@ -1153,5 +1154,333 @@ class ExecutiveMetricsService
             'promo_leaderboard' => $promoLeaderboard,
             'recent_claims' => array_slice($claimedRows, 0, 40),
         ];
+    }
+
+    /**
+     * Get list of all distinct active project names from ProductAccurate.
+     */
+    public function getAvailableProjects(): Collection
+    {
+        return ProductAccurate::whereNotNull('proyek')
+            ->where('proyek', '!=', '')
+            ->orderBy('proyek')
+            ->pluck('proyek')
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * Get aggregated Project Sales Report (Daily matrix & executive project breakdown).
+     */
+    public function getProjectSalesReport(array $filters): array
+    {
+        [$start, $end, $range] = $this->parseDateRange(
+            $filters['date_range'] ?? ($filters['period'] ?? null),
+            $filters['start_date'] ?? null,
+            $filters['end_date'] ?? null
+        );
+
+        $period = CarbonPeriod::create($start->copy()->startOfDay(), $end->copy()->startOfDay());
+        $dates = [];
+        foreach ($period as $dt) {
+            $dates[] = [
+                'raw' => $dt->format('Y-m-d'),
+                'display' => $dt->format('d-m-Y'),
+                'day_name' => $dt->translatedFormat('l')
+            ];
+        }
+
+        $orders = $this->baseOrderQuery($filters)
+            ->with(['items.variant.product', 'items.promos', 'branch'])
+            ->get();
+
+        $lookups = $this->prepareHppLookups($orders);
+
+        $rawMatrix = [];
+        $encounteredProjects = [];
+        $projectBreakdownData = [];
+
+        foreach ($orders as $order) {
+            $orderDate = $order->order_date ? $order->order_date->format('Y-m-d') : $order->created_at->format('Y-m-d');
+
+            foreach ($order->items as $item) {
+                $variant = $item->variant;
+                $proyekName = $variant?->proyek ?? ($variant?->accurateData?->proyek ?? null);
+                
+                if (empty($proyekName) && !empty($item->serial_number)) {
+                    $firstSn = trim(explode(',', $item->serial_number)[0] ?? '');
+                    if ($firstSn) {
+                        $proyekName = ProductSerialNumber::where('serial_number', $firstSn)->value('proyek');
+                    }
+                }
+
+                if (empty($proyekName) || trim($proyekName) === '') {
+                    $proyekName = 'NON-PROYEK';
+                }
+                $proyekName = strtoupper(trim($proyekName));
+                $encounteredProjects[$proyekName] = true;
+
+                $itemPromosTotal = $item->promos ? $item->promos->sum('pivot.discount_amount') : 0;
+                $netSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - (float)$itemPromosTotal;
+                $qty = (int)$item->qty;
+
+                // Determine item HPP
+                $itemHpp = 0;
+                if (!empty($item->serial_number)) {
+                    $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                    foreach ($sns as $sn) {
+                        $itemHpp += $lookups['sn_hpp'][$sn] ?? 0;
+                    }
+                } elseif ($item->product_variant_type === ProductAccurate::class) {
+                    $itemHpp = ($lookups['accurate_cost'][$item->product_variant_id] ?? 0) * $qty;
+                } elseif ($item->product_variant_id) {
+                    $itemHpp = ($lookups['variant_cost'][$item->product_variant_id] ?? 0) * $qty;
+                }
+
+                $grossProfit = $netSubtotal - $itemHpp;
+
+                if (!isset($rawMatrix[$orderDate][$proyekName])) {
+                    $rawMatrix[$orderDate][$proyekName] = [
+                        'nominal' => 0,
+                        'qty' => 0,
+                        'count' => 0,
+                        'hpp' => 0,
+                        'profit' => 0,
+                    ];
+                }
+
+                $rawMatrix[$orderDate][$proyekName]['nominal'] += $netSubtotal;
+                $rawMatrix[$orderDate][$proyekName]['qty'] += $qty;
+                $rawMatrix[$orderDate][$proyekName]['count'] += 1;
+                $rawMatrix[$orderDate][$proyekName]['hpp'] += $itemHpp;
+                $rawMatrix[$orderDate][$proyekName]['profit'] += $grossProfit;
+
+                if (!isset($projectBreakdownData[$proyekName])) {
+                    $projectBreakdownData[$proyekName] = [
+                        'project' => $proyekName,
+                        'net_sales' => 0,
+                        'total_qty' => 0,
+                        'total_hpp' => 0,
+                        'gross_profit' => 0,
+                        'orders_count' => 0,
+                    ];
+                }
+
+                $projectBreakdownData[$proyekName]['net_sales'] += $netSubtotal;
+                $projectBreakdownData[$proyekName]['total_qty'] += $qty;
+                $projectBreakdownData[$proyekName]['total_hpp'] += $itemHpp;
+                $projectBreakdownData[$proyekName]['gross_profit'] += $grossProfit;
+                $projectBreakdownData[$proyekName]['orders_count'] += 1;
+            }
+        }
+
+        // Filter projects if specific projects are requested
+        $requestedProjects = $filters['projects'] ?? ($filters['project'] ?? null);
+        if ($requestedProjects) {
+            if (is_string($requestedProjects)) {
+                $requestedProjects = array_map('trim', explode(',', $requestedProjects));
+            }
+            $selectedColumns = array_map(fn($p) => strtoupper(trim($p)), $requestedProjects);
+            $columns = array_values(array_unique($selectedColumns));
+        } else {
+            if (!empty($encounteredProjects)) {
+                $columns = array_keys($encounteredProjects);
+                sort($columns);
+            } else {
+                $columns = $this->getAvailableProjects()->map(fn($p) => strtoupper(trim($p)))->take(6)->toArray();
+            }
+        }
+
+        $matrix = [];
+        $rowTotals = [];
+        $columnTotals = array_fill_keys($columns, ['nominal' => 0, 'qty' => 0, 'profit' => 0]);
+        $grandTotal = ['nominal' => 0, 'qty' => 0, 'hpp' => 0, 'profit' => 0];
+
+        foreach ($dates as $d) {
+            $dateKey = $d['raw'];
+            $rowTotals[$dateKey] = ['nominal' => 0, 'qty' => 0, 'profit' => 0];
+
+            foreach ($columns as $col) {
+                $cellData = $rawMatrix[$dateKey][$col] ?? ['nominal' => 0, 'qty' => 0, 'count' => 0, 'hpp' => 0, 'profit' => 0];
+                $matrix[$dateKey][$col] = $cellData;
+
+                $rowTotals[$dateKey]['nominal'] += $cellData['nominal'];
+                $rowTotals[$dateKey]['qty'] += $cellData['qty'];
+                $rowTotals[$dateKey]['profit'] += $cellData['profit'];
+
+                $columnTotals[$col]['nominal'] += $cellData['nominal'];
+                $columnTotals[$col]['qty'] += $cellData['qty'];
+                $columnTotals[$col]['profit'] += $cellData['profit'];
+
+                $grandTotal['nominal'] += $cellData['nominal'];
+                $grandTotal['qty'] += $cellData['qty'];
+                $grandTotal['hpp'] += $cellData['hpp'];
+                $grandTotal['profit'] += $cellData['profit'];
+            }
+        }
+
+        $totalCompanyNetSales = $grandTotal['nominal'];
+        $projectBreakdown = [];
+        foreach ($projectBreakdownData as $name => $b) {
+            $marginPct = $b['net_sales'] > 0 ? round(($b['gross_profit'] / $b['net_sales']) * 100, 2) : 0;
+            $sharePct = $totalCompanyNetSales > 0 ? round(($b['net_sales'] / $totalCompanyNetSales) * 100, 2) : 0;
+
+            $projectBreakdown[] = [
+                'project' => $name,
+                'net_sales' => round($b['net_sales'], 2),
+                'total_qty' => $b['total_qty'],
+                'total_hpp' => round($b['total_hpp'], 2),
+                'gross_profit' => round($b['gross_profit'], 2),
+                'margin_percentage' => $marginPct,
+                'contribution_percentage' => $sharePct,
+                'orders_count' => $b['orders_count'],
+            ];
+        }
+
+        usort($projectBreakdown, fn($a, $b) => $b['net_sales'] <=> $a['net_sales']);
+
+        $totalDays = count($dates);
+        $dailyAverage = $totalDays > 0 ? round($grandTotal['nominal'] / $totalDays, 2) : 0;
+        $dailyAverageQty = $totalDays > 0 ? round($grandTotal['qty'] / $totalDays, 1) : 0;
+
+        return [
+            'period' => [
+                'range' => $range,
+                'start_date' => $start->format('Y-m-d'),
+                'end_date' => $end->format('Y-m-d'),
+                'total_days' => $totalDays,
+            ],
+            'summary' => [
+                'total_net_sales' => round($grandTotal['nominal'], 2),
+                'total_qty' => $grandTotal['qty'],
+                'total_hpp' => round($grandTotal['hpp'], 2),
+                'gross_profit' => round($grandTotal['profit'], 2),
+                'profit_margin' => $grandTotal['nominal'] > 0 ? round(($grandTotal['profit'] / $grandTotal['nominal']) * 100, 2) : 0,
+                'total_projects_count' => count($columns),
+                'daily_average_sales' => $dailyAverage,
+                'daily_average_qty' => $dailyAverageQty,
+            ],
+            'project_breakdown' => $projectBreakdown,
+            'columns' => $columns,
+            'dates' => $dates,
+            'matrix' => $matrix,
+            'row_totals' => $rowTotals,
+            'column_totals' => $columnTotals,
+            'grand_total' => $grandTotal,
+            'available_projects' => $this->getAvailableProjects(),
+        ];
+    }
+
+    /**
+     * Get transaction item details for drill-down modal on specific date and project.
+     */
+    public function getProjectSalesDetail(array $filters): array
+    {
+        $targetDate = $filters['date'] ?? null;
+        $targetProject = strtoupper(trim($filters['project'] ?? ''));
+        $search = strtolower(trim($filters['search'] ?? ''));
+
+        if (!$targetDate) {
+            return [];
+        }
+
+        $dateObj = Carbon::parse($targetDate);
+
+        $orders = Order::with([
+            'user',
+            'salesBy',
+            'handledBy',
+            'branch',
+            'payments.paymentMethod',
+            'items.variant.product',
+            'items.promos'
+        ])
+        ->whereDate('order_date', $dateObj)
+        ->whereIn('order_status', ['COMPLETED', 'piutang', 'PIUTANG'])
+        ->when(!empty($filters['business_unit_id']), function ($q) use ($filters) {
+            if (is_array($filters['business_unit_id'])) {
+                $q->whereIn('business_unit_id', $filters['business_unit_id']);
+            } else {
+                $q->where('business_unit_id', $filters['business_unit_id']);
+            }
+        })
+        ->when(!empty($filters['branch']), function ($q) use ($filters) {
+            $branch = $filters['branch'];
+            if (is_numeric($branch)) {
+                $q->where('branch_id', $branch);
+            } else {
+                $q->where('shipping_address_snapshot->store', $branch);
+            }
+        })
+        ->get();
+
+        $items = [];
+
+        foreach ($orders as $order) {
+            $branch = $order->branch?->name ?? ($order->shipping_address_snapshot['store'] ?? 'Cabang Pusat');
+            $time = $order->order_date ? $order->order_date->format('H:i') : $order->created_at->format('H:i');
+
+            foreach ($order->items as $item) {
+                $variant = $item->variant;
+                $proyekName = $variant?->proyek ?? ($variant?->accurateData?->proyek ?? null);
+
+                if (empty($proyekName) && !empty($item->serial_number)) {
+                    $firstSn = trim(explode(',', $item->serial_number)[0] ?? '');
+                    if ($firstSn) {
+                        $proyekName = ProductSerialNumber::where('serial_number', $firstSn)->value('proyek');
+                    }
+                }
+
+                if (empty($proyekName) || trim($proyekName) === '') {
+                    $proyekName = 'NON-PROYEK';
+                }
+                $proyekName = strtoupper(trim($proyekName));
+
+                // Match project (or if targetProject is 'ALL', include all)
+                if ($targetProject !== 'ALL' && $targetProject !== '' && $proyekName !== $targetProject) {
+                    continue;
+                }
+
+                $itemPromosTotal = $item->promos ? $item->promos->sum('pivot.discount_amount') : 0;
+                $netSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - (float)$itemPromosTotal;
+                $productName = $variant?->name ?? ($variant?->product?->name ?? ($item->product_name ?? 'Unknown Product'));
+                $sku = $variant?->item_no ?? ($variant?->sku ?? '-');
+
+                if ($search !== '') {
+                    $matched = str_contains(strtolower($order->order_number), $search)
+                        || str_contains(strtolower($order->accurate_invoice_no ?? ''), $search)
+                        || str_contains(strtolower($productName), $search)
+                        || str_contains(strtolower($sku), $search)
+                        || str_contains(strtolower($order->user?->name ?? ''), $search)
+                        || str_contains(strtolower($order->salesBy?->name ?? ''), $search)
+                        || str_contains(strtolower($order->handledBy?->name ?? ''), $search);
+
+                    if (!$matched) {
+                        continue;
+                    }
+                }
+
+                $items[] = [
+                    'order_number' => $order->order_number,
+                    'invoice_no' => $order->accurate_invoice_no ?? '-',
+                    'time' => $time,
+                    'customer_name' => $order->user?->name ?? 'Walk-in Customer',
+                    'sales_name' => $order->salesBy?->name ?? '-',
+                    'handled_by' => $order->handledBy?->name ?? '-',
+                    'branch' => $branch,
+                    'project' => $proyekName,
+                    'product_name' => $productName,
+                    'sku' => $sku,
+                    'serial_number' => $item->serial_number ?? '-',
+                    'qty' => (int)$item->qty,
+                    'price' => (float)($item->price_at_checkout ?? 0),
+                    'discount' => (float)($item->discount_amount ?? 0) + (float)$itemPromosTotal,
+                    'subtotal' => round($netSubtotal, 2),
+                    'payment_method' => $order->payments->first()?->paymentMethod?->name ?? '-',
+                ];
+            }
+        }
+
+        return $items;
     }
 }
