@@ -102,6 +102,7 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
             'Cabang',
             'Customer',
             'Status',
+            'Qty',
             'Harga Dasar',
             'Harga Sistem',
             'Harga Beli Aktual',
@@ -155,6 +156,7 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
             $sellPhone->branch ? $sellPhone->branch->name : '-',
             $sellPhone->user ? $sellPhone->user->name : 'Tamu',
             $sellPhone->status,
+            1,
             $hargaDasar,
             $sellPhone->original_appraised_value ?? 0,
             $sellPhone->appraised_value ?? 0,
@@ -169,10 +171,13 @@ class LaporanPembelianExport implements FromQuery, WithHeadings, WithMapping, Sh
         $sheet->getColumnDimension('E')->setWidth(45);
         $sheet->getStyle('E')->getAlignment()->setWrapText(true);
 
-        // Wrap text & atur lebar kolom Catatan Approval (bergeser ke Kolom Q)
-        $sheet->getColumnDimension('Q')->setAutoSize(false);
-        $sheet->getColumnDimension('Q')->setWidth(48);
-        $sheet->getStyle('Q')->getAlignment()->setWrapText(true);
+        // Format kolom Qty (Kolom N) rata tengah
+        $sheet->getStyle('N')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+        // Wrap text & atur lebar kolom Catatan Approval (bergeser ke Kolom R karena penambahan Qty)
+        $sheet->getColumnDimension('R')->setAutoSize(false);
+        $sheet->getColumnDimension('R')->setWidth(48);
+        $sheet->getStyle('R')->getAlignment()->setWrapText(true);
 
         return [
             1 => ['font' => ['bold' => true]],
