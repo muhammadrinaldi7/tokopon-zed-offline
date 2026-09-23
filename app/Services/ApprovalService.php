@@ -25,6 +25,7 @@ class ApprovalService
      */
     protected array $handlers = [
         'ORDER_CANCELLATION'   => OrderCancellationHandler::class,
+        'cancellation'         => OrderCancellationHandler::class,
         'SELL_PHONE_APPROVAL'  => SellPhoneApprovalHandler::class,
         'WARRANTY_EXTENSION'   => WarrantyExtensionHandler::class,
         'WARRANTY_REPLACEMENT' => WarrantyReplacementHandler::class,
@@ -37,6 +38,8 @@ class ApprovalService
      */
     public function resolveRules(string $module, ?int $businessUnitId = null, ?float $amount = null, ?int $branchId = null): Collection
     {
+        $module = ($module === 'cancellation') ? 'ORDER_CANCELLATION' : $module;
+
         // 1. Coba cari aturan spesifik untuk Business Unit terkait
         if ($businessUnitId) {
             $buRules = ApprovalRule::with('role')
@@ -94,6 +97,8 @@ class ApprovalService
      */
     public function getRuleForLevel(string $module, int $level, ?int $businessUnitId = null): ?ApprovalRule
     {
+        $module = ($module === 'cancellation') ? 'ORDER_CANCELLATION' : $module;
+
         if ($businessUnitId) {
             $rule = ApprovalRule::with('role')
                 ->where('module', $module)

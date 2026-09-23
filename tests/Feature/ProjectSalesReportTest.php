@@ -57,13 +57,20 @@ class ProjectSalesReportTest extends TestCase
     {
         $this->actingAs($this->user);
 
+        $category = \App\Models\Category::create([
+            'name' => 'Smartphone',
+            'slug' => 'smartphone',
+        ]);
+
         $prod = Product::create([
+            'category_id' => $category->id,
             'name' => 'iPhone 15 Pro',
             'slug' => 'iphone-15-pro',
             'is_active' => true,
         ]);
 
         $accurate1 = ProductAccurate::create([
+            'accurate_id' => '1001',
             'product_id' => $prod->id,
             'item_no' => 'IPH15-RESMI',
             'name' => 'iPhone 15 Pro Resmi',
@@ -74,6 +81,7 @@ class ProjectSalesReportTest extends TestCase
         ]);
 
         $accurate2 = ProductAccurate::create([
+            'accurate_id' => '1002',
             'product_id' => $prod->id,
             'item_no' => 'IPH15-INTER',
             'name' => 'iPhone 15 Pro Inter',

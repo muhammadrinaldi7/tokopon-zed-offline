@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class ExecutiveMetricsService
 {
@@ -27,6 +28,15 @@ class ExecutiveMetricsService
     public function parseDateRange(?string $dateRange, ?string $startDate = null, ?string $endDate = null): array
     {
         $now = now();
+
+        if (!empty($startDate) && !empty($endDate) && (empty($dateRange) || $dateRange === 'custom')) {
+            return [
+                Carbon::parse($startDate)->startOfDay(),
+                Carbon::parse($endDate)->endOfDay(),
+                $dateRange ?: 'custom',
+            ];
+        }
+
         $range = $dateRange ?: 'this_month';
 
         switch ($range) {
@@ -133,16 +143,15 @@ class ExecutiveMetricsService
         foreach ($orders as $order) {
             foreach ($order->items as $item) {
                 $sns = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
-                if (!empty($sns)) {
-                    foreach ($sns as $sn) {
-                        $allSns[] = $sn;
-                    }
-                } else {
-                    if ($item->product_variant_type === ProductAccurate::class) {
-                        $accurateIds[] = $item->product_variant_id;
-                    } elseif ($item->product_variant_id) {
-                        $variantIds[] = $item->product_variant_id;
-                    }
+                foreach ($sns as $sn) {
+                    $allSns[] = $sn;
+                }
+
+                // Selalu kumpulkan accurateIds dan variantIds agar fallback HPP dapat bekerja jika SN bernilai 0
+                if ($item->product_variant_type === ProductAccurate::class) {
+                    $accurateIds[] = $item->product_variant_id;
+                } elseif ($item->product_variant_id) {
+                    $variantIds[] = $item->product_variant_id;
                 }
             }
         }
@@ -178,10 +187,47 @@ class ExecutiveMetricsService
             }
         }
 
+        // 4. Batch lookup SN -> Proyek
+        $hasProyekInSn = Schema::hasTable('product_serial_numbers') && Schema::hasColumn('product_serial_numbers', 'proyek');
+        $hasProyekInAcc = Schema::hasTable('product_accurates') && Schema::hasColumn('product_accurates', 'proyek');
+        $snProyekMap = [];
+
+        if (!empty($allSns) && ($hasProyekInSn || $hasProyekInAcc)) {
+            $uniqueSns = array_unique($allSns);
+            if ($hasProyekInSn) {
+                $snProyekMap = ProductSerialNumber::whereIn('serial_number', $uniqueSns)
+                    ->whereNotNull('proyek')
+                    ->pluck('proyek', 'serial_number')
+                    ->toArray();
+            } elseif ($hasProyekInAcc) {
+                $snAccMap = ProductSerialNumber::whereIn('serial_number', $uniqueSns)
+                    ->whereNotNull('product_accurate_id')
+                    ->pluck('product_accurate_id', 'serial_number')
+                    ->toArray();
+                if (!empty($snAccMap)) {
+                    $accProyeks = ProductAccurate::whereIn('id', array_values($snAccMap))
+                        ->whereNotNull('proyek')
+                        ->pluck('proyek', 'id')
+                        ->toArray();
+                    foreach ($snAccMap as $sn => $accId) {
+                        if (isset($accProyeks[$accId])) {
+                            $snProyekMap[$sn] = $accProyeks[$accId];
+                        }
+                    }
+                }
+            }
+        }
+
         return [
             'snHppMap' => $snHppMap,
             'accurateBaseCostMap' => $accurateBaseCostMap,
             'variantBaseCostMap' => $variantBaseCostMap,
+            'sn_hpp' => $snHppMap,
+            'accurate_cost' => $accurateBaseCostMap,
+            'variant_cost' => $variantBaseCostMap,
+            'snProyekMap' => $snProyekMap,
+            'hasProyekInAcc' => $hasProyekInAcc,
+            'hasProyekInSn' => $hasProyekInSn,
         ];
     }
 
@@ -190,30 +236,40 @@ class ExecutiveMetricsService
      */
     public function computeSingleOrderMetrics($order, array $lookups): array
     {
-        $snHppMap = $lookups['snHppMap'] ?? [];
-        $accurateBaseCostMap = $lookups['accurateBaseCostMap'] ?? [];
-        $variantBaseCostMap = $lookups['variantBaseCostMap'] ?? [];
+        $snHppMap = $lookups['snHppMap'] ?? ($lookups['sn_hpp'] ?? []);
+        $accurateBaseCostMap = $lookups['accurateBaseCostMap'] ?? ($lookups['accurate_cost'] ?? []);
+        $variantBaseCostMap = $lookups['variantBaseCostMap'] ?? ($lookups['variant_cost'] ?? []);
 
         $totalHpp = 0;
         $totalQty = 0;
 
         foreach ($order->items as $item) {
             $totalQty += $item->qty;
+            $itemHpp = 0;
             $sns = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
 
+            // 1. Coba ambil HPP dari nomor seri (jika tercatat > 0)
             if (!empty($sns)) {
                 foreach ($sns as $sn) {
-                    $totalHpp += ($snHppMap[$sn] ?? 0);
-                }
-            } else {
-                if ($item->product_variant_type === ProductAccurate::class) {
-                    $baseCost = $accurateBaseCostMap[$item->product_variant_id] ?? 0;
-                    $totalHpp += ($baseCost * $item->qty);
-                } else {
-                    $baseCost = $variantBaseCostMap[$item->product_variant_id] ?? 0;
-                    $totalHpp += ($baseCost * $item->qty);
+                    $snCost = $snHppMap[$sn] ?? 0;
+                    if ($snCost > 0) {
+                        $itemHpp += $snCost;
+                    }
                 }
             }
+
+            // 2. Fallback: jika nomor seri tidak memiliki HPP (atau = 0), ambil dari base_cost Accurate / Varian
+            if ($itemHpp <= 0) {
+                if ($item->product_variant_type === ProductAccurate::class) {
+                    $baseCost = $accurateBaseCostMap[$item->product_variant_id] ?? 0;
+                    $itemHpp = ($baseCost * $item->qty);
+                } else {
+                    $baseCost = $variantBaseCostMap[$item->product_variant_id] ?? 0;
+                    $itemHpp = ($baseCost * $item->qty);
+                }
+            }
+
+            $totalHpp += $itemHpp;
         }
 
         // Calculate MDR from payments
@@ -878,28 +934,74 @@ class ExecutiveMetricsService
         }
 
         $orderIds = $orders->pluck('id');
-        $items = OrderItem::with(['variant.product.brand'])->whereIn('order_id', $orderIds)->get();
+        $items = OrderItem::whereIn('order_id', $orderIds)->get();
 
-        $grouped = $items->groupBy(function ($item) {
-            $variant = $item->variant;
-            if ($variant instanceof ProductAccurate && !empty($variant->brandName)) {
-                return trim($variant->brandName);
+        // Prepare HPP lookups for items
+        $allSns = [];
+        $accurateIds = [];
+        $variantIds = [];
+        foreach ($items as $item) {
+            $sns = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
+            foreach ($sns as $sn) {
+                $allSns[] = $sn;
             }
-            if ($variant && method_exists($variant, 'accurateData') && !empty($variant->accurateData?->brandName)) {
-                return trim($variant->accurateData->brandName);
+            if ($item->product_variant_type === ProductAccurate::class) {
+                $accurateIds[] = $item->product_variant_id;
+            } elseif ($item->product_variant_id) {
+                $variantIds[] = $item->product_variant_id;
             }
-            if (!empty($variant?->product?->brand?->name)) {
-                return trim($variant->product->brand->name);
+        }
+
+        $snHppMap = !empty($allSns) ? ProductSerialNumber::whereIn('serial_number', array_unique($allSns))->pluck('hpp', 'serial_number')->map(fn($v) => (float)$v)->toArray() : [];
+        $accurateBaseCostMap = !empty($accurateIds) ? ProductAccurate::whereIn('id', array_unique($accurateIds))->pluck('base_cost', 'id')->map(fn($v) => (float)$v)->toArray() : [];
+        $accurateBrandMap = !empty($accurateIds) ? ProductAccurate::whereIn('id', array_unique($accurateIds))->whereNotNull('brandName')->pluck('brandName', 'id')->toArray() : [];
+
+        $variantBaseCostMap = [];
+        $variantBrandMap = [];
+        if (!empty($variantIds)) {
+            $variants = ProductVariant::with(['accurateData', 'product.brand'])->whereIn('id', array_unique($variantIds))->get();
+            foreach ($variants as $variant) {
+                $variantBaseCostMap[$variant->id] = (float)($variant->accurateData?->base_cost ?? 0);
+                $brand = $variant->accurateData?->brandName ?: ($variant->product?->brand?->name ?: null);
+                if ($brand) {
+                    $variantBrandMap[$variant->id] = trim($brand);
+                }
+            }
+        }
+
+        $grouped = $items->groupBy(function ($item) use ($accurateBrandMap, $variantBrandMap) {
+            if ($item->product_variant_type === ProductAccurate::class) {
+                return $accurateBrandMap[$item->product_variant_id] ?? 'Lainnya / Aksesoris';
+            }
+            if ($item->product_variant_id && isset($variantBrandMap[$item->product_variant_id])) {
+                return $variantBrandMap[$item->product_variant_id];
             }
             return 'Lainnya / Aksesoris';
-        })->map(function ($brandItems, $brandName) {
+        })->map(function ($brandItems, $brandName) use ($snHppMap, $accurateBaseCostMap, $variantBaseCostMap) {
             $totalQty = $brandItems->sum('qty');
             $grossSales = $brandItems->sum('subtotal');
 
-            // HPP estimation from accurate_cogs or 80% fallback
-            $hpp = $brandItems->sum(function ($it) {
-                $cogs = $it->accurate_cogs ?? ($it->price * 0.8);
-                return $cogs * $it->qty;
+            // HPP computation: SN -> Accurate/Variant base_cost -> estimated price_at_checkout
+            $hpp = $brandItems->sum(function ($it) use ($snHppMap, $accurateBaseCostMap, $variantBaseCostMap) {
+                $cost = 0;
+                $sns = array_filter(array_map('trim', explode(',', $it->serial_number ?? '')));
+                if (!empty($sns)) {
+                    foreach ($sns as $sn) {
+                        $val = $snHppMap[$sn] ?? 0;
+                        if ($val > 0) $cost += $val;
+                    }
+                }
+                if ($cost <= 0) {
+                    if ($it->product_variant_type === ProductAccurate::class) {
+                        $cost = ($accurateBaseCostMap[$it->product_variant_id] ?? 0) * (int)$it->qty;
+                    } elseif ($it->product_variant_id) {
+                        $cost = ($variantBaseCostMap[$it->product_variant_id] ?? 0) * (int)$it->qty;
+                    }
+                }
+                if ($cost <= 0 && (float)($it->price_at_checkout ?? 0) > 0) {
+                    $cost = (float)$it->price_at_checkout * 0.85 * (int)$it->qty;
+                }
+                return $cost;
             });
 
             $grossProfit = $grossSales - $hpp;
@@ -947,12 +1049,19 @@ class ExecutiveMetricsService
         // 1. Audit Pembatalan Transaksi (Void & Cancellation)
         // ─────────────────────────────────────────────────────────────
         $cancelQuery = ApprovalRequest::with(['requestedBy', 'approvable.branch'])
-            ->where('request_type', 'ORDER_CANCELLATION')
+            ->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])
             ->whereBetween('created_at', [$start, $end]);
 
         if ($branchFilter) {
             $cancelQuery->whereHasMorph('approvable', [Order::class], function ($q) use ($branchFilter) {
-                $q->where('shipping_address_snapshot->store', $branchFilter);
+                if (is_numeric($branchFilter)) {
+                    $q->where('branch_id', $branchFilter);
+                } else {
+                    $q->where(function ($sub) use ($branchFilter) {
+                        $sub->where('shipping_address_snapshot->store', $branchFilter)
+                            ->orWhereHas('branch', fn($bq) => $bq->where('name', $branchFilter));
+                    });
+                }
             });
         }
 
@@ -1161,10 +1270,19 @@ class ExecutiveMetricsService
      */
     public function getAvailableProjects(): Collection
     {
-        return ProductAccurate::whereNotNull('proyek')
-            ->where('proyek', '!=', '')
-            ->orderBy('proyek')
-            ->pluck('proyek')
+        $fromAcc = collect();
+        if (Schema::hasTable('product_accurates') && Schema::hasColumn('product_accurates', 'proyek')) {
+            $fromAcc = ProductAccurate::whereNotNull('proyek')
+                ->where('proyek', '!=', '')
+                ->pluck('proyek');
+        }
+
+        $defaultProjects = collect(ProductAccurate::$proyek ?? [
+            'RESMI', 'INTER', 'BEACUKAI', 'ACCESSORIES', 'HANDPHONE', 'NON-PROYEK'
+        ]);
+
+        return $fromAcc->concat($defaultProjects)
+            ->map(fn($p) => strtoupper(trim($p)))
             ->unique()
             ->values();
     }
@@ -1200,17 +1318,24 @@ class ExecutiveMetricsService
         $encounteredProjects = [];
         $projectBreakdownData = [];
 
+        $hasProyekInAcc = $lookups['hasProyekInAcc'] ?? false;
+        $snProyekMap = $lookups['snProyekMap'] ?? [];
+
         foreach ($orders as $order) {
             $orderDate = $order->order_date ? $order->order_date->format('Y-m-d') : $order->created_at->format('Y-m-d');
 
             foreach ($order->items as $item) {
                 $variant = $item->variant;
-                $proyekName = $variant?->proyek ?? ($variant?->accurateData?->proyek ?? null);
-                
+
+                $proyekName = null;
+                if ($hasProyekInAcc) {
+                    $proyekName = $variant?->proyek ?? ($variant?->accurateData?->proyek ?? null);
+                }
+
                 if (empty($proyekName) && !empty($item->serial_number)) {
                     $firstSn = trim(explode(',', $item->serial_number)[0] ?? '');
-                    if ($firstSn) {
-                        $proyekName = ProductSerialNumber::where('serial_number', $firstSn)->value('proyek');
+                    if ($firstSn && isset($snProyekMap[$firstSn])) {
+                        $proyekName = $snProyekMap[$firstSn];
                     }
                 }
 
@@ -1224,17 +1349,27 @@ class ExecutiveMetricsService
                 $netSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - (float)$itemPromosTotal;
                 $qty = (int)$item->qty;
 
-                // Determine item HPP
+                // Determine item HPP with fallback hierarchy
                 $itemHpp = 0;
                 if (!empty($item->serial_number)) {
                     $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
                     foreach ($sns as $sn) {
-                        $itemHpp += $lookups['sn_hpp'][$sn] ?? 0;
+                        $snCost = $lookups['snHppMap'][$sn] ?? ($lookups['sn_hpp'][$sn] ?? 0);
+                        if ($snCost > 0) {
+                            $itemHpp += $snCost;
+                        }
                     }
-                } elseif ($item->product_variant_type === ProductAccurate::class) {
-                    $itemHpp = ($lookups['accurate_cost'][$item->product_variant_id] ?? 0) * $qty;
-                } elseif ($item->product_variant_id) {
-                    $itemHpp = ($lookups['variant_cost'][$item->product_variant_id] ?? 0) * $qty;
+                }
+
+                // Fallback: jika nomor seri belum memiliki HPP (> 0), ambil dari base_cost Accurate / Varian
+                if ($itemHpp <= 0) {
+                    if ($item->product_variant_type === ProductAccurate::class) {
+                        $baseCost = $lookups['accurateBaseCostMap'][$item->product_variant_id] ?? ($lookups['accurate_cost'][$item->product_variant_id] ?? 0);
+                        $itemHpp = $baseCost * $qty;
+                    } elseif ($item->product_variant_id) {
+                        $baseCost = $lookups['variantBaseCostMap'][$item->product_variant_id] ?? ($lookups['variant_cost'][$item->product_variant_id] ?? 0);
+                        $itemHpp = $baseCost * $qty;
+                    }
                 }
 
                 $grossProfit = $netSubtotal - $itemHpp;
@@ -1414,6 +1549,48 @@ class ExecutiveMetricsService
         })
         ->get();
 
+        $hasProyekInSn = Schema::hasTable('product_serial_numbers') && Schema::hasColumn('product_serial_numbers', 'proyek');
+        $hasProyekInAcc = Schema::hasTable('product_accurates') && Schema::hasColumn('product_accurates', 'proyek');
+
+        $detailSns = [];
+        foreach ($orders as $order) {
+            foreach ($order->items as $item) {
+                if (!empty($item->serial_number)) {
+                    $firstSn = trim(explode(',', $item->serial_number)[0] ?? '');
+                    if ($firstSn) {
+                        $detailSns[] = $firstSn;
+                    }
+                }
+            }
+        }
+
+        $snProyekMap = [];
+        if (!empty($detailSns) && ($hasProyekInSn || $hasProyekInAcc)) {
+            $uniqueSns = array_unique($detailSns);
+            if ($hasProyekInSn) {
+                $snProyekMap = ProductSerialNumber::whereIn('serial_number', $uniqueSns)
+                    ->whereNotNull('proyek')
+                    ->pluck('proyek', 'serial_number')
+                    ->toArray();
+            } elseif ($hasProyekInAcc) {
+                $snAccMap = ProductSerialNumber::whereIn('serial_number', $uniqueSns)
+                    ->whereNotNull('product_accurate_id')
+                    ->pluck('product_accurate_id', 'serial_number')
+                    ->toArray();
+                if (!empty($snAccMap)) {
+                    $accProyeks = ProductAccurate::whereIn('id', array_values($snAccMap))
+                        ->whereNotNull('proyek')
+                        ->pluck('proyek', 'id')
+                        ->toArray();
+                    foreach ($snAccMap as $sn => $accId) {
+                        if (isset($accProyeks[$accId])) {
+                            $snProyekMap[$sn] = $accProyeks[$accId];
+                        }
+                    }
+                }
+            }
+        }
+
         $items = [];
 
         foreach ($orders as $order) {
@@ -1422,12 +1599,16 @@ class ExecutiveMetricsService
 
             foreach ($order->items as $item) {
                 $variant = $item->variant;
-                $proyekName = $variant?->proyek ?? ($variant?->accurateData?->proyek ?? null);
+
+                $proyekName = null;
+                if ($hasProyekInAcc) {
+                    $proyekName = $variant?->proyek ?? ($variant?->accurateData?->proyek ?? null);
+                }
 
                 if (empty($proyekName) && !empty($item->serial_number)) {
                     $firstSn = trim(explode(',', $item->serial_number)[0] ?? '');
-                    if ($firstSn) {
-                        $proyekName = ProductSerialNumber::where('serial_number', $firstSn)->value('proyek');
+                    if ($firstSn && isset($snProyekMap[$firstSn])) {
+                        $proyekName = $snProyekMap[$firstSn];
                     }
                 }
 

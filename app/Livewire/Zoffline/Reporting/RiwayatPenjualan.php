@@ -233,7 +233,7 @@ class RiwayatPenjualan extends Component
                             });
                     })
                     ->orWhereHas('approvalRequests', function ($aq) {
-                        $aq->where('request_type', 'ORDER_CANCELLATION')->where('status', 'PENDING');
+                        $aq->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])->where('status', 'PENDING');
                     });
             })->count(),
             'CANCELLED' => (clone $baseQuery)->where('order_status', 'CANCELLED')->count(),
@@ -242,7 +242,7 @@ class RiwayatPenjualan extends Component
         // Orders query with search and filters applied
         $orders = (clone $baseQuery)
             ->with(['user', 'items', 'payments', 'salesBy', 'handledBy', 'businessUnit', 'branch', 'approvalRequests' => function ($q) {
-                $q->where('request_type', 'ORDER_CANCELLATION');
+                $q->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation']);
             }])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
@@ -272,7 +272,7 @@ class RiwayatPenjualan extends Component
                                     });
                             })
                             ->orWhereHas('approvalRequests', function ($aq) {
-                                $aq->where('request_type', 'ORDER_CANCELLATION')->where('status', 'PENDING');
+                                $aq->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])->where('status', 'PENDING');
                             });
                     });
                 } elseif ($this->filterStatus === 'COMPLETED') {
@@ -692,7 +692,7 @@ class RiwayatPenjualan extends Component
         }
 
         // Check if there is already a pending request
-        $existing = $order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'ORDER_CANCELLATION')->first();
+        $existing = $order->approvalRequests()->where('status', 'PENDING')->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])->first();
         if ($existing) {
             $this->dispatch('toast', title: 'Info', message: 'Transaksi ini sudah dalam proses pengajuan pembatalan.', type: 'info');
             $this->closeCancelModal();

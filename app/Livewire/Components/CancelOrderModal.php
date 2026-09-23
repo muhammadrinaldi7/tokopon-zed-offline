@@ -45,7 +45,7 @@ class CancelOrderModal extends Component
         }
 
         // Check if there is already a pending request
-        $existing = $order->approvalRequests()->where('status', 'PENDING')->where('request_type', 'ORDER_CANCELLATION')->first();
+        $existing = $order->approvalRequests()->where('status', 'PENDING')->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])->first();
         if ($existing) {
             $this->dispatch('toast', title: 'Info', message: 'Transaksi ini sudah dalam proses pengajuan pembatalan.', type: 'info');
             $this->closeModal();

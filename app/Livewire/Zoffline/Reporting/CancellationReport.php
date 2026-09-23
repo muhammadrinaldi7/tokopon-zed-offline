@@ -54,7 +54,7 @@ class CancellationReport extends Component
             'approvable.user.profile',
             'approvable.branch',
         ])
-            ->where('request_type', 'ORDER_CANCELLATION')
+            ->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])
             ->whereBetween('created_at', [
                 Carbon::parse($this->dateFrom)->startOfDay(),
                 Carbon::parse($this->dateTo)->endOfDay(),
@@ -247,7 +247,7 @@ class CancellationReport extends Component
     public function render()
     {
         // Base query without search & specific status/channel filters for summary metrics
-        $baseQuery = ApprovalRequest::where('request_type', 'ORDER_CANCELLATION')
+        $baseQuery = ApprovalRequest::whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])
             ->whereBetween('created_at', [
                 Carbon::parse($this->dateFrom)->startOfDay(),
                 Carbon::parse($this->dateTo)->endOfDay(),
@@ -263,7 +263,7 @@ class CancellationReport extends Component
 
         // Top Cashiers
         $topCashiers = ApprovalRequest::with('requestedBy')
-            ->where('request_type', 'ORDER_CANCELLATION')
+            ->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])
             ->whereBetween('created_at', [
                 Carbon::parse($this->dateFrom)->startOfDay(),
                 Carbon::parse($this->dateTo)->endOfDay(),
