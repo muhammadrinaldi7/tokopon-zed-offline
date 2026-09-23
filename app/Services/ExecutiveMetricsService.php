@@ -848,14 +848,18 @@ class ExecutiveMetricsService
      */
     public function getStaffKpi(array $filters): array
     {
-        $orders = $this->baseOrderQuery($filters)->with(['salesBy', 'handledBy'])->get();
+        $orders = $this->baseOrderQuery($filters)
+            ->with(['salesBy', 'handledBy', 'items:id,order_id,qty'])
+            ->get();
 
         // 1. Salespersons Performance (sales_id)
         $salesGrouped = $orders->groupBy('sales_id')->map(function ($group, $salesId) {
             $sales = $group->first()->salesBy;
             $salesName = $sales ? $sales->name : 'Walk-in / Tanpa Sales';
             $totalOrders = $group->count();
-            $totalQty = $group->sum('total_qty');
+            $totalQty = $group->sum(function ($order) {
+                return (int)$order->items->sum('qty');
+            });
             $grossSales = $group->sum('total_amount');
             $netSales = $group->sum('grand_total');
             $aov = $totalOrders > 0 ? round($netSales / $totalOrders, 2) : 0;
@@ -884,6 +888,9 @@ class ExecutiveMetricsService
             $cashier = $group->first()->handledBy;
             $cashierName = $cashier ? $cashier->name : 'Sistem / Tidak Tercatat';
             $totalOrders = $group->count();
+            $totalQty = $group->sum(function ($order) {
+                return (int)$order->items->sum('qty');
+            });
             $totalGross = $group->sum('total_amount');
             $completedAmount = $group->where('order_status', 'COMPLETED')->sum('grand_total');
             $aov = $totalOrders > 0 ? round($totalGross / $totalOrders, 2) : 0;
@@ -892,6 +899,7 @@ class ExecutiveMetricsService
                 'cashier_id' => $handledBy ?: null,
                 'cashier_name' => $cashierName,
                 'orders_count' => $totalOrders,
+                'total_qty' => (int)$totalQty,
                 'total_gross' => round($totalGross, 2),
                 'completed_amount' => round($completedAmount, 2),
                 'aov' => $aov,

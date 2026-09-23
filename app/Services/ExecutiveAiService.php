@@ -125,6 +125,30 @@ class ExecutiveAiService
                 }
             }
 
+            $staff = $contextData['staff'] ?? null;
+            if (!empty($staff['sales']) && is_array($staff['sales'])) {
+                $metricsContext .= "\n[TOP PERFORMER SALESPERSON]\n";
+                foreach (array_slice($staff['sales'], 0, 5) as $s) {
+                    $sName = $s['sales_name'] ?? '-';
+                    $sNet = number_format($s['net_sales'] ?? 0, 0, ',', '.');
+                    $sQty = $s['total_qty'] ?? 0;
+                    $sOrders = $s['orders_count'] ?? 0;
+                    $metricsContext .= "- #{$s['rank']} {$sName}: Omset Rp {$sNet} ({$sQty} unit, {$sOrders} order)\n";
+                }
+            }
+
+            $audit = $contextData['audit'] ?? null;
+            if (!empty($audit['cashier_cancellations']) && is_array($audit['cashier_cancellations'])) {
+                $metricsContext .= "\n[AUDIT PEMBATALAN / VOID KASIR]\n";
+                foreach (array_slice($audit['cashier_cancellations'], 0, 5) as $c) {
+                    $cName = $c['cashier_name'] ?? '-';
+                    $cCount = $c['cancellation_count'] ?? 0;
+                    $cAmt = number_format($c['total_amount'] ?? 0, 0, ',', '.');
+                    $reasons = implode(', ', $c['reasons'] ?? []);
+                    $metricsContext .= "- Kasir {$cName}: {$cCount} void (Total Rp {$cAmt}) | Alasan: {$reasons}\n";
+                }
+            }
+
             // Provide comparative baseline between Today and Yesterday if relevant
             $activePeriod = $contextData['period']['range'] ?? 'today';
             if ($activePeriod === 'today') {
@@ -240,6 +264,8 @@ PROMPT;
                 $topProducts = $this->metricsService->getTopProducts($filters, 10);
                 $payments = $this->metricsService->getPaymentMethodBreakdown($filters);
                 $projectReport = $this->metricsService->getProjectSalesReport($filters);
+                $staff = $this->metricsService->getStaffKpi($filters);
+                $audit = $this->metricsService->getCashierAudit($filters);
 
                 return [
                     'period' => ['range' => $period],
@@ -248,6 +274,8 @@ PROMPT;
                     'top_products' => $topProducts,
                     'payments' => $payments,
                     'projects' => $projectReport['project_breakdown'] ?? [],
+                    'staff' => $staff,
+                    'audit' => $audit,
                 ];
             } catch (\Throwable $e) {
                 Log::warning("Failed to fetch metrics for period {$period}: " . $e->getMessage());
