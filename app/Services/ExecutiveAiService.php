@@ -12,14 +12,16 @@ use Illuminate\Support\Facades\Log;
 class ExecutiveAiService
 {
     protected ExecutiveMetricsService $metricsService;
+    protected ExecutiveInventoryService $inventoryService;
     protected string $apiBase;
     protected string $apiKey;
     protected string $model;
     protected int $timeout;
 
-    public function __construct(ExecutiveMetricsService $metricsService)
+    public function __construct(ExecutiveMetricsService $metricsService, ExecutiveInventoryService $inventoryService)
     {
         $this->metricsService = $metricsService;
+        $this->inventoryService = $inventoryService;
 
         // 9router or any OpenAI-compatible gateway configuration
         $this->apiBase = rtrim(config('services.ninerouter.base_url', 'https://api.9router.com/v1'), '/');
@@ -187,8 +189,11 @@ class ExecutiveAiService
                     $tOrders = number_format($tSummary['total_orders'] ?? 0, 0, ',', '.');
                     $tMargin = number_format($tSummary['profit_margin'] ?? 0, 1, ',', '.');
                     $metricsContext .= "\n[KOMPARASI PERFORMA HARI INI BERJALAN (TODAY)]\n";
-                    $metricsContext .= "- Total Omset Hari Ini (Berjalan): Rp {$tNet} (Transaksi: {$tOrders}, Margin: {$tMargin}%)\n";
                 }
+            }
+
+            if (!empty($contextData['inventory_context'])) {
+                $metricsContext .= "\n\n" . $contextData['inventory_context'] . "\n";
             }
         }
 
@@ -202,7 +207,10 @@ Gaya Komunikasi & Standar Jawaban:
 2. PANDUAN FORMATTING TABEL (SANGAT KRUSIAL AGAR RAPI DI SEMUA LAYAR & MOBILE):
    - JIKA MENAMPILKAN DATA CABANG ATAU PRODUK:
      * TABEL HARUS KOMPAK MAKSIMAL 4-5 KOLOM (JANGAN buat 6 kolom lebar karena akan terpotong, wrapping berantakan, dan sulit dibaca di chat/mobile).
-     * Padatkan informasi dengan menggabungkan Omset & Share %, serta Margin & Laba:
+     * SETIAP BARIS TABEL WAJIB MENGGUNAKAN BARIS BARU (LINE BREAK \n). DILARANG KERAS menggabungkan 2 atau lebih baris tabel dalam satu line teks!
+     * DILARANG MENGGUNAKAN DOUBLE/TRIPLE PIPE (|| atau |||). Setiap baris tabel WAJIB diawali tepat satu pipa (|) dan diakhiri tepat satu pipa (|).
+     * JANGAN ADA BARIS KOSONG di antara baris-baris data dalam satu tabel. Baris header langsung diikuti baris pemisah (|---|---|), lalu baris data.
+     * Padatkan informasi dalam kolom ringkas:
        | No | Cabang | Omset Bersih (Share) | Margin (Laba) | Trx |
        |----|--------|----------------------|---------------|-----|
        | 1  | Banjarbaru | Rp 288.918.693 (25,4%) | 5,8% (Rp 16,7 Jt) | 106 |
@@ -215,9 +223,25 @@ Gaya Komunikasi & Standar Jawaban:
    - 🎯 **Top Performer & High Margin** (cabang kontributor omset & margin tertinggi).
    - ⚠️ **Cabang Perlu Perhatian** (cabang dengan margin di bawah target <5% atau anomali transaksi).
    - 💡 **Rekomendasi Tindakan C-Level** (langkah konkret yang dapat langsung dieksekusi).
-4. KONTEKS DATA:
+4. KAMUS STRUKTUR UNIT BISNIS & ATURAN PRODUK (WAJIB DIPAHAMI):
+   - UNIT BISNIS 1: "Syihab" (HP Baru / Retail Utama Resmi)
+     * Toko Cabang: Banjarbaru, Martapura, Sultan Adam, Veteran, Premium.
+     * Produk: Khusus HP/Gadget BARU resmi (Apple Resmi, Android Baru, Aksesoris).
+   - UNIT BISNIS 2: "GSK Second" (Spesialis HP Second / Bekas & Tukar Tambah)
+     * Toko Cabang: Menggunakan prefix "GSK - " (GSK - Banjarbaru, GSK - Martapura, GSK - Sultan Adam, GSK - Veteran, GSK - Kayutangi, GSK - Sampit).
+     * ATURAN MUTLAK: SETIAP PERTANYAAN TENTANG HP SECOND / BEKAS HARUS MERUJUK KE UNIT BISNIS GSK SECOND.
+   - UNIT BISNIS 3: "GSK Distri" (Grosir / Distribusi B2B).
+5. ATURAN CARA MENJAWAB INFORMASI STOK, HARGA & LOKASI HP:
+   - JIKA ADA BLOK [DATA REALTIME STOK & LOKASI UNIT HP DI GUDANG/CABANG] ATAU [DATA PELACAKAN FISIK NOMOR SERI / IMEI], utamakan menjawab berdasarkan data tersebut.
+   - Sajikan secara detail dan ramah:
+     * Nama model produk lengkap & SKU-nya.
+     * Unit Bisnis yang menaungi (Syihab Baru vs GSK Second).
+     * Harga Jual resmi & Modal HPP (karena Anda berbicara dengan Direksi).
+     * Total unit fisik yang siap jual (Available) dan rincian lokasinya per cabang toko.
+     * Jika stok fisik kosong atau tidak tersedia di cabang tertentu, sampaikan secara transparan.
+6. KONTEKS DATA REALTIME:
 {$metricsContext}
-5. Jawab pertanyaan Direksi dengan menganalisis angka-angka di atas secara tajam, berikan 'Key Takeaways' dan 'Rekomendasi Tindakan' praktis jika relevan.
+7. Jawab pertanyaan Direksi dengan menganalisis angka-angka di atas secara tajam, berikan 'Key Takeaways' dan 'Rekomendasi Tindakan' praktis jika relevan.
 PROMPT;
     }
 
@@ -264,8 +288,112 @@ PROMPT;
     }
 
     /**
-     * Fetch complete executive metrics package for a given period.
+     * Detect real-time operational inventory / stock / IMEI / dead-stock intent from user query.
      */
+    public function detectInventoryIntent(string $message): ?array
+    {
+        $msg = strtolower($message);
+
+        // 1. Detect IMEI / Serial Number tracking
+        if (preg_match('/\b(?:imei|sn|serial(?:\s*number)?)\s*[:#]?\s*([a-zA-Z0-9\-\/]{4,30})\b/i', $message, $m)) {
+            return [
+                'type' => 'imei_track',
+                'imei' => trim($m[1]),
+            ];
+        }
+
+        // 2. Detect Dead Stock / Aging stock intent
+        if (preg_match('/\b(dead\s*stock|stok\s*(?:mati|mengendap|lama|tertahan)|lama\s*belum\s*laku)\b/i', $msg)) {
+            $buId = 2; // Default to GSK Second
+            if (preg_match('/\b(baru|syihab)\b/i', $msg)) {
+                $buId = 1;
+            }
+            return [
+                'type' => 'dead_stock',
+                'business_unit_id' => $buId,
+            ];
+        }
+
+        // 3. Detect stock, price, or product location inquiry
+        $inventoryKeywords = [
+            'stok', 'stock', 'harga', 'price', 'lokasi', 'ada di mana', 'tersedia', 'ketersediaan',
+            'iphone', 'ipad', 'macbook', 'apple watch', 'samsung', 'oppo', 'vivo', 'xiaomi', 'redmi',
+            'infinix', 'poco', 'iqoo', 'realme', 'second', 'bekas', '2nd', 'unit'
+        ];
+
+        $matched = false;
+        foreach ($inventoryKeywords as $kw) {
+            if (str_contains($msg, $kw)) {
+                $matched = true;
+                break;
+            }
+        }
+
+        if (!$matched) {
+            return null;
+        }
+
+        // Detect Business Unit
+        $buId = null;
+        if (preg_match('/\b(second|bekas|2nd|gsk)\b/i', $msg)) {
+            $buId = 2; // GSK Second
+        } elseif (preg_match('/\b(baru|new|resmi|syihab)\b/i', $msg)) {
+            $buId = 1; // Syihab Baru
+        }
+
+        // Detect branch filter if mentioned
+        $branches = ['banjarbaru', 'martapura', 'sultan adam', 'veteran', 'premium', 'kayutangi', 'sampit', 'head office'];
+        $branchFilter = null;
+        foreach ($branches as $b) {
+            if (str_contains($msg, $b)) {
+                $branchFilter = $b;
+                break;
+            }
+        }
+
+        // Extract product search term
+        $clean = preg_replace('/[?!.,;:]+/', ' ', $message);
+        $clean = preg_replace('/\b(cek|tolong|coba|tanya|apakah|ada|stok|stock|harga|berapa|unit|lokasi|di|cabang|toko|mana|ya|dong|min|zed|ai|mohon|info|informasi|tentang)\b/i', ' ', $clean);
+        $clean = preg_replace('/\b(saja|sih|kah|nya|kan|nih|deh|aja)\b/i', ' ', $clean);
+        $clean = preg_replace('/\b(second|bekas|2nd|baru|new|resmi|banjarbaru|martapura|veteran|sultan adam|premium|kayutangi|sampit|head office)\b/i', ' ', $clean);
+        $clean = trim(preg_replace('/\s+/', ' ', $clean));
+
+        if (empty($clean) || strlen($clean) < 2) {
+            if (preg_match('/(iphone\s*\d*(?:\s*(?:pro\s*max|pro|plus|mini))?|samsung\s*[a-z0-9\+\s]+|iqoo\s*[a-z0-9\s]+|macbook|ipad)/i', $message, $mModel)) {
+                $clean = trim($mModel[1]);
+            }
+        }
+
+        if (empty($clean)) {
+            return null;
+        }
+
+        return [
+            'type' => 'stock_search',
+            'keyword' => $clean,
+            'business_unit_id' => $buId,
+            'branch' => $branchFilter,
+        ];
+    }
+
+    /**
+     * Format dead stock data into AI context text.
+     */
+    public function formatDeadStockForAiContext(array $deadStock): string
+    {
+        if (empty($deadStock)) {
+            return "[DATA STOK MENGENDAP (DEAD STOCK): Tidak ada unit yang mengendap >30 hari, rotasi stok fisik sehat!]";
+        }
+
+        $text = "[PERINGATAN OPERASIONAL: STOK MENGENDAP / DEAD STOCK (>30 HARI DI TOKO)]\n";
+        foreach ($deadStock as $idx => $ds) {
+            $num = $idx + 1;
+            $price = number_format($ds['price'], 0, ',', '.');
+            $cost = number_format($ds['hpp'], 0, ',', '.');
+            $text .= "- #{$num} {$ds['product_name']} | Cabang: {$ds['branch']} | Qty: {$ds['qty']} unit | Mengendap: {$ds['days_in_stock']} hari (Harga Jual: Rp {$price}, Modal HPP: Rp {$cost})\n";
+        }
+        return trim($text);
+    }
     public function getMetricsForPeriod(string $period, ?User $user = null): array
     {
         $cacheKey = 'executive_metrics_auto_' . $period . '_' . ($user ? $user->id : 'all');
@@ -317,6 +445,25 @@ PROMPT;
             $contextData = $this->getMetricsForPeriod($detectedPeriod, $user);
         } elseif (empty($contextData)) {
             $contextData = $this->getMetricsForPeriod($detectedPeriod ?: 'today', $user);
+        }
+
+        // 1b. Real-time Inventory & Operational Intent Pre-fetch
+        $inventoryIntent = $this->detectInventoryIntent($message);
+        if ($inventoryIntent) {
+            if ($inventoryIntent['type'] === 'stock_search') {
+                $searchResults = $this->inventoryService->searchInventory(
+                    $inventoryIntent['keyword'],
+                    $inventoryIntent['business_unit_id'],
+                    $inventoryIntent['branch'] ?? null
+                );
+                $contextData['inventory_context'] = $this->inventoryService->formatInventoryForAiContext($searchResults);
+            } elseif ($inventoryIntent['type'] === 'imei_track') {
+                $imeiResult = $this->inventoryService->trackSerialNumber($inventoryIntent['imei']);
+                $contextData['inventory_context'] = $this->inventoryService->formatImeiForAiContext($imeiResult);
+            } elseif ($inventoryIntent['type'] === 'dead_stock') {
+                $deadStock = $this->inventoryService->getDeadStockAlerts($inventoryIntent['business_unit_id'] ?? 2, 30);
+                $contextData['inventory_context'] = $this->formatDeadStockForAiContext($deadStock);
+            }
         }
 
         // 2. Record user message
@@ -378,6 +525,7 @@ PROMPT;
             }
 
             $reply = $this->extractReplyFromResponse($response);
+            $reply = $this->normalizeMarkdownTables($reply);
 
             // 4. Save assistant response
             $assistantRecord = AiChatHistory::create([
@@ -421,7 +569,13 @@ PROMPT;
             })
             ->orderBy('id', 'asc')
             ->take($limit)
-            ->get(['id', 'role', 'message', 'created_at']);
+            ->get(['id', 'role', 'message', 'created_at'])
+            ->map(function ($item) {
+                if ($item->role === 'assistant') {
+                    $item->message = $this->normalizeMarkdownTables($item->message);
+                }
+                return $item;
+            });
     }
 
     /**
@@ -521,6 +675,113 @@ PROMPT;
         ]);
 
         return 'Maaf, AI tidak menghasilkan respons teks.';
+    }
+
+    /**
+     * Robustly normalize and repair markdown tables from LLM:
+     * - Fixes consecutive pipes (||, |||) and collapsed rows into proper line breaks
+     * - Ensures valid leading and trailing pipes
+     * - Enforces GFM table continuity without accidental blank lines
+     */
+    public function normalizeMarkdownTables(string $text): string
+    {
+        if (empty($text)) {
+            return '';
+        }
+
+        $lines = explode("\n", $text);
+        $processedLines = [];
+        $inCodeBlock = false;
+
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+
+            if (str_starts_with($trimmed, '```')) {
+                $inCodeBlock = !$inCodeBlock;
+                $processedLines[] = $line;
+                continue;
+            }
+
+            if ($inCodeBlock) {
+                $processedLines[] = $line;
+                continue;
+            }
+
+            // Clean up multi-pipe artifacts at the start of a line
+            $line = preg_replace('/^\|{2,}\s*/', '| ', $line);
+
+            // Convert collapsed row separators into line breaks
+            $line = preg_replace('/\|\s*\|\s*\|\s*/', "|\n| ", $line);
+            $line = preg_replace('/\|\s*\|\s*([0-9A-Za-z#\-\:\*\—\–\w])/', "|\n| $1", $line);
+            $line = preg_replace('/\|{2,}\s*/', "|\n| ", $line);
+
+            $subLines = explode("\n", $line);
+            foreach ($subLines as $sub) {
+                $subTrimmed = trim($sub);
+                if (str_contains($subTrimmed, '|') && !str_starts_with($subTrimmed, '>') && !str_starts_with($subTrimmed, '#')) {
+                    if (!str_starts_with($subTrimmed, '|')) {
+                        $subTrimmed = '| ' . $subTrimmed;
+                    }
+                    if (!str_ends_with($subTrimmed, '|')) {
+                        $subTrimmed = $subTrimmed . ' |';
+                    }
+                }
+                $processedLines[] = $subTrimmed;
+            }
+        }
+
+        $finalLines = [];
+        $inTable = false;
+        $inCodeBlock = false;
+
+        for ($i = 0; $i < count($processedLines); $i++) {
+            $line = $processedLines[$i];
+            $trimmed = trim($line);
+
+            if (str_starts_with($trimmed, '```')) {
+                $inCodeBlock = !$inCodeBlock;
+                $finalLines[] = $line;
+                continue;
+            }
+
+            if ($inCodeBlock) {
+                $finalLines[] = $line;
+                continue;
+            }
+
+            $isTableRow = str_starts_with($trimmed, '|') && str_ends_with($trimmed, '|') && strlen($trimmed) > 2;
+
+            if ($isTableRow) {
+                if (!$inTable) {
+                    if (!empty($finalLines) && end($finalLines) !== '') {
+                        $finalLines[] = '';
+                    }
+                    $inTable = true;
+                }
+                $finalLines[] = $trimmed;
+            } else {
+                if ($inTable && $trimmed === '') {
+                    $nextIsTable = false;
+                    for ($j = $i + 1; $j < count($processedLines); $j++) {
+                        $nextTrim = trim($processedLines[$j]);
+                        if ($nextTrim === '') continue;
+                        if (str_starts_with($nextTrim, '|') && str_ends_with($nextTrim, '|')) {
+                            $nextIsTable = true;
+                        }
+                        break;
+                    }
+                    if ($nextIsTable) {
+                        continue;
+                    }
+                    $inTable = false;
+                } elseif ($inTable) {
+                    $inTable = false;
+                }
+                $finalLines[] = $line;
+            }
+        }
+
+        return implode("\n", $finalLines);
     }
 }
 

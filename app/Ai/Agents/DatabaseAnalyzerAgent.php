@@ -38,6 +38,8 @@ class DatabaseAnalyzerAgent implements Agent, Conversational, HasTools
         $dbDriver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
         $dbName = $dbDriver === 'sqlite' ? 'SQLite' : ($dbDriver === 'mysql' ? 'MySQL' : $dbDriver);
 
+        $schemaSummary = $this->getDatabaseSchemaSummary();
+
         return $basePrompt .
             "\n\nATURAN BAHASA & KONTEKS (SANGAT PENTING):" .
             "\n- Anda WAJIB memberikan jawaban akhir HANYA dalam Bahasa Indonesia yang natural." .
@@ -45,15 +47,28 @@ class DatabaseAnalyzerAgent implements Agent, Conversational, HasTools
             "\n- Jelaskan hasil data secara langsung dan natural sesuai pertanyaan user." .
             "\n- JANGAN pernah menyebutkan proses teknis di belakang layar seperti 'tool called', 'query executed', atau format 'JSON' kepada user." .
 
-            "\n\nATURAN DATABASE:" .
+            "\n\nKAMUS STRUKTUR UNIT BISNIS & ATURAN PRODUK TOKOPON (WAJIB DIPAHAMI):" .
+            "\n- UNIT BISNIS 1: Syihab (Produk HP Baru / Retail Utama Resmi, database_source = 'syihab'). Cabang: Banjarbaru, Martapura, Sultan Adam, Veteran, Premium." .
+            "\n- UNIT BISNIS 2: GSK Second (Produk HP Second / Bekas, database_source = 'second'). Cabang: GSK - Banjarbaru, GSK - Martapura, GSK - Sultan Adam, GSK - Veteran, GSK - Kayutangi, GSK - Sampit." .
+            "\n  * ATURAN MUTLAK: SETIAP PERTANYAAN TERKAIT BARANG SECOND/BEKAS, QUERY SQL WAJIB MEMFILTER `business_unit_id = 2`!" .
+            "\n- UNIT BISNIS 3: GSK Distri (Grosir / Distribusi B2B, database_source = 'distri')." .
+
+            "\n\nPANDUAN QUERY STOK, HARGA & LOKASI CABANG:" .
+            "\n- HARGA JUAL RESMI: Cari di tabel `product_accurates` (kolom `base_price` untuk harga jual, `base_cost` untuk HPP, `name` untuk nama produk, `item_no` untuk SKU)." .
+            "\n- STOK FISIK & LOKASI CABANG (HP IMEI/SN): Cari di tabel `product_serial_numbers` di-JOIN ke tabel `warehouses` on `product_serial_numbers.warehouse_id = warehouses.id`." .
+            "\n  * Selalu filter unit siap jual di toko: `product_serial_numbers.status = 'Available'`." .
+            "\n  * Hitung kuantitas unit per toko dengan `COUNT(product_serial_numbers.id)` GROUP BY `warehouses.name`." .
+
+            "\n\nATURAN DATABASE & SISTEM:" .
             "\n- Sistem database yang digunakan saat ini adalah **{$dbName}**." .
             "\n- Gunakan sintaks query yang sesuai dengan {$dbName} murni." .
 
+            "\n\nRINGKASAN SKEMA TABEL DATABASE:\n" . $schemaSummary .
+
             "\n\nLANGKAH WAJIB YANG HARUS ANDA LAKUKAN:" .
-            "\n1. Anda TIDAK TAHU tabel apa saja yang ada. Anda WAJIB memanggil 'GetSchemaTool' terlebih dahulu." .
-            "\n2. Tentukan tabel mana yang relevan dari hasil 'GetSchemaTool'." .
-            "\n3. Eksekusi query SQL yang Anda buat ke database dengan menggunakan tool 'RunQueryTool'." .
-            "\n4. Setelah mendapatkan hasil dari eksekusi SQL, berikan kesimpulan jawaban dalam bahasa Indonesia." .
+            "\n1. Tentukan tabel dan relasi yang tepat dari ringkasan skema di atas." .
+            "\n2. Eksekusi query SQL dengan tool 'RunQueryTool'." .
+            "\n3. Setelah mendapatkan hasil, jelaskan jawaban secara ramah, lengkap, dan informatif kepada user." .
 
             "\n\nATURAN KETAT KEAMANAN:" .
             "\n- Anda HANYA BOLEH merancang dan menjalankan query untuk membaca data (seperti SELECT, PRAGMA, atau SHOW)." .

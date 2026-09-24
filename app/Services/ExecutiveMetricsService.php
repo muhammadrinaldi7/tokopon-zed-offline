@@ -243,33 +243,46 @@ class ExecutiveMetricsService
         $totalHpp = 0;
         $totalQty = 0;
 
+        $isOrderReturn = str_starts_with($order->order_number ?? '', 'RET-') 
+            || !empty($order->shipping_address_snapshot['is_warranty_return'])
+            || (str_starts_with($order->accurate_invoice_no ?? '', 'SRT'))
+            || ((float)($order->total_amount ?? 0) < 0);
+
         foreach ($order->items as $item) {
-            $totalQty += $item->qty;
+            $qty = (float)$item->qty;
+            $totalQty += $qty;
             $itemHpp = 0;
+            $isReturn = $isOrderReturn || ($qty < 0) || ((float)($item->subtotal ?? 0) < 0);
+
             $sns = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
 
-            // 1. Coba ambil HPP dari nomor seri (jika tercatat > 0)
+            $baseCost = 0;
+            if ($item->product_variant_type === ProductAccurate::class) {
+                $baseCost = (float)($accurateBaseCostMap[$item->product_variant_id] ?? 0);
+            } else {
+                $baseCost = (float)($variantBaseCostMap[$item->product_variant_id] ?? 0);
+            }
+
+            // 1. Sesuai Aturan ManagementSalesReport: Jika produk ber-SN, ambil HPP dari product_serial_numbers
             if (!empty($sns)) {
                 foreach ($sns as $sn) {
-                    $snCost = $snHppMap[$sn] ?? 0;
-                    if ($snCost > 0) {
-                        $itemHpp += $snCost;
+                    $snCost = (float)($snHppMap[$sn] ?? 0);
+                    // Fallback jika HPP SN belum terisi / 0: ambil base_cost
+                    if ($snCost <= 0) {
+                        $snCost = $baseCost;
                     }
+                    $itemHpp += $snCost;
                 }
+            } else {
+                // Sesuai Aturan ManagementSalesReport: Jika non-SN, ambil base_cost * qty
+                $itemHpp = $baseCost * $qty;
             }
 
-            // 2. Fallback: jika nomor seri tidak memiliki HPP (atau = 0), ambil dari base_cost Accurate / Varian
-            if ($itemHpp <= 0) {
-                if ($item->product_variant_type === ProductAccurate::class) {
-                    $baseCost = $accurateBaseCostMap[$item->product_variant_id] ?? 0;
-                    $itemHpp = ($baseCost * $item->qty);
-                } else {
-                    $baseCost = $variantBaseCostMap[$item->product_variant_id] ?? 0;
-                    $itemHpp = ($baseCost * $item->qty);
-                }
+            if ($isReturn) {
+                $itemHpp = -abs($itemHpp);
             }
 
-            $totalHpp += $itemHpp;
+            $totalHpp += round($itemHpp);
         }
 
         // Calculate MDR from payments
@@ -284,8 +297,9 @@ class ExecutiveMetricsService
 
         $grossSales = (float)$order->total_amount;
         $discount = (float)$order->discount_amount;
-        $netSales = (float)$order->grand_total - $totalMdr;
-        $grossProfit = $netSales - $totalHpp;
+        $grandTotal = (float)$order->grand_total;
+        $netSales = $grandTotal; // Samakan dengan Omset Faktur Riil!
+        $grossProfit = $netSales - $totalHpp; // Laba Kotor = Omset Faktur - Total HPP (sebelum potongan MDR)
         $marginPct = $netSales > 0 ? round(($grossProfit / $netSales) * 100, 2) : 0;
 
         return [
@@ -294,7 +308,7 @@ class ExecutiveMetricsService
             'order_status' => $order->order_status,
             'gross_sales' => $grossSales,
             'discount' => $discount,
-            'grand_total' => (float)$order->grand_total,
+            'grand_total' => $grandTotal,
             'mdr' => (float)$totalMdr,
             'net_sales' => (float)$netSales,
             'hpp' => (float)$totalHpp,
@@ -356,7 +370,7 @@ class ExecutiveMetricsService
             }
         }
 
-        $netSales = $grandTotal - $totalMdr;
+        $netSales = $grandTotal;
         $grossProfit = $netSales - $totalHpp;
         $profitMargin = $netSales > 0 ? round(($grossProfit / $netSales) * 100, 2) : 0;
         $aov = $totalOrders > 0 ? round($netSales / $totalOrders, 2) : 0;
@@ -519,7 +533,7 @@ class ExecutiveMetricsService
                 }
             }
 
-            $branchNetSales = $branchGrandTotal - $branchMdr;
+            $branchNetSales = $branchGrandTotal;
             $branchGrossProfit = $branchNetSales - $branchHpp;
             $marginPct = $branchNetSales > 0 ? round(($branchGrossProfit / $branchNetSales) * 100, 2) : 0;
             $aov = count($branchOrders) > 0 ? round($branchNetSales / count($branchOrders), 2) : 0;
@@ -1991,7 +2005,7 @@ class ExecutiveMetricsService
             $grandTotal = (float)$order->grand_total;
             $grossSales = (float)$order->total_amount;
             $discountTotal = (float)$order->discount_amount;
-            $netSales = $grandTotal - $orderMdr;
+            $netSales = $grandTotal;
 
             $totalQty += $orderQty;
             $totalGrandTotal += $grandTotal;
