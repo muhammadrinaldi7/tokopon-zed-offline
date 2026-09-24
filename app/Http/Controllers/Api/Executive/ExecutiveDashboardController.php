@@ -36,7 +36,7 @@ class ExecutiveDashboardController extends Controller
         $canAccessAllBu = $user && $user->hasAnyRole(['superadmin', 'director', 'admin']);
 
         if (!$canAccessAllBu) {
-            $filters['business_unit_id'] = $user->business_unit_id;
+            $filters['business_unit_id'] = $user ? $user->business_unit_id : $request->input('business_unit_id');
         } else {
             $filters['business_unit_id'] = $request->input('business_unit_id');
         }
@@ -280,6 +280,20 @@ class ExecutiveDashboardController extends Controller
         }
 
         $data = $this->metricsService->getBranchTransactions($filters);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * Get Piutang & Outstanding Receivables Report (adheres to Dashboard.php).
+     */
+    public function piutangReport(Request $request): JsonResponse
+    {
+        $filters = $this->extractFilters($request);
+        $data = $this->metricsService->getPiutangReport($filters);
 
         return response()->json([
             'success' => true,

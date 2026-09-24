@@ -101,6 +101,8 @@ Route::prefix('v1/executive')->group(function () {
             ->name('api.executive.project-sales.detail');
         Route::get('/branch-transactions', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'branchTransactions'])
             ->name('api.executive.branch-transactions');
+        Route::get('/piutang', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'piutangReport'])
+            ->name('api.executive.piutang');
 
         // AI Executive Assistant Endpoints (Direct 9router Integration)
         Route::prefix('ai')->group(function () {

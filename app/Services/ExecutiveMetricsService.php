@@ -2048,5 +2048,220 @@ class ExecutiveMetricsService
             'transactions' => $transactions,
         ];
     }
+
+    /**
+     * Get Outstanding Receivables (Piutang) Report adhering strictly to Dashboard.php:
+     * - Group 1: Finance Piutang (order_status = 'COMPLETED', paymentMethod has bank_name like 'finance')
+     *   - total = sum(expectedNetAmount = amount - MDR)
+     *   - sisa = sum(expectedNetAmount where payment->status === 'PENDING')
+     * - Group 2: Pure Piutang Toko (order_status = 'PIUTANG')
+     *   - total = sum(grand_total)
+     *   - sisa = sum(grand_total)
+     *
+     * Also provides summary aggregates and detailed order drill-downs.
+     */
+    public function getPiutangReport(array $filters): array
+    {
+        [$startDate, $endDate, $range] = $this->parseDateRange(
+            $filters['date_range'] ?? 'this_month',
+            $filters['start_date'] ?? null,
+            $filters['end_date'] ?? null
+        );
+
+        $branchFilter = $filters['branch'] ?? null;
+        $businessUnitFilter = $filters['business_unit_id'] ?? null;
+
+        // Base date query (matches order_date or fallback to created_at)
+        $dateFilter = function ($q) use ($startDate, $endDate) {
+            $q->whereBetween('order_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                ->orWhere(function ($sub) use ($startDate, $endDate) {
+                    $sub->whereNull('order_date')
+                        ->whereBetween('created_at', [$startDate, $endDate]);
+                });
+        };
+
+        // 1. Finance Piutang (order_status = 'COMPLETED' and has finance payments)
+        $completedOrdersQuery = Order::with([
+                'payments.paymentMethod',
+                'payments.paymentMethodRate',
+                'branch',
+                'user',
+                'handledBy.branch',
+                'salesBy',
+                'items.variant'
+            ])
+            ->where($dateFilter)
+            ->where('order_status', 'COMPLETED')
+            ->when($branchFilter, function ($q) use ($branchFilter) {
+                $q->where('shipping_address_snapshot->store', $branchFilter);
+            })
+            ->when($businessUnitFilter, function ($q) use ($businessUnitFilter) {
+                $q->where('business_unit_id', $businessUnitFilter);
+            });
+
+        $completedOrders = $completedOrdersQuery->get();
+
+        $piutangData = [];
+        $detailedTransactions = [];
+
+        foreach ($completedOrders as $order) {
+            foreach ($order->payments as $payment) {
+                $bankName = strtolower($payment->paymentMethod->bank_name ?? '');
+                if (str_contains($bankName, 'finance') || $bankName === 'finance') {
+                    $pm = $payment->paymentMethod;
+                    $rate = $payment->paymentMethodRate;
+
+                    // Calculate MDR
+                    $pct = $rate ? ($rate->mdr_percentage ?? 0) : ($pm->mdr_percentage ?? 0);
+                    $rowMdr = $pct > 0 ? round((float)$payment->amount * (float)$pct / 100, 0) : 0;
+                    $expectedNetAmount = (float)$payment->amount - $rowMdr;
+
+                    $methodName = $pm->name ?? 'Finance';
+
+                    if (!isset($piutangData[$methodName])) {
+                        $piutangData[$methodName] = [
+                            'payment_method' => $methodName,
+                            'type' => 'finance',
+                            'total' => 0,
+                            'sisa' => 0,
+                            'count_total' => 0,
+                            'count_pending' => 0,
+                        ];
+                    }
+
+                    $piutangData[$methodName]['total'] += $expectedNetAmount;
+                    $piutangData[$methodName]['count_total']++;
+
+                    $isPending = strtoupper($payment->status) === 'PENDING';
+                    if ($isPending) {
+                        $piutangData[$methodName]['sisa'] += $expectedNetAmount;
+                        $piutangData[$methodName]['count_pending']++;
+                    }
+
+                    // Collect detail
+                    $orderDate = $order->order_date ? Carbon::parse($order->order_date) : $order->created_at;
+                    $days = $orderDate->diffInDays(now());
+                    $branchName = $order->branch?->name ?? ($order->shipping_address_snapshot['store'] ?? ($order->handledBy?->branch?->name ?? '-'));
+
+                    $detailedTransactions[] = [
+                        'order_id' => $order->id,
+                        'order_number' => $order->order_number,
+                        'invoice_no' => $order->accurate_invoice_no ?? '-',
+                        'type' => 'finance',
+                        'payment_method' => $methodName,
+                        'customer_name' => $order->user?->name ?? ($order->shipping_address_snapshot['name'] ?? 'Pelanggan'),
+                        'customer_phone' => $order->user?->phone ?? '-',
+                        'branch' => $branchName,
+                        'cashier_name' => $order->handledBy?->name ?? '-',
+                        'sales_name' => $order->salesBy?->name ?? '-',
+                        'order_date' => $orderDate->format('Y-m-d'),
+                        'aging_days' => (int) floor($days),
+                        'amount' => round((float)$payment->amount, 2),
+                        'mdr' => round($rowMdr, 2),
+                        'net_amount' => round($expectedNetAmount, 2),
+                        'payment_status' => $payment->status,
+                        'is_outstanding' => $isPending,
+                        'notes' => $order->notes ?? null,
+                    ];
+                }
+            }
+        }
+
+        // 2. Pure Piutang Toko (order_status = 'PIUTANG')
+        $purePiutangOrders = Order::with([
+                'branch',
+                'user',
+                'handledBy.branch',
+                'salesBy',
+                'items.variant'
+            ])
+            ->where($dateFilter)
+            ->where('order_status', 'PIUTANG')
+            ->when($branchFilter, function ($q) use ($branchFilter) {
+                $q->where('shipping_address_snapshot->store', $branchFilter);
+            })
+            ->when($businessUnitFilter, function ($q) use ($businessUnitFilter) {
+                $q->where('business_unit_id', $businessUnitFilter);
+            })
+            ->get();
+
+        if ($purePiutangOrders->isNotEmpty()) {
+            $pureTotal = $purePiutangOrders->sum('grand_total');
+            $piutangData['Piutang Toko'] = [
+                'payment_method' => 'Piutang Toko',
+                'type' => 'toko',
+                'total' => round($pureTotal, 2),
+                'sisa' => round($pureTotal, 2),
+                'count_total' => $purePiutangOrders->count(),
+                'count_pending' => $purePiutangOrders->count(),
+            ];
+
+            foreach ($purePiutangOrders as $order) {
+                $orderDate = $order->order_date ? Carbon::parse($order->order_date) : $order->created_at;
+                $days = $orderDate->diffInDays(now());
+                $branchName = $order->branch?->name ?? ($order->shipping_address_snapshot['store'] ?? ($order->handledBy?->branch?->name ?? '-'));
+
+                $detailedTransactions[] = [
+                    'order_id' => $order->id,
+                    'order_number' => $order->order_number,
+                    'invoice_no' => $order->accurate_invoice_no ?? '-',
+                    'type' => 'toko',
+                    'payment_method' => 'Piutang Toko',
+                    'customer_name' => $order->user?->name ?? ($order->shipping_address_snapshot['name'] ?? 'Pelanggan'),
+                    'customer_phone' => $order->user?->phone ?? '-',
+                    'branch' => $branchName,
+                    'cashier_name' => $order->handledBy?->name ?? '-',
+                    'sales_name' => $order->salesBy?->name ?? '-',
+                    'order_date' => $orderDate->format('Y-m-d'),
+                    'aging_days' => (int) floor($days),
+                    'amount' => round((float)$order->grand_total, 2),
+                    'mdr' => 0,
+                    'net_amount' => round((float)$order->grand_total, 2),
+                    'payment_status' => 'PENDING',
+                    'is_outstanding' => true,
+                    'notes' => $order->notes ?? null,
+                ];
+            }
+        }
+
+        // Format hasil persis Dashboard.php
+        $piutangTransactions = collect(array_values($piutangData))
+            ->sortByDesc('sisa')
+            ->values()
+            ->toArray();
+
+        $totalPiutangAll = array_sum(array_column($piutangTransactions, 'total'));
+        $totalSisaAll = array_sum(array_column($piutangTransactions, 'sisa'));
+
+        $piutangTokoSisa = $piutangData['Piutang Toko']['sisa'] ?? 0;
+        $financePendingSisa = $totalSisaAll - $piutangTokoSisa;
+
+        // Aging classification for outstanding items
+        $outstandingItems = array_values(array_filter($detailedTransactions, fn($t) => $t['is_outstanding']));
+        $agingSummary = [
+            'under_7_days' => count(array_filter($outstandingItems, fn($t) => $t['aging_days'] < 7)),
+            'days_7_to_14' => count(array_filter($outstandingItems, fn($t) => $t['aging_days'] >= 7 && $t['aging_days'] <= 14)),
+            'days_15_to_30' => count(array_filter($outstandingItems, fn($t) => $t['aging_days'] > 14 && $t['aging_days'] <= 30)),
+            'over_30_days' => count(array_filter($outstandingItems, fn($t) => $t['aging_days'] > 30)),
+        ];
+
+        return [
+            'period' => [
+                'range' => $range,
+                'start_date' => $startDate->format('Y-m-d'),
+                'end_date' => $endDate->format('Y-m-d'),
+            ],
+            'summary' => [
+                'total_piutang' => round($totalPiutangAll, 2),
+                'total_sisa' => round($totalSisaAll, 2),
+                'total_piutang_toko' => round($piutangTokoSisa, 2),
+                'total_finance_pending' => round($financePendingSisa, 2),
+                'outstanding_orders_count' => count($outstandingItems),
+                'aging_summary' => $agingSummary,
+            ],
+            'piutang_transactions' => $piutangTransactions,
+            'details' => $detailedTransactions,
+        ];
+    }
 }
 

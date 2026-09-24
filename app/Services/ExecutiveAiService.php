@@ -195,6 +195,10 @@ class ExecutiveAiService
             if (!empty($contextData['inventory_context'])) {
                 $metricsContext .= "\n\n" . $contextData['inventory_context'] . "\n";
             }
+
+            if (!empty($contextData['piutang_context'])) {
+                $metricsContext .= "\n\n" . $contextData['piutang_context'] . "\n";
+            }
         }
 
         return <<<PROMPT
@@ -239,9 +243,14 @@ Gaya Komunikasi & Standar Jawaban:
      * Harga Jual resmi & Modal HPP (karena Anda berbicara dengan Direksi).
      * Total unit fisik yang siap jual (Available) dan rincian lokasinya per cabang toko.
      * Jika stok fisik kosong atau tidak tersedia di cabang tertentu, sampaikan secara transparan.
-6. KONTEKS DATA REALTIME:
+6. ATURAN PENJELASAN PIUTANG & SISA TAGIHAN (SESUAI DASHBOARD DIREKSI):
+   - Piutang di Tokopon Zed terdiri dari DUA KATEGORI UTAMA:
+     1. "Piutang Toko": Transaksi kasir langsung (order_status = 'PIUTANG'). Barang fisik sudah diserahkan ke pelanggan namun belum dilunasi. Sisa tagihan = 100% grand total pesanan.
+     2. "Piutang Leasing / Multi-Finance": Transaksi kredit konsumen via KREDIVO, AKULAKU, Samsung Finance Plus, Home Credit, dll. Status order 'COMPLETED' karena barang sudah diambil. Jika status pembayaran 'PENDING', artinya dana talangan leasing BELUM CAIR ke rekening toko (Outstanding). Jika sudah 'PAID', artinya dana leasing sudah cair (Sisa = Rp 0).
+   - Selalu bedakan secara tegas antara Piutang Toko vs Piutang Leasing Pending.
+7. KONTEKS DATA REALTIME:
 {$metricsContext}
-7. Jawab pertanyaan Direksi dengan menganalisis angka-angka di atas secara tajam, berikan 'Key Takeaways' dan 'Rekomendasi Tindakan' praktis jika relevan.
+8. Jawab pertanyaan Direksi dengan menganalisis angka-angka di atas secara tajam, berikan 'Key Takeaways' dan 'Rekomendasi Tindakan' praktis jika relevan.
 PROMPT;
     }
 
@@ -394,6 +403,49 @@ PROMPT;
         }
         return trim($text);
     }
+
+    /**
+     * Format piutang report strictly adhering to Dashboard.php into AI context text.
+     */
+    public function formatPiutangForAiContext(array $report): string
+    {
+        $summary = $report['summary'] ?? [];
+        $totalPiutang = number_format($summary['total_piutang'] ?? 0, 0, ',', '.');
+        $totalSisa = number_format($summary['total_sisa'] ?? 0, 0, ',', '.');
+        $piutangToko = number_format($summary['total_piutang_toko'] ?? 0, 0, ',', '.');
+        $financePending = number_format($summary['total_finance_pending'] ?? 0, 0, ',', '.');
+        $outstandingCount = $summary['outstanding_orders_count'] ?? 0;
+
+        $text = "[DATA REALTIME TRANSAKSI PIUTANG & LEASING PENDING (STANDAR DASHBOARD DIREKSI)]\n";
+        $text .= "- Total Portofolio Piutang Tercatat: Rp {$totalPiutang}\n";
+        $text .= "- Sisa Tagihan Berjalan (Outstanding Belum Masuk Kas): Rp {$totalSisa} ({$outstandingCount} transaksi)\n";
+        $text .= "  * Piutang Toko (Langsung Customer Belum Lunas): Rp {$piutangToko}\n";
+        $text .= "  * Piutang Leasing / Finance (Status PENDING Belum Cair ke Rekening): Rp {$financePending}\n";
+
+        $text .= "\nRINCIAN PER METODE (JENIS PIUTANG):\n";
+        foreach ($report['piutang_transactions'] ?? [] as $pt) {
+            $mName = $pt['payment_method'];
+            $tot = number_format($pt['total'], 0, ',', '.');
+            $sis = number_format($pt['sisa'], 0, ',', '.');
+            $trx = $pt['count_total'];
+            $pnd = $pt['count_pending'];
+            $type = $pt['type'] === 'toko' ? 'Piutang Toko Langsung' : 'Multi-Finance Leasing';
+            $text .= "- {$mName} [{$type}]: Total Rp {$tot} ({$trx} trx) | Sisa Outstanding: Rp {$sis} ({$pnd} pending)\n";
+        }
+
+        $outstandingDetails = array_filter($report['details'] ?? [], fn($d) => $d['is_outstanding']);
+        if (!empty($outstandingDetails)) {
+            $text .= "\nDAFTAR NOTA OUTSTANDING TERBESAR / MENUNGGAK:\n";
+            foreach (array_slice($outstandingDetails, 0, 10) as $idx => $d) {
+                $num = $idx + 1;
+                $net = number_format($d['net_amount'], 0, ',', '.');
+                $text .= "  #{$num} Nota {$d['order_number']} ({$d['order_date']}, {$d['aging_days']} hr) | {$d['payment_method']} | Cabang: {$d['branch']} | Pelanggan: {$d['customer_name']} | Sisa: Rp {$net}\n";
+            }
+        }
+
+        return trim($text);
+    }
+
     public function getMetricsForPeriod(string $period, ?User $user = null): array
     {
         $cacheKey = 'executive_metrics_auto_' . $period . '_' . ($user ? $user->id : 'all');
@@ -464,6 +516,21 @@ PROMPT;
                 $deadStock = $this->inventoryService->getDeadStockAlerts($inventoryIntent['business_unit_id'] ?? 2, 30);
                 $contextData['inventory_context'] = $this->formatDeadStockForAiContext($deadStock);
             }
+        }
+
+        // 1c. Piutang Intent Pre-fetch (Standar Dashboard.php)
+        if (preg_match('/\b(piutang|leasing|tagihan|outstanding|kredivo|akulaku|samsung\s*finance|hci|home\s*credit|menunggak|belum\s*lunas|belum\s*cair)\b/i', $message)) {
+            $periodToUse = $detectedPeriod ?: ($contextData['period']['range'] ?? 'this_month');
+            $piutangFilters = [
+                'date_range' => $periodToUse,
+                'start_date' => $contextData['period']['start_date'] ?? null,
+                'end_date' => $contextData['period']['end_date'] ?? null,
+            ];
+            if ($user && !$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
+                $piutangFilters['business_unit_id'] = $user->business_unit_id;
+            }
+            $piutangReport = $this->metricsService->getPiutangReport($piutangFilters);
+            $contextData['piutang_context'] = $this->formatPiutangForAiContext($piutangReport);
         }
 
         // 2. Record user message
