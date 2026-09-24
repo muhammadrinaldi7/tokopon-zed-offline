@@ -780,6 +780,7 @@ class ExecutiveMetricsService
             return [
                 'payment_method_id' => $pm?->id,
                 'payment_method_name' => $pm?->name ?? 'Unknown',
+                'category' => $pm?->category ?? 'Lainnya',
                 'bank_name' => $pm?->bank_name ?? '-',
                 'transactions_count' => $count,
                 'total_amount' => round($amount, 2),
