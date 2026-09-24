@@ -1231,46 +1231,172 @@ class ExecutiveMetricsService
     public function getPromoClaims(array $filters): array
     {
         $orders = $this->baseOrderQuery($filters)
-            ->with(['promos', 'items.promos', 'branch'])
+            ->where(function ($q) {
+                $q->whereHas('promos')
+                  ->orWhereHas('items.promos');
+            })
+            ->with([
+                'promos.brand',
+                'branch',
+                'items.promos',
+                'items.variant.product.brand',
+            ])
             ->get();
+
+        if ($orders->isEmpty()) {
+            return [
+                'summary' => [
+                    'total_discount_amount' => 0,
+                    'orders_with_promo_count' => 0,
+                    'total_promo_claims_count' => 0,
+                    'avg_discount_per_order' => 0,
+                    'total_brands_count' => 0,
+                    'total_vendors_count' => 0,
+                ],
+                'promo_leaderboard' => [],
+                'brand_breakdown' => [],
+                'vendor_breakdown' => [],
+                'recent_claims' => [],
+            ];
+        }
+
+        // Batch collect serial numbers to find vendors in a single query
+        $allSns = [];
+        foreach ($orders as $order) {
+            foreach ($order->items as $item) {
+                if (!empty($item->serial_number)) {
+                    foreach (explode(',', $item->serial_number) as $sn) {
+                        $clean = trim($sn);
+                        if ($clean) $allSns[] = $clean;
+                    }
+                }
+            }
+        }
+
+        $snVendorMap = [];
+        if (!empty($allSns)) {
+            $snVendorMap = ProductSerialNumber::whereIn('serial_number', array_unique($allSns))
+                ->join('vendors', 'product_serial_numbers.vendor_id', '=', 'vendors.id')
+                ->pluck('vendors.vendor_name', 'product_serial_numbers.serial_number')
+                ->toArray();
+        }
 
         $claimedRows = [];
         $totalDiscountSum = 0;
         $ordersWithPromoCount = 0;
+
+        $normalizeBrand = function (?string $rawBrand): string {
+            if (!$rawBrand) return 'Umum / Multi-Brand';
+            $trimmed = trim($rawBrand);
+            $lower = strtolower($trimmed);
+            if (in_array($lower, ['iphone', 'apple', 'ios'])) {
+                return 'Apple';
+            } elseif ($lower === 'samsung') {
+                return 'Samsung';
+            } elseif ($lower === 'oppo') {
+                return 'Oppo';
+            } elseif ($lower === 'vivo') {
+                return 'Vivo';
+            } elseif (in_array($lower, ['xiaomi', 'redmi', 'mi', 'poco'])) {
+                return 'Xiaomi';
+            } elseif ($lower === 'realme') {
+                return 'Realme';
+            } elseif ($lower === 'infinix') {
+                return 'Infinix';
+            } elseif ($lower === 'tecno') {
+                return 'Tecno';
+            }
+            return ucwords($lower);
+        };
 
         foreach ($orders as $order) {
             $hasPromo = false;
             $branch = $order->shipping_address_snapshot['store'] ?? ($order->branch?->name ?? 'Unknown');
             $date = $order->created_at->format('Y-m-d H:i');
 
-            // Order-level promos
+            $itemBrands = [];
+            $itemVendors = [];
+            $itemProductNames = [];
+
+            foreach ($order->items as $item) {
+                $variant = $item->variant;
+                $bName = $variant?->brandName ?? ($variant?->product?->brand?->name ?? null);
+                if ($bName) {
+                    $itemBrands[] = $normalizeBrand($bName);
+                }
+
+                $pName = $variant?->name ?? $item->product_name;
+                if ($pName) {
+                    $itemProductNames[] = $pName;
+                }
+
+                if (!empty($item->serial_number)) {
+                    foreach (explode(',', $item->serial_number) as $sn) {
+                        $cleanSn = trim($sn);
+                        if (isset($snVendorMap[$cleanSn])) {
+                            $itemVendors[] = $snVendorMap[$cleanSn];
+                        }
+                    }
+                }
+            }
+
+            $dominantBrand = !empty($itemBrands) ? array_keys(array_count_values($itemBrands))[0] : 'Umum / Multi-Brand';
+            $dominantVendor = !empty($itemVendors) ? array_keys(array_count_values($itemVendors))[0] : null;
+
+            // 1. Order-level promos
             foreach ($order->promos as $op) {
                 $hasPromo = true;
                 $disc = (float)($op->pivot->discount_applied ?? 0);
+                if ($disc <= 0) continue;
                 $totalDiscountSum += $disc;
+
+                $brand = $op->brand?->name ? $normalizeBrand($op->brand->name) : $dominantBrand;
+                $vendor = $dominantVendor ?: ($op->vendor_name ?: ($brand !== 'Umum / Multi-Brand' ? "Distributor {$brand}" : 'Distributor Resmi / Brand'));
+
+                $productDesc = !empty($itemProductNames)
+                    ? implode(', ', array_slice(array_unique($itemProductNames), 0, 2))
+                    : 'Diskon Faktur Belanja';
 
                 $claimedRows[] = [
                     'date' => $date,
                     'order_number' => $order->order_number,
                     'branch' => $branch,
-                    'brand' => 'Konsolidasi Order',
-                    'product_name' => 'Diskon Keranjang / Faktur',
+                    'brand' => $brand,
+                    'product_name' => $productDesc,
                     'promo_name' => $op->name,
-                    'vendor_name' => $op->vendor_name ?? 'Internal Store',
+                    'vendor_name' => $vendor,
                     'claim_amount' => $disc,
                 ];
             }
 
-            // Item-level promos
+            // 2. Item-level promos
             foreach ($order->items as $item) {
                 $variant = $item->variant;
                 $pName = $variant?->name ?? $item->product_name ?? 'Produk';
-                $brand = $variant?->brandName ?? ($variant?->product?->brand?->name ?? 'Unknown');
+                $brand = $variant?->brandName ?? ($variant?->product?->brand?->name ?? $dominantBrand);
+                $brand = $normalizeBrand($brand);
+
+                $itemVendor = null;
+                if (!empty($item->serial_number)) {
+                    foreach (explode(',', $item->serial_number) as $sn) {
+                        $cleanSn = trim($sn);
+                        if (isset($snVendorMap[$cleanSn])) {
+                            $itemVendor = $snVendorMap[$cleanSn];
+                            break;
+                        }
+                    }
+                }
 
                 foreach ($item->promos as $ip) {
                     $hasPromo = true;
                     $disc = (float)($ip->pivot->discount_amount ?? 0);
+                    if ($disc <= 0) continue;
                     $totalDiscountSum += $disc;
+
+                    $vendor = $ip->pivot->vendor_name;
+                    if (empty($vendor) || $vendor === 'Vendor tidak ditemukan') {
+                        $vendor = $itemVendor ?: ($dominantVendor ?: ($brand !== 'Umum / Multi-Brand' ? "Distributor {$brand}" : 'Distributor Resmi / Brand'));
+                    }
 
                     $claimedRows[] = [
                         'date' => $date,
@@ -1279,7 +1405,7 @@ class ExecutiveMetricsService
                         'brand' => $brand,
                         'product_name' => $pName,
                         'promo_name' => $ip->name,
-                        'vendor_name' => $ip->pivot->vendor_name ?? ($ip->vendor_name ?? $brand),
+                        'vendor_name' => $vendor,
                         'claim_amount' => $disc,
                     ];
                 }
@@ -1290,24 +1416,70 @@ class ExecutiveMetricsService
             }
         }
 
-        // Promo leaderboard by total subsidy amount
-        $promoLeaderboard = collect($claimedRows)->groupBy('promo_name')->map(function ($group, $name) {
+        $claimsCollection = collect($claimedRows);
+
+        // Filter by brand or vendor if requested
+        if (!empty($filters['brand'])) {
+            $claimsCollection = $claimsCollection->filter(fn($r) => strcasecmp($r['brand'], $filters['brand']) === 0);
+        }
+        if (!empty($filters['vendor'])) {
+            $claimsCollection = $claimsCollection->filter(fn($r) => stripos($r['vendor_name'], $filters['vendor']) !== false);
+        }
+
+        // Leaderboard by Program Promo
+        $promoLeaderboard = $claimsCollection->groupBy('promo_name')->map(function ($group, $name) {
+            $first = $group->first();
             return [
                 'promo_name' => $name,
+                'brand' => $first['brand'] ?? 'Multi-Brand',
+                'top_vendor' => $group->groupBy('vendor_name')->sortByDesc(fn($g) => $g->count())->keys()->first() ?? '-',
                 'times_used' => $group->count(),
                 'total_discount' => round($group->sum('claim_amount'), 2),
             ];
         })->sortByDesc('total_discount')->values()->toArray();
 
+        // Rekap Subsidi per Brand
+        $brandBreakdown = $claimsCollection->groupBy('brand')->map(function ($group, $brandName) {
+            $vendorBreakdown = $group->groupBy('vendor_name')->map(function ($vg, $vName) {
+                return [
+                    'vendor_name' => $vName,
+                    'claims_count' => $vg->count(),
+                    'total_subsidy' => round($vg->sum('claim_amount'), 2),
+                ];
+            })->sortByDesc('total_subsidy')->values()->toArray();
+
+            return [
+                'brand' => $brandName,
+                'claims_count' => $group->count(),
+                'total_subsidy' => round($group->sum('claim_amount'), 2),
+                'vendors' => $vendorBreakdown,
+            ];
+        })->sortByDesc('total_subsidy')->values()->toArray();
+
+        // Rekap Tagihan per Vendor
+        $vendorBreakdown = $claimsCollection->groupBy('vendor_name')->map(function ($group, $vendorName) {
+            return [
+                'vendor_name' => $vendorName,
+                'claims_count' => $group->count(),
+                'total_subsidy' => round($group->sum('claim_amount'), 2),
+                'brands' => $group->pluck('brand')->unique()->filter()->values()->toArray(),
+                'promos' => $group->pluck('promo_name')->unique()->filter()->values()->toArray(),
+            ];
+        })->sortByDesc('total_subsidy')->values()->toArray();
+
         return [
             'summary' => [
-                'total_discount_amount' => round($totalDiscountSum, 2),
+                'total_discount_amount' => round($claimsCollection->sum('claim_amount'), 2),
                 'orders_with_promo_count' => $ordersWithPromoCount,
-                'total_promo_claims_count' => count($claimedRows),
-                'avg_discount_per_order' => $ordersWithPromoCount > 0 ? round($totalDiscountSum / $ordersWithPromoCount, 2) : 0,
+                'total_promo_claims_count' => $claimsCollection->count(),
+                'avg_discount_per_order' => $ordersWithPromoCount > 0 ? round($claimsCollection->sum('claim_amount') / $ordersWithPromoCount, 2) : 0,
+                'total_brands_count' => count($brandBreakdown),
+                'total_vendors_count' => count($vendorBreakdown),
             ],
             'promo_leaderboard' => $promoLeaderboard,
-            'recent_claims' => array_slice($claimedRows, 0, 40),
+            'brand_breakdown' => $brandBreakdown,
+            'vendor_breakdown' => $vendorBreakdown,
+            'recent_claims' => $claimsCollection->take(100)->values()->toArray(),
         ];
     }
 
@@ -1710,4 +1882,156 @@ class ExecutiveMetricsService
 
         return $items;
     }
+
+    /**
+     * Get list of detailed invoices / transactions for a specific branch and period.
+     */
+    public function getBranchTransactions(array $filters): array
+    {
+        $orders = $this->baseOrderQuery($filters)
+            ->with([
+                'user.profile',
+                'salesBy',
+                'handledBy',
+                'branch',
+                'payments.paymentMethod',
+                'payments.paymentMethodRate',
+                'items.variant',
+                'items.promos',
+            ])
+            ->latest('order_date')
+            ->get();
+
+        $search = strtolower(trim($filters['search'] ?? ''));
+
+        $transactions = [];
+        $totalQty = 0;
+        $totalGrandTotal = 0;
+        $totalNetSales = 0;
+        $totalMdr = 0;
+
+        foreach ($orders as $order) {
+            $branchName = $order->shipping_address_snapshot['store'] ?? ($order->branch?->name ?? 'Cabang Pusat');
+            $customerName = $order->user?->name ?? 'Walk-in Customer';
+            $customerPhone = $order->user?->profile?->phone_number ?? '-';
+            $salesName = $order->salesBy?->name ?? '-';
+            $cashierName = $order->handledBy?->name ?? '-';
+            $orderNo = $order->order_number;
+            $invoiceNo = $order->accurate_invoice_no ?? '-';
+
+            // Calculate MDR for this order
+            $orderMdr = 0;
+            $paymentsSummary = [];
+            foreach ($order->payments as $payment) {
+                $rate = $payment->paymentMethodRate;
+                $pct = $rate ? (float)$rate->mdr_percentage : (float)($payment->paymentMethod?->mdr_percentage ?? 0);
+                $mdrAmt = $pct > 0 ? round($payment->amount * $pct / 100) : 0;
+                $orderMdr += $mdrAmt;
+                $pmName = $payment->paymentMethod?->name ?? 'Pembayaran';
+                $paymentsSummary[] = [
+                    'name' => $pmName,
+                    'amount' => (float)$payment->amount,
+                    'rate_name' => $rate?->name ?? null,
+                    'mdr_amount' => $mdrAmt,
+                    'no_kontrak' => $payment->no_kontrak ?? null,
+                ];
+            }
+
+            $orderItems = [];
+            $orderQty = 0;
+            $matchedSearch = empty($search);
+
+            if (!$matchedSearch) {
+                if (
+                    str_contains(strtolower($orderNo), $search) ||
+                    str_contains(strtolower($invoiceNo), $search) ||
+                    str_contains(strtolower($customerName), $search) ||
+                    str_contains(strtolower($customerPhone), $search) ||
+                    str_contains(strtolower($salesName), $search) ||
+                    str_contains(strtolower($cashierName), $search)
+                ) {
+                    $matchedSearch = true;
+                }
+            }
+
+            foreach ($order->items as $item) {
+                $variant = $item->variant;
+                $pName = $variant?->name ?? $item->product_name ?? 'Produk';
+                $sku = $variant?->item_no ?? ($variant?->sku ?? '-');
+                $qty = (int)$item->qty;
+                $orderQty += $qty;
+
+                if (!$matchedSearch) {
+                    if (str_contains(strtolower($pName), $search) || str_contains(strtolower($sku), $search) || str_contains(strtolower($item->serial_number ?? ''), $search)) {
+                        $matchedSearch = true;
+                    }
+                }
+
+                $itemPromoTotal = (float)$item->promos->sum('pivot.discount_amount');
+                $price = (float)($item->price_at_checkout ?? 0);
+                $discount = (float)($item->discount_amount ?? 0) + $itemPromoTotal;
+                $subtotal = ($price * $qty) - $discount;
+
+                $orderItems[] = [
+                    'product_name' => $pName,
+                    'sku' => $sku,
+                    'qty' => $qty,
+                    'price' => $price,
+                    'discount' => $discount,
+                    'subtotal' => round($subtotal, 2),
+                    'serial_number' => $item->serial_number ?? null,
+                ];
+            }
+
+            if (!$matchedSearch) {
+                continue;
+            }
+
+            $grandTotal = (float)$order->grand_total;
+            $grossSales = (float)$order->total_amount;
+            $discountTotal = (float)$order->discount_amount;
+            $netSales = $grandTotal - $orderMdr;
+
+            $totalQty += $orderQty;
+            $totalGrandTotal += $grandTotal;
+            $totalNetSales += $netSales;
+            $totalMdr += $orderMdr;
+
+            $transactions[] = [
+                'order_id' => $order->id,
+                'order_number' => $orderNo,
+                'invoice_no' => $invoiceNo,
+                'date' => $order->order_date ? $order->order_date->format('Y-m-d') : $order->created_at->format('Y-m-d'),
+                'time' => $order->order_date ? $order->order_date->format('H:i') : $order->created_at->format('H:i'),
+                'branch' => $branchName,
+                'customer_name' => $customerName,
+                'customer_phone' => $customerPhone,
+                'sales_name' => $salesName,
+                'cashier_name' => $cashierName,
+                'status' => $order->order_status,
+                'total_qty' => $orderQty,
+                'gross_sales' => round($grossSales, 2),
+                'discount' => round($discountTotal, 2),
+                'grand_total' => round($grandTotal, 2),
+                'mdr' => round($orderMdr, 2),
+                'net_sales' => round($netSales, 2),
+                'payment_methods' => $paymentsSummary,
+                'items' => $orderItems,
+                'notes' => $order->notes ?? null,
+            ];
+        }
+
+        return [
+            'branch' => $filters['branch'] ?? 'Semua Cabang',
+            'summary' => [
+                'total_orders' => count($transactions),
+                'total_qty' => $totalQty,
+                'total_grand_total' => round($totalGrandTotal, 2),
+                'total_net_sales' => round($totalNetSales, 2),
+                'total_mdr' => round($totalMdr, 2),
+            ],
+            'transactions' => $transactions,
+        ];
+    }
 }
+

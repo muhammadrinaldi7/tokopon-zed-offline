@@ -149,6 +149,24 @@ class ExecutiveAiService
                 }
             }
 
+            $promosData = $contextData['promos'] ?? null;
+            if (!empty($promosData['brand_breakdown']) && is_array($promosData['brand_breakdown'])) {
+                $metricsContext .= "\n[KLAIM SUBSIDI PROMO PER BRAND & VENDOR (PENAGIHAN)]\n";
+                foreach (array_slice($promosData['brand_breakdown'], 0, 5) as $b) {
+                    $bName = $b['brand'] ?? '-';
+                    $bSub = number_format($b['total_subsidy'] ?? 0, 0, ',', '.');
+                    $bCnt = $b['claims_count'] ?? 0;
+                    $metricsContext .= "- Brand {$bName}: Total Subsidi Rp {$bSub} ({$bCnt} klaim)\n";
+                    if (!empty($b['vendors'])) {
+                        foreach (array_slice($b['vendors'], 0, 3) as $v) {
+                            $vName = $v['vendor_name'] ?? '-';
+                            $vSub = number_format($v['total_subsidy'] ?? 0, 0, ',', '.');
+                            $metricsContext .= "   * Ditagihkan ke {$vName}: Rp {$vSub}\n";
+                        }
+                    }
+                }
+            }
+
             // Provide comparative baseline between Today and Yesterday if relevant
             $activePeriod = $contextData['period']['range'] ?? 'today';
             if ($activePeriod === 'today') {
@@ -266,6 +284,7 @@ PROMPT;
                 $projectReport = $this->metricsService->getProjectSalesReport($filters);
                 $staff = $this->metricsService->getStaffKpi($filters);
                 $audit = $this->metricsService->getCashierAudit($filters);
+                $promos = $this->metricsService->getPromoClaims($filters);
 
                 return [
                     'period' => ['range' => $period],
@@ -276,6 +295,7 @@ PROMPT;
                     'projects' => $projectReport['project_breakdown'] ?? [],
                     'staff' => $staff,
                     'audit' => $audit,
+                    'promos' => $promos,
                 ];
             } catch (\Throwable $e) {
                 Log::warning("Failed to fetch metrics for period {$period}: " . $e->getMessage());

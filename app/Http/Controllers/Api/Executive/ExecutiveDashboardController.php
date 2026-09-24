@@ -219,6 +219,12 @@ class ExecutiveDashboardController extends Controller
     public function promoClaims(Request $request): JsonResponse
     {
         $filters = $this->extractFilters($request);
+        if ($request->filled('brand')) {
+            $filters['brand'] = $request->input('brand');
+        }
+        if ($request->filled('vendor')) {
+            $filters['vendor'] = $request->input('vendor');
+        }
         $data = $this->metricsService->getPromoClaims($filters);
 
         return response()->json([
@@ -259,5 +265,27 @@ class ExecutiveDashboardController extends Controller
             'data' => $data,
         ]);
     }
+
+    /**
+     * Get Branch Detailed Invoices / Transactions.
+     */
+    public function branchTransactions(Request $request): JsonResponse
+    {
+        $filters = $this->extractFilters($request);
+        if ($request->filled('branch')) {
+            $filters['branch'] = $request->input('branch');
+        }
+        if ($request->filled('search')) {
+            $filters['search'] = $request->input('search');
+        }
+
+        $data = $this->metricsService->getBranchTransactions($filters);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
 }
+
 
