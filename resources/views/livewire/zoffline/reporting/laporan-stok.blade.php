@@ -53,13 +53,26 @@
         <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <h3 class="font-bold text-gray-700 text-sm">Daftar Serial Number</h3>
             
-            <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-wrap">
                 {{-- Dropdown Gudang --}}
                 <div class="relative">
                     <select wire:model.live="warehouseId" class="w-full sm:w-48 pl-3 pr-8 py-2 border border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] bg-white appearance-none cursor-pointer">
                         <option value="">Semua Gudang</option>
                         @foreach($warehouses as $warehouse)
                             <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
+
+                {{-- Dropdown Subkategori --}}
+                <div class="relative">
+                    <select wire:model.live="subkategori" class="w-full sm:w-44 pl-3 pr-8 py-2 border border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] bg-white appearance-none cursor-pointer">
+                        <option value="">Semua Subkategori</option>
+                        @foreach($subkategoris as $sub)
+                            <option value="{{ $sub }}">{{ $sub }}</option>
                         @endforeach
                     </select>
                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
@@ -149,7 +162,7 @@
 
                 {{-- Input Pencarian --}}
                 <div class="relative">
-                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari SN / SKU / Nama Produk..." 
+                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari SN / SKU / Nama Produk / Subkategori..." 
                         class="w-full sm:w-80 pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] bg-white">
                     <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -176,6 +189,12 @@
                         </th>
                         <th class="px-5 py-4 font-bold">Brand</th>
                         <th class="px-5 py-4 font-bold">Kategori</th>
+                        <th class="px-5 py-4 font-bold cursor-pointer hover:bg-gray-50" wire:click="sortBy('subkategori')">
+                            Subkategori
+                            @if($sortField === 'subkategori')
+                                <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
+                            @endif
+                        </th>
                         <th class="px-5 py-4 font-bold">Lokasi Gudang</th>
                         <th class="px-5 py-4 font-bold text-right cursor-pointer hover:bg-gray-50" wire:click="sortBy('hpp')">
                             Harga Pokok (HPP)
@@ -218,6 +237,36 @@
                                 <p class="text-[11px] font-semibold text-gray-700">{{ $item->productAccurate->categoryName ?? '-' }}</p>
                             </td>
                             <td class="px-5 py-3">
+                                @php
+                                    $subVal = $item->productAccurate->proyek ?? ($item->proyek ?? null);
+                                    $upperSub = strtoupper($subVal ?? '');
+                                @endphp
+                                @if(!empty($subVal))
+                                    @if(str_contains($upperSub, 'RESMI') || str_contains($upperSub, 'IBOX') || str_contains($upperSub, 'TAM'))
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                            {{ $subVal }}
+                                        </span>
+                                    @elseif(str_contains($upperSub, 'INTER') || str_contains($upperSub, 'GLOBAL'))
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                            {{ $subVal }}
+                                        </span>
+                                    @elseif(str_contains($upperSub, 'BEACUKAI'))
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                            {{ $subVal }}
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-700">
+                                            {{ $subVal }}
+                                        </span>
+                                    @endif
+                                @else
+                                    <span class="text-xs text-gray-400 italic">-</span>
+                                @endif
+                            </td>
+                            <td class="px-5 py-3">
                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 text-[11px] font-bold">
                                     <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                                     {{ $item->warehouse->name ?? 'Belum Dialokasikan' }}
@@ -242,7 +291,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-5 py-8 text-center text-gray-400 text-sm">
+                            <td colspan="10" class="px-5 py-8 text-center text-gray-400 text-sm">
                                 Tidak ada data Serial Number yang ditemukan.
                             </td>
                         </tr>

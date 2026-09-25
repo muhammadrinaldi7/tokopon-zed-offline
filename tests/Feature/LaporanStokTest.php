@@ -66,17 +66,27 @@ class LaporanStokTest extends TestCase
         ]);
 
         // Create ProductAccurate
-        $product = ProductAccurate::create([
+        $product1 = ProductAccurate::create([
             'item_no' => 'PROD-001',
-            'name' => 'Product Test',
+            'name' => 'Product Test Resmi',
             'accurate_id' => 'ACC-TEST-001',
+            'proyek' => 'RESMI',
+            'business_unit_id' => $this->bu->id,
+        ]);
+
+        $product2 = ProductAccurate::create([
+            'item_no' => 'PROD-002',
+            'name' => 'Product Test Inter',
+            'accurate_id' => 'ACC-TEST-002',
+            'proyek' => 'INTER',
+            'business_unit_id' => $this->bu->id,
         ]);
 
         // Create Product Serial Numbers
         ProductSerialNumber::create([
             'serial_number' => 'SN-VND1-001',
             'item_no' => 'PROD-001',
-            'product_accurate_id' => $product->id,
+            'product_accurate_id' => $product1->id,
             'warehouse_id' => $this->warehouse->id,
             'hpp' => 100000,
             'vendor_id' => $this->vendor1->id,
@@ -86,8 +96,8 @@ class LaporanStokTest extends TestCase
 
         ProductSerialNumber::create([
             'serial_number' => 'SN-VND2-002',
-            'item_no' => 'PROD-001',
-            'product_accurate_id' => $product->id,
+            'item_no' => 'PROD-002',
+            'product_accurate_id' => $product2->id,
             'warehouse_id' => $this->warehouse->id,
             'hpp' => 120000,
             'vendor_id' => $this->vendor2->id,
@@ -100,6 +110,7 @@ class LaporanStokTest extends TestCase
     {
         $response = $this->actingAs($this->user)->get(route('reporting.laporan-stok'));
         $response->assertStatus(200);
+        $response->assertSee('Subkategori');
     }
 
     public function test_laporan_stok_filters_by_vendor_id()
@@ -129,6 +140,25 @@ class LaporanStokTest extends TestCase
             });
     }
 
+    public function test_laporan_stok_filters_by_subkategori()
+    {
+        // Filter by subkategori RESMI
+        Livewire::actingAs($this->user)
+            ->test(LaporanStok::class)
+            ->set('subkategori', 'RESMI')
+            ->assertViewHas('stocks', function ($stocks) {
+                return $stocks->count() === 1 && $stocks->first()->serial_number === 'SN-VND1-001';
+            });
+
+        // Filter by subkategori INTER
+        Livewire::actingAs($this->user)
+            ->test(LaporanStok::class)
+            ->set('subkategori', 'INTER')
+            ->assertViewHas('stocks', function ($stocks) {
+                return $stocks->count() === 1 && $stocks->first()->serial_number === 'SN-VND2-002';
+            });
+    }
+
     public function test_laporan_stok_filters_by_query_parameter()
     {
         // Access with vendor_id parameter
@@ -138,6 +168,28 @@ class LaporanStokTest extends TestCase
             ->assertSet('vendor_id', $this->vendor2->id)
             ->assertViewHas('stocks', function ($stocks) {
                 return $stocks->count() === 1 && $stocks->first()->serial_number === 'SN-VND2-002';
+            });
+
+        // Access with subkategori parameter
+        Livewire::withQueryParams(['subkategori' => 'RESMI'])
+            ->actingAs($this->user)
+            ->test(LaporanStok::class)
+            ->assertSet('subkategori', 'RESMI')
+            ->assertViewHas('stocks', function ($stocks) {
+                return $stocks->count() === 1 && $stocks->first()->serial_number === 'SN-VND1-001';
+            });
+    }
+
+    public function test_laporan_stok_sort_by_subkategori()
+    {
+        Livewire::actingAs($this->user)
+            ->test(LaporanStok::class)
+            ->call('sortBy', 'subkategori')
+            ->assertSet('sortField', 'subkategori')
+            ->assertSet('sortDirection', 'asc')
+            ->assertViewHas('stocks', function ($stocks) {
+                // INTER comes before RESMI in ascending order
+                return $stocks->first()->serial_number === 'SN-VND2-002';
             });
     }
 
