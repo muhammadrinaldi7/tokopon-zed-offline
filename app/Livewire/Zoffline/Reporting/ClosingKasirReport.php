@@ -23,6 +23,12 @@ class ClosingKasirReport extends Component
     public $branchFilter = '';
     public $csvSeparator = ';';
 
+    // Reopen Shift State
+    public $showReopenModal = false;
+    public $reopenShiftId = null;
+    public $reopenShiftData = null;
+    public $reopenReason = '';
+
     public function mount()
     {
         $this->setDateRange();
@@ -194,6 +200,89 @@ class ClosingKasirReport extends Component
         return response()->streamDownload(function () use ($csvData) {
             echo $csvData;
         }, $fileName);
+    }
+
+    public function confirmReopenShift($shiftId)
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if (!($user->can('reopening-shiff-kasir') || $user->hasRole('reopening-shiff-kasir') || $user->hasRole('superadmin'))) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki hak akses role reopening-shiff-kasir untuk membuka kembali shift kasir.', type: 'error');
+            return;
+        }
+
+        $shift = CashierShift::with(['user', 'branch'])->find($shiftId);
+        if (!$shift || $shift->status !== 'closed') {
+            $this->dispatch('toast', title: 'Gagal', message: 'Shift tidak ditemukan atau statusnya tidak tertutup.', type: 'error');
+            return;
+        }
+
+        // Cek apakah kasir bersangkutan saat ini sudah memiliki shift lain yang open
+        $activeShift = CashierShift::where('business_unit_id', $shift->business_unit_id)
+            ->where('user_id', $shift->user_id)
+            ->where('status', 'open')
+            ->where('id', '!=', $shift->id)
+            ->first();
+
+        if ($activeShift) {
+            $this->dispatch('toast', title: 'Peringatan', message: 'Kasir ' . ($shift->user->name ?? 'ini') . ' saat ini sudah memiliki shift lain yang sedang aktif.', type: 'warning');
+            return;
+        }
+
+        $this->reopenShiftId = $shift->id;
+        $this->reopenShiftData = [
+            'id'            => $shift->id,
+            'cashier_name'  => $shift->user->name ?? 'Kasir',
+            'branch_name'   => $shift->branch->name ?? '-',
+            'shift_date'    => $shift->shift_date ? $shift->shift_date->format('d/m/Y') : '-',
+            'opened_at'     => $shift->opened_at ? $shift->opened_at->format('H:i') : '-',
+            'closed_at'     => $shift->closed_at ? $shift->closed_at->format('H:i') : '-',
+            'starting_cash' => $shift->starting_cash,
+            'actual_cash'   => $shift->actual_cash,
+        ];
+        $this->reopenReason = '';
+        $this->showReopenModal = true;
+    }
+
+    public function executeReopenShift()
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if (!($user->can('reopening-shiff-kasir') || $user->hasRole('reopening-shiff-kasir') || $user->hasRole('superadmin'))) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki hak akses role reopening-shiff-kasir.', type: 'error');
+            return;
+        }
+
+        $this->validate([
+            'reopenReason' => 'required|min:3|max:500',
+        ], [
+            'reopenReason.required' => 'Alasan pembukaan kembali shift wajib diisi.',
+            'reopenReason.min'      => 'Alasan minimal 3 karakter.',
+        ]);
+
+        $shift = CashierShift::with('user')->find($this->reopenShiftId);
+        if (!$shift || $shift->status !== 'closed') {
+            $this->dispatch('toast', title: 'Gagal', message: 'Shift tidak ditemukan atau statusnya sudah terbuka.', type: 'error');
+            $this->showReopenModal = false;
+            return;
+        }
+
+        $shift->reopen($this->reopenReason, \Illuminate\Support\Facades\Auth::id());
+
+        $cashierName = $shift->user->name ?? 'Kasir';
+        $this->showReopenModal = false;
+        $this->reopenShiftId = null;
+        $this->reopenShiftData = null;
+        $this->reopenReason = '';
+
+        $this->dispatch('toast', title: 'Shift Berhasil Dibuka Kembali', message: "Shift kasir {$cashierName} berhasil dibuka kembali. Kasir dapat melanjutkan transaksi POS.", type: 'success');
+    }
+
+    public function cancelReopen()
+    {
+        $this->showReopenModal = false;
+        $this->reopenShiftId = null;
+        $this->reopenShiftData = null;
+        $this->reopenReason = '';
+        $this->resetValidation();
     }
 
     public function render()

@@ -51,6 +51,7 @@ class PermissionSeeder extends Seeder
             'laporan-sales-order',
             'laba-rugi',
             'closing-kasir-report',
+            'reopening-shiff-kasir',
             'laporan-cancel-order',
 
             // Pendukung Lainnya

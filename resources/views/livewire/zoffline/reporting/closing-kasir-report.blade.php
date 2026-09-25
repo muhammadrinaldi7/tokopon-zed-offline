@@ -118,9 +118,17 @@
                         <th class="py-4 px-6 text-right font-semibold">Actual (Fisik)</th>
                         <th class="py-4 px-6 text-right font-semibold">Selisih</th>
                         <th class="py-4 px-6 text-center font-semibold">Status</th>
+                        <th class="py-4 px-6 text-center font-semibold">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="text-sm divide-y divide-gray-50">
+                    @php
+                        $canReopen = auth()->user() && (
+                            auth()->user()->can('reopening-shiff-kasir') || 
+                            auth()->user()->hasRole('reopening-shiff-kasir') || 
+                            auth()->user()->hasRole('superadmin')
+                        );
+                    @endphp
                     @forelse ($shifts as $shift)
                         <tr class="hover:bg-gray-50/80 transition-colors group">
                             <td class="py-4 px-6">
@@ -163,10 +171,32 @@
                                     </span>
                                 @endif
                             </td>
+                            <td class="py-4 px-6 text-center">
+                                @if(strtolower($shift->status) === 'closed')
+                                    @if($canReopen)
+                                        <button wire:click="confirmReopenShift({{ $shift->id }})"
+                                            type="button"
+                                            title="Buka Kembali Shift Kasir Ini"
+                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 shadow-2xs hover:shadow-xs transition-all duration-150 cursor-pointer">
+                                            <svg class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                            </svg>
+                                            Buka Kembali
+                                        </button>
+                                    @else
+                                        <span class="text-xs text-gray-300 font-medium" title="Perlu role reopening-shiff-kasir">-</span>
+                                    @endif
+                                @else
+                                    <span class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        Aktif
+                                    </span>
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="py-12 px-6 text-center">
+                            <td colspan="9" class="py-12 px-6 text-center">
                                 <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-50 mb-4">
                                     <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
@@ -186,5 +216,110 @@
                 {{ $shifts->links() }}
             </div>
         @endif
+    </div>
+
+    <!-- Modal Reopen Shift Kasir -->
+    <div x-data="{ show: @entangle('showReopenModal') }" x-show="show" class="relative z-50" aria-labelledby="modal-reopen-title" role="dialog" aria-modal="true" style="display: none;">
+        <div x-show="show" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"></div>
+        <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+            <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                <div x-show="show" x-transition:enter="ease-out duration-300"
+                    x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                    x-transition:leave="ease-in duration-200"
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                    x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                    class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-slate-200">
+                    
+                    <form wire:submit="executeReopenShift">
+                        <div class="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-4 text-white flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-white/20 p-2 rounded-xl backdrop-blur-xs">
+                                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-black text-white" id="modal-reopen-title">Buka Kembali Shift Kasir</h3>
+                                    <p class="text-xs text-amber-100">Otorisasi Admin (Role: reopening-shiff-kasir)</p>
+                                </div>
+                            </div>
+                            <button type="button" wire:click="cancelReopen" class="text-white/80 hover:text-white transition-colors cursor-pointer">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="p-6 space-y-4">
+                            @if ($reopenShiftData)
+                                <div class="bg-amber-50/60 rounded-xl p-4 border border-amber-200/80 text-sm space-y-2">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-slate-500 font-medium">Kasir:</span>
+                                        <span class="font-bold text-slate-800">{{ $reopenShiftData['cashier_name'] }} ({{ $reopenShiftData['branch_name'] }})</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-slate-500 font-medium">Tanggal Shift:</span>
+                                        <span class="font-bold text-slate-800">{{ $reopenShiftData['shift_date'] }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-slate-500 font-medium">Waktu Shift:</span>
+                                        <span class="font-bold text-slate-800">{{ $reopenShiftData['opened_at'] }} s/d {{ $reopenShiftData['closed_at'] }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center pt-2 border-t border-amber-200/50">
+                                        <span class="text-slate-500 font-medium">Setoran Fisik Sebelumnya:</span>
+                                        <span class="font-black text-amber-700">Rp {{ number_format($reopenShiftData['actual_cash'] ?? 0, 0, ',', '.') }}</span>
+                                    </div>
+                                </div>
+                            @endif
+
+                            <div class="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-r-lg text-xs text-blue-800">
+                                <p class="font-bold mb-1">Dampak Pembukaan Kembali Shift:</p>
+                                <ul class="list-disc list-inside space-y-0.5 text-blue-700">
+                                    <li>Status shift kasir akan dikembalikan menjadi <strong>OPEN</strong>.</li>
+                                    <li>Kasir dapat langsung kembali melakukan transaksi di POS.</li>
+                                    <li>Data rincian uang closing sebelumnya akan direset sehingga kasir dapat menghitung ulang saat shift benar-benar selesai.</li>
+                                </ul>
+                            </div>
+
+                            <div>
+                                <label for="reopenReason" class="block text-sm font-bold text-slate-700 mb-1.5">
+                                    Alasan Pembukaan Kembali <span class="text-rose-500">*</span>
+                                </label>
+                                <textarea wire:model="reopenReason" id="reopenReason" rows="3"
+                                    placeholder="Contoh: Kasir tidak sengaja menekan tombol closing shift saat jam kerja masih berlangsung..."
+                                    class="block w-full rounded-xl border border-slate-300 p-3 text-slate-900 text-sm focus:border-amber-500 focus:ring-amber-500 placeholder:text-slate-400"></textarea>
+                                @error('reopenReason')
+                                    <p class="mt-1 text-xs text-rose-500 font-semibold">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 px-6 py-4 rounded-b-2xl flex items-center justify-end gap-3 border-t border-slate-100">
+                            <button type="button" wire:click="cancelReopen"
+                                class="px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer">
+                                Batal
+                            </button>
+                            <button type="submit"
+                                wire:loading.attr="disabled"
+                                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-sm font-bold text-white shadow-md shadow-amber-200 transition-all cursor-pointer">
+                                <span wire:loading.remove wire:target="executeReopenShift">Konfirmasi Buka Kembali</span>
+                                <span wire:loading.inline-flex wire:target="executeReopenShift" class="items-center gap-1.5">
+                                    <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Memproses...
+                                </span>
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
     </div>
 </div>
