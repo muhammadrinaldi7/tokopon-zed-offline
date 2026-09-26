@@ -52,7 +52,7 @@
                     <div class="flex items-center gap-1.5 bg-black/25 px-3 py-1.5 rounded-lg border border-white/10">
                         <span class="text-neutral-400">Terakhir Diperpanjang:</span>
                         <strong class="text-white font-mono">
-                            {{ $lastRenewedAt ? \Carbon\Carbon::parse($lastRenewedAt)->translatedFormat('d M Y, H:i') . ' WIB' : 'Belum pernah' }}
+                            {{ $lastRenewedAt ? \Carbon\Carbon::parse($lastRenewedAt)->translatedFormat('d M Y, H:i:s') . ' WIB (' . \Carbon\Carbon::parse($lastRenewedAt)->diffForHumans() . ')' : 'Belum pernah' }}
                         </strong>
                     </div>
                 </div>
@@ -70,19 +70,47 @@
                         <label class="block text-xs font-medium text-blue-100 mb-1">Frekuensi Perpanjangan Otomatis</label>
                         <select wire:model="renewFrequency"
                             class="w-full bg-neutral-900/90 text-white text-xs rounded-lg px-3 py-2 border border-white/20 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none">
-                            <option value="monthly">Setiap Bulan (Monthly - Disarankan)</option>
-                            <option value="biweekly">Setiap 2 Minggu (Bi-Weekly)</option>
+                            <option value="every_minute">⚡ Per 1 Menit (Mode Pengujian / Testing)</option>
+                            <option value="every_five_minutes">⚡ Per 5 Menit (Mode Pengujian / Testing)</option>
+                            <option value="daily">Setiap Hari (Daily)</option>
                             <option value="weekly">Setiap Minggu (Weekly)</option>
+                            <option value="biweekly">Setiap 2 Minggu (Bi-Weekly)</option>
+                            <option value="monthly">Setiap Bulan (Monthly - Disarankan)</option>
                             <option value="disabled">Nonaktifkan Otomatis (Manual Saja)</option>
                         </select>
                     </div>
 
                     <div class="flex items-center justify-between pt-1">
-                        <span class="text-[11px] text-blue-200/70">Dijalankan otomatis jam 02:00 WIB</span>
+                        <span class="text-[11px] text-blue-200/70">
+                            @if($renewFrequency === 'every_minute')
+                                ⚡ Dipicu otomatis setiap 1 menit
+                            @elseif($renewFrequency === 'every_five_minutes')
+                                ⚡ Dipicu otomatis setiap 5 menit
+                            @elseif($renewFrequency === 'daily')
+                                Dipicu otomatis setiap hari
+                            @elseif($renewFrequency === 'weekly')
+                                Dipicu otomatis setiap minggu
+                            @elseif($renewFrequency === 'biweekly')
+                                Dipicu otomatis setiap 2 minggu
+                            @elseif($renewFrequency === 'monthly')
+                                Dipicu otomatis setiap bulan (disarankan)
+                            @else
+                                Otomatisasi dinonaktifkan
+                            @endif
+                        </span>
                         <button wire:click="saveScheduleSettings"
                             class="px-3.5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">
                             Simpan Jadwal
                         </button>
+                    </div>
+
+                    <div class="mt-2 p-2.5 rounded-lg bg-black/30 border border-white/10 text-[11px] text-blue-200/80 leading-relaxed">
+                        <div class="font-semibold text-white flex items-center gap-1 mb-1">
+                            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Setup Eksekutor Scheduler di Windows:
+                        </div>
+                        Agar jadwal otomatis berjalan di latar belakang, jalankan worker di terminal:
+                        <code class="block mt-1 bg-black/50 text-emerald-400 px-2 py-1 rounded font-mono text-[10px] select-all">php artisan schedule:work</code>
                     </div>
                 </div>
             </div>
@@ -120,6 +148,10 @@
                                         @if(($unitRenew['status'] ?? '') === 'success')
                                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800" title="{{ $unitRenew['message'] ?? '' }}">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Webhook Aktif
+                                            </span>
+                                        @elseif(($unitRenew['status'] ?? '') === 'warning')
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800" title="{{ $unitRenew['message'] ?? '' }}">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Token Belum Diisi
                                             </span>
                                         @else
                                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800" title="{{ $unitRenew['message'] ?? '' }}">

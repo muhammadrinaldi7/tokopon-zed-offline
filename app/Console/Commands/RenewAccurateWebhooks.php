@@ -38,13 +38,11 @@ class RenewAccurateWebhooks extends Command
                 return 1;
             }
         } else {
-            $units = BusinessUnit::where('is_active', true)
-                ->whereNotNull('accurate_token')
-                ->where('accurate_token', '!=', '')
-                ->get();
+            $units = BusinessUnit::where('is_active', true)->get();
 
             if ($units->isEmpty()) {
-                $this->warn("⚠️ Tidak ada unit usaha aktif yang memiliki kredensial Accurate Token.");
+                $this->warn("⚠️ Tidak ada unit usaha aktif di database.");
+                $settingService->set('accurate_webhook_last_renewed_at', now()->toDateTimeString());
                 return 0;
             }
         }
@@ -54,10 +52,34 @@ class RenewAccurateWebhooks extends Command
 
         $tableData = [];
         $hasErrors = false;
-        $resultsLog = [];
+        $resultsLog = $settingService->get('accurate_webhook_last_renew_status', []);
+        if (!is_array($resultsLog)) {
+            $resultsLog = [];
+        }
+
+        $processedCount = 0;
 
         foreach ($units as $unit) {
             $buLabel = "{$unit->name} ({$unit->code})";
+
+            if (empty($unit->accurate_token) || empty($unit->accurate_secret_key)) {
+                $this->line("⚠️ Melewati {$buLabel}: Accurate Token atau Secret Key belum diisi.");
+                $tableData[] = [
+                    'Unit' => $unit->name,
+                    'Kode' => $unit->code,
+                    'Status' => '⚠️ Dilewati',
+                    'Keterangan' => 'Belum ada Accurate Token / Secret Key',
+                ];
+
+                $resultsLog[$unit->code] = [
+                    'status' => 'warning',
+                    'message' => 'Accurate Token atau Secret Key belum diisi.',
+                    'checked_at' => now()->toDateTimeString(),
+                ];
+                continue;
+            }
+
+            $processedCount++;
             $this->line("Mengirim request perpanjang webhook untuk: {$buLabel}...");
 
             try {
@@ -112,6 +134,11 @@ class RenewAccurateWebhooks extends Command
         if ($hasErrors) {
             $this->warn("⚠️ Beberapa unit usaha gagal diperpanjang. Silakan periksa log sistem.");
             return 1;
+        }
+
+        if ($processedCount === 0) {
+            $this->warn("⚠️ Semua unit usaha aktif dilewati karena Accurate Token / Secret Key belum diisi.");
+            return 0;
         }
 
         $this->info("🎉 Semua webhook Accurate berhasil diperpanjang!");

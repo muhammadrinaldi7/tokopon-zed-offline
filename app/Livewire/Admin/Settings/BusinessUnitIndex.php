@@ -172,6 +172,10 @@ class BusinessUnitIndex extends Component
 
     public function saveScheduleSettings()
     {
+        $this->validate([
+            'renewFrequency' => 'required|in:every_minute,every_five_minutes,daily,weekly,biweekly,monthly,disabled',
+        ]);
+
         $settingService = app(SettingService::class);
         $settingService->set('accurate_webhook_renew_frequency', $this->renewFrequency);
         $this->loadData();
@@ -216,21 +220,29 @@ class BusinessUnitIndex extends Component
                 $this->loadData();
                 $this->dispatch('toast', title: 'Perpanjangan Berhasil', message: "Webhook untuk unit {$unit->name} berhasil diperpanjang: {$message}", type: 'success');
             } else {
-                $units = BusinessUnit::where('is_active', true)
-                    ->whereNotNull('accurate_token')
-                    ->where('accurate_token', '!=', '')
-                    ->get();
+                $units = BusinessUnit::where('is_active', true)->get();
 
                 if ($units->isEmpty()) {
-                    $this->dispatch('toast', title: 'Peringatan', message: 'Tidak ada unit usaha aktif dengan kredensial Accurate Token.', type: 'warning');
+                    $this->dispatch('toast', title: 'Peringatan', message: 'Tidak ada unit usaha aktif.', type: 'warning');
                     return;
                 }
 
                 $successCount = 0;
                 $failCount = 0;
-                $currentStatus = [];
+                $skipCount = 0;
+                $currentStatus = $this->lastRenewStatus ?: [];
 
                 foreach ($units as $unit) {
+                    if (empty($unit->accurate_token) || empty($unit->accurate_secret_key)) {
+                        $currentStatus[$unit->code] = [
+                            'status' => 'warning',
+                            'message' => 'Token Accurate belum diisi.',
+                            'checked_at' => now()->toDateTimeString(),
+                        ];
+                        $skipCount++;
+                        continue;
+                    }
+
                     try {
                         $response = $accurateService->renewWebhookDo($unit->code);
                         $message = $response['d'] ?? 'Webhook berhasil diperpanjang.';
@@ -259,10 +271,12 @@ class BusinessUnitIndex extends Component
 
                 $this->loadData();
 
-                if ($failCount === 0) {
-                    $this->dispatch('toast', title: 'Perpanjangan Berhasil', message: "Semua webhook untuk {$successCount} unit usaha berhasil diperpanjang!", type: 'success');
+                if ($successCount > 0 && $failCount === 0) {
+                    $this->dispatch('toast', title: 'Perpanjangan Berhasil', message: "Webhook untuk {$successCount} unit usaha berhasil diperpanjang!" . ($skipCount > 0 ? " ({$skipCount} unit dilewati karena token belum diisi)" : ""), type: 'success');
+                } elseif ($successCount === 0 && $skipCount > 0 && $failCount === 0) {
+                    $this->dispatch('toast', title: 'Perhatian', message: "Semua unit usaha dilewati ({$skipCount} unit) karena belum memiliki Accurate Token atau Secret Key.", type: 'warning');
                 } else {
-                    $this->dispatch('toast', title: 'Perpanjangan Sebagian Selesai', message: "{$successCount} unit berhasil, {$failCount} unit gagal diperpanjang. Periksa detail log.", type: 'warning');
+                    $this->dispatch('toast', title: 'Perpanjangan Sebagian Selesai', message: "{$successCount} unit berhasil, {$failCount} unit gagal, {$skipCount} unit dilewati. Periksa detail log.", type: 'warning');
                 }
             }
         } catch (\Throwable $e) {
