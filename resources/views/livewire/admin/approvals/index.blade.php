@@ -88,6 +88,12 @@
                                     @if(!empty($req->payload['total_loss_value']))
                                         <br><span class="text-red-600 font-bold">Loss: Rp {{ number_format($req->payload['total_loss_value'], 0, ',', '.') }}</span>
                                     @endif
+                                @elseif($req->request_type === 'STOCK_ADJUSTMENT' || $req->approvable_type === 'App\Models\StockAdjustment' || $req->approvable instanceof \App\Models\StockAdjustment)
+                                    ADJ: <span class="font-bold text-gray-800">{{ $req->approvable->adjustment_number ?? ($req->payload['adjustment_number'] ?? '-') }}</span><br>
+                                    Barang: <span class="font-bold text-blue-700">{{ $req->approvable->product_name ?? ($req->payload['product_name'] ?? '-') }}</span> ({{ $req->approvable->quantity ?? ($req->payload['quantity'] ?? 1) }} pcs {{ ($req->approvable->adjustment_type ?? ($req->payload['type'] ?? 'OUT')) === 'OUT' ? 'Keluar' : 'Masuk' }})<br>
+                                    @if(!empty($req->approvable->target_product_name) || !empty($req->payload['target_product_name']))
+                                        Tujuan: <span class="text-amber-700 font-semibold">{{ $req->approvable->target_product_name ?? $req->payload['target_product_name'] }}</span>
+                                    @endif
                                 @elseif($req->approvable_type === 'App\Models\Order' || $req->approvable instanceof \App\Models\Order)
                                     Order: {{ $req->approvable->order_number ?? '-' }}
                                 @elseif($req->approvable_type === 'App\Models\SellPhone' || $req->approvable instanceof \App\Models\SellPhone)

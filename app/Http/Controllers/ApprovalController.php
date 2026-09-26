@@ -70,6 +70,13 @@ class ApprovalController extends Controller
             $orderInfo = $approval->approvable->order_number;
         } elseif ($approval->approvable_type === \App\Models\SellPhone::class && $approval->approvable) {
             $orderInfo = $approval->approvable->phone_brand . ' ' . $approval->approvable->phone_model;
+        } elseif ($approval->approvable_type === \App\Models\StockAdjustment::class && $approval->approvable) {
+            $adj = $approval->approvable;
+            $typeLabel = $adj->adjustment_type === 'OUT' ? 'Pengurangan' : 'Penambahan';
+            $orderInfo = "{$adj->product_name} ({$adj->quantity} pcs {$typeLabel})";
+            if ($adj->target_product_name) {
+                $orderInfo .= " utk {$adj->target_product_name}";
+            }
         }
 
         $keterangan = $approval->reason ?? '-';
@@ -230,6 +237,13 @@ class ApprovalController extends Controller
                         $orderInfo = $approval->approvable->order_number;
                     } elseif ($approval->approvable_type === \App\Models\SellPhone::class && $approval->approvable) {
                         $orderInfo = $approval->approvable->phone_brand . ' ' . $approval->approvable->phone_model;
+                    } elseif ($approval->approvable_type === \App\Models\StockAdjustment::class && $approval->approvable) {
+                        $adj = $approval->approvable;
+                        $typeLabel = $adj->adjustment_type === 'OUT' ? 'Pengurangan' : 'Penambahan';
+                        $orderInfo = "{$adj->product_name} ({$adj->quantity} pcs {$typeLabel})";
+                        if ($adj->target_product_name) {
+                            $orderInfo .= " utk {$adj->target_product_name}";
+                        }
                     }
                     $cabang = $approval->branch?->name ?? ($approval->requestedBy?->branch?->name ?? '-');
                     $waktu = $approval->created_at->format('d M Y H:i');

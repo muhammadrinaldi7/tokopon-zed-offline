@@ -224,7 +224,7 @@ class Show extends Component
 
             // Tentukan nomor proyek berdasarkan Business Unit & jenis proyek produk
             $namaProyek = trim(strtoupper($phoneData->productAccurate->proyek ?? ''));
-            
+
             // Mengambil secara dinamis dari tabel business_unit_projects
             // Jika tidak ditemukan, fallback ke nama aslinya (jika kosong jadi null agar tidak dikirim ke accurate)
             $projectNo = \App\Models\BusinessUnitProject::getProjectNoByBusinessUnit(
@@ -562,9 +562,9 @@ class Show extends Component
         $this->isEditingBank = false;
         $this->sellPhone->refresh();
         $this->sellPhone->load(['issues.user', 'issues.resolvedBy']);
-        
+
         $resolvedCount = $openBankIssues->count();
-        $msg = $resolvedCount > 0 
+        $msg = $resolvedCount > 0
             ? "Data rekening berhasil diperbarui & {$resolvedCount} kendala rekening ditandai Selesai."
             : "Data rekening bank tujuan berhasil diperbarui.";
 
@@ -583,7 +583,7 @@ class Show extends Component
         return \App\Models\ProductAccurate::where('business_unit_id', $buId)
             ->where(function ($q) {
                 $q->where('name', 'like', '%' . $this->searchProductQuery . '%')
-                  ->orWhere('item_no', 'like', '%' . $this->searchProductQuery . '%');
+                    ->orWhere('item_no', 'like', '%' . $this->searchProductQuery . '%');
             })
             ->take(15)
             ->get();
@@ -651,10 +651,10 @@ class Show extends Component
                 ->where('business_unit_id', $this->sellPhone->business_unit_id)
                 ->first();
 
-            if ($snRecord && $snRecord->status !== 'Available') {
-                $this->dispatch('toast', title: 'Tidak Dapat Dikoreksi', message: "Unit dengan SN/IMEI {$this->sellPhone->imei} sudah berstatus '{$snRecord->status}' (kemungkinan sudah terjual di POS).", type: 'error');
-                return;
-            }
+            // if ($snRecord && $snRecord->status !== 'Available') {
+            //     $this->dispatch('toast', title: 'Tidak Dapat Dikoreksi', message: "Unit dengan SN/IMEI {$this->sellPhone->imei} sudah berstatus '{$snRecord->status}' (kemungkinan sudah terjual di POS).", type: 'error');
+            //     return;
+            // }
         }
 
         try {
