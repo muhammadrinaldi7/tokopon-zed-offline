@@ -26,62 +26,87 @@ class StockAdjustmentApprovalHandler implements ApprovalHandlerInterface
             throw new Exception("Data StockAdjustment tidak ditemukan untuk approval request #{$request->id}.");
         }
 
+        $adjustment->loadMissing(['items', 'warehouse', 'branch', 'businessUnit']);
+
         // 1. Mutasi Stok Lokal di Gudang Terkait (jika tracking aktif)
         $this->mutateLocalStock($adjustment);
 
         // 2. Susun Payload dan Kirim ke Accurate Online
         try {
             $notesFull = "[{$adjustment->reason_category}] " . ($adjustment->notes ?: 'Penyesuaian Stok');
-            if ($adjustment->target_item_no) {
-                $notesFull .= " (Tujuan Alokasi: {$adjustment->target_item_no} - {$adjustment->target_product_name}";
-                if ($adjustment->target_serial_number) {
-                    $notesFull .= " [SN/IMEI: {$adjustment->target_serial_number}]";
+            
+            // Tambahkan ringkasan SKU tujuan jika ada
+            $targetSummaries = [];
+            foreach ($adjustment->items as $item) {
+                if (!empty($item->target_item_no)) {
+                    $targetSummaries[] = "{$item->item_no} -> {$item->target_item_no}";
                 }
-                $notesFull .= ")";
+            }
+            if (!empty($targetSummaries)) {
+                $notesFull .= " (Tujuan: " . implode(', ', array_slice($targetSummaries, 0, 5)) . ")";
             }
 
             $warehouseName = $adjustment->warehouse?->name ?? ($adjustment->warehouse_name ?? 'UTAMA');
+            $detailItems = [];
 
-            $detailItem = [
-                'itemNo'             => $adjustment->item_no,
-                'itemAdjustmentType' => $adjustment->adjustment_type === 'OUT' ? 'ADJUSTMENT_OUT' : 'ADJUSTMENT_IN',
-                'quantity'           => (float) $adjustment->quantity,
-                'warehouseName'      => $warehouseName,
-            ];
+            if ($adjustment->items->isNotEmpty()) {
+                foreach ($adjustment->items as $item) {
+                    $detailRow = [
+                        'itemNo'             => $item->item_no,
+                        'itemAdjustmentType' => $item->adjustment_type === 'OUT' ? 'ADJUSTMENT_OUT' : 'ADJUSTMENT_IN',
+                        'quantity'           => (float) $item->quantity,
+                        'warehouseName'      => $warehouseName,
+                    ];
 
-            // Tambahkan Project No jika ada
-            if (!empty($adjustment->project_no)) {
-                $detailItem['projectNo'] = $adjustment->project_no;
-            }
-
-            // Tambahkan Unit Cost jika ada
-            if (!empty($adjustment->unit_cost) && $adjustment->unit_cost > 0) {
-                $detailItem['unitCost'] = (float) $adjustment->unit_cost;
-            }
-
-            // Tambahkan Serial Number jika ada
-            if (!empty($adjustment->serial_numbers) && is_array($adjustment->serial_numbers)) {
-                $detailSN = [];
-                foreach ($adjustment->serial_numbers as $sn) {
-                    $snVal = is_array($sn) ? ($sn['serial_number'] ?? ($sn['sn'] ?? '')) : $sn;
-                    if (!empty(trim((string)$snVal))) {
-                        $detailSN[] = [
-                            'serialNumberNo' => trim((string)$snVal),
-                            'quantity'       => 1,
-                        ];
+                    if (!empty($item->project_no)) {
+                        $detailRow['projectNo'] = $item->project_no;
                     }
+
+                    if (!empty($item->unit_cost) && $item->unit_cost > 0) {
+                        $detailRow['unitCost'] = (float) $item->unit_cost;
+                    }
+
+                    if (!empty($item->serial_numbers) && is_array($item->serial_numbers)) {
+                        $detailSN = [];
+                        foreach ($item->serial_numbers as $sn) {
+                            $snVal = is_array($sn) ? ($sn['serial_number'] ?? ($sn['sn'] ?? '')) : $sn;
+                            if (!empty(trim((string)$snVal))) {
+                                $detailSN[] = [
+                                    'serialNumberNo' => trim((string)$snVal),
+                                    'quantity'       => 1,
+                                ];
+                            }
+                        }
+                        if (!empty($detailSN)) {
+                            $detailRow['detailSerialNumber'] = $detailSN;
+                        }
+                    }
+
+                    $detailItems[] = $detailRow;
                 }
-                if (!empty($detailSN)) {
-                    $detailItem['detailSerialNumber'] = $detailSN;
+            } else {
+                // Fallback jika single item lama
+                $detailRow = [
+                    'itemNo'             => $adjustment->item_no,
+                    'itemAdjustmentType' => $adjustment->adjustment_type === 'OUT' ? 'ADJUSTMENT_OUT' : 'ADJUSTMENT_IN',
+                    'quantity'           => (float) $adjustment->quantity,
+                    'warehouseName'      => $warehouseName,
+                ];
+                if (!empty($adjustment->project_no)) {
+                    $detailRow['projectNo'] = $adjustment->project_no;
                 }
+                if (!empty($adjustment->unit_cost) && $adjustment->unit_cost > 0) {
+                    $detailRow['unitCost'] = (float) $adjustment->unit_cost;
+                }
+                $detailItems[] = $detailRow;
             }
 
             $payload = [
                 'transDate'           => now()->format('d/m/Y'),
                 'adjustmentAccountNo' => $adjustment->accurate_account_no ?: '5101',
-                'description'         => $notesFull,
+                'description'         => mb_substr($notesFull, 0, 250),
                 'branchName'          => $adjustment->branch?->name,
-                'detailItem'          => [$detailItem],
+                'detailItem'          => $detailItems,
             ];
 
             $buCode = $adjustment->businessUnit?->code ?? 'syihab';
@@ -141,35 +166,39 @@ class StockAdjustmentApprovalHandler implements ApprovalHandlerInterface
             return;
         }
 
-        // Cari variant berdasarkan SKU
-        $variant = ProductVariant::where('sku', $adjustment->item_no)->first();
-        if (!$variant) {
-            $variant = ProductAccurate::where('item_no', $adjustment->item_no)->first();
-        }
+        $items = $adjustment->items->isNotEmpty() ? $adjustment->items : collect([$adjustment]);
 
-        if ($variant) {
-            $stock = WarehouseStock::where('warehouse_id', $adjustment->warehouse_id)
-                ->where('variant_type', get_class($variant))
-                ->where('variant_id', $variant->id)
-                ->first();
+        foreach ($items as $item) {
+            // Cari variant berdasarkan SKU
+            $variant = ProductVariant::where('sku', $item->item_no)->first();
+            if (!$variant) {
+                $variant = ProductAccurate::where('item_no', $item->item_no)->first();
+            }
 
-            if ($stock) {
-                if ($adjustment->adjustment_type === 'OUT') {
-                    $stock->decrement('stock', $adjustment->quantity);
-                } else {
-                    $stock->increment('stock', $adjustment->quantity);
+            if ($variant) {
+                $stock = WarehouseStock::where('warehouse_id', $adjustment->warehouse_id)
+                    ->where('variant_type', get_class($variant))
+                    ->where('variant_id', $variant->id)
+                    ->first();
+
+                if ($stock) {
+                    if ($item->adjustment_type === 'OUT') {
+                        $stock->decrement('stock', $item->quantity);
+                    } else {
+                        $stock->increment('stock', $item->quantity);
+                    }
                 }
             }
-        }
 
-        // Jika ada serial number yang disesuaikan keluar
-        if ($adjustment->adjustment_type === 'OUT' && !empty($adjustment->serial_numbers)) {
-            foreach ($adjustment->serial_numbers as $sn) {
-                $snVal = is_array($sn) ? ($sn['serial_number'] ?? ($sn['sn'] ?? '')) : $sn;
-                if (!empty($snVal)) {
-                    ProductSerialNumber::where('item_no', $adjustment->item_no)
-                        ->where('serial_number', trim((string)$snVal))
-                        ->update(['status' => 'ADJUSTED_OUT']);
+            // Jika ada serial number yang disesuaikan keluar
+            if ($item->adjustment_type === 'OUT' && !empty($item->serial_numbers)) {
+                foreach ($item->serial_numbers as $sn) {
+                    $snVal = is_array($sn) ? ($sn['serial_number'] ?? ($sn['sn'] ?? '')) : $sn;
+                    if (!empty($snVal)) {
+                        ProductSerialNumber::where('item_no', $item->item_no)
+                            ->where('serial_number', trim((string)$snVal))
+                            ->update(['status' => 'ADJUSTED_OUT']);
+                    }
                 }
             }
         }

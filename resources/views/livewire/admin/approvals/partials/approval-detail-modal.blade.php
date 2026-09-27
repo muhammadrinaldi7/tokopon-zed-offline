@@ -295,6 +295,95 @@
                                             <span class="text-gray-500 block text-[10px] font-bold">HARGA SETELAH CASHBACK</span>
                                             <span class="font-black text-blue-700 text-base">Rp {{ number_format(($detailRequest->payload['item_price'] ?? 0) - ($detailRequest->payload['amount'] ?? 0), 0, ',', '.') }}</span>
                                         </div>
+                                    @elseif($detailRequest->request_type === 'STOCK_ADJUSTMENT')
+                                        <div class="col-span-1 sm:col-span-2">
+                                            <span class="text-gray-400 block text-[10px]">Nomor Penyesuaian</span>
+                                            <span class="font-bold text-gray-900 font-mono">{{ $detailRequest->payload['adjustment_number'] ?? '-' }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-400 block text-[10px]">Gudang</span>
+                                            <span class="font-semibold text-gray-800">{{ $detailRequest->payload['warehouse_name'] ?? '-' }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-400 block text-[10px]">Total Item & Kuantitas</span>
+                                            <span class="font-bold text-indigo-700">
+                                                {{ $detailRequest->payload['total_items'] ?? (isset($detailRequest->payload['items']) ? count($detailRequest->payload['items']) : 1) }} Item
+                                                ({{ $detailRequest->payload['total_quantity'] ?? ($detailRequest->payload['quantity'] ?? 1) }} pcs)
+                                            </span>
+                                        </div>
+
+                                        @if(!empty($detailRequest->payload['items']) && is_array($detailRequest->payload['items']))
+                                            <div class="col-span-1 sm:col-span-2 mt-2">
+                                                <span class="text-gray-500 block text-[10px] font-bold uppercase mb-1">Rincian Barang yang Diajukan ({{ count($detailRequest->payload['items']) }} Item):</span>
+                                                <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                                                    <table class="min-w-full divide-y divide-gray-100 text-[11px]">
+                                                        <thead class="bg-gray-50 text-gray-500 font-bold uppercase text-[9px]">
+                                                            <tr>
+                                                                <th class="px-3 py-2 text-center w-6">#</th>
+                                                                <th class="px-3 py-2 text-left">Barang & SKU</th>
+                                                                <th class="px-3 py-2 text-center">Arah</th>
+                                                                <th class="px-3 py-2 text-center">Qty</th>
+                                                                <th class="px-3 py-2 text-left">Tujuan Display</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody class="divide-y divide-gray-100">
+                                                            @foreach($detailRequest->payload['items'] as $idx => $it)
+                                                                <tr class="hover:bg-gray-50/50">
+                                                                    <td class="px-3 py-2 text-center text-gray-400 font-bold">{{ $idx + 1 }}</td>
+                                                                    <td class="px-3 py-2">
+                                                                        <div class="font-bold text-gray-900">{{ $it['product_name'] ?? '-' }}</div>
+                                                                        <div class="text-[10px] text-gray-500 font-mono">
+                                                                            SKU: {{ $it['item_no'] ?? '-' }}
+                                                                            @if(!empty($it['proyek']))
+                                                                                <span class="text-indigo-600 font-sans font-semibold ml-1">[{{ $it['proyek'] }}]</span>
+                                                                            @endif
+                                                                        </div>
+                                                                    </td>
+                                                                    <td class="px-3 py-2 text-center whitespace-nowrap">
+                                                                        <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold {{ ($it['adjustment_type'] ?? 'OUT') === 'OUT' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700' }}">
+                                                                            {{ ($it['adjustment_type'] ?? 'OUT') === 'OUT' ? '🔴 Keluar' : '🟢 Masuk' }}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td class="px-3 py-2 text-center font-bold font-mono text-gray-900">
+                                                                        {{ $it['quantity'] ?? 1 }} pcs
+                                                                    </td>
+                                                                    <td class="px-3 py-2">
+                                                                        @if(!empty($it['target_item_no']))
+                                                                            <div class="bg-amber-50 p-1 rounded border border-amber-200 text-[10px]">
+                                                                                <span class="font-bold text-amber-950">{{ $it['target_product_name'] ?? '-' }}</span>
+                                                                                <span class="text-amber-800 font-mono">({{ $it['target_item_no'] }})</span>
+                                                                            </div>
+                                                                        @else
+                                                                            <span class="text-gray-400 italic text-[10px]">-</span>
+                                                                        @endif
+                                                                    </td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        @else
+                                            {{-- Fallback untuk single-item lama --}}
+                                            <div class="col-span-1 sm:col-span-2">
+                                                <span class="text-gray-400 block text-[10px]">Barang Disesuaikan (SKU)</span>
+                                                <span class="font-bold text-blue-700">{{ $detailRequest->payload['product_name'] ?? '-' }}</span>
+                                                <span class="text-gray-500 font-mono text-[11px]">({{ $detailRequest->payload['item_no'] ?? '-' }})</span>
+                                            </div>
+                                            <div>
+                                                <span class="text-gray-400 block text-[10px]">Arah Mutasi & Jumlah</span>
+                                                <span class="font-bold {{ ($detailRequest->payload['type'] ?? 'OUT') === 'OUT' ? 'text-rose-600' : 'text-emerald-600' }}">
+                                                    {{ ($detailRequest->payload['type'] ?? 'OUT') === 'OUT' ? '🔴 Pengurangan (Keluar)' : '🟢 Penambahan (Masuk)' }} : {{ $detailRequest->payload['quantity'] ?? 1 }} pcs
+                                                </span>
+                                            </div>
+                                            @if(!empty($detailRequest->payload['target_item_no']))
+                                                <div class="col-span-1 sm:col-span-2 mt-1 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                                                    <span class="text-amber-800 block text-[10px] font-bold uppercase">Tujuan Alokasi / Unit Display:</span>
+                                                    <span class="font-bold text-amber-950">{{ $detailRequest->payload['target_product_name'] ?? '-' }}</span>
+                                                    <span class="text-amber-800 font-mono text-[11px]">(SKU: {{ $detailRequest->payload['target_item_no'] }})</span>
+                                                </div>
+                                            @endif
+                                        @endif
                                     @else
                                         @foreach($detailRequest->payload as $key => $val)
                                             <div>

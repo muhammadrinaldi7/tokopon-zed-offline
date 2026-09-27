@@ -18,6 +18,7 @@ use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class ApprovalService
 {
@@ -49,9 +50,9 @@ class ApprovalService
                 ->where('business_unit_id', $businessUnitId)
                 ->when($amount !== null, function ($q) use ($amount) {
                     $q->where('min_amount', '<=', $amount)
-                      ->where(function ($sq) use ($amount) {
-                          $sq->whereNull('max_amount')->orWhere('max_amount', '>=', $amount);
-                      });
+                        ->where(function ($sq) use ($amount) {
+                            $sq->whereNull('max_amount')->orWhere('max_amount', '>=', $amount);
+                        });
                 })
                 ->when($branchId !== null, function ($q) use ($branchId) {
                     $q->where(function ($sq) use ($branchId) {
@@ -72,9 +73,9 @@ class ApprovalService
             ->whereNull('business_unit_id')
             ->when($amount !== null, function ($q) use ($amount) {
                 $q->where('min_amount', '<=', $amount)
-                  ->where(function ($sq) use ($amount) {
-                      $sq->whereNull('max_amount')->orWhere('max_amount', '>=', $amount);
-                  });
+                    ->where(function ($sq) use ($amount) {
+                        $sq->whereNull('max_amount')->orWhere('max_amount', '>=', $amount);
+                    });
             })
             ->when($branchId !== null, function ($q) use ($branchId) {
                 $q->where(function ($sq) use ($branchId) {
@@ -178,8 +179,12 @@ class ApprovalService
             'current_level'    => 0,
         ]);
 
-        // Pemicu notifikasi Telegram n8n
-        ApprovalController::sendTelegramNotification($request);
+        // Pemicu notifikasi Telegram n8n (non-blocking jika error webhook/role)
+        try {
+            ApprovalController::sendTelegramNotification($request);
+        } catch (\Throwable $e) {
+            Log::warning("Gagal mengirim notifikasi Telegram untuk ApprovalRequest #{$request->id}: " . $e->getMessage());
+        }
 
         return $request;
     }

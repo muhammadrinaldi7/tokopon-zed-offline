@@ -7,11 +7,13 @@ use App\Models\BusinessUnitProject;
 use App\Models\ProductAccurate;
 use App\Models\ProductVariant;
 use App\Models\StockAdjustment;
+use App\Models\StockAdjustmentItem;
 use App\Models\Warehouse;
 use App\Models\WarehouseStock;
 use App\Services\ApprovalService;
 use Exception;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -36,39 +38,43 @@ class Index extends Component
     public $showDetailModal = false;
     public $selectedAdjustment = null;
 
-    // Form State for New Adjustment
+    // Header State Form
     public $business_unit_id;
     public $warehouse_id;
-    public $adjustment_type = 'OUT'; // 'OUT' (Pengurangan) atau 'IN' (Penambahan)
-
-    // Barang Utama (Disesuaikan Stoknya)
-    public $searchItem = '';
-    public $itemSearchResults = [];
-    public $selectedItem = null;
-    public $item_no = '';
-    public $product_name = '';
-    public $quantity = 1;
-    public $current_stock = 0;
-    public $has_sn = false;
-    public $proyek = '';
-    public $project_no = '';
-
-    // Barang Tujuan Alokasi (OPSIONAL)
-    public $searchTargetItem = '';
-    public $targetItemSearchResults = [];
-    public $selectedTargetItem = null;
-    public $target_item_no = null;
-    public $target_product_name = null;
-    public $target_serial_number = null; // Opsional SN / IMEI display
-
-    // Serial numbers untuk barang ber-SN
-    public $serial_numbers = [];
-    public $input_serial_number = '';
-
-    // Kategori Alasan & Accurate
+    public $default_adjustment_type = 'OUT'; // 'OUT' (Pengurangan) atau 'IN' (Penambahan)
     public $reason_category = 'PEMELIHARAAN_INVENTARIS';
     public $notes = '';
     public $accurate_account_no = '5101'; // Default COA Penyesuaian/Beban
+
+    // Keranjang Item Penyesuaian (Multi Item)
+    public $items = [];
+
+    // Form Input Tambah Item Sementara (Temporary fields)
+    public $searchItem = '';
+    public $itemSearchResults = [];
+    public $selectedItem = null;
+    public $temp_item_no = '';
+    public $temp_product_name = '';
+    public $temp_adjustment_type = 'OUT';
+    public $temp_quantity = 1;
+    public $temp_unit_cost = 0;
+    public $temp_current_stock = 0;
+    public $temp_has_sn = false;
+    public $temp_proyek = '';
+    public $temp_project_no = '';
+    public $temp_item_notes = '';
+
+    // Barang Tujuan Alokasi (OPSIONAL untuk item)
+    public $searchTargetItem = '';
+    public $targetItemSearchResults = [];
+    public $selectedTargetItem = null;
+    public $temp_target_item_no = null;
+    public $temp_target_product_name = null;
+    public $temp_target_serial_number = null; // Opsional SN / IMEI display
+
+    // Serial numbers untuk barang ber-SN sementara
+    public $temp_serial_numbers = [];
+    public $temp_input_serial_number = '';
 
     public function mount()
     {
@@ -83,13 +89,11 @@ class Index extends Component
     {
         $user = Auth::user();
 
-        // 1. Ambil dari penugasan gudang user jika ada
         if (!empty($user->warehouse_id)) {
             $this->warehouse_id = $user->warehouse_id;
             return;
         }
 
-        // 2. Fallback ke gudang pertama di Business Unit yang aktif
         $firstWarehouse = Warehouse::where('business_unit_id', $this->business_unit_id)->first();
         if ($firstWarehouse) {
             $this->warehouse_id = $firstWarehouse->id;
@@ -114,30 +118,45 @@ class Index extends Component
 
     public function resetForm()
     {
-        $this->adjustment_type = 'OUT';
+        $this->default_adjustment_type = 'OUT';
+        $this->reason_category = 'PEMELIHARAAN_INVENTARIS';
+        $this->notes = '';
+        $this->accurate_account_no = '5101';
+        $this->items = [];
+
+        $this->resetTempItemInput();
+    }
+
+    public function resetTempItemInput()
+    {
         $this->searchItem = '';
         $this->itemSearchResults = [];
         $this->selectedItem = null;
-        $this->item_no = '';
-        $this->product_name = '';
-        $this->quantity = 1;
-        $this->current_stock = 0;
-        $this->has_sn = false;
-        $this->proyek = '';
-        $this->project_no = '';
+        $this->temp_item_no = '';
+        $this->temp_product_name = '';
+        $this->temp_adjustment_type = $this->default_adjustment_type;
+        $this->temp_quantity = 1;
+        $this->temp_unit_cost = 0;
+        $this->temp_current_stock = 0;
+        $this->temp_has_sn = false;
+        $this->temp_proyek = '';
+        $this->temp_project_no = '';
+        $this->temp_item_notes = '';
 
         $this->searchTargetItem = '';
         $this->targetItemSearchResults = [];
         $this->selectedTargetItem = null;
-        $this->target_item_no = null;
-        $this->target_product_name = null;
-        $this->target_serial_number = null;
+        $this->temp_target_item_no = null;
+        $this->temp_target_product_name = null;
+        $this->temp_target_serial_number = null;
 
-        $this->serial_numbers = [];
-        $this->input_serial_number = '';
-        $this->reason_category = 'PEMELIHARAAN_INVENTARIS';
-        $this->notes = '';
-        $this->accurate_account_no = '5101';
+        $this->temp_serial_numbers = [];
+        $this->temp_input_serial_number = '';
+    }
+
+    public function updatedDefaultAdjustmentType($value)
+    {
+        $this->temp_adjustment_type = $value;
     }
 
     // --- PENCARIAN SKU BARANG UTAMA ---
@@ -165,16 +184,17 @@ class Index extends Component
         if (!$item) return;
 
         $this->selectedItem = $item;
-        $this->item_no = $item->item_no;
-        $this->product_name = $item->name;
-        $this->has_sn = (bool) $item->has_sn;
-        $this->proyek = $item->proyek ?? '';
+        $this->temp_item_no = $item->item_no;
+        $this->temp_product_name = $item->name;
+        $this->temp_has_sn = (bool) $item->has_sn;
+        $this->temp_proyek = $item->proyek ?? '';
+        $this->temp_unit_cost = (float) ($item->base_cost ?? 0);
 
         // Ambil project_no dari BusinessUnitProject
-        $this->project_no = BusinessUnitProject::getProjectNoByBusinessUnit(
+        $this->temp_project_no = BusinessUnitProject::getProjectNoByBusinessUnit(
             $this->business_unit_id,
-            $this->proyek,
-            $this->proyek ?: null
+            $this->temp_proyek,
+            $this->temp_proyek ?: null
         ) ?? '';
 
         // Ambil stok terkini di gudang yang dipilih
@@ -191,22 +211,21 @@ class Index extends Component
 
     protected function fetchCurrentStock()
     {
-        if (!$this->item_no || !$this->warehouse_id) {
-            $this->current_stock = 0;
+        if (!$this->temp_item_no || !$this->warehouse_id) {
+            $this->temp_current_stock = 0;
             return;
         }
 
-        // Cari variant atau product accurate
-        $variant = ProductVariant::where('sku', $this->item_no)->first();
+        $variant = ProductVariant::where('sku', $this->temp_item_no)->first();
         if ($variant) {
             $ws = WarehouseStock::where('warehouse_id', $this->warehouse_id)
                 ->where('variant_type', get_class($variant))
                 ->where('variant_id', $variant->id)
                 ->first();
-            $this->current_stock = $ws ? $ws->stock : 0;
+            $this->temp_current_stock = $ws ? $ws->stock : 0;
         } else {
-            $item = ProductAccurate::where('item_no', $this->item_no)->first();
-            $this->current_stock = $item ? $item->stock : 0;
+            $item = ProductAccurate::where('item_no', $this->temp_item_no)->first();
+            $this->temp_current_stock = $item ? $item->stock : 0;
         }
     }
 
@@ -235,107 +254,219 @@ class Index extends Component
         if (!$item) return;
 
         $this->selectedTargetItem = $item;
-        $this->target_item_no = $item->item_no;
-        $this->target_product_name = $item->name;
+        $this->temp_target_item_no = $item->item_no;
+        $this->temp_target_product_name = $item->name;
         $this->searchTargetItem = $item->name . ' (' . $item->item_no . ')';
         $this->targetItemSearchResults = [];
     }
 
-    public function clearTargetItem()
+    public function clearTempTargetItem()
     {
         $this->selectedTargetItem = null;
-        $this->target_item_no = null;
-        $this->target_product_name = null;
-        $this->target_serial_number = null;
+        $this->temp_target_item_no = null;
+        $this->temp_target_product_name = null;
+        $this->temp_target_serial_number = null;
         $this->searchTargetItem = '';
         $this->targetItemSearchResults = [];
     }
 
-    // --- SERIAL NUMBERS ---
-    public function addSerialNumber()
+    // --- SERIAL NUMBERS ITEM SEMENTARA ---
+    public function addTempSerialNumber()
     {
-        $sn = trim($this->input_serial_number);
+        $sn = trim($this->temp_input_serial_number);
         if (empty($sn)) return;
 
-        if (in_array($sn, $this->serial_numbers)) {
-            $this->dispatch('toast', title: 'Perhatian', message: 'Serial Number ini sudah ditambahkan ke daftar.', type: 'warning');
+        if (in_array($sn, $this->temp_serial_numbers)) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Serial Number ini sudah ditambahkan ke daftar item ini.', type: 'warning');
             return;
         }
 
-        $this->serial_numbers[] = $sn;
-        $this->input_serial_number = '';
+        $this->temp_serial_numbers[] = $sn;
+        $this->temp_input_serial_number = '';
     }
 
-    public function removeSerialNumber($index)
+    public function removeTempSerialNumber($index)
     {
-        if (isset($this->serial_numbers[$index])) {
-            unset($this->serial_numbers[$index]);
-            $this->serial_numbers = array_values($this->serial_numbers);
+        if (isset($this->temp_serial_numbers[$index])) {
+            unset($this->temp_serial_numbers[$index]);
+            $this->temp_serial_numbers = array_values($this->temp_serial_numbers);
         }
     }
 
-    // --- SUBMIT PENYESUAIAN STOK ---
+    // --- TAMBAH ITEM KE KERANJANG PENYESUAIAN ---
+    public function addItemToList()
+    {
+        if (empty($this->temp_item_no) || empty($this->temp_product_name)) {
+            $this->dispatch('toast', title: 'Pilih Barang', message: 'Silakan cari dan pilih barang terlebih dahulu.', type: 'error');
+            return;
+        }
+
+        $qty = (int) $this->temp_quantity;
+        if ($qty < 1) {
+            $this->dispatch('toast', title: 'Jumlah Tidak Valid', message: 'Jumlah kuantiti penyesuaian minimal 1 unit.', type: 'error');
+            return;
+        }
+
+        if ($this->temp_has_sn && $this->temp_adjustment_type === 'OUT' && count($this->temp_serial_numbers) < $qty) {
+            $this->dispatch('toast', title: 'Serial Number Kurang', message: "Barang ini memiliki SN. Silakan masukkan {$qty} serial number.", type: 'warning');
+            return;
+        }
+
+        // Cek jika item dengan SKU dan target yang sama sudah ada di keranjang
+        $existingIndex = null;
+        foreach ($this->items as $idx => $it) {
+            if ($it['item_no'] === $this->temp_item_no && $it['target_item_no'] === $this->temp_target_item_no && $it['adjustment_type'] === $this->temp_adjustment_type) {
+                $existingIndex = $idx;
+                break;
+            }
+        }
+
+        if ($existingIndex !== null) {
+            // Tambahkan quantity
+            $this->items[$existingIndex]['quantity'] += $qty;
+            if (!empty($this->temp_serial_numbers)) {
+                $this->items[$existingIndex]['serial_numbers'] = array_unique(array_merge($this->items[$existingIndex]['serial_numbers'], $this->temp_serial_numbers));
+            }
+            $this->dispatch('toast', title: 'Kuantiti Ditambahkan', message: "Kuantiti {$this->temp_product_name} ditambahkan menjadi {$this->items[$existingIndex]['quantity']} pcs.", type: 'info');
+        } else {
+            // Tambah baris baru
+            $this->items[] = [
+                'item_no'              => $this->temp_item_no,
+                'product_name'         => $this->temp_product_name,
+                'adjustment_type'      => $this->temp_adjustment_type,
+                'quantity'             => $qty,
+                'unit_cost'            => $this->temp_unit_cost,
+                'current_stock'        => $this->temp_current_stock,
+                'has_sn'               => $this->temp_has_sn,
+                'proyek'               => $this->temp_proyek,
+                'project_no'           => $this->temp_project_no,
+                'target_item_no'       => $this->temp_target_item_no ?: null,
+                'target_product_name'  => $this->temp_target_product_name ?: null,
+                'target_serial_number' => $this->temp_target_serial_number ?: null,
+                'serial_numbers'       => $this->temp_serial_numbers,
+                'item_notes'           => $this->temp_item_notes,
+            ];
+            $this->dispatch('toast', title: 'Item Ditambahkan', message: "{$this->temp_product_name} ({$qty} pcs) berhasil dimasukkan ke daftar.", type: 'success');
+        }
+
+        // Reset input sementara untuk barang berikutnya
+        $this->resetTempItemInput();
+    }
+
+    public function removeItemFromList($index)
+    {
+        if (isset($this->items[$index])) {
+            $name = $this->items[$index]['product_name'];
+            unset($this->items[$index]);
+            $this->items = array_values($this->items);
+            $this->dispatch('toast', title: 'Item Dihapus', message: "{$name} dihapus dari daftar penyesuaian.", type: 'info');
+        }
+    }
+
+    public function updateItemQuantity($index, $qty)
+    {
+        $qty = (int) $qty;
+        if (isset($this->items[$index]) && $qty >= 1) {
+            $this->items[$index]['quantity'] = $qty;
+        }
+    }
+
+    // --- SUBMIT PENYESUAIAN STOK (HEADER + DETAIL) ---
     public function submitAdjustment()
     {
         $this->validate([
-            'warehouse_id'         => 'required|exists:warehouses,id',
-            'adjustment_type'      => 'required|in:OUT,IN',
-            'item_no'              => 'required|string',
-            'product_name'         => 'required|string',
-            'quantity'             => 'required|integer|min:1',
-            'reason_category'      => 'required|string',
-            'target_item_no'       => 'nullable|string',
-            'target_product_name'  => 'nullable|string',
-            'target_serial_number' => 'nullable|string',
-            'notes'                => 'nullable|string|max:1000',
-            'accurate_account_no'  => 'nullable|string',
+            'warehouse_id'        => 'required|exists:warehouses,id',
+            'reason_category'     => 'required|string',
+            'notes'               => 'nullable|string|max:1000',
+            'accurate_account_no' => 'nullable|string',
         ], [
             'warehouse_id.required'    => 'Pilih gudang penyesuaian.',
-            'item_no.required'         => 'Pilih barang/SKU yang akan disesuaikan.',
-            'quantity.min'             => 'Jumlah penyesuaian minimal 1 unit.',
             'reason_category.required' => 'Pilih kategori alasan penyesuaian.',
         ]);
 
-        if ($this->has_sn && count($this->serial_numbers) < $this->quantity) {
-            $this->dispatch('toast', title: 'Serial Number Belum Lengkap', message: "Barang ini memiliki SN. Silakan masukkan {$this->quantity} serial number.", type: 'warning');
+        if (empty($this->items)) {
+            $this->dispatch('toast', title: 'Daftar Barang Masih Kosong', message: 'Silakan tambahkan minimal 1 barang ke dalam daftar sebelum mengajukan.', type: 'warning');
             return;
         }
 
+        DB::beginTransaction();
         try {
             $adjNumber = StockAdjustment::generateAdjustmentNumber();
             $wh = Warehouse::find($this->warehouse_id);
 
+            $totalItems = count($this->items);
+            $totalQty = array_sum(array_column($this->items, 'quantity'));
+
+            $firstItem = $this->items[0];
+            $summaryProductName = $totalItems === 1 
+                ? $firstItem['product_name'] 
+                : $firstItem['product_name'] . ' (+' . ($totalItems - 1) . ' item lainnya)';
+
+            // 1. Buat Record Header
             $adjustment = StockAdjustment::create([
                 'adjustment_number'    => $adjNumber,
                 'business_unit_id'     => $this->business_unit_id,
                 'branch_id'            => Auth::user()->branch_id,
                 'warehouse_id'         => $this->warehouse_id,
                 'warehouse_name'       => $wh?->name ?? 'Gudang Utama',
-                'adjustment_type'      => $this->adjustment_type,
-                'item_no'              => $this->item_no,
-                'product_name'         => $this->product_name,
-                'quantity'             => $this->quantity,
-                'unit_cost'            => $this->selectedItem?->base_cost ?? 0,
-                'proyek'               => $this->proyek,
-                'project_no'           => $this->project_no,
-                'target_item_no'       => $this->target_item_no ?: null,
-                'target_product_name'  => $this->target_product_name ?: null,
-                'target_serial_number' => $this->target_serial_number ?: null,
+                'adjustment_type'      => $this->default_adjustment_type,
+                'total_items'          => $totalItems,
+                'total_quantity'       => $totalQty,
+                'item_no'              => $firstItem['item_no'],
+                'product_name'         => $summaryProductName,
+                'quantity'             => $totalQty,
+                'unit_cost'            => $firstItem['unit_cost'] ?? 0,
+                'proyek'               => $firstItem['proyek'] ?? null,
+                'project_no'           => $firstItem['project_no'] ?? null,
+                'target_item_no'       => $firstItem['target_item_no'] ?? null,
+                'target_product_name'  => $firstItem['target_product_name'] ?? null,
+                'target_serial_number' => $firstItem['target_serial_number'] ?? null,
                 'reason_category'      => $this->reason_category,
                 'notes'                => $this->notes,
-                'serial_numbers'       => !empty($this->serial_numbers) ? $this->serial_numbers : null,
                 'accurate_account_no'  => $this->accurate_account_no ?: '5101',
                 'status'               => 'PENDING',
                 'requested_by'         => Auth::id(),
             ]);
 
-            // Kirim permohonan ke Approval Center
-            $approvalService = app(ApprovalService::class);
-            $reasonText = "[{$this->reason_category}] " . ($this->notes ?: 'Penyesuaian Stok');
-            if ($this->target_item_no) {
-                $reasonText .= " (Atas SKU Tujuan: {$this->target_item_no} - {$this->target_product_name})";
+            // 2. Buat Record Detail Items
+            foreach ($this->items as $it) {
+                StockAdjustmentItem::create([
+                    'stock_adjustment_id'  => $adjustment->id,
+                    'adjustment_type'      => $it['adjustment_type'],
+                    'item_no'              => $it['item_no'],
+                    'product_name'         => $it['product_name'],
+                    'quantity'             => $it['quantity'],
+                    'unit_cost'            => $it['unit_cost'],
+                    'proyek'               => $it['proyek'],
+                    'project_no'           => $it['project_no'],
+                    'target_item_no'       => $it['target_item_no'],
+                    'target_product_name'  => $it['target_product_name'],
+                    'target_serial_number' => $it['target_serial_number'],
+                    'serial_numbers'       => !empty($it['serial_numbers']) ? $it['serial_numbers'] : null,
+                    'item_notes'           => $it['item_notes'] ?? null,
+                ]);
             }
 
+            // 3. Susun teks alasan dan payload untuk Approval Center
+            $reasonText = "[{$this->reason_category}] " . ($this->notes ?: 'Penyesuaian Stok');
+            $reasonText .= " ({$totalItems} jenis item, Total: {$totalQty} pcs)";
+
+            $itemsPayload = array_map(function ($it) {
+                return [
+                    'item_no'              => $it['item_no'],
+                    'product_name'         => $it['product_name'],
+                    'quantity'             => $it['quantity'],
+                    'adjustment_type'      => $it['adjustment_type'],
+                    'unit_cost'            => $it['unit_cost'],
+                    'proyek'               => $it['proyek'],
+                    'project_no'           => $it['project_no'],
+                    'target_item_no'       => $it['target_item_no'],
+                    'target_product_name'  => $it['target_product_name'],
+                    'target_serial_number' => $it['target_serial_number'],
+                ];
+            }, $this->items);
+
+            $approvalService = app(ApprovalService::class);
             $approvalService->createRequest([
                 'approvable'       => $adjustment,
                 'approvable_type'  => StockAdjustment::class,
@@ -346,40 +477,41 @@ class Index extends Component
                 'branch_id'        => Auth::user()->branch_id,
                 'reason'           => $reasonText,
                 'payload'          => [
-                    'adjustment_number'   => $adjustment->adjustment_number,
-                    'type'                => $adjustment->adjustment_type,
-                    'item_no'             => $adjustment->item_no,
-                    'product_name'        => $adjustment->product_name,
-                    'quantity'            => $adjustment->quantity,
-                    'proyek'              => $adjustment->proyek,
-                    'project_no'          => $adjustment->project_no,
-                    'target_item_no'      => $adjustment->target_item_no,
-                    'target_product_name' => $adjustment->target_product_name,
-                    'warehouse_name'      => $adjustment->warehouse_name,
-                    'reason_category'     => $adjustment->reason_category,
-                    'notes'               => $adjustment->notes,
+                    'adjustment_number' => $adjustment->adjustment_number,
+                    'warehouse_name'    => $adjustment->warehouse_name,
+                    'reason_category'   => $adjustment->reason_category,
+                    'total_items'       => $totalItems,
+                    'total_quantity'    => $totalQty,
+                    'items'             => $itemsPayload,
+                    'notes'             => $adjustment->notes,
+                    'created_at'        => now()->toIso8601String(),
                 ],
             ]);
 
+            DB::commit();
+
             $this->closeCreateModal();
-            $this->dispatch('toast', title: 'Berhasil Diajukan', message: "Pengajuan penyesuaian stok {$adjustment->adjustment_number} berhasil dibuat dan menunggu persetujuan (approval).", type: 'success');
+            $this->dispatch('toast', title: 'Berhasil Diajukan', message: "Permohonan penyesuaian stok {$adjNumber} ({$totalItems} barang) berhasil dikirim untuk approval.", type: 'success');
         } catch (\Throwable $e) {
-            Log::error("Gagal submit StockAdjustment: " . $e->getMessage());
-            $this->dispatch('toast', title: 'Gagal Menyimpan', message: $e->getMessage(), type: 'error');
+            DB::rollBack();
+            Log::error("Gagal membuat StockAdjustment: " . $e->getMessage());
+            $this->dispatch('toast', title: 'Terjadi Kesalahan', message: $e->getMessage(), type: 'error');
         }
     }
 
-    // --- DETAIL & RETRY SYNC ---
     public function viewDetail($id)
     {
-        $this->selectedAdjustment = StockAdjustment::with([
+        /** @var StockAdjustment|null $selected */
+        $selected = StockAdjustment::with([
+            'items',
             'warehouse',
             'branch',
             'requestedBy',
             'approvedBy',
             'approvalRequest.histories.actedBy'
-        ])->find($id);
+        ])->where('id', $id)->first();
 
+        $this->selectedAdjustment = $selected;
         $this->showDetailModal = true;
     }
 
@@ -391,7 +523,8 @@ class Index extends Component
 
     public function retrySync($id)
     {
-        $adjustment = StockAdjustment::find($id);
+        /** @var StockAdjustment|null $adjustment */
+        $adjustment = StockAdjustment::with(['items', 'warehouse', 'branch', 'businessUnit'])->where('id', $id)->first();
         if (!$adjustment) return;
 
         if ($adjustment->status !== 'FAILED_SYNC' && $adjustment->status !== 'APPROVED') {
@@ -401,31 +534,51 @@ class Index extends Component
 
         try {
             $notesFull = "[{$adjustment->reason_category}] " . ($adjustment->notes ?: 'Penyesuaian Stok');
-            if ($adjustment->target_item_no) {
-                $notesFull .= " (Tujuan Alokasi: {$adjustment->target_item_no} - {$adjustment->target_product_name}";
-                if ($adjustment->target_serial_number) {
-                    $notesFull .= " [SN: {$adjustment->target_serial_number}]";
+            
+            $targetSummaries = [];
+            foreach ($adjustment->items as $item) {
+                if (!empty($item->target_item_no)) {
+                    $targetSummaries[] = "{$item->item_no} -> {$item->target_item_no}";
                 }
-                $notesFull .= ")";
+            }
+            if (!empty($targetSummaries)) {
+                $notesFull .= " (Tujuan: " . implode(', ', array_slice($targetSummaries, 0, 5)) . ")";
             }
 
-            $detailItem = [
-                'itemNo'             => $adjustment->item_no,
-                'itemAdjustmentType' => $adjustment->adjustment_type === 'OUT' ? 'ADJUSTMENT_OUT' : 'ADJUSTMENT_IN',
-                'quantity'           => (float) $adjustment->quantity,
-                'warehouseName'      => $adjustment->warehouse?->name ?? ($adjustment->warehouse_name ?? 'UTAMA'),
-            ];
+            $warehouseName = $adjustment->warehouse?->name ?? ($adjustment->warehouse_name ?? 'UTAMA');
+            $detailItems = [];
 
-            if (!empty($adjustment->project_no)) {
-                $detailItem['projectNo'] = $adjustment->project_no;
+            if ($adjustment->items->isNotEmpty()) {
+                foreach ($adjustment->items as $item) {
+                    $detailRow = [
+                        'itemNo'             => $item->item_no,
+                        'itemAdjustmentType' => $item->adjustment_type === 'OUT' ? 'ADJUSTMENT_OUT' : 'ADJUSTMENT_IN',
+                        'quantity'           => (float) $item->quantity,
+                        'warehouseName'      => $warehouseName,
+                    ];
+                    if (!empty($item->project_no)) {
+                        $detailRow['projectNo'] = $item->project_no;
+                    }
+                    if (!empty($item->unit_cost) && $item->unit_cost > 0) {
+                        $detailRow['unitCost'] = (float) $item->unit_cost;
+                    }
+                    $detailItems[] = $detailRow;
+                }
+            } else {
+                $detailItems[] = [
+                    'itemNo'             => $adjustment->item_no,
+                    'itemAdjustmentType' => $adjustment->adjustment_type === 'OUT' ? 'ADJUSTMENT_OUT' : 'ADJUSTMENT_IN',
+                    'quantity'           => (float) $adjustment->quantity,
+                    'warehouseName'      => $warehouseName,
+                ];
             }
 
             $payload = [
                 'transDate'           => now()->format('d/m/Y'),
                 'adjustmentAccountNo' => $adjustment->accurate_account_no ?: '5101',
-                'description'         => $notesFull,
+                'description'         => mb_substr($notesFull, 0, 250),
                 'branchName'          => $adjustment->branch?->name,
-                'detailItem'          => [$detailItem],
+                'detailItem'          => $detailItems,
             ];
 
             $buCode = $adjustment->businessUnit?->code ?? 'syihab';
@@ -458,7 +611,8 @@ class Index extends Component
     {
         $warehouses = Warehouse::where('business_unit_id', $this->business_unit_id)->get();
 
-        $adjustments = StockAdjustment::with(['warehouse', 'branch', 'requestedBy', 'approvedBy'])
+        /** @var \Illuminate\Pagination\LengthAwarePaginator<StockAdjustment> $adjustments */
+        $adjustments = StockAdjustment::with(['items', 'warehouse', 'branch', 'requestedBy', 'approvedBy'])
             ->where('business_unit_id', $this->business_unit_id)
             ->when($this->search, function ($q) {
                 $term = "%{$this->search}%";
@@ -468,7 +622,13 @@ class Index extends Component
                        ->orWhere('product_name', 'like', $term)
                        ->orWhere('target_item_no', 'like', $term)
                        ->orWhere('target_product_name', 'like', $term)
-                       ->orWhere('notes', 'like', $term);
+                       ->orWhere('notes', 'like', $term)
+                       ->orWhereHas('items', function ($iq) use ($term) {
+                           $iq->where('item_no', 'like', $term)
+                              ->orWhere('product_name', 'like', $term)
+                              ->orWhere('target_item_no', 'like', $term)
+                              ->orWhere('target_product_name', 'like', $term);
+                       });
                 });
             })
             ->when($this->filterStatus !== 'ALL', function ($q) {

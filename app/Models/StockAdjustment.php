@@ -5,6 +5,47 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+/**
+ * App\Models\StockAdjustment
+ *
+ * @property int $id
+ * @property string $adjustment_number
+ * @property int $business_unit_id
+ * @property int|null $branch_id
+ * @property int|null $warehouse_id
+ * @property string|null $warehouse_name
+ * @property string $adjustment_type
+ * @property int $total_items
+ * @property int $total_quantity
+ * @property string|null $item_no
+ * @property string|null $product_name
+ * @property int|null $quantity
+ * @property float|null $unit_cost
+ * @property string|null $proyek
+ * @property string|null $project_no
+ * @property string|null $target_item_no
+ * @property string|null $target_product_name
+ * @property string|null $target_serial_number
+ * @property string $reason_category
+ * @property string|null $notes
+ * @property string|null $accurate_account_no
+ * @property string|null $accurate_adjustment_no
+ * @property string $status
+ * @property string|null $sync_error
+ * @property int $requested_by
+ * @property int|null $approved_by
+ * @property \Illuminate\Support\Carbon|null $approved_at
+ * @property \Illuminate\Support\Carbon|null $synced_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\StockAdjustmentItem> $items
+ * @property-read \App\Models\Warehouse|null $warehouse
+ * @property-read \App\Models\Branch|null $branch
+ * @property-read \App\Models\BusinessUnit|null $businessUnit
+ * @property-read \App\Models\User|null $requestedBy
+ * @property-read \App\Models\User|null $approvedBy
+ * @property-read \App\Models\ApprovalRequest|null $approvalRequest
+ */
 class StockAdjustment extends Model
 {
     use HasFactory;
@@ -42,6 +83,11 @@ class StockAdjustment extends Model
     public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function items()
+    {
+        return $this->hasMany(StockAdjustmentItem::class, 'stock_adjustment_id');
     }
 
     public function approvalRequest()

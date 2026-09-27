@@ -90,9 +90,18 @@
                                     @endif
                                 @elseif($req->request_type === 'STOCK_ADJUSTMENT' || $req->approvable_type === 'App\Models\StockAdjustment' || $req->approvable instanceof \App\Models\StockAdjustment)
                                     ADJ: <span class="font-bold text-gray-800">{{ $req->approvable->adjustment_number ?? ($req->payload['adjustment_number'] ?? '-') }}</span><br>
-                                    Barang: <span class="font-bold text-blue-700">{{ $req->approvable->product_name ?? ($req->payload['product_name'] ?? '-') }}</span> ({{ $req->approvable->quantity ?? ($req->payload['quantity'] ?? 1) }} pcs {{ ($req->approvable->adjustment_type ?? ($req->payload['type'] ?? 'OUT')) === 'OUT' ? 'Keluar' : 'Masuk' }})<br>
-                                    @if(!empty($req->approvable->target_product_name) || !empty($req->payload['target_product_name']))
-                                        Tujuan: <span class="text-amber-700 font-semibold">{{ $req->approvable->target_product_name ?? $req->payload['target_product_name'] }}</span>
+                                    @php
+                                        $itemTotal = $req->payload['total_items'] ?? ($req->approvable->total_items ?? (isset($req->payload['items']) ? count($req->payload['items']) : 1));
+                                        $qtyTotal = $req->payload['total_quantity'] ?? ($req->approvable->total_quantity ?? ($req->payload['quantity'] ?? 1));
+                                    @endphp
+                                    Total: <span class="font-bold text-blue-700">{{ $itemTotal }} Barang ({{ $qtyTotal }} pcs)</span><br>
+                                    @if(!empty($req->payload['items']) && is_array($req->payload['items']))
+                                        <span class="text-gray-600">{{ $req->payload['items'][0]['product_name'] ?? '-' }}</span>
+                                        @if(count($req->payload['items']) > 1)
+                                            <span class="text-indigo-600 font-bold text-[10px]">(+{{ count($req->payload['items']) - 1 }} lainnya)</span>
+                                        @endif
+                                    @else
+                                        Barang: <span class="font-semibold text-gray-700">{{ $req->approvable->product_name ?? ($req->payload['product_name'] ?? '-') }}</span>
                                     @endif
                                 @elseif($req->approvable_type === 'App\Models\Order' || $req->approvable instanceof \App\Models\Order)
                                     Order: {{ $req->approvable->order_number ?? '-' }}

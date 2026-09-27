@@ -33,6 +33,17 @@ class ApprovalController extends Controller
         $rule = app(ApprovalService::class)->getRuleForLevel($approval->request_type, $nextLevel, $businessUnitId);
         $targetRole = $rule && $rule->role ? strtolower($rule->role->name) : 'manager';
 
+        // Pastikan role ada di database Spatie, jika tidak ada fallback ke role admin/superadmin
+        if (!\Spatie\Permission\Models\Role::where('name', $targetRole)->exists()) {
+            $fallback = \Spatie\Permission\Models\Role::whereIn('name', ['admin', 'superadmin', 'bm'])->value('name');
+            if ($fallback) {
+                $targetRole = $fallback;
+            } else {
+                Log::info("Telegram Webhook: Role {$targetRole} tidak terdaftar di sistem.");
+                return false;
+            }
+        }
+
         $cabangId = $approval->branch_id ?? $approval->requestedBy?->branch_id;
 
         $globalRoles = ['admin', 'direktur', 'superadmin'];
