@@ -2,8 +2,11 @@
 
 namespace App\Livewire\Zoffline\Qc;
 
+use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\DeviceInspection;
+use App\Models\BusinessUnit;
+use App\Models\Branch;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -23,6 +26,9 @@ class ActivationList extends Component
     public $statusFilter = 'all'; // all, active, inactive
 
     #[Url]
+    public $businessUnitFilter = null;
+
+    #[Url]
     public $branchFilter = 'all';
 
     #[Url]
@@ -34,10 +40,19 @@ class ActivationList extends Component
     public $showQcModal = false;
     public $selectedInspection = null;
 
+    // Modal Struk Nota Transaksi
+    public $showReceiptModal = false;
+    public $viewingOrder = null;
+
     public function mount()
     {
         $this->dateStart = $this->dateStart ?? Carbon::now()->subDays(7)->format('Y-m-d');
         $this->dateEnd = $this->dateEnd ?? Carbon::now()->format('Y-m-d');
+
+        if ($this->businessUnitFilter === null || $this->businessUnitFilter === '') {
+            $userBuId = Auth::user()?->getActiveBusinessUnitId();
+            $this->businessUnitFilter = $userBuId ? (string) $userBuId : 'all';
+        }
     }
 
     public function updatedSearch()
@@ -47,6 +62,12 @@ class ActivationList extends Component
 
     public function updatedStatusFilter()
     {
+        $this->resetPage();
+    }
+
+    public function updatedBusinessUnitFilter()
+    {
+        $this->branchFilter = 'all';
         $this->resetPage();
     }
 
@@ -69,19 +90,71 @@ class ActivationList extends Component
         $this->selectedInspection = null;
     }
 
+    /**
+     * Membuka modal struk nota transaksi pesanan
+     *
+     * @param int $orderId
+     * @return void
+     */
+    public function viewReceipt(int $orderId): void
+    {
+        $orderQuery = Order::with([
+            'user.profile',
+            'businessUnit',
+            'branch',
+            'handledBy',
+            'salesBy',
+            'items.variant',
+            'items.promos',
+            'payments.paymentMethod',
+            'payments.paymentMethodRate',
+        ]);
+
+        if ($this->businessUnitFilter !== 'all' && !empty($this->businessUnitFilter)) {
+            $orderQuery->where('business_unit_id', $this->businessUnitFilter);
+        }
+
+        $this->viewingOrder = $orderQuery->find($orderId);
+
+        if (!$this->viewingOrder) {
+            $this->dispatch('toast', title: 'Error', message: 'Data nota transaksi tidak ditemukan atau di luar unit bisnis yang dipilih.', type: 'error');
+            return;
+        }
+
+        $this->showReceiptModal = true;
+    }
+
+    /**
+     * Menutup modal struk nota
+     *
+     * @return void
+     */
+    public function closeReceiptModal(): void
+    {
+        $this->showReceiptModal = false;
+        $this->viewingOrder = null;
+    }
+
     public function render()
     {
-        $activeUnitId = Auth::user()->getActiveBusinessUnitId();
-        
-        $branches = \App\Models\Branch::where('business_unit_id', $activeUnitId)->get();
+        $businessUnits = BusinessUnit::where('is_active', true)->orderBy('name')->get();
 
-        $query = OrderItem::with(['order.user', 'inspections'])
+        if ($this->businessUnitFilter !== 'all' && !empty($this->businessUnitFilter)) {
+            $branches = Branch::where('business_unit_id', $this->businessUnitFilter)->orderBy('name')->get();
+        } else {
+            $branches = Branch::orderBy('name')->get();
+        }
+
+        $query = OrderItem::with(['order.user', 'order.businessUnit', 'inspections'])
             ->whereNotNull('serial_number')
             ->where('serial_number', '!=', '')
-            ->whereHas('order', function($q) use ($activeUnitId) {
-                $q->where('business_unit_id', $activeUnitId)
-                  ->where('order_status', 'COMPLETED')
+            ->whereHas('order', function($q) {
+                $q->where('order_status', 'COMPLETED')
                   ->where('order_number', 'NOT LIKE', 'RET-CLM-%');
+
+                if ($this->businessUnitFilter !== 'all' && !empty($this->businessUnitFilter)) {
+                    $q->where('business_unit_id', $this->businessUnitFilter);
+                }
                 
                 if ($this->dateStart && $this->dateEnd) {
                     $q->whereBetween('created_at', [
@@ -132,6 +205,7 @@ class ActivationList extends Component
                     'order_id' => $item->order_id,
                     'order_number' => $item->order->order_number,
                     'customer_name' => $item->order->user->name ?? 'Tamu',
+                    'business_unit_name' => $item->order->businessUnit->name ?? null,
                     'order_date' => $item->order->created_at,
                     'product_name' => $item->product_name,
                     'serial_number' => $sn,
@@ -156,6 +230,7 @@ class ActivationList extends Component
 
         return view('livewire.zoffline.qc.activation-list', [
             'paginatedItems' => $paginator,
+            'businessUnits' => $businessUnits,
             'branches' => $branches
         ]);
     }

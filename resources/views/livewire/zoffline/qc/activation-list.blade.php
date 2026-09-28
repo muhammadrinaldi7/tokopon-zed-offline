@@ -49,9 +49,20 @@
                     </div>
                 </div>
 
-                {{-- Baris 2: Cabang & Tanggal --}}
+                {{-- Baris 2: Unit Bisnis, Cabang & Tanggal --}}
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-gray-50">
-                    <div class="md:col-span-2">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Unit Bisnis</label>
+                        <select wire:model.live="businessUnitFilter"
+                            class="w-full px-4 py-3 bg-gray-50 border-gray-200 rounded-xl text-sm focus:ring-blue-500 focus:border-blue-500 font-medium">
+                            <option value="all">Semua Unit Bisnis</option>
+                            @foreach($businessUnits as $bu)
+                                <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Pilih Cabang (Branch)</label>
                         <select wire:model.live="branchFilter"
                             class="w-full px-4 py-3 bg-gray-50 border-gray-200 rounded-xl text-sm focus:ring-blue-500 focus:border-blue-500 font-medium">
@@ -98,7 +109,14 @@
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="font-bold text-gray-900">{{ $item['customer_name'] }}</div>
-                                    <div class="text-xs text-gray-500 mt-0.5">{{ $item['order_number'] }}</div>
+                                    <div class="flex items-center gap-2 mt-0.5">
+                                        <span class="text-xs font-mono text-gray-500">{{ $item['order_number'] }}</span>
+                                        @if(!empty($item['business_unit_name']) && $businessUnitFilter === 'all')
+                                            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100">
+                                                {{ $item['business_unit_name'] }}
+                                            </span>
+                                        @endif
+                                    </div>
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="font-bold text-gray-900">{{ $item['product_name'] }}</div>
@@ -130,19 +148,31 @@
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 text-right whitespace-nowrap">
-                                    @if (!$item['is_activated'])
-                                        <a href="{{ route('zoffline.warranty-activation', ['sn' => $item['serial_number']]) }}"
-                                            wire:navigate
-                                            class="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 text-xs font-bold rounded-xl transition-all shadow-sm">
-                                            Aktivasi Sekarang
-                                        </a>
-                                    @else
-                                        <button wire:click="viewQc({{ $item['inspection_id'] }})"
-                                            class="inline-flex items-center justify-center px-4 py-2 bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white text-xs font-bold rounded-xl transition-all shadow-sm gap-1.5">
-                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                            Lihat QC
+                                    <div class="inline-flex items-center gap-1.5">
+                                        {{-- Tombol Lihat Struk Cepat --}}
+                                        <button type="button" 
+                                            wire:click="viewReceipt({{ $item['order_id'] }})"
+                                            class="inline-flex items-center justify-center p-2 bg-gray-50 border border-gray-200 text-gray-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 rounded-xl transition shadow-xs"
+                                            title="Lihat Struk Nota">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
                                         </button>
-                                    @endif
+
+                                        @if (!$item['is_activated'])
+                                            <a href="{{ route('zoffline.warranty-activation', ['sn' => $item['serial_number']]) }}"
+                                                wire:navigate
+                                                class="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 text-xs font-bold rounded-xl transition-all shadow-sm">
+                                                Aktivasi Sekarang
+                                            </a>
+                                        @else
+                                            <button wire:click="viewQc({{ $item['inspection_id'] }})"
+                                                class="inline-flex items-center justify-center px-4 py-2 bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white text-xs font-bold rounded-xl transition-all shadow-sm gap-1.5">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                Lihat QC
+                                            </button>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -278,6 +308,187 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- MODAL STRUK NOTA TRANSAKSI --}}
+    @if ($showReceiptModal && $viewingOrder)
+    <div class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-xs transition-opacity"
+        @click="if($event.target === $el) $wire.closeReceiptModal()">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-150" @click.stop>
+            
+            {{-- Header Modal --}}
+            <div class="px-5 py-4 bg-gradient-to-r from-gray-900 to-gray-800 text-white flex items-center justify-between z-10">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-black leading-tight">Nota Transaksi Pesanan</h3>
+                        <p class="text-gray-300 text-xs font-mono mt-0.5">{{ $viewingOrder->order_number }}</p>
+                    </div>
+                </div>
+                <button type="button" wire:click="closeReceiptModal"
+                    class="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-colors">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            {{-- Badan Struk Thermal POS --}}
+            <div id="print-area-receipt" class="p-6 font-mono text-xs text-gray-800 overflow-y-auto space-y-3 bg-gray-50/50 flex-1 leading-relaxed">
+                {{-- Store Title & Branch --}}
+                <div class="text-center pb-2">
+                    <p class="font-bold text-sm text-gray-900 uppercase tracking-tight">
+                        {{ optional($viewingOrder->businessUnit)->store_title ?? 'ZED STORE' }}
+                    </p>
+                    <p class="text-[11px] text-gray-500">
+                        {{ $viewingOrder->shipping_address_snapshot['store'] ?? ($viewingOrder->branch->name ?? 'Toko Offline') }}
+                    </p>
+                    <p class="text-[10px] text-gray-400">
+                        {{ $viewingOrder->created_at ? $viewingOrder->created_at->format('d/m/Y H:i') : '-' }}
+                    </p>
+                </div>
+
+                <div class="border-t border-dashed border-gray-300 my-2"></div>
+
+                {{-- Metadata Nota --}}
+                <div class="space-y-1 text-[11px]">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">No. Order:</span>
+                        <span class="font-bold text-gray-900">{{ $viewingOrder->order_number }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Kasir:</span>
+                        <span class="text-gray-800">{{ $viewingOrder->handledBy->name ?? '-' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Sales:</span>
+                        <span class="text-gray-800">{{ $viewingOrder->salesBy->name ?? '-' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Pelanggan:</span>
+                        <span class="font-semibold text-gray-900">{{ $viewingOrder->user->name ?? $viewingOrder->customer_name ?? 'Tamu' }}</span>
+                    </div>
+                    @if (optional($viewingOrder->user)->profile?->phone_number)
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">No. Telp:</span>
+                            <span class="text-gray-800">{{ $viewingOrder->user->profile->phone_number }}</span>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="border-t border-dashed border-gray-300 my-2"></div>
+
+                {{-- Daftar Item Belanja --}}
+                <div class="space-y-2 mb-2">
+                    @foreach ($viewingOrder->items as $item)
+                        @php
+                            $v = $item->variant;
+                            if ($v instanceof \App\Models\ProductAccurate) {
+                                $itemName = $v->name ?? '-';
+                                $ram = '';
+                                $storage = '';
+                                $color = '';
+                            } else {
+                                $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : ($item->product_name ?? '-');
+                                $ram = $v ? $v->ram ?? '' : '';
+                                $storage = $v ? $v->storage ?? '' : '';
+                                $color = $v ? $v->color ?? '' : '';
+                            }
+                            $itemName = preg_replace('/^(?:DS\s*-\s*HP\s*|DS\s*-\s*|HP\s*-\s*|HP\s*)/i', '', trim($itemName));
+                        @endphp
+                        <div class="p-2.5 rounded-xl text-[11px] bg-white border border-gray-200 shadow-2xs">
+                            <p class="font-bold text-gray-900">
+                                {{ $itemName }}
+                                @if ($ram != null){{ $ram }}/@endif{{ $storage }} {{ $color }}
+                            </p>
+                            <div class="flex justify-between text-gray-600 mt-1">
+                                <span>{{ $item->qty }}x Rp {{ number_format($item->price_at_checkout, 0, ',', '.') }}</span>
+                                <span class="font-bold text-gray-800">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</span>
+                            </div>
+                            @if ($item->serial_number)
+                                <p class="text-[10px] text-gray-500 font-mono mt-1 bg-gray-50 px-2 py-0.5 rounded border border-gray-100 inline-block">
+                                    SN: <span class="font-bold text-blue-700">{{ $item->serial_number }}</span>
+                                </p>
+                            @endif
+                            @if ($item->promos && $item->promos->count() > 0)
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    @foreach($item->promos as $promo)
+                                        <span class="text-[9px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded font-bold border border-purple-100">
+                                            Promo: {{ $promo->name }}
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="border-t border-dashed border-gray-300 my-2"></div>
+
+                {{-- Rincian Finansial --}}
+                <div class="space-y-1 text-[11px]">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Subtotal</span>
+                        <span>Rp {{ number_format($viewingOrder->total_amount, 0, ',', '.') }}</span>
+                    </div>
+                    @if ($viewingOrder->discount_amount > 0)
+                        <div class="flex justify-between text-rose-600 font-medium">
+                            <span>Diskon</span>
+                            <span>-Rp {{ number_format($viewingOrder->discount_amount, 0, ',', '.') }}</span>
+                        </div>
+                    @endif
+                    <div class="border-t border-dashed border-gray-300 my-1"></div>
+                    <div class="flex justify-between font-black text-xs text-gray-900">
+                        <span>TOTAL</span>
+                        <span>Rp {{ number_format($viewingOrder->grand_total, 0, ',', '.') }}</span>
+                    </div>
+                </div>
+
+                <div class="border-t border-dashed border-gray-300 my-2"></div>
+
+                {{-- Riwayat Pembayaran --}}
+                <div class="space-y-1 text-[10px] text-gray-600">
+                    <p class="font-bold text-gray-700 text-[11px]">Pembayaran:</p>
+                    @forelse ($viewingOrder->payments as $payment)
+                        <div class="flex justify-between">
+                            <span>{{ $payment->paymentMethod->name ?? 'Cash' }}{{ optional($payment->paymentMethod)->bank_name ? ' - ' . $payment->paymentMethod->bank_name : '' }}:</span>
+                            <span class="font-semibold text-gray-900">Rp {{ number_format($payment->amount, 0, ',', '.') }}</span>
+                        </div>
+                    @empty
+                        <div class="text-gray-400 italic">Belum ada riwayat pembayaran</div>
+                    @endforelse
+                </div>
+
+                @if ($viewingOrder->notes)
+                    <div class="mt-2 pt-2 border-t border-dashed border-gray-200 text-[10px] text-gray-600">
+                        <span class="font-bold">Catatan:</span> {{ $viewingOrder->notes }}
+                    </div>
+                @endif
+
+                @if ($viewingOrder->accurate_invoice_no)
+                    <div class="mt-2 text-[10px] text-gray-500 font-mono">
+                        Inv Accurate: {{ $viewingOrder->accurate_invoice_no }}
+                    </div>
+                @endif
+
+                <div class="text-center pt-3 text-gray-400 text-[10px]">
+                    <p>Terima kasih atas kunjungan Anda!</p>
+                </div>
+            </div>
+
+            {{-- Footer Tombol Aksi --}}
+            <div class="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3">
+                <button type="button" wire:click="closeReceiptModal"
+                    class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition">
+                    Tutup
+                </button>
             </div>
         </div>
     </div>
