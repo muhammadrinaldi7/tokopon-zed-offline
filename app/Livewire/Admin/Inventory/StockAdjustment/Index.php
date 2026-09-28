@@ -64,13 +64,15 @@ class Index extends Component
     public $temp_project_no = '';
     public $temp_item_notes = '';
 
-    // Barang Tujuan Alokasi (OPSIONAL untuk item)
+    // Barang Tujuan Alokasi (OPSIONAL untuk item, bisa multiple sampai dengan temp_quantity)
     public $searchTargetItem = '';
     public $targetItemSearchResults = [];
     public $selectedTargetItem = null;
     public $temp_target_item_no = null;
     public $temp_target_product_name = null;
     public $temp_target_serial_number = null; // Opsional SN / IMEI display
+    public $temp_target_quantity = 1;
+    public $temp_target_items = []; // Daftar alokasi unit tujuan: [['item_no' => ..., 'product_name' => ..., 'serial_number' => ..., 'quantity' => 1], ...]
 
     // Serial numbers untuk barang ber-SN sementara
     public $temp_serial_numbers = [];
@@ -143,15 +145,22 @@ class Index extends Component
         $this->temp_project_no = '';
         $this->temp_item_notes = '';
 
+        $this->clearTempTargetInput();
+        $this->temp_target_items = [];
+
+        $this->temp_serial_numbers = [];
+        $this->temp_input_serial_number = '';
+    }
+
+    public function clearTempTargetInput()
+    {
         $this->searchTargetItem = '';
         $this->targetItemSearchResults = [];
         $this->selectedTargetItem = null;
         $this->temp_target_item_no = null;
         $this->temp_target_product_name = null;
         $this->temp_target_serial_number = null;
-
-        $this->temp_serial_numbers = [];
-        $this->temp_input_serial_number = '';
+        $this->temp_target_quantity = 1;
     }
 
     public function updatedDefaultAdjustmentType($value)
@@ -258,16 +267,58 @@ class Index extends Component
         $this->temp_target_product_name = $item->name;
         $this->searchTargetItem = $item->name . ' (' . $item->item_no . ')';
         $this->targetItemSearchResults = [];
+
+        // Auto-set kuantiti alokasi ke sisa kuantiti yang belum dialokasikan (minimal 1)
+        $allocated = array_sum(array_column($this->temp_target_items, 'quantity'));
+        $remaining = max(1, (int) $this->temp_quantity - $allocated);
+        $this->temp_target_quantity = 1;
+    }
+
+    public function addTempTargetItem()
+    {
+        if (empty($this->temp_target_item_no) || empty($this->temp_target_product_name)) {
+            $this->dispatch('toast', title: 'Pilih Unit Display', message: 'Silakan cari dan pilih unit HP display terlebih dahulu.', type: 'warning');
+            return;
+        }
+
+        $targetQty = (int) $this->temp_target_quantity;
+        if ($targetQty < 1) {
+            $this->dispatch('toast', title: 'Jumlah Tidak Valid', message: 'Kuantiti alokasi minimal 1 unit.', type: 'error');
+            return;
+        }
+
+        $itemQty = (int) $this->temp_quantity;
+        $currentAllocated = array_sum(array_column($this->temp_target_items, 'quantity'));
+        if (($currentAllocated + $targetQty) > $itemQty) {
+            $this->dispatch('toast', title: 'Melebihi Kuantiti', message: "Total alokasi (" . ($currentAllocated + $targetQty) . " unit) melebihi kuantiti barang yang disesuaikan ({$itemQty} unit).", type: 'error');
+            return;
+        }
+
+        $this->temp_target_items[] = [
+            'item_no'        => $this->temp_target_item_no,
+            'product_name'   => $this->temp_target_product_name,
+            'serial_number'  => $this->temp_target_serial_number ? trim($this->temp_target_serial_number) : null,
+            'quantity'       => $targetQty,
+        ];
+
+        $unitName = $this->temp_target_product_name;
+        $this->clearTempTargetInput();
+        $this->dispatch('toast', title: 'Unit Alokasi Ditambahkan', message: "{$targetQty}x {$unitName} ditambahkan ke alokasi barang ini.", type: 'success');
+    }
+
+    public function removeTempTargetItem($index)
+    {
+        if (isset($this->temp_target_items[$index])) {
+            $unitName = $this->temp_target_items[$index]['product_name'];
+            unset($this->temp_target_items[$index]);
+            $this->temp_target_items = array_values($this->temp_target_items);
+            $this->dispatch('toast', title: 'Unit Alokasi Dihapus', message: "{$unitName} dihapus dari alokasi barang.", type: 'info');
+        }
     }
 
     public function clearTempTargetItem()
     {
-        $this->selectedTargetItem = null;
-        $this->temp_target_item_no = null;
-        $this->temp_target_product_name = null;
-        $this->temp_target_serial_number = null;
-        $this->searchTargetItem = '';
-        $this->targetItemSearchResults = [];
+        $this->clearTempTargetInput();
     }
 
     // --- SERIAL NUMBERS ITEM SEMENTARA ---
@@ -312,42 +363,59 @@ class Index extends Component
             return;
         }
 
-        // Cek jika item dengan SKU dan target yang sama sudah ada di keranjang
-        $existingIndex = null;
-        foreach ($this->items as $idx => $it) {
-            if ($it['item_no'] === $this->temp_item_no && $it['target_item_no'] === $this->temp_target_item_no && $it['adjustment_type'] === $this->temp_adjustment_type) {
-                $existingIndex = $idx;
-                break;
+        // Jika user telah memilih target item di input tapi belum klik '+ Tambah Unit Alokasi', otomatis masukkan jika kuota mencukupi
+        if (!empty($this->temp_target_item_no) && !empty($this->temp_target_product_name)) {
+            $currentAllocated = array_sum(array_column($this->temp_target_items, 'quantity'));
+            $tQty = (int) $this->temp_target_quantity;
+            if ($tQty < 1) $tQty = 1;
+            if (($currentAllocated + $tQty) <= $qty) {
+                $this->temp_target_items[] = [
+                    'item_no'        => $this->temp_target_item_no,
+                    'product_name'   => $this->temp_target_product_name,
+                    'serial_number'  => $this->temp_target_serial_number ? trim($this->temp_target_serial_number) : null,
+                    'quantity'       => $tQty,
+                ];
             }
         }
 
-        if ($existingIndex !== null) {
-            // Tambahkan quantity
-            $this->items[$existingIndex]['quantity'] += $qty;
-            if (!empty($this->temp_serial_numbers)) {
-                $this->items[$existingIndex]['serial_numbers'] = array_unique(array_merge($this->items[$existingIndex]['serial_numbers'], $this->temp_serial_numbers));
-            }
-            $this->dispatch('toast', title: 'Kuantiti Ditambahkan', message: "Kuantiti {$this->temp_product_name} ditambahkan menjadi {$this->items[$existingIndex]['quantity']} pcs.", type: 'info');
-        } else {
-            // Tambah baris baru
-            $this->items[] = [
-                'item_no'              => $this->temp_item_no,
-                'product_name'         => $this->temp_product_name,
-                'adjustment_type'      => $this->temp_adjustment_type,
-                'quantity'             => $qty,
-                'unit_cost'            => $this->temp_unit_cost,
-                'current_stock'        => $this->temp_current_stock,
-                'has_sn'               => $this->temp_has_sn,
-                'proyek'               => $this->temp_proyek,
-                'project_no'           => $this->temp_project_no,
-                'target_item_no'       => $this->temp_target_item_no ?: null,
-                'target_product_name'  => $this->temp_target_product_name ?: null,
-                'target_serial_number' => $this->temp_target_serial_number ?: null,
-                'serial_numbers'       => $this->temp_serial_numbers,
-                'item_notes'           => $this->temp_item_notes,
-            ];
-            $this->dispatch('toast', title: 'Item Ditambahkan', message: "{$this->temp_product_name} ({$qty} pcs) berhasil dimasukkan ke daftar.", type: 'success');
+        // Validasi total target items tidak melebihi kuantiti penyesuaian
+        $totalAllocated = array_sum(array_column($this->temp_target_items, 'quantity'));
+        if ($totalAllocated > $qty) {
+            $this->dispatch('toast', title: 'Alokasi Melebihi Kuantiti', message: "Total alokasi unit display ({$totalAllocated}) melebihi kuantiti penyesuaian ({$qty}).", type: 'error');
+            return;
         }
+
+        // Tentukan nilai backward compatible untuk header / single summary
+        $firstTarget = !empty($this->temp_target_items) ? $this->temp_target_items[0] : null;
+        $targetCount = count($this->temp_target_items);
+        $targetItemNo = $firstTarget ? $firstTarget['item_no'] : null;
+        $targetProductName = null;
+        if ($firstTarget) {
+            $targetProductName = $targetCount > 1 
+                ? "{$firstTarget['product_name']} (+ " . ($targetCount - 1) . " unit lain)"
+                : $firstTarget['product_name'];
+        }
+        $targetSerialNumber = $firstTarget ? ($firstTarget['serial_number'] ?? null) : null;
+
+        // Tambah baris baru
+        $this->items[] = [
+            'item_no'              => $this->temp_item_no,
+            'product_name'         => $this->temp_product_name,
+            'adjustment_type'      => $this->temp_adjustment_type,
+            'quantity'             => $qty,
+            'unit_cost'            => $this->temp_unit_cost,
+            'current_stock'        => $this->temp_current_stock,
+            'has_sn'               => $this->temp_has_sn,
+            'proyek'               => $this->temp_proyek,
+            'project_no'           => $this->temp_project_no,
+            'target_item_no'       => $targetItemNo,
+            'target_product_name'  => $targetProductName,
+            'target_serial_number' => $targetSerialNumber,
+            'target_items'         => $this->temp_target_items,
+            'serial_numbers'       => $this->temp_serial_numbers,
+            'item_notes'           => $this->temp_item_notes,
+        ];
+        $this->dispatch('toast', title: 'Item Ditambahkan', message: "{$this->temp_product_name} ({$qty} pcs) berhasil dimasukkan ke daftar.", type: 'success');
 
         // Reset input sementara untuk barang berikutnya
         $this->resetTempItemInput();
@@ -442,6 +510,7 @@ class Index extends Component
                     'target_item_no'       => $it['target_item_no'],
                     'target_product_name'  => $it['target_product_name'],
                     'target_serial_number' => $it['target_serial_number'],
+                    'target_items'         => !empty($it['target_items']) ? $it['target_items'] : null,
                     'serial_numbers'       => !empty($it['serial_numbers']) ? $it['serial_numbers'] : null,
                     'item_notes'           => $it['item_notes'] ?? null,
                 ]);
@@ -463,6 +532,7 @@ class Index extends Component
                     'target_item_no'       => $it['target_item_no'],
                     'target_product_name'  => $it['target_product_name'],
                     'target_serial_number' => $it['target_serial_number'],
+                    'target_items'         => $it['target_items'] ?? [],
                 ];
             }, $this->items);
 
@@ -537,7 +607,15 @@ class Index extends Component
             
             $targetSummaries = [];
             foreach ($adjustment->items as $item) {
-                if (!empty($item->target_item_no)) {
+                $targetsList = $item->target_items_list;
+                if (!empty($targetsList)) {
+                    $tDesc = [];
+                    foreach ($targetsList as $t) {
+                        $qtyStr = ($t['quantity'] ?? 1) > 1 ? ($t['quantity'] . 'x ') : '';
+                        $tDesc[] = "{$qtyStr}" . ($t['product_name'] ?? $t['item_no']);
+                    }
+                    $targetSummaries[] = "{$item->item_no} -> (" . implode(', ', $tDesc) . ")";
+                } elseif (!empty($item->target_item_no)) {
                     $targetSummaries[] = "{$item->item_no} -> {$item->target_item_no}";
                 }
             }

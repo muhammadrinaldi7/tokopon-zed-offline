@@ -348,7 +348,22 @@
                                                                         {{ $it['quantity'] ?? 1 }} pcs
                                                                     </td>
                                                                     <td class="px-3 py-2">
-                                                                        @if(!empty($it['target_item_no']))
+                                                                        @if(!empty($it['target_items']) && count($it['target_items']) > 0)
+                                                                            <div class="space-y-1">
+                                                                                @foreach($it['target_items'] as $ti)
+                                                                                    <div class="bg-amber-50 p-1 rounded border border-amber-200 text-[10px]">
+                                                                                        <span class="font-bold text-amber-950">
+                                                                                            <span class="font-black font-mono mr-0.5">{{ $ti['quantity'] ?? 1 }}x</span>
+                                                                                            {{ $ti['product_name'] ?? $ti['item_no'] }}
+                                                                                        </span>
+                                                                                        <div class="text-amber-800 font-mono text-[9px]">
+                                                                                            {{ $ti['item_no'] }}
+                                                                                            @if(!empty($ti['serial_number'])) | SN: {{ $ti['serial_number'] }} @endif
+                                                                                        </div>
+                                                                                    </div>
+                                                                                @endforeach
+                                                                            </div>
+                                                                        @elseif(!empty($it['target_item_no']))
                                                                             <div class="bg-amber-50 p-1 rounded border border-amber-200 text-[10px]">
                                                                                 <span class="font-bold text-amber-950">{{ $it['target_product_name'] ?? '-' }}</span>
                                                                                 <span class="text-amber-800 font-mono">({{ $it['target_item_no'] }})</span>

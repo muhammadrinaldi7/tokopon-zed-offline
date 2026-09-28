@@ -38,7 +38,15 @@ class StockAdjustmentApprovalHandler implements ApprovalHandlerInterface
             // Tambahkan ringkasan SKU tujuan jika ada
             $targetSummaries = [];
             foreach ($adjustment->items as $item) {
-                if (!empty($item->target_item_no)) {
+                $targetList = $item->target_items_list;
+                if (!empty($targetList)) {
+                    foreach ($targetList as $t) {
+                        $tName = $t['product_name'] ?? $t['item_no'];
+                        $tQty = $t['quantity'] ?? 1;
+                        $tSn = !empty($t['serial_number']) ? "[SN:{$t['serial_number']}]" : "";
+                        $targetSummaries[] = "{$tQty}x {$tName} {$tSn}";
+                    }
+                } elseif (!empty($item->target_item_no)) {
                     $targetSummaries[] = "{$item->item_no} -> {$item->target_item_no}";
                 }
             }

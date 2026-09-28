@@ -149,11 +149,32 @@
                             {{-- Tujuan Alokasi --}}
                             <td class="px-6 py-4">
                                 @php
+                                    $targets = $firstItem?->target_items_list ?? [];
                                     $targetName = $firstItem?->target_product_name ?? $adj->target_product_name;
                                     $targetSku = $firstItem?->target_item_no ?? $adj->target_item_no;
                                     $targetSn = $firstItem?->target_serial_number ?? $adj->target_serial_number;
                                 @endphp
-                                @if($targetSku || $targetName)
+                                @if(!empty($targets))
+                                    <div class="space-y-1 max-w-xs">
+                                        @foreach(array_slice($targets, 0, 2) as $tgt)
+                                            <div class="bg-amber-50/80 border border-amber-200/60 p-1.5 rounded-lg text-[11px]">
+                                                <div class="font-bold text-amber-900 truncate" title="{{ $tgt['product_name'] ?? $tgt['item_no'] }}">
+                                                    <span class="font-black text-[10px] bg-amber-200/90 text-amber-900 px-1 py-0.2 rounded font-mono mr-1">
+                                                        {{ $tgt['quantity'] ?? 1 }}x
+                                                    </span>
+                                                    {{ $tgt['product_name'] ?? $tgt['item_no'] }}
+                                                </div>
+                                                <div class="text-[10px] text-amber-700 font-mono">
+                                                    {{ $tgt['item_no'] }}
+                                                    @if(!empty($tgt['serial_number'])) | SN: {{ $tgt['serial_number'] }} @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                        @if(count($targets) > 2)
+                                            <span class="text-[10px] text-amber-800 font-bold block pl-1">+ {{ count($targets) - 2 }} unit lainnya</span>
+                                        @endif
+                                    </div>
+                                @elseif($targetSku || $targetName)
                                     <div class="bg-amber-50/80 border border-amber-200/60 p-2 rounded-lg max-w-xs">
                                         <div class="font-bold text-amber-900 text-[11px] truncate" title="{{ $targetName }}">
                                             {{ $targetName ?: '-' }}
@@ -452,24 +473,40 @@
                             </div>
                         @endif
 
-                        {{-- Baris 2: SKU Tujuan Alokasi (OPSIONAL) --}}
-                        <div class="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200 space-y-2">
-                            <div class="flex items-center justify-between">
-                                <label class="block text-xs font-bold text-amber-950">
-                                    Tujuan Alokasi / Unit Display <span class="text-gray-500 font-normal text-[11px]">(Opsional untuk barang ini)</span>
-                                </label>
-                                @if($temp_target_item_no)
-                                    <button type="button" wire:click="clearTempTargetItem" class="text-[11px] text-rose-600 hover:text-rose-800 font-bold underline cursor-pointer">
-                                        Hapus Unit Tujuan
-                                    </button>
-                                @endif
+                        {{-- Baris 2: SKU Tujuan Alokasi (Bisa Multiple sampai Qty Barang) --}}
+                        @php
+                            $totalAllocated = array_sum(array_column($temp_target_items, 'quantity'));
+                            $itemQty = (int) $temp_quantity;
+                            $remainingQty = max(0, $itemQty - $totalAllocated);
+                        @endphp
+                        <div class="bg-amber-50/70 p-4 rounded-xl border border-amber-200 space-y-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <label class="block text-xs font-bold text-amber-950">
+                                        Tujuan Alokasi / Unit Display <span class="text-gray-500 font-normal text-[11px]">(Opsional - berdasarkan kuantiti item)</span>
+                                    </label>
+                                    <span class="text-[10px] text-amber-800">
+                                        Dapat dialokasikan hingga <strong>{{ $itemQty }}</strong> unit display (misal: penyesuaian {{ $itemQty }} antigores untuk {{ $itemQty }} HP display berbeda atau kurang).
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold font-mono border {{ $totalAllocated > $itemQty ? 'bg-rose-100 text-rose-800 border-rose-300' : ($totalAllocated == $itemQty && $itemQty > 0 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-900 border-amber-300') }}">
+                                        <span>Teralokasi:</span>
+                                        <strong>{{ $totalAllocated }} / {{ $itemQty }}</strong> Unit
+                                    </span>
+                                </div>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div class="relative">
+                            {{-- Form Tambah Unit Target --}}
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-end bg-white/80 p-3 rounded-xl border border-amber-200">
+                                {{-- Cari Barang Target --}}
+                                <div class="md:col-span-5 relative">
+                                    <label class="block text-[10px] font-bold text-amber-900 uppercase tracking-wider mb-1">
+                                        Pilih Unit Display (SKU / Nama HP)
+                                    </label>
                                     <input type="text" wire:model.live.debounce.300ms="searchTargetItem"
-                                        placeholder="Ketik SKU atau nama HP display (misal: S26 Ultra LDU)..."
-                                        class="w-full text-xs p-2 bg-white border border-amber-300 rounded-lg outline-none font-medium">
+                                        placeholder="Cari unit (misal: S26 Ultra LDU, Fold 6)..."
+                                        class="w-full text-xs p-2 bg-white border border-amber-300 rounded-lg outline-none font-medium focus:border-amber-500">
 
                                     {{-- Autocomplete Dropdown Target --}}
                                     @if(!empty($targetItemSearchResults))
@@ -487,15 +524,81 @@
                                     @endif
                                 </div>
 
-                                <div>
-                                    <input type="text" wire:model="temp_target_serial_number" placeholder="Nomor Seri / IMEI unit display (opsional)"
-                                        class="w-full text-xs p-2 bg-white border border-amber-300 rounded-lg outline-none font-mono">
+                                {{-- Qty Alokasi untuk unit ini --}}
+                                <div class="md:col-span-2">
+                                    <label class="block text-[10px] font-bold text-amber-900 uppercase tracking-wider mb-1">
+                                        Qty Alokasi
+                                    </label>
+                                    <div class="relative">
+                                        <input type="number" min="1" max="{{ max(1, $remainingQty) }}" wire:model="temp_target_quantity"
+                                            class="w-full text-xs font-black p-2 bg-white border border-amber-300 rounded-lg outline-none text-center focus:border-amber-500">
+                                        <span class="absolute right-2 top-2 text-[10px] text-gray-400 font-bold">unit</span>
+                                    </div>
+                                </div>
+
+                                {{-- SN / IMEI Display --}}
+                                <div class="md:col-span-3">
+                                    <label class="block text-[10px] font-bold text-amber-900 uppercase tracking-wider mb-1">
+                                        SN / IMEI <span class="text-gray-400 font-normal">(Opsional)</span>
+                                    </label>
+                                    <input type="text" wire:model="temp_target_serial_number" placeholder="Nomor Seri / IMEI..."
+                                        class="w-full text-xs p-2 bg-white border border-amber-300 rounded-lg outline-none font-mono focus:border-amber-500">
+                                </div>
+
+                                {{-- Tombol Tambah ke List Alokasi --}}
+                                <div class="md:col-span-2 flex items-center">
+                                    <button type="button" wire:click="addTempTargetItem"
+                                        @if(empty($temp_target_item_no) || $remainingQty <= 0) disabled @endif
+                                        class="w-full py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer {{ empty($temp_target_item_no) || $remainingQty <= 0 ? 'bg-amber-200 text-amber-600 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs' }}">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                        + Alokasi
+                                    </button>
                                 </div>
                             </div>
 
-                            @if($temp_target_item_no)
-                                <div class="text-[11px] text-amber-900 bg-amber-100/70 px-2.5 py-1 rounded-md font-medium">
-                                    Dialokasikan untuk: <strong>{{ $temp_target_product_name }}</strong> (SKU: {{ $temp_target_item_no }})
+                            {{-- Selected Target Hint if not yet clicked + Alokasi --}}
+                            @if($temp_target_item_no && $remainingQty > 0)
+                                <div class="flex items-center justify-between text-[11px] text-amber-900 bg-amber-100/90 px-3 py-1.5 rounded-lg font-medium border border-amber-300">
+                                    <span>
+                                        🎯 Dipilih: <strong>{{ $temp_target_product_name }}</strong> (SKU: {{ $temp_target_item_no }}) - klik <strong>"+ Alokasi"</strong> untuk menambahkan.
+                                    </span>
+                                    <button type="button" wire:click="clearTempTargetInput" class="text-rose-600 hover:text-rose-800 font-bold ml-2">Batal</button>
+                                </div>
+                            @endif
+
+                            {{-- List of Added Target Units for this item --}}
+                            @if(!empty($temp_target_items))
+                                <div class="space-y-1.5 pt-1">
+                                    <span class="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">
+                                        Daftar Unit Display yang Dialokasikan ({{ count($temp_target_items) }} unit/alokasi):
+                                    </span>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                        @foreach($temp_target_items as $tIdx => $ti)
+                                            <div class="bg-white p-2.5 rounded-xl border border-amber-300 shadow-xs flex items-start justify-between gap-2">
+                                                <div class="overflow-hidden">
+                                                    <div class="flex items-center gap-1.5">
+                                                        <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-black text-[10px] font-mono shrink-0">
+                                                            {{ $ti['quantity'] }}x
+                                                        </span>
+                                                        <span class="font-bold text-gray-900 text-xs truncate" title="{{ $ti['product_name'] }}">
+                                                            {{ $ti['product_name'] }}
+                                                        </span>
+                                                    </div>
+                                                    <div class="text-[10px] text-gray-500 font-mono mt-0.5">
+                                                        SKU: {{ $ti['item_no'] }}
+                                                        @if(!empty($ti['serial_number']))
+                                                            <span class="block text-amber-800 font-semibold truncate">SN: {{ $ti['serial_number'] }}</span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <button type="button" wire:click="removeTempTargetItem({{ $tIdx }})"
+                                                    class="text-rose-400 hover:text-rose-600 p-1 hover:bg-rose-50 rounded-md transition cursor-pointer"
+                                                    title="Hapus unit alokasi ini">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                                </button>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </div>
                             @endif
                         </div>
@@ -578,7 +681,28 @@
                                                     </div>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    @if(!empty($it['target_item_no']))
+                                                    @if(!empty($it['target_items']) && count($it['target_items']) > 0)
+                                                        <div class="space-y-1.5 max-w-xs">
+                                                            @foreach($it['target_items'] as $tgt)
+                                                                <div class="bg-amber-50/90 p-1.5 rounded-lg border border-amber-200 text-[11px]">
+                                                                    <div class="font-bold text-amber-950 truncate flex items-center gap-1">
+                                                                        <span class="px-1.5 py-0.2 bg-amber-200 text-amber-900 rounded font-black text-[10px] font-mono shrink-0">
+                                                                            {{ $tgt['quantity'] ?? 1 }}x
+                                                                        </span>
+                                                                        <span class="truncate" title="{{ $tgt['product_name'] ?? $tgt['item_no'] }}">
+                                                                            {{ $tgt['product_name'] ?? $tgt['item_no'] }}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div class="text-[10px] text-amber-800 font-mono pl-6">
+                                                                        SKU: {{ $tgt['item_no'] }}
+                                                                        @if(!empty($tgt['serial_number']))
+                                                                            | SN: {{ $tgt['serial_number'] }}
+                                                                        @endif
+                                                                    </div>
+                                                                </div>
+                                                            @endforeach
+                                                        </div>
+                                                    @elseif(!empty($it['target_item_no']))
                                                         <div class="bg-amber-50/80 p-2 rounded-lg border border-amber-200 max-w-xs">
                                                             <div class="font-bold text-amber-900 text-[11px] truncate">
                                                                 {{ $it['target_product_name'] ?? '-' }}
@@ -749,7 +873,29 @@
                                                 {{ $item->quantity }} pcs
                                             </td>
                                             <td class="px-4 py-2.5">
-                                                @if($item->target_item_no)
+                                                @php
+                                                    $itemTargets = $item->target_items_list;
+                                                @endphp
+                                                @if(!empty($itemTargets))
+                                                    <div class="space-y-1 max-w-xs">
+                                                        @foreach($itemTargets as $itgt)
+                                                            <div class="bg-amber-50 p-1.5 rounded-lg border border-amber-200 text-[11px]">
+                                                                <div class="font-bold text-amber-950 flex items-center gap-1">
+                                                                    <span class="px-1 py-0.2 bg-amber-200 text-amber-900 rounded font-black text-[9px] font-mono shrink-0">
+                                                                        {{ $itgt['quantity'] ?? 1 }}x
+                                                                    </span>
+                                                                    <span class="truncate">{{ $itgt['product_name'] ?? $itgt['item_no'] }}</span>
+                                                                </div>
+                                                                <div class="text-[10px] text-amber-800 font-mono pl-5">
+                                                                    SKU: {{ $itgt['item_no'] }}
+                                                                    @if(!empty($itgt['serial_number']))
+                                                                        | SN: {{ $itgt['serial_number'] }}
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @elseif($item->target_item_no)
                                                     <div class="bg-amber-50 p-1.5 rounded-lg border border-amber-200">
                                                         <div class="font-bold text-amber-950 text-[11px]">{{ $item->target_product_name }}</div>
                                                         <div class="text-[10px] text-amber-800 font-mono">SKU: {{ $item->target_item_no }}</div>
