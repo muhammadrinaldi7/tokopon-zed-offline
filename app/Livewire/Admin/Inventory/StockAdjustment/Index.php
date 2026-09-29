@@ -123,7 +123,7 @@ class Index extends Component
         $this->default_adjustment_type = 'OUT';
         $this->reason_category = 'PEMELIHARAAN_INVENTARIS';
         $this->notes = '';
-        $this->accurate_account_no = '5101';
+        $this->accurate_account_no = '50.03.005';
         $this->items = [];
 
         $this->resetTempItemInput();
@@ -491,7 +491,7 @@ class Index extends Component
                 'target_serial_number' => $firstItem['target_serial_number'] ?? null,
                 'reason_category'      => $this->reason_category,
                 'notes'                => $this->notes,
-                'accurate_account_no'  => $this->accurate_account_no ?: '5101',
+                'accurate_account_no'  => $this->accurate_account_no ?: '50.03.005',
                 'status'               => 'PENDING',
                 'requested_by'         => Auth::id(),
             ]);
@@ -656,7 +656,7 @@ class Index extends Component
 
             $payload = [
                 'transDate'           => now()->format('d/m/Y'),
-                'adjustmentAccountNo' => $adjustment->accurate_account_no ?: '5101',
+                'adjustmentAccountNo' => $adjustment->accurate_account_no ?: '50.03.005',
                 'description'         => mb_substr($notesFull, 0, 250),
                 'branchName'          => $adjustment->branch?->name,
                 'detailItem'          => $detailItems,
