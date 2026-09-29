@@ -53,6 +53,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/warranty-activation', \App\Livewire\Zoffline\Qc\WarrantyActivation::class)->name('zoffline.warranty-activation')->middleware('can:warranty-activation');
     Route::get('/zoffline/warranty-claim', WarrantyClaim::class)->name('zoffline.warranty-claim')->middleware('can:warranty-activation');
     Route::get('/zoffline/cek-stock', CekStock::class)->name('zoffline.cek-stock')->middleware('can:view-stock');
+    Route::get('/zoffline/pemakaian-inventaris', \App\Livewire\Admin\Inventory\StockAdjustment\Index::class)->name('zoffline.pemakaian-inventaris')->middleware('can:view-stock');
     Route::get('/zoffline/reporting', \App\Livewire\Zoffline\Reporting\Reporting::class)->name('zoffline.reporting')->middleware('can:view-reporting');
     Route::get('/zoffline/reporting/cek-harga', \App\Livewire\Zoffline\Reporting\CheckPrice::class)->name('zoffline.reporting.cek-harga')->middleware('can:view-reporting');
     Route::get('/zoffline/reporting/pembelian', \App\Livewire\Zoffline\Reporting\LaporanPembelian::class)->name('zoffline.reporting.pembelian')->middleware('can:view-reporting');
@@ -191,7 +192,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/settings/warehouse', \App\Livewire\Admin\Settings\Warehouse\Index::class)->name('settings.warehouse')->middleware('can:manage-settings');
     Route::livewire('/settings/pos', 'pages::admin.settings.pos-settings')->name('settings.pos')->middleware('can:manage-settings');
     Route::get('/settings/approval-rules', \App\Livewire\Admin\Settings\ApprovalRule\Index::class)->name('settings.approval-rules')->middleware('can:manage-settings');
-    Route::get('/inventory/stock-adjustment', \App\Livewire\Admin\Inventory\StockAdjustment\Index::class)->name('adjustment.index')->middleware('can:manage-settings');
+    Route::get('/inventory/stock-adjustment', \App\Livewire\Admin\Inventory\StockAdjustment\Index::class)->name('adjustment.index')->middleware('can:view-stock');
 
     // Approvals
     Route::get('/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('approvals.index');

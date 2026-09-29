@@ -32,6 +32,11 @@ class Home extends Component
         return $this->redirectRoute('zoffline.check-serial-number', navigate: true);
     }
 
+    public function navigateToPemakaianInventaris()
+    {
+        return $this->redirectRoute('zoffline.pemakaian-inventaris', navigate: true);
+    }
+
     public function navigateToInbound()
     {
         return $this->redirectRoute('zoffline.inbound.index', navigate: true);

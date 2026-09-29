@@ -1,8 +1,18 @@
 <div class="max-w-7xl mx-auto p-2  md:p-6 min-h-screen">
-    <div class="mb-6">
-        <h2 class="text-2xl font-black text-gray-800">Cek Ketersediaan Stok</h2>
-        <p class="text-gray-500 text-sm">Cari produk berdasarkan Nama atau SKU untuk melihat ketersediaan stok di seluruh
-            gudang.</p>
+    <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h2 class="text-2xl font-black text-gray-800">Cek Ketersediaan Stok</h2>
+            <p class="text-gray-500 text-sm">Cari produk berdasarkan Nama atau SKU untuk melihat ketersediaan stok di seluruh gudang.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="{{ route('zoffline.pemakaian-inventaris') }}" wire:navigate
+                class="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition hover:shadow-md cursor-pointer">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                <span>Pemakaian Inventaris Toko</span>
+            </a>
+        </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -1,21 +1,21 @@
-<div class="p-6 bg-gray-50 min-h-screen space-y-6">
+<div class="max-w-7xl mx-auto p-3 md:p-6 min-h-screen space-y-6">
     {{-- Header --}}
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <div class="flex items-center gap-2">
-                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200">
-                    Modul Inventaris
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200">
+                    Operasional Cabang
                 </span>
-                <span class="text-xs text-gray-500 font-mono">Stock Adjustment (Header - Detail)</span>
+                <span class="text-xs text-gray-500 font-mono">Store Expense & Maintenance</span>
             </div>
-            <h1 class="text-2xl font-bold text-gray-900 mt-1">Penyesuaian Stok Persediaan</h1>
-            <p class="text-sm text-gray-500">Kelola mutasi penyesuaian stok fisik multi-item dengan sistem approval bertingkat & sinkronisasi Accurate.</p>
+            <h1 class="text-2xl font-black text-gray-900 mt-1">Pemakaian Inventaris Toko</h1>
+            <p class="text-sm text-gray-500">Pencatatan & pengajuan pengeluaran barang untuk pemeliharaan unit display dan kebutuhan operasional toko.</p>
         </div>
         <div class="flex items-center gap-3">
             <button wire:click="openCreateModal"
-                class="bg-blue-600 hover:bg-blue-700 transition-all text-white px-4 py-2.5 rounded-xl font-medium shadow-sm hover:shadow flex items-center gap-2 text-sm cursor-pointer">
+                class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all text-white px-5 py-2.5 rounded-xl font-bold shadow-sm hover:shadow-md flex items-center gap-2 text-sm cursor-pointer">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                Buat Penyesuaian Baru
+                + Ajukan Pemakaian Inventaris
             </button>
         </div>
     </div>
@@ -338,20 +338,14 @@
                                 </select>
                             </div>
 
-                            {{-- Default Arah Mutasi --}}
+                            {{-- Tipe Transaksi Tetap Pengeluaran --}}
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">
-                                    Default Arah Mutasi <span class="text-red-500">*</span>
+                                    Tipe Transaksi
                                 </label>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <button type="button" wire:click="$set('default_adjustment_type', 'OUT')"
-                                        class="py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer {{ $default_adjustment_type === 'OUT' ? 'bg-rose-100 text-rose-800 border-2 border-rose-500 shadow-xs' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100' }}">
-                                        🔴 Keluar
-                                    </button>
-                                    <button type="button" wire:click="$set('default_adjustment_type', 'IN')"
-                                        class="py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer {{ $default_adjustment_type === 'IN' ? 'bg-emerald-100 text-emerald-800 border-2 border-emerald-500 shadow-xs' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100' }}">
-                                        🟢 Masuk
-                                    </button>
+                                <div class="py-2.5 px-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                    🔴 Pengeluaran / Pemakaian Toko
                                 </div>
                             </div>
                         </div>
@@ -427,15 +421,15 @@
                                 @endif
                             </div>
 
-                            {{-- Arah Mutasi Baris --}}
+                            {{-- Arah Mutasi Baris Tetap Pengeluaran --}}
                             <div class="md:col-span-3">
                                 <label class="block text-xs font-bold text-blue-900 mb-1">
-                                    Arah Mutasi <span class="text-red-500">*</span>
+                                    Jenis Mutasi
                                 </label>
-                                <select wire:model="temp_adjustment_type" class="w-full text-xs p-2.5 bg-white border border-blue-300 rounded-xl font-bold outline-none cursor-pointer">
-                                    <option value="OUT">🔴 Pengurangan (Keluar)</option>
-                                    <option value="IN">🟢 Penambahan (Masuk)</option>
-                                </select>
+                                <div class="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-rose-600"></span>
+                                    🔴 Pemakaian (Keluar)
+                                </div>
                             </div>
 
                             {{-- Jumlah Qty --}}
@@ -608,7 +602,7 @@
                             <button type="button" wire:click="addItemToList"
                                 class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md shadow-indigo-600/20 transition flex items-center gap-2 cursor-pointer">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                                + Tambahkan Barang ke Daftar
+                                + Tambahkan Barang ke Daftar Pemakaian
                             </button>
                         </div>
                     </div>
@@ -618,7 +612,7 @@
                         <div class="flex items-center justify-between">
                             <h3 class="text-xs font-black uppercase tracking-wider text-gray-800 flex items-center gap-2">
                                 <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-                                3. Daftar Barang dalam Penyesuaian Ini
+                                3. Daftar Barang yang Dikeluarkan untuk Pemakaian
                             </h3>
                             <span class="text-xs font-bold text-gray-600">
                                 Total: <strong class="text-blue-700 font-black">{{ count($items) }}</strong> jenis barang 
@@ -629,8 +623,8 @@
                         @if(empty($items))
                             <div class="p-8 bg-gray-50/80 rounded-2xl border-2 border-dashed border-gray-200 text-center text-gray-400">
                                 <svg class="w-10 h-10 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                                <p class="text-xs font-bold text-gray-500">Belum ada barang di daftar penyesuaian.</p>
-                                <p class="text-[11px] text-gray-400 mt-0.5">Silakan pilih barang dan klik tombol "+ Tambahkan Barang ke Daftar" di atas.</p>
+                                <p class="text-xs font-bold text-gray-500">Belum ada barang di daftar pemakaian.</p>
+                                <p class="text-[11px] text-gray-400 mt-0.5">Silakan pilih barang dan klik tombol "+ Tambahkan Barang ke Daftar Pemakaian" di atas.</p>
                             </div>
                         @else
                             <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs">
@@ -749,16 +743,16 @@
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         <span wire:loading.remove wire:target="submitAdjustment">
-                            Ajukan Penyesuaian ({{ count($items) }} Barang)
+                            Ajukan Pemakaian ({{ count($items) }} Barang)
                         </span>
-                        <span wire:loading wire:target="submitAdjustment">Menyimpan & Minta Approval...</span>
+                        <span wire:loading wire:target="submitAdjustment">Menyimpan & Mengajukan Approval...</span>
                     </button>
                 </div>
             </div>
         </div>
     @endif
 
-    {{-- MODAL DETAIL PENYESUAIAN (HEADER & DAFTAR ITEM) --}}
+    {{-- MODAL DETAIL PEMAKAIAN INVENTARIS (HEADER & DAFTAR ITEM) --}}
     @if($showDetailModal && $selectedAdjustment)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
             <div class="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-gray-100 overflow-hidden my-8 max-h-[90vh] flex flex-col">
@@ -766,8 +760,8 @@
                 <div class="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/80 shrink-0">
                     <div>
                         <div class="flex items-center gap-2">
-                            <span class="text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full border border-blue-200">
-                                Berkas Penyesuaian Stok
+                            <span class="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full border border-purple-200">
+                                Berkas Pemakaian Inventaris
                             </span>
                             <span class="font-mono text-xs font-bold text-gray-800">{{ $selectedAdjustment->adjustment_number }}</span>
                         </div>

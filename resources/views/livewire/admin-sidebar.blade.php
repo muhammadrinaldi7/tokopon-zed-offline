@@ -125,8 +125,8 @@
 
             @can('view-stock')
                 <a href="{{ route('zoffline.cek-stock') }}" wire:navigate
-                    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.cekstock') ? $activeClass : $inactiveClass }}">
-                    <svg class="w-5 h-5 {{ request()->routeIs('zoffline.cekstock') ? $activeIconClass : $inactiveIconClass }}"
+                    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.cek-stock') ? $activeClass : $inactiveClass }} group relative">
+                    <svg class="w-5 h-5 flex-shrink-0 {{ request()->routeIs('zoffline.cek-stock') ? $activeIconClass : $inactiveIconClass }}"
                         xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                         stroke="currentColor" class="size-6">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -136,6 +136,18 @@
                     <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Cek Stock</span><span
                         class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                         x-show="sidebarCollapsed" style="display:none;" x-cloak>Cek Stock</span>
+                </a>
+
+                <a href="{{ route('zoffline.pemakaian-inventaris') }}" wire:navigate
+                    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('zoffline.pemakaian-inventaris') || request()->routeIs('admin.adjustment.*') ? $activeClass : $inactiveClass }} group relative">
+                    <svg class="w-5 h-5 flex-shrink-0 {{ request()->routeIs('zoffline.pemakaian-inventaris') || request()->routeIs('admin.adjustment.*') ? $activeIconClass : $inactiveIconClass }}"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pemakaian Inventaris</span>
+                    <span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                        x-show="sidebarCollapsed" style="display:none;" x-cloak>Pemakaian Inventaris</span>
                 </a>
             @endcan
 
@@ -806,17 +818,6 @@
             <!--    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Pengaturan POS</span><span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50" x-show="sidebarCollapsed" style="display:none;" x-cloak>Pengaturan POS</span>-->
             <!--</a>-->
 
-            <a href="{{ route('admin.adjustment.index') }}" wire:navigate
-                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.adjustment.index') ? $activeClass : $inactiveClass }}">
-                <svg class="w-5 h-5 {{ request()->routeIs('admin.adjustment.index') ? $activeIconClass : $inactiveIconClass }}"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Penyesuaian Stok</span><span
-                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
-                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Penyesuaian Stok</span>
-            </a>
 
             <a href="{{ route('admin.ai-assistant.index') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.ai-assistant.*') ? $activeClass : $inactiveClass }}">

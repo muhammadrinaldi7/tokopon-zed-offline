@@ -19,7 +19,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-#[Layout('layouts.admin', ['title' => 'Penyesuaian Stok Persediaan'])]
+#[Layout('layouts.z', ['title' => 'Pemakaian Inventaris Toko'])]
 class Index extends Component
 {
     use WithPagination;
@@ -517,7 +517,10 @@ class Index extends Component
             }
 
             // 3. Susun teks alasan dan payload untuk Approval Center
-            $reasonText = "[{$this->reason_category}] " . ($this->notes ?: 'Penyesuaian Stok');
+            $reasonCategoryLabel = $this->reason_category === 'PEMELIHARAAN_INVENTARIS' 
+                ? 'Pemakaian / Pemeliharaan Inventaris' 
+                : str_replace('_', ' ', $this->reason_category);
+            $reasonText = "[{$reasonCategoryLabel}] " . ($this->notes ?: 'Pemakaian Operasional Toko');
             $reasonText .= " ({$totalItems} jenis item, Total: {$totalQty} pcs)";
 
             $itemsPayload = array_map(function ($it) {
@@ -525,7 +528,7 @@ class Index extends Component
                     'item_no'              => $it['item_no'],
                     'product_name'         => $it['product_name'],
                     'quantity'             => $it['quantity'],
-                    'adjustment_type'      => $it['adjustment_type'],
+                    'adjustment_type'      => 'OUT',
                     'unit_cost'            => $it['unit_cost'],
                     'proyek'               => $it['proyek'],
                     'project_no'           => $it['project_no'],
@@ -561,7 +564,7 @@ class Index extends Component
             DB::commit();
 
             $this->closeCreateModal();
-            $this->dispatch('toast', title: 'Berhasil Diajukan', message: "Permohonan penyesuaian stok {$adjNumber} ({$totalItems} barang) berhasil dikirim untuk approval.", type: 'success');
+            $this->dispatch('toast', title: 'Berhasil Diajukan', message: "Pengajuan pemakaian inventaris {$adjNumber} ({$totalItems} barang) berhasil dikirim untuk approval.", type: 'success');
         } catch (\Throwable $e) {
             DB::rollBack();
             Log::error("Gagal membuat StockAdjustment: " . $e->getMessage());
