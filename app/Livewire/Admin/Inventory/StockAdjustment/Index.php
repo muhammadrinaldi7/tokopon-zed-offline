@@ -44,7 +44,7 @@ class Index extends Component
     public $default_adjustment_type = 'OUT'; // 'OUT' (Pengurangan) atau 'IN' (Penambahan)
     public $reason_category = 'PEMELIHARAAN_INVENTARIS';
     public $notes = '';
-    public $accurate_account_no = '5101'; // Default COA Penyesuaian/Beban
+    public $accurate_account_no = '50.03.005'; // Default COA Penyesuaian/Beban
 
     // Keranjang Item Penyesuaian (Multi Item)
     public $items = [];
@@ -180,7 +180,7 @@ class Index extends Component
         $this->itemSearchResults = ProductAccurate::where('business_unit_id', $this->business_unit_id)
             ->where(function ($q) use ($term) {
                 $q->where('item_no', 'like', "%{$term}%")
-                  ->orWhere('name', 'like', "%{$term}%");
+                    ->orWhere('name', 'like', "%{$term}%");
             })
             ->limit(10)
             ->get(['id', 'item_no', 'name', 'stock', 'proyek', 'has_sn', 'base_cost'])
@@ -250,7 +250,7 @@ class Index extends Component
         $this->targetItemSearchResults = ProductAccurate::where('business_unit_id', $this->business_unit_id)
             ->where(function ($q) use ($term) {
                 $q->where('item_no', 'like', "%{$term}%")
-                  ->orWhere('name', 'like', "%{$term}%");
+                    ->orWhere('name', 'like', "%{$term}%");
             })
             ->limit(10)
             ->get(['id', 'item_no', 'name', 'proyek'])
@@ -391,7 +391,7 @@ class Index extends Component
         $targetItemNo = $firstTarget ? $firstTarget['item_no'] : null;
         $targetProductName = null;
         if ($firstTarget) {
-            $targetProductName = $targetCount > 1 
+            $targetProductName = $targetCount > 1
                 ? "{$firstTarget['product_name']} (+ " . ($targetCount - 1) . " unit lain)"
                 : $firstTarget['product_name'];
         }
@@ -466,8 +466,8 @@ class Index extends Component
             $totalQty = array_sum(array_column($this->items, 'quantity'));
 
             $firstItem = $this->items[0];
-            $summaryProductName = $totalItems === 1 
-                ? $firstItem['product_name'] 
+            $summaryProductName = $totalItems === 1
+                ? $firstItem['product_name']
                 : $firstItem['product_name'] . ' (+' . ($totalItems - 1) . ' item lainnya)';
 
             // 1. Buat Record Header
@@ -517,8 +517,8 @@ class Index extends Component
             }
 
             // 3. Susun teks alasan dan payload untuk Approval Center
-            $reasonCategoryLabel = $this->reason_category === 'PEMELIHARAAN_INVENTARIS' 
-                ? 'Pemakaian / Pemeliharaan Inventaris' 
+            $reasonCategoryLabel = $this->reason_category === 'PEMELIHARAAN_INVENTARIS'
+                ? 'Pemakaian / Pemeliharaan Inventaris'
                 : str_replace('_', ' ', $this->reason_category);
             $reasonText = "[{$reasonCategoryLabel}] " . ($this->notes ?: 'Pemakaian Operasional Toko');
             $reasonText .= " ({$totalItems} jenis item, Total: {$totalQty} pcs)";
@@ -607,7 +607,7 @@ class Index extends Component
 
         try {
             $notesFull = "[{$adjustment->reason_category}] " . ($adjustment->notes ?: 'Penyesuaian Stok');
-            
+
             $targetSummaries = [];
             foreach ($adjustment->items as $item) {
                 $targetsList = $item->target_items_list;
@@ -699,17 +699,17 @@ class Index extends Component
                 $term = "%{$this->search}%";
                 $q->where(function ($sq) use ($term) {
                     $sq->where('adjustment_number', 'like', $term)
-                       ->orWhere('item_no', 'like', $term)
-                       ->orWhere('product_name', 'like', $term)
-                       ->orWhere('target_item_no', 'like', $term)
-                       ->orWhere('target_product_name', 'like', $term)
-                       ->orWhere('notes', 'like', $term)
-                       ->orWhereHas('items', function ($iq) use ($term) {
-                           $iq->where('item_no', 'like', $term)
-                              ->orWhere('product_name', 'like', $term)
-                              ->orWhere('target_item_no', 'like', $term)
-                              ->orWhere('target_product_name', 'like', $term);
-                       });
+                        ->orWhere('item_no', 'like', $term)
+                        ->orWhere('product_name', 'like', $term)
+                        ->orWhere('target_item_no', 'like', $term)
+                        ->orWhere('target_product_name', 'like', $term)
+                        ->orWhere('notes', 'like', $term)
+                        ->orWhereHas('items', function ($iq) use ($term) {
+                            $iq->where('item_no', 'like', $term)
+                                ->orWhere('product_name', 'like', $term)
+                                ->orWhere('target_item_no', 'like', $term)
+                                ->orWhere('target_product_name', 'like', $term);
+                        });
                 });
             })
             ->when($this->filterStatus !== 'ALL', function ($q) {
