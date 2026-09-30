@@ -334,8 +334,10 @@
                             <span class="text-gray-400 font-medium w-16 shrink-0">Rek. Tujuan:</span>
                             <span class="text-gray-600 truncate font-mono">
                                 @php
-                                    $bankName = $item->bank_name ?: ($item->user->bankAccounts->first()->bank_name ?? null);
-                                    $bankAccNo = $item->bank_account_number ?: ($item->user->bankAccounts->first()->account_number ?? null);
+                                    $fallbackBank = $item->user?->bankAccounts?->where('is_primary', true)->first() 
+                                        ?? $item->user?->bankAccounts?->sortByDesc('id')->first();
+                                    $bankName = $item->bank_name ?: ($fallbackBank->bank_name ?? null);
+                                    $bankAccNo = $item->bank_account_number ?: ($fallbackBank->account_number ?? null);
                                 @endphp
                                 @if($bankName && $bankAccNo)
                                     {{ $bankName }} - {{ $bankAccNo }}
@@ -548,9 +550,12 @@
                         <p>Struk ini adalah bukti sah penyerahan perangkat ke toko.</p>
                         <p>Pembayaran akan ditransfer ke rekening:</p>
                         @php
+                            $fallbackBank = $selectedSell->user 
+                                ? ($selectedSell->user->bankAccounts->where('is_primary', true)->first() ?? $selectedSell->user->bankAccounts->sortByDesc('id')->first())
+                                : null;
                             $userBank = $selectedSell->bank_name 
                                 ? (object)['bank_name' => $selectedSell->bank_name, 'account_number' => $selectedSell->bank_account_number, 'account_name' => $selectedSell->bank_account_name]
-                                : ($selectedSell->user && $selectedSell->user->bankAccounts->first() ? $selectedSell->user->bankAccounts->first() : null);
+                                : $fallbackBank;
                         @endphp
                         @if ($userBank)
                             <p class="font-bold text-gray-700 mt-1">{{ $userBank->bank_name }} - {{ $userBank->account_number }}</p>

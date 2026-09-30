@@ -8,7 +8,8 @@
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f5f7; color: #334155; line-height: 1.6; margin: 0; padding: 24px 12px;">
     @php
         $storeTitle = optional($sellPhone->businessUnit)->store_title ?? 'TOKOPON';
-        $userBank = $sellPhone->user?->bankAccounts?->first();
+        $userBank = $sellPhone->user?->bankAccounts?->where('is_primary', true)->first()
+            ?? $sellPhone->user?->bankAccounts?->sortByDesc('id')->first();
         $bankName = $sellPhone->bank_name ?: ($userBank?->bank_name ?? '-');
         $bankNumber = $sellPhone->bank_account_number ?: ($userBank?->account_number ?? '-');
         $bankOwner = $sellPhone->bank_account_name ?: ($userBank?->account_name ?? '-');

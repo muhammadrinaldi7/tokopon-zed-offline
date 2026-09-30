@@ -176,11 +176,21 @@ class SellPhoneDetail extends Component
             'account_name' => 'required|string|max:100',
         ]);
 
-        $this->sellPhone->user->bankAccounts()->create([
+        $this->sellPhone->update([
             'bank_name' => $this->bank_name,
-            'account_number' => $this->account_number,
-            'account_name' => $this->account_name,
+            'bank_account_number' => $this->account_number,
+            'bank_account_name' => $this->account_name,
         ]);
+
+        if ($this->sellPhone->user) {
+            $this->sellPhone->user->bankAccounts()->where('is_primary', true)->update(['is_primary' => false]);
+            $this->sellPhone->user->bankAccounts()->create([
+                'bank_name' => $this->bank_name,
+                'account_number' => $this->account_number,
+                'account_name' => $this->account_name,
+                'is_primary' => true,
+            ]);
+        }
 
         $this->dispatch('toast', title: 'Berhasil', message: 'Informasi Rekening Bank berhasil disimpan.', type: 'success');
         $this->isEditBankOpen = false;

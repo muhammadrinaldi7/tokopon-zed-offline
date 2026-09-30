@@ -147,7 +147,8 @@
                     </div>
 
                     @php
-                        $userBank = $claim->customer?->bankAccounts?->first();
+                        $userBank = $claim->customer?->bankAccounts?->where('is_primary', true)->first()
+                            ?? $claim->customer?->bankAccounts?->sortByDesc('id')->first();
                         $displayBank = $userBank?->bank_name ?? null;
                         $displayAccNo = $userBank?->account_number ?? null;
                         $displayAccName = $userBank?->account_name ?? null;

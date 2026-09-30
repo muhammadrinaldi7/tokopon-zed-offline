@@ -82,7 +82,8 @@ class Show extends Component
         $this->appraisedValue = $this->sellPhone->appraised_value ?? 0;
         $this->qcPassed = $this->sellPhone->hasPassedQc();
 
-        $userBank = $this->sellPhone->user?->bankAccounts?->first();
+        $userBank = $this->sellPhone->user?->bankAccounts?->where('is_primary', true)->first()
+            ?? $this->sellPhone->user?->bankAccounts?->sortByDesc('id')->first();
         $this->editBankName = $this->sellPhone->bank_name ?: ($userBank?->bank_name ?? '');
         $this->editBankAccountNumber = $this->sellPhone->bank_account_number ?: ($userBank?->account_number ?? '');
         $this->editBankAccountName = $this->sellPhone->bank_account_name ?: ($userBank?->account_name ?? '');
@@ -497,7 +498,8 @@ class Show extends Component
             return;
         }
 
-        $userBank = $this->sellPhone->user?->bankAccounts?->first();
+        $userBank = $this->sellPhone->user?->bankAccounts?->where('is_primary', true)->first()
+            ?? $this->sellPhone->user?->bankAccounts?->sortByDesc('id')->first();
         $this->editBankName = $this->sellPhone->bank_name ?: ($userBank?->bank_name ?? '');
         $this->editBankAccountNumber = $this->sellPhone->bank_account_number ?: ($userBank?->account_number ?? '');
         $this->editBankAccountName = $this->sellPhone->bank_account_name ?: ($userBank?->account_name ?? '');

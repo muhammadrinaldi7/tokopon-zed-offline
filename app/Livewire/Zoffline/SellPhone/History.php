@@ -197,9 +197,12 @@ class History extends Component
         $printer->text("penyerahan perangkat ke toko.\n");
         $printer->text("Pembayaran akan ditransfer ke rekening:\n");
 
-        $userBankName = $sellPhone->bank_name ?: ($sellPhone->user && $sellPhone->user->bankAccounts->first() ? $sellPhone->user->bankAccounts->first()->bank_name : null);
-        $userBankNumber = $sellPhone->bank_account_number ?: ($sellPhone->user && $sellPhone->user->bankAccounts->first() ? $sellPhone->user->bankAccounts->first()->account_number : null);
-        $userBankAccountName = $sellPhone->bank_account_name ?: ($sellPhone->user && $sellPhone->user->bankAccounts->first() ? $sellPhone->user->bankAccounts->first()->account_name : null);
+        $fallbackBank = $sellPhone->user 
+            ? ($sellPhone->user->bankAccounts->where('is_primary', true)->first() ?? $sellPhone->user->bankAccounts->sortByDesc('id')->first())
+            : null;
+        $userBankName = $sellPhone->bank_name ?: ($fallbackBank?->bank_name);
+        $userBankNumber = $sellPhone->bank_account_number ?: ($fallbackBank?->account_number);
+        $userBankAccountName = $sellPhone->bank_account_name ?: ($fallbackBank?->account_name);
 
         if ($userBankName || $userBankNumber) {
             $printer->setEmphasis(true);

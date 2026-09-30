@@ -329,8 +329,10 @@
                             <span class="text-gray-400 font-semibold block text-[11px] uppercase">Customer & Rekening</span>
                             <p class="font-bold text-gray-900 mt-1">{{ optional($selectedPurchase->user)->name ?? 'Tamu' }}</p>
                             @php
-                                $bName = $selectedPurchase->bank_name ?: ($selectedPurchase->user?->bankAccounts?->first()?->bank_name);
-                                $bNo = $selectedPurchase->bank_account_number ?: ($selectedPurchase->user?->bankAccounts?->first()?->account_number);
+                                $fallbackBank = $selectedPurchase->user?->bankAccounts?->where('is_primary', true)->first()
+                                    ?? $selectedPurchase->user?->bankAccounts?->sortByDesc('id')->first();
+                                $bName = $selectedPurchase->bank_name ?: ($fallbackBank?->bank_name);
+                                $bNo = $selectedPurchase->bank_account_number ?: ($fallbackBank?->account_number);
                             @endphp
                             @if($bName && $bNo)
                                 <p class="text-gray-600 font-mono text-[11px] mt-0.5">{{ $bName }} - {{ $bNo }}</p>

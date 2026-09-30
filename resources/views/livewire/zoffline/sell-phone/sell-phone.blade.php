@@ -1287,11 +1287,11 @@
                                         @foreach ($existingUserPreview['banks'] as $bankItem)
                                             @php
                                                 $isSelectedBank =
-                                                    $bank_name === $bankItem['bank_name'] &&
-                                                    $account_number == $bankItem['account_number'];
+                                                    (!empty($bankItem['id']) && $selectedBankId == $bankItem['id']) ||
+                                                    ($bank_name === $bankItem['bank_name'] && $account_number == $bankItem['account_number']);
                                             @endphp
                                             <button type="button"
-                                                wire:click="$set('bank_name', '{{ $bankItem['bank_name'] }}'); $set('account_number', '{{ $bankItem['account_number'] }}'); $set('account_name', '{{ $bankItem['account_name'] }}');"
+                                                wire:click="selectBankAccount({{ $bankItem['id'] ?? 'null' }})"
                                                 class="p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2 cursor-pointer {{ $isSelectedBank ? 'bg-[#A28153] text-black border-[#A28153] shadow-xs' : 'bg-white hover:bg-neutral-50 text-neutral-800 border-neutral-200/80' }}">
                                                 <div class="truncate">
                                                     <span

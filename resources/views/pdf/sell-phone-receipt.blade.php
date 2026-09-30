@@ -157,9 +157,12 @@
         <p>Struk ini adalah bukti sah penyerahan perangkat ke toko.</p>
         <p>Pembayaran akan ditransfer ke rekening:</p>
         @php
+            $fallbackBank = $sellPhone->user 
+                ? ($sellPhone->user->bankAccounts->where('is_primary', true)->first() ?? $sellPhone->user->bankAccounts->sortByDesc('id')->first())
+                : null;
             $userBank = $sellPhone->bank_name 
                 ? (object)['bank_name' => $sellPhone->bank_name, 'account_number' => $sellPhone->bank_account_number, 'account_name' => $sellPhone->bank_account_name]
-                : ($sellPhone->user && $sellPhone->user->bankAccounts->first() ? $sellPhone->user->bankAccounts->first() : null);
+                : $fallbackBank;
         @endphp
         @if ($userBank)
             <p class="bank-info" style="margin-top: 4px;">{{ $userBank->bank_name }} - {{ $userBank->account_number }}</p>

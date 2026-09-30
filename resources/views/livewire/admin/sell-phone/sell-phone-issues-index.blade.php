@@ -191,7 +191,8 @@
                         @php
                             $isResolved = $issue->status === 'RESOLVED';
                             $sellPhone = $issue->sellPhone;
-                            $userBank = $sellPhone?->user?->bankAccounts?->first();
+                            $userBank = $sellPhone?->user?->bankAccounts?->where('is_primary', true)->first()
+                                ?? $sellPhone?->user?->bankAccounts?->sortByDesc('id')->first();
                             $bankName = $sellPhone?->bank_name ?: ($userBank?->bank_name ?? '-');
                             $bankAccNo = $sellPhone?->bank_account_number ?: ($userBank?->account_number ?? '-');
                             $bankAccName = $sellPhone?->bank_account_name ?: ($userBank?->account_name ?? '-');

@@ -28,6 +28,7 @@ class SellPhone extends Component
     public $account_name;
 
     public $bank_name;
+    public $selectedBankId = null;
 
     // FL Customer Search
     public $isNewCustomer = true;
@@ -189,31 +190,54 @@ class SellPhone extends Component
         $customer = User::with(['profile', 'bankAccounts'])->find($id);
         if (!$customer) return;
 
+        $this->existingUserId = $id;
+        $this->isExistingUserFound = true;
         $this->searchCustomer = $customer->name;
         $this->name = $customer->name;
         $this->email = $customer->email;
         $this->mobilePhone = $customer->profile?->phone_number ?? '';
         $this->domisili = $customer->profile?->domisili ?? '';
 
-        $latestBank = $customer->bankAccounts()->latest()->first();
+        $latestBank = $customer->bankAccounts()->where('is_primary', true)->first() 
+            ?? $customer->bankAccounts()->latest()->first();
         if ($latestBank) {
+            $this->selectedBankId = $latestBank->id;
             $this->bank_name = $latestBank->bank_name;
             $this->account_number = $latestBank->account_number;
             $this->account_name = $latestBank->account_name;
             $this->needsBankInfo = false;
         } else {
+            $this->selectedBankId = null;
             $this->bank_name = '';
             $this->account_number = '';
             $this->account_name = '';
             $this->needsBankInfo = true;
             $this->dispatch('toast', title: 'Perhatian!', message: 'Pelanggan ini belum memiliki informasi rekening bank. Silakan lengkapi data bank di bawah.', type: 'warning');
         }
+
+        $this->existingUserPreview = [
+            'id' => $customer->id,
+            'name' => $customer->name,
+            'email' => $customer->email,
+            'phone' => $customer->profile?->phone_number ?? $this->mobilePhone,
+            'domisili' => $customer->profile?->domisili ?? '-',
+            'banks' => $customer->bankAccounts->sortByDesc('is_primary')->map(function ($b) {
+                return [
+                    'id' => $b->id,
+                    'bank_name' => $b->bank_name,
+                    'account_number' => $b->account_number,
+                    'account_name' => $b->account_name,
+                    'is_primary' => (bool) $b->is_primary,
+                ];
+            })->values()->toArray(),
+        ];
     }
 
     public function selectBankAccount($bankId)
     {
         $bank = \App\Models\UserBankAccount::find($bankId);
         if ($bank) {
+            $this->selectedBankId = $bank->id;
             $this->bank_name = $bank->bank_name;
             $this->account_number = $bank->account_number;
             $this->account_name = $bank->account_name;
@@ -224,6 +248,7 @@ class SellPhone extends Component
     public function clearSelectedCustomer()
     {
         $this->selectedCustomerId = null;
+        $this->selectedBankId = null;
         $this->name = '';
         $this->email = '';
         $this->mobilePhone = '';
@@ -288,11 +313,18 @@ class SellPhone extends Component
             $this->domisili = $user->profile?->domisili ?? '';
 
             // Muat data rekening terakhir jika ada
-            $latestBank = $user->bankAccounts()->latest()->first();
+            $latestBank = $user->bankAccounts()->where('is_primary', true)->first() 
+                ?? $user->bankAccounts()->latest()->first();
             if ($latestBank) {
+                $this->selectedBankId = $latestBank->id;
                 $this->bank_name = $latestBank->bank_name;
                 $this->account_number = $latestBank->account_number;
                 $this->account_name = $latestBank->account_name;
+            } else {
+                $this->selectedBankId = null;
+                $this->bank_name = '';
+                $this->account_number = '';
+                $this->account_name = '';
             }
 
             $this->existingUserPreview = [
@@ -301,13 +333,15 @@ class SellPhone extends Component
                 'email' => $user->email,
                 'phone' => $user->profile?->phone_number ?? $this->mobilePhone,
                 'domisili' => $user->profile?->domisili ?? '-',
-                'banks' => $user->bankAccounts->map(function ($b) {
+                'banks' => $user->bankAccounts->sortByDesc('is_primary')->map(function ($b) {
                     return [
+                        'id' => $b->id,
                         'bank_name' => $b->bank_name,
                         'account_number' => $b->account_number,
                         'account_name' => $b->account_name,
+                        'is_primary' => (bool) $b->is_primary,
                     ];
-                })->toArray(),
+                })->values()->toArray(),
             ];
 
             $this->dispatch(
@@ -339,6 +373,7 @@ class SellPhone extends Component
     public function resetExistingCustomer()
     {
         $this->existingUserId = null;
+        $this->selectedBankId = null;
         $this->isExistingUserFound = false;
         $this->existingUserPreview = null;
         $this->name = '';
@@ -1111,23 +1146,38 @@ class SellPhone extends Component
                     ]);
                 }
 
-                // Cek data rekening bank: jika belum ada nomor rekening ini, tambahkan sebagai rekening baru
-                $existingBank = $customer->bankAccounts()
-                    ->where('account_number', $this->account_number)
-                    ->first();
+                // Cek data rekening bank pelanggan
+                $targetBank = null;
+                if ($this->selectedBankId) {
+                    $selectedBank = $customer->bankAccounts()->find($this->selectedBankId);
+                    if ($selectedBank && $selectedBank->account_number === $this->account_number) {
+                        $targetBank = $selectedBank;
+                    }
+                }
 
-                if (!$existingBank) {
-                    $customer->bankAccounts()->create([
+                if (!$targetBank) {
+                    $targetBank = $customer->bankAccounts()
+                        ->where('account_number', $this->account_number)
+                        ->first();
+                }
+
+                if ($targetBank) {
+                    $targetBank->update([
                         'account_number' => $this->account_number,
                         'account_name'   => $this->account_name,
                         'bank_name'      => $this->bank_name,
+                        'is_primary'     => true,
                     ]);
-                    Log::channel('sell_phone')->info("Rekening baru berhasil ditambahkan untuk user lama ID {$customer->id}: {$this->bank_name} - {$this->account_number}");
+                    $customer->bankAccounts()->where('id', '!=', $targetBank->id)->update(['is_primary' => false]);
                 } else {
-                    $existingBank->update([
-                        'account_name' => $this->account_name,
-                        'bank_name'    => $this->bank_name,
+                    $newBank = $customer->bankAccounts()->create([
+                        'account_number' => $this->account_number,
+                        'account_name'   => $this->account_name,
+                        'bank_name'      => $this->bank_name,
+                        'is_primary'     => true,
                     ]);
+                    $customer->bankAccounts()->where('id', '!=', $newBank->id)->update(['is_primary' => false]);
+                    Log::channel('sell_phone')->info("Rekening baru berhasil ditambahkan untuk user lama ID {$customer->id}: {$this->bank_name} - {$this->account_number}");
                 }
 
                 $userIdToSave = $customer->id;
@@ -1157,6 +1207,7 @@ class SellPhone extends Component
                         'account_number' => $this->account_number,
                         'account_name'   => $this->account_name,
                         'bank_name'      => $this->bank_name,
+                        'is_primary'     => true,
                     ]);
                 }
                 event(new Registered($customer));
@@ -1276,22 +1327,25 @@ class SellPhone extends Component
 
             // Simpan ke Database
             $sellPhone = \App\Models\SellPhone::create([
-                'user_id'           => $userIdToSave,
-                'sales_id'          => $this->selected_sales_id,
-                'product_accurate_id' => $productAccurate->id,
-                'phone_brand'       => $productAccurate->brandName,
-                'phone_model'       => $productAccurate->name,
-                'phone_ram'         => null,
-                'phone_storage'     => null,
-                'imei'              => $this->imei,
-                'minus_desc'        => $minusDesc,
-                'appraised_value'   => $this->final_price,
+                'user_id'                  => $userIdToSave,
+                'sales_id'                 => $this->selected_sales_id,
+                'product_accurate_id'      => $productAccurate->id,
+                'phone_brand'              => $productAccurate->brandName,
+                'phone_model'              => $productAccurate->name,
+                'phone_ram'                => null,
+                'phone_storage'            => null,
+                'imei'                     => $this->imei,
+                'minus_desc'               => $minusDesc,
+                'appraised_value'          => $this->final_price,
                 'original_appraised_value' => $this->calculated_price,
-                'is_price_adjusted' => false, // Set false karena kasir tidak bisa mengubah harga lagi
-                'status'            => $finalStatus,
-                'handled_by'        => $currentUser->id,
-                'business_unit_id'  => $currentUser->getActiveBusinessUnitId(),
-                'branch_id'         => Auth::user()->branch_id,
+                'is_price_adjusted'        => false, // Set false karena kasir tidak bisa mengubah harga lagi
+                'status'                   => $finalStatus,
+                'handled_by'               => $currentUser->id,
+                'business_unit_id'         => $currentUser->getActiveBusinessUnitId(),
+                'branch_id'                => Auth::user()->branch_id,
+                'bank_name'                => $this->bank_name,
+                'bank_account_number'      => $this->account_number,
+                'bank_account_name'        => $this->account_name,
             ]);
 
             Log::channel('sell_phone')->info("SellPhone berhasil disimpan ke DB. ID: {$sellPhone->id}, IMEI: {$sellPhone->imei}, Status: {$sellPhone->status}");
@@ -1454,6 +1508,7 @@ class SellPhone extends Component
             'account_number',
             'account_name',
             'bank_name',
+            'selectedBankId',
             'isNewCustomer',
             'searchCustomer',
             'selectedCustomerId',

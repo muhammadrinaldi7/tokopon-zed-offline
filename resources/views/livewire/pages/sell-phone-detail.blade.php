@@ -278,9 +278,16 @@
                     @if($sellPhone->salesBy)
                         • Sales: <strong class="text-indigo-600">{{ $sellPhone->salesBy->name }} ({{ $sellPhone->salesBy->employee_no ?? '-' }})</strong>
                     @endif
-                    @if($sellPhone->user && $sellPhone->user->bankAccounts->first())
-                        • Rekening: <strong class="text-neutral-700">{{ $sellPhone->user->bankAccounts->first()->bank_name }}
-                        ({{ $sellPhone->user->bankAccounts->first()->account_number }})</strong>
+                    @php
+                        $fallbackBank = $sellPhone->user 
+                            ? ($sellPhone->user->bankAccounts->where('is_primary', true)->first() ?? $sellPhone->user->bankAccounts->sortByDesc('id')->first())
+                            : null;
+                        $displayBankName = $sellPhone->bank_name ?: ($fallbackBank?->bank_name);
+                        $displayBankAccNo = $sellPhone->bank_account_number ?: ($fallbackBank?->account_number);
+                    @endphp
+                    @if($displayBankName && $displayBankAccNo)
+                        • Rekening: <strong class="text-neutral-700">{{ $displayBankName }}
+                        ({{ $displayBankAccNo }})</strong>
                     @else
                         • Rekening: <strong class="text-neutral-500 italic">Belum diisi</strong>
                         <button type="button" @click="$wire.set('isEditBankOpen', true)" class="ml-2 px-3 py-1 bg-violet-100 text-violet-700 hover:bg-violet-200 text-[10px] font-bold uppercase rounded-lg transition-colors">

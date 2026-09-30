@@ -288,7 +288,8 @@
                 </div>
 
                 @php
-                    $userBank = $sellPhone->user?->bankAccounts?->first();
+                    $userBank = $sellPhone->user?->bankAccounts?->where('is_primary', true)->first()
+                        ?? $sellPhone->user?->bankAccounts?->sortByDesc('id')->first();
                     $displayBank = $sellPhone->bank_name ?: $userBank?->bank_name ?? null;
                     $displayAccNo = $sellPhone->bank_account_number ?: $userBank?->account_number ?? null;
                     $displayAccName = $sellPhone->bank_account_name ?: $userBank?->account_name ?? null;

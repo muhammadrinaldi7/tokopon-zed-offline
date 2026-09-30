@@ -594,7 +594,9 @@
                                 @if ($selectedCustomerId)
                                     @php 
                                         $selectedUser = \App\Models\User::find($selectedCustomerId); 
-                                        $firstBank = $selectedUser ? $selectedUser->bankAccounts()->first() : null;
+                                        $firstBank = $selectedUser 
+                                            ? ($selectedUser->bankAccounts()->where('is_primary', true)->first() ?: $selectedUser->bankAccounts()->first()) 
+                                            : null;
                                     @endphp
                                     <div
                                         class="p-4 bg-violet-50 border border-violet-200 rounded-2xl flex flex-col gap-4">
