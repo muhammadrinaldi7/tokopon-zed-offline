@@ -95,6 +95,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/products', \App\Livewire\Zoffline\Reporting\ProductReport::class)->name('products');
         Route::get('/stock', \App\Livewire\Zoffline\Reporting\StockReport::class)->name('stock');
         Route::get('/laporan-stok', \App\Livewire\Zoffline\Reporting\LaporanStok::class)->name('laporan-stok');
+        Route::get('/laporan-unit-harga', \App\Livewire\Zoffline\Reporting\LaporanUnitRentangHarga::class)->name('laporan-unit-harga')->middleware('can:cek-unit-rentang-harga');
         Route::get('/staff', \App\Livewire\Zoffline\Reporting\StaffReport::class)->name('staff');
         Route::get('/laba-rugi', \App\Livewire\Zoffline\Reporting\IncomeStatement::class)->name('income-statement');
         Route::get('/profit', \App\Livewire\Zoffline\Reporting\ProfitReport::class)->name('profit');
