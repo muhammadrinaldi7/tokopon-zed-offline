@@ -136,7 +136,12 @@ class LaporanStok extends Component
                 $query->leftJoin('product_accurates', 'product_serial_numbers.product_accurate_id', '=', 'product_accurates.id')
                     ->orderBy('product_accurates.proyek', $this->sortDirection);
             }, function ($query) {
-                $query->orderBy('product_serial_numbers.' . $this->sortField, $this->sortDirection);
+                if (in_array($this->sortField, ['base_price', 'harga_jual'])) {
+                    $query->leftJoin('product_accurates', 'product_serial_numbers.product_accurate_id', '=', 'product_accurates.id')
+                        ->orderBy('product_accurates.base_price', $this->sortDirection);
+                } else {
+                    $query->orderBy('product_serial_numbers.' . $this->sortField, $this->sortDirection);
+                }
             });
     }
 
@@ -181,6 +186,7 @@ class LaporanStok extends Component
             'SUBKATEGORI',
             'GUDANG',
             'HPP',
+            'HARGA JUAL',
             'VENDOR',
             'STATUS',
             'TANGGAL TERIMA',
@@ -204,6 +210,7 @@ class LaporanStok extends Component
                     $item->productAccurate->proyek ?? ($item->proyek ?? '-'),
                     $item->warehouse->name ?? '-',
                     round($item->hpp ?? 0),
+                    round($item->productAccurate->base_price ?? ($item->base_price ?? 0)),
                     $item->vendor->vendor_name ?? '-',
                     $item->status,
                     $item->receipt_date ? \Carbon\Carbon::parse($item->receipt_date)->format('Y-m-d') : '-',

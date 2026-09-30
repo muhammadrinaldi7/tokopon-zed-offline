@@ -71,6 +71,7 @@ class LaporanStokTest extends TestCase
             'name' => 'Product Test Resmi',
             'accurate_id' => 'ACC-TEST-001',
             'proyek' => 'RESMI',
+            'base_price' => 150000,
             'business_unit_id' => $this->bu->id,
         ]);
 
@@ -79,6 +80,7 @@ class LaporanStokTest extends TestCase
             'name' => 'Product Test Inter',
             'accurate_id' => 'ACC-TEST-002',
             'proyek' => 'INTER',
+            'base_price' => 200000,
             'business_unit_id' => $this->bu->id,
         ]);
 
@@ -111,6 +113,10 @@ class LaporanStokTest extends TestCase
         $response = $this->actingAs($this->user)->get(route('reporting.laporan-stok'));
         $response->assertStatus(200);
         $response->assertSee('Subkategori');
+        $response->assertSee('Harga Jual');
+        $response->assertSee('Harga Pokok (HPP)');
+        $response->assertSee('Rp 150.000');
+        $response->assertSee('Rp 200.000');
     }
 
     public function test_laporan_stok_filters_by_vendor_id()
@@ -191,6 +197,44 @@ class LaporanStokTest extends TestCase
                 // INTER comes before RESMI in ascending order
                 return $stocks->first()->serial_number === 'SN-VND2-002';
             });
+    }
+
+    public function test_laporan_stok_sort_by_harga_jual()
+    {
+        Livewire::actingAs($this->user)
+            ->test(LaporanStok::class)
+            ->call('sortBy', 'harga_jual')
+            ->assertSet('sortField', 'harga_jual')
+            ->assertSet('sortDirection', 'asc')
+            ->assertViewHas('stocks', function ($stocks) {
+                // 150000 (PROD-001) comes before 200000 (PROD-002) in asc
+                return $stocks->first()->serial_number === 'SN-VND1-001';
+            })
+            ->call('sortBy', 'harga_jual')
+            ->assertSet('sortDirection', 'desc')
+            ->assertViewHas('stocks', function ($stocks) {
+                // 200000 (PROD-002) comes before 150000 (PROD-001) in desc
+                return $stocks->first()->serial_number === 'SN-VND2-002';
+            });
+    }
+
+    public function test_laporan_stok_excel_export_structure()
+    {
+        $sn = ProductSerialNumber::with(['productAccurate', 'warehouse', 'vendor'])->get();
+        $export = new \App\Exports\LaporanStokExport($sn);
+
+        $headings = $export->headings();
+        $this->assertContains('Harga Jual', $headings);
+        $this->assertContains('Harga Pokok (HPP)', $headings);
+
+        // Verify Harga Jual is positioned right after Harga Pokok (HPP)
+        $hppIndex = array_search('Harga Pokok (HPP)', $headings);
+        $hargaJualIndex = array_search('Harga Jual', $headings);
+        $this->assertEquals($hppIndex + 1, $hargaJualIndex);
+
+        $mapped = $export->map($sn->first());
+        $this->assertEquals(100000, $mapped[$hppIndex]);
+        $this->assertEquals(150000, $mapped[$hargaJualIndex]);
     }
 
     public function test_laporan_stok_excel_export()

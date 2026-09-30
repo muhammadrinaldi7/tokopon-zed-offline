@@ -81,4 +81,22 @@ class ProductSerialNumber extends Model
 
         return \App\Models\ProductAccurate::where('item_no', $this->item_no)->value('proyek');
     }
+
+    public function getBasePriceAttribute()
+    {
+        if ($this->relationLoaded('productAccurate') && $this->productAccurate) {
+            return (float) ($this->productAccurate->base_price ?? 0);
+        }
+
+        if ($this->product_accurate_id && $this->productAccurate) {
+            return (float) ($this->productAccurate->base_price ?? 0);
+        }
+
+        $accurate = \App\Models\ProductAccurate::where('item_no', $this->item_no)->first();
+        if ($accurate) {
+            return (float) ($accurate->base_price ?? 0);
+        }
+
+        return 0;
+    }
 }

@@ -202,6 +202,12 @@
                                 <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
                             @endif
                         </th>
+                        <th class="px-5 py-4 font-bold text-right cursor-pointer hover:bg-gray-50" wire:click="sortBy('harga_jual')">
+                            Harga Jual
+                            @if($sortField === 'harga_jual' || $sortField === 'base_price')
+                                <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
+                            @endif
+                        </th>
                         <th class="px-5 py-4 font-bold">Vendor</th>
                         <th class="px-5 py-4 font-bold text-center cursor-pointer hover:bg-gray-50" wire:click="sortBy('receipt_date')">
                             Tanggal Masuk
@@ -275,6 +281,9 @@
                             <td class="px-5 py-3 text-right">
                                 <p class="text-sm font-bold text-gray-700">Rp {{ number_format($item->hpp ?? 0, 0, ',', '.') }}</p>
                             </td>
+                            <td class="px-5 py-3 text-right">
+                                <p class="text-sm font-bold text-emerald-600">Rp {{ number_format($item->productAccurate->base_price ?? ($item->base_price ?? 0), 0, ',', '.') }}</p>
+                            </td>
                             <td class="px-5 py-3">
                                 <p class="text-xs font-semibold text-gray-600">{{ $item->vendor->vendor_name ?? '-' }}</p>
                             </td>
@@ -291,7 +300,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="px-5 py-8 text-center text-gray-400 text-sm">
+                            <td colspan="11" class="px-5 py-8 text-center text-gray-400 text-sm">
                                 Tidak ada data Serial Number yang ditemukan.
                             </td>
                         </tr>
