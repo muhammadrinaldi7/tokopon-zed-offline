@@ -23,6 +23,7 @@ class Index extends Component
         'CUSTOM_CASHBACK'      => 'Persetujuan Cashback (PC)',
         'purchase_order'       => 'Persetujuan Pembelian (PO)',
         'STOCK_ADJUSTMENT'     => 'Penyesuaian Stok Persediaan',
+        'STOCK_OPNAME_REPORT'  => 'Laporan Stock Opname',
     ];
 
     public function getIsFinancialProperty(): bool

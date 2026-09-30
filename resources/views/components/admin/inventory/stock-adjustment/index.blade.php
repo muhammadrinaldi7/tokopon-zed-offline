@@ -49,11 +49,11 @@
                 <select wire:model.live="filterStatus"
                     class="w-full py-2 px-3 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-blue-500 cursor-pointer">
                     <option value="ALL">Semua Status</option>
-                    <option value="PENDING">⏳ Menunggu Approval</option>
-                    <option value="APPROVED">✅ Disetujui (Siap Sync)</option>
-                    <option value="SYNCED">🎉 Berhasil Sync Accurate</option>
-                    <option value="FAILED_SYNC">⚠️ Gagal Sync Accurate</option>
-                    <option value="REJECTED">❌ Ditolak</option>
+                    <option value="PENDING">Menunggu Approval</option>
+                    <option value="APPROVED">Disetujui (Siap Sync)</option>
+                    <option value="SYNCED">Berhasil Sync Accurate</option>
+                    <option value="FAILED_SYNC">Gagal Sync Accurate</option>
+                    <option value="REJECTED">Ditolak</option>
                 </select>
             </div>
 
@@ -64,7 +64,7 @@
                     class="w-full py-2 px-3 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-blue-500 cursor-pointer">
                     <option value="ALL">Semua Tipe</option>
                     <option value="OUT"> Pengurangan (Keluar)</option>
-                    <option value="IN">🟢 Penambahan (Masuk)</option>
+                    <option value="IN">Penambahan (Masuk)</option>
                 </select>
             </div>
 
@@ -153,7 +153,7 @@
                                 <div class="flex items-center gap-1.5">
                                     <span
                                         class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold {{ $adj->adjustment_type === 'OUT' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' }}">
-                                        {{ $adj->adjustment_type === 'OUT' ? ' Keluar' : '🟢 Masuk' }}
+                                        {{ $adj->adjustment_type === 'OUT' ? ' Keluar' : ' Masuk' }}
                                     </span>
                                     <span class="font-extrabold text-gray-900 text-xs font-mono">
                                         {{ $totalQty }} pcs
@@ -378,7 +378,7 @@
                                     @foreach ($warehouses as $wh)
                                         <option value="{{ $wh->id }}">
                                             {{ $wh->name }}
-                                            {{ Auth::user()->warehouse_id == $wh->id ? '⭐ (Gudang Anda)' : '' }}
+                                            {{ Auth::user()->warehouse_id == $wh->id ? '(Gudang Anda)' : '' }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -396,10 +396,10 @@
                                     class="w-full text-xs bg-white border border-gray-300 rounded-xl p-2.5 focus:border-blue-500 outline-none cursor-pointer font-medium">
                                     <option value="PEMELIHARAAN_INVENTARIS">Pemeliharaan Inventaris / Unit Display
                                     </option>
-                                    <option value="BARANG_RUSAK_DEFECT">Barang Rusak / Defect / Cacat Pabrik</option>
+                                    {{-- <option value="BARANG_RUSAK_DEFECT">Barang Rusak / Defect / Cacat Pabrik</option> --}}
                                     <option value="SAMPLE_PROMOSI">Sample / Display Promosi Toko</option>
-                                    <option value="SELISIH_OPNAME">Selisih Hasil Stock Opname</option>
-                                    <option value="KOREKSI_STOK">Koreksi Administrasi / Salah Input</option>
+                                    {{-- <option value="SELISIH_OPNAME">Selisih Hasil Stock Opname</option> --}}
+                                    {{-- <option value="KOREKSI_STOK">Koreksi Administrasi / Salah Input</option> --}}
                                     <option value="LAINNYA">Lain-lain</option>
                                 </select>
                             </div>
@@ -506,7 +506,7 @@
                                 </label>
                                 <div
                                     class="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold flex items-center gap-2">
-                                    <span class="w-2 h-2 rounded-full bg-rose-600"></span>
+                                    {{-- <span class="w-2 h-2 rounded-full bg-rose-600"></span> --}}
                                     Pemakaian (Keluar)
                                 </div>
                             </div>
@@ -1098,7 +1098,7 @@
                                             <td class="px-4 py-2.5 text-center">
                                                 <span
                                                     class="inline-block px-2 py-0.5 rounded text-[10px] font-black {{ $selectedAdjustment->adjustment_type === 'OUT' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700' }}">
-                                                    {{ $selectedAdjustment->adjustment_type === 'OUT' ? ' Keluar' : '🟢 Masuk' }}
+                                                    {{ $selectedAdjustment->adjustment_type === 'OUT' ? ' Keluar' : 'Masuk' }}
                                                 </span>
                                             </td>
                                             <td class="px-4 py-2.5 text-center font-black font-mono">
