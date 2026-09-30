@@ -67,14 +67,30 @@ class StockOpname extends Model
      */
     public function getScopeLabelAttribute(): string
     {
-        return match ($this->type) {
-            'SERIALIZED_ONLY'     => 'Khusus Unit HP (IMEI)',
+        $filters = [];
+        if ($this->brand_filter) {
+            $filters[] = "Brand: {$this->brand_filter}";
+        }
+        if ($this->category_filter) {
+            $filters[] = "Kategori: {$this->category_filter}";
+        }
+        if ($this->project_filter) {
+            $filters[] = "Proyek: {$this->project_filter}";
+        }
+
+        $filterText = !empty($filters) ? implode(' • ', $filters) : '';
+
+        $typeText = match ($this->type) {
+            'SERIALIZED_ONLY'     => 'Khusus HP (IMEI)',
             'NON_SERIALIZED_ONLY' => 'Khusus Aksesoris',
-            'BRAND'               => 'Per Brand: ' . ($this->brand_filter ?: 'Semua Brand'),
-            'PROYEK'              => 'Per Proyek: ' . ($this->project_filter ?: 'Semua Proyek'),
-            'CATEGORY'            => 'Per Kategori: ' . ($this->category_filter ?: 'Semua Kategori'),
-            default               => 'Semua Produk (Full Audit)',
+            default               => 'Semua Produk',
         };
+
+        if ($filterText) {
+            return "{$typeText} [{$filterText}]";
+        }
+
+        return $typeText . ' (Full Audit)';
     }
 
     /**
