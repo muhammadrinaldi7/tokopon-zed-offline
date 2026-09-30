@@ -48,6 +48,11 @@ class Reporting extends Component
         return $this->redirectRoute('reporting.laporan-stok', navigate: true);
     }
 
+    public function navigateToLaporanUnitHarga()
+    {
+        return $this->redirectRoute('reporting.laporan-unit-harga', navigate: true);
+    }
+
     public function navigateToStaff()
     {
         return $this->redirectRoute('reporting.staff', navigate: true);
