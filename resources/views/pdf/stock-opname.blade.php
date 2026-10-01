@@ -301,12 +301,17 @@
 
     {{-- Rincian IMEI Missing (Jika Ada) --}}
     @if($missingSerials->isNotEmpty())
-        <div class="section-title" style="color: #b91c1c;">II. Rincian IMEI / Serial Number yang Hilang (Missing)</div>
+        <div class="section-title" style="color: #b91c1c;">
+            II. Rincian IMEI / Serial Number yang Hilang (Missing)
+            @if(empty($isCompleted))
+                <span style="font-size: 7pt; color: #777; text-transform: none; font-weight: normal;">(Nomor Seri Disensor - Belum Selesai)</span>
+            @endif
+        </div>
         <table class="data-table">
             <thead>
                 <tr>
                     <th style="width: 5%;">No</th>
-                    <th style="width: 25%;">Nomor IMEI / Seri</th>
+                    <th style="width: 25%;">Nomor IMEI / Seri @if(empty($isCompleted)) (Disensor) @endif</th>
                     <th style="width: 45%;">Nama Produk</th>
                     <th style="width: 25%;" class="text-right">HPP Unit</th>
                 </tr>
@@ -326,12 +331,17 @@
 
     {{-- Rincian IMEI Nyasar (Jika Ada) --}}
     @if($unexpectedSerials->isNotEmpty())
-        <div class="section-title" style="color: #b45309;">III. Rincian IMEI / Serial Number Nyasar (Unexpected)</div>
+        <div class="section-title" style="color: #b45309;">
+            III. Rincian IMEI / Serial Number Nyasar (Unexpected)
+            @if(empty($isCompleted))
+                <span style="font-size: 7pt; color: #777; text-transform: none; font-weight: normal;">(Nomor Seri Disensor Sebagian)</span>
+            @endif
+        </div>
         <table class="data-table">
             <thead>
                 <tr>
                     <th style="width: 5%;">No</th>
-                    <th style="width: 25%;">Nomor IMEI / Seri</th>
+                    <th style="width: 25%;">Nomor IMEI / Seri @if(empty($isCompleted)) (Disensor) @endif</th>
                     <th style="width: 30%;">Nama Produk</th>
                     <th style="width: 20%;">Discan Oleh</th>
                     <th style="width: 20%;">Catatan Investigasi</th>

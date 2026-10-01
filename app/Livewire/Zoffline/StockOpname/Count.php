@@ -57,6 +57,35 @@ class Count extends Component
     }
 
     /**
+     * Helper untuk menyensor nomor IMEI / Serial Number agar tidak terjadi kecurangan copy-paste.
+     * Untuk status MISSING (belum discan), hanya 4 digit terakhir yang ditampilkan.
+     * Untuk status MATCHED / UNEXPECTED, digit tengah disensor.
+     */
+    public static function maskSerialNumber(?string $sn, string $status = 'MISSING'): string
+    {
+        if (!$sn) {
+            return '-';
+        }
+
+        $clean = trim($sn);
+        $len = strlen($clean);
+
+        if ($len <= 4) {
+            return str_repeat('•', $len);
+        }
+
+        if ($status === 'MISSING') {
+            return str_repeat('•', max(0, $len - 4)) . substr($clean, -4);
+        }
+
+        if ($len <= 8) {
+            return substr($clean, 0, 2) . str_repeat('•', max(0, $len - 4)) . substr($clean, -2);
+        }
+
+        return substr($clean, 0, 4) . str_repeat('•', max(0, $len - 8)) . substr($clean, -4);
+    }
+
+    /**
      * Proses Pemindaian Barcode / Input IMEI Cepat (Kolaborasi Multi-BM)
      */
     public function processScan()
@@ -79,6 +108,8 @@ class Count extends Component
             ->first();
 
         if ($opnameSerial) {
+            $maskedSn = self::maskSerialNumber($cleanSn, 'MATCHED');
+
             // Kasus A: Sudah discan sebelumnya (Duplikat)
             if ($opnameSerial->status === 'MATCHED') {
                 $previouslyScannedBy = $opnameSerial->scannedByUser->name ?? 'BM Lain';
@@ -86,7 +117,7 @@ class Count extends Component
 
                 $this->scanAlert = [
                     'type'    => 'warning',
-                    'message' => "Nomor Seri/IMEI [{$cleanSn}] SUDAH discan sebelumnya oleh {$previouslyScannedBy} pada pukul {$time}!",
+                    'message' => "Nomor Seri/IMEI [{$maskedSn}] SUDAH discan sebelumnya oleh {$previouslyScannedBy} pada pukul {$time}!",
                 ];
                 $this->dispatch('play-scan-sound', type: 'warning');
                 $this->barcodeScan = '';
@@ -111,7 +142,8 @@ class Count extends Component
             $this->opname->calculateTotals();
 
             $this->lastScannedItem = [
-                'sn'           => $cleanSn,
+                'id'           => $opnameSerial->id,
+                'sn'           => $maskedSn,
                 'name'         => $item->product_name ?? $opnameSerial->item_no,
                 'status'       => 'MATCHED',
                 'status_label' => 'Cocok (Terverifikasi)',
@@ -121,7 +153,7 @@ class Count extends Component
 
             $this->scanAlert = [
                 'type'    => 'success',
-                'message' => "IMEI [{$cleanSn}] berhasil diverifikasi oleh {$scannerName}!",
+                'message' => "IMEI [{$maskedSn}] berhasil diverifikasi oleh {$scannerName}!",
             ];
             $this->dispatch('play-scan-sound', type: 'success');
 
@@ -164,7 +196,7 @@ class Count extends Component
             );
 
             // Tambahkan ke tabel serials dengan status UNEXPECTED
-            StockOpnameSerial::create([
+            $createdSerial = StockOpnameSerial::create([
                 'stock_opname_id'      => $this->opname->id,
                 'stock_opname_item_id' => $item->id,
                 'item_no'              => $itemNo,
@@ -182,8 +214,11 @@ class Count extends Component
 
             $this->opname->calculateTotals();
 
+            $maskedSn = self::maskSerialNumber($cleanSn, 'UNEXPECTED');
+
             $this->lastScannedItem = [
-                'sn'           => $cleanSn,
+                'id'           => $createdSerial->id,
+                'sn'           => $maskedSn,
                 'name'         => $productName,
                 'status'       => 'UNEXPECTED',
                 'status_label' => 'Barang Nyasar / Di Luar Cakupan Sesi',
@@ -193,12 +228,98 @@ class Count extends Component
 
             $this->scanAlert = [
                 'type'    => 'error',
-                'message' => "PERINGATAN: IMEI [{$cleanSn}] adalah Barang Nyasar! Dicatat oleh {$scannerName}.",
+                'message' => "PERINGATAN: Scan [{$maskedSn}] adalah Barang Nyasar / Di Luar Sesi! Dicatat oleh {$scannerName}.",
             ];
             $this->dispatch('play-scan-sound', type: 'error');
         }
 
         $this->barcodeScan = '';
+    }
+
+    /**
+     * Batalkan atau hapus pemindaian IMEI / Barcode salah.
+     * - Jika UNEXPECTED (barang nyasar / barcode lain ke-scan): Hapus record serial, dan hapus item jika dibuat otomatis.
+     * - Jika MATCHED (IMEI resmi toko tapi salah scan): Kembalikan ke MISSING.
+     */
+    public function deleteScan(int $serialId)
+    {
+        if ($this->opname->status !== 'COUNTING') {
+            $this->scanAlert = [
+                'type'    => 'error',
+                'message' => 'Sesi stock opname ini sudah tidak dalam tahap pemindaian (counting).',
+            ];
+            return;
+        }
+
+        $serial = StockOpnameSerial::where('stock_opname_id', $this->opname->id)
+            ->with('stockOpnameItem')
+            ->find($serialId);
+
+        if (!$serial) {
+            $this->scanAlert = [
+                'type'    => 'error',
+                'message' => 'Data scan tidak ditemukan atau sudah dibatalkan sebelumnya.',
+            ];
+            return;
+        }
+
+        $item = $serial->stockOpnameItem;
+        $maskedSn = self::maskSerialNumber($serial->serial_number, $serial->status);
+
+        if ($serial->status === 'UNEXPECTED') {
+            $serial->delete();
+
+            if ($item) {
+                $item->decrement('physical_qty');
+
+                // Jika item dibuat otomatis karena scan nyasar (system_qty == 0)
+                // dan kuantitas fisik kembali 0 serta tidak ada serial lain tersisa, hapus itemnya
+                if ($item->system_qty <= 0 && $item->physical_qty <= 0 && $item->serials()->count() === 0) {
+                    $item->delete();
+                } else {
+                    $item->recalculateDifference();
+                }
+            }
+
+            $this->scanAlert = [
+                'type'    => 'success',
+                'message' => "Scan salah/nyasar [{$maskedSn}] berhasil dihapus dari opname.",
+            ];
+        } elseif ($serial->status === 'MATCHED') {
+            $serial->update([
+                'status'     => 'MISSING',
+                'scanned_at' => null,
+                'scanned_by' => null,
+            ]);
+
+            if ($item) {
+                $item->decrement('physical_qty');
+                $item->recalculateDifference();
+            }
+
+            $this->scanAlert = [
+                'type'    => 'success',
+                'message' => "Scan IMEI [{$maskedSn}] berhasil dibatalkan (status kembali Belum Discan).",
+            ];
+        }
+
+        $this->opname->calculateTotals();
+
+        // Reset lastScannedItem jika yang dihapus adalah item terakhir yang discan
+        if ($this->lastScannedItem && ($this->lastScannedItem['id'] ?? null) === $serialId) {
+            $this->lastScannedItem = null;
+        }
+
+        // Refresh modal jika modal sedang terbuka
+        if ($this->showSerialModal && $this->selectedItemForSerials) {
+            $activeItemId = is_array($this->selectedItemForSerials)
+                ? ($this->selectedItemForSerials['id'] ?? null)
+                : ($this->selectedItemForSerials->id ?? null);
+
+            if ($activeItemId) {
+                $this->openSerialModal($activeItemId);
+            }
+        }
     }
 
     /**
@@ -247,15 +368,41 @@ class Count extends Component
     }
 
     /**
-     * Buka modal untuk melihat serials suatu item (lengkap dengan info scanner)
+     * Buka modal untuk melihat serials suatu item (lengkap dengan info scanner & sensor anti-copy)
      */
     public function openSerialModal(int $itemId)
     {
-        $this->selectedItemForSerials = StockOpnameItem::with(['serials' => function ($q) {
+        $item = StockOpnameItem::with(['serials' => function ($q) {
             $q->with('scannedByUser')->orderBy('status', 'asc')->orderBy('scanned_at', 'desc');
         }])
             ->where('stock_opname_id', $this->opname->id)
             ->find($itemId);
+
+        if (!$item) {
+            $this->selectedItemForSerials = null;
+            $this->showSerialModal = false;
+            return;
+        }
+
+        // Mapping serials dengan sensor IMEI langsung di backend
+        // Demi keamanan, nomor seri utuh berstatus MISSING tidak pernah dikirim ke browser/client
+        $serialsList = $item->serials->map(function ($sn) {
+            return [
+                'id'                   => $sn->id,
+                'masked_sn'            => self::maskSerialNumber($sn->serial_number, $sn->status),
+                'status'               => $sn->status,
+                'scanned_by_name'      => $sn->scannedByUser->name ?? null,
+                'scanned_at_formatted' => $sn->scanned_at ? $sn->scanned_at->format('H:i:s') : null,
+                'notes'                => $sn->notes,
+            ];
+        })->toArray();
+
+        $this->selectedItemForSerials = [
+            'id'           => $item->id,
+            'product_name' => $item->product_name,
+            'item_no'      => $item->item_no,
+            'serials'      => $serialsList,
+        ];
 
         $this->showSerialModal = true;
     }

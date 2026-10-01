@@ -122,6 +122,8 @@ class Summary extends Component
     {
         $this->opname->refresh();
 
+        $isCompleted = in_array($this->opname->status, ['COMPLETED', 'APPROVED']);
+
         // Ambil item yang memiliki selisih fisik
         $discrepancyItems = StockOpnameItem::with('lastCountedBy')
             ->where('stock_opname_id', $this->opname->id)
@@ -130,21 +132,50 @@ class Summary extends Component
             ->get();
 
         // Ambil serial number yang Missing (hilang)
-        $missingSerials = StockOpnameSerial::with(['stockOpnameItem', 'scannedByUser'])
+        $missingSerialsRaw = StockOpnameSerial::with(['stockOpnameItem', 'scannedByUser'])
             ->where('stock_opname_id', $this->opname->id)
             ->where('status', 'MISSING')
             ->get();
 
         // Ambil serial number yang Unexpected (nyasar)
-        $unexpectedSerials = StockOpnameSerial::with(['stockOpnameItem', 'scannedByUser'])
+        $unexpectedSerialsRaw = StockOpnameSerial::with(['stockOpnameItem', 'scannedByUser'])
             ->where('stock_opname_id', $this->opname->id)
             ->where('status', 'UNEXPECTED')
             ->get();
+
+        // Jika belum disahkan / selesai, sensor nomor seri di backend agar aman dari inspect element
+        $missingSerials = $missingSerialsRaw->map(function ($sn) use ($isCompleted) {
+            return (object) [
+                'id'              => $sn->id,
+                'serial_number'   => $isCompleted ? $sn->serial_number : Count::maskSerialNumber($sn->serial_number, 'MISSING'),
+                'is_masked'       => !$isCompleted,
+                'stockOpnameItem' => $sn->stockOpnameItem,
+                'item_no'         => $sn->item_no,
+                'hpp'             => $sn->hpp,
+                'status'          => $sn->status,
+                'notes'           => $sn->notes,
+            ];
+        });
+
+        $unexpectedSerials = $unexpectedSerialsRaw->map(function ($sn) use ($isCompleted) {
+            return (object) [
+                'id'              => $sn->id,
+                'serial_number'   => $isCompleted ? $sn->serial_number : Count::maskSerialNumber($sn->serial_number, 'UNEXPECTED'),
+                'is_masked'       => !$isCompleted,
+                'stockOpnameItem' => $sn->stockOpnameItem,
+                'scannedByUser'   => $sn->scannedByUser,
+                'item_no'         => $sn->item_no,
+                'hpp'             => $sn->hpp,
+                'status'          => $sn->status,
+                'notes'           => $sn->notes,
+            ];
+        });
 
         $latestApproval = $this->opname->latestApprovalRequest;
         $scannersSummary = $this->opname->getScannersSummary();
 
         return view('livewire.zoffline.stock-opname.summary', [
+            'isCompleted'       => $isCompleted,
             'discrepancyItems'  => $discrepancyItems,
             'missingSerials'    => $missingSerials,
             'unexpectedSerials' => $unexpectedSerials,

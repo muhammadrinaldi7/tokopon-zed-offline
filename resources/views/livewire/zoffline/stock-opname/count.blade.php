@@ -115,10 +115,23 @@
             @endif
 
             @if($lastScannedItem)
-                <div class="mt-2 text-xs text-blue-200">
-                    Terakhir discan: <span class="font-bold text-white">{{ $lastScannedItem['name'] }}</span> (<span class="font-mono">{{ $lastScannedItem['sn'] }}</span>) - 
-                    <span class="font-bold {{ $lastScannedItem['status'] === 'MATCHED' ? 'text-emerald-400' : 'text-red-400' }}">{{ $lastScannedItem['status_label'] }}</span>
-                    <span class="text-blue-300 ml-1.5">• Discan oleh: <strong class="text-white">{{ $lastScannedItem['scanned_by'] ?? 'Anda' }}</strong> ({{ $lastScannedItem['scanned_at'] ?? 'Barusan' }})</span>
+                <div class="mt-2 text-xs text-blue-200 flex flex-wrap items-center justify-center gap-2">
+                    <span>
+                        Terakhir discan: <span class="font-bold text-white">{{ $lastScannedItem['name'] }}</span> (<span class="font-mono">{{ $lastScannedItem['sn'] }}</span>) - 
+                        <span class="font-bold {{ $lastScannedItem['status'] === 'MATCHED' ? 'text-emerald-400' : 'text-red-400' }}">{{ $lastScannedItem['status_label'] }}</span>
+                        <span class="text-blue-300 ml-1.5">• Discan oleh: <strong class="text-white">{{ $lastScannedItem['scanned_by'] ?? 'Anda' }}</strong> ({{ $lastScannedItem['scanned_at'] ?? 'Barusan' }})</span>
+                    </span>
+                    @if(!empty($lastScannedItem['id']))
+                        <button type="button"
+                            wire:click="deleteScan({{ $lastScannedItem['id'] }})"
+                            wire:confirm="Yakin ingin membatalkan/menghapus scan item ini?"
+                            class="px-2.5 py-1 bg-red-500/80 hover:bg-red-600 text-white text-[11px] font-bold rounded-lg transition inline-flex items-center gap-1 shadow-xs cursor-pointer">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span>Batalkan Scan Ini</span>
+                        </button>
+                    @endif
                 </div>
             @endif
         </div>
@@ -188,9 +201,11 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                 @forelse($recentScans as $recent)
                     <div class="p-2.5 bg-neutral-50 rounded-xl border border-neutral-100 flex items-center justify-between gap-2">
-                        <div class="min-w-0 flex-1">
+                        <div class="min-w-0 flex-1 select-none">
                             <div class="flex items-center gap-1.5">
-                                <span class="font-mono font-bold text-xs text-gray-900 truncate">{{ $recent->serial_number }}</span>
+                                <span class="font-mono font-bold text-xs text-gray-900 truncate">
+                                    {{ \App\Livewire\Zoffline\StockOpname\Count::maskSerialNumber($recent->serial_number, $recent->status) }}
+                                </span>
                                 @if($recent->status === 'MATCHED')
                                     <span class="px-1.5 py-0.2 bg-emerald-100 text-emerald-700 font-bold text-[9px] rounded">Cocok</span>
                                 @else
@@ -201,13 +216,24 @@
                                 {{ $recent->stockOpnameItem->product_name ?? $recent->item_no }}
                             </span>
                         </div>
-                        <div class="text-right shrink-0">
-                            <span class="text-[11px] font-bold text-[#4E44DB] block">
-                                {{ $recent->scannedByUser->name ?? 'BM' }}
-                            </span>
-                            <span class="text-[10px] text-neutral-400 font-mono">
-                                {{ $recent->scanned_at ? $recent->scanned_at->format('H:i:s') : '-' }}
-                            </span>
+                        <div class="text-right shrink-0 flex items-center gap-2">
+                            <div>
+                                <span class="text-[11px] font-bold text-[#4E44DB] block">
+                                    {{ $recent->scannedByUser->name ?? 'BM' }}
+                                </span>
+                                <span class="text-[10px] text-neutral-400 font-mono">
+                                    {{ $recent->scanned_at ? $recent->scanned_at->format('H:i:s') : '-' }}
+                                </span>
+                            </div>
+                            <button type="button"
+                                wire:click="deleteScan({{ $recent->id }})"
+                                wire:confirm="Yakin ingin membatalkan/menghapus scan serial ini?"
+                                class="p-1.5 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                title="Batalkan / Hapus Scan Ini">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 @empty
@@ -352,45 +378,71 @@
         </div>
     </div>
 
-    {{-- Serial Numbers Detail Modal (Lengkap dengan Penandaan Siapa User Yang Scan) --}}
+    {{-- Serial Numbers Detail Modal (Lengkap dengan Sensor IMEI Anti-Copy & Aksi Batalkan/Hapus) --}}
     @if($showSerialModal && $selectedItemForSerials)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="fixed inset-0 bg-black/50 backdrop-blur-xs" wire:click="closeSerialModal"></div>
 
-            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden border border-neutral-200 z-10">
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden border border-neutral-200 z-10"
+                 oncopy="return false;" oncut="return false;">
                 <div class="p-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
                     <div>
-                        <h3 class="font-bold text-gray-900 text-base">{{ $selectedItemForSerials->product_name }}</h3>
-                        <p class="text-xs text-neutral-500 font-mono">SKU: {{ $selectedItemForSerials->item_no }}</p>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-gray-900 text-base">{{ $selectedItemForSerials['product_name'] ?? $selectedItemForSerials->product_name }}</h3>
+                            <span class="px-2 py-0.5 bg-neutral-100 text-neutral-600 text-[10px] font-mono rounded font-semibold border border-neutral-200">
+                                Sensor Aktif (Anti-Copy)
+                            </span>
+                        </div>
+                        <p class="text-xs text-neutral-500 font-mono mt-0.5">SKU: {{ $selectedItemForSerials['item_no'] ?? $selectedItemForSerials->item_no }}</p>
                     </div>
-                    <button wire:click="closeSerialModal" class="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-lg">
+                    <button wire:click="closeSerialModal" class="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-lg cursor-pointer">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
                     </button>
                 </div>
 
-                <div class="p-5 max-h-96 overflow-y-auto">
+                <div class="p-5 max-h-96 overflow-y-auto select-none">
                     <table class="w-full text-left text-xs border-collapse">
                         <thead>
                             <tr class="bg-neutral-50 text-[10px] uppercase font-bold text-neutral-500 border-b border-neutral-200">
-                                <th class="px-3 py-2">Nomor IMEI / Seri</th>
+                                <th class="px-3 py-2">Nomor IMEI / Seri (Disensor)</th>
                                 <th class="px-3 py-2 text-center">Status Verifikasi</th>
                                 <th class="px-3 py-2">Discan Oleh (User BM)</th>
                                 <th class="px-3 py-2">Waktu Scan</th>
-                                <th class="px-3 py-2">Catatan</th>
+                                <th class="px-3 py-2 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-neutral-100 text-neutral-700 font-mono">
-                            @forelse($selectedItemForSerials->serials as $sn)
-                                <tr>
-                                    <td class="px-3 py-2.5 font-bold text-gray-900">{{ $sn->serial_number }}</td>
+                            @php
+                                $serials = is_array($selectedItemForSerials)
+                                    ? ($selectedItemForSerials['serials'] ?? [])
+                                    : ($selectedItemForSerials->serials ?? []);
+                            @endphp
+                            @forelse($serials as $sn)
+                                @php
+                                    $snId = is_array($sn) ? $sn['id'] : $sn->id;
+                                    $snStatus = is_array($sn) ? $sn['status'] : $sn->status;
+                                    $maskedSn = is_array($sn)
+                                        ? ($sn['masked_sn'] ?? '-')
+                                        : \App\Livewire\Zoffline\StockOpname\Count::maskSerialNumber($sn->serial_number, $snStatus);
+                                    $scannedByName = is_array($sn)
+                                        ? ($sn['scanned_by_name'] ?? null)
+                                        : ($sn->scannedByUser->name ?? null);
+                                    $scannedAtFormatted = is_array($sn)
+                                        ? ($sn['scanned_at_formatted'] ?? null)
+                                        : ($sn->scanned_at ? $sn->scanned_at->format('H:i:s') : null);
+                                @endphp
+                                <tr class="hover:bg-neutral-50/50 transition">
+                                    <td class="px-3 py-2.5 font-bold tracking-wider {{ $snStatus === 'MISSING' ? 'text-neutral-500' : 'text-gray-900' }}">
+                                        {{ $maskedSn }}
+                                    </td>
                                     <td class="px-3 py-2.5 text-center font-sans">
-                                        @if($sn->status === 'MATCHED')
+                                        @if($snStatus === 'MATCHED')
                                             <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded">
                                                 ✓ Cocok
                                             </span>
-                                        @elseif($sn->status === 'MISSING')
+                                        @elseif($snStatus === 'MISSING')
                                             <span class="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 text-[10px] font-bold rounded">
                                                 Belum Discan
                                             </span>
@@ -401,19 +453,35 @@
                                         @endif
                                     </td>
                                     <td class="px-3 py-2.5 font-sans">
-                                        @if($sn->scannedByUser)
+                                        @if($scannedByName)
                                             <span class="px-2 py-0.5 bg-blue-50 text-[#4E44DB] border border-blue-200 rounded font-bold text-[10px]">
-                                                👤 {{ $sn->scannedByUser->name }}
+                                                👤 {{ $scannedByName }}
                                             </span>
                                         @else
                                             <span class="text-neutral-400 text-[11px]">-</span>
                                         @endif
                                     </td>
                                     <td class="px-3 py-2.5 text-neutral-500 text-[11px]">
-                                        {{ $sn->scanned_at ? $sn->scanned_at->format('H:i:s') : '-' }}
+                                        {{ $scannedAtFormatted ?? '-' }}
                                     </td>
-                                    <td class="px-3 py-2.5 text-neutral-500 text-[11px] font-sans">
-                                        {{ $sn->notes ?? '-' }}
+                                    <td class="px-3 py-2.5 text-center font-sans">
+                                        @if($snStatus === 'MATCHED')
+                                            <button type="button"
+                                                wire:click="deleteScan({{ $snId }})"
+                                                wire:confirm="Batalkan status scan untuk IMEI ini agar kembali ke Belum Discan?"
+                                                class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded text-[10px] font-bold transition cursor-pointer">
+                                                Batalkan Scan
+                                            </button>
+                                        @elseif($snStatus === 'UNEXPECTED')
+                                            <button type="button"
+                                                wire:click="deleteScan({{ $snId }})"
+                                                wire:confirm="Hapus scan salah/nyasar ini dari opname?"
+                                                class="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded text-[10px] font-bold transition cursor-pointer">
+                                                Hapus Scan
+                                            </button>
+                                        @else
+                                            <span class="text-neutral-300 text-[10px]">-</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty
@@ -425,7 +493,10 @@
                     </table>
                 </div>
 
-                <div class="p-4 border-t border-neutral-100 bg-neutral-50/50 flex justify-end">
+                <div class="p-4 border-t border-neutral-100 bg-neutral-50/50 flex flex-col sm:flex-row items-center justify-between gap-2">
+                    <p class="text-[11px] text-neutral-400">
+                        * Nomor IMEI disensor untuk menjamin akurasi fisik saat audit opname (anti-copy).
+                    </p>
                     <button wire:click="closeSerialModal" class="px-4 py-2 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 rounded-xl text-xs font-bold transition cursor-pointer">
                         Tutup
                     </button>

@@ -291,23 +291,35 @@
 
             {{-- Tabel 2: IMEI yang Hilang (Missing Serials) --}}
             @if($missingSerials->isNotEmpty())
-                <div class="bg-white rounded-2xl shadow-sm border border-red-200 overflow-hidden">
-                    <div class="p-4.5 border-b border-red-100 bg-red-50/50 flex items-center justify-between">
+                <div class="bg-white rounded-2xl shadow-sm border border-red-200 overflow-hidden"
+                     @if(!$isCompleted) oncopy="return false;" oncut="return false;" @endif>
+                    <div class="p-4.5 border-b border-red-100 bg-red-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
-                            <h3 class="font-bold text-red-900 text-sm flex items-center gap-1.5">
-                                <svg class="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                </svg>
-                                <span>Daftar IMEI Tidak Ditemukan / Hilang ({{ $missingSerials->count() }} Unit)</span>
-                            </h3>
-                            <p class="text-xs text-red-700">Tercatat di sistem cabang, namun fisik tidak ditemukan saat pemindaian</p>
+                            <div class="flex items-center gap-2">
+                                <h3 class="font-bold text-red-900 text-sm flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                    </svg>
+                                    <span>Daftar IMEI Tidak Ditemukan / Hilang ({{ $missingSerials->count() }} Unit)</span>
+                                </h3>
+                                @if(!$isCompleted)
+                                    <span class="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded border border-amber-200">
+                                        🔒 Disensor (Anti-Copy) - Terbuka Utuh Setelah Selesai
+                                    </span>
+                                @else
+                                    <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded border border-emerald-200">
+                                        ✓ Data Resmi Selesai
+                                    </span>
+                                @endif
+                            </div>
+                            <p class="text-xs text-red-700 mt-0.5">Tercatat di sistem cabang, namun fisik tidak ditemukan saat pemindaian</p>
                         </div>
                     </div>
-                    <div class="overflow-x-auto max-h-64">
+                    <div class="overflow-x-auto max-h-64 @if(!$isCompleted) select-none @endif">
                         <table class="w-full text-left text-xs border-collapse">
                             <thead>
                                 <tr class="bg-neutral-50 text-[10px] uppercase font-bold text-neutral-500 border-b border-neutral-200">
-                                    <th class="px-5 py-2.5">Nomor IMEI / Seri</th>
+                                    <th class="px-5 py-2.5">Nomor IMEI / Seri @if(!$isCompleted) (Disensor) @endif</th>
                                     <th class="px-5 py-2.5">Produk</th>
                                     <th class="px-5 py-2.5">SKU</th>
                                     <th class="px-5 py-2.5">HPP Unit</th>
@@ -317,7 +329,9 @@
                             <tbody class="divide-y divide-neutral-100 text-neutral-700 font-mono">
                                 @foreach($missingSerials as $mSn)
                                     <tr class="hover:bg-red-50/30">
-                                        <td class="px-5 py-2.5 font-bold text-red-700">{{ $mSn->serial_number }}</td>
+                                        <td class="px-5 py-2.5 font-bold tracking-wider {{ !$isCompleted ? 'text-neutral-600' : 'text-red-700' }}">
+                                            {{ $mSn->serial_number }}
+                                        </td>
                                         <td class="px-5 py-2.5 font-sans text-gray-800">{{ $mSn->stockOpnameItem->product_name ?? '-' }}</td>
                                         <td class="px-5 py-2.5 text-neutral-500">{{ $mSn->item_no }}</td>
                                         <td class="px-5 py-2.5 text-red-600 font-bold">Rp {{ number_format($mSn->hpp, 0, ',', '.') }}</td>
@@ -336,23 +350,31 @@
 
             {{-- Tabel 3: IMEI Nyasar (Unexpected Serials) --}}
             @if($unexpectedSerials->isNotEmpty())
-                <div class="bg-white rounded-2xl shadow-sm border border-amber-200 overflow-hidden">
-                    <div class="p-4.5 border-b border-amber-100 bg-amber-50/50 flex items-center justify-between">
+                <div class="bg-white rounded-2xl shadow-sm border border-amber-200 overflow-hidden"
+                     @if(!$isCompleted) oncopy="return false;" oncut="return false;" @endif>
+                    <div class="p-4.5 border-b border-amber-100 bg-amber-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
-                            <h3 class="font-bold text-amber-900 text-sm flex items-center gap-1.5">
-                                <svg class="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span>Daftar IMEI Nyasar / Tidak Terdaftar di Cabang Ini ({{ $unexpectedSerials->count() }} Unit)</span>
-                            </h3>
-                            <p class="text-xs text-amber-700">Fisik ditemukan dan discan di etalase, tetapi di sistem belum terdaftar di cabang ini</p>
+                            <div class="flex items-center gap-2">
+                                <h3 class="font-bold text-amber-900 text-sm flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span>Daftar IMEI Nyasar / Tidak Terdaftar di Cabang Ini ({{ $unexpectedSerials->count() }} Unit)</span>
+                                </h3>
+                                @if(!$isCompleted)
+                                    <span class="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded border border-amber-200">
+                                        🔒 Disensor Sebagian
+                                    </span>
+                                @endif
+                            </div>
+                            <p class="text-xs text-amber-700 mt-0.5">Fisik ditemukan dan discan di etalase, tetapi di sistem belum terdaftar di cabang ini</p>
                         </div>
                     </div>
-                    <div class="overflow-x-auto max-h-64">
+                    <div class="overflow-x-auto max-h-64 @if(!$isCompleted) select-none @endif">
                         <table class="w-full text-left text-xs border-collapse">
                             <thead>
                                 <tr class="bg-neutral-50 text-[10px] uppercase font-bold text-neutral-500 border-b border-neutral-200">
-                                    <th class="px-5 py-2.5">Nomor IMEI / Seri</th>
+                                    <th class="px-5 py-2.5">Nomor IMEI / Seri @if(!$isCompleted) (Disensor) @endif</th>
                                     <th class="px-5 py-2.5">Produk</th>
                                     <th class="px-5 py-2.5">Discan Oleh</th>
                                     <th class="px-5 py-2.5">HPP Unit</th>
@@ -362,7 +384,9 @@
                             <tbody class="divide-y divide-neutral-100 text-neutral-700 font-mono">
                                 @foreach($unexpectedSerials as $uSn)
                                     <tr class="hover:bg-amber-50/30">
-                                        <td class="px-5 py-2.5 font-bold text-amber-800">{{ $uSn->serial_number }}</td>
+                                        <td class="px-5 py-2.5 font-bold tracking-wider {{ !$isCompleted ? 'text-neutral-600' : 'text-amber-800' }}">
+                                            {{ $uSn->serial_number }}
+                                        </td>
                                         <td class="px-5 py-2.5 font-sans text-gray-800">{{ $uSn->stockOpnameItem->product_name ?? '-' }}</td>
                                         <td class="px-5 py-2.5 font-sans">
                                             @if($uSn->scannedByUser)

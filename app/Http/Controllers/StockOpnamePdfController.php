@@ -31,13 +31,45 @@ class StockOpnamePdfController extends Controller
 
         $opname->load(['branch', 'warehouse', 'user', 'businessUnit', 'items.lastCountedBy', 'serials.stockOpnameItem', 'serials.scannedByUser']);
 
+        $isCompleted = in_array($opname->status, ['COMPLETED', 'APPROVED']);
+
         $discrepancyItems = $opname->items->filter(fn($i) => $i->difference_qty != 0);
-        $missingSerials = $opname->serials->where('status', 'MISSING');
-        $unexpectedSerials = $opname->serials->where('status', 'UNEXPECTED');
+
+        $missingSerialsRaw = $opname->serials->where('status', 'MISSING');
+        $unexpectedSerialsRaw = $opname->serials->where('status', 'UNEXPECTED');
+
+        $missingSerials = $missingSerialsRaw->map(function ($sn) use ($isCompleted) {
+            return (object) [
+                'id'              => $sn->id,
+                'serial_number'   => $isCompleted ? $sn->serial_number : \App\Livewire\Zoffline\StockOpname\Count::maskSerialNumber($sn->serial_number, 'MISSING'),
+                'is_masked'       => !$isCompleted,
+                'stockOpnameItem' => $sn->stockOpnameItem,
+                'item_no'         => $sn->item_no,
+                'hpp'             => $sn->hpp,
+                'status'          => $sn->status,
+                'notes'           => $sn->notes,
+            ];
+        });
+
+        $unexpectedSerials = $unexpectedSerialsRaw->map(function ($sn) use ($isCompleted) {
+            return (object) [
+                'id'              => $sn->id,
+                'serial_number'   => $isCompleted ? $sn->serial_number : \App\Livewire\Zoffline\StockOpname\Count::maskSerialNumber($sn->serial_number, 'UNEXPECTED'),
+                'is_masked'       => !$isCompleted,
+                'stockOpnameItem' => $sn->stockOpnameItem,
+                'scannedByUser'   => $sn->scannedByUser,
+                'item_no'         => $sn->item_no,
+                'hpp'             => $sn->hpp,
+                'status'          => $sn->status,
+                'notes'           => $sn->notes,
+            ];
+        });
+
         $scannersSummary = $opname->getScannersSummary();
 
         $pdf = Pdf::loadView('pdf.stock-opname', [
             'opname'            => $opname,
+            'isCompleted'       => $isCompleted,
             'discrepancyItems'  => $discrepancyItems,
             'missingSerials'    => $missingSerials,
             'unexpectedSerials' => $unexpectedSerials,
