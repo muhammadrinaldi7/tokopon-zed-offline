@@ -69,11 +69,16 @@ class WarrantyClaim extends Component
             'searchQuery.min' => 'Serial Number minimal 3 karakter'
         ]);
 
+        $search = trim($this->searchQuery);
         $warranties = Warranty::with(['policy', 'orderItem.order.user.profile', 'orderItem.variant', 'customer.profile'])
-            ->where('serial_number', $this->searchQuery)
+            ->where('serial_number', $search)
             ->where('status', '!=', 'voided')
-            ->whereDoesntHave('orderItem.order', function ($q) {
-                $q->whereIn('order_status', ['CANCELLED', 'DRAFT']);
+            ->whereHas('orderItem.order', function ($q) {
+                $q->whereIn('order_status', ['COMPLETED', 'PIUTANG'])
+                  ->whereDoesntHave('approvalRequests', function ($aq) {
+                      $aq->where('status', 'PENDING')
+                         ->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation']);
+                  });
             })
             ->orderByDesc('id')
             ->get();
@@ -340,15 +345,21 @@ class WarrantyClaim extends Component
             'photo_kelengkapan' => 'required|image|max:5120',
         ]);
 
-        $warranty = Warranty::with('orderItem.order')->find($this->selectedWarrantyId);
+        $warranty = Warranty::with(['orderItem.order.approvalRequests'])->find($this->selectedWarrantyId);
 
         if (!$warranty) {
             $this->dispatch('toast', title: 'Gagal', message: 'Data garansi tidak ditemukan.', type: 'error');
             return;
         }
 
-        if ($warranty->status === 'voided' || ($warranty->orderItem && in_array($warranty->orderItem->order?->order_status, ['CANCELLED', 'DRAFT']))) {
-            $this->dispatch('toast', title: 'Garansi Tidak Berlaku', message: 'Garansi ini tidak berlaku karena transaksi telah dibatalkan atau masih draft.', type: 'error');
+        $order = $warranty->orderItem?->order;
+        $hasPendingCancellation = $order ? $order->approvalRequests()
+            ->where('status', 'PENDING')
+            ->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])
+            ->exists() : false;
+
+        if ($warranty->status === 'voided' || !$order || !in_array($order->order_status, ['COMPLETED', 'PIUTANG']) || $hasPendingCancellation) {
+            $this->dispatch('toast', title: 'Garansi Tidak Berlaku', message: 'Garansi ini tidak berlaku karena transaksi telah dibatalkan, sedang diajukan pembatalan, atau bukan transaksi sah.', type: 'error');
             return;
         }
 

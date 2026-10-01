@@ -202,6 +202,31 @@ class ResetToDraft extends Component
                 ->where('status', 'USED')
                 ->update(['status' => 'AVAILABLE']);
 
+            // Void garansi aktif dan pulihkan status Serial Number ke Available
+            $order->loadMissing('items');
+            $itemIds = $order->items->pluck('id')->toArray();
+            if (!empty($itemIds)) {
+                \App\Models\Warranty::whereIn('order_item_id', $itemIds)
+                    ->where('status', 'active')
+                    ->update(['status' => 'voided']);
+            }
+
+            $allSns = [];
+            foreach ($order->items as $item) {
+                if (!empty($item->serial_number)) {
+                    $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                    $allSns = array_merge($allSns, $sns);
+                }
+            }
+            if (!empty($allSns)) {
+                \App\Models\Warranty::whereIn('serial_number', $allSns)
+                    ->where('status', 'active')
+                    ->update(['status' => 'voided']);
+
+                \App\Models\ProductSerialNumber::whereIn('serial_number', $allSns)
+                    ->update(['status' => 'Available']);
+            }
+
             // 4. Hapus semua payment terkait order ini
             $order->payments()->delete();
 
