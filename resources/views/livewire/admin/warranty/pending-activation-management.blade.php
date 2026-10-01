@@ -586,16 +586,31 @@
                         <!-- Preview Masa Berlaku -->
                         @php
                             $chosenPolicy = collect($availablePolicies)->firstWhere('id', $selectedPolicyId);
+                            $qcDate = $targetInspection?->inspected_at 
+                                ? \Carbon\Carbon::parse($targetInspection->inspected_at) 
+                                : ($targetInspection?->created_at ? \Carbon\Carbon::parse($targetInspection->created_at) : ($targetOrder?->created_at ? \Carbon\Carbon::parse($targetOrder->created_at) : \Carbon\Carbon::now()));
+                            $expDate = $chosenPolicy ? $qcDate->copy()->addDays($chosenPolicy->duration_days) : null;
+                            $isAlreadyExpired = $expDate ? $expDate->isPast() : false;
+                            $daysLeft = $expDate && !$isAlreadyExpired ? (int)ceil(\Carbon\Carbon::now()->diffInHours($expDate, false) / 24) : 0;
                         @endphp
                         @if($chosenPolicy)
-                            <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between text-xs">
+                            <div class="p-3.5 {{ $isAlreadyExpired ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-100' }} rounded-2xl border flex items-center justify-between text-xs">
                                 <div>
-                                    <span class="text-emerald-700 font-bold block">Masa Berlaku Garansi</span>
-                                    <span class="text-emerald-900 font-semibold text-[11px]">
-                                        Mulai: {{ \Carbon\Carbon::now()->format('d/m/Y') }} s/d {{ \Carbon\Carbon::now()->addDays($chosenPolicy->duration_days)->format('d/m/Y') }}
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="{{ $isAlreadyExpired ? 'text-rose-700' : 'text-emerald-700' }} font-bold block">
+                                            Masa Berlaku Garansi (Terhitung dari Waktu QC)
+                                        </span>
+                                        @if($isAlreadyExpired)
+                                            <span class="px-1.5 py-0.5 rounded text-[9px] bg-rose-600 text-white font-black">SUDAH LEWAT/KEDALUWARSA</span>
+                                        @else
+                                            <span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-600 text-white font-black">Sisa {{ $daysLeft }} Hari</span>
+                                        @endif
+                                    </div>
+                                    <span class="{{ $isAlreadyExpired ? 'text-rose-900' : 'text-emerald-900' }} font-semibold text-[11px] block mt-0.5">
+                                        Mulai: {{ $qcDate->format('d/m/Y H:i') }} s/d {{ $expDate ? $expDate->format('d/m/Y') : '-' }}
                                     </span>
                                 </div>
-                                <span class="px-2.5 py-1 bg-emerald-600 text-white font-black text-xs rounded-xl shadow-xs">
+                                <span class="px-2.5 py-1 {{ $isAlreadyExpired ? 'bg-rose-600' : 'bg-emerald-600' }} text-white font-black text-xs rounded-xl shadow-xs">
                                     {{ $chosenPolicy->duration_days }} HARI
                                 </span>
                             </div>

@@ -11,6 +11,43 @@ use App\Models\SecondProductVariant;
 
 class WarrantyCalculatorService
 {
+    protected static $policiesCache = [];
+    protected static $brandCache = [];
+    protected static $brandIdCache = [];
+
+    /**
+     * Hitung hanya kebijakan Garansi Utama (tanpa evaluasi kuota asuransi addon yang berat).
+     * Sangat cepat dan cocok untuk display preview tabel.
+     */
+    public function getMainWarrantyPolicy(Order $order, $orderItem)
+    {
+        $businessUnitId = $order->business_unit_id;
+        $brandId = $this->extractBrandId($orderItem, $businessUnitId);
+
+        $hasManualDiscount = (float)($orderItem->discount_amount ?? 0) > 0;
+
+        $hasInternalPromo = false;
+        if ($orderItem->relationLoaded('promos') || method_exists($orderItem, 'promos')) {
+            foreach ($orderItem->promos as $promo) {
+                if (strtolower(trim($promo->category ?? '')) === 'internal') {
+                    $hasInternalPromo = true;
+                    break;
+                }
+            }
+        }
+
+        $isDiscounted = $hasManualDiscount || $hasInternalPromo;
+
+        $targetType = $isDiscounted ? 'store_discount' : 'store_normal';
+        $mainPolicy = $this->findMainWarrantyPolicy($businessUnitId, $targetType, $brandId, $orderItem);
+
+        if (!$mainPolicy && $targetType === 'store_discount') {
+            $mainPolicy = $this->findMainWarrantyPolicy($businessUnitId, 'store_normal', $brandId, $orderItem);
+        }
+
+        return $mainPolicy;
+    }
+
     /**
      * Menghitung dan mencari Policy Garansi yang berlaku untuk OrderItem tertentu.
      * Mengembalikan collection/array of WarrantyPolicy yang harus digenerate.
@@ -82,10 +119,14 @@ class WarrantyCalculatorService
      */
     private function findMainWarrantyPolicy($businessUnitId, $type, $brandId, $orderItem = null)
     {
-        $policies = WarrantyPolicy::where('type', $type)
-            ->where('business_unit_id', $businessUnitId)
-            ->where('is_active', true)
-            ->get();
+        $cacheKey = $businessUnitId . '_' . $type;
+        if (!isset(self::$policiesCache[$cacheKey])) {
+            self::$policiesCache[$cacheKey] = WarrantyPolicy::where('type', $type)
+                ->where('business_unit_id', $businessUnitId)
+                ->where('is_active', true)
+                ->get();
+        }
+        $policies = self::$policiesCache[$cacheKey];
 
         if ($policies->isEmpty()) {
             return null;
@@ -104,10 +145,17 @@ class WarrantyCalculatorService
 
                 // Fallback pencocokan Nama Brand jika ID berbeda antar Business Unit
                 if (!$isMatched && $brandId) {
-                    $detectedBrand = Brand::find($brandId);
+                    if (!array_key_exists($brandId, self::$brandCache)) {
+                        self::$brandCache[$brandId] = Brand::find($brandId);
+                    }
+                    $detectedBrand = self::$brandCache[$brandId];
                     if ($detectedBrand) {
                         $detectedName = strtolower(trim($detectedBrand->name));
-                        $policyBrandNames = Brand::whereIn('id', $brandList)->pluck('name')->map(fn($n) => strtolower(trim($n)))->toArray();
+                        $listKey = 'list_' . implode(',', $brandList);
+                        if (!isset(self::$brandCache[$listKey])) {
+                            self::$brandCache[$listKey] = Brand::whereIn('id', $brandList)->pluck('name')->map(fn($n) => strtolower(trim($n)))->toArray();
+                        }
+                        $policyBrandNames = self::$brandCache[$listKey];
 
                         if (in_array($detectedName, $policyBrandNames)) {
                             $isMatched = true;
@@ -276,6 +324,10 @@ class WarrantyCalculatorService
         }
 
         $cleanBrandName = strtolower(trim($brandName));
+        $cacheKey = $cleanBrandName . '_' . ($businessUnitId ?? 'all');
+        if (array_key_exists($cacheKey, self::$brandIdCache)) {
+            return self::$brandIdCache[$cacheKey];
+        }
 
         // 2. Cari Brand ID di business unit yang bersangkutan (prioritas utama)
         $brandQuery = Brand::query();
@@ -299,7 +351,7 @@ class WarrantyCalculatorService
         }
 
         if ($buBrand) {
-            return $buBrand->id;
+            return self::$brandIdCache[$cacheKey] = $buBrand->id;
         }
 
         // 3. Fallback: Cari Brand secara global (jika BU belum diset pada tabel Brand)
@@ -311,6 +363,6 @@ class WarrantyCalculatorService
             })->first();
         }
 
-        return $globalBrand->id ?? null;
+        return self::$brandIdCache[$cacheKey] = ($globalBrand->id ?? null);
     }
 }
