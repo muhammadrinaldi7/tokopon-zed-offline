@@ -72,6 +72,9 @@ class WarrantyClaim extends Component
         $warranties = Warranty::with(['policy', 'orderItem.order.user.profile', 'orderItem.variant', 'customer.profile'])
             ->where('serial_number', $this->searchQuery)
             ->where('status', '!=', 'voided')
+            ->whereDoesntHave('orderItem.order', function ($q) {
+                $q->whereIn('order_status', ['CANCELLED', 'DRAFT']);
+            })
             ->orderByDesc('id')
             ->get();
 
@@ -337,7 +340,17 @@ class WarrantyClaim extends Component
             'photo_kelengkapan' => 'required|image|max:5120',
         ]);
 
-        $warranty = Warranty::find($this->selectedWarrantyId);
+        $warranty = Warranty::with('orderItem.order')->find($this->selectedWarrantyId);
+
+        if (!$warranty) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Data garansi tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        if ($warranty->status === 'voided' || ($warranty->orderItem && in_array($warranty->orderItem->order?->order_status, ['CANCELLED', 'DRAFT']))) {
+            $this->dispatch('toast', title: 'Garansi Tidak Berlaku', message: 'Garansi ini tidak berlaku karena transaksi telah dibatalkan atau masih draft.', type: 'error');
+            return;
+        }
 
         $isExpired = $warranty->expires_at < Carbon::now() || $warranty->status !== 'active';
 
