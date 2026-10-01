@@ -238,6 +238,12 @@ trait WithCheckoutAndReceipt
             $customerId = $this->resolveCustomerId();
             if (!$customerId) return;
 
+            if (empty($this->selectedSales)) {
+                $this->dispatch('toast', title: 'Sales Belum Dipilih', message: 'Pilih minimal 1 tenaga penjual sebelum memproses pembayaran.', type: 'warning');
+                $this->goToStep(1);
+                return;
+            }
+
             // Validasi Promo vs Metode Pembayaran
             if (!empty($this->selectedPromos)) {
                 $service = app(\App\Services\PromoCalculatorService::class);
@@ -439,7 +445,7 @@ trait WithCheckoutAndReceipt
                     Log::channel('pos_accurate')->error('POS Accurate Integration Error (Pelunasan Piutang): ' . $e->getMessage());
                 }
 
-                $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
+                $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'salesBy']);
                 $this->showCheckoutModal = false;
                 $this->showReceiptModal = true;
 
@@ -775,7 +781,7 @@ trait WithCheckoutAndReceipt
 
 
             // Success! Show receipt
-            $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
+            $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'salesBy']);
             $this->showCheckoutModal = false;
             $this->showReceiptModal = true;
 
@@ -985,7 +991,7 @@ trait WithCheckoutAndReceipt
                 Log::channel('pos_accurate')->error('POS Accurate Integration Error (Piutang): ' . $e->getMessage());
             }
 
-            $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
+            $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'salesBy']);
             $this->showCheckoutModal = false;
             $this->showPiutangModal = false; // Add this too
             $this->showReceiptModal = true;
@@ -1596,6 +1602,7 @@ trait WithCheckoutAndReceipt
                 'discount_amount' => (int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1),
                 'promo_discount_amount' => (int)($item['promo_discount'] ?? 0),
                 'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
+                'sales_ids' => !empty($this->selectedSales) ? json_encode(array_column($this->selectedSales, 'id')) : (!empty($order->sales_id) ? json_encode([$order->sales_id]) : null),
             ]);
 
             $this->attachPromoBreakdownToItem($orderItem, $item, $cleanSns);
@@ -1785,8 +1792,17 @@ trait WithCheckoutAndReceipt
                 $accurateBranchName = 'GSK ' . $accurateBranchName;
             }
 
+            // Ambil sales aktif dari form POS jika kasir mengganti/memilih sales, atau fallback ke order sebelumnya
+            $activeSalesId = !empty($this->selectedSales) ? $this->selectedSales[0]['id'] : ($order->sales_id ?? null);
+
             $detailSalesman = [];
-            if ($order->salesBy && !empty($order->salesBy->employee_no)) {
+            if (!empty($this->selectedSales)) {
+                foreach ($this->selectedSales as $sales) {
+                    if (!empty($sales['employee_no'])) {
+                        $detailSalesman[] = (string) $sales['employee_no'];
+                    }
+                }
+            } elseif ($order->salesBy && !empty($order->salesBy->employee_no)) {
                 $detailSalesman[] = (string) $order->salesBy->employee_no;
             }
 
@@ -1802,6 +1818,7 @@ trait WithCheckoutAndReceipt
                 'discount_amount' => $totalDiscountAmount,
                 'grand_total' => $grandTotal,
                 'notes' => $this->notes,
+                'sales_id' => $activeSalesId,
             ]);
 
             $this->restoreStockFromOldItems($order);
@@ -2134,7 +2151,7 @@ trait WithCheckoutAndReceipt
                 $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate gagal.', type: 'warning');
             }
 
-            $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy']);
+            $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'salesBy']);
             $this->showCheckoutModal = false;
             $this->showReceiptModal = true;
 

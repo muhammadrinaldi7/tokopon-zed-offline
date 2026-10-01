@@ -545,6 +545,8 @@
                                         </div>
                                         <div class="text-xs text-gray-500">
                                             Kasir: {{ $order->handledBy->name ?? 'Tanpa Nama' }}
+                                            &bull;
+                                            Sales: <span class="{{ $order->salesBy ? 'font-semibold text-gray-700' : 'text-amber-600 font-semibold' }}">{{ $order->salesBy->name ?? 'Belum dipilih' }}</span>
                                         </div>
                                     </div>
                                     <div class="text-right flex flex-col items-end gap-2">

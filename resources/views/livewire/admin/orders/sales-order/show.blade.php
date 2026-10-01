@@ -79,7 +79,7 @@
                 </svg>
                 Informasi Tambahan
             </h3>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
                 <div>
                     <span class="block text-xs font-bold text-gray-400 uppercase">Pelanggan</span>
                     <span class="font-semibold text-gray-800">{{ $order->user->name ?? '-' }}</span>
@@ -91,6 +91,10 @@
                 <div>
                     <span class="block text-xs font-bold text-gray-400 uppercase">Cabang</span>
                     <span class="font-semibold text-gray-800">{{ $order->branch->name ?? '-' }}</span>
+                </div>
+                <div>
+                    <span class="block text-xs font-bold text-gray-400 uppercase">Sales / Pramuniaga</span>
+                    <span class="font-semibold text-gray-800">{{ $order->salesBy->name ?? '-' }}</span>
                 </div>
                 @if ($order->accurate_so_number)
                     <div>

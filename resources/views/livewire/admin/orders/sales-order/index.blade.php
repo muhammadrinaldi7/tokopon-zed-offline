@@ -58,6 +58,9 @@
                             <td class="p-4">
                                 <div class="font-bold text-gray-800">{{ $order->user->name ?? 'Unknown' }}</div>
                                 <div class="text-[10px] text-gray-400">{{ $order->user->email ?? '' }}</div>
+                                @if ($order->salesBy)
+                                    <div class="text-[10px] text-indigo-600 font-semibold mt-0.5">Sales: {{ $order->salesBy->name }}</div>
+                                @endif
                             </td>
                             <td class="p-4 font-bold text-gray-800">Rp
                                 {{ number_format($order->grand_total, 0, ',', '.') }}</td>

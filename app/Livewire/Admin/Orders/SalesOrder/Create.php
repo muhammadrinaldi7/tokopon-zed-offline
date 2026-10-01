@@ -582,7 +582,7 @@ class Create extends Component
                     'discount_amount' => $item['discount'],
                     'subtotal' => $item['total'],
                     'serial_number' => isset($item['serial_numbers']) ? implode(',', array_filter(array_map('trim', $item['serial_numbers']))) : null, // Simpan IMEI gabungan
-                    'sales_ids' => !empty($item['sales_ids']) ? json_encode($item['sales_ids']) : null,
+                    'sales_ids' => !empty($item['sales_ids']) ? json_encode($item['sales_ids']) : ($this->sales_id ? json_encode([$this->sales_id]) : null),
                 ]);
             }
 
@@ -634,6 +634,11 @@ class Create extends Component
 
                         if (!empty($employeeNos)) {
                             $detailData['salesmanListNumber'] = $employeeNos;
+                        }
+                    } elseif ($this->sales_id) {
+                        $salesmanNo = !empty($this->selectedSalesNo) ? $this->selectedSalesNo : \App\Models\Employe::where('id', $this->sales_id)->value('employee_no');
+                        if (!empty($salesmanNo)) {
+                            $detailData['salesmanListNumber'] = [(string) $salesmanNo];
                         }
                     }
 

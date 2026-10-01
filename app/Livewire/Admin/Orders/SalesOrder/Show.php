@@ -41,7 +41,7 @@ class Show extends Component
 
     public function mount(Order $order)
     {
-        $this->order = $order->load(['items.variant', 'user', 'businessUnit', 'payments.paymentMethod']);
+        $this->order = $order->load(['items.variant', 'user', 'businessUnit', 'payments.paymentMethod', 'salesBy', 'branch']);
         $this->displayCustomerName = $this->order->user->name ?? 'Pelanggan Umum';
         $this->dp_amount = $this->getRemainingBalance();
         $this->dp_date = Carbon::now()->format('Y-m-d');

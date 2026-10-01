@@ -352,7 +352,7 @@ class Pos extends Component
         $user = \Illuminate\Support\Facades\Auth::user();
         $userBranchId = $user->branch_id ?? null;
 
-        $query = Order::with(['user', 'accurateDocs'])
+        $query = Order::with(['user', 'accurateDocs', 'salesBy', 'handledBy'])
             ->where('order_channel', 'SO')
             ->whereIn('order_status', ['pending', 'down_payment', 'paid'])
             ->where('business_unit_id', $user->getActiveBusinessUnitId())
@@ -374,7 +374,7 @@ class Pos extends Component
 
     public function loadSoOrder($orderId)
     {
-        $order = Order::with(['items.variant', 'items.promos', 'user.profile', 'promos', 'accurateDocs'])->find($orderId);
+        $order = Order::with(['items.variant', 'items.promos', 'user.profile', 'promos', 'accurateDocs', 'salesBy'])->find($orderId);
         if (!$order) {
             $this->dispatch('toast', title: 'Error', message: 'Pesanan SO tidak ditemukan.', type: 'error');
             return;
@@ -389,7 +389,7 @@ class Pos extends Component
             $this->customerEmail = $order->user->email ?? '';
         }
 
-        // Restore sales from salesBy
+        // Restore sales from salesBy or sales_id
         $this->selectedSales = [];
         if ($order->salesBy) {
             $this->selectedSales = [[
@@ -397,6 +397,15 @@ class Pos extends Component
                 'name' => $order->salesBy->name,
                 'employee_no' => $order->salesBy->employee_no
             ]];
+        } elseif ($order->sales_id) {
+            $sales = \App\Models\Employe::find($order->sales_id);
+            if ($sales) {
+                $this->selectedSales = [[
+                    'id' => $sales->id,
+                    'name' => $sales->name,
+                    'employee_no' => $sales->employee_no
+                ]];
+            }
         }
 
         $this->notes = $order->notes;
@@ -461,12 +470,16 @@ class Pos extends Component
         $this->payments[0]['amount'] = $remaining;
         // Kita juga perlu me-reset subtotal agar perhitungan valid. Nanti diatur di Computed properties.
 
-        $this->dispatch('toast', title: 'Berhasil', message: 'Faktur SO berhasil dimuat.', type: 'success');
-
-        if ($hasDo) {
-            $this->goToStep(4);
+        if (empty($this->selectedSales)) {
+            $this->dispatch('toast', title: 'Pilih Sales', message: 'Faktur SO berhasil dimuat. Pesanan SO ini belum memiliki data sales, silakan pilih pramuniaga terlebih dahulu.', type: 'warning');
+            $this->goToStep(1);
         } else {
-            $this->goToStep(2);
+            $this->dispatch('toast', title: 'Berhasil', message: 'Faktur SO berhasil dimuat.', type: 'success');
+            if ($hasDo) {
+                $this->goToStep(4);
+            } else {
+                $this->goToStep(2);
+            }
         }
     }
 
