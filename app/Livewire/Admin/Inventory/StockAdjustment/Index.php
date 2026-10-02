@@ -16,6 +16,7 @@ use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -50,12 +51,14 @@ class Index extends Component
     // Modal Kelola Kategori Alasan
     public $showReasonModal = false;
     public $reason_form_id = null;
+    public $reason_business_unit_id = null;
     public $reason_name = '';
     public $reason_code = '';
     public $reason_accurate_account_no = '';
     public $reason_accurate_account_name = '';
     public $reason_description = '';
     public $reason_is_active = true;
+    public $modalBuFilter = 'ALL';
 
     // Keranjang Item Penyesuaian (Multi Item)
     public $items = [];
@@ -97,8 +100,16 @@ class Index extends Component
         // Default gudang berdasarkan penugasan user
         $this->setDefaultWarehouse();
 
-        // Default alasan dan akun COA dari database
-        $defaultReason = StockAdjustmentReason::active()->orderBy('sort_order')->first();
+        // Default alasan dan akun COA dari database spesifik Business Unit aktif
+        $defaultReason = StockAdjustmentReason::active()
+            ->where(function ($q) {
+                $q->where('business_unit_id', $this->business_unit_id)
+                  ->orWhereNull('business_unit_id');
+            })
+            ->orderByRaw('business_unit_id IS NULL ASC')
+            ->orderBy('sort_order')
+            ->first();
+
         if ($defaultReason) {
             $this->reason_category = $defaultReason->code;
             $this->accurate_account_no = $defaultReason->accurate_account_no ?: '50.03.005';
@@ -142,7 +153,15 @@ class Index extends Component
     public function resetForm()
     {
         $this->default_adjustment_type = 'OUT';
-        $defaultReason = StockAdjustmentReason::active()->orderBy('sort_order')->first();
+        $defaultReason = StockAdjustmentReason::active()
+            ->where(function ($q) {
+                $q->where('business_unit_id', $this->business_unit_id)
+                  ->orWhereNull('business_unit_id');
+            })
+            ->orderByRaw('business_unit_id IS NULL ASC')
+            ->orderBy('sort_order')
+            ->first();
+
         if ($defaultReason) {
             $this->reason_category = $defaultReason->code;
             $this->accurate_account_no = $defaultReason->accurate_account_no ?: '50.03.005';
@@ -158,7 +177,15 @@ class Index extends Component
 
     public function updatedReasonCategory($val)
     {
-        $reason = StockAdjustmentReason::where('code', $val)->where('is_active', true)->first();
+        $reason = StockAdjustmentReason::where('code', $val)
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->where('business_unit_id', $this->business_unit_id)
+                  ->orWhereNull('business_unit_id');
+            })
+            ->orderByRaw('business_unit_id IS NULL ASC')
+            ->first();
+
         if ($reason && !empty($reason->accurate_account_no)) {
             $this->accurate_account_no = $reason->accurate_account_no;
         }
@@ -725,6 +752,7 @@ class Index extends Component
     // --- MANAJEMEN KATEGORI ALASAN ---
     public function openReasonModal()
     {
+        $this->modalBuFilter = $this->business_unit_id ? (string) $this->business_unit_id : 'ALL';
         $this->resetReasonForm();
         $this->showReasonModal = true;
     }
@@ -738,13 +766,16 @@ class Index extends Component
     public function resetReasonForm()
     {
         $this->reason_form_id = null;
+        $this->reason_business_unit_id = ($this->modalBuFilter !== 'ALL' && $this->modalBuFilter !== 'GLOBAL')
+            ? (int) $this->modalBuFilter
+            : $this->business_unit_id;
         $this->reason_name = '';
         $this->reason_code = '';
         $this->reason_accurate_account_no = '';
         $this->reason_accurate_account_name = '';
         $this->reason_description = '';
         $this->reason_is_active = true;
-        $this->resetErrorBag(['reason_name', 'reason_code', 'reason_accurate_account_no']);
+        $this->resetErrorBag(['reason_name', 'reason_code', 'reason_accurate_account_no', 'reason_business_unit_id']);
     }
 
     public function updatedReasonName($val)
@@ -758,6 +789,7 @@ class Index extends Component
     {
         $reason = StockAdjustmentReason::findOrFail($id);
         $this->reason_form_id = $reason->id;
+        $this->reason_business_unit_id = $reason->business_unit_id;
         $this->reason_name = $reason->name;
         $this->reason_code = $reason->code;
         $this->reason_accurate_account_no = $reason->accurate_account_no;
@@ -769,23 +801,35 @@ class Index extends Component
     public function saveReason()
     {
         $code = strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '_', trim($this->reason_code)));
+        $buId = !empty($this->reason_business_unit_id) ? (int) $this->reason_business_unit_id : null;
 
         $this->validate([
+            'reason_business_unit_id'    => 'nullable|exists:business_units,id',
             'reason_name'                => 'required|string|max:255',
-            'reason_code'                => 'required|string|max:50|unique:stock_adjustment_reasons,code,' . ($this->reason_form_id ?? 'NULL') . ',id',
+            'reason_code'                => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('stock_adjustment_reasons', 'code')
+                    ->where(function ($query) use ($buId) {
+                        return $query->where('business_unit_id', $buId);
+                    })
+                    ->ignore($this->reason_form_id),
+            ],
             'reason_accurate_account_no' => 'required|string|max:50',
             'reason_accurate_account_name' => 'nullable|string|max:255',
             'reason_description'         => 'nullable|string|max:500',
         ], [
             'reason_name.required'                => 'Nama kategori alasan wajib diisi.',
             'reason_code.required'                => 'Kode kategori wajib diisi.',
-            'reason_code.unique'                  => 'Kode kategori ini sudah digunakan.',
+            'reason_code.unique'                  => 'Kode kategori ini sudah digunakan untuk Business Unit tersebut.',
             'reason_accurate_account_no.required' => 'Nomor Akun COA Accurate wajib diisi.',
         ]);
 
         StockAdjustmentReason::updateOrCreate(
             ['id' => $this->reason_form_id],
             [
+                'business_unit_id'      => $buId,
                 'name'                  => trim($this->reason_name),
                 'code'                  => $code,
                 'accurate_account_no'   => trim($this->reason_accurate_account_no),
@@ -821,10 +865,32 @@ class Index extends Component
 
     public function render()
     {
+        $businessUnits = BusinessUnit::all();
         $warehouses = Warehouse::where('business_unit_id', $this->business_unit_id)->get();
 
-        $allReasons = StockAdjustmentReason::orderBy('sort_order')->get();
-        $activeReasons = $allReasons->where('is_active', true);
+        // Kategori aktif untuk form pemakaian stok & filter tabel (berdasarkan BU aktif dengan fallback global)
+        $activeReasons = StockAdjustmentReason::active()
+            ->where(function ($q) {
+                $q->where('business_unit_id', $this->business_unit_id)
+                  ->orWhereNull('business_unit_id');
+            })
+            ->orderByRaw('business_unit_id IS NULL ASC')
+            ->orderBy('sort_order')
+            ->get()
+            ->unique('code');
+
+        // Daftar semua kategori untuk modal manajemen (bisa difilter per BU)
+        $allReasons = StockAdjustmentReason::with('businessUnit')
+            ->when($this->modalBuFilter !== 'ALL', function ($q) {
+                if ($this->modalBuFilter === 'GLOBAL') {
+                    $q->whereNull('business_unit_id');
+                } else {
+                    $q->where('business_unit_id', $this->modalBuFilter);
+                }
+            })
+            ->orderByRaw('business_unit_id IS NULL ASC')
+            ->orderBy('sort_order')
+            ->get();
 
         /** @var \Illuminate\Pagination\LengthAwarePaginator<StockAdjustment> $adjustments */
         $adjustments = StockAdjustment::with(['items', 'warehouse', 'branch', 'requestedBy', 'approvedBy', 'reason'])
@@ -872,6 +938,7 @@ class Index extends Component
             'warehouses'    => $warehouses,
             'allReasons'    => $allReasons,
             'activeReasons' => $activeReasons,
+            'businessUnits' => $businessUnits,
         ]);
     }
 }

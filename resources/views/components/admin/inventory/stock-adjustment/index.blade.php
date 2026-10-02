@@ -1229,6 +1229,24 @@
 
                 {{-- Body Modal --}}
                 <div class="p-6 overflow-y-auto space-y-6">
+                    {{-- Filter Business Unit --}}
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-purple-50/70 p-3.5 rounded-2xl border border-purple-200">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-purple-600 animate-pulse"></span>
+                            <span class="text-xs font-bold text-purple-950">Filter Business Unit yang Dikelola:</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <select wire:model.live="modalBuFilter"
+                                class="text-xs py-1.5 px-3 bg-white border border-purple-300 rounded-xl outline-none focus:border-purple-600 font-bold text-purple-900 cursor-pointer shadow-sm">
+                                <option value="ALL">Semua Business Unit</option>
+                                <option value="GLOBAL">Khusus Global (Tanpa BU)</option>
+                                @foreach ($businessUnits as $bu)
+                                    <option value="{{ $bu->id }}">{{ $bu->name }} ({{ strtoupper($bu->code) }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
                     {{-- Form Input / Edit --}}
                     <div class="bg-purple-50/40 p-4 md:p-5 rounded-2xl border border-purple-100 space-y-4">
                         <div class="flex items-center justify-between">
@@ -1245,6 +1263,25 @@
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {{-- Target Business Unit --}}
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">
+                                    Target Business Unit
+                                </label>
+                                <select wire:model="reason_business_unit_id"
+                                    class="w-full text-xs p-2.5 bg-white border border-gray-300 rounded-xl outline-none focus:border-purple-500 font-bold text-gray-800">
+                                    <option value="">-- Berlaku Global (Semua BU) --</option>
+                                    @foreach ($businessUnits as $bu)
+                                        <option value="{{ $bu->id }}">
+                                            {{ $bu->name }} ({{ strtoupper($bu->code) }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('reason_business_unit_id')
+                                    <span class="text-red-500 text-[11px] font-bold">{{ $message }}</span>
+                                @enderror
+                            </div>
+
                             {{-- Nama Kategori --}}
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">
@@ -1276,7 +1313,7 @@
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">
                                     Nomor Akun COA Accurate <span class="text-red-500">*</span>
-                                    <span class="text-[10px] text-gray-400 font-normal">(Input Manual)</span>
+                                    <span class="text-[10px] text-purple-600 font-bold">(Spesifik BU ini)</span>
                                 </label>
                                 <input type="text" wire:model="reason_accurate_account_no"
                                     placeholder="Contoh: 50.01.003 atau 09.09.09"
@@ -1300,12 +1337,12 @@
                             </div>
 
                             {{-- Keterangan / Deskripsi --}}
-                            <div class="md:col-span-2">
+                            <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">
                                     Keterangan / Panduan untuk Staf <span class="text-[10px] text-gray-400 font-normal">(Opsional)</span>
                                 </label>
                                 <input type="text" wire:model="reason_description"
-                                    placeholder="Misal: Digunakan untuk pemakaian unit display toko atau pemeliharaan alat kerja"
+                                    placeholder="Misal: Digunakan untuk pemakaian unit display toko"
                                     class="w-full text-xs p-2.5 bg-white border border-gray-300 rounded-xl outline-none focus:border-purple-500 font-medium">
                             </div>
                         </div>
@@ -1346,6 +1383,7 @@
                                 <thead class="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold tracking-wider text-left">
                                     <tr>
                                         <th class="px-4 py-3">Nama & Identifier</th>
+                                        <th class="px-4 py-3">Business Unit</th>
                                         <th class="px-4 py-3">No. Akun COA Accurate</th>
                                         <th class="px-4 py-3">Status</th>
                                         <th class="px-4 py-3 text-right">Aksi</th>
@@ -1359,6 +1397,17 @@
                                                 <div class="font-mono text-[10px] text-gray-400">{{ $r->code }}</div>
                                                 @if ($r->description)
                                                     <div class="text-[10px] text-gray-500 italic mt-0.5">{{ $r->description }}</div>
+                                                @endif
+                                            </td>
+                                            <td class="px-4 py-3 whitespace-nowrap">
+                                                @if ($r->businessUnit)
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                        {{ $r->businessUnit->name }}
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                                                        Semua BU (Global)
+                                                    </span>
                                                 @endif
                                             </td>
                                             <td class="px-4 py-3 whitespace-nowrap">
@@ -1396,8 +1445,8 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="4" class="px-4 py-8 text-center text-gray-400">
-                                                Belum ada kategori alasan terdaftar.
+                                            <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                                                Belum ada kategori alasan terdaftar untuk filter ini.
                                             </td>
                                         </tr>
                                     @endforelse

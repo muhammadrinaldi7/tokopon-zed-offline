@@ -35,4 +35,12 @@ class StockAdjustmentReason extends Model
     {
         return $query->where('is_active', true);
     }
+
+    public function scopeForBusinessUnit($query, $businessUnitId)
+    {
+        return $query->where(function ($q) use ($businessUnitId) {
+            $q->where('business_unit_id', $businessUnitId)
+              ->orWhereNull('business_unit_id');
+        });
+    }
 }

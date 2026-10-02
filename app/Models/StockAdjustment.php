@@ -102,7 +102,15 @@ class StockAdjustment extends Model
 
     public function getReasonLabelAttribute(): string
     {
-        return $this->reason?->name ?: str_replace('_', ' ', $this->reason_category);
+        $specificReason = StockAdjustmentReason::where('code', $this->reason_category)
+            ->where(function ($q) {
+                $q->where('business_unit_id', $this->business_unit_id)
+                  ->orWhereNull('business_unit_id');
+            })
+            ->orderByRaw('business_unit_id IS NULL ASC')
+            ->first();
+
+        return $specificReason?->name ?? str_replace('_', ' ', $this->reason_category);
     }
 
     /**

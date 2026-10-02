@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\BusinessUnit;
 use App\Models\StockAdjustmentReason;
 use Illuminate\Database\Seeder;
 
@@ -12,7 +13,7 @@ class StockAdjustmentReasonSeeder extends Seeder
      */
     public function run(): void
     {
-        $reasons = [
+        $baseReasons = [
             [
                 'code' => 'PEMELIHARAAN_INVENTARIS',
                 'name' => 'Pemeliharaan Inventaris / Unit Display',
@@ -75,10 +76,29 @@ class StockAdjustmentReasonSeeder extends Seeder
             ],
         ];
 
-        foreach ($reasons as $data) {
+        $businessUnits = BusinessUnit::all();
+
+        // 1. Seed per Business Unit spesifik
+        foreach ($businessUnits as $bu) {
+            foreach ($baseReasons as $data) {
+                StockAdjustmentReason::updateOrCreate(
+                    [
+                        'business_unit_id' => $bu->id,
+                        'code' => $data['code'],
+                    ],
+                    array_merge($data, ['business_unit_id' => $bu->id])
+                );
+            }
+        }
+
+        // 2. Seed untuk Global fallback (business_unit_id = null)
+        foreach ($baseReasons as $data) {
             StockAdjustmentReason::updateOrCreate(
-                ['code' => $data['code']],
-                $data
+                [
+                    'business_unit_id' => null,
+                    'code' => $data['code'],
+                ],
+                array_merge($data, ['business_unit_id' => null])
             );
         }
     }
