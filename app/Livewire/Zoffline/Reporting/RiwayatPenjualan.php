@@ -5,12 +5,17 @@ namespace App\Livewire\Zoffline\Reporting;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Computed;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\Branch;
 use App\Models\BusinessUnit;
+use App\Models\Employe;
 use App\Services\MessageDispatchService;
+use App\Services\AccurateService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 #[Layout('layouts.z', ['title' => 'Riwayat Penjualan POS'])]
 class RiwayatPenjualan extends Component
@@ -40,6 +45,13 @@ class RiwayatPenjualan extends Component
     public $showDirectCancelModal = false;
     public $directCancelOrderId = null;
     public $directCancelReason = '';
+
+    // Edit Salesperson properties
+    public $showEditSalesModal = false;
+    public $editSalesOrderId = null;
+    public $selectedNewSalesId = null;
+    public $searchNewSales = '';
+    public $editSalesNotes = '';
 
     public function mount()
     {
@@ -244,6 +256,9 @@ class RiwayatPenjualan extends Component
             ->with(['user', 'items', 'payments', 'salesBy', 'handledBy', 'businessUnit', 'branch', 'approvalRequests' => function ($q) {
                 $q->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation']);
             }])
+            ->when(\Illuminate\Support\Facades\Schema::hasTable('order_sales_logs'), function ($q) {
+                $q->withCount('salesLogs');
+            })
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('order_number', 'like', '%' . $this->search . '%')
@@ -711,5 +726,267 @@ class RiwayatPenjualan extends Component
 
         $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan pembatalan berhasil dikirim ke Admin/Pusat.', type: 'success');
         $this->closeCancelModal();
+    }
+
+    #[Computed]
+    public function orderToEditSales()
+    {
+        if (!$this->editSalesOrderId) return null;
+        $order = Order::with(['salesBy', 'handledBy', 'businessUnit', 'branch'])->find($this->editSalesOrderId);
+        if ($order && \Illuminate\Support\Facades\Schema::hasTable('order_sales_logs')) {
+            $order->load(['salesLogs.previousSales', 'salesLogs.newSales', 'salesLogs.changedBy']);
+        }
+        return $order;
+    }
+
+    #[Computed]
+    public function availableSalesList()
+    {
+        if (!$this->editSalesOrderId) {
+            return collect();
+        }
+
+        $order = $this->orderToEditSales;
+        if (!$order) {
+            return collect();
+        }
+
+        $query = Employe::active();
+        if ($order->business_unit_id) {
+            $query->where('business_unit_id', $order->business_unit_id);
+        }
+
+        if ($order->branch_id) {
+            $query->where(function ($q) use ($order) {
+                $q->where('branch_id', $order->branch_id)
+                  ->orWhereNull('branch_id');
+            });
+        }
+
+        if (strlen(trim($this->searchNewSales)) >= 1) {
+            $keyword = trim($this->searchNewSales);
+            $query->where(function ($q) use ($keyword) {
+                $q->where('name', 'like', '%' . $keyword . '%')
+                  ->orWhere('employee_no', 'like', '%' . $keyword . '%');
+            });
+        }
+
+        return $query->with('branch')->orderBy('name')->take(30)->get();
+    }
+
+    public function openEditSalesModal($orderId)
+    {
+        $user = Auth::user();
+        $canEditSales = $user && ($user->can('edit-order-salesman') || $user->hasRole(['admin', 'superadmin']));
+        if (!$canEditSales) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki izin untuk mengubah tenaga penjual.', type: 'error');
+            return;
+        }
+
+        $order = Order::with('salesBy')->find($orderId);
+        if (!$order) {
+            $this->dispatch('toast', title: 'Error', message: 'Transaksi tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        $this->editSalesOrderId = $order->id;
+        $this->selectedNewSalesId = $order->sales_id;
+        $this->searchNewSales = '';
+        $this->editSalesNotes = '';
+        $this->showEditSalesModal = true;
+    }
+
+    public function closeEditSalesModal()
+    {
+        $this->showEditSalesModal = false;
+        $this->editSalesOrderId = null;
+        $this->selectedNewSalesId = null;
+        $this->searchNewSales = '';
+        $this->editSalesNotes = '';
+    }
+
+    public function selectNewSales($salesId)
+    {
+        $this->selectedNewSalesId = $salesId;
+    }
+
+    public function updateSalesperson()
+    {
+        $user = Auth::user();
+        $canEditSales = $user && ($user->can('edit-order-salesman') || $user->hasRole(['admin', 'superadmin']));
+        if (!$canEditSales) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki izin untuk mengubah tenaga penjual.', type: 'error');
+            return;
+        }
+
+        $this->validate([
+            'selectedNewSalesId' => 'required|exists:employes,id',
+        ], [
+            'selectedNewSalesId.required' => 'Pilih tenaga penjual baru.',
+            'selectedNewSalesId.exists' => 'Tenaga penjual tidak valid.',
+        ]);
+
+        $order = Order::with(['items', 'salesBy', 'businessUnit'])->find($this->editSalesOrderId);
+        if (!$order) {
+            $this->dispatch('toast', title: 'Error', message: 'Transaksi tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        $newSales = Employe::find($this->selectedNewSalesId);
+        if (!$newSales) {
+            $this->dispatch('toast', title: 'Error', message: 'Data tenaga penjual baru tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        $oldSalesId = $order->sales_id;
+        $oldSalesName = $order->salesBy->name ?? 'Belum ada sales';
+
+        // 1. Update Database Lokal (Header Order & Order Items)
+        try {
+            DB::beginTransaction();
+
+            $order->update([
+                'sales_id' => $newSales->id,
+            ]);
+
+            foreach ($order->items as $item) {
+                $item->update([
+                    'sales_ids' => json_encode([(int) $newSales->id]),
+                ]);
+            }
+
+            Log::info("Tenaga penjual order #{$order->order_number} diubah dari '{$oldSalesName}' ke '{$newSales->name}' oleh {$user->name}. Catatan: {$this->editSalesNotes}");
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Gagal update sales order #{$order->order_number}: " . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal mengubah sales di database lokal: ' . $e->getMessage(), type: 'error');
+            return;
+        }
+
+        // 2. Sinkronisasi ke Accurate Online
+        $accurateSynced = false;
+        $accurateError = null;
+
+        // A. Cek Sales Invoice (SI)
+        $siDoc = $order->accurateDocs()
+            ->where('doc_type', 'SALES_INVOICE')
+            ->where('status', 'SUCCESS')
+            ->first();
+
+        if ($siDoc && $siDoc->accurate_id) {
+            try {
+                $accurateService = app(AccurateService::class);
+                $dbSource = strtolower($order->businessUnit->code ?? 'syihab');
+
+                $existingSi = $accurateService->getSalesInvoiceDetail($siDoc->accurate_id, $dbSource);
+
+                if ($existingSi && !empty($existingSi['detailItem'])) {
+                    $detailItemsPayload = [];
+                    foreach ($existingSi['detailItem'] as $exItem) {
+                        $detailItemsPayload[] = [
+                            'id' => $exItem['id'],
+                            'salesmanListNumber' => !empty($newSales->employee_no) ? [(string) $newSales->employee_no] : [],
+                        ];
+                    }
+
+                    // Tentukan nama cabang untuk Accurate
+                    $branchName = $existingSi['branch']['name'] ?? ($existingSi['branchName'] ?? ($order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru')));
+                    if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
+                        $branchName = 'GSK ' . $branchName;
+                    }
+
+                    $siPayload = [
+                        'id' => $siDoc->accurate_id,
+                        'branchName' => $branchName,
+                        'detailItem' => $detailItemsPayload,
+                    ];
+
+                    if (!empty($existingSi['transDate'])) {
+                        $siPayload['transDate'] = $existingSi['transDate'];
+                    }
+
+                    $accurateService->postSalesInvoice($siPayload, $dbSource);
+                    $accurateSynced = true;
+                    Log::channel('pos_accurate')->info("Salesman Faktur Accurate {$siDoc->doc_number} berhasil diupdate untuk sales {$newSales->name} ({$newSales->employee_no}) pada cabang {$branchName}.");
+                }
+            } catch (\Exception $e) {
+                $accurateError = $e->getMessage();
+                Log::channel('pos_accurate')->error("Gagal sync update salesman ke Accurate Invoice {$order->accurate_invoice_no}: " . $e->getMessage());
+            }
+        }
+
+        // B. Cek Sales Order (SO) jika ada
+        $soDoc = $order->accurateDocs()
+            ->where('doc_type', 'SALES_ORDER')
+            ->where('status', 'SUCCESS')
+            ->first();
+
+        if ($soDoc && $soDoc->accurate_id) {
+            try {
+                $accurateService = app(AccurateService::class);
+                $dbSource = strtolower($order->businessUnit->code ?? 'syihab');
+                $existingSo = $accurateService->getSalesOrderDetail($soDoc->accurate_id, $dbSource);
+
+                if ($existingSo && !empty($existingSo['detailItem'])) {
+                    $detailItemsPayload = [];
+                    foreach ($existingSo['detailItem'] as $exItem) {
+                        $detailItemsPayload[] = [
+                            'id' => $exItem['id'],
+                            'salesmanListNumber' => !empty($newSales->employee_no) ? [(string) $newSales->employee_no] : [],
+                        ];
+                    }
+
+                    $branchName = $existingSo['branch']['name'] ?? ($existingSo['branchName'] ?? ($order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru')));
+                    if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
+                        $branchName = 'GSK ' . $branchName;
+                    }
+
+                    $soPayload = [
+                        'id' => $soDoc->accurate_id,
+                        'branchName' => $branchName,
+                        'detailItem' => $detailItemsPayload,
+                    ];
+
+                    if (!empty($existingSo['transDate'])) {
+                        $soPayload['transDate'] = $existingSo['transDate'];
+                    }
+
+                    $accurateService->postSalesOrder($soPayload, $dbSource);
+                    Log::channel('pos_accurate')->info("Salesman SO Accurate {$soDoc->doc_number} berhasil diupdate untuk sales {$newSales->name} pada cabang {$branchName}.");
+                }
+            } catch (\Exception $e) {
+                Log::channel('pos_accurate')->warning("Gagal sync update salesman ke Accurate SO: " . $e->getMessage());
+            }
+        }
+
+        // 3. Simpan Riwayat Audit Perubahan Sales ke Tabel order_sales_logs
+        if (\Illuminate\Support\Facades\Schema::hasTable('order_sales_logs')) {
+            try {
+                \App\Models\OrderSalesLog::create([
+                    'order_id' => $order->id,
+                    'previous_sales_id' => $oldSalesId,
+                    'new_sales_id' => $newSales->id,
+                    'changed_by' => $user->id,
+                    'notes' => $this->editSalesNotes ?: null,
+                    'accurate_sync_status' => $accurateSynced ? 'SUCCESS' : ($accurateError ? 'FAILED' : 'NOT_APPLICABLE'),
+                    'accurate_sync_message' => $accurateError ?: ($accurateSynced ? 'Tersinkron ke Faktur Accurate' : null),
+                ]);
+            } catch (\Exception $e) {
+                Log::warning("Gagal mencatat order sales log: " . $e->getMessage());
+            }
+        }
+
+        if ($accurateSynced) {
+            $this->dispatch('toast', title: 'Berhasil', message: "Tenaga penjual berhasil diubah menjadi {$newSales->name} dan disinkronkan ke Accurate.", type: 'success');
+        } elseif ($accurateError) {
+            $this->dispatch('toast', title: 'Perhatian', message: "Tenaga penjual diubah di lokal ({$newSales->name}), namun sinkronisasi Accurate terkendala: {$accurateError}", type: 'warning');
+        } else {
+            $this->dispatch('toast', title: 'Berhasil', message: "Tenaga penjual berhasil diubah menjadi {$newSales->name}.", type: 'success');
+        }
+
+        $this->closeEditSalesModal();
+        $this->resetPage();
     }
 }

@@ -88,6 +88,11 @@ class Order extends Model
         return $this->hasMany(OrderResetLog::class);
     }
 
+    public function salesLogs()
+    {
+        return $this->hasMany(OrderSalesLog::class)->latest();
+    }
+
     public function issues()
     {
         return $this->hasMany(OrderIssue::class)->latest();

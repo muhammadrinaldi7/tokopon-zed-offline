@@ -275,9 +275,37 @@
                                         {{ $order->handledBy->name ?? '-' }}
                                     </div>
                                     @if ($order->salesBy)
-                                        <div
-                                            class="text-[11px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded inline-block mt-1">
-                                            Sales: {{ $order->salesBy->name }}</div>
+                                        <div class="flex flex-col items-start gap-0.5 mt-1">
+                                            <div
+                                                class="text-[11px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                                                <span>Sales: {{ $order->salesBy->name }}</span>
+                                                @if (auth()->user()->can('edit-order-salesman') || auth()->user()->hasRole(['admin', 'superadmin']))
+                                                    <button wire:click="openEditSalesModal({{ $order->id }})" class="hover:text-indigo-900 ml-0.5" title="Ubah Sales">
+                                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                        </svg>
+                                                    </button>
+                                                @endif
+                                            </div>
+                                            @if (!empty($order->sales_logs_count) && $order->sales_logs_count > 0)
+                                                <button wire:click="openEditSalesModal({{ $order->id }})"
+                                                    class="inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 px-1.5 py-0.5 rounded transition"
+                                                    title="Pernah diubah {{ $order->sales_logs_count }} kali. Klik untuk lihat riwayat.">
+                                                    <svg class="w-2.5 h-2.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <span>{{ $order->sales_logs_count }}x diubah</span>
+                                                </button>
+                                            @endif
+                                        </div>
+                                    @else
+                                        @if (auth()->user()->can('edit-order-salesman') || auth()->user()->hasRole(['admin', 'superadmin']))
+                                            <div class="mt-1">
+                                                <button wire:click="openEditSalesModal({{ $order->id }})" class="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold underline decoration-dashed flex items-center gap-0.5" title="Tentukan Sales">
+                                                    + Set Sales
+                                                </button>
+                                            </div>
+                                        @endif
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
@@ -322,9 +350,9 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                                     @if ($order->order_status != 'DELETED')
-                                        <div class="flex flex-col gap-2 items-center">
+                                        <div class="flex flex-col gap-1.5 items-center">
                                             <button wire:click="reprintOrder({{ $order->id }})"
-                                                class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-all border border-emerald-100">
+                                                class="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-all border border-emerald-100">
                                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
                                                     stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -333,9 +361,20 @@
                                                 Struk
                                             </button>
 
+                                            @if (auth()->user()->can('edit-order-salesman') || auth()->user()->hasRole(['admin', 'superadmin']))
+                                                <button wire:click="openEditSalesModal({{ $order->id }})"
+                                                    class="w-full inline-flex items-center justify-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-[10px] font-bold transition-all border border-indigo-200 uppercase"
+                                                    title="Ubah Tenaga Penjual">
+                                                    <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                    </svg>
+                                                    Ubah Sales
+                                                </button>
+                                            @endif
+
                                             @if (!$pendingCancel && $order->order_status !== 'CANCELLED')
                                                 <button wire:click="requestCancellation({{ $order->id }})"
-                                                    class="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-[10px] font-bold transition-all border border-red-100 uppercase mt-1">
+                                                    class="w-full inline-flex items-center justify-center gap-1 px-3 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-[10px] font-bold transition-all border border-red-100 uppercase">
                                                     Batalkan
                                                 </button>
                                             @endif
@@ -417,6 +456,193 @@
                     <button wire:click="submitCancellation"
                         class="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-all shadow-sm shadow-red-600/20">
                         Kirim Pengajuan
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- MODAL UBAH TENAGA PENJUAL --}}
+    @if ($showEditSalesModal && $this->orderToEditSales)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/50 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-neutral-100"
+                @click.outside="$wire.closeEditSalesModal()">
+                {{-- Header --}}
+                <div class="p-5 bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-indigo-100/60 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-neutral-900">Ubah Tenaga Penjual (Sales)</h3>
+                            <p class="text-xs text-neutral-500 font-medium">Order: <span class="font-mono font-bold text-indigo-700">{{ $this->orderToEditSales->order_number }}</span></p>
+                        </div>
+                    </div>
+                    <button wire:click="closeEditSalesModal" class="text-neutral-400 hover:text-neutral-600 transition p-1">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Body Content --}}
+                <div class="p-6 space-y-4">
+                    {{-- Info Transaksi Singkat --}}
+                    <div class="bg-neutral-50 rounded-xl p-3.5 border border-neutral-200/70 text-xs grid grid-cols-2 gap-2">
+                        <div>
+                            <span class="text-neutral-400 block font-medium">Cabang / BU:</span>
+                            <span class="font-bold text-neutral-800">{{ $this->orderToEditSales->branch->name ?? 'Semua Cabang' }} ({{ $this->orderToEditSales->businessUnit->code ?? ($this->orderToEditSales->businessUnit->name ?? '-') }})</span>
+                        </div>
+                        <div>
+                            <span class="text-neutral-400 block font-medium">Kasir:</span>
+                            <span class="font-bold text-neutral-800">{{ $this->orderToEditSales->handledBy->name ?? '-' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-neutral-400 block font-medium">Sales Saat Ini:</span>
+                            <span class="font-bold text-indigo-700">{{ $this->orderToEditSales->salesBy->name ?? 'Belum ada sales' }}</span>
+                            @if($this->orderToEditSales->salesBy?->employee_no)
+                                <span class="text-neutral-400 font-mono text-[10px]">({{ $this->orderToEditSales->salesBy->employee_no }})</span>
+                            @endif
+                        </div>
+                        <div>
+                            <span class="text-neutral-400 block font-medium">Faktur Accurate:</span>
+                            @if ($this->orderToEditSales->accurate_invoice_no)
+                                <span class="inline-flex items-center gap-1 font-bold text-emerald-600">
+                                    <span>✓ {{ $this->orderToEditSales->accurate_invoice_no }}</span>
+                                </span>
+                            @else
+                                <span class="text-neutral-400">Belum ada faktur</span>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Form Pilih Sales Baru --}}
+                    <div>
+                        <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">
+                            Pilih Tenaga Penjual Baru <span class="text-red-500">*</span>
+                        </label>
+
+                        {{-- Search Input --}}
+                        <div class="relative mb-2">
+                            <input type="text" wire:model.live.debounce.250ms="searchNewSales"
+                                class="w-full pl-9 pr-4 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium text-neutral-800 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition"
+                                placeholder="Cari nama atau NIK sales...">
+                            <svg class="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+
+                        {{-- Sales List Box --}}
+                        <div class="max-h-48 overflow-y-auto border border-neutral-200 rounded-xl divide-y divide-neutral-100 bg-white shadow-inner">
+                            @forelse ($this->availableSalesList as $sales)
+                                <button type="button" wire:click="selectNewSales({{ $sales->id }})"
+                                    class="w-full text-left px-3.5 py-2.5 flex items-center justify-between text-xs transition {{ $selectedNewSalesId == $sales->id ? 'bg-indigo-50/90 text-indigo-900 font-bold border-l-4 border-indigo-600' : 'hover:bg-neutral-50 text-neutral-700 font-medium' }}">
+                                    <div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span>{{ $sales->name }}</span>
+                                            @if ($this->orderToEditSales->sales_id == $sales->id)
+                                                <span class="text-[9px] bg-neutral-200 text-neutral-700 px-1.5 py-0.5 rounded font-normal">(Saat Ini)</span>
+                                            @endif
+                                        </div>
+                                        <div class="text-[10px] text-neutral-400 font-mono mt-0.5">
+                                            {{ $sales->employee_no ?? 'No NIK' }} &bull; {{ $sales->branch->name ?? 'Semua Cabang' }}
+                                        </div>
+                                    </div>
+                                    @if ($selectedNewSalesId == $sales->id)
+                                        <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    @endif
+                                </button>
+                            @empty
+                                <div class="p-4 text-center text-xs text-neutral-400">
+                                    Tidak ada tenaga penjual yang cocok.
+                                </div>
+                            @endforelse
+                        </div>
+                        @error('selectedNewSalesId')
+                            <span class="text-xs text-red-500 font-medium mt-1 block">{{ $message }}</span>
+                        @enderror
+                    </div>
+
+                    {{-- Catatan Alasan Perubahan (Opsional) --}}
+                    <div>
+                        <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">
+                            Catatan Perubahan (Opsional)
+                        </label>
+                        <input type="text" wire:model="editSalesNotes"
+                            class="w-full px-3.5 py-2 border border-neutral-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition"
+                            placeholder="Contoh: Koreksi input salah sales oleh kasir">
+                    </div>
+
+                    @if ($this->orderToEditSales->accurate_invoice_no)
+                        <div class="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl flex items-start gap-2.5 text-xs text-blue-900">
+                            <svg class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div class="text-[11px] leading-relaxed">
+                                <span class="font-bold">Info Sinkronisasi Accurate:</span> Pesanan ini memiliki Faktur Penjualan Accurate (<span class="font-mono font-bold">{{ $this->orderToEditSales->accurate_invoice_no }}</span>). Sistem akan otomatis memperbarui tenaga penjual pada faktur Accurate tersebut.
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Riwayat Perubahan Sales (Audit Trail) --}}
+                    @if ($this->orderToEditSales->salesLogs && $this->orderToEditSales->salesLogs->count() > 0)
+                        <div class="border-t border-neutral-200/80 pt-4 mt-2">
+                            <h4 class="text-xs font-bold text-neutral-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Riwayat Perubahan Sales ({{ $this->orderToEditSales->salesLogs->count() }})
+                            </h4>
+                            <div class="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                @foreach ($this->orderToEditSales->salesLogs as $log)
+                                    <div class="p-2.5 bg-neutral-50 rounded-xl border border-neutral-200/70 text-xs">
+                                        <div class="flex items-center justify-between gap-2 mb-1">
+                                            <span class="text-neutral-500 font-mono text-[10px]">{{ $log->created_at->format('d/m/Y H:i') }}</span>
+                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded {{ $log->accurate_sync_status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : ($log->accurate_sync_status === 'FAILED' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-neutral-100 text-neutral-600') }}">
+                                                {{ $log->accurate_sync_status === 'SUCCESS' ? '✓ Accurate' : ($log->accurate_sync_status === 'FAILED' ? '✕ Gagal Sync' : 'Lokal') }}
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 font-medium text-neutral-800 flex-wrap">
+                                            <span class="text-neutral-500 line-through">{{ $log->previousSales->name ?? 'Tanpa Sales' }}</span>
+                                            <span class="text-neutral-400 font-bold">➔</span>
+                                            <span class="font-bold text-indigo-700">{{ $log->newSales->name ?? '-' }}</span>
+                                            <span class="text-neutral-400 text-[10px] ml-auto">oleh <strong class="text-neutral-700">{{ $log->changedBy->name ?? 'Sistem' }}</strong></span>
+                                        </div>
+                                        @if ($log->notes)
+                                            <div class="mt-1 text-[11px] text-neutral-600 italic bg-white p-1.5 rounded border border-neutral-100">
+                                                "{{ $log->notes }}"
+                                            </div>
+                                        @endif
+                                        @if ($log->accurate_sync_status === 'FAILED' && $log->accurate_sync_message)
+                                            <div class="mt-1 text-[10px] text-red-600 font-mono">
+                                                Error: {{ $log->accurate_sync_message }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Footer Actions --}}
+                <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end gap-2.5">
+                    <button wire:click="closeEditSalesModal" type="button"
+                        class="px-4 py-2 text-xs font-bold text-neutral-600 bg-white border border-neutral-200 rounded-xl hover:bg-neutral-100 transition">
+                        Batal
+                    </button>
+                    <button wire:click="updateSalesperson" wire:loading.attr="disabled" type="button"
+                        class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-600/20 transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg wire:loading wire:target="updateSalesperson" class="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span wire:loading.remove wire:target="updateSalesperson">Simpan Perubahan</span>
+                        <span wire:loading wire:target="updateSalesperson">Menyimpan...</span>
                     </button>
                 </div>
             </div>
