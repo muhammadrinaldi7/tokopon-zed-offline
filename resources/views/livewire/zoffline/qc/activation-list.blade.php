@@ -135,6 +135,20 @@
                                             </svg>
                                             Aktif
                                         </span>
+                                    @elseif (!empty($item['pending_switch']))
+                                        <div class="inline-flex flex-col items-center gap-0.5">
+                                            <span
+                                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Menunggu Approval
+                                            </span>
+                                            <span class="text-[10px] text-amber-600 font-semibold">
+                                                Level {{ $item['pending_switch']['level'] }}/{{ $item['pending_switch']['required'] }}
+                                            </span>
+                                        </div>
                                     @else
                                         <span
                                             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200/50">
@@ -160,11 +174,29 @@
                                         </button>
 
                                         @if (!$item['is_activated'])
-                                            <a href="{{ route('zoffline.warranty-activation', ['sn' => $item['serial_number']]) }}"
-                                                wire:navigate
-                                                class="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 text-xs font-bold rounded-xl transition-all shadow-sm">
-                                                Aktivasi Sekarang
-                                            </a>
+                                            @if (!empty($item['pending_switch']))
+                                                <span class="inline-flex items-center px-3 py-2 bg-amber-50 text-amber-700 text-xs font-semibold rounded-xl border border-amber-200/70" title="Sedang menunggu persetujuan alih garansi">
+                                                    Proses Alih Garansi
+                                                </span>
+                                            @else
+                                                <a href="{{ route('zoffline.warranty-activation', ['sn' => $item['serial_number']]) }}"
+                                                    wire:navigate
+                                                    class="inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-200 text-gray-700 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 text-xs font-bold rounded-xl transition-all shadow-sm">
+                                                    Aktivasi Sekarang
+                                                </a>
+
+                                                @if (auth()->user()?->can('switch-warranty') || auth()->user()?->hasRole(['superadmin', 'admin', 'bm', 'bm_gsk']))
+                                                    <button type="button"
+                                                        wire:click="openSwitchModal('{{ $item['serial_number'] }}', {{ $item['order_id'] }}, '{{ $item['order_number'] }}', '{{ addslashes($item['product_name']) }}')"
+                                                        class="inline-flex items-center justify-center px-3 py-2 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 hover:border-amber-300 text-xs font-bold rounded-xl transition-all shadow-sm gap-1"
+                                                        title="Alihkan / Tautkan Garansi Lama dari Order Sebelumnya">
+                                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                                        </svg>
+                                                        Tautkan Garansi
+                                                    </button>
+                                                @endif
+                                            @endif
                                         @else
                                             <button wire:click="viewQc({{ $item['inspection_id'] }})"
                                                 class="inline-flex items-center justify-center px-4 py-2 bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white text-xs font-bold rounded-xl transition-all shadow-sm gap-1.5">
@@ -488,6 +520,154 @@
                 <button type="button" wire:click="closeReceiptModal"
                     class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition">
                     Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- MODAL SWITCH WARRANTY --}}
+    @if ($showSwitchModal)
+    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-gray-900/60 backdrop-blur-sm transition-opacity" @click="if($event.target === $el) $wire.closeSwitchModal()">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" @click.stop>
+            {{-- Header --}}
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-white z-10">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shadow-xs">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-black text-gray-900 tracking-tight">Tautkan Hasil QC & Garansi Lama</h3>
+                        <p class="text-xs text-gray-500">Alihkan riwayat QC & garansi dari transaksi yang dibatalkan tanpa aktivasi/foto unboxing ulang.</p>
+                    </div>
+                </div>
+                <button wire:click="closeSwitchModal" class="p-2 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            {{-- Body --}}
+            <div class="p-6 overflow-y-auto bg-gray-50/50 flex-1 space-y-5">
+                {{-- Approval Notice Banner --}}
+                <div class="p-4 rounded-2xl bg-blue-50/70 border border-blue-200/80 flex items-start gap-3">
+                    <svg class="w-5 h-5 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div class="text-xs text-blue-900">
+                        <span class="font-bold">Alur Persetujuan Bertingkat:</span>
+                        Pengajuan ini akan diproses ke antrean approval <strong class="font-semibold text-blue-800">Branch Manager (Level 1)</strong> lalu dilanjutkan ke <strong class="font-semibold text-blue-800">Manager Operasional (Level 2)</strong>. Setelah disetujui penuh oleh MO, garansi akan otomatis aktif kembali dan tertaut ke order baru ini.
+                    </div>
+                </div>
+
+                {{-- Komparasi Order: Baru vs Lama --}}
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {{-- Order Baru --}}
+                    <div class="p-4 rounded-2xl bg-white border border-gray-200 shadow-xs space-y-2">
+                        <div class="flex items-center justify-between border-b border-gray-100 pb-2">
+                            <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Order Baru (Tujuan)</span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">Aktif</span>
+                        </div>
+                        <div class="space-y-1 text-xs">
+                            <div class="text-gray-500">No. Order: <span class="font-mono font-bold text-gray-900">{{ $switchTargetOrderNumber }}</span></div>
+                            <div class="text-gray-500">Produk: <span class="font-bold text-gray-900">{{ $switchTargetProductName }}</span></div>
+                            <div class="text-gray-500">IMEI/SN: <span class="font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">{{ $switchTargetSn }}</span></div>
+                        </div>
+                    </div>
+
+                    {{-- Order / QC Lama --}}
+                    <div class="p-4 rounded-2xl bg-white border border-gray-200 shadow-xs space-y-2">
+                        <div class="flex items-center justify-between border-b border-gray-100 pb-2">
+                            <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">QC & Garansi Sebelumnya</span>
+                            @if ($foundPreviousOrder)
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-md {{ $foundPreviousOrder->status === 'CANCELLED' ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-gray-100 text-gray-700' }}">
+                                    Order {{ $foundPreviousOrder->status ?? 'Lama' }}
+                                </span>
+                            @endif
+                        </div>
+                        <div class="space-y-1 text-xs">
+                            @if ($foundPreviousInspection)
+                                <div class="text-gray-500">Order Asal: <span class="font-mono font-bold text-gray-900">{{ $foundPreviousOrder->order_number ?? '-' }}</span></div>
+                                <div class="text-gray-500">Staff QC: <span class="font-bold text-gray-900">{{ $foundPreviousInspection->inspector->name ?? 'Staff' }}</span></div>
+                                <div class="text-gray-500">Waktu QC: <span class="text-gray-800">{{ $foundPreviousInspection->created_at?->format('d M Y, H:i') }}</span></div>
+                            @else
+                                <div class="text-rose-500 italic py-2">Tidak ditemukan inspeksi QC sebelumnya untuk SN ini.</div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Status Garansi Sebelumnya --}}
+                @if (!empty($foundPreviousWarranties) && count($foundPreviousWarranties) > 0)
+                    <div class="p-3.5 rounded-2xl bg-white border border-gray-200 shadow-xs space-y-2">
+                        <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Polis Garansi Sebelumnya</span>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($foundPreviousWarranties as $w)
+                                <div class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs">
+                                    <span class="font-bold text-gray-800">{{ $w->policy->name ?? 'Garansi' }}</span>
+                                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded {{ $w->status === 'active' ? 'bg-emerald-100 text-emerald-700' : ($w->status === 'voided' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700') }}">
+                                        {{ strtoupper($w->status) }}
+                                    </span>
+                                    <span class="text-gray-400 text-[10px]">{{ $w->expired_at ? 's/d ' . \Carbon\Carbon::parse($w->expired_at)->format('d/m/Y') : '' }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Foto QC Sebelumnya --}}
+                @if ($foundPreviousInspection && $foundPreviousInspection->getMedia('qc_photos')->count() > 0)
+                    <div class="p-3.5 rounded-2xl bg-white border border-gray-200 shadow-xs space-y-2">
+                        <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
+                            Bukti Foto QC Unboxing Sebelumnya ({{ $foundPreviousInspection->getMedia('qc_photos')->count() }} Foto)
+                        </span>
+                        <div class="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                            @foreach ($foundPreviousInspection->getMedia('qc_photos') as $media)
+                                <a href="{{ $media->getUrl() }}" target="_blank" class="block aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100 hover:opacity-85 transition group relative shadow-2xs" title="{{ $media->name }}">
+                                    <img src="{{ $media->getUrl() }}" alt="{{ $media->name }}" class="w-full h-full object-cover">
+                                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold">
+                                        Perbesar
+                                    </div>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Form Alasan Pengalihan --}}
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-bold text-gray-700">
+                        Alasan Pengalihan Garansi <span class="text-rose-500">*</span>
+                    </label>
+                    <textarea wire:model="switchReason" rows="3"
+                        class="w-full text-xs rounded-2xl border-gray-300 focus:border-amber-500 focus:ring focus:ring-amber-200 transition"
+                        placeholder="Contoh: Order sebelumnya dibatalkan karena customer salah memilih metode pembayaran. Barang & IMEI unit fisik sama dan telah lolos QC."></textarea>
+                    @error('switchReason')
+                        <p class="text-xs text-rose-600 font-medium">{{ $message }}</p>
+                    @enderror
+                </div>
+            </div>
+
+            {{-- Footer --}}
+            <div class="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3">
+                <button type="button" wire:click="closeSwitchModal"
+                    class="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition">
+                    Batal
+                </button>
+
+                <button type="button"
+                    wire:click="submitSwitchRequest"
+                    wire:loading.attr="disabled"
+                    @if (!$foundPreviousInspection) disabled @endif
+                    class="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition shadow-sm">
+                    <svg wire:loading wire:target="submitSwitchRequest" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Kirim Pengajuan Approval</span>
                 </button>
             </div>
         </div>

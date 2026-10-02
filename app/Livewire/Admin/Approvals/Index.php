@@ -82,6 +82,16 @@ class Index extends Component
                 'salesBy',
                 'businessUnit'
             ])->find($this->detailRequest->approvable_id);
+        } elseif ($this->detailRequest->request_type === 'SWITCH_WARRANTY' && !empty($this->detailRequest->payload['new_order_id'])) {
+            $this->detailOrder = Order::with([
+                'items.variant',
+                'user.profile',
+                'payments.paymentMethod',
+                'payments.paymentMethodRate',
+                'handledBy',
+                'salesBy',
+                'businessUnit'
+            ])->find($this->detailRequest->payload['new_order_id']);
         } else {
             $this->detailOrder = null;
         }
@@ -263,7 +273,9 @@ class Index extends Component
                 $kasirName = $request->requestedBy->name ?? 'Kasir';
                 $tipe = str_replace('_', ' ', $request->request_type) . " (Level {$request->required_level})";
                 $orderInfo = '-';
-                if ($request->approvable_type === Order::class && $request->approvable) {
+                if ($request->request_type === 'SWITCH_WARRANTY') {
+                    $orderInfo = "SN " . ($request->payload['serial_number'] ?? '-') . " (Ke Order #" . ($request->payload['new_order_number'] ?? '-') . ")";
+                } elseif ($request->approvable_type === Order::class && $request->approvable) {
                     $orderInfo = $request->approvable->order_number;
                 } elseif ($request->approvable_type === \App\Models\SellPhone::class && $request->approvable) {
                     $orderInfo = $request->approvable->phone_brand . ' ' . $request->approvable->phone_model;
@@ -287,7 +299,7 @@ class Index extends Component
 
                 $msg = $request->request_type === 'ORDER_CANCELLATION'
                     ? 'Persetujuan berhasil dan transaksi dibatalkan di Accurate.'
-                    : 'Persetujuan berhasil dieksekusi.';
+                    : ($request->request_type === 'SWITCH_WARRANTY' ? 'Persetujuan berhasil dan garansi telah dialihkan ke order baru.' : 'Persetujuan berhasil dieksekusi.');
 
                 $this->dispatch('toast', title: 'Berhasil', message: $msg, type: 'success');
             } catch (Exception $e) {

@@ -103,6 +103,10 @@
                                     @else
                                         Barang: <span class="font-semibold text-gray-700">{{ $req->approvable->product_name ?? ($req->payload['product_name'] ?? '-') }}</span>
                                     @endif
+                                @elseif($req->request_type === 'SWITCH_WARRANTY')
+                                    SN: <span class="font-bold text-gray-800">{{ $req->payload['serial_number'] ?? '-' }}</span><br>
+                                    Dari Order: <span class="text-rose-600 font-semibold">{{ $req->payload['old_order_number'] ?? '-' }}</span><br>
+                                    Ke Order: <span class="text-emerald-600 font-bold">{{ $req->payload['new_order_number'] ?? '-' }}</span>
                                 @elseif($req->approvable_type === 'App\Models\Order' || $req->approvable instanceof \App\Models\Order)
                                     Order: {{ $req->approvable->order_number ?? '-' }}
                                 @elseif($req->approvable_type === 'App\Models\SellPhone' || $req->approvable instanceof \App\Models\SellPhone)
@@ -203,6 +207,18 @@
                 <h3 class="mb-2 text-xl font-bold text-gray-900">Konfirmasi Cashback Kustom</h3>
                 <p class="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
                     Anda akan menyetujui permintaan cashback kustom ini. Diskon akan langsung diterapkan di perangkat Kasir secara otomatis.
+                </p>
+                @elseif($confirmingRequestType === 'SWITCH_WARRANTY')
+                <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4 border-4 border-blue-50">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                </div>
+                
+                <h3 class="mb-2 text-xl font-bold text-gray-900">Konfirmasi Alihkan Garansi</h3>
+                <p class="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
+                    Anda akan menyetujui pengalihan hasil inspeksi QC dan kartu garansi dari transaksi lama ke nomor order penjualan baru.
+                    <br><br>Apakah Anda yakin ingin menyetujui pengalihan ini?
                 </p>
                 @elseif($confirmingRequestType === 'WARRANTY_REPLACEMENT')
                 <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4 border-4 border-blue-50">
@@ -316,6 +332,10 @@
                     @elseif($confirmingRequestType === 'WARRANTY_REPLACEMENT')
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20 cursor-pointer">
                         Setujui Ganti Unit
+                    </button>
+                    @elseif($confirmingRequestType === 'SWITCH_WARRANTY')
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20 cursor-pointer">
+                        Setujui Alih Garansi
                     </button>
                     @elseif($confirmingRequestType === 'SELL_PHONE_APPROVAL')
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-amber-600 rounded-xl hover:bg-amber-700 focus:ring-4 focus:ring-amber-300 transition-colors shadow-md shadow-amber-500/20 cursor-pointer">

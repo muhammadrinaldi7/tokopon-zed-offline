@@ -24,6 +24,7 @@ class Index extends Component
         'purchase_order'       => 'Persetujuan Pembelian (PO)',
         'STOCK_ADJUSTMENT'     => 'Penyesuaian Stok Persediaan',
         'STOCK_OPNAME_REPORT'  => 'Laporan Stock Opname',
+        'SWITCH_WARRANTY'      => 'Alihkan / Migrasi Garansi ke Order Baru',
     ];
 
     public function getIsFinancialProperty(): bool

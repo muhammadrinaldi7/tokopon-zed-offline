@@ -10,6 +10,7 @@ use App\Approvals\Handlers\WarrantyExtensionHandler;
 use App\Approvals\Handlers\StockAdjustmentApprovalHandler;
 use App\Approvals\Handlers\StockOpnameApprovalHandler;
 use App\Approvals\Handlers\WarrantyReplacementHandler;
+use App\Approvals\Handlers\SwitchWarrantyApprovalHandler;
 use App\Http\Controllers\ApprovalController;
 use App\Models\ApprovalRequest;
 use App\Models\ApprovalRule;
@@ -34,6 +35,7 @@ class ApprovalService
         'CUSTOM_CASHBACK'      => CustomCashbackHandler::class,
         'STOCK_OPNAME_REPORT'  => StockOpnameApprovalHandler::class,
         'STOCK_ADJUSTMENT'     => StockAdjustmentApprovalHandler::class,
+        'SWITCH_WARRANTY'      => SwitchWarrantyApprovalHandler::class,
     ];
 
     /**
