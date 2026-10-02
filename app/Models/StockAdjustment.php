@@ -95,6 +95,16 @@ class StockAdjustment extends Model
         return $this->morphOne(ApprovalRequest::class, 'approvable');
     }
 
+    public function reason()
+    {
+        return $this->belongsTo(StockAdjustmentReason::class, 'reason_category', 'code');
+    }
+
+    public function getReasonLabelAttribute(): string
+    {
+        return $this->reason?->name ?: str_replace('_', ' ', $this->reason_category);
+    }
+
     /**
      * Generate unique adjustment number: ADJ-YYYYMM-XXXX
      */

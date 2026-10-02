@@ -26,14 +26,14 @@ class StockAdjustmentApprovalHandler implements ApprovalHandlerInterface
             throw new Exception("Data StockAdjustment tidak ditemukan untuk approval request #{$request->id}.");
         }
 
-        $adjustment->loadMissing(['items', 'warehouse', 'branch', 'businessUnit']);
+        $adjustment->loadMissing(['items', 'warehouse', 'branch', 'businessUnit', 'reason']);
 
         // 1. Mutasi Stok Lokal di Gudang Terkait (jika tracking aktif)
         $this->mutateLocalStock($adjustment);
 
         // 2. Susun Payload dan Kirim ke Accurate Online
         try {
-            $notesFull = "[{$adjustment->reason_category}] " . ($adjustment->notes ?: 'Penyesuaian Stok');
+            $notesFull = "[{$adjustment->reason_label}] " . ($adjustment->notes ?: 'Penyesuaian Stok');
             
             // Tambahkan ringkasan SKU tujuan jika ada
             $targetSummaries = [];

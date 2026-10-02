@@ -8,6 +8,7 @@ use App\Models\ProductAccurate;
 use App\Models\ProductVariant;
 use App\Models\StockAdjustment;
 use App\Models\StockAdjustmentItem;
+use App\Models\StockAdjustmentReason;
 use App\Models\Warehouse;
 use App\Models\WarehouseStock;
 use App\Services\ApprovalService;
@@ -42,9 +43,19 @@ class Index extends Component
     public $business_unit_id;
     public $warehouse_id;
     public $default_adjustment_type = 'OUT'; // 'OUT' (Pengurangan) atau 'IN' (Penambahan)
-    public $reason_category = 'PEMELIHARAAN_INVENTARIS';
+    public $reason_category = '';
     public $notes = '';
-    public $accurate_account_no = '50.03.005'; // Default COA Penyesuaian/Beban
+    public $accurate_account_no = ''; // COA Penyesuaian/Beban
+
+    // Modal Kelola Kategori Alasan
+    public $showReasonModal = false;
+    public $reason_form_id = null;
+    public $reason_name = '';
+    public $reason_code = '';
+    public $reason_accurate_account_no = '';
+    public $reason_accurate_account_name = '';
+    public $reason_description = '';
+    public $reason_is_active = true;
 
     // Keranjang Item Penyesuaian (Multi Item)
     public $items = [];
@@ -85,6 +96,16 @@ class Index extends Component
 
         // Default gudang berdasarkan penugasan user
         $this->setDefaultWarehouse();
+
+        // Default alasan dan akun COA dari database
+        $defaultReason = StockAdjustmentReason::active()->orderBy('sort_order')->first();
+        if ($defaultReason) {
+            $this->reason_category = $defaultReason->code;
+            $this->accurate_account_no = $defaultReason->accurate_account_no ?: '50.03.005';
+        } else {
+            $this->reason_category = 'PEMELIHARAAN_INVENTARIS';
+            $this->accurate_account_no = '50.03.005';
+        }
     }
 
     public function setDefaultWarehouse()
@@ -121,12 +142,26 @@ class Index extends Component
     public function resetForm()
     {
         $this->default_adjustment_type = 'OUT';
-        $this->reason_category = 'PEMELIHARAAN_INVENTARIS';
+        $defaultReason = StockAdjustmentReason::active()->orderBy('sort_order')->first();
+        if ($defaultReason) {
+            $this->reason_category = $defaultReason->code;
+            $this->accurate_account_no = $defaultReason->accurate_account_no ?: '50.03.005';
+        } else {
+            $this->reason_category = 'PEMELIHARAAN_INVENTARIS';
+            $this->accurate_account_no = '50.03.005';
+        }
         $this->notes = '';
-        $this->accurate_account_no = '50.03.005';
         $this->items = [];
 
         $this->resetTempItemInput();
+    }
+
+    public function updatedReasonCategory($val)
+    {
+        $reason = StockAdjustmentReason::where('code', $val)->where('is_active', true)->first();
+        if ($reason && !empty($reason->accurate_account_no)) {
+            $this->accurate_account_no = $reason->accurate_account_no;
+        }
     }
 
     public function resetTempItemInput()
@@ -517,9 +552,8 @@ class Index extends Component
             }
 
             // 3. Susun teks alasan dan payload untuk Approval Center
-            $reasonCategoryLabel = $this->reason_category === 'PEMELIHARAAN_INVENTARIS'
-                ? 'Pemakaian / Pemeliharaan Inventaris'
-                : str_replace('_', ' ', $this->reason_category);
+            $reasonObj = StockAdjustmentReason::where('code', $this->reason_category)->first();
+            $reasonCategoryLabel = $reasonObj ? $reasonObj->name : str_replace('_', ' ', $this->reason_category);
             $reasonText = "[{$reasonCategoryLabel}] " . ($this->notes ?: 'Pemakaian Operasional Toko');
             $reasonText .= " ({$totalItems} jenis item, Total: {$totalQty} pcs)";
 
@@ -597,7 +631,7 @@ class Index extends Component
     public function retrySync($id)
     {
         /** @var StockAdjustment|null $adjustment */
-        $adjustment = StockAdjustment::with(['items', 'warehouse', 'branch', 'businessUnit'])->where('id', $id)->first();
+        $adjustment = StockAdjustment::with(['items', 'warehouse', 'branch', 'businessUnit', 'reason'])->where('id', $id)->first();
         if (!$adjustment) return;
 
         if ($adjustment->status !== 'FAILED_SYNC' && $adjustment->status !== 'APPROVED') {
@@ -606,7 +640,7 @@ class Index extends Component
         }
 
         try {
-            $notesFull = "[{$adjustment->reason_category}] " . ($adjustment->notes ?: 'Penyesuaian Stok');
+            $notesFull = "[{$adjustment->reason_label}] " . ($adjustment->notes ?: 'Penyesuaian Stok');
 
             $targetSummaries = [];
             foreach ($adjustment->items as $item) {
@@ -688,12 +722,112 @@ class Index extends Component
         }
     }
 
+    // --- MANAJEMEN KATEGORI ALASAN ---
+    public function openReasonModal()
+    {
+        $this->resetReasonForm();
+        $this->showReasonModal = true;
+    }
+
+    public function closeReasonModal()
+    {
+        $this->showReasonModal = false;
+        $this->resetReasonForm();
+    }
+
+    public function resetReasonForm()
+    {
+        $this->reason_form_id = null;
+        $this->reason_name = '';
+        $this->reason_code = '';
+        $this->reason_accurate_account_no = '';
+        $this->reason_accurate_account_name = '';
+        $this->reason_description = '';
+        $this->reason_is_active = true;
+        $this->resetErrorBag(['reason_name', 'reason_code', 'reason_accurate_account_no']);
+    }
+
+    public function updatedReasonName($val)
+    {
+        if (empty($this->reason_form_id) && empty($this->reason_code)) {
+            $this->reason_code = strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '_', trim($val)));
+        }
+    }
+
+    public function editReason($id)
+    {
+        $reason = StockAdjustmentReason::findOrFail($id);
+        $this->reason_form_id = $reason->id;
+        $this->reason_name = $reason->name;
+        $this->reason_code = $reason->code;
+        $this->reason_accurate_account_no = $reason->accurate_account_no;
+        $this->reason_accurate_account_name = $reason->accurate_account_name;
+        $this->reason_description = $reason->description;
+        $this->reason_is_active = (bool) $reason->is_active;
+    }
+
+    public function saveReason()
+    {
+        $code = strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '_', trim($this->reason_code)));
+
+        $this->validate([
+            'reason_name'                => 'required|string|max:255',
+            'reason_code'                => 'required|string|max:50|unique:stock_adjustment_reasons,code,' . ($this->reason_form_id ?? 'NULL') . ',id',
+            'reason_accurate_account_no' => 'required|string|max:50',
+            'reason_accurate_account_name' => 'nullable|string|max:255',
+            'reason_description'         => 'nullable|string|max:500',
+        ], [
+            'reason_name.required'                => 'Nama kategori alasan wajib diisi.',
+            'reason_code.required'                => 'Kode kategori wajib diisi.',
+            'reason_code.unique'                  => 'Kode kategori ini sudah digunakan.',
+            'reason_accurate_account_no.required' => 'Nomor Akun COA Accurate wajib diisi.',
+        ]);
+
+        StockAdjustmentReason::updateOrCreate(
+            ['id' => $this->reason_form_id],
+            [
+                'name'                  => trim($this->reason_name),
+                'code'                  => $code,
+                'accurate_account_no'   => trim($this->reason_accurate_account_no),
+                'accurate_account_name' => trim($this->reason_accurate_account_name),
+                'description'           => $this->reason_description,
+                'is_active'             => $this->reason_is_active,
+            ]
+        );
+
+        $this->resetReasonForm();
+        $this->dispatch('toast', title: 'Berhasil', message: 'Kategori alasan penyesuaian berhasil disimpan.', type: 'success');
+    }
+
+    public function toggleReasonActive($id)
+    {
+        $reason = StockAdjustmentReason::findOrFail($id);
+        $reason->update(['is_active' => !$reason->is_active]);
+        $this->dispatch('toast', title: 'Status Diperbarui', message: "Kategori '{$reason->name}' berhasil di-" . ($reason->is_active ? 'aktifkan' : 'nonaktifkan') . '.', type: 'info');
+    }
+
+    public function deleteReason($id)
+    {
+        $reason = StockAdjustmentReason::findOrFail($id);
+        $usedCount = StockAdjustment::where('reason_category', $reason->code)->count();
+        if ($usedCount > 0) {
+            $this->dispatch('toast', title: 'Tidak Dapat Dihapus', message: "Kategori '{$reason->name}' sudah digunakan pada {$usedCount} transaksi. Silakan nonaktifkan saja.", type: 'warning');
+            return;
+        }
+
+        $reason->delete();
+        $this->dispatch('toast', title: 'Berhasil Dihapus', message: 'Kategori alasan berhasil dihapus.', type: 'success');
+    }
+
     public function render()
     {
         $warehouses = Warehouse::where('business_unit_id', $this->business_unit_id)->get();
 
+        $allReasons = StockAdjustmentReason::orderBy('sort_order')->get();
+        $activeReasons = $allReasons->where('is_active', true);
+
         /** @var \Illuminate\Pagination\LengthAwarePaginator<StockAdjustment> $adjustments */
-        $adjustments = StockAdjustment::with(['items', 'warehouse', 'branch', 'requestedBy', 'approvedBy'])
+        $adjustments = StockAdjustment::with(['items', 'warehouse', 'branch', 'requestedBy', 'approvedBy', 'reason'])
             ->where('business_unit_id', $this->business_unit_id)
             ->when($this->search, function ($q) {
                 $term = "%{$this->search}%";
@@ -734,8 +868,10 @@ class Index extends Component
             ->paginate(15);
 
         return view('components.admin.inventory.stock-adjustment.index', [
-            'adjustments' => $adjustments,
-            'warehouses'  => $warehouses,
+            'adjustments'   => $adjustments,
+            'warehouses'    => $warehouses,
+            'allReasons'    => $allReasons,
+            'activeReasons' => $activeReasons,
         ]);
     }
 }

@@ -13,9 +13,19 @@
             <p class="text-sm text-gray-500">Pencatatan & pengajuan pengeluaran barang untuk pemeliharaan unit display
                 dan kebutuhan operasional toko.</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+            <button wire:click="openReasonModal"
+                class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-4 py-2.5 rounded-xl font-bold shadow-sm hover:shadow transition-all flex items-center gap-2 text-xs md:text-sm cursor-pointer">
+                <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Kelola Kategori & COA
+            </button>
             <button wire:click="openCreateModal"
-                class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all text-white px-5 py-2.5 rounded-xl font-bold shadow-sm hover:shadow-md flex items-center gap-2 text-sm cursor-pointer">
+                class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all text-white px-5 py-2.5 rounded-xl font-bold shadow-sm hover:shadow-md flex items-center gap-2 text-xs md:text-sm cursor-pointer">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -27,7 +37,7 @@
 
     {{-- Filter Panel --}}
     <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
             {{-- Search --}}
             <div class="lg:col-span-2">
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Cari Penyesuaian / SKU / Barang</label>
@@ -54,6 +64,18 @@
                     <option value="SYNCED">Berhasil Sync Accurate</option>
                     <option value="FAILED_SYNC">Gagal Sync Accurate</option>
                     <option value="REJECTED">Ditolak</option>
+                </select>
+            </div>
+
+            {{-- Filter Kategori Alasan --}}
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Kategori Alasan</label>
+                <select wire:model.live="filterCategory"
+                    class="w-full py-2 px-3 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-blue-500 cursor-pointer">
+                    <option value="ALL">Semua Alasan</option>
+                    @foreach ($allReasons as $r)
+                        <option value="{{ $r->code }}">{{ $r->name }}</option>
+                    @endforeach
                 </select>
             </div>
 
@@ -162,8 +184,11 @@
                                 <div class="text-[10px] text-gray-500 mt-1">
                                     <span class="font-bold text-gray-700">{{ $itemCount }}</span> Jenis Barang
                                 </div>
-                                <div class="text-[9px] text-gray-400 uppercase font-semibold mt-0.5">
-                                    {{ str_replace('_', ' ', $adj->reason_category) }}
+                                <div class="text-[10px] text-purple-700 font-semibold mt-0.5">
+                                    {{ $adj->reason_label }}
+                                    @if ($adj->accurate_account_no)
+                                        <span class="text-gray-400 font-mono text-[9px] font-normal">({{ $adj->accurate_account_no }})</span>
+                                    @endif
                                 </div>
                             </td>
 
@@ -389,19 +414,31 @@
 
                             {{-- Kategori Alasan --}}
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1">
-                                    Kategori Alasan <span class="text-red-500">*</span>
-                                </label>
-                                <select wire:model="reason_category"
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-xs font-bold text-gray-700">
+                                        Kategori Alasan <span class="text-red-500">*</span>
+                                    </label>
+                                    <button type="button" wire:click="openReasonModal"
+                                        class="text-[11px] text-purple-600 hover:text-purple-800 font-semibold underline flex items-center gap-0.5 cursor-pointer">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                        </svg>
+                                        Kelola
+                                    </button>
+                                </div>
+                                <select wire:model.live="reason_category"
                                     class="w-full text-xs bg-white border border-gray-300 rounded-xl p-2.5 focus:border-blue-500 outline-none cursor-pointer font-medium">
-                                    <option value="PEMELIHARAAN_INVENTARIS">Pemeliharaan Inventaris / Unit Display
-                                    </option>
-                                    {{-- <option value="BARANG_RUSAK_DEFECT">Barang Rusak / Defect / Cacat Pabrik</option> --}}
-                                    <option value="SAMPLE_PROMOSI">Sample / Display Promosi Toko</option>
-                                    {{-- <option value="SELISIH_OPNAME">Selisih Hasil Stock Opname</option> --}}
-                                    {{-- <option value="KOREKSI_STOK">Koreksi Administrasi / Salah Input</option> --}}
-                                    <option value="LAINNYA">Lain-lain</option>
+                                    @forelse ($activeReasons as $r)
+                                        <option value="{{ $r->code }}">
+                                            {{ $r->name }} (COA: {{ $r->accurate_account_no ?: '-' }})
+                                        </option>
+                                    @empty
+                                        <option value="PEMELIHARAAN_INVENTARIS">Pemeliharaan Inventaris</option>
+                                    @endforelse
                                 </select>
+                                @error('reason_category')
+                                    <span class="text-red-500 text-[11px] font-bold">{{ $message }}</span>
+                                @enderror
                             </div>
 
                             {{-- Tipe Transaksi Tetap Pengeluaran --}}
@@ -429,10 +466,13 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">
-                                    Akun COA Accurate
+                                    Akun COA Accurate <span class="text-[10px] text-gray-400 font-normal">(Otomatis Terisi)</span>
                                 </label>
-                                <input type="text" wire:model="accurate_account_no" placeholder="5101"
+                                <input type="text" wire:model="accurate_account_no" placeholder="Contoh: 50.01.003"
                                     class="w-full text-xs font-mono font-bold p-2.5 bg-white border border-gray-300 rounded-xl text-center outline-none focus:border-blue-500">
+                                @error('accurate_account_no')
+                                    <span class="text-red-500 text-[11px] font-bold">{{ $message }}</span>
+                                @enderror
                             </div>
                         </div>
                     </div>
@@ -982,8 +1022,10 @@
                         </div>
                         <div>
                             <span class="text-[10px] text-gray-400 block font-bold uppercase">Kategori Alasan</span>
-                            <span
-                                class="font-bold text-gray-800">{{ str_replace('_', ' ', $selectedAdjustment->reason_category) }}</span>
+                            <span class="font-bold text-gray-800">{{ $selectedAdjustment->reason_label }}</span>
+                            @if ($selectedAdjustment->accurate_account_no)
+                                <span class="text-[10px] text-purple-600 font-mono block">COA: {{ $selectedAdjustment->accurate_account_no }}</span>
+                            @endif
                         </div>
                         <div>
                             <span class="text-[10px] text-gray-400 block font-bold uppercase">Diajukan Oleh</span>
@@ -1155,6 +1197,221 @@
                     <button wire:click="closeDetailModal"
                         class="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs transition cursor-pointer">
                         Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- MODAL KELOLA KATEGORI ALASAN & AKUN COA --}}
+    @if ($showReasonModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 animate-fadeIn">
+            <div class="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh] animate-scaleUp">
+                {{-- Header Modal --}}
+                <div class="bg-gradient-to-r from-purple-700 via-indigo-700 to-blue-700 text-white p-5 flex items-center justify-between shrink-0">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/20 text-white border border-white/20">
+                                Master Data
+                            </span>
+                            <span class="text-xs text-purple-200">Mapping Akun COA Accurate</span>
+                        </div>
+                        <h3 class="text-lg font-black tracking-tight mt-1 text-white">Kelola Kategori Alasan & Akun COA</h3>
+                        <p class="text-xs text-purple-100 mt-0.5">Atur daftar alasan pemakaian inventaris toko serta nomor akun COA Accurate yang terhubung secara otomatis.</p>
+                    </div>
+                    <button wire:click="closeReasonModal"
+                        class="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Body Modal --}}
+                <div class="p-6 overflow-y-auto space-y-6">
+                    {{-- Form Input / Edit --}}
+                    <div class="bg-purple-50/40 p-4 md:p-5 rounded-2xl border border-purple-100 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-black uppercase tracking-wider text-purple-900 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-purple-600"></span>
+                                {{ $reason_form_id ? 'Edit Kategori Alasan' : 'Tambah Kategori Alasan Baru' }}
+                            </h4>
+                            @if ($reason_form_id)
+                                <button type="button" wire:click="resetReasonForm"
+                                    class="text-xs text-gray-500 hover:text-gray-700 underline font-medium cursor-pointer">
+                                    + Tambah Baru (Reset Form)
+                                </button>
+                            @endif
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {{-- Nama Kategori --}}
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">
+                                    Nama Kategori <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text" wire:model.live="reason_name"
+                                    placeholder="Misal: Pemeliharaan Inventaris / Display"
+                                    class="w-full text-xs p-2.5 bg-white border border-gray-300 rounded-xl outline-none focus:border-purple-500 font-medium">
+                                @error('reason_name')
+                                    <span class="text-red-500 text-[11px] font-bold">{{ $message }}</span>
+                                @enderror
+                            </div>
+
+                            {{-- Kode Kategori --}}
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">
+                                    Kode Identifier <span class="text-red-500">*</span>
+                                    <span class="text-[10px] text-gray-400 font-normal">(Otomatis kapital & underscore)</span>
+                                </label>
+                                <input type="text" wire:model="reason_code"
+                                    placeholder="Contoh: PEMELIHARAAN_INVENTARIS"
+                                    class="w-full text-xs font-mono font-bold p-2.5 bg-white border border-gray-300 rounded-xl outline-none focus:border-purple-500">
+                                @error('reason_code')
+                                    <span class="text-red-500 text-[11px] font-bold">{{ $message }}</span>
+                                @enderror
+                            </div>
+
+                            {{-- Nomor Akun COA Accurate --}}
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">
+                                    Nomor Akun COA Accurate <span class="text-red-500">*</span>
+                                    <span class="text-[10px] text-gray-400 font-normal">(Input Manual)</span>
+                                </label>
+                                <input type="text" wire:model="reason_accurate_account_no"
+                                    placeholder="Contoh: 50.01.003 atau 09.09.09"
+                                    class="w-full text-xs font-mono font-bold p-2.5 bg-white border border-gray-300 rounded-xl outline-none focus:border-purple-500">
+                                @error('reason_accurate_account_no')
+                                    <span class="text-red-500 text-[11px] font-bold">{{ $message }}</span>
+                                @enderror
+                            </div>
+
+                            {{-- Nama Akun COA (Opsional) --}}
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">
+                                    Nama Akun / Beban <span class="text-[10px] text-gray-400 font-normal">(Opsional)</span>
+                                </label>
+                                <input type="text" wire:model="reason_accurate_account_name"
+                                    placeholder="Misal: Beban Pemeliharaan Display"
+                                    class="w-full text-xs p-2.5 bg-white border border-gray-300 rounded-xl outline-none focus:border-purple-500 font-medium">
+                                @error('reason_accurate_account_name')
+                                    <span class="text-red-500 text-[11px] font-bold">{{ $message }}</span>
+                                @enderror
+                            </div>
+
+                            {{-- Keterangan / Deskripsi --}}
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-gray-700 mb-1">
+                                    Keterangan / Panduan untuk Staf <span class="text-[10px] text-gray-400 font-normal">(Opsional)</span>
+                                </label>
+                                <input type="text" wire:model="reason_description"
+                                    placeholder="Misal: Digunakan untuk pemakaian unit display toko atau pemeliharaan alat kerja"
+                                    class="w-full text-xs p-2.5 bg-white border border-gray-300 rounded-xl outline-none focus:border-purple-500 font-medium">
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-2">
+                            <label class="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-gray-700">
+                                <input type="checkbox" wire:model="reason_is_active" class="rounded text-purple-600 focus:ring-purple-500">
+                                <span>Kategori Aktif (Dapat dipilih pada form pemakaian)</span>
+                            </label>
+
+                            <div class="flex items-center gap-2">
+                                @if ($reason_form_id)
+                                    <button type="button" wire:click="resetReasonForm"
+                                        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs transition cursor-pointer">
+                                        Batal
+                                    </button>
+                                @endif
+                                <button type="button" wire:click="saveReason"
+                                    class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-sm hover:shadow transition flex items-center gap-1.5 cursor-pointer">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    {{ $reason_form_id ? 'Perbarui Kategori' : 'Simpan Kategori' }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Tabel Daftar Kategori --}}
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-xs font-bold text-gray-800 uppercase tracking-wider">
+                                Daftar Kategori Alasan Terdaftar ({{ $allReasons->count() }})
+                            </h4>
+                        </div>
+                        <div class="border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50 text-gray-500 text-[11px] uppercase font-bold tracking-wider text-left">
+                                    <tr>
+                                        <th class="px-4 py-3">Nama & Identifier</th>
+                                        <th class="px-4 py-3">No. Akun COA Accurate</th>
+                                        <th class="px-4 py-3">Status</th>
+                                        <th class="px-4 py-3 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 text-xs">
+                                    @forelse ($allReasons as $r)
+                                        <tr class="hover:bg-gray-50/70 transition-colors">
+                                            <td class="px-4 py-3">
+                                                <div class="font-bold text-gray-900">{{ $r->name }}</div>
+                                                <div class="font-mono text-[10px] text-gray-400">{{ $r->code }}</div>
+                                                @if ($r->description)
+                                                    <div class="text-[10px] text-gray-500 italic mt-0.5">{{ $r->description }}</div>
+                                                @endif
+                                            </td>
+                                            <td class="px-4 py-3 whitespace-nowrap">
+                                                <div class="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg inline-block border border-purple-200">
+                                                    {{ $r->accurate_account_no ?: '-' }}
+                                                </div>
+                                                @if ($r->accurate_account_name)
+                                                    <div class="text-[10px] text-gray-500 mt-0.5">{{ $r->accurate_account_name }}</div>
+                                                @endif
+                                            </td>
+                                            <td class="px-4 py-3 whitespace-nowrap">
+                                                <button type="button" wire:click="toggleReasonActive({{ $r->id }})"
+                                                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer transition {{ $r->is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200' }}">
+                                                    <span class="w-1.5 h-1.5 rounded-full {{ $r->is_active ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
+                                                    {{ $r->is_active ? 'Aktif' : 'Nonaktif' }}
+                                                </button>
+                                            </td>
+                                            <td class="px-4 py-3 whitespace-nowrap text-right space-x-1">
+                                                <button type="button" wire:click="editReason({{ $r->id }})"
+                                                    class="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-bold text-[11px] transition cursor-pointer"
+                                                    title="Edit Kategori">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button type="button" wire:click="deleteReason({{ $r->id }})"
+                                                    onclick="return confirm('Apakah Anda yakin ingin menghapus kategori alasan ini?')"
+                                                    class="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg font-bold text-[11px] transition cursor-pointer"
+                                                    title="Hapus Kategori">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="4" class="px-4 py-8 text-center text-gray-400">
+                                                Belum ada kategori alasan terdaftar.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Footer Modal --}}
+                <div class="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end shrink-0">
+                    <button wire:click="closeReasonModal"
+                        class="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs transition cursor-pointer">
+                        Selesai / Tutup
                     </button>
                 </div>
             </div>
