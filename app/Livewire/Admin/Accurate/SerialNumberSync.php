@@ -29,6 +29,17 @@ class SerialNumberSync extends Component
     public $snStatus = 'Available'; // Available, Unavailable, all
     public $perPage = 25;
 
+    // Mode Switcher: 'sn' (Serialized IMEI) vs 'non_sn' (Aksesoris / Reguler)
+    public $productType = 'sn';
+
+    // Modal Edit Manual Non-SN
+    public $showNonSnEditModal = false;
+    public $editingNonSnId = null;
+    public $editingNonSnSku = '';
+    public $editingNonSnName = '';
+    public $editNonSnCost = 0;
+    public $editNonSnVendorName = '';
+
     // Legacy / Mass Sync States
     public $isSyncing = false;
     public $isSyncingVendor = false;
@@ -67,6 +78,11 @@ class SerialNumberSync extends Component
         $this->docBusinessUnitId = $firstBu?->id ?? '';
     }
 
+    public function updatingProductType()
+    {
+        $this->resetPage();
+    }
+
     public function updatingSearch()
     {
         $this->resetPage();
@@ -101,68 +117,7 @@ class SerialNumberSync extends Component
     #[Layout('layouts.admin')]
     public function render()
     {
-        // 1. Base Query
-        $query = ProductSerialNumber::with(['warehouse', 'businessUnit', 'vendor', 'productAccurate']);
-
-        // 2. Filter Unit Usaha
-        if ($this->businessUnitId) {
-            $query->where('business_unit_id', $this->businessUnitId);
-        }
-
-        // 3. Filter Gudang
-        if ($this->warehouseId) {
-            $query->where('warehouse_id', $this->warehouseId);
-        }
-
-        // 4. Filter Status SN
-        if ($this->snStatus !== 'all') {
-            $query->where('status', $this->snStatus);
-        }
-
-        // 5. Filter Tab Kondisi Kelengkapan Data
-        switch ($this->filterTab) {
-            case 'missing_both':
-                $query->whereNull('vendor_id')->where(function ($q) {
-                    $q->whereNull('hpp')->orWhere('hpp', 0)->orWhere('hpp', '0');
-                });
-                break;
-            case 'missing_vendor':
-                $query->whereNull('vendor_id');
-                break;
-            case 'missing_hpp':
-                $query->where(function ($q) {
-                    $q->whereNull('hpp')->orWhere('hpp', 0)->orWhere('hpp', '0');
-                });
-                break;
-            case 'all_missing':
-                $query->where(function ($q) {
-                    $q->whereNull('vendor_id')
-                        ->orWhereNull('hpp')
-                        ->orWhere('hpp', 0)
-                        ->orWhere('hpp', '0');
-                });
-                break;
-            case 'all':
-            default:
-                // Tidak ada filter kelengkapan
-                break;
-        }
-
-        // 6. Pencarian (IMEI, SKU, atau Nama Produk)
-        if (!empty(trim($this->search))) {
-            $searchTerm = '%' . trim($this->search) . '%';
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('serial_number', 'like', $searchTerm)
-                    ->orWhere('item_no', 'like', $searchTerm)
-                    ->orWhereHas('productAccurate', function ($pa) use ($searchTerm) {
-                        $pa->where('name', 'like', $searchTerm);
-                    });
-            });
-        }
-
-        $serialNumbers = $query->orderByDesc('id')->paginate($this->perPage);
-
-        // 7. Ringkasan Statistik Global (Untuk 4 KPI Cards)
+        // 1. Ringkasan Statistik Global SN (Untuk 4 KPI Cards SN)
         $statsQuery = ProductSerialNumber::query();
         if ($this->businessUnitId) {
             $statsQuery->where('business_unit_id', $this->businessUnitId);
@@ -179,7 +134,134 @@ class SerialNumberSync extends Component
             })->count(),
         ];
 
-        // 8. Opsi Gudang & Vendor
+        // 2. Ringkasan Statistik Global Non-SN (Untuk 4 KPI Cards Non-SN)
+        $nonSnStatsQuery = ProductAccurate::where('has_sn', false);
+        if ($this->businessUnitId) {
+            $nonSnStatsQuery->where('business_unit_id', $this->businessUnitId);
+        }
+
+        $nonSnStats = [
+            'total_non_sn' => (clone $nonSnStatsQuery)->count(),
+            'missing_both' => (clone $nonSnStatsQuery)->where(function ($q) {
+                $q->whereNull('base_cost')->orWhere('base_cost', 0);
+            })->where(function ($q) {
+                $q->whereNull('vendor_name')->orWhere('vendor_name', '');
+            })->count(),
+            'missing_vendor' => (clone $nonSnStatsQuery)->where(function ($q) {
+                $q->whereNull('vendor_name')->orWhere('vendor_name', '');
+            })->count(),
+            'missing_hpp' => (clone $nonSnStatsQuery)->where(function ($q) {
+                $q->whereNull('base_cost')->orWhere('base_cost', 0);
+            })->count(),
+        ];
+
+        // 3. Query Sesuai Mode Switcher
+        if ($this->productType === 'sn') {
+            $query = ProductSerialNumber::with(['warehouse', 'businessUnit', 'vendor', 'productAccurate']);
+
+            if ($this->businessUnitId) {
+                $query->where('business_unit_id', $this->businessUnitId);
+            }
+            if ($this->warehouseId) {
+                $query->where('warehouse_id', $this->warehouseId);
+            }
+            if ($this->snStatus !== 'all') {
+                $query->where('status', $this->snStatus);
+            }
+
+            switch ($this->filterTab) {
+                case 'missing_both':
+                    $query->whereNull('vendor_id')->where(function ($q) {
+                        $q->whereNull('hpp')->orWhere('hpp', 0)->orWhere('hpp', '0');
+                    });
+                    break;
+                case 'missing_vendor':
+                    $query->whereNull('vendor_id');
+                    break;
+                case 'missing_hpp':
+                    $query->where(function ($q) {
+                        $q->whereNull('hpp')->orWhere('hpp', 0)->orWhere('hpp', '0');
+                    });
+                    break;
+                case 'all_missing':
+                    $query->where(function ($q) {
+                        $q->whereNull('vendor_id')
+                            ->orWhereNull('hpp')
+                            ->orWhere('hpp', 0)
+                            ->orWhere('hpp', '0');
+                    });
+                    break;
+                case 'all':
+                default:
+                    break;
+            }
+
+            if (!empty(trim($this->search))) {
+                $searchTerm = '%' . trim($this->search) . '%';
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('serial_number', 'like', $searchTerm)
+                        ->orWhere('item_no', 'like', $searchTerm)
+                        ->orWhereHas('productAccurate', function ($pa) use ($searchTerm) {
+                            $pa->where('name', 'like', $searchTerm);
+                        });
+                });
+            }
+
+            $serialNumbers = $query->orderByDesc('id')->paginate($this->perPage);
+            $nonSnProducts = collect([]);
+        } else {
+            $query = ProductAccurate::with('businessUnit')->where('has_sn', false);
+
+            if ($this->businessUnitId) {
+                $query->where('business_unit_id', $this->businessUnitId);
+            }
+
+            switch ($this->filterTab) {
+                case 'missing_both':
+                    $query->where(function ($q) {
+                        $q->whereNull('base_cost')->orWhere('base_cost', 0);
+                    })->where(function ($q) {
+                        $q->whereNull('vendor_name')->orWhere('vendor_name', '');
+                    });
+                    break;
+                case 'missing_vendor':
+                    $query->where(function ($q) {
+                        $q->whereNull('vendor_name')->orWhere('vendor_name', '');
+                    });
+                    break;
+                case 'missing_hpp':
+                    $query->where(function ($q) {
+                        $q->whereNull('base_cost')->orWhere('base_cost', 0);
+                    });
+                    break;
+                case 'all_missing':
+                    $query->where(function ($q) {
+                        $q->whereNull('base_cost')
+                            ->orWhere('base_cost', 0)
+                            ->orWhereNull('vendor_name')
+                            ->orWhere('vendor_name', '');
+                    });
+                    break;
+                case 'all':
+                default:
+                    break;
+            }
+
+            if (!empty(trim($this->search))) {
+                $searchTerm = '%' . trim($this->search) . '%';
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('item_no', 'like', $searchTerm)
+                        ->orWhere('name', 'like', $searchTerm)
+                        ->orWhere('categoryName', 'like', $searchTerm)
+                        ->orWhere('brandName', 'like', $searchTerm);
+                });
+            }
+
+            $nonSnProducts = $query->orderByDesc('id')->paginate($this->perPage);
+            $serialNumbers = collect([]);
+        }
+
+        // 4. Opsi Gudang & Vendor
         $warehouses = Warehouse::when($this->businessUnitId, function ($q) {
             $q->where('business_unit_id', $this->businessUnitId);
         })->orderBy('name')->get();
@@ -187,8 +269,11 @@ class SerialNumberSync extends Component
         $vendors = Vendor::orderBy('vendor_name')->get();
 
         return view('livewire.admin.accurate.serial-number-sync', [
+            'productType' => $this->productType,
             'serialNumbers' => $serialNumbers,
+            'nonSnProducts' => $nonSnProducts,
             'stats' => $stats,
+            'nonSnStats' => $nonSnStats,
             'warehouses' => $warehouses,
             'vendors' => $vendors,
             'businessUnits' => $this->businessUnits,
@@ -204,6 +289,11 @@ class SerialNumberSync extends Component
             'showEditModal' => $this->showEditModal,
             'editingSnNumber' => $this->editingSnNumber,
             'editingProductName' => $this->editingProductName,
+            'showNonSnEditModal' => $this->showNonSnEditModal,
+            'editingNonSnSku' => $this->editingNonSnSku,
+            'editingNonSnName' => $this->editingNonSnName,
+            'editNonSnCost' => $this->editNonSnCost,
+            'editNonSnVendorName' => $this->editNonSnVendorName,
         ]);
     }
 
@@ -384,6 +474,147 @@ class SerialNumberSync extends Component
         }
 
         $this->closeEditModal();
+    }
+
+    // =========================================================================
+    // METODE SINKRONISASI & EDIT PRODUK NON-SN (AKSESORIS / REGULER)
+    // =========================================================================
+
+    /**
+     * Sinkronisasi presisi untuk 1 produk Non-SN terpilih
+     */
+    public function syncSingleNonSn($id)
+    {
+        try {
+            /** @var SerialNumberSyncService $service */
+            $service = app(SerialNumberSyncService::class);
+            $res = $service->syncSingleNonSnProduct($id);
+
+            $costFmt = number_format($res['new_cost'], 0, ',', '.');
+            $vendor = $res['vendor_name'] ?: 'Belum Terdeteksi';
+            $msg = "Produk [{$res['sku']}] {$res['name']} berhasil disinkronkan. HPP Rata-rata: Rp {$costFmt} | Vendor: {$vendor}";
+            $this->addLog($msg);
+            $this->dispatch('toast', title: 'Sinkronisasi Berhasil', message: $msg, type: 'success');
+        } catch (\Exception $e) {
+            $this->addLog("Gagal sinkron Produk Non-SN ID {$id}: " . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal Sinkronisasi', message: $e->getMessage(), type: 'error');
+        }
+    }
+
+    /**
+     * Jalankan Sinkronisasi HPP Rata-Rata (Balance Cost / Nearest Cost) untuk Produk Non-SN yang terfilter
+     */
+    public function startSyncNonSnHpp()
+    {
+        $this->isSyncingHpp = true;
+        $this->processedItems = 0;
+        $this->logs = [];
+        $this->itemsToSync = [];
+
+        $this->addLog("Mengumpulkan data SKU Non-SN yang belum memiliki HPP rata-rata...");
+
+        $query = ProductAccurate::where('has_sn', false);
+        if ($this->businessUnitId) {
+            $query->where('business_unit_id', $this->businessUnitId);
+        }
+
+        $itemNos = $query->where(function ($q) {
+            $q->whereNull('base_cost')->orWhere('base_cost', 0);
+        })->whereNotNull('item_no')
+          ->distinct()
+          ->pluck('item_no')
+          ->toArray();
+
+        $this->itemsToSync = array_values(array_unique($itemNos));
+        $this->totalItems = count($this->itemsToSync);
+
+        if ($this->totalItems == 0) {
+            $this->addLog("Tidak ada produk Non-SN pada filter ini yang membutuhkan HPP.");
+            $this->isSyncingHpp = false;
+            return;
+        }
+
+        $this->addLog("Ditemukan {$this->totalItems} SKU Non-SN terfilter. Memulai sinkronisasi HPP rata-rata (balance cost) dari Accurate...");
+        $this->dispatch('sync-next-non-sn-hpp-item');
+    }
+
+    #[On('sync-next-non-sn-hpp-item')]
+    public function syncNextNonSnHppItem()
+    {
+        if (empty($this->itemsToSync) || !$this->isSyncingHpp) {
+            $this->addLog("Proses sinkronisasi HPP Non-SN selesai!");
+            $this->isSyncingHpp = false;
+            return;
+        }
+
+        $itemNo = array_shift($this->itemsToSync);
+        $this->currentItem = "Sedang memproses HPP Non-SN untuk SKU: {$itemNo}";
+
+        try {
+            $service = app(SerialNumberSyncService::class);
+            $sourceCode = null;
+            if ($this->businessUnitId) {
+                $sourceCode = BusinessUnit::find($this->businessUnitId)?->code;
+            }
+            $updatedCount = $service->syncNonSnHppFromAccurate($itemNo, $sourceCode);
+
+            if ($updatedCount > 0) {
+                $this->addLog("[{$itemNo}] Berhasil update HPP rata-rata untuk $updatedCount item.");
+            } else {
+                $this->addLog("[{$itemNo}] Tidak ada data HPP yang diperbarui atau cost 0.");
+            }
+        } catch (\Exception $e) {
+            $this->addLog("[{$itemNo}] Error: " . $e->getMessage());
+        }
+
+        $this->processedItems++;
+        $this->dispatch('sync-next-non-sn-hpp-item');
+    }
+
+    /**
+     * Buka Modal Edit Manual Produk Non-SN
+     */
+    public function openNonSnEditModal($id)
+    {
+        $product = ProductAccurate::find($id);
+        if (!$product) return;
+
+        $this->editingNonSnId = $product->id;
+        $this->editingNonSnSku = $product->item_no;
+        $this->editingNonSnName = $product->name;
+        $this->editNonSnCost = (float)$product->base_cost;
+        $this->editNonSnVendorName = $product->vendor_name ?? '';
+        $this->showNonSnEditModal = true;
+    }
+
+    public function closeNonSnEditModal()
+    {
+        $this->showNonSnEditModal = false;
+        $this->editingNonSnId = null;
+    }
+
+    /**
+     * Simpan Perubahan Manual HPP & Vendor Produk Non-SN
+     */
+    public function saveNonSnManualEdit()
+    {
+        $this->validate([
+            'editNonSnCost' => 'nullable|numeric|min:0',
+            'editNonSnVendorName' => 'nullable|string|max:255',
+        ]);
+
+        $product = ProductAccurate::find($this->editingNonSnId);
+        if ($product) {
+            $product->update([
+                'base_cost' => $this->editNonSnCost ?: 0,
+                'vendor_name' => trim($this->editNonSnVendorName) ?: null,
+            ]);
+
+            $this->addLog("Data manual untuk Produk Non-SN [{$product->item_no}] {$product->name} berhasil diperbarui.");
+            $this->dispatch('toast', title: 'Berhasil', message: 'HPP dan Vendor produk Non-SN berhasil disimpan.', type: 'success');
+        }
+
+        $this->closeNonSnEditModal();
     }
 
     // =========================================================================

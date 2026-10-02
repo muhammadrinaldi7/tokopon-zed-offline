@@ -724,5 +724,161 @@ class SerialNumberSyncService
             'updated_count' => $updatedCount
         ];
     }
+
+    /**
+     * Sinkronisasi HPP Rata-Rata (Balance Unit Cost / Nearest Cost) & Vendor untuk 1 produk Non-SN
+     *
+     * @param int|string $productAccurateId
+     * @return array
+     */
+    public function syncSingleNonSnProduct($productAccurateId)
+    {
+        $product = \App\Models\ProductAccurate::find($productAccurateId);
+        if (!$product) {
+            throw new \Exception("Produk Accurate dengan ID {$productAccurateId} tidak ditemukan.");
+        }
+
+        $bu = $product->business_unit_id ? \App\Models\BusinessUnit::find($product->business_unit_id) : null;
+        $dbSource = $bu ? $bu->code : ($product->database_source ?: 'syihab');
+
+        $sku = (string) $product->item_no;
+        $newCost = null;
+        $newVendorName = null;
+
+        // TIER 1: Tarik detail item dari Accurate API (/item/detail.do) -> balanceUnitCost
+        try {
+            $itemDetail = $this->accurateService->itemDetailDo($sku, $dbSource);
+            if ($itemDetail) {
+                // balanceUnitCost adalah moving average cost resmi di Accurate
+                if (!empty($itemDetail['balanceUnitCost']) && (float)$itemDetail['balanceUnitCost'] > 0) {
+                    $newCost = (float)$itemDetail['balanceUnitCost'];
+                }
+
+                // Cek vendor jika ada di detail item (misal vendor / defaultVendor)
+                if (!empty($itemDetail['vendor']['name'])) {
+                    $newVendorName = $itemDetail['vendor']['name'];
+                } elseif (!empty($itemDetail['defaultVendor']['name'])) {
+                    $newVendorName = $itemDetail['defaultVendor']['name'];
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning("Gagal fetch itemDetailDo untuk Non-SN {$sku}: " . $e->getMessage());
+        }
+
+        // TIER 2: Fallback ke nearestCost (/item/get-nearest-cost.do) jika balanceUnitCost 0 / belum ada
+        if ($newCost === null || $newCost <= 0) {
+            try {
+                $costData = $this->accurateService->getNearestCost($sku, $dbSource);
+                if (is_numeric($costData) && (float)$costData > 0) {
+                    $newCost = (float)$costData;
+                } elseif (is_array($costData)) {
+                    $val = (float)($costData['cost'] ?? ($costData['nearestCost'] ?? current($costData)));
+                    if ($val > 0) {
+                        $newCost = $val;
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning("Gagal fetch nearestCost untuk Non-SN {$sku}: " . $e->getMessage());
+            }
+        }
+
+        // TIER 3: Cari Vendor dari Purchase Order Item lokal jika vendor belum ada
+        if (empty($newVendorName)) {
+            $poItem = \App\Models\PurchaseOrderItem::where('item_no', $sku)
+                ->whereHas('purchaseOrder', function ($q) use ($dbSource) {
+                    $q->where('database_source', $dbSource);
+                })
+                ->latest()
+                ->first();
+            if ($poItem && $poItem->purchaseOrder && $poItem->purchaseOrder->vendor) {
+                $newVendorName = $poItem->purchaseOrder->vendor->vendor_name;
+                if (($newCost === null || $newCost <= 0) && (float)$poItem->unit_price > 0) {
+                    $newCost = (float)$poItem->unit_price;
+                }
+            }
+        }
+
+        // Simpan pembaruan ke ProductAccurate
+        $updatePayload = [];
+        if ($newCost !== null && $newCost > 0) {
+            $updatePayload['base_cost'] = $newCost;
+        }
+        if (!empty($newVendorName)) {
+            $updatePayload['vendor_name'] = $newVendorName;
+        }
+
+        if (!empty($updatePayload)) {
+            $product->update($updatePayload);
+        }
+
+        return [
+            'product'     => $product,
+            'sku'         => $sku,
+            'name'        => $product->name,
+            'new_cost'    => $newCost ?? (float)$product->base_cost,
+            'vendor_name' => $newVendorName ?? $product->vendor_name,
+            'updated'     => !empty($updatePayload),
+        ];
+    }
+
+    /**
+     * Sinkronisasi HPP Rata-Rata untuk SKU Non-SN via Nearest Cost / Balance Cost
+     *
+     * @param string $sku
+     * @param string|null $databaseSource
+     * @return int
+     */
+    public function syncNonSnHppFromAccurate($sku, $databaseSource = null)
+    {
+        $products = \App\Models\ProductAccurate::where('item_no', $sku)
+            ->where('has_sn', false)
+            ->when($databaseSource, function ($q) use ($databaseSource) {
+                $q->where('database_source', $databaseSource);
+            })
+            ->get();
+
+        if ($products->isEmpty()) {
+            return 0;
+        }
+
+        $source = $databaseSource ?: ($products->first()->database_source ?: 'syihab');
+        $cost = 0;
+
+        // Coba itemDetailDo dulu untuk balanceUnitCost
+        try {
+            $detail = $this->accurateService->itemDetailDo($sku, $source);
+            if (!empty($detail['balanceUnitCost']) && (float)$detail['balanceUnitCost'] > 0) {
+                $cost = (float)$detail['balanceUnitCost'];
+            }
+        } catch (\Exception $e) {
+            // ignore
+        }
+
+        // Fallback nearest-cost
+        if ($cost <= 0) {
+            try {
+                $costData = $this->accurateService->getNearestCost($sku, $source);
+                if (is_numeric($costData) && (float)$costData > 0) {
+                    $cost = (float)$costData;
+                } elseif (is_array($costData)) {
+                    $val = (float)($costData['cost'] ?? ($costData['nearestCost'] ?? current($costData)));
+                    if ($val > 0) {
+                        $cost = $val;
+                    }
+                }
+            } catch (\Exception $e) {
+                // ignore
+            }
+        }
+
+        if ($cost > 0) {
+            $count = \App\Models\ProductAccurate::where('item_no', $sku)
+                ->where('has_sn', false)
+                ->update(['base_cost' => $cost]);
+            return $count;
+        }
+
+        return 0;
+    }
 }
 
