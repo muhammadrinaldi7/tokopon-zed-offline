@@ -532,6 +532,21 @@ class Index extends Component
                 ? $firstItem['product_name']
                 : $firstItem['product_name'] . ' (+' . ($totalItems - 1) . ' item lainnya)';
 
+            // Validasi & fallback nomor akun COA Accurate
+            $reasonObj = StockAdjustmentReason::where('code', $this->reason_category)
+                ->where(function ($q) {
+                    $q->where('business_unit_id', $this->business_unit_id)
+                      ->orWhereNull('business_unit_id');
+                })
+                ->orderByRaw('business_unit_id IS NULL ASC')
+                ->first();
+
+            $accountNoToUse = $this->accurate_account_no;
+            // Jika user bukan admin, nomor akun COA wajib mengikuti master kategori
+            if (!$this->canManageReasons() && $reasonObj && !empty($reasonObj->accurate_account_no)) {
+                $accountNoToUse = $reasonObj->accurate_account_no;
+            }
+
             // 1. Buat Record Header
             $adjustment = StockAdjustment::create([
                 'adjustment_number'    => $adjNumber,
@@ -553,7 +568,7 @@ class Index extends Component
                 'target_serial_number' => $firstItem['target_serial_number'] ?? null,
                 'reason_category'      => $this->reason_category,
                 'notes'                => $this->notes,
-                'accurate_account_no'  => $this->accurate_account_no ?: '50.03.005',
+                'accurate_account_no'  => $accountNoToUse ?: '50.03.005',
                 'status'               => 'PENDING',
                 'requested_by'         => Auth::id(),
             ]);
@@ -749,9 +764,25 @@ class Index extends Component
         }
     }
 
-    // --- MANAJEMEN KATEGORI ALASAN ---
+    // --- MANAJEMEN KATEGORI ALASAN & PERMISSION CHECK ---
+    public function canManageReasons(): bool
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasAnyRole(['superadmin', 'admin', 'director', 'Super Admin', 'Admin'])
+            || $user->can('manage-settings');
+    }
+
     public function openReasonModal()
     {
+        if (!$this->canManageReasons()) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Hanya Admin atau Super Admin yang dapat mengelola master kategori alasan & COA.', type: 'error');
+            return;
+        }
+
         $this->modalBuFilter = $this->business_unit_id ? (string) $this->business_unit_id : 'ALL';
         $this->resetReasonForm();
         $this->showReasonModal = true;
@@ -787,6 +818,11 @@ class Index extends Component
 
     public function editReason($id)
     {
+        if (!$this->canManageReasons()) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Hanya Admin atau Super Admin yang dapat mengubah kategori alasan.', type: 'error');
+            return;
+        }
+
         $reason = StockAdjustmentReason::findOrFail($id);
         $this->reason_form_id = $reason->id;
         $this->reason_business_unit_id = $reason->business_unit_id;
@@ -800,6 +836,11 @@ class Index extends Component
 
     public function saveReason()
     {
+        if (!$this->canManageReasons()) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Hanya Admin atau Super Admin yang dapat menyimpan kategori alasan.', type: 'error');
+            return;
+        }
+
         $code = strtoupper(preg_replace('/[^a-zA-Z0-9_]/', '_', trim($this->reason_code)));
         $buId = !empty($this->reason_business_unit_id) ? (int) $this->reason_business_unit_id : null;
 
@@ -845,6 +886,11 @@ class Index extends Component
 
     public function toggleReasonActive($id)
     {
+        if (!$this->canManageReasons()) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Hanya Admin atau Super Admin yang dapat mengubah status kategori alasan.', type: 'error');
+            return;
+        }
+
         $reason = StockAdjustmentReason::findOrFail($id);
         $reason->update(['is_active' => !$reason->is_active]);
         $this->dispatch('toast', title: 'Status Diperbarui', message: "Kategori '{$reason->name}' berhasil di-" . ($reason->is_active ? 'aktifkan' : 'nonaktifkan') . '.', type: 'info');
@@ -852,6 +898,11 @@ class Index extends Component
 
     public function deleteReason($id)
     {
+        if (!$this->canManageReasons()) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Hanya Admin atau Super Admin yang dapat menghapus kategori alasan.', type: 'error');
+            return;
+        }
+
         $reason = StockAdjustmentReason::findOrFail($id);
         $usedCount = StockAdjustment::where('reason_category', $reason->code)->count();
         if ($usedCount > 0) {

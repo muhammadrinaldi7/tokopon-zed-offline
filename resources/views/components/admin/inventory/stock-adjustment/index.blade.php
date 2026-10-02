@@ -14,16 +14,18 @@
                 dan kebutuhan operasional toko.</p>
         </div>
         <div class="flex items-center gap-2">
-            <button wire:click="openReasonModal"
-                class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-4 py-2.5 rounded-xl font-bold shadow-sm hover:shadow transition-all flex items-center gap-2 text-xs md:text-sm cursor-pointer">
-                <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                </svg>
-                Kelola Kategori & COA
-            </button>
+            @if ($this->canManageReasons())
+                <button wire:click="openReasonModal"
+                    class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-4 py-2.5 rounded-xl font-bold shadow-sm hover:shadow transition-all flex items-center gap-2 text-xs md:text-sm cursor-pointer">
+                    <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Kelola Kategori & COA
+                </button>
+            @endif
             <button wire:click="openCreateModal"
                 class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all text-white px-5 py-2.5 rounded-xl font-bold shadow-sm hover:shadow-md flex items-center gap-2 text-xs md:text-sm cursor-pointer">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -418,13 +420,15 @@
                                     <label class="block text-xs font-bold text-gray-700">
                                         Kategori Alasan <span class="text-red-500">*</span>
                                     </label>
-                                    <button type="button" wire:click="openReasonModal"
-                                        class="text-[11px] text-purple-600 hover:text-purple-800 font-semibold underline flex items-center gap-0.5 cursor-pointer">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                        </svg>
-                                        Kelola
-                                    </button>
+                                    @if ($this->canManageReasons())
+                                        <button type="button" wire:click="openReasonModal"
+                                            class="text-[11px] text-purple-600 hover:text-purple-800 font-semibold underline flex items-center gap-0.5 cursor-pointer">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                            </svg>
+                                            Kelola
+                                        </button>
+                                    @endif
                                 </div>
                                 <select wire:model.live="reason_category"
                                     class="w-full text-xs bg-white border border-gray-300 rounded-xl p-2.5 focus:border-blue-500 outline-none cursor-pointer font-medium">
@@ -465,11 +469,24 @@
                                     class="w-full text-xs p-2.5 bg-white border border-gray-300 rounded-xl outline-none focus:border-blue-500 font-medium">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1">
-                                    Akun COA Accurate <span class="text-[10px] text-gray-400 font-normal">(Otomatis Terisi)</span>
-                                </label>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-xs font-bold text-gray-700">
+                                        Akun COA Accurate
+                                    </label>
+                                    @if (!$this->canManageReasons())
+                                        <span class="text-[10px] text-gray-400 flex items-center gap-0.5">
+                                            <svg class="w-3 h-3 text-gray-400 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                            </svg>
+                                            Terkunci
+                                        </span>
+                                    @else
+                                        <span class="text-[10px] text-purple-600 font-medium">Admin Editable</span>
+                                    @endif
+                                </div>
                                 <input type="text" wire:model="accurate_account_no" placeholder="Contoh: 50.01.003"
-                                    class="w-full text-xs font-mono font-bold p-2.5 bg-white border border-gray-300 rounded-xl text-center outline-none focus:border-blue-500">
+                                    {{ !$this->canManageReasons() ? 'readonly' : '' }}
+                                    class="w-full text-xs font-mono font-bold p-2.5 border rounded-xl text-center outline-none focus:border-blue-500 {{ !$this->canManageReasons() ? 'bg-gray-100/80 text-gray-600 border-gray-200 cursor-not-allowed select-none' : 'bg-white border-gray-300' }}">
                                 @error('accurate_account_no')
                                     <span class="text-red-500 text-[11px] font-bold">{{ $message }}</span>
                                 @enderror
@@ -1204,7 +1221,7 @@
     @endif
 
     {{-- MODAL KELOLA KATEGORI ALASAN & AKUN COA --}}
-    @if ($showReasonModal)
+    @if ($showReasonModal && $this->canManageReasons())
         <div class="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 animate-fadeIn">
             <div class="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh] animate-scaleUp">
                 {{-- Header Modal --}}
