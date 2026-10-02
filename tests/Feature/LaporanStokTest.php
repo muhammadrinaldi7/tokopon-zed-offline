@@ -70,6 +70,7 @@ class LaporanStokTest extends TestCase
             'item_no' => 'PROD-001',
             'name' => 'Product Test Resmi',
             'accurate_id' => 'ACC-TEST-001',
+            'brandName' => 'APPLE',
             'proyek' => 'RESMI',
             'base_price' => 150000,
             'business_unit_id' => $this->bu->id,
@@ -79,6 +80,7 @@ class LaporanStokTest extends TestCase
             'item_no' => 'PROD-002',
             'name' => 'Product Test Inter',
             'accurate_id' => 'ACC-TEST-002',
+            'brandName' => 'SAMSUNG',
             'proyek' => 'INTER',
             'base_price' => 200000,
             'business_unit_id' => $this->bu->id,
@@ -165,6 +167,33 @@ class LaporanStokTest extends TestCase
             });
     }
 
+    public function test_laporan_stok_filters_by_brand()
+    {
+        // When brand is empty, it should show both
+        Livewire::actingAs($this->user)
+            ->test(LaporanStok::class)
+            ->assertSet('brand', '')
+            ->assertViewHas('stocks', function ($stocks) {
+                return $stocks->count() === 2;
+            });
+
+        // Filter by APPLE
+        Livewire::actingAs($this->user)
+            ->test(LaporanStok::class)
+            ->set('brand', 'APPLE')
+            ->assertViewHas('stocks', function ($stocks) {
+                return $stocks->count() === 1 && $stocks->first()->serial_number === 'SN-VND1-001';
+            });
+
+        // Filter by SAMSUNG
+        Livewire::actingAs($this->user)
+            ->test(LaporanStok::class)
+            ->set('brand', 'SAMSUNG')
+            ->assertViewHas('stocks', function ($stocks) {
+                return $stocks->count() === 1 && $stocks->first()->serial_number === 'SN-VND2-002';
+            });
+    }
+
     public function test_laporan_stok_filters_by_query_parameter()
     {
         // Access with vendor_id parameter
@@ -183,6 +212,34 @@ class LaporanStokTest extends TestCase
             ->assertSet('subkategori', 'RESMI')
             ->assertViewHas('stocks', function ($stocks) {
                 return $stocks->count() === 1 && $stocks->first()->serial_number === 'SN-VND1-001';
+            });
+
+        // Access with brand parameter
+        Livewire::withQueryParams(['brand' => 'APPLE'])
+            ->actingAs($this->user)
+            ->test(LaporanStok::class)
+            ->assertSet('brand', 'APPLE')
+            ->assertViewHas('stocks', function ($stocks) {
+                return $stocks->count() === 1 && $stocks->first()->serial_number === 'SN-VND1-001';
+            });
+    }
+
+    public function test_laporan_stok_sort_by_brand()
+    {
+        Livewire::actingAs($this->user)
+            ->test(LaporanStok::class)
+            ->call('sortBy', 'brand')
+            ->assertSet('sortField', 'brand')
+            ->assertSet('sortDirection', 'asc')
+            ->assertViewHas('stocks', function ($stocks) {
+                // APPLE comes before SAMSUNG in ascending order
+                return $stocks->first()->serial_number === 'SN-VND1-001';
+            })
+            ->call('sortBy', 'brand')
+            ->assertSet('sortDirection', 'desc')
+            ->assertViewHas('stocks', function ($stocks) {
+                // SAMSUNG comes before APPLE in descending order
+                return $stocks->first()->serial_number === 'SN-VND2-002';
             });
     }
 

@@ -67,6 +67,90 @@
                     </div>
                 </div>
 
+                {{-- Dropdown Brand (Searchable) --}}
+                <div x-data="{
+                    open: false,
+                    search: '',
+                    selectedBrand: @entangle('brand').live,
+                    selectedName: 'Semua Brand',
+                    brands: [
+                        { id: '', name: 'Semua Brand' },
+                        @foreach($brands as $brandItem)
+                            { id: '{{ addslashes($brandItem) }}', name: '{{ addslashes($brandItem) }}' },
+                        @endforeach
+                    ],
+                    init() {
+                        let found = this.brands.find(b => String(b.id).toLowerCase() === String(this.selectedBrand).toLowerCase());
+                        if (found && this.selectedBrand) {
+                            this.selectedName = found.name;
+                        } else {
+                            this.selectedName = 'Semua Brand';
+                        }
+
+                        this.$watch('selectedBrand', (val) => {
+                            let found = this.brands.find(b => String(b.id).toLowerCase() === String(val).toLowerCase());
+                            this.selectedName = (found && val) ? found.name : 'Semua Brand';
+                        });
+                    },
+                    get filteredBrands() {
+                        if (!this.search) return this.brands;
+                        return this.brands.filter(b => b.name.toLowerCase().includes(this.search.toLowerCase()));
+                    },
+                    selectBrand(id, name) {
+                        this.selectedBrand = id;
+                        this.selectedName = name;
+                        $wire.set('brand', id);
+                        this.open = false;
+                        this.search = '';
+                    }
+                }" 
+                @click.outside="open = false"
+                class="relative w-full sm:w-48">
+                    <!-- Dropdown Button -->
+                    <button @click="open = !open" type="button" class="w-full pl-3 pr-10 py-2 border border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-1 focus:ring-[#1c69d4] bg-white text-left cursor-pointer flex items-center justify-between shadow-sm">
+                        <span class="truncate" x-text="selectedName">Semua Brand</span>
+                        <svg class="w-4 h-4 text-gray-400 absolute right-3 transition-transform duration-200" :class="{'rotate-180': open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+
+                    <!-- Dropdown Content -->
+                    <div x-show="open" 
+                         x-transition:enter="transition ease-out duration-100"
+                         x-transition:enter-start="transform opacity-0 scale-95"
+                         x-transition:enter-end="transform opacity-100 scale-100"
+                         x-transition:leave="transition ease-in duration-75"
+                         x-transition:leave-start="transform opacity-100 scale-100"
+                         x-transition:leave-end="transform opacity-0 scale-95"
+                         class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-hidden flex flex-col" 
+                         style="display: none;">
+                        <!-- Search Input -->
+                        <div class="p-2 border-b border-gray-100 bg-gray-50/50 relative">
+                            <input x-model="search" 
+                                   x-ref="brandSearchInput"
+                                   type="text" 
+                                   placeholder="Cari Brand..." 
+                                   class="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-[#1c69d4] focus:border-[#1c69d4] bg-white"
+                                   x-init="$watch('open', value => { if (value) setTimeout(() => $refs.brandSearchInput.focus(), 50) })">
+                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+
+                        <!-- Brand Options List -->
+                        <div class="overflow-y-auto max-h-48 divide-y divide-gray-50">
+                            <template x-for="b in filteredBrands" :key="b.id">
+                                <button @click="selectBrand(b.id, b.name)" type="button" class="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition-colors flex items-center justify-between" :class="String(selectedBrand).toLowerCase() === String(b.id).toLowerCase() ? 'bg-[#1c69d4]/5 text-[#1c69d4] font-bold' : 'text-gray-700'">
+                                    <span x-text="b.name" class="truncate"></span>
+                                    <svg x-show="String(selectedBrand).toLowerCase() === String(b.id).toLowerCase() && b.id !== ''" class="w-3.5 h-3.5 text-[#1c69d4] shrink-0 font-bold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
                 {{-- Dropdown Subkategori --}}
                 <div class="relative">
                     <select wire:model.live="subkategori" class="w-full sm:w-44 pl-3 pr-8 py-2 border border-gray-200 rounded-xl text-sm focus:border-[#1c69d4] focus:ring-[#1c69d4] bg-white appearance-none cursor-pointer">
@@ -187,7 +271,12 @@
                                 <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
                             @endif
                         </th>
-                        <th class="px-5 py-4 font-bold">Brand</th>
+                        <th class="px-5 py-4 font-bold cursor-pointer hover:bg-gray-50" wire:click="sortBy('brand')">
+                            Brand
+                            @if($sortField === 'brand')
+                                <span class="ml-1">{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>
+                            @endif
+                        </th>
                         <th class="px-5 py-4 font-bold">Kategori</th>
                         <th class="px-5 py-4 font-bold cursor-pointer hover:bg-gray-50" wire:click="sortBy('subkategori')">
                             Subkategori

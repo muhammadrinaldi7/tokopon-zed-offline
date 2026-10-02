@@ -26,6 +26,9 @@ class LaporanStok extends Component
     #[Url(as: 'vendor_id', except: '')]
     public $vendor_id = '';
 
+    #[Url(as: 'brand', except: '')]
+    public $brand = '';
+
     #[Url(as: 'subkategori', except: '')]
     public $subkategori = '';
 
@@ -37,6 +40,10 @@ class LaporanStok extends Component
     {
         if (request()->has('vendor_id') && !empty(request()->query('vendor_id'))) {
             $this->vendor_id = request()->query('vendor_id');
+        }
+
+        if (request()->has('brand') && !empty(request()->query('brand'))) {
+            $this->brand = request()->query('brand');
         }
 
         if (request()->has('subkategori') && !empty(request()->query('subkategori'))) {
@@ -67,6 +74,16 @@ class LaporanStok extends Component
     }
 
     public function updatedVendorId()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingBrand()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedBrand()
     {
         $this->resetPage();
     }
@@ -117,6 +134,21 @@ class LaporanStok extends Component
             ->when($this->vendor_id, function ($query) {
                 $query->where('product_serial_numbers.vendor_id', $this->vendor_id);
             })
+            ->when($this->brand, function ($query) {
+                $brand = $this->brand;
+                $query->where(function ($q) use ($brand) {
+                    $q->whereHas('productAccurate', function ($paQuery) use ($brand) {
+                        $paQuery->whereRaw('LOWER(brandName) = ?', [strtolower($brand)]);
+                    })->orWhere(function ($fallbackQuery) use ($brand) {
+                        $fallbackQuery->whereNull('product_serial_numbers.product_accurate_id')
+                            ->whereIn('product_serial_numbers.item_no', function ($inner) use ($brand) {
+                                $inner->select('item_no')
+                                    ->from('product_accurates')
+                                    ->whereRaw('LOWER(brandName) = ?', [strtolower($brand)]);
+                            });
+                    });
+                });
+            })
             ->when($this->subkategori, function ($query) {
                 $sub = $this->subkategori;
                 $query->where(function ($q) use ($sub) {
@@ -132,11 +164,14 @@ class LaporanStok extends Component
                     });
                 });
             })
-            ->when($this->sortField === 'subkategori', function ($query) {
+            ->when($this->sortField === 'brand', function ($query) {
                 $query->leftJoin('product_accurates', 'product_serial_numbers.product_accurate_id', '=', 'product_accurates.id')
-                    ->orderBy('product_accurates.proyek', $this->sortDirection);
+                    ->orderBy('product_accurates.brandName', $this->sortDirection);
             }, function ($query) {
-                if (in_array($this->sortField, ['base_price', 'harga_jual'])) {
+                if ($this->sortField === 'subkategori') {
+                    $query->leftJoin('product_accurates', 'product_serial_numbers.product_accurate_id', '=', 'product_accurates.id')
+                        ->orderBy('product_accurates.proyek', $this->sortDirection);
+                } elseif (in_array($this->sortField, ['base_price', 'harga_jual'])) {
                     $query->leftJoin('product_accurates', 'product_serial_numbers.product_accurate_id', '=', 'product_accurates.id')
                         ->orderBy('product_accurates.base_price', $this->sortDirection);
                 } else {
@@ -265,11 +300,45 @@ class LaporanStok extends Component
             ->sort()
             ->values();
 
+        $brandQuery = ProductAccurate::whereNotNull('brandName')
+            ->where('brandName', '!=', '');
+
+        if ($buId) {
+            $brandQuery->where('business_unit_id', $buId);
+        }
+
+        $brands = $brandQuery->distinct()
+            ->pluck('brandName')
+            ->map(fn($b) => trim((string)$b))
+            ->filter();
+
+        // Fallback jika BU saat ini belum memiliki brandName terisi di ProductAccurate
+        if ($brands->isEmpty()) {
+            $brands = ProductAccurate::whereNotNull('brandName')
+                ->where('brandName', '!=', '')
+                ->distinct()
+                ->pluck('brandName')
+                ->map(fn($b) => trim((string)$b))
+                ->filter();
+        }
+
+        $brandModelQuery = \App\Models\Brand::query();
+        if ($buId) {
+            $brandModelQuery->where('business_unit_id', $buId);
+        }
+        $brandModelNames = $brandModelQuery->pluck('name')->map(fn($b) => trim((string)$b))->filter();
+
+        $brands = $brands->concat($brandModelNames)
+            ->unique(fn($b) => strtolower($b))
+            ->sort(SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
         return view('livewire.zoffline.reporting.laporan-stok', [
             'stocks' => $stocks,
             'warehouses' => $warehouses,
             'vendors' => $vendors,
             'subkategoris' => $subkategoris,
+            'brands' => $brands,
         ])->layout('layouts.z');
     }
 }
