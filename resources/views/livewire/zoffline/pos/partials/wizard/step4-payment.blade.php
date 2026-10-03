@@ -1,32 +1,40 @@
 <div class="space-y-6">
-    @if($availableCustomerDepositTotal > 0)
-    <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4 flex items-center justify-between">
-        <div>
-            <h3 class="font-bold text-blue-900">Deposit Tersedia</h3>
-            <p class="text-sm text-blue-700 mt-1">
-                Pelanggan memiliki deposit Rp {{ number_format($availableCustomerDepositTotal, 0, ',', '.') }}.
-                @if($useCustomerDeposit)
-                    <div class="mt-2 flex items-center gap-2">
-                        <span class="font-semibold text-gray-700">Akan digunakan:</span>
-                        <div class="relative max-w-xs">
-                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 font-medium">Rp</span>
-                            <input type="text" x-data x-mask:dynamic="$money($input, '.')" wire:model.live.debounce.500ms="customDepositAmount" class="block w-full pl-10 pr-3 py-1 text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="0">
+    @if ($availableCustomerDepositTotal > 0)
+        <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4 flex items-center justify-between">
+            <div>
+                <h3 class="font-bold text-blue-900">Deposit Tersedia</h3>
+                <p class="text-sm text-blue-700 mt-1">
+                    Pelanggan memiliki deposit Rp {{ number_format($availableCustomerDepositTotal, 0, ',', '.') }}.
+                    @if ($useCustomerDeposit)
+                        <div class="mt-2 flex items-center gap-2">
+                            <span class="font-semibold text-gray-700">Akan digunakan:</span>
+                            <div class="relative max-w-xs">
+                                <span
+                                    class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 font-medium">Rp</span>
+                                <input type="text" x-data x-mask:dynamic="$money($input, '.')"
+                                    wire:model.live.debounce.500ms="customDepositAmount"
+                                    class="block w-full pl-10 pr-3 py-1 text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="0">
+                            </div>
+                        </div>
+                    @endif
+                </p>
+            </div>
+            <div>
+                <label class="flex items-center cursor-pointer">
+                    <div class="relative">
+                        <input type="checkbox" wire:model.live="useCustomerDeposit" class="sr-only peer">
+                        <div
+                            class="block bg-gray-300 w-14 h-8 rounded-full transition-colors duration-300 ease-in-out peer-checked:bg-blue-600 @if ($useCustomerDeposit) bg-blue-600 @endif">
+                        </div>
+                        <div
+                            class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition transform duration-300 ease-in-out @if ($useCustomerDeposit) translate-x-6 @endif">
                         </div>
                     </div>
-                @endif
-            </p>
+                    <span class="ml-3 text-sm font-medium text-gray-700">Gunakan Deposit</span>
+                </label>
+            </div>
         </div>
-        <div>
-            <label class="flex items-center cursor-pointer">
-                <div class="relative">
-                    <input type="checkbox" wire:model.live="useCustomerDeposit" class="sr-only peer">
-                    <div class="block bg-gray-300 w-14 h-8 rounded-full transition-colors duration-300 ease-in-out peer-checked:bg-blue-600 @if($useCustomerDeposit) bg-blue-600 @endif"></div>
-                    <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition transform duration-300 ease-in-out @if($useCustomerDeposit) translate-x-6 @endif"></div>
-                </div>
-                <span class="ml-3 text-sm font-medium text-gray-700">Gunakan Deposit</span>
-            </label>
-        </div>
-    </div>
     @endif
 
     {{-- METODE PEMBAYARAN WIZARD (Dipindah ke atas) --}}
@@ -123,7 +131,8 @@
                                 <h1
                                     class="text-2xl font-black {{ $paymentMode === 'split' ? 'text-[#1c69d4]' : 'text-neutral-800' }}">
                                     SPLIT</h1>
-                                <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Bayar dengan lebih dari satu metode
+                                <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Bayar dengan lebih dari satu
+                                    metode
                                 </p>
                             </div>
                         </button>
@@ -219,14 +228,14 @@
                                 <div
                                     class="w-16 h-16 bg-gray-50 border border-gray-100 rounded-full flex items-center justify-center text-gray-400 group-hover:text-[#1c69d4] group-hover:bg-blue-50 group-hover:border-blue-200 transition-all">
                                     @if ($cat === 'TUNAI')
-                                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                            stroke-width="2">
+                                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                                         </svg>
                                     @else
-                                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                            stroke-width="2">
+                                        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                                         </svg>
@@ -387,13 +396,15 @@
 
                     @if (strtolower($methodObj->bank_name ?? '') === 'finance')
                         <div class="space-y-3">
-                            <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Nomor Kontrak <span class="text-rose-500 font-bold">* (Wajib diisi)</span></label>
+                            <label class="text-sm font-bold text-gray-700 uppercase tracking-wide">Nomor Kontrak <span
+                                    class="text-rose-500 font-bold">* (Wajib diisi)</span></label>
                             <input type="text"
                                 wire:model.live.debounce.500ms="payments.{{ $activePaymentIndex }}.no_kontrak"
                                 class="w-full bg-white border-2 {{ empty($payment['no_kontrak'] ?? '') ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-200' : 'border-gray-300 focus:border-[#1c69d4] focus:ring-[#1c69d4]/20' }} rounded-2xl px-5 py-4 text-xl font-bold text-gray-800 focus:ring-4 transition-all"
                                 placeholder="Masukkan Nomor Kontrak">
                             @if (empty($payment['no_kontrak'] ?? ''))
-                                <p class="text-sm text-rose-500 font-semibold mt-1">Nomor kontrak wajib diisi untuk pembayaran Finance.</p>
+                                <p class="text-sm text-rose-500 font-semibold mt-1">Nomor kontrak wajib diisi untuk
+                                    pembayaran Finance.</p>
                             @endif
                         </div>
                     @endif
@@ -412,8 +423,10 @@
                             <span
                                 class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-black text-2xl">Rp</span>
                             <input type="text" x-ref="amountInput" x-model="formattedAmount"
-                                @input="updateAmount($event)" x-bind:readonly="!isSplit && {{ isset($allowEditAmount) && $allowEditAmount ? 'false' : 'true' }}"
-                                :class="(!isSplit && {{ isset($allowEditAmount) && $allowEditAmount ? 'false' : 'true' }}) ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'text-gray-800 bg-white'"
+                                @input="updateAmount($event)"
+                                x-bind:readonly="!isSplit && {{ isset($allowEditAmount) && $allowEditAmount ? 'false' : 'true' }}"
+                                :class="(!isSplit && {{ isset($allowEditAmount) && $allowEditAmount ? 'false' : 'true' }}) ?
+                                'bg-gray-100 text-gray-500 cursor-not-allowed' : 'text-gray-800 bg-white'"
                                 class="w-full border-2 border-gray-300 rounded-2xl pl-16 pr-5 py-5 text-4xl font-black focus:border-[#1c69d4] focus:ring-4 focus:ring-[#1c69d4]/20 transition-all text-right"
                                 placeholder="0">
                         </div>
@@ -527,7 +540,13 @@
 
                     @php
                         $totalPaid = collect($payments)->sum('amount');
-                        $target = max(0, $this->subtotal() - (int) $this->totalDiscount() - ($isSoFulfillment ? ($soPaidAmount ?? 0) : 0) - ($useCustomerDeposit ? $availableCustomerDepositTotal : 0));
+                        $target = max(
+                            0,
+                            $this->subtotal() -
+                                (int) $this->totalDiscount() -
+                                ($isSoFulfillment ? $soPaidAmount ?? 0 : 0) -
+                                ($useCustomerDeposit ? $availableCustomerDepositTotal : 0),
+                        );
                         $kurang = $target - $totalPaid;
                     @endphp
 
@@ -590,252 +609,301 @@
 
     </div>
 
-    @if(!isset($hideFooter) || !$hideFooter)
-    {{-- Footer Actions --}}
-    <div class="flex flex-col sm:flex-row justify-between gap-3 pt-4 sm:pt-6 border-t border-gray-200 mt-2">
-        <button wire:click="prevStep"
-            class="order-last sm:order-first w-full sm:w-auto px-6 py-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Kembali
-        </button>
-        <div x-data="{ showConfirmModal: false, showPiutangModal: false }" class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <button type="button" wire:click="saveDraft" wire:loading.attr="disabled" wire:target="saveDraft"
-                class="w-full sm:w-auto px-6 py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[170px]">
-                <span wire:loading.remove wire:target="saveDraft" class="flex items-center gap-2">
+    @if (!isset($hideFooter) || !$hideFooter)
+        {{-- Footer Actions --}}
+        <div class="flex flex-col sm:flex-row justify-between gap-3 pt-4 sm:pt-6 border-t border-gray-200 mt-2">
+            <button wire:click="prevStep"
+                class="order-last sm:order-first w-full sm:w-auto px-6 py-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Kembali
+            </button>
+            <div x-data="{ showConfirmModal: false, showPiutangModal: false }" class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                @if (!$isSoFulfillment)
+                    <button type="button" wire:click="saveDraft" wire:loading.attr="disabled"
+                        wire:target="saveDraft"
+                        class="w-full sm:w-auto px-6 py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[170px]">
+                        <span wire:loading.remove wire:target="saveDraft" class="flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                            Simpan Draft
+                        </span>
+                        <span wire:loading.inline-flex wire:target="saveDraft" class="items-center gap-2 hidden">
+                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg"
+                                fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10"
+                                    stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            Menyimpan...
+                        </span>
+                    </button>
+                @endif
+                @can('piutang-penjualan')
+                    @if (!$isSoFulfillment)
+                        <button type="button" @click="showPiutangModal = true"
+                            class="w-full sm:w-auto px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[170px]">
+                            Piutang
+                        </button>
+                    @endif
+                @endcan
+                <button type="button" @click="showConfirmModal = true"
+                    @if (!$this->isPaymentsValid) disabled @endif
+                    class="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                    Proses Transaksi
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                         stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Simpan Draft
-                </span>
-                <span wire:loading.inline-flex wire:target="saveDraft" class="items-center gap-2 hidden">
-                    <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
-                        viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                            stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                        </path>
-                    </svg>
-                    Menyimpan...
-                </span>
-            </button>
-            @can('piutang-penjualan')
-                @if (!$isSoFulfillment)
-                    <button type="button" @click="showPiutangModal = true"
-                        class="w-full sm:w-auto px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-w-[170px]">
-                        Piutang
-                    </button>
-                @endif
-            @endcan
-            <button type="button" @click="showConfirmModal = true" @if (!$this->isPaymentsValid) disabled @endif
-                class="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
-                Proses Transaksi
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </button>
+                </button>
 
-            {{-- MODAL KONFIRMASI PIUTANG --}}
-            <template x-teleport="body">
-                <div x-show="showConfirmModal" class="fixed inset-0 z-[100] overflow-y-auto" style="display: none;"
-                    aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                    <div
-                        class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                        <div x-show="showConfirmModal" x-transition:enter="ease-out duration-300"
-                            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                            x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100"
-                            x-transition:leave-end="opacity-0"
-                            class="fixed inset-0 transition-opacity bg-gray-900/50 backdrop-blur-sm"
-                            aria-hidden="true" @click="showConfirmModal = false"></div>
+                {{-- MODAL KONFIRMASI PIUTANG --}}
+                <template x-teleport="body">
+                    <div x-show="showConfirmModal" class="fixed inset-0 z-[100] overflow-y-auto"
+                        style="display: none;" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                        <div
+                            class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                            <div x-show="showConfirmModal" x-transition:enter="ease-out duration-300"
+                                x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100"
+                                x-transition:leave-end="opacity-0"
+                                class="fixed inset-0 transition-opacity bg-gray-900/50 backdrop-blur-sm"
+                                aria-hidden="true" @click="showConfirmModal = false"></div>
 
-                        <span class="hidden sm:inline-block sm:align-middle sm:h-screen"
-                            aria-hidden="true">&#8203;</span>
+                            <span class="hidden sm:inline-block sm:align-middle sm:h-screen"
+                                aria-hidden="true">&#8203;</span>
 
-                        <div x-show="showConfirmModal" x-transition:enter="ease-out duration-300"
-                            x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                            x-transition:leave="ease-in duration-200"
-                            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                            class="inline-block w-full max-w-2xl overflow-hidden text-left align-middle transition-all transform bg-white rounded-2xl shadow-2xl sm:my-8 sm:align-middle border border-gray-100 relative">
+                            <div x-show="showConfirmModal" x-transition:enter="ease-out duration-300"
+                                x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                                x-transition:leave="ease-in duration-200"
+                                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                                x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                                class="inline-block w-full max-w-2xl overflow-hidden text-left align-middle transition-all transform bg-white rounded-2xl shadow-2xl sm:my-8 sm:align-middle border border-gray-100 relative">
 
-                            {{-- Header --}}
-                            <div
-                                class="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-start sm:items-center sticky top-0 z-10">
-                                <div>
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <h3 class="text-lg sm:text-xl font-black text-gray-800" id="modal-title">
-                                            Konfirmasi
-                                            Pesanan</h3>
-                                        <span
-                                            class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] sm:text-xs font-bold border border-blue-100">{{ $this->displayCustomerName }}</span>
+                                {{-- Header --}}
+                                <div
+                                    class="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-start sm:items-center sticky top-0 z-10">
+                                    <div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <h3 class="text-lg sm:text-xl font-black text-gray-800" id="modal-title">
+                                                Konfirmasi
+                                                Pesanan</h3>
+                                            <span
+                                                class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] sm:text-xs font-bold border border-blue-100">{{ $this->displayCustomerName }}</span>
+                                        </div>
+                                        <p class="text-xs sm:text-sm text-gray-500 mt-1">Pastikan pesanan dan
+                                            pembayaran
+                                            sudah sesuai
+                                        </p>
                                     </div>
-                                    <p class="text-xs sm:text-sm text-gray-500 mt-1">Pastikan pesanan dan pembayaran
-                                        sudah sesuai
-                                    </p>
+                                    <button type="button" @click="showConfirmModal = false"
+                                        class="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 focus:outline-none p-2 rounded-xl transition-all shrink-0">
+                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
                                 </div>
-                                <button type="button" @click="showConfirmModal = false"
-                                    class="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 focus:outline-none p-2 rounded-xl transition-all shrink-0">
-                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                        stroke-width="2.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
 
-                            {{-- Body --}}
-                            <div
-                                class="px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+                                {{-- Body --}}
+                                <div
+                                    class="px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
 
-                                {{-- Daftar Item --}}
-                                <div>
-                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Daftar
-                                        Item</h4>
-                                    <div class="space-y-3 bg-gray-50/50 p-3 sm:p-4 rounded-xl border border-gray-100">
-                                        @forelse($this->cart as $item)
-                                            <div
-                                                class="flex flex-col sm:flex-row justify-between items-start gap-2 sm:gap-4 pb-3 border-b border-gray-200/60 last:border-0 last:pb-0">
-                                                <div class="flex-1 w-full">
-                                                    @php
-                                                        $nameParts = explode(' - ', $item['name']);
+                                    {{-- Daftar Item --}}
+                                    <div>
+                                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+                                            Daftar
+                                            Item</h4>
+                                        <div
+                                            class="space-y-3 bg-gray-50/50 p-3 sm:p-4 rounded-xl border border-gray-100">
+                                            @forelse($this->cart as $item)
+                                                <div
+                                                    class="flex flex-col sm:flex-row justify-between items-start gap-2 sm:gap-4 pb-3 border-b border-gray-200/60 last:border-0 last:pb-0">
+                                                    <div class="flex-1 w-full">
+                                                        @php
+                                                            $nameParts = explode(' - ', $item['name']);
 
-                                                        // Hapus prefix 'DS' jika ada di awal nama
-                                                        if (
-                                                            isset($nameParts[0]) &&
-                                                            trim(strtoupper($nameParts[0])) === 'DS'
-                                                        ) {
-                                                            array_shift($nameParts);
-                                                        }
-
-                                                        // Hapus prefix 'HP' di awal (bisa 'HP ' atau 'HP' saja)
-                                                        if (isset($nameParts[0])) {
-                                                            if (trim(strtoupper($nameParts[0])) === 'HP') {
-                                                                array_shift($nameParts);
-                                                            } else {
-                                                                $nameParts[0] = preg_replace(
-                                                                    '/^HP\s+/i',
-                                                                    '',
-                                                                    trim($nameParts[0]),
-                                                                );
-                                                            }
-                                                        }
-
-                                                        $parsedStorage = null;
-                                                        $parsedColor = null;
-
-                                                        if (count($nameParts) >= 3) {
-                                                            // Ambil 2 elemen paling belakang sebagai Color dan Storage
-                                                            $parsedColor = trim(array_pop($nameParts));
-                                                            $parsedStorage = trim(array_pop($nameParts));
-                                                            // Sisanya digabung kembali sebagai Base Name
-                                                            $baseName = trim(implode(' - ', $nameParts));
-                                                        } elseif (count($nameParts) == 2) {
-                                                            // Jika cuma 2 elemen, cek apakah elemen terakhir berupa angka/kapasitas
-                                                            $lastPart = trim($nameParts[1]);
+                                                            // Hapus prefix 'DS' jika ada di awal nama
                                                             if (
-                                                                preg_match(
-                                                                    '/^(\d+(GB|TB)?)$/i',
-                                                                    str_replace(' ', '', $lastPart),
-                                                                )
+                                                                isset($nameParts[0]) &&
+                                                                trim(strtoupper($nameParts[0])) === 'DS'
                                                             ) {
+                                                                array_shift($nameParts);
+                                                            }
+
+                                                            // Hapus prefix 'HP' di awal (bisa 'HP ' atau 'HP' saja)
+                                                            if (isset($nameParts[0])) {
+                                                                if (trim(strtoupper($nameParts[0])) === 'HP') {
+                                                                    array_shift($nameParts);
+                                                                } else {
+                                                                    $nameParts[0] = preg_replace(
+                                                                        '/^HP\s+/i',
+                                                                        '',
+                                                                        trim($nameParts[0]),
+                                                                    );
+                                                                }
+                                                            }
+
+                                                            $parsedStorage = null;
+                                                            $parsedColor = null;
+
+                                                            if (count($nameParts) >= 3) {
+                                                                // Ambil 2 elemen paling belakang sebagai Color dan Storage
+                                                                $parsedColor = trim(array_pop($nameParts));
                                                                 $parsedStorage = trim(array_pop($nameParts));
+                                                                // Sisanya digabung kembali sebagai Base Name
                                                                 $baseName = trim(implode(' - ', $nameParts));
+                                                            } elseif (count($nameParts) == 2) {
+                                                                // Jika cuma 2 elemen, cek apakah elemen terakhir berupa angka/kapasitas
+                                                                $lastPart = trim($nameParts[1]);
+                                                                if (
+                                                                    preg_match(
+                                                                        '/^(\d+(GB|TB)?)$/i',
+                                                                        str_replace(' ', '', $lastPart),
+                                                                    )
+                                                                ) {
+                                                                    $parsedStorage = trim(array_pop($nameParts));
+                                                                    $baseName = trim(implode(' - ', $nameParts));
+                                                                } else {
+                                                                    $baseName = trim($item['name']);
+                                                                }
                                                             } else {
                                                                 $baseName = trim($item['name']);
                                                             }
-                                                        } else {
-                                                            $baseName = trim($item['name']);
-                                                        }
 
-                                                        $displayRam = $item['ram'] !== '-' ? $item['ram'] : null;
-                                                        $displayStorage =
-                                                            $item['storage'] !== '-'
-                                                                ? $item['storage']
-                                                                : $parsedStorage;
-                                                        $displayColor =
-                                                            $item['color'] !== '-' ? $item['color'] : $parsedColor;
-                                                    @endphp
-                                                    <h4 class="font-bold text-gray-800 text-sm leading-tight">
-                                                        {{ $baseName }}</h4>
-                                                    <div class="text-xs text-gray-500 mt-1.5 flex flex-wrap gap-1">
-                                                        @if ($displayRam || $displayStorage)
-                                                            <span
-                                                                class="bg-white border border-gray-200 px-2 py-0.5 rounded-md shadow-sm">{{ $displayRam ? $displayRam . ' / ' : '' }}{{ $displayStorage ?? '' }}</span>
-                                                        @endif
-                                                        @if ($displayColor)
-                                                            <span
-                                                                class="bg-white border border-gray-200 px-2 py-0.5 rounded-md shadow-sm">{{ $displayColor }}</span>
-                                                        @endif
-                                                        {{-- @if (!empty($item['condition']))
+                                                            $displayRam = $item['ram'] !== '-' ? $item['ram'] : null;
+                                                            $displayStorage =
+                                                                $item['storage'] !== '-'
+                                                                    ? $item['storage']
+                                                                    : $parsedStorage;
+                                                            $displayColor =
+                                                                $item['color'] !== '-' ? $item['color'] : $parsedColor;
+                                                        @endphp
+                                                        <h4 class="font-bold text-gray-800 text-sm leading-tight">
+                                                            {{ $baseName }}</h4>
+                                                        <div class="text-xs text-gray-500 mt-1.5 flex flex-wrap gap-1">
+                                                            @if ($displayRam || $displayStorage)
+                                                                <span
+                                                                    class="bg-white border border-gray-200 px-2 py-0.5 rounded-md shadow-sm">{{ $displayRam ? $displayRam . ' / ' : '' }}{{ $displayStorage ?? '' }}</span>
+                                                            @endif
+                                                            @if ($displayColor)
+                                                                <span
+                                                                    class="bg-white border border-gray-200 px-2 py-0.5 rounded-md shadow-sm">{{ $displayColor }}</span>
+                                                            @endif
+                                                            {{-- @if (!empty($item['condition']))
                                                             <span
                                                                 class="bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-md font-bold shadow-sm">{{ $item['condition'] }}</span>
                                                         @endif --}}
-                                                    </div>
-                                                    @if (count($item['serial_numbers']) > 0)
-                                                        <div class="mt-2 flex flex-wrap gap-1">
-                                                            @foreach ($item['serial_numbers'] as $sn)
-                                                                <span
-                                                                    class="text-[10px] font-mono bg-blue-50/50 border border-blue-100 text-blue-600 px-1.5 py-0.5 rounded">{{ $sn }}</span>
-                                                            @endforeach
                                                         </div>
-                                                    @endif
-                                                </div>
-                                                <div
-                                                    class="w-full sm:w-auto mt-2 sm:mt-0 flex sm:block justify-between items-center sm:text-right">
-                                                    <div class="text-left sm:text-right">
-                                                        <div class="text-xs font-bold text-gray-400 sm:mt-0.5">
-                                                            {{ $item['qty'] }} x</div>
-                                                    </div>
-                                                    <div class="text-right">
-                                                        <div class="font-black text-gray-800 text-sm">Rp
-                                                            {{ number_format($item['price'], 0, ',', '.') }}</div>
-                                                        @if (isset($item['discount_amount']) && $item['discount_amount'] > 0)
-                                                            <div
-                                                                class="text-xs text-rose-500 font-bold mt-0.5 sm:mt-1">
-                                                                - Rp
-                                                                {{ number_format($item['discount_amount'], 0, ',', '.') }}
+                                                        @if (count($item['serial_numbers']) > 0)
+                                                            <div class="mt-2 flex flex-wrap gap-1">
+                                                                @foreach ($item['serial_numbers'] as $sn)
+                                                                    <span
+                                                                        class="text-[10px] font-mono bg-blue-50/50 border border-blue-100 text-blue-600 px-1.5 py-0.5 rounded">{{ $sn }}</span>
+                                                                @endforeach
                                                             </div>
                                                         @endif
                                                     </div>
+                                                    <div
+                                                        class="w-full sm:w-auto mt-2 sm:mt-0 flex sm:block justify-between items-center sm:text-right">
+                                                        <div class="text-left sm:text-right">
+                                                            <div class="text-xs font-bold text-gray-400 sm:mt-0.5">
+                                                                {{ $item['qty'] }} x</div>
+                                                        </div>
+                                                        <div class="text-right">
+                                                            <div class="font-black text-gray-800 text-sm">Rp
+                                                                {{ number_format($item['price'], 0, ',', '.') }}</div>
+                                                            @if (isset($item['discount_amount']) && $item['discount_amount'] > 0)
+                                                                <div
+                                                                    class="text-xs text-rose-500 font-bold mt-0.5 sm:mt-1">
+                                                                    - Rp
+                                                                    {{ number_format($item['discount_amount'], 0, ',', '.') }}
+                                                                </div>
+                                                            @endif
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        @empty
-                                            <div class="text-center py-2 text-gray-400 text-sm font-medium">Keranjang
-                                                kosong</div>
-                                        @endforelse
+                                            @empty
+                                                <div class="text-center py-2 text-gray-400 text-sm font-medium">
+                                                    Keranjang
+                                                    kosong</div>
+                                            @endforelse
+                                        </div>
                                     </div>
-                                </div>
 
-                                {{-- Informasi Pembayaran --}}
-                                <div>
-                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Metode
-                                        Pembayaran</h4>
-                                    <div
-                                        class="bg-white border border-gray-100 rounded-xl p-3 sm:p-4 shadow-sm space-y-4">
-                                        @if ($paymentMode === 'split')
-                                            @foreach ($payments as $payment)
+                                    {{-- Informasi Pembayaran --}}
+                                    <div>
+                                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+                                            Metode
+                                            Pembayaran</h4>
+                                        <div
+                                            class="bg-white border border-gray-100 rounded-xl p-3 sm:p-4 shadow-sm space-y-4">
+                                            @if ($paymentMode === 'split')
+                                                @foreach ($payments as $payment)
+                                                    @php
+                                                        $pmObj = \App\Models\PaymentMethod::find(
+                                                            $payment['payment_method_id'] ?? null,
+                                                        );
+                                                        $rateObj = \App\Models\PaymentMethodRate::find(
+                                                            $payment['payment_method_rate_id'] ?? null,
+                                                        );
+                                                    @endphp
+                                                    <div
+                                                        class="flex flex-col sm:flex-row sm:justify-between sm:items-start text-sm border-b border-gray-50 pb-2 last:border-0 last:pb-0 gap-1.5 sm:gap-2">
+                                                        <div class="flex flex-col gap-1.5">
+                                                            <div class="flex items-center gap-2">
+                                                                <span
+                                                                    class="w-2 h-2 rounded-full shrink-0 {{ $payment['category'] === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
+                                                                <span
+                                                                    class="text-gray-700 font-bold">{{ $pmObj->name ?? $payment['category'] }}</span>
+                                                            </div>
+                                                            <div class="flex flex-wrap items-center gap-1.5 pl-4">
+                                                                @if (!empty($payment['bank_name']))
+                                                                    <span
+                                                                        class="px-1.5 py-0.5 bg-[#1c69d4]/10 text-[#1c69d4] rounded text-[9px] font-black uppercase tracking-widest">{{ $payment['bank_name'] }}</span>
+                                                                @endif
+                                                                @if ($rateObj)
+                                                                    <span
+                                                                        class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">Tarif:
+                                                                        {{ $rateObj->name }}
+                                                                    </span>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                        <span class="font-black text-gray-800 pt-0.5 pl-4 sm:pl-0">Rp
+                                                            {{ number_format($payment['amount'], 0, ',', '.') }}</span>
+                                                    </div>
+                                                @endforeach
+                                            @else
                                                 @php
+                                                    $payment = $payments[0] ?? [];
                                                     $pmObj = \App\Models\PaymentMethod::find(
                                                         $payment['payment_method_id'] ?? null,
                                                     );
                                                     $rateObj = \App\Models\PaymentMethodRate::find(
                                                         $payment['payment_method_rate_id'] ?? null,
                                                     );
+                                                    $methodName = $pmObj
+                                                        ? $pmObj->name
+                                                        : $payment['category'] ?? 'Belum dipilih';
                                                 @endphp
                                                 <div
-                                                    class="flex flex-col sm:flex-row sm:justify-between sm:items-start text-sm border-b border-gray-50 pb-2 last:border-0 last:pb-0 gap-1.5 sm:gap-2">
+                                                    class="flex flex-col sm:flex-row sm:justify-between sm:items-start text-sm gap-1.5 sm:gap-2">
                                                     <div class="flex flex-col gap-1.5">
                                                         <div class="flex items-center gap-2">
                                                             <span
-                                                                class="w-2 h-2 rounded-full shrink-0 {{ $payment['category'] === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
+                                                                class="w-2 h-2 rounded-full shrink-0 {{ ($payment['category'] ?? '') === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
                                                             <span
-                                                                class="text-gray-700 font-bold">{{ $pmObj->name ?? $payment['category'] }}</span>
+                                                                class="text-gray-700 font-bold">{{ $methodName }}</span>
                                                         </div>
                                                         <div class="flex flex-wrap items-center gap-1.5 pl-4">
                                                             @if (!empty($payment['bank_name']))
@@ -851,261 +919,229 @@
                                                         </div>
                                                     </div>
                                                     <span class="font-black text-gray-800 pt-0.5 pl-4 sm:pl-0">Rp
-                                                        {{ number_format($payment['amount'], 0, ',', '.') }}</span>
+                                                        {{ number_format($payment['amount'] ?? 0, 0, ',', '.') }}</span>
                                                 </div>
-                                            @endforeach
-                                        @else
-                                            @php
-                                                $payment = $payments[0] ?? [];
-                                                $pmObj = \App\Models\PaymentMethod::find(
-                                                    $payment['payment_method_id'] ?? null,
-                                                );
-                                                $rateObj = \App\Models\PaymentMethodRate::find(
-                                                    $payment['payment_method_rate_id'] ?? null,
-                                                );
-                                                $methodName = $pmObj
-                                                    ? $pmObj->name
-                                                    : $payment['category'] ?? 'Belum dipilih';
-                                            @endphp
-                                            <div
-                                                class="flex flex-col sm:flex-row sm:justify-between sm:items-start text-sm gap-1.5 sm:gap-2">
-                                                <div class="flex flex-col gap-1.5">
-                                                    <div class="flex items-center gap-2">
-                                                        <span
-                                                            class="w-2 h-2 rounded-full shrink-0 {{ ($payment['category'] ?? '') === 'TUNAI' ? 'bg-emerald-500' : 'bg-[#1c69d4]' }}"></span>
-                                                        <span
-                                                            class="text-gray-700 font-bold">{{ $methodName }}</span>
-                                                    </div>
-                                                    <div class="flex flex-wrap items-center gap-1.5 pl-4">
-                                                        @if (!empty($payment['bank_name']))
-                                                            <span
-                                                                class="px-1.5 py-0.5 bg-[#1c69d4]/10 text-[#1c69d4] rounded text-[9px] font-black uppercase tracking-widest">{{ $payment['bank_name'] }}</span>
-                                                        @endif
-                                                        @if ($rateObj)
-                                                            <span
-                                                                class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">Tarif:
-                                                                {{ $rateObj->name }}
-                                                            </span>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <span class="font-black text-gray-800 pt-0.5 pl-4 sm:pl-0">Rp
-                                                    {{ number_format($payment['amount'] ?? 0, 0, ',', '.') }}</span>
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-
-                                {{-- Rincian Tagihan --}}
-                                <div>
-                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Rincian
-                                        Tagihan</h4>
-                                    <div
-                                        class="bg-[#1c69d4]/5 rounded-xl p-3 sm:p-4 border border-[#1c69d4]/10 space-y-2">
-                                        <div class="flex justify-between items-center text-sm">
-                                            <span class="text-gray-600 font-medium">Subtotal</span>
-                                            <span class="font-bold text-gray-800">Rp
-                                                {{ number_format($this->subtotal, 0, ',', '.') }}</span>
-                                        </div>
-                                        @if ($this->itemDiscountTotal > 0)
-                                            <div class="flex justify-between items-center text-sm">
-                                                <span class="text-gray-500">Diskon Item</span>
-                                                <span class="font-medium text-rose-400">- Rp
-                                                    {{ number_format($this->itemDiscountTotal, 0, ',', '.') }}</span>
-                                            </div>
-                                        @endif
-                                        @if ($this->promoDiscountTotal > 0)
-                                            <div class="flex justify-between items-center text-sm">
-                                                <span class="text-gray-500">Promo</span>
-                                                <span class="font-medium text-rose-400">- Rp
-                                                    {{ number_format($this->promoDiscountTotal, 0, ',', '.') }}</span>
-                                            </div>
-                                        @endif
-                                        <div class="flex justify-between items-center text-sm">
-                                            <span class="text-gray-600 font-medium">Total Diskon</span>
-                                            <span class="font-bold text-rose-500">- Rp
-                                                {{ number_format($this->totalDiscount, 0, ',', '.') }}</span>
-                                        </div>
-                                        @if ($isSoFulfillment && ($soPaidAmount ?? 0) > 0)
-                                            <div class="flex justify-between items-center text-sm">
-                                                <span class="text-gray-600 font-medium">Down Payment (DP) SO</span>
-                                                <span class="font-bold text-emerald-500">- Rp
-                                                    {{ number_format($soPaidAmount, 0, ',', '.') }}</span>
-                                            </div>
-                                        @endif
-                                        @if($useCustomerDeposit && $availableCustomerDepositTotal > 0)
-                                            <div class="flex justify-between items-center text-sm">
-                                                <span class="text-gray-600 font-medium">Gunakan Deposit</span>
-                                                <span class="font-bold text-emerald-500">- Rp
-                                                    {{ number_format($availableCustomerDepositTotal, 0, ',', '.') }}</span>
-                                            </div>
-                                        @endif
-                                        <div class="border-t border-[#1c69d4]/20 my-2 pt-2">
-                                            <div class="flex justify-between items-center">
-                                                <span class="text-gray-800 font-black">Grand Total</span>
-                                                <span class="font-black text-xl sm:text-2xl text-[#1c69d4]">Rp
-                                                    {{ number_format(max(0, $this->subtotal - $this->totalDiscount - ($isSoFulfillment ? ($soPaidAmount ?? 0) : 0) - ($useCustomerDeposit ? $availableCustomerDepositTotal : 0)), 0, ',', '.') }}</span>
-                                            </div>
+                                            @endif
                                         </div>
                                     </div>
-                                </div>
-                            </div>
 
-                            {{-- Footer --}}
-                            <div
-                                class="px-4 sm:px-6 py-4 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row justify-end gap-3 rounded-b-2xl sticky bottom-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                                <button type="button" @click="showConfirmModal = false"
-                                    class="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-all flex justify-center">
-                                    Batal
-                                </button>
-                                <button type="button" wire:click="processPayment" @click="showConfirmModal = false"
-                                    class="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-[#1c69d4] hover:bg-blue-700 text-white font-black rounded-xl shadow-md shadow-blue-500/30 transition-all flex items-center justify-center gap-2">
-                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                        stroke-width="2.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Konfirmasi & Bayar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </template>
-
-            {{-- MODAL KONFIRMASI PIUTANG --}}
-            <template x-teleport="body">
-                <div x-show="showPiutangModal" class="fixed inset-0 z-[100] overflow-y-auto" style="display: none;"
-                    aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                    <div
-                        class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                        <div x-show="showPiutangModal" x-transition:enter="ease-out duration-300"
-                            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                            x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100"
-                            x-transition:leave-end="opacity-0"
-                            class="fixed inset-0 transition-opacity bg-gray-900/50 backdrop-blur-sm"
-                            aria-hidden="true" @click="showPiutangModal = false"></div>
-
-                        <span class="hidden sm:inline-block sm:align-middle sm:h-screen"
-                            aria-hidden="true">&#8203;</span>
-
-                        <div x-show="showPiutangModal" x-transition:enter="ease-out duration-300"
-                            x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                            x-transition:leave="ease-in duration-200"
-                            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                            class="inline-block w-full max-w-xl overflow-hidden text-left align-middle transition-all transform bg-white rounded-2xl shadow-2xl sm:my-8 sm:align-middle border border-gray-100 relative">
-
-                            {{-- Header --}}
-                            <div
-                                class="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-start sm:items-center sticky top-0 z-10">
-                                <div>
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <h3 class="text-lg sm:text-xl font-black text-gray-800" id="modal-title">
-                                            Konfirmasi Piutang</h3>
-                                        <span
-                                            class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] sm:text-xs font-bold border border-blue-100">{{ $this->displayCustomerName }}</span>
-                                    </div>
-                                    <p class="text-xs sm:text-sm text-gray-500 mt-1">Transaksi ini akan dicatat sebagai
-                                        piutang (belum lunas)
-                                    </p>
-                                </div>
-                                <button type="button" @click="showPiutangModal = false"
-                                    class="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 focus:outline-none p-2 rounded-xl transition-all shrink-0">
-                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                        stroke-width="2.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            {{-- Body --}}
-                            <div
-                                class="px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
-
-                                <div
-                                    class="bg-violet-50 border border-violet-100 text-violet-700 p-4 rounded-xl flex gap-3 text-sm">
-                                    <svg class="w-6 h-6 shrink-0 text-violet-500" fill="none" viewBox="0 0 24 24"
-                                        stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                    {{-- Rincian Tagihan --}}
                                     <div>
-                                        <p class="font-bold mb-1">Perhatian!</p>
-                                        <p>Order ini akan langsung diproses dan faktur akan dibuat di Accurate, namun
-                                            <b>tanpa pelunasan</b> (Piutang). Pastikan data customer sudah benar.</p>
+                                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+                                            Rincian
+                                            Tagihan</h4>
+                                        <div
+                                            class="bg-[#1c69d4]/5 rounded-xl p-3 sm:p-4 border border-[#1c69d4]/10 space-y-2">
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-600 font-medium">Subtotal</span>
+                                                <span class="font-bold text-gray-800">Rp
+                                                    {{ number_format($this->subtotal, 0, ',', '.') }}</span>
+                                            </div>
+                                            @if ($this->itemDiscountTotal > 0)
+                                                <div class="flex justify-between items-center text-sm">
+                                                    <span class="text-gray-500">Diskon Item</span>
+                                                    <span class="font-medium text-rose-400">- Rp
+                                                        {{ number_format($this->itemDiscountTotal, 0, ',', '.') }}</span>
+                                                </div>
+                                            @endif
+                                            @if ($this->promoDiscountTotal > 0)
+                                                <div class="flex justify-between items-center text-sm">
+                                                    <span class="text-gray-500">Promo</span>
+                                                    <span class="font-medium text-rose-400">- Rp
+                                                        {{ number_format($this->promoDiscountTotal, 0, ',', '.') }}</span>
+                                                </div>
+                                            @endif
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-600 font-medium">Total Diskon</span>
+                                                <span class="font-bold text-rose-500">- Rp
+                                                    {{ number_format($this->totalDiscount, 0, ',', '.') }}</span>
+                                            </div>
+                                            @if ($isSoFulfillment && ($soPaidAmount ?? 0) > 0)
+                                                <div class="flex justify-between items-center text-sm">
+                                                    <span class="text-gray-600 font-medium">Down Payment (DP) SO</span>
+                                                    <span class="font-bold text-emerald-500">- Rp
+                                                        {{ number_format($soPaidAmount, 0, ',', '.') }}</span>
+                                                </div>
+                                            @endif
+                                            @if ($useCustomerDeposit && $availableCustomerDepositTotal > 0)
+                                                <div class="flex justify-between items-center text-sm">
+                                                    <span class="text-gray-600 font-medium">Gunakan Deposit</span>
+                                                    <span class="font-bold text-emerald-500">- Rp
+                                                        {{ number_format($availableCustomerDepositTotal, 0, ',', '.') }}</span>
+                                                </div>
+                                            @endif
+                                            <div class="border-t border-[#1c69d4]/20 my-2 pt-2">
+                                                <div class="flex justify-between items-center">
+                                                    <span class="text-gray-800 font-black">Grand Total</span>
+                                                    <span class="font-black text-xl sm:text-2xl text-[#1c69d4]">Rp
+                                                        {{ number_format(max(0, $this->subtotal - $this->totalDiscount - ($isSoFulfillment ? $soPaidAmount ?? 0 : 0) - ($useCustomerDeposit ? $availableCustomerDepositTotal : 0)), 0, ',', '.') }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {{-- Rincian Tagihan --}}
-                                <div>
-                                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Rincian
-                                        Tagihan</h4>
-                                    <div
-                                        class="bg-violet-600/5 rounded-xl p-3 sm:p-4 border border-violet-600/10 space-y-2">
-                                        <div class="flex justify-between items-center text-sm">
-                                            <span class="text-gray-600 font-medium">Subtotal</span>
-                                            <span class="font-bold text-gray-800">Rp
-                                                {{ number_format($this->subtotal, 0, ',', '.') }}</span>
-                                        </div>
-                                        @if ($this->itemDiscountTotal > 0)
-                                            <div class="flex justify-between items-center text-sm">
-                                                <span class="text-gray-500">Diskon Item</span>
-                                                <span class="font-medium text-rose-400">- Rp
-                                                    {{ number_format($this->itemDiscountTotal, 0, ',', '.') }}</span>
-                                            </div>
-                                        @endif
-                                        @if ($this->promoDiscountTotal > 0)
-                                            <div class="flex justify-between items-center text-sm">
-                                                <span class="text-gray-500">Promo</span>
-                                                <span class="font-medium text-rose-400">- Rp
-                                                    {{ number_format($this->promoDiscountTotal, 0, ',', '.') }}</span>
-                                            </div>
-                                        @endif
-                                        <div class="flex justify-between items-center text-sm">
-                                            <span class="text-gray-600 font-medium">Total Diskon</span>
-                                            <span class="font-bold text-rose-500">- Rp
-                                                {{ number_format($this->totalDiscount, 0, ',', '.') }}</span>
-                                        </div>
-                                        @if ($isSoFulfillment && ($soPaidAmount ?? 0) > 0)
-                                            <div class="flex justify-between items-center text-sm">
-                                                <span class="text-gray-600 font-medium">Down Payment (DP) SO</span>
-                                                <span class="font-bold text-emerald-500">- Rp
-                                                    {{ number_format($soPaidAmount, 0, ',', '.') }}</span>
-                                            </div>
-                                        @endif
-                                        <div class="border-t border-violet-600/20 my-2 pt-2">
-                                            <div class="flex justify-between items-center">
-                                                <span class="text-gray-800 font-black">Total Piutang</span>
-                                                <span class="font-black text-xl sm:text-2xl text-violet-600">Rp
-                                                    {{ number_format(max(0, $this->subtotal - $this->totalDiscount - ($isSoFulfillment ? ($soPaidAmount ?? 0) : 0)), 0, ',', '.') }}</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                {{-- Footer --}}
+                                <div
+                                    class="px-4 sm:px-6 py-4 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row justify-end gap-3 rounded-b-2xl sticky bottom-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                                    <button type="button" @click="showConfirmModal = false"
+                                        class="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-all flex justify-center">
+                                        Batal
+                                    </button>
+                                    <button type="button" wire:click="processPayment"
+                                        @click="showConfirmModal = false"
+                                        class="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-[#1c69d4] hover:bg-blue-700 text-white font-black rounded-xl shadow-md shadow-blue-500/30 transition-all flex items-center justify-center gap-2">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Konfirmasi & Bayar
+                                    </button>
                                 </div>
-                            </div>
-
-                            {{-- Footer --}}
-                            <div
-                                class="px-4 sm:px-6 py-4 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row justify-end gap-3 rounded-b-2xl sticky bottom-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                                <button type="button" @click="showPiutangModal = false"
-                                    class="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-all flex justify-center">
-                                    Batal
-                                </button>
-                                <button type="button" wire:click="processPiutang" @click="showPiutangModal = false"
-                                    class="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-xl shadow-md shadow-violet-500/30 transition-all flex items-center justify-center gap-2">
-                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                        stroke-width="2.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Konfirmasi Piutang
-                                </button>
                             </div>
                         </div>
                     </div>
-                </div>
-            </template>
+                </template>
+
+                {{-- MODAL KONFIRMASI PIUTANG --}}
+                <template x-teleport="body">
+                    <div x-show="showPiutangModal" class="fixed inset-0 z-[100] overflow-y-auto"
+                        style="display: none;" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                        <div
+                            class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                            <div x-show="showPiutangModal" x-transition:enter="ease-out duration-300"
+                                x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100"
+                                x-transition:leave-end="opacity-0"
+                                class="fixed inset-0 transition-opacity bg-gray-900/50 backdrop-blur-sm"
+                                aria-hidden="true" @click="showPiutangModal = false"></div>
+
+                            <span class="hidden sm:inline-block sm:align-middle sm:h-screen"
+                                aria-hidden="true">&#8203;</span>
+
+                            <div x-show="showPiutangModal" x-transition:enter="ease-out duration-300"
+                                x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                                x-transition:leave="ease-in duration-200"
+                                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                                x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                                class="inline-block w-full max-w-xl overflow-hidden text-left align-middle transition-all transform bg-white rounded-2xl shadow-2xl sm:my-8 sm:align-middle border border-gray-100 relative">
+
+                                {{-- Header --}}
+                                <div
+                                    class="px-4 sm:px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-start sm:items-center sticky top-0 z-10">
+                                    <div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <h3 class="text-lg sm:text-xl font-black text-gray-800" id="modal-title">
+                                                Konfirmasi Piutang</h3>
+                                            <span
+                                                class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] sm:text-xs font-bold border border-blue-100">{{ $this->displayCustomerName }}</span>
+                                        </div>
+                                        <p class="text-xs sm:text-sm text-gray-500 mt-1">Transaksi ini akan dicatat
+                                            sebagai
+                                            piutang (belum lunas)
+                                        </p>
+                                    </div>
+                                    <button type="button" @click="showPiutangModal = false"
+                                        class="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 focus:outline-none p-2 rounded-xl transition-all shrink-0">
+                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                {{-- Body --}}
+                                <div
+                                    class="px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+
+                                    <div
+                                        class="bg-violet-50 border border-violet-100 text-violet-700 p-4 rounded-xl flex gap-3 text-sm">
+                                        <svg class="w-6 h-6 shrink-0 text-violet-500" fill="none"
+                                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div>
+                                            <p class="font-bold mb-1">Perhatian!</p>
+                                            <p>Order ini akan langsung diproses dan faktur akan dibuat di Accurate,
+                                                namun
+                                                <b>tanpa pelunasan</b> (Piutang). Pastikan data customer sudah benar.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {{-- Rincian Tagihan --}}
+                                    <div>
+                                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+                                            Rincian
+                                            Tagihan</h4>
+                                        <div
+                                            class="bg-violet-600/5 rounded-xl p-3 sm:p-4 border border-violet-600/10 space-y-2">
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-600 font-medium">Subtotal</span>
+                                                <span class="font-bold text-gray-800">Rp
+                                                    {{ number_format($this->subtotal, 0, ',', '.') }}</span>
+                                            </div>
+                                            @if ($this->itemDiscountTotal > 0)
+                                                <div class="flex justify-between items-center text-sm">
+                                                    <span class="text-gray-500">Diskon Item</span>
+                                                    <span class="font-medium text-rose-400">- Rp
+                                                        {{ number_format($this->itemDiscountTotal, 0, ',', '.') }}</span>
+                                                </div>
+                                            @endif
+                                            @if ($this->promoDiscountTotal > 0)
+                                                <div class="flex justify-between items-center text-sm">
+                                                    <span class="text-gray-500">Promo</span>
+                                                    <span class="font-medium text-rose-400">- Rp
+                                                        {{ number_format($this->promoDiscountTotal, 0, ',', '.') }}</span>
+                                                </div>
+                                            @endif
+                                            <div class="flex justify-between items-center text-sm">
+                                                <span class="text-gray-600 font-medium">Total Diskon</span>
+                                                <span class="font-bold text-rose-500">- Rp
+                                                    {{ number_format($this->totalDiscount, 0, ',', '.') }}</span>
+                                            </div>
+                                            @if ($isSoFulfillment && ($soPaidAmount ?? 0) > 0)
+                                                <div class="flex justify-between items-center text-sm">
+                                                    <span class="text-gray-600 font-medium">Down Payment (DP) SO</span>
+                                                    <span class="font-bold text-emerald-500">- Rp
+                                                        {{ number_format($soPaidAmount, 0, ',', '.') }}</span>
+                                                </div>
+                                            @endif
+                                            <div class="border-t border-violet-600/20 my-2 pt-2">
+                                                <div class="flex justify-between items-center">
+                                                    <span class="text-gray-800 font-black">Total Piutang</span>
+                                                    <span class="font-black text-xl sm:text-2xl text-violet-600">Rp
+                                                        {{ number_format(max(0, $this->subtotal - $this->totalDiscount - ($isSoFulfillment ? $soPaidAmount ?? 0 : 0)), 0, ',', '.') }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Footer --}}
+                                <div
+                                    class="px-4 sm:px-6 py-4 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row justify-end gap-3 rounded-b-2xl sticky bottom-0 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                                    <button type="button" @click="showPiutangModal = false"
+                                        class="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-all flex justify-center">
+                                        Batal
+                                    </button>
+                                    <button type="button" wire:click="processPiutang"
+                                        @click="showPiutangModal = false"
+                                        class="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-xl shadow-md shadow-violet-500/30 transition-all flex items-center justify-center gap-2">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Konfirmasi Piutang
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
         </div>
-    </div>
     @endif
