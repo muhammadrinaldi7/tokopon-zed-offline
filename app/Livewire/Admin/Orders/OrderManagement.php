@@ -228,6 +228,42 @@ class OrderManagement extends Component
         }
     }
 
+    public function resendCrmWhatsApp($orderId)
+    {
+        $order = Order::with('user.profile')->find($orderId);
+        if (!$order) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Data order tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        $phone = $order->user?->profile?->phone_number ?? null;
+        if (!$phone) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Nomor HP tidak ditemukan.', type: 'warning');
+            return;
+        }
+
+        try {
+            $pdf = $this->generateReceiptPdf($order);
+            $filename = 'Struk_' . $order->order_number . '.pdf';
+            $folderPath = 'receipts';
+            $path = $folderPath . '/' . $filename;
+
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf->output(), 'public');
+            $pdfPublicUrl = asset('storage/' . $path);
+
+            $result = app(\App\Services\CrmWhatsAppService::class)->sendOrder($order, $pdfPublicUrl, $filename, Auth::user());
+
+            if ($result['success']) {
+                $this->dispatch('toast', title: 'Berhasil (CRM WA)', message: "Kirim CRM WA Sukses untuk #{$order->order_number}", type: 'success');
+            } else {
+                $this->dispatch('toast', title: 'Gagal API CRM', message: $result['message'], type: 'error');
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('CRM WhatsApp Resend Crash: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
     public function sendReceiptToEmail()
     {
         if (!$this->completedOrder) return;
@@ -239,6 +275,13 @@ class OrderManagement extends Component
     {
         if (!$this->completedOrder) return;
         $this->resendWhatsApp($this->completedOrder->id);
+        $this->completedOrder->refresh();
+    }
+
+    public function sendReceiptToCrm()
+    {
+        if (!$this->completedOrder) return;
+        $this->resendCrmWhatsApp($this->completedOrder->id);
         $this->completedOrder->refresh();
     }
 

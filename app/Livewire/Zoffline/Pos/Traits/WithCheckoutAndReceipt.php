@@ -785,6 +785,15 @@ trait WithCheckoutAndReceipt
             $this->showCheckoutModal = false;
             $this->showReceiptModal = true;
 
+            // Otomatis kirim nota via WhatsApp gateway aktif jika diaktifkan di pengaturan
+            if (\App\Services\CrmWhatsAppService::isAutoSendOrderEnabled()) {
+                if (\App\Services\CrmWhatsAppService::isCrmActive()) {
+                    $this->sendReceiptToCrm(true);
+                } elseif (\App\Services\CrmWhatsAppService::isQontakActive()) {
+                    $this->sendReceiptToQontak(true);
+                }
+            }
+
             $this->resetCheckout();
             $this->dispatch('toast', title: 'Transaksi Berhasil', message: 'Order ' . $orderNumber . ' berhasil diproses.', type: 'success');
         } catch (\Exception $e) {
@@ -1132,7 +1141,7 @@ trait WithCheckoutAndReceipt
     }
 
     // ─── Kirim Struk via WA + Simpan di Storage (Qontak) ─────────────────────────
-    public function sendReceiptToQontak()
+    public function sendReceiptToQontak(bool $isSilent = false)
     {
         // 1. Validasi Awal data order
         if (!$this->completedOrder) return;
@@ -1140,17 +1149,20 @@ trait WithCheckoutAndReceipt
         // Ambil ID dari state, lalu tarik data paling FRESH langsung dari database
         $orderId = $this->completedOrder->id;
         $order = Order::with('user.profile')->find($orderId);
-        $phone = $order->user->profile->phone_number ?? null;
+        if (!$order) return;
+        $phone = $order->user?->profile?->phone_number ?? null;
 
         // ─── VALIDASI PEMBATASAN AKSES UTK FRONT-LINER (FL) ───
         $userAktif = Auth::user();
-        if (!$userAktif->hasRole('admin') && $order->is_wa_sent) {
+        if (!$isSilent && !$userAktif->hasRole('admin') && $order->is_wa_sent) {
             $this->dispatch('toast', title: 'Akses Ditolak', message: 'Struk WhatsApp hanya dapat dikirim sekali oleh Kasir/FL.', type: 'warning');
             return;
         }
 
         if (!$phone) {
-            $this->dispatch('toast', title: 'Gagal', message: 'Nomor HP customer tidak ditemukan.', type: 'warning');
+            if (!$isSilent) {
+                $this->dispatch('toast', title: 'Gagal', message: 'Nomor HP customer tidak ditemukan.', type: 'warning');
+            }
             return;
         }
 
@@ -1174,14 +1186,72 @@ trait WithCheckoutAndReceipt
             // REFRESH STATE LIVEWIRE UTAMA
             $this->completedOrder->refresh();
 
-            if ($result['success']) {
-                $this->dispatch('toast', title: 'Berhasil', message: $result['message'], type: 'success');
-            } else {
-                $this->dispatch('toast', title: 'Gagal API', message: $result['message'], type: 'error');
+            if (!$isSilent) {
+                if ($result['success']) {
+                    $this->dispatch('toast', title: 'Berhasil (Qontak WA)', message: $result['message'], type: 'success');
+                } else {
+                    $this->dispatch('toast', title: 'Gagal API', message: $result['message'], type: 'error');
+                }
             }
         } catch (\Exception $e) {
             Log::channel('pos_accurate')->error('Qontak Process Error: ' . $e->getMessage());
-            $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
+            if (!$isSilent) {
+                $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
+            }
+        }
+    }
+
+    // ─── Kirim Struk via CRM WhatsApp Zed Group ─────────────────────────
+    public function sendReceiptToCrm(bool $isSilent = false)
+    {
+        // 1. Validasi Awal data order
+        if (!$this->completedOrder) return;
+
+        $orderId = $this->completedOrder->id;
+        $order = Order::with('user.profile')->find($orderId);
+        if (!$order) return;
+        $phone = $order->user?->profile?->phone_number ?? null;
+
+        // ─── VALIDASI PEMBATASAN AKSES UTK FRONT-LINER (FL) ───
+        $userAktif = Auth::user();
+        if (!$isSilent && !$userAktif->hasRole('admin') && $order->is_wa_sent) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Struk WhatsApp hanya dapat dikirim sekali oleh Kasir/FL.', type: 'warning');
+            return;
+        }
+
+        if (!$phone) {
+            if (!$isSilent) {
+                $this->dispatch('toast', title: 'Gagal', message: 'Nomor HP customer tidak ditemukan.', type: 'warning');
+            }
+            return;
+        }
+
+        // ─── 2. PROSES GENERATE PDF & SIMPAN KE STORAGE PUBLIK ────
+        try {
+            $pdf = $this->generateReceiptPdf($order);
+            $filename = 'Struk_' . $order->order_number . '.pdf';
+            $folderPath = 'receipts';
+            $path = $folderPath . '/' . $filename;
+
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf->output());
+            $pdfPublicUrl = asset('storage/' . $path);
+
+            $result = app(\App\Services\CrmWhatsAppService::class)->sendOrder($order, $pdfPublicUrl, $filename, $userAktif);
+
+            $this->completedOrder->refresh();
+
+            if (!$isSilent) {
+                if ($result['success']) {
+                    $this->dispatch('toast', title: 'Berhasil (CRM WA)', message: $result['message'], type: 'success');
+                } else {
+                    $this->dispatch('toast', title: 'Gagal API CRM', message: $result['message'], type: 'error');
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::channel('pos_accurate')->error('CRM WhatsApp Process Error: ' . $e->getMessage());
+            if (!$isSilent) {
+                $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
+            }
         }
     }
 

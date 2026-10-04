@@ -132,6 +132,7 @@
                                             class="text-xs font-bold bg-purple-50 text-purple-600 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition">
                                             Kirim
                                         </button>
+                                        @endif
                                     @endif
 
                                     {{-- ─── TOMBOL RE-SEND KHUSUS ADMIN ─── --}}
@@ -146,6 +147,18 @@
                                             </svg>
                                         </button>
 
+                                        @if (\App\Services\CrmWhatsAppService::isWhatsAppEnabled())
+                                        @if (\App\Services\CrmWhatsAppService::isCrmActive())
+                                        <button wire:click="resendCrmWhatsApp({{ $order->id }})"
+                                            class="p-1 text-teal-600 hover:bg-teal-50 rounded-lg transition"
+                                            title="Kirim Ulang CRM WA Zed (Admin)">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                            </svg>
+                                        </button>
+                                        @else
                                         <button wire:click="resendWhatsApp({{ $order->id }})"
                                             class="p-1 text-emerald-500 hover:bg-emerald-50 rounded-lg transition"
                                             title="Kirim Ulang WA Qontak (Admin)">
@@ -155,6 +168,8 @@
                                                     d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                             </svg>
                                         </button>
+                                        @endif
+                                        @endif
                                     @endif
 
                                     {{-- Order Detail Button (Struk) --}}

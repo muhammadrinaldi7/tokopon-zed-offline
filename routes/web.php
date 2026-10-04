@@ -183,6 +183,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     });
 
     // Settings
+    Route::get('/settings/whatsapp', \App\Livewire\Admin\Settings\WhatsAppSettings::class)->name('settings.whatsapp')->middleware('can:manage-settings');
     Route::get('/settings/system-reset', \App\Livewire\Admin\Settings\SystemReset::class)->name('settings.system-reset')->middleware('can:manage-settings');
     Route::get('/settings/system-reset/export', [\App\Http\Controllers\SystemResetExportController::class, 'exportSo'])->name('settings.system-reset.export-so')->middleware('can:manage-settings');
     Route::get('/settings/telegram', \App\Livewire\Admin\Settings\TelegramConnection::class)->name('settings.telegram')->middleware('can:manage-settings');

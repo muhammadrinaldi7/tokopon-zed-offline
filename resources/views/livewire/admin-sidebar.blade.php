@@ -707,6 +707,18 @@
                 <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Integrasi Telegram</span>
             </a>
 
+            <a href="{{ route('admin.settings.whatsapp') }}" wire:navigate
+                class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.whatsapp') ? $activeClass : $inactiveClass }}">
+                <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.whatsapp') ? $activeIconClass : $inactiveIconClass }}"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Integrasi WhatsApp</span><span
+                    class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                    x-show="sidebarCollapsed" style="display:none;" x-cloak>Integrasi WhatsApp</span>
+            </a>
+
             <a href="{{ route('admin.settings.business-units') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.settings.business-units') ? $activeClass : $inactiveClass }}">
                 <svg class="w-5 h-5 {{ request()->routeIs('admin.settings.business-units') ? $activeIconClass : $inactiveIconClass }}"

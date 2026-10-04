@@ -62,4 +62,15 @@ return [
         'agent_token' => env('N8N_AGENT_TOKEN', 'zedpos-2026-banjarbaru'),
     ],
 
+    'crm_wa' => [
+        'enabled' => env('CRM_WA_ENABLED', true),
+        'api_url' => env('CRM_WA_API_URL', 'https://arbitrate-prelaw-poplar.ngrok-free.dev/api/zedpos/nota'),
+        'token' => env('CRM_WA_TOKEN', 'B-M515tMiSLtAK3f5GL_8au7bY4eaOsaBuhs0W6kPqA'),
+        'channel_integration_id' => env('CRM_WA_CHANNEL_INTEGRATION_ID', '56b60c3c-0123-46af-958b-32f3ad12ee37'),
+        'template_id' => env('CRM_WA_TEMPLATE_ID', '380d1355-0a65-4dc5-be82-308ee7619910'),
+        'sellphone_template_id' => env('CRM_WA_SELLPHONE_TEMPLATE_ID', '380d1355-0a65-4dc5-be82-308ee7619910'),
+        'auto_send_order' => env('CRM_WA_AUTO_SEND_ORDER', true),
+        'auto_send_sellphone' => env('CRM_WA_AUTO_SEND_SELLPHONE', true),
+    ],
+
 ];

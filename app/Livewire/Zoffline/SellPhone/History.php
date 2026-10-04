@@ -285,6 +285,49 @@ class History extends Component
         }
     }
 
+    public function sendReceiptToCrm()
+    {
+        if (!$this->selectedSell) return;
+
+        $sellPhoneId = $this->selectedSell->id;
+        $sellPhone = SellPhone::with('user.profile')->find($sellPhoneId);
+        if (!$sellPhone) return;
+        $phone = $sellPhone->user?->profile?->phone_number ?? null;
+
+        $userAktif = Auth::user();
+        if (!$userAktif->hasRole('admin') && $sellPhone->is_wa_sent) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Struk WhatsApp hanya dapat dikirim sekali oleh Kasir/FL.', type: 'warning');
+            return;
+        }
+
+        if (!$phone) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Nomor HP customer tidak ditemukan.', type: 'warning');
+            return;
+        }
+
+        try {
+            $pdf = $this->generateReceiptPdf($sellPhone);
+            $filename = 'Tanda_Terima_SPL-' . $sellPhone->id . '.pdf';
+            $folderPath = 'receipts_sellphone';
+            $path = $folderPath . '/' . $filename;
+
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf->output());
+            $pdfPublicUrl = asset('storage/' . $path);
+
+            $result = app(\App\Services\CrmWhatsAppService::class)->sendSellPhone($sellPhone, $pdfPublicUrl, $filename, $userAktif);
+
+            $this->selectedSell->refresh();
+
+            if ($result['success']) {
+                $this->dispatch('toast', title: 'Berhasil (CRM WA)', message: $result['message'], type: 'success');
+            } else {
+                $this->dispatch('toast', title: 'Gagal API CRM', message: $result['message'], type: 'error');
+            }
+        } catch (\Throwable $e) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
     public function sendReceiptToEmail()
     {
         if (!$this->selectedSell) return;

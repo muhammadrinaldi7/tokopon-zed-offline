@@ -76,21 +76,20 @@ class SellPhoneDetail extends Component
         return $this->redirect(route('sell-phone-history'));
     }
 
-    public function sendPaymentReceiptToQontak()
+    private function preparePaymentProofDocument(): ?array
     {
         if (!$this->sellPhone->payment_receipt_path) {
-            $this->dispatch('toast', title: 'Gagal', message: 'Bukti pembayaran belum diupload oleh finance.', type: 'warning');
-            return;
+            return null;
         }
 
         $extension = pathinfo($this->sellPhone->payment_receipt_path, PATHINFO_EXTENSION);
         $imagePath = storage_path('app/public/' . $this->sellPhone->payment_receipt_path);
-        
+
         if (file_exists($imagePath)) {
             $imageData = base64_encode(file_get_contents($imagePath));
             $mimeType = mime_content_type($imagePath) ?: 'image/jpeg';
             $src = 'data:' . $mimeType . ';base64,' . $imageData;
-            
+
             $html = '
             <html>
             <body style="margin: 0; padding: 20px; text-align: center;">
@@ -98,11 +97,11 @@ class SellPhoneDetail extends Component
                 <img src="' . $src . '" style="max-width: 100%; height: auto;">
             </body>
             </html>';
-            
+
             $pdf = Pdf::loadHTML($html);
             $pdfPath = 'payment_receipts/pdf_bukti_' . $this->sellPhone->id . '.pdf';
             Storage::disk('public')->put($pdfPath, $pdf->output());
-            
+
             $documentUrl = asset('storage/' . $pdfPath);
             $filename = 'Bukti_Transfer_SPL' . $this->sellPhone->id . '.pdf';
         } else {
@@ -110,12 +109,42 @@ class SellPhoneDetail extends Component
             $filename = 'Bukti_Transfer_SPL' . $this->sellPhone->id . '.' . ($extension ?: 'jpg');
         }
 
+        return [$documentUrl, $filename];
+    }
+
+    public function sendPaymentReceiptToQontak()
+    {
+        $doc = $this->preparePaymentProofDocument();
+        if (!$doc) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Bukti pembayaran belum diupload oleh finance.', type: 'warning');
+            return;
+        }
+        [$documentUrl, $filename] = $doc;
+
         $result = app(MessageDispatchService::class)->sendSellPhonePaymentProofWhatsApp($this->sellPhone, $documentUrl, $filename, Auth::user());
 
         if ($result['success']) {
-            $this->dispatch('toast', title: 'Berhasil', message: 'Bukti pembayaran berhasil dikirim via WA!', type: 'success');
+            $this->dispatch('toast', title: 'Berhasil', message: 'Bukti pembayaran berhasil dikirim via WA (Qontak)!', type: 'success');
         } else {
             $this->dispatch('toast', title: 'Gagal', message: $result['message'], type: 'error');
+        }
+    }
+
+    public function sendPaymentReceiptToCrm()
+    {
+        $doc = $this->preparePaymentProofDocument();
+        if (!$doc) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Bukti pembayaran belum diupload oleh finance.', type: 'warning');
+            return;
+        }
+        [$documentUrl, $filename] = $doc;
+
+        $result = app(\App\Services\CrmWhatsAppService::class)->sendSellPhonePaymentProof($this->sellPhone, $documentUrl, $filename, Auth::user());
+
+        if ($result['success']) {
+            $this->dispatch('toast', title: 'Berhasil (CRM WA)', message: 'Bukti pembayaran berhasil dikirim via WA (Zed CRM)!', type: 'success');
+        } else {
+            $this->dispatch('toast', title: 'Gagal API CRM', message: $result['message'], type: 'error');
         }
     }
 

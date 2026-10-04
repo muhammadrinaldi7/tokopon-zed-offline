@@ -602,6 +602,49 @@ class RiwayatPenjualan extends Component
         }
     }
 
+    public function sendReceiptToCrm()
+    {
+        if (!$this->completedOrder) return;
+
+        $orderId = $this->completedOrder->id;
+        $order = Order::with('user.profile')->find($orderId);
+        if (!$order) return;
+        $phone = $order->user?->profile?->phone_number ?? null;
+
+        $userAktif = Auth::user();
+        if (!$userAktif->hasRole('admin') && $order->is_wa_sent) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Struk WhatsApp hanya dapat dikirim sekali oleh Kasir/FL.', type: 'warning');
+            return;
+        }
+
+        if (!$phone) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Nomor HP customer tidak ditemukan.', type: 'warning');
+            return;
+        }
+
+        try {
+            $pdf = $this->generateReceiptPdf($order);
+            $filename = 'Struk_' . $order->order_number . '.pdf';
+            $folderPath = 'receipts';
+            $path = $folderPath . '/' . $filename;
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $pdf->output());
+            $pdfPublicUrl = asset('storage/' . $path);
+
+            $result = app(\App\Services\CrmWhatsAppService::class)->sendOrder($order, $pdfPublicUrl, $filename, $userAktif);
+
+            $this->completedOrder->refresh();
+
+            if ($result['success']) {
+                $this->dispatch('toast', title: 'Berhasil (CRM WA)', message: $result['message'], type: 'success');
+            } else {
+                $this->dispatch('toast', title: 'Gagal API CRM', message: $result['message'], type: 'error');
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('CRM WhatsApp Process Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Crash: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
     // Cancellation Methods
     public function requestCancellation($orderId)
     {
