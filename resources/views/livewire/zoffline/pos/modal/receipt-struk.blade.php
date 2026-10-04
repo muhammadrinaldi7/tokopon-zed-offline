@@ -212,7 +212,6 @@
                                    Email
                                </span>
                            </button>
-                        @endif
                        @else
                            {{-- Terkunci untuk Kasir/FL jika is_email_sent bernilai true --}}
                            <button disabled
