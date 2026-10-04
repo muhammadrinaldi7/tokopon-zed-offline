@@ -20,6 +20,7 @@ class Index extends Component
         'SELL_PHONE_APPROVAL'  => 'Pembelian Handphone (Buyback)',
         'WARRANTY_REPLACEMENT' => 'Ganti Unit Garansi',
         'WARRANTY_EXTENSION'   => 'Perpanjangan Garansi',
+        'WARRANTY_EXTRA_CLAIM' => 'Toleransi Klaim Tambahan (Ganti Unit Ulang)',
         'CUSTOM_CASHBACK'      => 'Persetujuan Cashback (PC)',
         'purchase_order'       => 'Persetujuan Pembelian (PO)',
         'STOCK_ADJUSTMENT'     => 'Penyesuaian Stok Persediaan',

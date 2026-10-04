@@ -88,6 +88,10 @@ class ApprovalController extends Controller
             if ($adj->target_product_name) {
                 $orderInfo .= " utk {$adj->target_product_name}";
             }
+        } elseif ($approval->approvable_type === \App\Models\Warranty::class && $approval->approvable) {
+            $orderInfo = "SN: " . $approval->approvable->serial_number;
+        } elseif (!empty($approval->payload['serial_number'])) {
+            $orderInfo = "SN: " . $approval->payload['serial_number'];
         }
 
         $keterangan = $approval->reason ?? '-';

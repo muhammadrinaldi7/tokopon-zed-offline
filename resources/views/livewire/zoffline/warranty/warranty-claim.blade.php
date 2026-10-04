@@ -92,10 +92,18 @@
                                                 </svg>
                                             </div>
                                             <div class="text-right">
+                                                @php
+                                                    $cardMaxClaims = ($warranty->policy->max_claims ?? 1) + ($warranty->extra_claims ?? 0);
+                                                    $cardIsLimitReached = ($warranty->claims_used ?? 0) >= $cardMaxClaims;
+                                                @endphp
                                                 @if ($isExpired)
                                                     <span
                                                         class="inline-block px-2 py-1 bg-rose-100 text-rose-700 text-[10px] font-bold rounded-md">Habis
                                                         Masa Garansi</span>
+                                                @elseif ($cardIsLimitReached)
+                                                    <span
+                                                        class="inline-block px-2 py-1 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-md">Batas
+                                                        Klaim Tercapai</span>
                                                 @else
                                                     <span
                                                         class="inline-block px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-md">Aktif</span>
@@ -162,11 +170,14 @@
                                     ? $selectedWarranty->expires_at < \Carbon\Carbon::now() ||
                                         $selectedWarranty->status !== 'active'
                                     : false;
+                                $maxClaims = $selectedWarranty ? (($selectedWarranty->policy->max_claims ?? 1) + ($selectedWarranty->extra_claims ?? 0)) : 1;
+                                $claimsUsed = $selectedWarranty ? ($selectedWarranty->claims_used ?? 0) : 0;
+                                $isClaimLimitReached = $claimsUsed >= $maxClaims;
                             @endphp
 
                             @if ($selectedWarranty)
                                 <div
-                                    class="mb-6 {{ $isSelectedExpired ? ($hasPendingExtensionRequest ? 'bg-amber-50 border-amber-100' : 'bg-rose-50 border-rose-100') : 'bg-blue-50 border-blue-100' }} rounded-lg p-4 border">
+                                    class="mb-6 {{ $isSelectedExpired ? ($hasPendingExtensionRequest ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200') : ($isClaimLimitReached ? ($hasPendingExtraClaimRequest ? 'bg-amber-50 border-amber-200' : 'bg-amber-50 border-amber-200') : 'bg-blue-50 border-blue-100') }} rounded-xl p-4 border">
                                     @if ($isSelectedExpired)
                                         @if ($hasPendingExtensionRequest)
                                             <div class="flex items-start gap-3">
@@ -198,7 +209,7 @@
                                                 </div>
                                                 <button type="button" wire:click="requestWarrantyExtension"
                                                     wire:loading.attr="disabled"
-                                                    class="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold rounded-lg transition-colors">
+                                                    class="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold rounded-lg transition-colors cursor-pointer">
                                                     <svg wire:loading.remove wire:target="requestWarrantyExtension"
                                                         class="w-4 h-4" fill="none" viewBox="0 0 24 24"
                                                         stroke="currentColor">
@@ -220,19 +231,80 @@
                                                 </button>
                                             </div>
                                         @endif
+                                    @elseif ($isClaimLimitReached)
+                                        @if ($hasPendingExtraClaimRequest)
+                                            <div class="flex items-start gap-3">
+                                                <div
+                                                    class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                                                    <svg class="w-5 h-5 text-amber-600" fill="none"
+                                                        viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <p class="text-sm font-bold text-amber-800 mb-1">Menunggu
+                                                        Persetujuan Manajer (Toleransi Ganti Unit Ulang)</p>
+                                                    <p class="text-xs text-amber-600 mb-0">Pengajuan toleransi klaim tambahan / ganti unit ulang sedang menunggu persetujuan Manajer. Mohon tunggu informasi lebih lanjut.</p>
+                                                </div>
+                                            </div>
+                                        @else
+                                            <div
+                                                class="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                                                <div>
+                                                    <p class="text-sm font-bold text-amber-900 mb-1">Batas Kuota Klaim Garansi Tercapai</p>
+                                                    <p class="text-xs text-amber-700 mb-0">Garansi ini sudah diklaim maksimal ({{ $claimsUsed }}/{{ $maxClaims }}x). Jika unit pengganti mengalami <b>cacat pabrik</b>, silakan ajukan toleransi ganti unit ulang ke Manajer.</p>
+                                                </div>
+                                                <button type="button" wire:click="requestExtraClaim"
+                                                    wire:loading.attr="disabled"
+                                                    class="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded-lg transition-colors cursor-pointer border border-amber-300">
+                                                    <svg wire:loading.remove wire:target="requestExtraClaim"
+                                                        class="w-4 h-4 text-amber-700" fill="none" viewBox="0 0 24 24"
+                                                        stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                                    </svg>
+                                                    <svg wire:loading wire:target="requestExtraClaim"
+                                                        class="animate-spin h-4 w-4"
+                                                        xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                        viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12"
+                                                            r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                        </path>
+                                                    </svg>
+                                                    Ajukan Toleransi Ganti Unit (Cacat Pabrik)
+                                                </button>
+                                            </div>
+                                        @endif
                                     @else
-                                        <p class="text-sm font-bold text-blue-800 mb-1">Cakupan Garansi:
-                                            {{ $selectedWarranty->type === 'full_cover' ? 'Full Cover (Termasuk Human Error)' : 'Ganti Unit (Hanya Cacat Pabrik)' }}
-                                        </p>
-                                        <p class="text-xs text-blue-600">Proses akan diawali dengan pengecekan QC
-                                            Penerimaan untuk verifikasi kerusakan.</p>
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <p class="text-sm font-bold text-blue-800 mb-1">Cakupan Garansi:
+                                                    {{ $selectedWarranty->type === 'full_cover' ? 'Full Cover (Termasuk Human Error)' : 'Ganti Unit (Hanya Cacat Pabrik)' }}
+                                                </p>
+                                                <p class="text-xs text-blue-600 mb-0">Proses akan diawali dengan pengecekan QC
+                                                    Penerimaan untuk verifikasi kerusakan.</p>
+                                            </div>
+                                            @if (($selectedWarranty->extra_claims ?? 0) > 0)
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    Toleransi Ekstra Aktif (+{{ $selectedWarranty->extra_claims }})
+                                                </span>
+                                            @endif
+                                        </div>
                                     @endif
                                 </div>
                             @endif
 
                             <div class="flex justify-end mt-4">
                                 <button type="button" wire:click="startInspection"
-                                    class="px-8 py-3 {{ $isSelectedExpired ? 'bg-rose-600 hover:bg-rose-700' : 'bg-[#1c69d4] hover:bg-[#3f36b8]' }} text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 w-full md:w-auto">
+                                    class="px-8 py-3 {{ ($isSelectedExpired || $isClaimLimitReached) ? 'bg-rose-600 hover:bg-rose-700' : 'bg-[#1c69d4] hover:bg-[#3f36b8]' }} text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 w-full md:w-auto">
                                     <svg wire:loading.remove wire:target="startInspection" class="w-5 h-5"
                                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -246,8 +318,7 @@
                                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                         </path>
                                     </svg>
-                                    {{ $isSelectedExpired ? ($hasPendingExtensionRequest ? 'Lanjutkan sebagai Servis Berbayar' : 'Lanjutkan QC dan Service Berbayar') : 'Mulai QC Penerimaan Klaim' }}
-
+                                    {{ ($isSelectedExpired || $isClaimLimitReached) ? ($hasPendingExtensionRequest || $hasPendingExtraClaimRequest ? 'Lanjutkan sebagai Servis Berbayar' : 'Lanjutkan QC dan Service Berbayar') : 'Mulai QC Penerimaan Klaim' }}
                                 </button>
                             </div>
                         </div>

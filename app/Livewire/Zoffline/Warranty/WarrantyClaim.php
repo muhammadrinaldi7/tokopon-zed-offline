@@ -33,6 +33,7 @@ class WarrantyClaim extends Component
     public $customer_phone = '';
 
     public $hasPendingExtensionRequest = false;
+    public $hasPendingExtraClaimRequest = false;
     public $isSubmitted = false;
 
     // Service Center Form fields
@@ -154,13 +155,19 @@ class WarrantyClaim extends Component
     public function checkPendingRequest()
     {
         $this->hasPendingExtensionRequest = false;
+        $this->hasPendingExtraClaimRequest = false;
         if ($this->selectedWarrantyId) {
-            $pending = \App\Models\ApprovalRequest::where('approvable_type', Warranty::class)
+            $this->hasPendingExtensionRequest = \App\Models\ApprovalRequest::where('approvable_type', Warranty::class)
                 ->where('approvable_id', $this->selectedWarrantyId)
                 ->where('request_type', 'WARRANTY_EXTENSION')
                 ->where('status', 'PENDING')
                 ->exists();
-            $this->hasPendingExtensionRequest = $pending;
+
+            $this->hasPendingExtraClaimRequest = \App\Models\ApprovalRequest::where('approvable_type', Warranty::class)
+                ->where('approvable_id', $this->selectedWarrantyId)
+                ->where('request_type', 'WARRANTY_EXTRA_CLAIM')
+                ->where('status', 'PENDING')
+                ->exists();
         }
     }
 
@@ -197,6 +204,50 @@ class WarrantyClaim extends Component
 
         $this->checkPendingRequest();
         $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan perpanjangan garansi telah dikirim ke Manajer.', type: 'success');
+    }
+
+    public function requestExtraClaim()
+    {
+        if (!$this->selectedWarrantyId) return;
+
+        $warranty = $this->warranty;
+        if (!$warranty) return;
+
+        $user = Auth::user();
+
+        // Check if there is already a pending request
+        $existing = \App\Models\ApprovalRequest::where('approvable_type', Warranty::class)
+            ->where('approvable_id', $warranty->id)
+            ->where('request_type', 'WARRANTY_EXTRA_CLAIM')
+            ->where('status', 'PENDING')
+            ->first();
+
+        if ($existing) {
+            $this->dispatch('toast', title: 'Info', message: 'Sudah ada pengajuan toleransi klaim yang menunggu persetujuan.', type: 'info');
+            return;
+        }
+
+        $businessUnitId = $warranty->policy?->business_unit_id ?? ($user->getActiveBusinessUnitId() ?? 1);
+        $productName = $warranty->orderItem?->product_name ?? '-';
+
+        $request = app(\App\Services\ApprovalService::class)->createRequest([
+            'approvable'       => $warranty,
+            'request_type'     => 'WARRANTY_EXTRA_CLAIM',
+            'requested_by'     => $user->id,
+            'business_unit_id' => $businessUnitId,
+            'branch_id'        => $user->branch_id,
+            'reason'           => "Pengajuan toleransi ganti unit ulang (cacat pabrik pada unit pengganti) untuk SN: {$warranty->serial_number}",
+            'payload'          => [
+                'serial_number'     => $warranty->serial_number,
+                'claims_used'       => $warranty->claims_used,
+                'replacement_count' => $warranty->replacement_count,
+                'product_name'      => $productName,
+                'customer_name'     => $this->customer_name,
+            ]
+        ]);
+
+        $this->checkPendingRequest();
+        $this->dispatch('toast', title: 'Berhasil', message: 'Pengajuan toleransi klaim ganti unit telah dikirim ke Manajer.', type: 'success');
     }
 
     public function openQcHistory()
@@ -372,13 +423,13 @@ class WarrantyClaim extends Component
             return;
         }
 
-        // Cek batas maksimal klaim
-        $maxClaims = $warranty->policy->max_claims ?? 1;
+        // Cek batas maksimal klaim (termasuk kuota ekstra dari toleransi approval)
+        $maxClaims = ($warranty->policy->max_claims ?? 1) + ($warranty->extra_claims ?? 0);
         $claimsUsed = $warranty->claims_used ?? 0;
 
         if ($claimsUsed >= $maxClaims) {
             $this->showServiceCenterForm = true;
-            $this->dispatch('toast', title: 'Batas Klaim Terlampaui', message: "Garansi ini sudah diklaim maksimal ({$maxClaims} kali). Silakan gunakan form Service Center berbayar.", type: 'warning');
+            $this->dispatch('toast', title: 'Batas Klaim Terlampaui', message: "Garansi ini sudah diklaim maksimal ({$maxClaims} kali). Silakan ajukan toleransi ganti unit tambahan atau gunakan form Service Center berbayar.", type: 'warning');
             return;
         }
 
@@ -487,6 +538,8 @@ class WarrantyClaim extends Component
         $this->isSubmitted = false;
         $this->isInspecting = false;
         $this->showServiceCenterForm = false;
+        $this->hasPendingExtensionRequest = false;
+        $this->hasPendingExtraClaimRequest = false;
         $this->physical_condition = '';
         $this->accessories = '';
         $this->estimated_cost = null;

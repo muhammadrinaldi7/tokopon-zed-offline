@@ -1066,7 +1066,15 @@
                                 <h5 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Tindakan
                                     Sistem & Accurate</h5>
                                 <div class="flex flex-wrap gap-3">
-                                    @if ($selectedClaim->status === 'pending' && !$hasPendingApproval)
+                                    @if (in_array($selectedClaim->status, ['pending', 'out_of_warranty_service']) && !$hasPendingApproval)
+                                        @if ($selectedClaim->status === 'out_of_warranty_service')
+                                            <div class="w-full p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 mb-1 flex items-start gap-2">
+                                                <svg class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                <span>Tiket ini tercatat sebagai <b>Service Center / Out of Warranty</b>. Anda tetap dapat mengajukan approval <b>Ganti Unit (Toleransi Cacat Pabrik)</b> jika disetujui Manajer.</span>
+                                            </div>
+                                        @endif
                                         <button wire:click="openReplacementForm"
                                             class="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm transition-all shadow-sm shadow-amber-500/20 flex flex-col items-start gap-1">
                                             <span class="flex items-center gap-2">
@@ -1107,7 +1115,7 @@
                                             </span>
                                             <span class="text-[10px] font-normal text-rose-100">Batal / Tidak Berlaku</span>
                                         </button>
-                                    @elseif ($selectedClaim->status === 'pending' && $hasPendingApproval)
+                                    @elseif ($hasPendingApproval)
                                         <div class="px-5 py-3 bg-amber-50 border border-amber-200 text-amber-700 font-bold rounded-xl text-sm w-full flex items-center justify-between">
                                             <div class="flex items-center gap-3">
                                                 <svg class="w-5 h-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

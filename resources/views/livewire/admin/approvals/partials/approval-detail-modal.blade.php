@@ -295,6 +295,27 @@
                                             <span class="text-gray-500 block text-[10px] font-bold">HARGA SETELAH CASHBACK</span>
                                             <span class="font-black text-blue-700 text-base">Rp {{ number_format(($detailRequest->payload['item_price'] ?? 0) - ($detailRequest->payload['amount'] ?? 0), 0, ',', '.') }}</span>
                                         </div>
+                                    @elseif($detailRequest->request_type === 'WARRANTY_EXTRA_CLAIM')
+                                        <div class="col-span-1 sm:col-span-2">
+                                            <span class="text-gray-400 block text-[10px]">Perangkat / Produk</span>
+                                            <span class="font-bold text-gray-800">{{ $detailRequest->payload['product_name'] ?? '-' }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-400 block text-[10px]">Serial Number (IMEI)</span>
+                                            <span class="font-mono font-bold text-blue-700">{{ $detailRequest->payload['serial_number'] ?? '-' }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-400 block text-[10px]">Pelanggan</span>
+                                            <span class="font-semibold text-gray-800">{{ $detailRequest->payload['customer_name'] ?? '-' }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-400 block text-[10px]">Klaim Terpakai</span>
+                                            <span class="font-bold text-amber-700">{{ $detailRequest->payload['claims_used'] ?? 0 }}x (Ganti Unit: {{ $detailRequest->payload['replacement_count'] ?? 0 }}x)</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-400 block text-[10px]">Toleransi Diminta</span>
+                                            <span class="font-bold text-emerald-700">+1 Kuota Ganti Unit (Cacat Pabrik)</span>
+                                        </div>
                                     @elseif($detailRequest->request_type === 'STOCK_ADJUSTMENT')
                                         <div class="col-span-1 sm:col-span-2">
                                             <span class="text-gray-400 block text-[10px]">Nomor Penyesuaian</span>

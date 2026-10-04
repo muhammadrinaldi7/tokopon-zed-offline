@@ -10,6 +10,7 @@ use App\Approvals\Handlers\WarrantyExtensionHandler;
 use App\Approvals\Handlers\StockAdjustmentApprovalHandler;
 use App\Approvals\Handlers\StockOpnameApprovalHandler;
 use App\Approvals\Handlers\WarrantyReplacementHandler;
+use App\Approvals\Handlers\WarrantyExtraClaimHandler;
 use App\Approvals\Handlers\SwitchWarrantyApprovalHandler;
 use App\Http\Controllers\ApprovalController;
 use App\Models\ApprovalRequest;
@@ -31,6 +32,7 @@ class ApprovalService
         'cancellation'         => OrderCancellationHandler::class,
         'SELL_PHONE_APPROVAL'  => SellPhoneApprovalHandler::class,
         'WARRANTY_EXTENSION'   => WarrantyExtensionHandler::class,
+        'WARRANTY_EXTRA_CLAIM' => WarrantyExtraClaimHandler::class,
         'WARRANTY_REPLACEMENT' => WarrantyReplacementHandler::class,
         'CUSTOM_CASHBACK'      => CustomCashbackHandler::class,
         'STOCK_OPNAME_REPORT'  => StockOpnameApprovalHandler::class,

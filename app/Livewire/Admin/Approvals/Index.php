@@ -275,6 +275,8 @@ class Index extends Component
                 $orderInfo = '-';
                 if ($request->request_type === 'SWITCH_WARRANTY') {
                     $orderInfo = "SN " . ($request->payload['serial_number'] ?? '-') . " (Ke Order #" . ($request->payload['new_order_number'] ?? '-') . ")";
+                } elseif ($request->request_type === 'WARRANTY_EXTRA_CLAIM' || $request->request_type === 'WARRANTY_EXTENSION') {
+                    $orderInfo = "SN: " . ($request->approvable->serial_number ?? ($request->payload['serial_number'] ?? '-'));
                 } elseif ($request->approvable_type === Order::class && $request->approvable) {
                     $orderInfo = $request->approvable->order_number;
                 } elseif ($request->approvable_type === \App\Models\SellPhone::class && $request->approvable) {
@@ -297,9 +299,13 @@ class Index extends Component
 
                 ApprovalController::sendGroupNotification($teksGrup, $request->business_unit_id);
 
-                $msg = $request->request_type === 'ORDER_CANCELLATION'
-                    ? 'Persetujuan berhasil dan transaksi dibatalkan di Accurate.'
-                    : ($request->request_type === 'SWITCH_WARRANTY' ? 'Persetujuan berhasil dan garansi telah dialihkan ke order baru.' : 'Persetujuan berhasil dieksekusi.');
+                $msg = match ($request->request_type) {
+                    'ORDER_CANCELLATION'   => 'Persetujuan berhasil dan transaksi dibatalkan di Accurate.',
+                    'SWITCH_WARRANTY'      => 'Persetujuan berhasil dan garansi telah dialihkan ke order baru.',
+                    'WARRANTY_EXTRA_CLAIM' => 'Persetujuan berhasil. Kuota toleransi ganti unit ulang telah ditambahkan.',
+                    'WARRANTY_EXTENSION'   => 'Persetujuan berhasil dan masa garansi telah diperpanjang.',
+                    default                => 'Persetujuan berhasil dieksekusi.',
+                };
 
                 $this->dispatch('toast', title: 'Berhasil', message: $msg, type: 'success');
             } catch (Exception $e) {

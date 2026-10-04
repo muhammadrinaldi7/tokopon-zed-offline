@@ -50,5 +50,15 @@ class Warranty extends Model
     {
         return $this->hasMany(WarrantySerialLog::class);
     }
+
+    public function getMaxClaimsAttribute(): int
+    {
+        return ($this->policy->max_claims ?? 1) + ($this->extra_claims ?? 0);
+    }
+
+    public function getIsClaimLimitReachedAttribute(): bool
+    {
+        return ($this->claims_used ?? 0) >= $this->max_claims;
+    }
 }
 

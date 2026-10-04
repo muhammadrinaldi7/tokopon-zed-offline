@@ -232,6 +232,18 @@
                     Menyetujui pengajuan ini akan otomatis mengeksekusi retur dan penggantian unit di Accurate (membuat <b>Sales Return</b>, <b>Sales Invoice</b>, dan <b>Sales Receipt</b>).
                     <br><br>Apakah Anda yakin ingin melanjutkan?
                 </p>
+                @elseif($confirmingRequestType === 'WARRANTY_EXTRA_CLAIM')
+                <div class="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4 border-4 border-amber-50">
+                    <svg class="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+                
+                <h3 class="mb-2 text-xl font-bold text-gray-900">Toleransi Ganti Unit Ulang</h3>
+                <p class="text-sm text-gray-500 mb-6 font-medium leading-relaxed">
+                    Pengajuan toleransi klaim tambahan untuk unit pengganti yang mengalami <b>cacat pabrik</b>. Menyetujui ini akan menambah kuota klaim (+1) sehingga kasir dapat memproses klaim ganti unit.
+                    <br><br>Apakah Anda yakin ingin menyetujui toleransi ganti unit ini?
+                </p>
                 @elseif($confirmingRequestType === 'SELL_PHONE_APPROVAL')
                 <div class="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4 border-4 border-amber-50">
                     <svg class="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -332,6 +344,10 @@
                     @elseif($confirmingRequestType === 'WARRANTY_REPLACEMENT')
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20 cursor-pointer">
                         Setujui Ganti Unit
+                    </button>
+                    @elseif($confirmingRequestType === 'WARRANTY_EXTRA_CLAIM')
+                    <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-amber-600 rounded-xl hover:bg-amber-700 focus:ring-4 focus:ring-amber-300 transition-colors shadow-md shadow-amber-500/20 cursor-pointer">
+                        Setujui Toleransi Klaim
                     </button>
                     @elseif($confirmingRequestType === 'SWITCH_WARRANTY')
                     <button wire:click="executeApprove" type="button" class="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors shadow-md shadow-blue-500/20 cursor-pointer">
