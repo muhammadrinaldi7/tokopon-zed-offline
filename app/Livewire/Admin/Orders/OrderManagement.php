@@ -19,10 +19,15 @@ class OrderManagement extends Component
     public $search = '';
     public $statusFilter = '';
     public $warehouseFilter = ''; // Filter per warehouse
+    public $channelFilter = ''; // Filter channel POS vs MOBILE_APP
 
     // Properties for Receipt Modal
     public $showReceiptModal = false;
     public $completedOrder = null;
+
+    // Properties for Mobile Payment Verification Modal
+    public $showVerificationModal = false;
+    public $selectedMobileOrder = null;
 
     // Properties for Issue Modal
     public $showIssueModal = false;
@@ -45,6 +50,11 @@ class OrderManagement extends Component
         $this->resetPage();
     }
 
+    public function updatingChannelFilter(): void
+    {
+        $this->resetPage();
+    }
+
     public function viewReceipt(int $orderId): void
     {
         $this->completedOrder = Order::with(['items.variant', 'user', 'payments.paymentMethod', 'handledBy', 'salesBy'])->find($orderId);
@@ -58,6 +68,52 @@ class OrderManagement extends Component
     {
         $this->showReceiptModal = false;
         $this->completedOrder = null;
+    }
+
+    public function openVerification(int $orderId): void
+    {
+        $this->selectedMobileOrder = Order::with(['payments.media', 'payments.paymentMethod', 'items', 'user', 'warehouse'])->find($orderId);
+        if ($this->selectedMobileOrder) {
+            $this->showVerificationModal = true;
+        }
+    }
+
+    public function closeVerification(): void
+    {
+        $this->showVerificationModal = false;
+        $this->selectedMobileOrder = null;
+    }
+
+    public function approveMobilePayment(int $orderId): void
+    {
+        $order = Order::find($orderId);
+        if (!$order) {
+            return;
+        }
+
+        try {
+            app(\App\Services\MobileOrderService::class)->approvePayment($order, Auth::user());
+            $this->closeVerification();
+            $this->dispatch('toast', title: 'Berhasil', message: "Pembayaran pesanan #{$order->order_number} disetujui & sinkronisasi Accurate diproses.", type: 'success');
+        } catch (\Throwable $e) {
+            $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
+        }
+    }
+
+    public function rejectMobilePayment(int $orderId): void
+    {
+        $order = Order::find($orderId);
+        if (!$order) {
+            return;
+        }
+
+        try {
+            app(\App\Services\MobileOrderService::class)->cancelOrExpireOrder($order, 'DITOLAK_ADMIN');
+            $this->closeVerification();
+            $this->dispatch('toast', title: 'Berhasil', message: "Pesanan #{$order->order_number} dibatalkan dan stok dikembalikan.", type: 'info');
+        } catch (\Throwable $e) {
+            $this->dispatch('toast', title: 'Gagal', message: $e->getMessage(), type: 'error');
+        }
     }
 
     public function openIssues(int $orderId): void
@@ -442,7 +498,7 @@ class OrderManagement extends Component
     #[Layout('layouts.admin', ['title' => 'Kelola Pesanan'])]
     public function render()
     {
-        $query = Order::with(['user', 'items', 'shipping'])
+        $query = Order::with(['user', 'items', 'shipping', 'payments.paymentMethod', 'payments.media'])
             ->withCount(['openIssues'])
             ->orderByDesc('created_at');
 
@@ -457,6 +513,10 @@ class OrderManagement extends Component
 
         if ($this->statusFilter) {
             $query->where('order_status', $this->statusFilter);
+        }
+
+        if ($this->channelFilter) {
+            $query->where('order_channel', $this->channelFilter);
         }
 
         if ($this->warehouseFilter) {

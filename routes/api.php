@@ -131,6 +131,8 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
         ->name('api.mobile.products.brands');
     Route::get('/products/{id}', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'show'])
         ->name('api.mobile.products.show');
+    Route::get('/products/{id}/serial-numbers', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'serialNumbers'])
+        ->name('api.mobile.products.serial-numbers');
 
     // 2. Rekening Pembayaran Manual
     Route::get('/payment-methods', [\App\Http\Controllers\Api\Mobile\PaymentMethodController::class, 'index'])

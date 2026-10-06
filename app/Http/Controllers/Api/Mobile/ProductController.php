@@ -263,4 +263,57 @@ class ProductController extends Controller
             'data' => $brands,
         ]);
     }
+
+    /**
+     * Mengambil daftar nomor seri (IMEI / SN) yang tersedia untuk produk tertentu di gudang online.
+     * Khusus untuk produk yang memiliki SN (has_sn = true), seperti iPhone second, gadget bergaransi, dsb.
+     */
+    public function serialNumbers(Request $request, int $id): JsonResponse
+    {
+        $onlineWarehouseIds = Warehouse::where('is_online_store', true)->pluck('id')->toArray();
+        $product = ProductAccurate::find($id);
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Produk tidak ditemukan.',
+            ], 404);
+        }
+
+        if (!$product->has_sn) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Produk ini tidak menggunakan nomor seri / IMEI.',
+                'data' => [],
+            ]);
+        }
+
+        $warehouseId = $request->query('warehouse_id');
+        $query = \App\Models\ProductSerialNumber::with('warehouse')
+            ->where('product_accurate_id', $product->id)
+            ->where('status', 'Available');
+
+        if ($warehouseId) {
+            $query->where('warehouse_id', $warehouseId);
+        } else {
+            $query->whereIn('warehouse_id', $onlineWarehouseIds);
+        }
+
+        $serialNumbers = $query->get()->map(function ($sn) {
+            return [
+                'id' => $sn->id,
+                'serial_number' => $sn->serial_number,
+                'warehouse_id' => $sn->warehouse_id,
+                'warehouse_name' => $sn->warehouse?->name,
+                'qc_status' => $sn->qc_status,
+                'receipt_date' => $sn->receipt_date,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Daftar nomor seri (SN/IMEI) yang tersedia berhasil dimuat.',
+            'data' => $serialNumbers,
+        ]);
+    }
 }

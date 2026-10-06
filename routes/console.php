@@ -69,3 +69,8 @@ Artisan::command('mail:test-mailtrap {email=test@example.com}', function (string
         }
     });
 
+// Otomatis batalkan pesanan mobile yang lewat batas waktu bayar (expired) dan pulihkan stok & SN
+\Illuminate\Support\Facades\Schedule::command('orders:expire-mobile')
+    ->everyTenMinutes()
+    ->withoutOverlapping();
+
