@@ -118,4 +118,43 @@ Route::prefix('v1/executive')->group(function () {
     });
 });
 
+// ============================================
+// MOBILE APP E-COMMERCE & REALTIME CHAT API
+// ============================================
+Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
+    // 1. Katalog Produk Toko Online
+    Route::get('/products', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'index'])
+        ->name('api.mobile.products.index');
+    Route::get('/products/categories', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'categories'])
+        ->name('api.mobile.products.categories');
+    Route::get('/products/brands', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'brands'])
+        ->name('api.mobile.products.brands');
+    Route::get('/products/{id}', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'show'])
+        ->name('api.mobile.products.show');
+
+    // 2. Rekening Pembayaran Manual
+    Route::get('/payment-methods', [\App\Http\Controllers\Api\Mobile\PaymentMethodController::class, 'index'])
+        ->name('api.mobile.payment-methods.index');
+
+    // 3. Transaksi & Checkout Pesanan
+    Route::post('/orders/checkout', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'checkout'])
+        ->name('api.mobile.orders.checkout');
+    Route::get('/orders/{orderNumber}', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'show'])
+        ->name('api.mobile.orders.show');
+    Route::post('/orders/{orderNumber}/upload-proof', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'uploadProof'])
+        ->name('api.mobile.orders.upload-proof');
+    Route::post('/orders/{orderNumber}/cancel', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'cancel'])
+        ->name('api.mobile.orders.cancel');
+
+    // 4. Realtime Chat (Customer & Guest)
+    Route::post('/chat/init', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'initConversation'])
+        ->name('api.mobile.chat.init');
+    Route::get('/chat/conversations/{conversationId}/messages', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'getMessages'])
+        ->name('api.mobile.chat.messages');
+    Route::post('/chat/conversations/{conversationId}/messages', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'sendMessage'])
+        ->name('api.mobile.chat.send');
+    Route::post('/chat/conversations/{conversationId}/read', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'markAsRead'])
+        ->name('api.mobile.chat.read');
+});
+
 

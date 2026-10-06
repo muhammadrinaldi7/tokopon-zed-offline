@@ -23,6 +23,7 @@ class PaymentMethodIndex extends Component
     public $accurate_customer_no;
     public $mdr_percentage = 0;
     public $is_active = true;
+    public $is_visible_mobile = false;
     public $category = 'NON-TUNAI';
 
     public $businessUnits = [];
@@ -52,6 +53,7 @@ class PaymentMethodIndex extends Component
         'accurate_customer_no' => 'nullable|string|max:255',
         'mdr_percentage' => 'required|numeric|min:0|max:100',
         'is_active' => 'boolean',
+        'is_visible_mobile' => 'boolean',
         'category' => 'required|in:TUNAI,NON-TUNAI',
     ];
 
@@ -104,6 +106,7 @@ class PaymentMethodIndex extends Component
         $this->accurate_customer_no = $method->accurate_customer_no;
         $this->mdr_percentage = $method->mdr_percentage;
         $this->is_active = $method->is_active;
+        $this->is_visible_mobile = (bool) $method->is_visible_mobile;
         $this->category = $method->category ?? 'NON-TUNAI';
 
         $this->isEdit = true;
@@ -124,6 +127,7 @@ class PaymentMethodIndex extends Component
             'accurate_customer_no' => $this->accurate_customer_no,
             'mdr_percentage' => $this->mdr_percentage,
             'is_active' => $this->is_active,
+            'is_visible_mobile' => (bool) $this->is_visible_mobile,
             'category' => $this->category,
         ];
 
@@ -153,6 +157,15 @@ class PaymentMethodIndex extends Component
         $this->loadData();
     }
 
+    public function toggleMobileVisible($id)
+    {
+        $method = PaymentMethod::findOrFail($id);
+        $method->update(['is_visible_mobile' => !$method->is_visible_mobile]);
+        $this->loadData();
+        $statusMsg = $method->is_visible_mobile ? 'ditampilkan di Mobile App' : 'disembunyikan dari Mobile App';
+        $this->dispatch('toast', title: 'Berhasil', message: "Rekening {$method->name} {$statusMsg}.", type: 'success');
+    }
+
     public function resetFields()
     {
         $this->methodId = null;
@@ -170,6 +183,7 @@ class PaymentMethodIndex extends Component
         $this->accurate_customer_no = '';
         $this->mdr_percentage = 0;
         $this->is_active = true;
+        $this->is_visible_mobile = false;
         $this->category = 'NON-TUNAI';
     }
 
