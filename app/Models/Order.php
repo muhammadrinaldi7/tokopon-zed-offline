@@ -12,6 +12,7 @@ class Order extends Model
     protected $casts = [
         'shipping_address_snapshot' => 'array',
         'order_date' => 'date',
+        'payment_expired_at' => 'datetime',
     ];
 
     // Accessor untuk menggantikan kolom legacy mdr_amount
@@ -128,6 +129,11 @@ class Order extends Model
         return $this->belongsTo(Branch::class);
     }
 
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class);
+    }
+
     public function paymentMethod()
     {
         return $this->belongsTo(PaymentMethod::class);
@@ -151,11 +157,31 @@ class Order extends Model
         return $query->where('order_channel', 'ONLINE');
     }
 
+    public function scopeMobile($query)
+    {
+        return $query->where('order_channel', 'MOBILE_APP');
+    }
+
     // ─── Helpers ───────────────────────────────────────────────
 
     public function isPosOrder(): bool
     {
         return $this->order_channel === 'POS';
+    }
+
+    public function isMobileAppOrder(): bool
+    {
+        return $this->order_channel === 'MOBILE_APP';
+    }
+
+    public function isWaitingPayment(): bool
+    {
+        return $this->order_status === 'WAITING_PAYMENT';
+    }
+
+    public function isWaitingVerification(): bool
+    {
+        return $this->order_status === 'WAITING_VERIFICATION';
     }
 
     public function messageLogs()

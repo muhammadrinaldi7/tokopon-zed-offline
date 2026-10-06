@@ -9,11 +9,26 @@ class Conversation extends Model
     protected $fillable = [
         'user_id',
         'status',
+        'business_unit_id',
+        'guest_token',
+        'guest_name',
+        'guest_phone',
+        'product_accurate_id',
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function productAccurate()
+    {
+        return $this->belongsTo(ProductAccurate::class);
     }
 
     public function messages()
@@ -29,8 +44,8 @@ class Conversation extends Model
     public function unreadCountForCs()
     {
         return $this->messages()
-            ->where('is_read', false)
-            ->where('user_id', $this->user_id) // pesan dari user, bukan dari CS
+            ->whereNull('read_at')
+            ->whereIn('sender_type', ['customer', 'guest'])
             ->count();
     }
 }

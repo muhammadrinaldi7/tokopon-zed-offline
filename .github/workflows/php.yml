@@ -1,9 +1,9 @@
-name: Deploy Laravel to Shared Hosting
+name: Deploy api to VPS
 
 on:
   push:
     branches:
-      - prod
+      - mobileapp-api
 
 jobs:
   test:
@@ -36,82 +36,90 @@ jobs:
     #   - name: Run PHPUnit tests
     #     run: vendor/bin/phpunit
 
-  deploy:
-    needs: test
+  deploy_vps:
+    needs: test # Menunggu deploy staging web hosting selesai
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout Repo
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: 🚚 Mengambil kode terbaru dari GitHub
+        uses: actions/checkout@v4
 
-      # 2. Setup PHP
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: 8.3
-
-      # 2.5 Cache Composer Dependencies
-      - name: Cache Composer dependencies
-        uses: actions/cache@v3
-        with:
-          path: vendor
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
-
-      # 3. Install Laravel Dependencies
-      - name: Install Composer Dependencies
-        run: composer install --no-dev --optimize-autoloader
-
-      # 3.5 Setup Node.js
+      # 2. Setup Node.js untuk build asset frontend (Vite)
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 22 # Sesuaikan dengan versi Node.js yang Anda gunakan
+          node-version: 22
 
-      # 3.6 Cache NPM dependencies
+      # 3. Cache NPM dependencies
       - name: Cache NPM dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: ${{ runner.os }}-node-
 
-      # 3.7 Install Node dependencies
-      - name: Install Node dependencies
-        run: npm install
+      # 4. Install Node dependencies & Build assets
+      - name: Install Node dependencies & Build assets
+        run: |
+          npm install
+          npm run build
 
-      # 3.8 Build assets for production
-      - name: Build assets
-        run: npm run build
+      # 5. ZIP file ringan (Mengecualikan vendor, storage, node_modules, dan file non-produksi)
+      # Ukuran zip berkurang dari 100MB+ menjadi ~3-5MB sehingga transfer SCP hanya butuh beberapa detik
+      - name: Compress files
+        run: |
+          zip -q -r deploy.zip . -x \
+            "node_modules/*" \
+            "vendor/*" \
+            "storage/*" \
+            ".git/*" \
+            "tests/*" \
+            ".agents/*" \
+            "artifacts/*" \
+            "scratch/*" \
+            "desain-figma/*"
 
-      # 4. Upload Laravel Core (Kecuali `public/`) ke root hosting
-      - name: Upload Laravel Core to Hosting Root
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      - name: 📂 Mentransfer file ke CloudPanel (via SCP)
+        uses: appleboy/scp-action@v0.1.7
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./
-          server-dir: /laravel/
-          exclude: |
-            node_modules/*
-            node_modules
-            node_modules/**
-            vendor/**
-            vendor/
-            vendor
-            .git*
-            .git/*
-            .git/**
-            .github/**
-            .github/*
-            .github/
-            test/*
-            test
-            test/**
-            README.md
-            vite.config.js
-            package.json
-            package-lock.json
-            webpack.mix.js
+          host: ${{ secrets.API_HOST }}
+          username: ${{ secrets.API_USERNAME }}
+          key: ${{ secrets.API_SSH_KEY }}
+          port: ${{ secrets.API_PORT }}
+          source: "deploy.zip"
+          target: "/home/${{ secrets.API_USERNAME }}/htdocs/${{secrets.API_URL}}/"
+
+      - name: ⚙️ Menjalankan perintah post-deploy di server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.API_HOST }}
+          username: ${{ secrets.API_USERNAME }}
+          key: ${{ secrets.API_SSH_KEY }}
+          port: ${{ secrets.API_PORT }}
+          script: |
+            # Pastikan direktori root tujuan tersedia
+            mkdir -p /home/${{ secrets.API_USERNAME }}/htdocs/${{secrets.API_URL}}/
+            
+            # Pindah ke folder project
+            cd /home/${{ secrets.API_USERNAME }}/htdocs/${{secrets.API_URL}}/
+            unzip -q -o deploy.zip
+            rm deploy.zip
+            
+            # Pastikan struktur folder storage dan permissions tersedia
+            mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache storage/logs bootstrap/cache
+            
+            # Pasang / perbarui vendor production langsung di server CloudPanel
+            composer install --no-dev --optimize-autoloader
+            
+            # Jalankan migrasi database otomatis (aman & idempotent)
+            php artisan migrate --force
+            
+            # Hubungkan folder storage jika belum terhubung
+            php artisan storage:link
+            
+            # Bersihkan cache lama & buat cache baru untuk production
+            php artisan optimize:clear
+            php artisan config:cache
+            php artisan event:cache
+            php artisan route:cache
+            php artisan view:cache
