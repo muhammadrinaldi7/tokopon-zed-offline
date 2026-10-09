@@ -126,6 +126,7 @@
                         <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Nama & Kode</th>
                         <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Accurate Info & Status Webhook</th>
                         <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Prefix / Awalan</th>
+                        <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Mobile App</th>
                         <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                         <th scope="col" class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
                     </tr>
@@ -167,6 +168,20 @@
                                     @if($unit->order_prefix) <span class="text-xs text-gray-600">Order: <strong class="font-mono">{{ $unit->order_prefix }}</strong></span> @endif
                                 </div>
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <div class="flex flex-col items-center gap-1">
+                                    <button wire:click="toggleVisibleMobile({{ $unit->id }})"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all {{ $unit->is_visible_mobile ? 'bg-sky-100 text-sky-800 hover:bg-sky-200 border border-sky-300' : 'bg-gray-100 text-gray-500 hover:bg-gray-200' }}">
+                                        <span class="w-2 h-2 rounded-full {{ $unit->is_visible_mobile ? 'bg-sky-500' : 'bg-gray-400' }}"></span>
+                                        {{ $unit->is_visible_mobile ? 'Tampil' : 'Sembunyi' }}
+                                    </button>
+                                    @if($unit->mobile_category)
+                                        <span class="text-[10px] font-semibold text-gray-600 font-mono uppercase bg-gray-100 px-1.5 py-0.5 rounded">
+                                            {{ $unit->mobile_category }}
+                                        </span>
+                                    @endif
+                                </div>
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center gap-2">
                                     <button wire:click="toggleActive({{ $unit->id }})"
@@ -197,7 +212,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-8 text-center">
+                            <td colspan="6" class="px-6 py-8 text-center">
                                 <div class="flex flex-col items-center justify-center text-gray-400 space-y-2">
                                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                                     <span class="font-medium text-gray-500">Belum ada unit usaha.</span>
@@ -388,6 +403,49 @@
                                     </div>
                                     <span class="ml-3 text-sm font-semibold text-gray-700 group-hover:text-gray-900 transition-colors">Status Aktif</span>
                                 </label>
+                            </div>
+                        </div>
+
+                        {{-- Seksi 6: Pengaturan Tampilan Mobile E-Commerce --}}
+                        <div class="bg-gradient-to-br from-sky-50/70 via-indigo-50/40 to-white p-5 rounded-xl border border-sky-200/80 space-y-4">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-sky-100">
+                                <h4 class="text-sm font-bold text-sky-950 uppercase tracking-wider flex items-center gap-2">
+                                    <span class="w-6 h-6 rounded bg-sky-600 text-white flex items-center justify-center">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                    </span>
+                                    Katalog Aplikasi Mobile (E-Commerce)
+                                </h4>
+                                <label class="flex items-center cursor-pointer group">
+                                    <div class="relative flex items-center">
+                                        <input type="checkbox" wire:model="is_visible_mobile" class="peer sr-only">
+                                        <div class="w-10 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                                    </div>
+                                    <span class="ml-2.5 text-xs font-bold text-sky-900 group-hover:text-sky-950 transition-colors">Tampilkan di Mobile App</span>
+                                </label>
+                            </div>
+                            <p class="text-xs text-sky-800/80 leading-relaxed">
+                                Jika diaktifkan, unit usaha ini akan muncul sebagai opsi pilihan toko/katalog di aplikasi smartphone pembeli. Produk dari unit usaha non-aktif (seperti POS Resto/FnB) akan otomatis disembunyikan dari aplikasi pembeli.
+                            </p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Nama Tampilan di Mobile (Mobile Display Name)</label>
+                                    <input type="text" wire:model="mobile_display_name" placeholder="Contoh: Syihab Phone Official / GSK Second"
+                                        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-xs font-medium focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                                    @error('mobile_display_name') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Badge Kategori Mobile (Contoh: BARU, SECOND)</label>
+                                    <input type="text" wire:model="mobile_category" placeholder="BARU / SECOND / AKSESORIS"
+                                        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-xs font-bold uppercase focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all font-mono">
+                                    @error('mobile_category') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                </div>
+                                <div class="col-span-1 md:col-span-2">
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Deskripsi Singkat Toko di Mobile</label>
+                                    <textarea wire:model="mobile_description" rows="2" placeholder="Pusat handphone baru garansi resmi Indonesia..."
+                                        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-xs font-medium focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all"></textarea>
+                                    @error('mobile_description') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                </div>
                             </div>
                         </div>
 

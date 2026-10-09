@@ -122,6 +122,10 @@ Route::prefix('v1/executive')->group(function () {
 // MOBILE APP E-COMMERCE & REALTIME CHAT API
 // ============================================
 Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
+    // 0. Daftar Unit Bisnis / Toko Online (Store Switcher)
+    Route::get('/business-units', [\App\Http\Controllers\Api\Mobile\BusinessUnitController::class, 'index'])
+        ->name('api.mobile.business-units.index');
+
     // 1. Katalog Produk Toko Online
     Route::get('/products', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'index'])
         ->name('api.mobile.products.index');

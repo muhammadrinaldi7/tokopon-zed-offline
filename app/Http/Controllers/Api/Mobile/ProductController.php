@@ -17,6 +17,7 @@ class ProductController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $businessUnitId = $request->query('business_unit_id');
         $search = $request->query('search');
         $category = $request->query('category');
         $brand = $request->query('brand');
@@ -25,13 +26,22 @@ class ProductController extends Controller
         $sort = $request->query('sort', 'latest'); // latest, price_asc, price_desc, name_asc
         $perPage = min((int) ($request->query('per_page', 20)), 50);
 
-        // 1. Dapatkan daftar ID gudang yang diizinkan untuk toko online
-        $onlineWarehouseIds = Warehouse::where('is_online_store', true)->pluck('id')->toArray();
+        // 1. Dapatkan daftar ID gudang yang diizinkan untuk toko online & unit bisnis terkait
+        $warehouseQuery = Warehouse::where('is_online_store', true);
+        if ($businessUnitId) {
+            $warehouseQuery->where('business_unit_id', $businessUnitId);
+        } else {
+            // Hanya izinkan gudang dari Business Unit yang aktif dan disetujui untuk mobile
+            $warehouseQuery->whereHas('businessUnit', function ($buQuery) {
+                $buQuery->where('is_active', true)->where('is_visible_mobile', true);
+            });
+        }
+        $onlineWarehouseIds = $warehouseQuery->pluck('id')->toArray();
 
         if (empty($onlineWarehouseIds)) {
             return response()->json([
                 'success' => true,
-                'message' => 'Tidak ada gudang online store yang aktif saat ini.',
+                'message' => 'Tidak ada produk atau gudang online store yang aktif untuk toko ini.',
                 'data' => [],
                 'meta' => [
                     'current_page' => 1,
@@ -56,9 +66,23 @@ class ProductController extends Controller
                     ->whereIn('warehouse_stocks.warehouse_id', $onlineWarehouseIds)
                     ->where('warehouse_stocks.stock', '>', 0);
             })
-            ->with(['product.media', 'productVariants.media', 'warehouseStocks' => function ($q) use ($onlineWarehouseIds) {
-                $q->whereIn('warehouse_id', $onlineWarehouseIds);
-            }]);
+            ->with([
+                'businessUnit',
+                'product.media',
+                'productVariants.media',
+                'warehouseStocks' => function ($q) use ($onlineWarehouseIds) {
+                    $q->whereIn('warehouse_id', $onlineWarehouseIds);
+                }
+            ]);
+
+        // Filter per Business Unit (Toko)
+        if ($businessUnitId) {
+            $query->where('business_unit_id', $businessUnitId);
+        } else {
+            $query->whereHas('businessUnit', function ($buQuery) {
+                $buQuery->where('is_active', true)->where('is_visible_mobile', true);
+            });
+        }
 
         // Filter Pencarian
         if (!empty($search)) {
@@ -122,6 +146,12 @@ class ProductController extends Controller
                 'stock' => (int) $totalOnlineStock,
                 'has_sn' => (bool) $product->has_sn,
                 'image_url' => $imageUrl,
+                'business_unit' => $product->businessUnit ? [
+                    'id' => $product->businessUnit->id,
+                    'name' => $product->businessUnit->mobile_display_name ?: $product->businessUnit->name,
+                    'code' => $product->businessUnit->code,
+                    'category' => $product->businessUnit->mobile_category ?: 'GENERAL',
+                ] : null,
             ];
         });
 
@@ -146,6 +176,7 @@ class ProductController extends Controller
         $onlineWarehouseIds = Warehouse::where('is_online_store', true)->pluck('id')->toArray();
 
         $product = ProductAccurate::with([
+            'businessUnit',
             'product.media',
             'productVariants.media',
             'warehouseStocks' => function ($q) use ($onlineWarehouseIds) {
@@ -205,6 +236,12 @@ class ProductController extends Controller
                 'is_in_stock' => $totalOnlineStock > 0,
                 'images' => $images,
                 'description' => $product->product?->description ?? ($product->raw_data['detailNotes'] ?? null),
+                'business_unit' => $product->businessUnit ? [
+                    'id' => $product->businessUnit->id,
+                    'name' => $product->businessUnit->mobile_display_name ?: $product->businessUnit->name,
+                    'code' => $product->businessUnit->code,
+                    'category' => $product->businessUnit->mobile_category ?: 'GENERAL',
+                ] : null,
                 'stock_per_warehouse' => $stockBreakdown,
             ]
         ]);
@@ -213,11 +250,21 @@ class ProductController extends Controller
     /**
      * Mengambil daftar kategori produk yang tersedia di online store.
      */
-    public function categories(): JsonResponse
+    public function categories(Request $request): JsonResponse
     {
-        $onlineWarehouseIds = Warehouse::where('is_online_store', true)->pluck('id')->toArray();
+        $businessUnitId = $request->query('business_unit_id');
 
-        $categories = ProductAccurate::where('base_price', '>', 0)
+        $warehouseQuery = Warehouse::where('is_online_store', true);
+        if ($businessUnitId) {
+            $warehouseQuery->where('business_unit_id', $businessUnitId);
+        } else {
+            $warehouseQuery->whereHas('businessUnit', function ($buQuery) {
+                $buQuery->where('is_active', true)->where('is_visible_mobile', true);
+            });
+        }
+        $onlineWarehouseIds = $warehouseQuery->pluck('id')->toArray();
+
+        $query = ProductAccurate::where('base_price', '>', 0)
             ->whereNotNull('categoryName')
             ->where('categoryName', '!=', '')
             ->whereExists(function ($sub) use ($onlineWarehouseIds) {
@@ -226,10 +273,17 @@ class ProductController extends Controller
                     ->whereColumn('warehouse_stocks.variant_id', 'product_accurates.id')
                     ->whereIn('warehouse_stocks.warehouse_id', $onlineWarehouseIds)
                     ->where('warehouse_stocks.stock', '>', 0);
-            })
-            ->distinct()
-            ->pluck('categoryName')
-            ->values();
+            });
+
+        if ($businessUnitId) {
+            $query->where('business_unit_id', $businessUnitId);
+        } else {
+            $query->whereHas('businessUnit', function ($buQuery) {
+                $buQuery->where('is_active', true)->where('is_visible_mobile', true);
+            });
+        }
+
+        $categories = $query->distinct()->pluck('categoryName')->values();
 
         return response()->json([
             'success' => true,
@@ -240,11 +294,21 @@ class ProductController extends Controller
     /**
      * Mengambil daftar merek produk yang tersedia di online store.
      */
-    public function brands(): JsonResponse
+    public function brands(Request $request): JsonResponse
     {
-        $onlineWarehouseIds = Warehouse::where('is_online_store', true)->pluck('id')->toArray();
+        $businessUnitId = $request->query('business_unit_id');
 
-        $brands = ProductAccurate::where('base_price', '>', 0)
+        $warehouseQuery = Warehouse::where('is_online_store', true);
+        if ($businessUnitId) {
+            $warehouseQuery->where('business_unit_id', $businessUnitId);
+        } else {
+            $warehouseQuery->whereHas('businessUnit', function ($buQuery) {
+                $buQuery->where('is_active', true)->where('is_visible_mobile', true);
+            });
+        }
+        $onlineWarehouseIds = $warehouseQuery->pluck('id')->toArray();
+
+        $query = ProductAccurate::where('base_price', '>', 0)
             ->whereNotNull('brandName')
             ->where('brandName', '!=', '')
             ->whereExists(function ($sub) use ($onlineWarehouseIds) {
@@ -253,10 +317,17 @@ class ProductController extends Controller
                     ->whereColumn('warehouse_stocks.variant_id', 'product_accurates.id')
                     ->whereIn('warehouse_stocks.warehouse_id', $onlineWarehouseIds)
                     ->where('warehouse_stocks.stock', '>', 0);
-            })
-            ->distinct()
-            ->pluck('brandName')
-            ->values();
+            });
+
+        if ($businessUnitId) {
+            $query->where('business_unit_id', $businessUnitId);
+        } else {
+            $query->whereHas('businessUnit', function ($buQuery) {
+                $buQuery->where('is_active', true)->where('is_visible_mobile', true);
+            });
+        }
+
+        $brands = $query->distinct()->pluck('brandName')->values();
 
         return response()->json([
             'success' => true,

@@ -39,6 +39,10 @@ class BusinessUnitIndex extends Component
     public $accurate_return_warehouse_name;
     public $is_taxable = false;
     public $is_active = true;
+    public $is_visible_mobile = false;
+    public $mobile_display_name;
+    public $mobile_category;
+    public $mobile_description;
 
     public $showModal = false;
 
@@ -78,6 +82,10 @@ class BusinessUnitIndex extends Component
         $this->accurate_return_warehouse_name = '';
         $this->is_taxable = false;
         $this->is_active = true;
+        $this->is_visible_mobile = false;
+        $this->mobile_display_name = '';
+        $this->mobile_category = '';
+        $this->mobile_description = '';
     }
 
     public function openModal()
@@ -115,6 +123,10 @@ class BusinessUnitIndex extends Component
         $this->accurate_return_warehouse_name = $unit->accurate_return_warehouse_name;
         $this->is_taxable = (bool)$unit->is_taxable;
         $this->is_active = $unit->is_active;
+        $this->is_visible_mobile = (bool)$unit->is_visible_mobile;
+        $this->mobile_display_name = $unit->mobile_display_name;
+        $this->mobile_category = $unit->mobile_category;
+        $this->mobile_description = $unit->mobile_description;
         $this->showModal = true;
     }
 
@@ -131,6 +143,10 @@ class BusinessUnitIndex extends Component
             'receipt_show_discount' => 'boolean',
             'telegram_approval_webhook' => 'nullable|url',
             'telegram_log_webhook' => 'nullable|url',
+            'is_visible_mobile' => 'boolean',
+            'mobile_display_name' => 'nullable|string|max:100',
+            'mobile_category' => 'nullable|string|max:50',
+            'mobile_description' => 'nullable|string|max:500',
         ]);
 
         BusinessUnit::updateOrCreate(
@@ -155,6 +171,10 @@ class BusinessUnitIndex extends Component
                 'accurate_return_warehouse_name' => $this->accurate_return_warehouse_name,
                 'is_taxable' => $this->is_taxable,
                 'is_active' => $this->is_active,
+                'is_visible_mobile' => (bool)$this->is_visible_mobile,
+                'mobile_display_name' => $this->mobile_display_name ?: null,
+                'mobile_category' => $this->mobile_category ? strtoupper($this->mobile_category) : null,
+                'mobile_description' => $this->mobile_description ?: null,
             ]
         );
 
@@ -167,6 +187,13 @@ class BusinessUnitIndex extends Component
     {
         $unit = BusinessUnit::findOrFail($id);
         $unit->update(['is_active' => !$unit->is_active]);
+        $this->loadData();
+    }
+
+    public function toggleVisibleMobile($id)
+    {
+        $unit = BusinessUnit::findOrFail($id);
+        $unit->update(['is_visible_mobile' => !$unit->is_visible_mobile]);
         $this->loadData();
     }
 
