@@ -306,3 +306,8 @@ Route::middleware(['auth', 'admin'])->group(function () {
         }
     });
 });
+
+// Cloudflare R2 Media Proxy (bypasses Indonesian ISP block on *.r2.dev)
+Route::get('/media-r2/{path}', [\App\Http\Controllers\R2MediaProxyController::class, 'show'])
+    ->where('path', '.*')
+    ->name('r2.media');

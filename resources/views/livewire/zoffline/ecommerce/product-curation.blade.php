@@ -187,24 +187,23 @@
                     @endif
 
                     {{-- Form Upload Foto Sampul Baru --}}
-                    <div>
+                    <div x-data="{ localPreview: null }">
                         <label class="block text-xs font-bold text-gray-800 mb-1.5">
                             Pilih Foto Sampul Baru <span class="text-rose-500">*</span>
                         </label>
                         <input type="file" wire:model="coverPhoto" accept="image/png,image/jpeg,image/webp"
+                            @change="if ($event.target.files[0]) { localPreview = URL.createObjectURL($event.target.files[0]); }"
                             class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-gray-200 rounded-2xl p-1 bg-gray-50">
                         <p class="text-[10px] text-gray-400 mt-1">Format: JPG, PNG, WEBP (Maksimal 10MB). Resolusi persegi (1:1) disarankan untuk katalog mobile.</p>
                         @error('coverPhoto') <span class="text-rose-600 text-xs font-medium">{{ $message }}</span> @enderror
 
-                        {{-- Preview Foto yang Baru Dipilih --}}
-                        @if($coverPhoto)
-                            <div class="mt-3">
-                                <span class="text-[11px] font-bold text-gray-600">Pratinjau Foto Baru:</span>
-                                <div class="mt-1 w-32 h-32 rounded-2xl overflow-hidden border-2 border-indigo-500 shadow-xs">
-                                    <img src="{{ $coverPhoto->temporaryUrl() }}" class="w-full h-full object-cover">
-                                </div>
+                        {{-- Instant Preview Foto Baru --}}
+                        <div class="mt-3" x-show="localPreview" style="display: none;">
+                            <span class="text-[11px] font-bold text-gray-600">Pratinjau Foto Baru:</span>
+                            <div class="mt-1 w-32 h-32 rounded-2xl overflow-hidden border-2 border-indigo-500 shadow-xs bg-gray-100">
+                                <img :src="localPreview" class="w-full h-full object-cover">
                             </div>
-                        @endif
+                        </div>
                     </div>
 
                     {{-- Form Upload Galeri Tambahan (Opsional) --}}

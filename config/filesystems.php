@@ -76,7 +76,7 @@ return [
             'secret' => env('CLOUDFLARE_R2_SECRET_ACCESS_KEY'),
             'region' => env('CLOUDFLARE_R2_DEFAULT_REGION', 'auto'),
             'bucket' => env('CLOUDFLARE_R2_BUCKET'),
-            'url' => env('CLOUDFLARE_R2_URL'),
+            'url' => env('CLOUDFLARE_R2_URL') ?: (rtrim(env('APP_URL', 'http://127.0.0.1:8000'), '/') . '/media-r2'),
             'endpoint' => env('CLOUDFLARE_R2_ENDPOINT'),
             'use_path_style_endpoint' => env('CLOUDFLARE_R2_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
