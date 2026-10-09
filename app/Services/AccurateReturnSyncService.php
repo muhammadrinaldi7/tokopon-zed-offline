@@ -27,6 +27,18 @@ class AccurateReturnSyncService
     }
 
     /**
+     * Resolve short tag for Business Unit order prefix.
+     */
+    public function getBuTag(BusinessUnit $bu): string
+    {
+        return match (strtolower($bu->code)) {
+            'second', 'gsk' => 'GSK',
+            'syihab', 'syb' => 'SYB',
+            default         => strtoupper($bu->code),
+        };
+    }
+
+    /**
      * Preview Sales Returns from Accurate Online and check sync status against POS.
      *
      * @param string|null $startDate (Y-m-d)
@@ -41,6 +53,7 @@ class AccurateReturnSyncService
             throw new \Exception("Unit Bisnis dengan kode '{$buCode}' tidak ditemukan.");
         }
 
+        $buTag = $this->getBuTag($bu);
         $rawReturns = $this->accurateService->getSalesReturns($startDate, $endDate, $buCode);
 
         $items = [];
@@ -59,19 +72,26 @@ class AccurateReturnSyncService
             $transDate = $sr['transDate'] ?? '';
             $description = $sr['description'] ?? '';
 
-            // Check if this Sales Return is already registered in POS database
+            // Check if this Sales Return is already registered in POS database FOR THIS BUSINESS UNIT
             $existingDoc = OrderAccurateDoc::where('doc_type', 'SALES_RETURN')
                 ->where('doc_number', $srNumber)
+                ->whereHas('order', function ($q) use ($bu) {
+                    $q->where('business_unit_id', $bu->id);
+                })
                 ->first();
 
             $existingOrder = null;
             if ($existingDoc) {
                 $existingOrder = $existingDoc->order;
             } else {
-                $existingOrder = Order::where('accurate_invoice_no', $srNumber)
-                    ->orWhere('order_number', 'RET-ACC-' . $srNumber)
-                    ->orWhere('order_number', 'RET-CLM-' . $srNumber)
-                    ->orWhere('order_number', 'RET-' . $srNumber)
+                $existingOrder = Order::where('business_unit_id', $bu->id)
+                    ->where(function ($q) use ($srNumber, $buTag) {
+                        $q->where('accurate_invoice_no', $srNumber)
+                            ->orWhere('order_number', 'RET-ACC-' . $buTag . '-' . $srNumber)
+                            ->orWhere('order_number', 'RET-ACC-' . $srNumber)
+                            ->orWhere('order_number', 'RET-CLM-' . $srNumber)
+                            ->orWhere('order_number', 'RET-' . $srNumber);
+                    })
                     ->first();
             }
 
@@ -102,6 +122,7 @@ class AccurateReturnSyncService
 
         Log::info("[AccurateReturnSync] previewReturns selesai diproses", [
             'bu_code' => $buCode,
+            'bu_id' => $bu->id,
             'start_date' => $startDate,
             'end_date' => $endDate,
             'total_from_accurate' => $totalCount,
@@ -140,6 +161,7 @@ class AccurateReturnSyncService
             throw new \Exception("Unit Bisnis dengan kode '{$buCode}' tidak ditemukan.");
         }
 
+        $buTag = $this->getBuTag($bu);
         $srNumber = $srItem['number'] ?? '';
         $srId = $srItem['id'] ?? null;
         $totalAmount = (float)($srItem['totalAmount'] ?? 0);
@@ -148,33 +170,44 @@ class AccurateReturnSyncService
             throw new \Exception("Nomor Sales Return Accurate tidak valid.");
         }
 
-        // Idempotency Check: Don't duplicate if already synced
+        // Idempotency Check: Don't duplicate if already synced FOR THIS BUSINESS UNIT
         $existingDoc = OrderAccurateDoc::where('doc_type', 'SALES_RETURN')
             ->where('doc_number', $srNumber)
+            ->whereHas('order', function ($q) use ($bu) {
+                $q->where('business_unit_id', $bu->id);
+            })
             ->first();
 
         if ($existingDoc) {
-            Log::info("[AccurateReturnSync] Lewati Sales Return {$srNumber} karena sudah ada di OrderAccurateDoc", [
+            Log::info("[AccurateReturnSync] Lewati Sales Return {$srNumber} karena sudah ada di OrderAccurateDoc untuk BU {$bu->name} ({$buCode})", [
                 'doc_number' => $srNumber,
                 'order_id' => $existingDoc->order_id,
                 'order_number' => $existingDoc->order?->order_number,
+                'business_unit_id' => $bu->id,
             ]);
             return [
                 'status' => 'skipped',
-                'reason' => 'Already synced in OrderAccurateDoc',
+                'reason' => 'Already synced in OrderAccurateDoc (' . ($existingDoc->order?->order_number ?? 'POS') . ')',
                 'order_number' => $existingDoc->order?->order_number,
             ];
         }
 
-        $existingOrder = Order::where('accurate_invoice_no', $srNumber)
-            ->orWhere('order_number', 'RET-ACC-' . $srNumber)
+        $existingOrder = Order::where('business_unit_id', $bu->id)
+            ->where(function ($q) use ($srNumber, $buTag) {
+                $q->where('accurate_invoice_no', $srNumber)
+                    ->orWhere('order_number', 'RET-ACC-' . $buTag . '-' . $srNumber)
+                    ->orWhere('order_number', 'RET-ACC-' . $srNumber)
+                    ->orWhere('order_number', 'RET-CLM-' . $srNumber)
+                    ->orWhere('order_number', 'RET-' . $srNumber);
+            })
             ->first();
 
         if ($existingOrder) {
-            Log::info("[AccurateReturnSync] Lewati Sales Return {$srNumber} karena Order sudah ada di POS", [
+            Log::info("[AccurateReturnSync] Lewati Sales Return {$srNumber} karena Order sudah ada di POS untuk BU {$bu->name} ({$buCode})", [
                 'doc_number' => $srNumber,
                 'order_id' => $existingOrder->id,
                 'order_number' => $existingOrder->order_number,
+                'business_unit_id' => $bu->id,
             ]);
             // Re-link OrderAccurateDoc if missing
             OrderAccurateDoc::firstOrCreate(
@@ -192,7 +225,7 @@ class AccurateReturnSyncService
 
             return [
                 'status' => 'skipped',
-                'reason' => 'Order already exists',
+                'reason' => 'Order already exists (' . $existingOrder->order_number . ')',
                 'order_number' => $existingOrder->order_number,
             ];
         }
@@ -252,7 +285,7 @@ class AccurateReturnSyncService
                 ->first();
         }
 
-        $targetOrderNumber = 'RET-ACC-' . $srNumber;
+        $targetOrderNumber = 'RET-ACC-' . $buTag . '-' . $srNumber;
 
         return DB::transaction(function () use (
             $bu,
@@ -377,12 +410,21 @@ class AccurateReturnSyncService
                     if ($itemNo || $accurateItemId) {
                         $productAccurate = null;
                         if ($itemNo) {
-                            $productAccurate = ProductAccurate::where('item_no', $itemNo)
-                                ->orWhere('accurate_id', (string)$itemNo)
-                                ->first();
+                            $productAccurate = ProductAccurate::where('business_unit_id', $bu->id)
+                                ->where(function ($q) use ($itemNo) {
+                                    $q->where('item_no', $itemNo)
+                                      ->orWhere('accurate_id', (string)$itemNo);
+                                })
+                                ->first()
+                                ?? ProductAccurate::where('item_no', $itemNo)
+                                    ->orWhere('accurate_id', (string)$itemNo)
+                                    ->first();
                         }
                         if (!$productAccurate && $accurateItemId) {
-                            $productAccurate = ProductAccurate::where('accurate_id', (string)$accurateItemId)->first();
+                            $productAccurate = ProductAccurate::where('business_unit_id', $bu->id)
+                                ->where('accurate_id', (string)$accurateItemId)
+                                ->first()
+                                ?? ProductAccurate::where('accurate_id', (string)$accurateItemId)->first();
                         }
 
                         if ($productAccurate) {
