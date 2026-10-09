@@ -7,13 +7,15 @@
         <div class="flex flex-wrap items-center gap-2">
             <a href="{{ route('admin.orders.issues') }}" wire:navigate
                 class="relative px-4 py-2 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors text-sm font-bold flex items-center gap-2">
-                <svg class="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <svg class="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                 </svg>
                 <span>Kendala Pesanan</span>
                 @if (($openIssuesTotal ?? 0) > 0)
-                    <span class="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-600 px-1.5 text-[11px] font-extrabold text-white animate-pulse">
+                    <span
+                        class="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-600 px-1.5 text-[11px] font-extrabold text-white animate-pulse">
                         {{ $openIssuesTotal }}
                     </span>
                 @endif
@@ -31,7 +33,8 @@
     </div>
 
     {{-- Filters --}}
-    <div class="bg-white p-4 rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 flex flex-col md:flex-row gap-4 mb-6">
+    <div
+        class="bg-white p-4 rounded-2xl shadow-sm border border-neutral-100-sm border border-gray-100 flex flex-col md:flex-row gap-4 mb-6">
         <div class="flex-1 relative">
             <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none"
                 viewBox="0 0 24 24" stroke="currentColor">
@@ -132,7 +135,6 @@
                                             class="text-xs font-bold bg-purple-50 text-purple-600 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition">
                                             Kirim
                                         </button>
-                                        @endif
                                     @endif
 
                                     {{-- ─── TOMBOL RE-SEND KHUSUS ADMIN ─── --}}
@@ -148,27 +150,27 @@
                                         </button>
 
                                         @if (\App\Services\CrmWhatsAppService::isWhatsAppEnabled())
-                                        @if (\App\Services\CrmWhatsAppService::isCrmActive())
-                                        <button wire:click="resendCrmWhatsApp({{ $order->id }})"
-                                            class="p-1 text-teal-600 hover:bg-teal-50 rounded-lg transition"
-                                            title="Kirim Ulang CRM WA Zed (Admin)">
-                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                            </svg>
-                                        </button>
-                                        @else
-                                        <button wire:click="resendWhatsApp({{ $order->id }})"
-                                            class="p-1 text-emerald-500 hover:bg-emerald-50 rounded-lg transition"
-                                            title="Kirim Ulang WA Qontak (Admin)">
-                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                            </svg>
-                                        </button>
-                                        @endif
+                                            @if (\App\Services\CrmWhatsAppService::isCrmActive())
+                                                <button wire:click="resendCrmWhatsApp({{ $order->id }})"
+                                                    class="p-1 text-teal-600 hover:bg-teal-50 rounded-lg transition"
+                                                    title="Kirim Ulang CRM WA Zed (Admin)">
+                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                        stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                    </svg>
+                                                </button>
+                                            @else
+                                                <button wire:click="resendWhatsApp({{ $order->id }})"
+                                                    class="p-1 text-emerald-500 hover:bg-emerald-50 rounded-lg transition"
+                                                    title="Kirim Ulang WA Qontak (Admin)">
+                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                        stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                    </svg>
+                                                </button>
+                                            @endif
                                         @endif
                                     @endif
 
@@ -176,8 +178,8 @@
                                     <button wire:click="viewReceipt({{ $order->id }})"
                                         class="p-1.5 text-gray-400 hover:text-[#1c69d4] hover:bg-blue-50 rounded-lg transition"
                                         title="Lihat Struk">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                            stroke-width="2">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -189,12 +191,14 @@
                                     <button wire:click="openIssues({{ $order->id }})"
                                         class="relative p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
                                         title="Catatan & Kesalahan Order">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                                         </svg>
                                         @if (($order->open_issues_count ?? 0) > 0)
-                                            <span class="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-extrabold text-white animate-pulse">
+                                            <span
+                                                class="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-extrabold text-white animate-pulse">
                                                 {{ $order->open_issues_count }}
                                             </span>
                                         @endif
@@ -231,4 +235,3 @@
     {{-- MODAL: Catatan & Kesalahan Order (Issues) --}}
     @include('livewire.admin.orders.modal.order-issues-modal')
 </div>
-
