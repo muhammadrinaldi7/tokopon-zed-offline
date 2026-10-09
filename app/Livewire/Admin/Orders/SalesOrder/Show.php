@@ -41,11 +41,28 @@ class Show extends Component
 
     public function mount(Order $order)
     {
+        $user = Auth::user();
+        if ($user) {
+            $isAdmin = $user->hasAnyRole(['superadmin', 'admin', 'director', 'direktur']);
+            $isMo = !$isAdmin && $user->hasAnyRole(['manager_operasional', 'manager_operasional_gsk']);
+            $isBranchLocked = !$isAdmin && !$isMo;
+
+            if ($isBranchLocked && $order->branch_id && $order->branch_id != $user->branch_id) {
+                abort(403, 'Akses Ditolak: Anda hanya memiliki akses untuk Sales Order di cabang Anda.');
+            }
+
+            if ($isMo) {
+                $userBuId = $user->business_unit_id ?? $user->getActiveBusinessUnitId();
+                if ($order->business_unit_id && $userBuId && $order->business_unit_id != $userBuId) {
+                    abort(403, 'Akses Ditolak: Anda hanya memiliki akses untuk Sales Order di unit bisnis Anda.');
+                }
+            }
+        }
+
         $this->order = $order->load(['items.variant', 'user', 'businessUnit', 'payments.paymentMethod', 'salesBy', 'branch']);
         $this->displayCustomerName = $this->order->user->name ?? 'Pelanggan Umum';
         $this->dp_amount = $this->getRemainingBalance();
         $this->dp_date = Carbon::now()->format('Y-m-d');
-        // dd($this->order);
     }
 
     #[On('orderCancellationSubmitted')]
