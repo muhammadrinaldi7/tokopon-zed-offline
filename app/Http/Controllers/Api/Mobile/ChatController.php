@@ -14,6 +14,45 @@ use Illuminate\Support\Str;
 class ChatController extends Controller
 {
     /**
+     * Helper untuk memformat objek produk konsisten untuk mobile app dan kartu chat Shopee-style.
+     */
+    protected function formatProduct(?ProductAccurate $product): ?array
+    {
+        if (!$product) {
+            return null;
+        }
+
+        $imageUrl = null;
+        if ($product->product && $product->product->hasMedia('cover')) {
+            $imageUrl = $product->product->getFirstMediaUrl('cover');
+        } elseif ($product->productVariants && $product->productVariants->isNotEmpty()) {
+            $firstVariant = $product->productVariants->first();
+            if ($firstVariant && $firstVariant->hasMedia('variant_image')) {
+                $imageUrl = $firstVariant->getFirstMediaUrl('variant_image');
+            }
+        }
+
+        if (!$imageUrl) {
+            $imageUrl = 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&q=80';
+        }
+
+        return [
+            'id' => $product->id,
+            'accurate_id' => $product->id,
+            'item_no' => $product->item_no,
+            'name' => $product->name,
+            'brand' => $product->brandName ?? 'Gadget',
+            'category' => $product->categoryName ?? 'Gadget',
+            'price' => (float) $product->base_price,
+            'formatted_price' => 'Rp ' . number_format($product->base_price, 0, ',', '.'),
+            'thumbnail' => $imageUrl,
+            'image_url' => $imageUrl,
+            'total_stock' => (int) ($product->warehouseStocks?->sum('stock') ?? 0),
+            'is_second' => (bool) ($product->is_second ?? false),
+        ];
+    }
+
+    /**
      * Memulai atau memuat sesi percakapan (Mendukung Customer Login & Guest Chat).
      */
     public function initConversation(Request $request): JsonResponse
@@ -23,7 +62,7 @@ class ChatController extends Controller
         $guestName = $request->input('guest_name');
         $guestPhone = $request->input('guest_phone');
         $businessUnitId = $request->input('business_unit_id');
-        $productAccurateId = $request->input('product_accurate_id');
+        $productAccurateId = $request->input('product_accurate_id') ?: $request->input('product_id');
 
         $conversation = null;
 
@@ -78,15 +117,8 @@ class ChatController extends Controller
         // Informasi konteks produk jika ada
         $productInfo = null;
         if ($conversation->product_accurate_id) {
-            $product = ProductAccurate::find($conversation->product_accurate_id);
-            if ($product) {
-                $productInfo = [
-                    'id' => $product->id,
-                    'name' => $product->name,
-                    'price' => (float) $product->base_price,
-                    'formatted_price' => 'Rp ' . number_format($product->base_price, 0, ',', '.'),
-                ];
-            }
+            $product = ProductAccurate::with(['product', 'productVariants'])->find($conversation->product_accurate_id);
+            $productInfo = $this->formatProduct($product);
         }
 
         return response()->json([
@@ -98,6 +130,7 @@ class ChatController extends Controller
                 'guest_name' => $conversation->guest_name,
                 'status' => $conversation->status,
                 'product_context' => $productInfo,
+                'product' => $productInfo,
             ]
         ]);
     }
@@ -122,7 +155,7 @@ class ChatController extends Controller
         $perPage = min((int) ($request->query('per_page', 30)), 100);
 
         $messages = Message::where('conversation_id', $conversationId)
-            ->with(['media'])
+            ->with(['media', 'productAccurate.product', 'productAccurate.productVariants'])
             ->latest()
             ->paginate($perPage);
 
@@ -138,11 +171,17 @@ class ChatController extends Controller
                 ];
             }
 
+            $productData = $this->formatProduct($msg->productAccurate);
+
             return [
                 'id' => $msg->id,
                 'sender_type' => $msg->sender_type,
                 'is_me' => in_array($msg->sender_type, ['customer', 'guest']),
                 'message' => $msg->message,
+                'product' => $productData,
+                'product_reference' => $productData,
+                'product_id' => $msg->product_accurate_id,
+                'product_accurate_id' => $msg->product_accurate_id,
                 'attachments' => $attachmentUrls,
                 'read_at' => $msg->read_at?->toIso8601String(),
                 'is_read' => !is_null($msg->read_at),
@@ -162,7 +201,7 @@ class ChatController extends Controller
     }
 
     /**
-     * Mengirim pesan baru ke percakapan (mendukung teks dan lampiran gambar/file).
+     * Mengirim pesan baru ke percakapan (mendukung teks, tag produk Shopee-style, dan lampiran gambar).
      */
     public function sendMessage(Request $request, int $conversationId): JsonResponse
     {
@@ -179,13 +218,17 @@ class ChatController extends Controller
 
         $request->validate([
             'message' => 'nullable|string|max:2000',
+            'product_accurate_id' => 'nullable',
+            'product_id' => 'nullable',
             'attachment' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf|max:5120',
         ]);
 
-        if (empty($request->input('message')) && !$request->hasFile('attachment')) {
+        $productAccurateId = $request->input('product_accurate_id') ?: $request->input('product_id');
+
+        if (empty($request->input('message')) && !$request->hasFile('attachment') && !$productAccurateId) {
             return response()->json([
                 'success' => false,
-                'message' => 'Pesan teks atau lampiran wajib diisi.',
+                'message' => 'Pesan teks, tag produk, atau lampiran wajib disertakan.',
             ], 422);
         }
 
@@ -205,6 +248,7 @@ class ChatController extends Controller
             'conversation_id' => $conversation->id,
             'user_id' => $user?->id,
             'sender_type' => $senderType,
+            'product_accurate_id' => $productAccurateId,
             'message' => $request->input('message') ?: '',
         ]);
 
@@ -225,6 +269,12 @@ class ChatController extends Controller
             ];
         }
 
+        $productData = null;
+        if ($message->product_accurate_id) {
+            $product = ProductAccurate::with(['product', 'productVariants'])->find($message->product_accurate_id);
+            $productData = $this->formatProduct($product);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Pesan berhasil dikirim.',
@@ -234,6 +284,10 @@ class ChatController extends Controller
                 'sender_type' => $message->sender_type,
                 'is_me' => in_array($message->sender_type, ['customer', 'guest']),
                 'message' => $message->message,
+                'product' => $productData,
+                'product_reference' => $productData,
+                'product_id' => $message->product_accurate_id,
+                'product_accurate_id' => $message->product_accurate_id,
                 'attachments' => $attachmentUrls,
                 'created_at' => $message->created_at?->toIso8601String(),
             ]

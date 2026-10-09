@@ -15,6 +15,7 @@ class Message extends Model implements HasMedia
         'user_id',
         'sender_type',
         'message',
+        'product_accurate_id',
         'read_at',
     ];
 
@@ -35,6 +36,11 @@ class Message extends Model implements HasMedia
     public function conversation()
     {
         return $this->belongsTo(Conversation::class);
+    }
+
+    public function productAccurate()
+    {
+        return $this->belongsTo(ProductAccurate::class, 'product_accurate_id');
     }
 
     public function isFromGuest(): bool
