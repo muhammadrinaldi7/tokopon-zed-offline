@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Orders\SalesOrder;
 
+use App\Models\BusinessUnitProject;
 use App\Models\Order;
 use App\Models\OrderPayment;
 use App\Models\PaymentMethod;
@@ -29,6 +30,16 @@ class Show extends Component
     public $dp_date;
     public $dp_notes;
     public $dp_contract_number;
+
+    // Edit Item Price Modal
+    public $showEditPriceModal = false;
+    public $editItemId = null;
+    public $editItemName = '';
+    public $editItemSku = '';
+    public $editItemQty = 1;
+    public $editItemCurrentPrice = 0;
+    public $editItemMasterPrice = null;
+    public $editItemNewPrice = 0;
 
     // Invoice Form
     
@@ -184,7 +195,12 @@ class Show extends Component
         }
 
         // Untuk DP (showDpModal), boleh parsial asal tidak melebihi sisa tagihan
-        return round($totalPaid, 2) <= round($this->getRemainingBalance(), 2);
+        if (round($totalPaid, 2) > round($this->getRemainingBalance(), 2)) {
+            $this->dispatch('toast', title: 'Nominal Melebihi Sisa Tagihan', message: 'Nominal DP (Rp ' . number_format($totalPaid, 0, ',', '.') . ') melebihi sisa tagihan SO saat ini (Rp ' . number_format($this->getRemainingBalance(), 0, ',', '.') . '). Silakan sesuaikan harga item SO terlebih dahulu jika terdapat kenaikan harga master.', type: 'warning');
+            return false;
+        }
+
+        return true;
     }
 
     public function openDpModal()
@@ -447,6 +463,202 @@ class Show extends Component
             \Illuminate\Support\Facades\DB::rollBack();
             $this->dispatch('toast', title: 'Error', message: 'Gagal menyimpan DP: ' . $e->getMessage(), type: 'error');
         }
+    }
+
+    // ─── Edit Item Price Methods ───────────────────────────────
+    public function openEditPriceModal($itemId)
+    {
+        if ($this->order->order_status === 'COMPLETED' || in_array(strtolower($this->order->order_status), ['cancelled', 'cancel'])) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Pesanan yang sudah selesai atau dibatalkan tidak dapat diubah.', type: 'error');
+            return;
+        }
+
+        $hasSi = $this->order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->where('status', 'SUCCESS')->exists();
+        if ($hasSi) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Faktur Penjualan (SI) sudah terbit untuk SO ini di Accurate. Harga tidak dapat diubah.', type: 'error');
+            return;
+        }
+
+        $item = $this->order->items()->find($itemId);
+        if (!$item) {
+            $this->dispatch('toast', title: 'Error', message: 'Item pesanan tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        $this->editItemId = $item->id;
+        $this->editItemName = $item->product_name ?? ($item->variant->name ?? 'Produk');
+        $this->editItemSku = $item->variant->item_no ?? ($item->variant->sku ?? '-');
+        $this->editItemQty = max(1, (int)$item->qty);
+        $this->editItemCurrentPrice = (float) $item->price_at_checkout;
+        $this->editItemNewPrice = (float) $item->price_at_checkout;
+
+        // Ambil harga master Accurate terkini
+        $masterPrice = null;
+        if ($item->variant && get_class($item->variant) === \App\Models\ProductAccurate::class) {
+            $masterPrice = (float) ($item->variant->base_price ?? 0);
+        } elseif ($item->variant && method_exists($item->variant, 'accurateData') && $item->variant->accurateData) {
+            $masterPrice = (float) ($item->variant->accurateData->base_price ?? 0);
+        }
+        $this->editItemMasterPrice = ($masterPrice && $masterPrice > 0) ? $masterPrice : null;
+
+        $this->showEditPriceModal = true;
+    }
+
+    public function useMasterPrice()
+    {
+        if ($this->editItemMasterPrice && $this->editItemMasterPrice > 0) {
+            $this->editItemNewPrice = $this->editItemMasterPrice;
+        }
+    }
+
+    public function closeEditPriceModal()
+    {
+        $this->showEditPriceModal = false;
+        $this->editItemId = null;
+        $this->editItemName = '';
+        $this->editItemSku = '';
+        $this->editItemQty = 1;
+        $this->editItemCurrentPrice = 0;
+        $this->editItemMasterPrice = null;
+        $this->editItemNewPrice = 0;
+    }
+
+    public function updateItemPrice()
+    {
+        $cleanPrice = (float) preg_replace('/[^0-9]/', '', (string)$this->editItemNewPrice);
+        if ($cleanPrice <= 0) {
+            $this->dispatch('toast', title: 'Validasi Gagal', message: 'Nominal harga baru harus lebih dari 0.', type: 'warning');
+            return;
+        }
+
+        $item = $this->order->items()->find($this->editItemId);
+        if (!$item) {
+            $this->dispatch('toast', title: 'Error', message: 'Item tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        // Hitung proyeksi Grand Total baru
+        $diff = ($cleanPrice - (float)$item->price_at_checkout) * $item->qty;
+        $projectedGrandTotal = (float)$this->order->grand_total + $diff;
+        $paidAmount = (float)$this->order->payments()->where('status', 'PAID')->sum('amount');
+
+        if ($projectedGrandTotal < $paidAmount) {
+            $this->dispatch('toast', title: 'Validasi Gagal', message: 'Harga baru membuat Grand Total (Rp ' . number_format($projectedGrandTotal, 0, ',', '.') . ') lebih kecil dari DP yang sudah dibayar (Rp ' . number_format($paidAmount, 0, ',', '.') . ').', type: 'error');
+            return;
+        }
+
+        DB::beginTransaction();
+        try {
+            $oldPrice = (float)$item->price_at_checkout;
+            $item->price_at_checkout = $cleanPrice;
+            $item->subtotal = ($cleanPrice * $item->qty) - ($item->discount_amount ?? 0);
+            $item->save();
+
+            // Recalculate Order totals
+            $orderTotalAmount = $this->order->items()->sum(DB::raw('price_at_checkout * qty'));
+            $orderDiscountAmount = $this->order->items()->sum('discount_amount');
+            $this->order->total_amount = $orderTotalAmount;
+            $this->order->discount_amount = $orderDiscountAmount;
+            $this->order->grand_total = $orderTotalAmount - $orderDiscountAmount;
+
+            // Update status jika sebelumnya paid tapi sekarang ada sisa
+            if ($this->order->grand_total > $paidAmount && $this->order->order_status === 'paid') {
+                $this->order->order_status = 'down_payment';
+            } elseif ($this->order->grand_total == $paidAmount && $paidAmount > 0) {
+                $this->order->order_status = 'paid';
+            }
+
+            // Catat history perubahan harga di notes
+            $user = Auth::user()->name ?? 'System';
+            $noteLog = "\n[" . now()->format('Y-m-d H:i') . "] $user mengubah harga \"{$this->editItemName}\" dari Rp " . number_format($oldPrice, 0, ',', '.') . " menjadi Rp " . number_format($cleanPrice, 0, ',', '.') . ".";
+            $this->order->notes = ($this->order->notes ?? '') . $noteLog;
+            $this->order->save();
+
+            // Sinkronkan ke Accurate jika SO terdaftar di Accurate
+            $this->syncPriceUpdateToAccurate();
+
+            DB::commit();
+
+            $this->showEditPriceModal = false;
+            $this->order->refresh();
+            $this->dp_amount = $this->getRemainingBalance();
+
+            $this->dispatch('toast', title: 'Berhasil', message: 'Harga item berhasil diperbarui dan disinkronkan ke Accurate.', type: 'success');
+            $this->dispatch('refreshOrderDetails');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Gagal update harga item SO: " . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal mengupdate harga: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    private function syncPriceUpdateToAccurate(): void
+    {
+        $soDoc = $this->order->accurateDocs()->where('doc_type', 'SALES_ORDER')->where('status', 'SUCCESS')->first();
+        if (!$soDoc || !$soDoc->accurate_id) {
+            return;
+        }
+
+        $dbSource = strtolower($this->order->businessUnit->code ?? 'syihab');
+        $accurateService = app(AccurateService::class);
+
+        $existingSo = $accurateService->getSalesOrderDetail($soDoc->accurate_id, $dbSource);
+        $existingDetailItems = $existingSo['detailItem'] ?? [];
+
+        $detailItem = [];
+        foreach ($this->order->items as $item) {
+            $variant = $item->variant;
+            if ($variant instanceof \App\Models\ProductAccurate) {
+                $itemNo = $variant->item_no;
+            } else {
+                $itemNo = $variant->accurate_item_no ?? $variant->sku ?? $variant->item_no;
+            }
+
+            $projectNo = '';
+            if ($variant instanceof \App\Models\ProductAccurate) {
+                $buId = $this->order->business_unit_id ?? $variant->business_unit_id ?? 1;
+                $projectNo = BusinessUnitProject::getProjectNoByBusinessUnit($buId, $variant->proyek, $variant->proyek ?? '');
+            }
+
+            $dItem = [
+                'itemNo' => $itemNo,
+                'unitPrice' => (float)$item->price_at_checkout,
+                'quantity' => (float)$item->qty,
+                'detailName' => $item->product_name ?? ($variant->name ?? 'Unknown'),
+                'itemCashDiscount' => (float)($item->discount_amount + $item->promo_discount_amount),
+            ];
+
+            if (!empty($projectNo)) {
+                $dItem['projectNo'] = $projectNo;
+            }
+
+            // Cari ID baris lama yang cocok berdasarkan itemNo
+            foreach ($existingDetailItems as $exItem) {
+                $exItemNo = $exItem['itemNo'] ?? ($exItem['item']['no'] ?? '');
+                if ($exItemNo === $dItem['itemNo']) {
+                    $dItem['id'] = $exItem['id'];
+                    break;
+                }
+            }
+
+            $detailItem[] = $dItem;
+        }
+
+        $branchName = $this->order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru');
+        if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
+            $branchName = 'GSK ' . $branchName;
+        }
+
+        $payload = [
+            'id' => $soDoc->accurate_id,
+            'branchName' => $branchName,
+            'detailItem' => $detailItem,
+        ];
+
+        $accurateService->postSalesOrder($payload, $dbSource);
+
+        // Update amount di OrderAccurateDoc
+        $soDoc->update(['amount' => $this->order->grand_total]);
     }
 
     public function render()

@@ -147,8 +147,41 @@
                                         @endif
                                     </td>
                                     <td class="p-3 text-sm text-center">{{ $item->qty }}</td>
-                                    <td class="p-3 text-sm text-right">Rp
-                                        {{ number_format($item->price_at_checkout, 0, ',', '.') }}
+                                    <td class="p-3 text-sm text-right">
+                                        <div class="flex items-center justify-end gap-1.5">
+                                            <span>Rp {{ number_format($item->price_at_checkout, 0, ',', '.') }}</span>
+                                            @if ($order->order_status !== 'COMPLETED' && $order->order_status !== 'CANCELLED' && $order->order_status !== 'cancelled' && !$order->accurateDocs->where('doc_type', 'SALES_INVOICE')->where('status', 'SUCCESS')->first())
+                                                <button type="button" wire:click="openEditPriceModal({{ $item->id }})"
+                                                    class="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="Ubah Harga Item SO">
+                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                    </svg>
+                                                </button>
+                                            @endif
+                                        </div>
+
+                                        @php
+                                            $masterPrice = null;
+                                            if ($item->variant && get_class($item->variant) === \App\Models\ProductAccurate::class) {
+                                                $masterPrice = (float) ($item->variant->base_price ?? 0);
+                                            }
+                                            $isPriceDiff = $masterPrice && $masterPrice > 0 && (int)$masterPrice !== (int)$item->price_at_checkout;
+                                        @endphp
+
+                                        @if ($isPriceDiff && $order->order_status !== 'COMPLETED' && $order->order_status !== 'CANCELLED' && $order->order_status !== 'cancelled' && !$order->accurateDocs->where('doc_type', 'SALES_INVOICE')->where('status', 'SUCCESS')->first())
+                                            <div class="mt-1 flex justify-end">
+                                                <button type="button" wire:click="openEditPriceModal({{ $item->id }})"
+                                                    class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200 transition"
+                                                    title="Harga master Accurate berbeda dengan harga SO">
+                                                    <svg class="w-3 h-3 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    Master: Rp {{ number_format($masterPrice, 0, ',', '.') }}
+                                                    <span class="text-blue-600 underline ml-0.5">Sesuaikan</span>
+                                                </button>
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="p-3 text-sm text-right text-red-500">
                                         {{ $item->discount_amount > 0 ? '-Rp ' . number_format($item->discount_amount, 0, ',', '.') : '-' }}
@@ -536,6 +569,101 @@
                     <button type="button" wire:click="saveDp"
                         class="px-6 py-2.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-colors shadow-sm flex items-center gap-2">
                         Simpan Pembayaran DP
+                    </button>
+                </div>
+            </div>
+        </div>
+    {{-- Edit Item Price Modal --}}
+    @if ($showEditPriceModal)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+                <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div class="flex items-center gap-2">
+                        <div class="w-9 h-9 bg-blue-50 text-[#1c69d4] rounded-xl flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-gray-800 text-lg">Ubah Harga Item SO</h3>
+                            <p class="text-xs text-gray-500">Sesuaikan harga transaksi dan sinkronkan ke Accurate</p>
+                        </div>
+                    </div>
+                    <button wire:click="closeEditPriceModal" class="text-gray-400 hover:text-rose-500 font-bold text-2xl leading-none">&times;</button>
+                </div>
+
+                <div class="p-6 space-y-5">
+                    {{-- Info Item --}}
+                    <div class="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <p class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">Produk</p>
+                        <h4 class="font-bold text-gray-800 text-base leading-tight">{{ $editItemName }}</h4>
+                        <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            <span>SKU: <b class="font-mono text-gray-700">{{ $editItemSku }}</b></span>
+                            <span>Qty: <b class="text-gray-700">{{ $editItemQty }} unit</b></span>
+                        </div>
+                    </div>
+
+                    {{-- Harga Master Terkini (Jika ada) --}}
+                    @if ($editItemMasterPrice && $editItemMasterPrice > 0)
+                        <div class="p-4 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between">
+                            <div>
+                                <span class="text-[11px] font-bold text-blue-700 uppercase tracking-wider block">Harga Master Accurate Terkini</span>
+                                <span class="text-base font-black text-[#1c69d4]">Rp {{ number_format($editItemMasterPrice, 0, ',', '.') }}</span>
+                            </div>
+                            <button type="button" wire:click="useMasterPrice"
+                                class="px-3 py-1.5 bg-[#1c69d4] hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-sm">
+                                Gunakan Harga Master
+                            </button>
+                        </div>
+                    @endif
+
+                    {{-- Input Harga Baru --}}
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                            Harga Satuan Baru (Rp) *
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-bold text-gray-400">Rp</span>
+                            <input type="number" wire:model.live="editItemNewPrice"
+                                class="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-lg font-bold text-gray-800 focus:ring-2 focus:ring-[#1c69d4] focus:border-transparent outline-none transition"
+                                placeholder="0" min="1" step="1000">
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">Harga saat ini di SO: Rp {{ number_format($editItemCurrentPrice, 0, ',', '.') }}</p>
+                    </div>
+
+                    {{-- Ringkasan Dampak --}}
+                    @php
+                        $cleanInputPrice = (float) preg_replace('/[^0-9]/', '', (string)$editItemNewPrice);
+                        $impactDiff = ($cleanInputPrice - (float)$editItemCurrentPrice) * max(1, (int)$editItemQty);
+                        $projGrandTotal = max(0, (float)$order->grand_total + $impactDiff);
+                        $paidTotal = (float)$order->payments()->where('status', 'PAID')->sum('amount');
+                        $projRemaining = max(0, $projGrandTotal - $paidTotal);
+                    @endphp
+                    <div class="p-4 bg-neutral-50 rounded-xl border border-neutral-200 text-xs space-y-2">
+                        <div class="flex justify-between text-neutral-600">
+                            <span>Total Nilai SO Baru:</span>
+                            <span class="font-bold text-neutral-800">Rp {{ number_format($projGrandTotal, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="flex justify-between text-neutral-600">
+                            <span>DP yang Sudah Dibayar:</span>
+                            <span class="font-bold text-emerald-600">Rp {{ number_format($paidTotal, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="border-t border-neutral-200 pt-2 flex justify-between font-bold">
+                            <span class="text-neutral-700">Sisa Tagihan Baru:</span>
+                            <span class="text-base text-rose-600">Rp {{ number_format($projRemaining, 0, ',', '.') }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-5 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                    <button type="button" wire:click="closeEditPriceModal"
+                        class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition">
+                        Batal
+                    </button>
+                    <button type="button" wire:click="updateItemPrice" wire:loading.attr="disabled"
+                        class="px-6 py-2.5 bg-[#1c69d4] hover:bg-blue-700 text-white font-bold rounded-xl transition flex items-center gap-2 shadow-sm shadow-blue-500/20">
+                        <span wire:loading.remove wire:target="updateItemPrice">Simpan & Sinkron Accurate</span>
+                        <span wire:loading wire:target="updateItemPrice">Menyimpan...</span>
                     </button>
                 </div>
             </div>
