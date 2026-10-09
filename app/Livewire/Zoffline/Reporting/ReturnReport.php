@@ -6,6 +6,9 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
 use App\Models\WarrantyClaim;
+use App\Models\BusinessUnit;
+use App\Models\Branch;
+use App\Models\ProductAccurate;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ReturnReportExport;
@@ -19,6 +22,9 @@ class ReturnReport extends Component
     public $startDate;
     public $endDate;
     public $status = '';
+    public $businessUnitFilter = '';
+    public $branchFilter = '';
+    public $subCategoryFilter = '';
 
     public $showDetailPanel = false;
     public $selectedClaimId = null;
@@ -49,6 +55,22 @@ class ReturnReport extends Component
         $this->resetPage();
     }
 
+    public function updatingBusinessUnitFilter()
+    {
+        $this->branchFilter = '';
+        $this->resetPage();
+    }
+
+    public function updatingBranchFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSubCategoryFilter()
+    {
+        $this->resetPage();
+    }
+
     public function showDetail($id)
     {
         $this->selectedClaimId = $id;
@@ -68,7 +90,9 @@ class ReturnReport extends Component
         return WarrantyClaim::with([
             'customer.profile', 
             'warranty.orderItem.variant',
-            'warranty.orderItem.order',
+            'warranty.orderItem.order.branch',
+            'warranty.orderItem.order.businessUnit',
+            'warranty.orderItem.order.salesBy',
             'claimedBy',
             'approvedBy',
             'inspection',
@@ -81,7 +105,9 @@ class ReturnReport extends Component
         return WarrantyClaim::with([
             'customer.profile', 
             'warranty.orderItem.variant',
-            'warranty.orderItem.order',
+            'warranty.orderItem.order.branch',
+            'warranty.orderItem.order.businessUnit',
+            'warranty.orderItem.order.salesBy',
             'warranty.orderItem.promos'
         ])
         ->when($this->startDate && $this->endDate, function ($q) {
@@ -94,6 +120,29 @@ class ReturnReport extends Component
         })
         ->when($this->status, function ($q) {
             return $q->where('status', $this->status);
+        })
+        ->when($this->businessUnitFilter && $this->businessUnitFilter !== 'all', function ($q) {
+            return $q->whereHas('warranty.orderItem.order', function ($oq) {
+                $oq->where('business_unit_id', $this->businessUnitFilter);
+            });
+        })
+        ->when($this->branchFilter, function ($q) {
+            return $q->whereHas('warranty.orderItem.order', function ($oq) {
+                $oq->where('branch_id', $this->branchFilter);
+            });
+        })
+        ->when($this->subCategoryFilter, function ($q) {
+            return $q->whereHas('warranty.orderItem', function ($iq) {
+                $iq->where(function ($sub) {
+                    $sub->whereHasMorph('variant', [ProductAccurate::class], function ($vq) {
+                        $vq->where('proyek', $this->subCategoryFilter);
+                    })->orWhereHasMorph('variant', [\App\Models\ProductVariant::class, \App\Models\SecondProductVariant::class], function ($vq) {
+                        $vq->whereHas('accurateData', function ($aq) {
+                            $aq->where('proyek', $this->subCategoryFilter);
+                        });
+                    });
+                });
+            });
         })
         ->when($this->search, function ($q) {
             $term = '%' . $this->search . '%';
@@ -128,8 +177,30 @@ class ReturnReport extends Component
     {
         $claims = $this->buildQuery()->paginate(20);
 
+        $businessUnits = BusinessUnit::orderBy('name')->get();
+
+        $branchQuery = Branch::query();
+        if ($this->businessUnitFilter && $this->businessUnitFilter !== 'all') {
+            $branchQuery->where('business_unit_id', $this->businessUnitFilter);
+        }
+        $availableBranches = $branchQuery->orderBy('name')->get();
+
+        $proyekQuery = ProductAccurate::whereNotNull('proyek')
+            ->where('proyek', '!=', '');
+        if ($this->businessUnitFilter && $this->businessUnitFilter !== 'all') {
+            $proyekQuery->where('business_unit_id', $this->businessUnitFilter);
+        }
+        $availableSubCategories = $proyekQuery->distinct()
+            ->pluck('proyek')
+            ->filter()
+            ->sort()
+            ->values();
+
         return view('livewire.zoffline.reporting.return-report', [
-            'claims' => $claims
+            'claims' => $claims,
+            'businessUnits' => $businessUnits,
+            'availableBranches' => $availableBranches,
+            'availableSubCategories' => $availableSubCategories,
         ]);
     }
 }

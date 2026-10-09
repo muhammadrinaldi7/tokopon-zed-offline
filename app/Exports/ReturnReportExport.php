@@ -31,12 +31,15 @@ class ReturnReportExport implements FromCollection, WithHeadings, ShouldAutoSize
             'No.',
             'No. Klaim',
             'Tanggal Klaim',
+            'Unit Bisnis',
+            'Cabang',
             'No. Pesanan',
             'No. Invoice Accurate',
             'Nama Pelanggan',
             'No. HP Pelanggan',
             'Nama Sales',
             'Produk',
+            'Subkategori',
             'Serial Number',
             'QTY',
             'HARGA SATUAN (Rp)',
@@ -63,6 +66,16 @@ class ReturnReportExport implements FromCollection, WithHeadings, ShouldAutoSize
             ?? ($claim->warranty->orderItem->variant->name ?? 'Produk Tidak Diketahui');
 
         $item = $claim->warranty->orderItem;
+        $order = $item?->order;
+        $unitBisnis = $order?->businessUnit?->name ?? '-';
+        $cabang = $order?->branch?->name ?? '-';
+
+        $variant = $item?->variant;
+        $subKategori = $variant?->proyek ?? ($variant?->accurateData?->proyek ?? '-');
+        if (empty($subKategori)) {
+            $subKategori = '-';
+        }
+
         $qty = $item->qty ?? 1;
         $hargaSatuan = $item->price_at_checkout ?? 0;
         $diskonItem = $item->discount_amount ?? 0;
@@ -82,12 +95,15 @@ class ReturnReportExport implements FromCollection, WithHeadings, ShouldAutoSize
             $this->rowNumber,
             $claim->claim_number,
             $claim->claimed_at ? $claim->claimed_at->format('Y-m-d H:i:s') : '-',
-            $item->order->order_number ?? '-',
-            $item->order->accurate_invoice_no ?? '-',
+            $unitBisnis,
+            $cabang,
+            $order->order_number ?? '-',
+            $order->accurate_invoice_no ?? '-',
             $claim->customer->name ?? '-',
             $claim->customer->profile->phone_number ?? '-',
-            $item->order->salesBy->name ?? '-',
+            $order->salesBy->name ?? '-',
             $productName,
+            $subKategori,
             $claim->serial_number,
             $qty,
             $hargaSatuan,

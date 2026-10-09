@@ -19,10 +19,48 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 w-full">
+            <!-- Unit Bisnis -->
             <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Unit Bisnis</label>
+                <select wire:model.live="businessUnitFilter"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent rounded-lg cursor-pointer w-full p-0">
+                    <option value="">Semua Unit Bisnis</option>
+                    @foreach($businessUnits as $bu)
+                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <!-- Cabang -->
+            <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Cabang</label>
+                <select wire:model.live="branchFilter"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent rounded-lg cursor-pointer w-full p-0">
+                    <option value="">Semua Cabang</option>
+                    @foreach($availableBranches as $branch)
+                        <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <!-- Subkategori (RESMI, INTER, dll) -->
+            <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Subkategori</label>
+                <select wire:model.live="subCategoryFilter"
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent rounded-lg cursor-pointer w-full p-0">
+                    <option value="">Semua Subkategori</option>
+                    @foreach($availableSubCategories as $subCat)
+                        <option value="{{ $subCat }}">{{ $subCat }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <!-- Status -->
+            <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Status</label>
                 <select wire:model.live="status"
-                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent rounded-lg cursor-pointer w-full">
+                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent rounded-lg cursor-pointer w-full p-0">
                     <option value="">Semua Status</option>
                     <option value="pending">Pending</option>
                     <option value="in_repair">Diproses</option>
@@ -33,12 +71,16 @@
                 </select>
             </div>
 
-            <div class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm col-span-1 md:col-span-2">
-                <input type="date" wire:model.live="startDate"
-                    class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700 w-full">
-                <span class="text-gray-400 text-sm font-bold">-</span>
-                <input type="date" wire:model.live="endDate"
-                    class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700 w-full">
+            <!-- Periode Tanggal -->
+            <div class="bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Periode Tanggal</label>
+                <div class="flex items-center gap-1.5">
+                    <input type="date" wire:model.live="startDate"
+                        class="border-none bg-transparent p-0 text-xs focus:ring-0 text-gray-700 w-full">
+                    <span class="text-gray-400 text-xs font-bold">-</span>
+                    <input type="date" wire:model.live="endDate"
+                        class="border-none bg-transparent p-0 text-xs focus:ring-0 text-gray-700 w-full">
+                </div>
             </div>
         </div>
     </div>
@@ -65,8 +107,9 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tgl Klaim & No Resi</th>
+                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Unit & Cabang</th>
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Pelanggan & Sales</th>
-                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Produk, Qty & Harga</th>
+                        <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Produk & Subkategori</th>
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Kendala</th>
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                         <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Resolusi</th>
@@ -81,13 +124,30 @@
                                 <div class="text-sm text-gray-500">{{ $claim->claimed_at ? $claim->claimed_at->format('d/m/Y H:i') : '-' }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-bold text-gray-900">{{ $claim->warranty->orderItem->order->branch->name ?? '-' }}</div>
+                                <div class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 mt-1">
+                                    {{ $claim->warranty->orderItem->order->businessUnit->name ?? '-' }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-medium text-gray-900">{{ $claim->customer->name ?? '-' }}</div>
                                 <div class="text-xs text-gray-500">{{ $claim->customer->profile->phone_number ?? '-' }}</div>
                                 <div class="text-xs text-indigo-600 font-medium mt-1">Sales: {{ $claim->warranty->orderItem->order->salesBy->name ?? '-' }}</div>
                             </td>
                             <td class="px-6 py-4">
-                                <div class="text-sm font-medium text-gray-900 line-clamp-2">
-                                    {{ $claim->warranty->orderItem->product_name ?? ($claim->warranty->orderItem->variant->name ?? 'Produk Tidak Diketahui') }}
+                                @php
+                                    $variant = $claim->warranty->orderItem->variant;
+                                    $proyek = $variant?->proyek ?? ($variant?->accurateData?->proyek ?? null);
+                                @endphp
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-sm font-medium text-gray-900 line-clamp-2">
+                                        {{ $claim->warranty->orderItem->product_name ?? ($variant->name ?? 'Produk Tidak Diketahui') }}
+                                    </span>
+                                    @if(!empty($proyek))
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                            {{ $proyek }}
+                                        </span>
+                                    @endif
                                 </div>
                                 <div class="flex items-center gap-2 mt-1">
                                     <span class="text-xs font-mono font-bold text-gray-500">SN: {{ $claim->serial_number }}</span>
@@ -126,7 +186,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-12 text-center">
+                            <td colspan="8" class="px-6 py-12 text-center">
                                 <div class="flex flex-col items-center justify-center">
                                     <svg class="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24">
@@ -219,6 +279,14 @@
                                         <h3 class="text-sm font-bold text-gray-500 mb-3 border-b pb-2">INFORMASI TRANSAKSI</h3>
                                         <dl class="space-y-2 text-sm">
                                             <div class="flex justify-between">
+                                                <dt class="text-gray-500">Unit Bisnis</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->businessUnit->name ?? '-' }}</dd>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">Cabang</dt>
+                                                <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->branch->name ?? '-' }}</dd>
+                                            </div>
+                                            <div class="flex justify-between">
                                                 <dt class="text-gray-500">No. Pesanan</dt>
                                                 <dd class="font-medium text-gray-900">{{ $this->selectedClaim->warranty->orderItem->order->order_number ?? '-' }}</dd>
                                             </div>
@@ -257,6 +325,14 @@
                                                 <dd class="font-medium text-gray-900 mt-1">
                                                     {{ $this->selectedClaim->warranty->orderItem->product_name ?? ($this->selectedClaim->warranty->orderItem->variant->name ?? 'Produk Tidak Diketahui') }}
                                                 </dd>
+                                            </div>
+                                            @php
+                                                $selVariant = $this->selectedClaim->warranty->orderItem->variant;
+                                                $selProyek = $selVariant?->proyek ?? ($selVariant?->accurateData?->proyek ?? null);
+                                            @endphp
+                                            <div class="flex justify-between">
+                                                <dt class="text-gray-500">Subkategori</dt>
+                                                <dd class="font-semibold text-purple-700">{{ $selProyek ?: '-' }}</dd>
                                             </div>
                                             <div class="flex justify-between">
                                                 <dt class="text-gray-500">Serial Number</dt>
