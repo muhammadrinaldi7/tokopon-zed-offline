@@ -76,6 +76,7 @@ class WarrantyReplacementHandler implements ApprovalHandlerInterface
             $branch_name
         );
 
+        $newVariant = null;
         if ($replacement_type === 'different' && $newItemNo) {
             $newVariant = ProductVariant::whereHas('accurateData', function ($q) use ($newItemNo) {
                 $q->where('item_no', $newItemNo);
@@ -288,10 +289,10 @@ class WarrantyReplacementHandler implements ApprovalHandlerInterface
                     'order_id' => $order->id,
                     'product_id' => $claim->warranty->orderItem?->product_id ?? 1,
                     'product_variant_type' => $replacement_type === 'different' && $newItemNo ?
-                        (isset($newVariant) ? get_class($newVariant) : $claim->warranty->orderItem?->product_variant_type) :
+                        ($newVariant ? get_class($newVariant) : $claim->warranty->orderItem?->product_variant_type) :
                         $claim->warranty->orderItem?->product_variant_type,
                     'product_variant_id' => $replacement_type === 'different' && $newItemNo ?
-                        ($newVariant->id ?? $claim->warranty->orderItem?->product_variant_id) :
+                        ($newVariant?->id ?? $claim->warranty->orderItem?->product_variant_id) :
                         $claim->warranty->orderItem?->product_variant_id,
                     'product_name' => $replacement_type === 'different' && $replacement_product_name ?
                         $replacement_product_name :

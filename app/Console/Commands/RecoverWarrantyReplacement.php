@@ -27,17 +27,18 @@ class RecoverWarrantyReplacement extends Command
      * @var string
      */
     protected $signature = 'warranty:recover-replacement 
-                            {approval_id=4580 : ID dari ApprovalRequest}
-                            {--sr=SRT.2026.10.00010 : Nomor Sales Return dari Accurate}
-                            {--receipt=10.02.103.2026.10.00009 : Nomor Sales Receipt dari Accurate}
-                            {--invoice= : Nomor Sales Invoice dari Accurate (opsional)}';
+                            {approval_id : ID dari ApprovalRequest}
+                            {--sr= : Nomor Sales Return dari Accurate (contoh: SRT.2026.10.00017)}
+                            {--receipt= : Nomor Sales Receipt dari Accurate}
+                            {--receipt-id= : ID Sales Receipt dari Accurate (opsional jika nomor belum diketahui)}
+                            {--invoice= : Nomor Sales Invoice dari Accurate (contoh: GSK.SI.2026.10.00845)}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Memulihkan data transaksi klaim ganti unit yang ter-rollback di POS akibat deadlock setelah Accurate sukses';
+    protected $description = 'Memulihkan data transaksi klaim ganti unit yang ter-rollback di POS akibat deadlock atau error DB setelah Accurate sukses';
 
     /**
      * Execute the console command.
@@ -47,6 +48,7 @@ class RecoverWarrantyReplacement extends Command
         $approvalId = (int) $this->argument('approval_id');
         $srDocNumber = $this->option('sr');
         $receiptDocNumber = $this->option('receipt');
+        $receiptId = $this->option('receipt-id');
         $invoiceDocNumber = $this->option('invoice');
 
         $this->info("=== MEMULAI RECOVERY KLAIM GANTI UNIT (APPROVAL #{$approvalId}) ===");
@@ -91,6 +93,21 @@ class RecoverWarrantyReplacement extends Command
             return Command::FAILURE;
         }
 
+        // Auto-lookup Sales Receipt dari Accurate jika receipt-id diberikan tetapi receipt doc number belum ada
+        if (empty($receiptDocNumber) && !empty($receiptId)) {
+            try {
+                $businessUnitCode = $claim->warranty->policy?->businessUnit?->code ?? 'syihab';
+                $accurateService = app(\App\Services\AccurateService::class);
+                $receiptDetail = $accurateService->getDetailSalesReceipt($receiptId, $businessUnitCode);
+                if ($receiptDetail && !empty($receiptDetail['number'])) {
+                    $receiptDocNumber = $receiptDetail['number'];
+                    $this->info("Berhasil mengambil nomor Sales Receipt dari Accurate: {$receiptDocNumber}");
+                }
+            } catch (\Exception $e) {
+                $this->warn("Tidak dapat mengambil detail Sales Receipt dari Accurate (ID {$receiptId}): " . $e->getMessage());
+            }
+        }
+
         $this->table(['Informasi', 'Nilai'], [
             ['Approval ID', $approvalId],
             ['Claim Number', $claim->claim_number],
@@ -98,7 +115,8 @@ class RecoverWarrantyReplacement extends Command
             ['IMEI Lama', $oldSn],
             ['IMEI Baru', $newSn],
             ['Sales Return Doc', $srDocNumber ?: '-'],
-            ['Sales Receipt Doc', $receiptDocNumber ?: '-'],
+            ['Sales Invoice Doc', $invoiceDocNumber ?: '-'],
+            ['Sales Receipt Doc', $receiptDocNumber ?: ($receiptId ? "ID {$receiptId} (Gagal lookup)" : '-')],
         ]);
 
         $originalPrice = $original_price > 0 ? $original_price : (float) ($warranty->orderItem?->price_at_checkout ?? 0);
@@ -226,10 +244,11 @@ class RecoverWarrantyReplacement extends Command
                 }
 
                 if ($srDocNumber) {
-                    OrderAccurateDoc::create([
+                    OrderAccurateDoc::firstOrCreate([
                         'order_id' => $retOrder->id,
                         'doc_type' => 'SALES_RETURN',
                         'doc_number' => $srDocNumber,
+                    ], [
                         'status' => 'SUCCESS',
                     ]);
                 }
@@ -296,27 +315,33 @@ class RecoverWarrantyReplacement extends Command
                 $warranty->order_item_id = $orderItem->id;
                 $warranty->save();
 
-                if ($invoiceDocNumber) {
-                    OrderAccurateDoc::create([
-                        'order_id' => $wrOrder->id,
-                        'doc_type' => 'SALES_INVOICE',
-                        'doc_number' => $invoiceDocNumber,
-                        'status' => 'SUCCESS',
-                    ]);
-                }
-
-                if ($receiptDocNumber) {
-                    OrderAccurateDoc::create([
-                        'order_id' => $wrOrder->id,
-                        'doc_type' => 'SALES_RECEIPT',
-                        'doc_number' => $receiptDocNumber,
-                        'status' => 'SUCCESS',
-                    ]);
-                }
-
                 $this->info("[5/7] Order Pengganti {$wrOrderNumber} berhasil dibuat!");
             } else {
                 $this->info("[5/7] Order Pengganti {$wrOrderNumber} sudah ada.");
+            }
+
+            if ($invoiceDocNumber) {
+                if (!$wrOrder->accurate_invoice_no) {
+                    $wrOrder->accurate_invoice_no = $invoiceDocNumber;
+                    $wrOrder->save();
+                }
+                OrderAccurateDoc::firstOrCreate([
+                    'order_id' => $wrOrder->id,
+                    'doc_type' => 'SALES_INVOICE',
+                    'doc_number' => $invoiceDocNumber,
+                ], [
+                    'status' => 'SUCCESS',
+                ]);
+            }
+
+            if ($receiptDocNumber) {
+                OrderAccurateDoc::firstOrCreate([
+                    'order_id' => $wrOrder->id,
+                    'doc_type' => 'SALES_RECEIPT',
+                    'doc_number' => $receiptDocNumber,
+                ], [
+                    'status' => 'SUCCESS',
+                ]);
             }
 
             // 6. Update Status IMEI Baru di tabel ProductSerialNumber menjadi Sold
