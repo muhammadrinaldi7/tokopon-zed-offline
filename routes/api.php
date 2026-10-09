@@ -137,6 +137,12 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
     Route::get('/business-units', [\App\Http\Controllers\Api\Mobile\BusinessUnitController::class, 'index'])
         ->name('api.mobile.business-units.index');
 
+    // 1.1 Promo Banners & Flash Sales
+    Route::get('/banners', [\App\Http\Controllers\Api\Mobile\BannerController::class, 'index'])
+        ->name('api.mobile.banners.index');
+    Route::get('/flash-sales', [\App\Http\Controllers\Api\Mobile\FlashSaleController::class, 'index'])
+        ->name('api.mobile.flash-sales.index');
+
     // 2. Katalog Produk Toko Online
     Route::get('/products', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'index'])
         ->name('api.mobile.products.index');

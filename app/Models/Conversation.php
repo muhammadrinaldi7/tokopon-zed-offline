@@ -14,7 +14,22 @@ class Conversation extends Model
         'guest_name',
         'guest_phone',
         'product_accurate_id',
+        'closing_status',
+        'closing_amount',
+        'closing_notes',
+        'closed_by_user_id',
+        'closed_at',
     ];
+
+    protected $casts = [
+        'closing_amount' => 'decimal:2',
+        'closed_at' => 'datetime',
+    ];
+
+    public function closedBy()
+    {
+        return $this->belongsTo(User::class, 'closed_by_user_id');
+    }
 
     public function user()
     {

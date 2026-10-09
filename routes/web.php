@@ -86,6 +86,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('zoffline.approvals.index');
     Route::get('/zoffline/approval-rules', \App\Livewire\Admin\Settings\ApprovalRule\Index::class)->name('zoffline.approval-rules.index')->middleware('can:manage-settings');
 
+    // Zoffline E-Commerce & CS Live Chat
+    Route::get('/zoffline/cs-chat', \App\Livewire\Zoffline\Ecommerce\CsChat::class)->name('zoffline.cs-chat')->middleware('can:access-cs-chat');
+    Route::prefix('zoffline/ecommerce')->name('zoffline.ecommerce.')->middleware('can:access-cs-chat')->group(function () {
+        Route::get('/flash-sale', \App\Livewire\Zoffline\Ecommerce\FlashSaleManager::class)->name('flash-sale');
+        Route::get('/banners', \App\Livewire\Zoffline\Ecommerce\BannerManager::class)->name('banners');
+        Route::get('/products', \App\Livewire\Zoffline\Ecommerce\ProductCuration::class)->name('products');
+        Route::get('/closing-analytics', \App\Livewire\Zoffline\Ecommerce\ClosingAnalytics::class)->name('closing-analytics');
+    });
+
     // Reporting
     Route::prefix('reporting')->name('reporting.')->middleware('can:view-reporting')->group(function () {
         Route::get('/sales', \App\Livewire\Zoffline\Reporting\SalesReport::class)->name('sales');
@@ -244,9 +253,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
 // Route::get('/qc/device/{imei}', App\Livewire\Pages\PublicDeviceQc::class)->name('public.device-qc');
 
-// ─── CS Chat Route (requires auth + admin middleware + cs role) ──
-Route::livewire('/admin/cs-chat', 'pages::cs-dashboard')
-    ->middleware(['auth', 'admin', 'can:access-cs-chat'])
+// ─── CS Chat Route (Unified with Zoffline E-Commerce) ──
+Route::get('/admin/cs-chat', \App\Livewire\Zoffline\Ecommerce\CsChat::class)
+    ->middleware(['auth', 'can:access-cs-chat'])
     ->name('admin.cs-chat');
 
 // ─── Logout ─────────────────────────────────────────────────────
