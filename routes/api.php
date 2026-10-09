@@ -122,11 +122,22 @@ Route::prefix('v1/executive')->group(function () {
 // MOBILE APP E-COMMERCE & REALTIME CHAT API
 // ============================================
 Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
-    // 0. Daftar Unit Bisnis / Toko Online (Store Switcher)
+    // 0. Autentikasi Pengguna Mobile App
+    Route::post('/auth/login', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'login'])
+        ->name('api.mobile.auth.login');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/auth/me', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'me'])
+            ->name('api.mobile.auth.me');
+        Route::post('/auth/logout', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'logout'])
+            ->name('api.mobile.auth.logout');
+    });
+
+    // 1. Daftar Unit Bisnis / Toko Online (Store Switcher)
     Route::get('/business-units', [\App\Http\Controllers\Api\Mobile\BusinessUnitController::class, 'index'])
         ->name('api.mobile.business-units.index');
 
-    // 1. Katalog Produk Toko Online
+    // 2. Katalog Produk Toko Online
     Route::get('/products', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'index'])
         ->name('api.mobile.products.index');
     Route::get('/products/categories', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'categories'])
@@ -138,11 +149,11 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
     Route::get('/products/{id}/serial-numbers', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'serialNumbers'])
         ->name('api.mobile.products.serial-numbers');
 
-    // 2. Rekening Pembayaran Manual
+    // 3. Rekening Pembayaran Manual
     Route::get('/payment-methods', [\App\Http\Controllers\Api\Mobile\PaymentMethodController::class, 'index'])
         ->name('api.mobile.payment-methods.index');
 
-    // 3. Transaksi & Checkout Pesanan
+    // 4. Transaksi & Checkout Pesanan
     Route::post('/orders/checkout', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'checkout'])
         ->name('api.mobile.orders.checkout');
     Route::get('/orders/{orderNumber}', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'show'])
@@ -152,7 +163,7 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
     Route::post('/orders/{orderNumber}/cancel', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'cancel'])
         ->name('api.mobile.orders.cancel');
 
-    // 4. Realtime Chat (Customer & Guest)
+    // 5. Realtime Chat (Customer & Guest)
     Route::post('/chat/init', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'initConversation'])
         ->name('api.mobile.chat.init');
     Route::get('/chat/conversations/{conversationId}/messages', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'getMessages'])
@@ -162,5 +173,3 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
     Route::post('/chat/conversations/{conversationId}/read', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'markAsRead'])
         ->name('api.mobile.chat.read');
 });
-
-
