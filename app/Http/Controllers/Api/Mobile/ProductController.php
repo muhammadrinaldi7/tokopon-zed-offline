@@ -68,8 +68,10 @@ class ProductController extends Controller
             })
             ->with([
                 'businessUnit',
+                'media',
                 'product.media',
                 'productVariants.media',
+                'secondProductVariants.media',
                 'warehouseStocks' => function ($q) use ($onlineWarehouseIds) {
                     $q->whereIn('warehouse_id', $onlineWarehouseIds);
                 }
@@ -124,14 +126,21 @@ class ProductController extends Controller
         $items = $paginated->getCollection()->map(function ($product) {
             $totalOnlineStock = $product->warehouseStocks->sum('stock');
 
-            // Ambil gambar produk terbaik
+            // Ambil gambar produk terbaik (Prioritas: Cover ProductAccurate -> Cover Induk -> Varian Baru -> Varian Second)
             $imageUrl = null;
-            if ($product->product && $product->product->hasMedia('cover')) {
+            if ($product->hasMedia('cover')) {
+                $imageUrl = $product->getFirstMediaUrl('cover');
+            } elseif ($product->product && $product->product->hasMedia('cover')) {
                 $imageUrl = $product->product->getFirstMediaUrl('cover');
             } elseif ($product->productVariants->isNotEmpty()) {
                 $firstVariant = $product->productVariants->first();
                 if ($firstVariant && $firstVariant->hasMedia('variant_image')) {
                     $imageUrl = $firstVariant->getFirstMediaUrl('variant_image');
+                }
+            } elseif ($product->secondProductVariants->isNotEmpty()) {
+                $firstSecondVariant = $product->secondProductVariants->first();
+                if ($firstSecondVariant && $firstSecondVariant->hasMedia('variant_image')) {
+                    $imageUrl = $firstSecondVariant->getFirstMediaUrl('variant_image');
                 }
             }
 
@@ -177,8 +186,10 @@ class ProductController extends Controller
 
         $product = ProductAccurate::with([
             'businessUnit',
+            'media',
             'product.media',
             'productVariants.media',
+            'secondProductVariants.media',
             'warehouseStocks' => function ($q) use ($onlineWarehouseIds) {
                 $q->whereIn('warehouse_id', $onlineWarehouseIds)->with('warehouse');
             }
@@ -195,6 +206,15 @@ class ProductController extends Controller
 
         // Kumpulkan semua foto produk
         $images = [];
+        if ($product->hasMedia('cover')) {
+            $images[] = $product->getFirstMediaUrl('cover');
+        }
+        if ($product->hasMedia('gallery')) {
+            foreach ($product->getMedia('gallery') as $media) {
+                $images[] = $media->getFullUrl();
+            }
+        }
+
         if ($product->product) {
             foreach ($product->product->getMedia('cover') as $media) {
                 $images[] = $media->getFullUrl();
@@ -205,6 +225,12 @@ class ProductController extends Controller
         }
 
         foreach ($product->productVariants as $variant) {
+            if ($variant->hasMedia('variant_image')) {
+                $images[] = $variant->getFirstMediaUrl('variant_image');
+            }
+        }
+
+        foreach ($product->secondProductVariants as $variant) {
             if ($variant->hasMedia('variant_image')) {
                 $images[] = $variant->getFirstMediaUrl('variant_image');
             }
