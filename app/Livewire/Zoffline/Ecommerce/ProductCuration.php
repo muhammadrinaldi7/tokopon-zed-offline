@@ -5,6 +5,7 @@ namespace App\Livewire\Zoffline\Ecommerce;
 use App\Models\BusinessUnit;
 use App\Models\ProductAccurate;
 use App\Models\Warehouse;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -18,8 +19,12 @@ class ProductCuration extends Component
     public string $search = '';
     public ?int $selectedBusinessUnitId = null;
     public string $selectedCategory = '';
+    public string $selectedBrand = '';
+    public bool $onlyInStock = true; // Sesuai permintaan: jika stok 0 jangan muncul (default true)
+    public string $mediaFilter = 'all'; // all, has_media, no_media
     public $businessUnits = [];
     public $categories = [];
+    public $brands = [];
 
     // Modal Upload Foto Produk
     public bool $showUploadModal = false;
@@ -31,10 +36,19 @@ class ProductCuration extends Component
     public function mount()
     {
         $this->businessUnits = BusinessUnit::where('is_active', true)->where('is_visible_mobile', true)->get();
+        
         $this->categories = ProductAccurate::whereNotNull('categoryName')
             ->where('categoryName', '!=', '')
             ->distinct()
+            ->orderBy('categoryName')
             ->pluck('categoryName')
+            ->values();
+
+        $this->brands = ProductAccurate::whereNotNull('brandName')
+            ->where('brandName', '!=', '')
+            ->distinct()
+            ->orderBy('brandName')
+            ->pluck('brandName')
             ->values();
     }
 
@@ -50,6 +64,32 @@ class ProductCuration extends Component
 
     public function updatingSelectedCategory()
     {
+        $this->resetPage();
+    }
+
+    public function updatingSelectedBrand()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingOnlyInStock()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingMediaFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function resetFilters()
+    {
+        $this->search = '';
+        $this->selectedBusinessUnitId = null;
+        $this->selectedCategory = '';
+        $this->selectedBrand = '';
+        $this->onlyInStock = true;
+        $this->mediaFilter = 'all';
         $this->resetPage();
     }
 
@@ -142,6 +182,26 @@ class ProductCuration extends Component
                 }
             ]);
 
+        // Filter stok ready di gudang online (Stok > 0)
+        if ($this->onlyInStock) {
+            if (!empty($onlineWarehouseIds)) {
+                $query->whereExists(function ($sub) use ($onlineWarehouseIds) {
+                    $sub->select(DB::raw(1))
+                        ->from('warehouse_stocks')
+                        ->whereColumn('warehouse_stocks.variant_id', 'product_accurates.id')
+                        ->whereIn('warehouse_stocks.variant_type', [
+                            ProductAccurate::class,
+                            'App\\Models\\ProductAccurate',
+                            'ProductAccurate'
+                        ])
+                        ->whereIn('warehouse_stocks.warehouse_id', $onlineWarehouseIds)
+                        ->where('warehouse_stocks.stock', '>', 0);
+                });
+            } else {
+                $query->where('stock', '>', 0);
+            }
+        }
+
         if ($this->selectedBusinessUnitId) {
             $query->where('business_unit_id', $this->selectedBusinessUnitId);
         } else {
@@ -160,6 +220,24 @@ class ProductCuration extends Component
 
         if (!empty($this->selectedCategory)) {
             $query->where('categoryName', $this->selectedCategory);
+        }
+
+        if (!empty($this->selectedBrand)) {
+            $query->where('brandName', $this->selectedBrand);
+        }
+
+        if ($this->mediaFilter === 'has_media') {
+            $query->where(function ($q) {
+                $q->whereHas('media')
+                  ->orWhereHas('product.media')
+                  ->orWhereHas('productVariants.media')
+                  ->orWhereHas('secondProductVariants.media');
+            });
+        } elseif ($this->mediaFilter === 'no_media') {
+            $query->whereDoesntHave('media')
+                  ->whereDoesntHave('product.media')
+                  ->whereDoesntHave('productVariants.media')
+                  ->whereDoesntHave('secondProductVariants.media');
         }
 
         $products = $query->paginate(24);

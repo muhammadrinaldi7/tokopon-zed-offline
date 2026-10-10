@@ -15,13 +15,13 @@
                         </span>
                     </h3>
                     <p class="text-xs text-gray-500 mt-0.5">
-                        Anda dapat mengunggah atau mengganti foto produk langsung dari sini. Foto otomatis tersimpan di Cloudflare R2 CDN dan langsung tampil di mobile app.
+                        Unggah dan kelola foto produk untuk katalog mobile app. Foto otomatis tersimpan di Cloudflare R2 CDN.
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <a href="{{ route('admin.products') }}" target="_blank"
                         class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition flex items-center gap-1">
-                        <span>📱 Katalog Baru (Syihab)</span>
+                        <span>📦 Katalog Baru (Syihab)</span>
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                     </a>
                     <a href="{{ route('admin.second-products') }}" target="_blank"
@@ -30,29 +30,84 @@
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                     </a>
                     <span class="px-3 py-1.5 bg-sky-50 text-sky-800 rounded-xl text-xs font-bold border border-sky-200">
-                        {{ $onlineWarehouseCount }} Gudang Online
+                        {{ $onlineWarehouseCount }} Gudang Online Aktif
                     </span>
                 </div>
             </div>
 
-            {{-- Filter Rows --}}
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari nama produk atau SKU..."
-                    class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:bg-white focus:border-indigo-500 outline-none">
+            {{-- Filter Rows Utama: Search, Brand, Kategori, Toko, Status Foto --}}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-1">
+                {{-- Search Input --}}
+                <div class="relative">
+                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari nama produk / SKU..."
+                        class="w-full pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:bg-white focus:border-indigo-500 outline-none transition">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </div>
+                    @if(!empty($search))
+                        <button type="button" wire:click="$set('search', '')" class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    @endif
+                </div>
 
-                <select wire:model.live="selectedBusinessUnitId" class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700">
+                {{-- Filter Brand (Pilihan Brand) --}}
+                <select wire:model.live="selectedBrand" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:bg-white focus:border-indigo-500 outline-none transition">
+                    <option value="">Semua Brand</option>
+                    @foreach($brands as $brand)
+                        <option value="{{ $brand }}">{{ $brand }}</option>
+                    @endforeach
+                </select>
+
+                {{-- Filter Kategori --}}
+                <select wire:model.live="selectedCategory" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:bg-white focus:border-indigo-500 outline-none transition">
+                    <option value="">Semua Kategori</option>
+                    @foreach($categories as $cat)
+                        <option value="{{ $cat }}">{{ $cat }}</option>
+                    @endforeach
+                </select>
+
+                {{-- Filter Toko Mobile --}}
+                <select wire:model.live="selectedBusinessUnitId" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:bg-white focus:border-indigo-500 outline-none transition">
                     <option value="">Semua Toko Mobile</option>
                     @foreach($businessUnits as $bu)
                         <option value="{{ $bu->id }}">{{ $bu->name }}</option>
                     @endforeach
                 </select>
 
-                <select wire:model.live="selectedCategory" class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700">
-                    <option value="">Semua Kategori</option>
-                    @foreach($categories as $cat)
-                        <option value="{{ $cat }}">{{ $cat }}</option>
-                    @endforeach
+                {{-- Filter Status Foto R2 --}}
+                <select wire:model.live="mediaFilter" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:bg-white focus:border-indigo-500 outline-none transition">
+                    <option value="all">Semua Status Foto</option>
+                    <option value="has_media">✅ Sudah Ada Foto (R2)</option>
+                    <option value="no_media">⚠️ Belum Ada Foto</option>
                 </select>
+            </div>
+
+            {{-- Sub-Toolbar: Toggle Stok 0 & Summary Info --}}
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100">
+                <div class="flex flex-wrap items-center gap-2">
+                    {{-- Toggle Hanya Stok Ready (> 0) --}}
+                    <button type="button" wire:click="$toggle('onlyInStock')"
+                        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border {{ $onlyInStock ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100' }}">
+                        <span class="w-2 h-2 rounded-full {{ $onlyInStock ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400' }}"></span>
+                        <span>Hanya Stok Ready (> 0)</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold {{ $onlyInStock ? 'bg-emerald-200/70 text-emerald-900' : 'bg-gray-200 text-gray-600' }}">
+                            {{ $onlyInStock ? 'Aktif' : 'Semua Stok' }}
+                        </span>
+                    </button>
+
+                    @if(!empty($search) || $selectedBusinessUnitId || !empty($selectedCategory) || !empty($selectedBrand) || $mediaFilter !== 'all' || !$onlyInStock)
+                        <button type="button" wire:click="resetFilters"
+                            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            <span>Reset Filter</span>
+                        </button>
+                    @endif
+                </div>
+
+                <div class="text-xs font-semibold text-gray-500">
+                    Menampilkan <span class="font-bold text-gray-900">{{ $products->total() }}</span> produk katalog
+                </div>
             </div>
         </div>
 
@@ -98,9 +153,19 @@
                                         Placeholder
                                     </span>
                                 @endif
+                                @if($prod->brandName)
+                                    <span class="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 bg-black/70 backdrop-blur-xs text-white rounded text-[9px] font-extrabold uppercase">
+                                        {{ $prod->brandName }}
+                                    </span>
+                                @endif
                             </div>
 
-                            <span class="text-[10px] font-bold text-indigo-600 uppercase">{{ $prod->brandName ?? 'Gadget' }}</span>
+                            <div class="flex items-center justify-between gap-1 mb-0.5">
+                                <span class="text-[10px] font-bold text-indigo-600 uppercase truncate">{{ $prod->categoryName ?? 'Gadget' }}</span>
+                                @if($prod->item_no)
+                                    <span class="text-[9px] font-mono text-gray-400 truncate max-w-[60px]" title="{{ $prod->item_no }}">{{ $prod->item_no }}</span>
+                                @endif
+                            </div>
                             <h4 class="text-xs font-bold text-gray-900 line-clamp-2 leading-snug mt-0.5" title="{{ $prod->name }}">{{ $prod->name }}</h4>
                         </div>
 
@@ -128,8 +193,21 @@
                         </div>
                     </div>
                 @empty
-                    <div class="col-span-full py-16 text-center text-gray-400 text-xs">
-                        Tidak ada produk yang cocok dengan pencarian dan filter Anda.
+                    <div class="col-span-full py-16 text-center">
+                        <div class="w-12 h-12 rounded-2xl bg-gray-100 text-gray-400 mx-auto flex items-center justify-center mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        </div>
+                        <h4 class="text-sm font-bold text-gray-800">Tidak ada produk yang cocok</h4>
+                        <p class="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+                            @if($onlyInStock)
+                                Tidak ada produk dengan stok > 0 untuk kombinasi filter ini. Anda dapat menonaktifkan tombol "Hanya Stok Ready" untuk melihat produk dengan stok 0.
+                            @else
+                                Coba sesuaikan kata kunci pencarian, kategori, atau brand yang dipilih.
+                            @endif
+                        </p>
+                        <button type="button" wire:click="resetFilters" class="mt-3 px-4 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition">
+                            Reset Semua Filter
+                        </button>
                     </div>
                 @endforelse
             </div>
