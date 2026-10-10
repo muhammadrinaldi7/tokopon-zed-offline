@@ -122,7 +122,11 @@ Route::prefix('v1/executive')->group(function () {
 // MOBILE APP E-COMMERCE & REALTIME CHAT API
 // ============================================
 Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
-    // 0. Autentikasi Pengguna Mobile App
+    // 0. Remote Config & Feature Flags
+    Route::get('/config', [\App\Http\Controllers\Api\Mobile\ConfigController::class, 'index'])
+        ->name('api.mobile.config');
+
+    // 0.1 Autentikasi Pengguna Mobile App
     Route::post('/auth/login', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'login'])
         ->name('api.mobile.auth.login');
 

@@ -93,6 +93,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/banners', \App\Livewire\Zoffline\Ecommerce\BannerManager::class)->name('banners');
         Route::get('/products', \App\Livewire\Zoffline\Ecommerce\ProductCuration::class)->name('products');
         Route::get('/closing-analytics', \App\Livewire\Zoffline\Ecommerce\ClosingAnalytics::class)->name('closing-analytics');
+        Route::get('/settings', \App\Livewire\Zoffline\Ecommerce\EcommerceSettings::class)->name('settings');
     });
 
     // Reporting

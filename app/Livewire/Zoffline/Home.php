@@ -165,6 +165,11 @@ class Home extends Component
     {
         return $this->redirectRoute('zoffline.ecommerce.closing-analytics', navigate: true);
     }
+
+    public function navigateToEcommerceSettings()
+    {
+        return $this->redirectRoute('zoffline.ecommerce.settings', navigate: true);
+    }
     public function render()
     {
         return view('livewire.zoffline.home');

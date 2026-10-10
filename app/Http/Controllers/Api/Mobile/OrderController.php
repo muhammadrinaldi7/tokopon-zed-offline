@@ -75,20 +75,35 @@ class OrderController extends Controller
                     $user = $existingProfile->user;
                 } else {
                     $customerName = trim($shipping['name'] ?: 'Pelanggan Mobile');
-                    $user = User::create([
-                        'name' => $customerName,
-                        'email' => $cleanPhone . '@tokopon.internal',
-                        'password' => bcrypt(Str::random(20)),
-                    ]);
+                    $existingUser = User::where('email', $cleanPhone . '@tokopon.internal')->first();
 
-                    UserProfile::create([
-                        'user_id' => $user->id,
-                        'phone_number' => $cleanPhone,
-                        'address' => $shipping['address'] ?? null,
-                    ]);
+                    if ($existingUser) {
+                        $user = $existingUser;
+                        if (!$user->profile) {
+                            UserProfile::create([
+                                'user_id' => $user->id,
+                                'full_name' => $customerName,
+                                'phone_number' => $cleanPhone,
+                                'address' => $shipping['address'] ?? null,
+                            ]);
+                        }
+                    } else {
+                        $user = User::create([
+                            'name' => $customerName,
+                            'email' => $cleanPhone . '@tokopon.internal',
+                            'password' => bcrypt(Str::random(20)),
+                        ]);
 
-                    if (Role::where('name', 'customer')->exists()) {
-                        $user->assignRole('customer');
+                        UserProfile::create([
+                            'user_id' => $user->id,
+                            'full_name' => $customerName,
+                            'phone_number' => $cleanPhone,
+                            'address' => $shipping['address'] ?? null,
+                        ]);
+
+                        if (Role::where('name', 'customer')->exists()) {
+                            $user->assignRole('customer');
+                        }
                     }
                 }
             }
