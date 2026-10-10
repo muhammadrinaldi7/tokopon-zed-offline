@@ -56,12 +56,10 @@ class ProductCuration extends Component
     public function openUploadModal(int $productId)
     {
         $this->selectedProductId = $productId;
+        // Hanya muat relasi yang esensial agar modal terbuka instan tanpa delay
         $this->selectedProduct = ProductAccurate::with([
             'businessUnit',
             'media',
-            'product.media',
-            'productVariants.media',
-            'secondProductVariants.media',
         ])->find($productId);
 
         $this->coverPhoto = null;
@@ -76,10 +74,16 @@ class ProductCuration extends Component
         $this->selectedProduct = null;
         $this->coverPhoto = null;
         $this->galleryPhotos = [];
+        $this->resetErrorBag();
     }
 
     public function saveProductPhotos()
     {
+        if (!$this->coverPhoto && empty($this->galleryPhotos)) {
+            $this->addError('coverPhoto', 'Foto belum dipilih atau proses unggah belum selesai. Harap pilih foto dan tunggu hingga 100%.');
+            return;
+        }
+
         $this->validate([
             'coverPhoto' => 'nullable|image|max:10240',
             'galleryPhotos.*' => 'nullable|image|max:10240',

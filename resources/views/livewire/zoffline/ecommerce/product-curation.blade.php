@@ -114,10 +114,16 @@
                             </div>
 
                             {{-- Tombol Aksi Upload / Edit Foto Cepat --}}
-                            <button type="button" wire:click="openUploadModal({{ $prod->id }})"
-                                class="mt-2.5 w-full py-1.5 px-2 bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all duration-200 shadow-xs">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                <span>{{ $hasMedia ? 'Ganti Foto' : 'Upload Foto' }}</span>
+                            <button type="button" wire:click="openUploadModal({{ $prod->id }})" wire:loading.attr="disabled"
+                                class="mt-2.5 w-full py-1.5 px-2 bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all duration-200 shadow-xs disabled:opacity-50">
+                                <span wire:loading.remove wire:target="openUploadModal({{ $prod->id }})" class="flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    <span>{{ $hasMedia ? 'Ganti Foto' : 'Upload Foto' }}</span>
+                                </span>
+                                <span wire:loading wire:target="openUploadModal({{ $prod->id }})" class="flex items-center gap-1.5 text-indigo-600">
+                                    <svg class="animate-spin w-3.5 h-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                                    <span>Membuka...</span>
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -137,8 +143,17 @@
 
     {{-- MODAL UPLOAD FOTO KE CLOUDFLARE R2 --}}
     @if($showUploadModal && $selectedProduct)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in">
-            <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-gray-100 overflow-hidden" @click.outside="$wire.closeUploadModal()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+            x-data="{
+                isUploading: false,
+                progress: 0,
+                localPreview: null
+            }"
+            x-on:livewire-upload-start="isUploading = true; progress = 0"
+            x-on:livewire-upload-finish="isUploading = false"
+            x-on:livewire-upload-error="isUploading = false"
+            x-on:livewire-upload-progress="progress = $event.detail.progress">
+            <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-gray-100 overflow-hidden" @click.outside="if(!isUploading) $wire.closeUploadModal()">
                 {{-- Header Modal --}}
                 <div class="px-6 py-4 bg-gradient-to-r from-gray-900 to-indigo-950 text-white flex items-center justify-between">
                     <div>
@@ -148,7 +163,7 @@
                         </h4>
                         <p class="text-[11px] text-gray-300 truncate max-w-sm mt-0.5">{{ $selectedProduct->name }}</p>
                     </div>
-                    <button type="button" wire:click="closeUploadModal" class="p-1.5 text-gray-400 hover:text-white rounded-xl hover:bg-white/10 transition">
+                    <button type="button" wire:click="closeUploadModal" :disabled="isUploading" class="p-1.5 text-gray-400 hover:text-white rounded-xl hover:bg-white/10 transition disabled:opacity-40">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -187,7 +202,7 @@
                     @endif
 
                     {{-- Form Upload Foto Sampul Baru --}}
-                    <div x-data="{ localPreview: null }">
+                    <div>
                         <label class="block text-xs font-bold text-gray-800 mb-1.5">
                             Pilih Foto Sampul Baru <span class="text-rose-500">*</span>
                         </label>
@@ -195,12 +210,30 @@
                             @change="if ($event.target.files[0]) { localPreview = URL.createObjectURL($event.target.files[0]); }"
                             class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-gray-200 rounded-2xl p-1 bg-gray-50">
                         <p class="text-[10px] text-gray-400 mt-1">Format: JPG, PNG, WEBP (Maksimal 10MB). Resolusi persegi (1:1) disarankan untuk katalog mobile.</p>
-                        @error('coverPhoto') <span class="text-rose-600 text-xs font-medium">{{ $message }}</span> @enderror
+                        @error('coverPhoto') <div class="mt-1.5 p-2 bg-rose-50 text-rose-700 text-xs font-bold rounded-xl border border-rose-200">{{ $message }}</div> @enderror
+
+                        {{-- Realtime Progress Bar saat Mengunggah dari Browser --}}
+                        <div x-show="isUploading" class="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-2xl" style="display: none;">
+                            <div class="flex items-center justify-between text-xs font-bold text-indigo-800 mb-1.5">
+                                <span class="flex items-center gap-1.5">
+                                    <svg class="animate-spin w-3.5 h-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                                    <span>Sedang mengunggah file ke server...</span>
+                                </span>
+                                <span x-text="progress + '%'" class="font-mono font-extrabold text-indigo-700"></span>
+                            </div>
+                            <div class="w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
+                                <div class="bg-indigo-600 h-2 rounded-full transition-all duration-150 ease-out" :style="'width: ' + progress + '%'"></div>
+                            </div>
+                            <p class="text-[10px] text-indigo-600 mt-1">Mohon tunggu hingga 100% sebelum menekan tombol simpan.</p>
+                        </div>
 
                         {{-- Instant Preview Foto Baru --}}
-                        <div class="mt-3" x-show="localPreview" style="display: none;">
-                            <span class="text-[11px] font-bold text-gray-600">Pratinjau Foto Baru:</span>
-                            <div class="mt-1 w-32 h-32 rounded-2xl overflow-hidden border-2 border-indigo-500 shadow-xs bg-gray-100">
+                        <div class="mt-3" x-show="localPreview && !isUploading" style="display: none;">
+                            <span class="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                Foto Siap Disimpan:
+                            </span>
+                            <div class="mt-1 w-32 h-32 rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-xs bg-gray-100">
                                 <img :src="localPreview" class="w-full h-full object-cover">
                             </div>
                         </div>
@@ -214,23 +247,43 @@
                         <input type="file" wire:model="galleryPhotos" multiple accept="image/png,image/jpeg,image/webp"
                             class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 border border-gray-200 rounded-2xl p-1 bg-gray-50">
                         <p class="text-[10px] text-gray-400 mt-1">Foto tampak samping, belakang, kelengkapan aksesoris, atau dusbox.</p>
-                        @error('galleryPhotos.*') <span class="text-rose-600 text-xs font-medium">{{ $message }}</span> @enderror
+                        @error('galleryPhotos.*') <div class="mt-1.5 p-2 bg-rose-50 text-rose-700 text-xs font-bold rounded-xl border border-rose-200">{{ $message }}</div> @enderror
                     </div>
                 </div>
 
                 {{-- Footer Modal --}}
                 <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2.5">
-                    <button type="button" wire:click="closeUploadModal"
-                        class="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900 rounded-xl hover:bg-gray-100 transition">
+                    <button type="button" wire:click="closeUploadModal" :disabled="isUploading"
+                        class="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900 rounded-xl hover:bg-gray-100 transition disabled:opacity-40">
                         Batal
                     </button>
-                    <button type="button" wire:click="saveProductPhotos" wire:loading.attr="disabled"
-                        class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 disabled:opacity-50">
-                        <span wire:loading.remove wire:target="saveProductPhotos">Simpan ke Cloudflare R2</span>
-                        <span wire:loading wire:target="saveProductPhotos" class="flex items-center gap-1.5">
+                    <button type="button" wire:click="saveProductPhotos"
+                        wire:loading.attr="disabled"
+                        wire:target="coverPhoto, galleryPhotos, saveProductPhotos"
+                        :disabled="isUploading"
+                        class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                        
+                        {{-- State 1: Uploading ke browser (isUploading) --}}
+                        <template x-if="isUploading">
+                            <span class="flex items-center gap-2">
+                                <svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                                <span x-text="'Mengunggah (' + progress + '%) ...'"></span>
+                            </span>
+                        </template>
+
+                        {{-- State 2: Menyimpan dari PHP ke Cloudflare R2 --}}
+                        <span wire:loading wire:target="saveProductPhotos" class="flex items-center gap-2">
                             <svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-                            Mengunggah ke R2...
+                            <span>Menyimpan ke Cloudflare R2...</span>
                         </span>
+
+                        {{-- State 3: Ready to submit --}}
+                        <template x-if="!isUploading">
+                            <span wire:loading.remove wire:target="saveProductPhotos" class="flex items-center gap-1.5">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                <span>Simpan ke Cloudflare R2</span>
+                            </span>
+                        </template>
                     </button>
                 </div>
             </div>
