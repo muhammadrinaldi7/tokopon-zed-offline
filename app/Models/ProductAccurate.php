@@ -36,8 +36,7 @@ class ProductAccurate extends Model implements HasMedia
     {
         $this->addMediaConversion('thumb')
             ->width(300)
-            ->height(300)
-            ->sharpen(10);
+            ->height(300);
     }
 
     public function product()

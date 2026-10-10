@@ -147,12 +147,115 @@
             x-data="{
                 isUploading: false,
                 progress: 0,
-                localPreview: null
-            }"
-            x-on:livewire-upload-start="isUploading = true; progress = 0"
-            x-on:livewire-upload-finish="isUploading = false"
-            x-on:livewire-upload-error="isUploading = false"
-            x-on:livewire-upload-progress="progress = $event.detail.progress">
+                localPreview: null,
+                compressInfo: '',
+
+                compressFile(file, maxDimension = 1200, quality = 0.85) {
+                    return new Promise((resolve) => {
+                        if (!file.type.match(/image.*/)) {
+                            resolve(file);
+                            return;
+                        }
+
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const img = new Image();
+                            img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                let width = img.width;
+                                let height = img.height;
+
+                                if (width > maxDimension || height > maxDimension) {
+                                    if (width > height) {
+                                        height = Math.round((height * maxDimension) / width);
+                                        width = maxDimension;
+                                    } else {
+                                        width = Math.round((width * maxDimension) / height);
+                                        height = maxDimension;
+                                    }
+                                }
+
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, width, height);
+
+                                canvas.toBlob((blob) => {
+                                    if (!blob) {
+                                        resolve(file);
+                                        return;
+                                    }
+                                    const cleanName = file.name.replace(/\.[^/.]+$/, '') + '.webp';
+                                    const compressed = new File([blob], cleanName, { type: 'image/webp' });
+                                    resolve(compressed);
+                                }, 'image/webp', quality);
+                            };
+                            img.src = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                },
+
+                async handleCoverSelect(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    this.isUploading = true;
+                    this.progress = 10;
+                    this.localPreview = URL.createObjectURL(file);
+                    const origMb = (file.size / (1024 * 1024)).toFixed(1);
+
+                    // Kompresi instan di browser
+                    const compressed = await this.compressFile(file);
+                    const compKb = Math.round(compressed.size / 1024);
+                    this.compressInfo = origMb > 0.3 ? (origMb + ' MB ➔ ' + compKb + ' KB') : (compKb + ' KB');
+                    this.progress = 25;
+
+                    // Upload via API resmi Livewire
+                    $wire.upload('coverPhoto', compressed,
+                        () => {
+                            this.isUploading = false;
+                            this.progress = 100;
+                        },
+                        () => {
+                            this.isUploading = false;
+                            alert('Gagal mengunggah foto. Silakan coba kembali.');
+                        },
+                        (evt) => {
+                            this.progress = 25 + Math.round(evt.detail.progress * 0.75);
+                        }
+                    );
+                },
+
+                async handleGallerySelect(e) {
+                    const files = e.target.files;
+                    if (!files || files.length === 0) return;
+
+                    this.isUploading = true;
+                    this.progress = 10;
+
+                    const compressedList = [];
+                    for (let i = 0; i < files.length; i++) {
+                        const comp = await this.compressFile(files[i]);
+                        compressedList.push(comp);
+                    }
+                    this.progress = 30;
+
+                    $wire.uploadMultiple('galleryPhotos', compressedList,
+                        () => {
+                            this.isUploading = false;
+                            this.progress = 100;
+                        },
+                        () => {
+                            this.isUploading = false;
+                            alert('Gagal mengunggah galeri foto.');
+                        },
+                        (evt) => {
+                            this.progress = 30 + Math.round(evt.detail.progress * 0.7);
+                        }
+                    );
+                }
+            }">
             <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-gray-100 overflow-hidden" @click.outside="if(!isUploading) $wire.closeUploadModal()">
                 {{-- Header Modal --}}
                 <div class="px-6 py-4 bg-gradient-to-r from-gray-900 to-indigo-950 text-white flex items-center justify-between">
@@ -203,13 +306,18 @@
 
                     {{-- Form Upload Foto Sampul Baru --}}
                     <div>
-                        <label class="block text-xs font-bold text-gray-800 mb-1.5">
-                            Pilih Foto Sampul Baru <span class="text-rose-500">*</span>
-                        </label>
-                        <input type="file" wire:model="coverPhoto" accept="image/png,image/jpeg,image/webp"
-                            @change="if ($event.target.files[0]) { localPreview = URL.createObjectURL($event.target.files[0]); }"
-                            class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-gray-200 rounded-2xl p-1 bg-gray-50">
-                        <p class="text-[10px] text-gray-400 mt-1">Format: JPG, PNG, WEBP (Maksimal 10MB). Resolusi persegi (1:1) disarankan untuk katalog mobile.</p>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-bold text-gray-800">
+                                Pilih Foto Sampul Baru <span class="text-rose-500">*</span>
+                            </label>
+                            <span x-show="compressInfo" class="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded-lg" style="display: none;">
+                                ⚡ Terkompresi: <span x-text="compressInfo"></span>
+                            </span>
+                        </div>
+
+                        <input type="file" @change="handleCoverSelect($event)" accept="image/png,image/jpeg,image/webp" :disabled="isUploading"
+                            class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-gray-200 rounded-2xl p-1 bg-gray-50 disabled:opacity-50">
+                        <p class="text-[10px] text-gray-400 mt-1">Otomatis dioptimalkan ke WebP super ringan & tajam untuk katalog mobile.</p>
                         @error('coverPhoto') <div class="mt-1.5 p-2 bg-rose-50 text-rose-700 text-xs font-bold rounded-xl border border-rose-200">{{ $message }}</div> @enderror
 
                         {{-- Realtime Progress Bar saat Mengunggah dari Browser --}}
@@ -217,14 +325,13 @@
                             <div class="flex items-center justify-between text-xs font-bold text-indigo-800 mb-1.5">
                                 <span class="flex items-center gap-1.5">
                                     <svg class="animate-spin w-3.5 h-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-                                    <span>Sedang mengunggah file ke server...</span>
+                                    <span>Mengunggah foto instan ke server...</span>
                                 </span>
                                 <span x-text="progress + '%'" class="font-mono font-extrabold text-indigo-700"></span>
                             </div>
                             <div class="w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
                                 <div class="bg-indigo-600 h-2 rounded-full transition-all duration-150 ease-out" :style="'width: ' + progress + '%'"></div>
                             </div>
-                            <p class="text-[10px] text-indigo-600 mt-1">Mohon tunggu hingga 100% sebelum menekan tombol simpan.</p>
                         </div>
 
                         {{-- Instant Preview Foto Baru --}}
@@ -244,8 +351,8 @@
                         <label class="block text-xs font-bold text-gray-800 mb-1.5">
                             Galeri Foto Tambahan <span class="text-gray-400 font-normal">(Opsional, bisa multiple)</span>
                         </label>
-                        <input type="file" wire:model="galleryPhotos" multiple accept="image/png,image/jpeg,image/webp"
-                            class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 border border-gray-200 rounded-2xl p-1 bg-gray-50">
+                        <input type="file" @change="handleGallerySelect($event)" multiple accept="image/png,image/jpeg,image/webp" :disabled="isUploading"
+                            class="block w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 border border-gray-200 rounded-2xl p-1 bg-gray-50 disabled:opacity-50">
                         <p class="text-[10px] text-gray-400 mt-1">Foto tampak samping, belakang, kelengkapan aksesoris, atau dusbox.</p>
                         @error('galleryPhotos.*') <div class="mt-1.5 p-2 bg-rose-50 text-rose-700 text-xs font-bold rounded-xl border border-rose-200">{{ $message }}</div> @enderror
                     </div>
