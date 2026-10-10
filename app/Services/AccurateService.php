@@ -1344,47 +1344,51 @@ class AccurateService
         return [];
     }
 
-    public function getItemStockPerWarehouse($warehouseName, $databaseSource = 'syihab')
+    public function getItemStockPerWarehousePage($warehouseName, $page = 1, $pageSize = 100, $databaseSource = 'syihab')
     {
         list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
 
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/item/list-stock.do', [
+            'sp.pageSize'   => $pageSize,
+            'sp.page'       => $page,
+            'warehouseName' => $warehouseName
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data['d']);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+
+            return $data['d'] ?? [];
+        } else {
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+
+    public function getItemStockPerWarehouse($warehouseName, $databaseSource = 'syihab')
+    {
         $allData = [];
         $page = 1;
         $hasMore = true;
 
         while ($hasMore) {
-            $timestamp = now()->toIso8601String();
-            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+            $chunk = $this->getItemStockPerWarehousePage($warehouseName, $page, 100, $databaseSource);
+            $allData = array_merge($allData, $chunk);
 
-            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
-                'Authorization' => 'Bearer ' . $token,
-                'X-Api-Timestamp' => $timestamp,
-                'X-Api-Signature'  => $signature,
-                'Content-Type'  => 'application/json',
-            ])->get($host . '/item/list-stock.do', [
-                'sp.pageSize' => 100,
-                'sp.page' => $page,
-                'warehouseName' => $warehouseName
-            ]);
-
-            if ($response->successful()) {
-                $data = $response->json();
-                if (isset($data['s']) && $data['s'] === false) {
-                    throw new \Exception('API Accurate Error: ' . json_encode($data['d']));
-                }
-
-                $chunk = $data['d'] ?? [];
-                $allData = array_merge($allData, $chunk);
-
-                // Jika jumlah data di halaman ini kurang dari limit (100), berarti sudah mentok di halaman terakhir
-                if (count($chunk) < 100) {
-                    $hasMore = false;
-                } else {
-                    $page++;
-                }
+            if (count($chunk) < 100) {
+                $hasMore = false;
             } else {
-                throw new \Exception('API Accurate Error: ' . $response->body());
+                $page++;
             }
         }
 
