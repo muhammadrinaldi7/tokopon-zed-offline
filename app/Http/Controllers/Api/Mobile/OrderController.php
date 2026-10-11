@@ -25,10 +25,141 @@ class OrderController extends Controller
     }
 
     /**
+     * Mengambil daftar riwayat pesanan pelanggan (User Login atau Nomor HP Pelanggan).
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $phone = $request->input('phone') ?? $request->header('X-Customer-Phone');
+
+        $query = Order::with(['items.productAccurate', 'payments.paymentMethod', 'warehouse'])
+            ->orderBy('id', 'desc');
+
+        if ($user) {
+            $query->where('user_id', $user->id);
+        } elseif (!empty($phone)) {
+            $cleanPhone = preg_replace('/[^0-9]/', '', (string) $phone);
+            $variations = [$cleanPhone];
+            if (str_starts_with($cleanPhone, '0')) {
+                $variations[] = '62' . substr($cleanPhone, 1);
+            } elseif (str_starts_with($cleanPhone, '62')) {
+                $variations[] = '0' . substr($cleanPhone, 2);
+            }
+            $userIds = UserProfile::whereIn('phone_number', $variations)->pluck('user_id')->filter();
+            $query->where(function ($q) use ($userIds, $cleanPhone) {
+                if ($userIds->isNotEmpty()) {
+                    $q->whereIn('user_id', $userIds);
+                }
+                $q->orWhere('shipping_address_snapshot->phone', 'like', "%{$cleanPhone}%");
+            });
+        } else {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+            ]);
+        }
+
+        if ($status = $request->input('status')) {
+            $query->where('order_status', $status);
+        }
+
+        $orders = $query->paginate($request->input('limit', 20));
+
+        $formattedOrders = $orders->getCollection()->map(function ($order) {
+            $latestPayment = $order->payments->last();
+            $pm = $latestPayment?->paymentMethod;
+            $paymentMethod = $pm ? [
+                'id' => $pm->id,
+                'code' => $pm->code ?? 'MANUAL_TRANSFER',
+                'name' => $pm->name,
+                'bank_name' => $pm->bank_name ?: $pm->name,
+                'account_number' => $pm->account_number,
+                'account_holder' => $pm->account_owner ?? 'Toko',
+                'instructions' => [],
+            ] : null;
+
+            $items = $order->items->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'product_id' => $item->product_accurate_id,
+                    'product_name' => $item->product_name,
+                    'product_thumbnail' => $item->productAccurate?->getFirstMediaUrl('products') ?: 'https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=400&q=80',
+                    'price' => (float) $item->price_at_checkout,
+                    'quantity' => (int) $item->qty,
+                    'serial_numbers' => !empty($item->serial_number) ? explode(', ', $item->serial_number) : [],
+                    'subtotal' => (float) $item->subtotal,
+                ];
+            });
+
+            return [
+                'id' => $order->id,
+                'order_number' => $order->order_number,
+                'status' => $order->order_status,
+                'customer_name' => $order->shipping_address_snapshot['name'] ?? $order->user?->name ?? 'Pelanggan',
+                'customer_phone' => $order->shipping_address_snapshot['phone'] ?? '',
+                'customer_email' => $order->shipping_address_snapshot['email'] ?? $order->user?->email,
+                'shipping_address' => is_array($order->shipping_address_snapshot) ? ($order->shipping_address_snapshot['address'] ?? '') : (string) $order->shipping_address_snapshot,
+                'payment_method' => $paymentMethod,
+                'payment_expired_at' => $order->payment_expired_at?->toIso8601String(),
+                'payment_proof_url' => $latestPayment?->getFirstMediaUrl('payment_proof'),
+                'subtotal' => (float) $order->total_amount,
+                'shipping_cost' => (float) $order->shipping_cost,
+                'unique_code' => 0,
+                'total_amount' => (float) $order->grand_total,
+                'items' => $items,
+                'created_at' => $order->created_at?->toIso8601String(),
+                'updated_at' => $order->updated_at?->toIso8601String(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $formattedOrders,
+            'meta' => [
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+                'total' => $orders->total(),
+            ]
+        ]);
+    }
+
+    /**
      * Checkout keranjang belanja mobile dan kunci stok pesanan.
      */
     public function checkout(Request $request): JsonResponse
     {
+        // 0. Normalisasi fleksibel items (dukung product_id dan quantity dari mobile app)
+        $rawItems = $request->input('items', []);
+        if (is_array($rawItems)) {
+            $normalizedItems = [];
+            foreach ($rawItems as $item) {
+                $pId = $item['product_accurate_id'] ?? $item['product_id'] ?? null;
+                $qty = $item['qty'] ?? $item['quantity'] ?? 1;
+                $sns = $item['serial_numbers'] ?? [];
+                $normalizedItems[] = [
+                    'product_accurate_id' => $pId ? (int) $pId : null,
+                    'qty' => (int) $qty,
+                    'serial_numbers' => is_array($sns) ? $sns : [],
+                ];
+            }
+            $request->merge(['items' => $normalizedItems]);
+        }
+
+        // 0.1 Normalisasi fleksibel shipping_address (dukung string tunggal dari mobile app)
+        $rawShipping = $request->input('shipping_address');
+        if (is_string($rawShipping)) {
+            $customerName = $request->input('customer_name') ?? $request->user()?->name ?? 'Pelanggan Tokopon';
+            $customerPhone = $request->input('customer_phone') ?? $request->user()?->profile?->phone_number ?? '';
+            $request->merge([
+                'shipping_address' => [
+                    'name' => $customerName,
+                    'phone' => $customerPhone,
+                    'address' => $rawShipping,
+                    'city' => $request->input('city', 'Indonesia'),
+                ]
+            ]);
+        }
+
         $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.product_accurate_id' => 'required|integer|exists:product_accurates,id',
@@ -243,6 +374,11 @@ class OrderController extends Controller
      */
     public function uploadProof(Request $request, string $orderNumber): JsonResponse
     {
+        // Dukung key proof_image dari React Native FormData
+        if (!$request->hasFile('proof') && $request->hasFile('proof_image')) {
+            $request->files->set('proof', $request->file('proof_image'));
+        }
+
         $request->validate([
             'proof' => 'required|file|image|mimes:jpeg,png,jpg,webp|max:5120', // Maksimal 5MB
             'payment_method_id' => 'nullable|integer|exists:payment_methods,id',

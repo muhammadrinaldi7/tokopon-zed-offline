@@ -129,10 +129,14 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
     // 0.1 Autentikasi Pengguna Mobile App
     Route::post('/auth/login', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'login'])
         ->name('api.mobile.auth.login');
+    Route::post('/auth/register', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'register'])
+        ->name('api.mobile.auth.register');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'me'])
             ->name('api.mobile.auth.me');
+        Route::put('/auth/profile', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'updateProfile'])
+            ->name('api.mobile.auth.profile');
         Route::post('/auth/logout', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'logout'])
             ->name('api.mobile.auth.logout');
     });
@@ -164,6 +168,8 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
         ->name('api.mobile.payment-methods.index');
 
     // 4. Transaksi & Checkout Pesanan
+    Route::get('/orders', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'index'])
+        ->name('api.mobile.orders.index');
     Route::post('/orders/checkout', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'checkout'])
         ->name('api.mobile.orders.checkout');
     Route::get('/orders/{orderNumber}', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'show'])

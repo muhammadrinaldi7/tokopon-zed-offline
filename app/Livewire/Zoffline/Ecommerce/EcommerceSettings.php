@@ -9,17 +9,20 @@ use App\Services\SettingService;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+#[Layout('layouts.z')]
 class EcommerceSettings extends Component
 {
     public bool $dynamicShipping = false;
     public bool $instantPayment = false;
     public string $csPhone = '081298765432';
+    public ?int $selectedWarehouseId = null;
 
     public function mount(SettingService $settingService): void
     {
         $this->dynamicShipping = filter_var($settingService->get('ecommerce_dynamic_shipping', false), FILTER_VALIDATE_BOOLEAN);
         $this->instantPayment = filter_var($settingService->get('ecommerce_instant_payment', false), FILTER_VALIDATE_BOOLEAN);
         $this->csPhone = (string) $settingService->get('ecommerce_cs_phone', '081298765432');
+        $this->selectedWarehouseId = Warehouse::where('is_online_store', true)->value('id');
     }
 
     public function toggleDynamicShipping(SettingService $settingService): void
@@ -50,17 +53,28 @@ class EcommerceSettings extends Component
         $this->dispatch('toast', title: 'Berhasil', message: 'Nomor WhatsApp CS Mobile berhasil diperbarui', type: 'success');
     }
 
-    #[Layout('layouts.admin')]
+    public function saveWarehouse(): void
+    {
+        if ($this->selectedWarehouseId) {
+            Warehouse::query()->update(['is_online_store' => false]);
+            Warehouse::where('id', $this->selectedWarehouseId)->update(['is_online_store' => true]);
+            $whName = Warehouse::find($this->selectedWarehouseId)?->name;
+            $this->dispatch('toast', title: 'Berhasil', message: "Gudang '{$whName}' telah ditetapkan sebagai Gudang Utama E-Commerce.", type: 'success');
+        }
+    }
+
     public function render(SettingService $settingService)
     {
         $mobileBanks = PaymentMethod::where('is_visible_mobile', true)->get();
         $onlineWarehouse = Warehouse::where('is_online_store', true)->first();
+        $allWarehouses = Warehouse::orderBy('name')->get();
         $hasBiteshipKey = !empty($settingService->get('biteship_api_key'));
         $hasXenditKey = !empty($settingService->get('xendit_secret_key'));
 
         return view('livewire.zoffline.ecommerce.ecommerce-settings', [
             'mobileBanks' => $mobileBanks,
             'onlineWarehouse' => $onlineWarehouse,
+            'allWarehouses' => $allWarehouses,
             'hasBiteshipKey' => $hasBiteshipKey,
             'hasXenditKey' => $hasXenditKey,
         ]);

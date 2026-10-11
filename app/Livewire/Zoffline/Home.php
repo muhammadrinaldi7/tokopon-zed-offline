@@ -170,6 +170,11 @@ class Home extends Component
     {
         return $this->redirectRoute('zoffline.ecommerce.settings', navigate: true);
     }
+
+    public function navigateToPaymentMethods()
+    {
+        return $this->redirectRoute('zoffline.ecommerce.payment-methods', navigate: true);
+    }
     public function render()
     {
         return view('livewire.zoffline.home');

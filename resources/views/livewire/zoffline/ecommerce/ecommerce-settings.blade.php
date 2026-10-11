@@ -1,4 +1,4 @@
-<div>
+<div class="p-4 sm:p-6 min-h-screen bg-neutral-100 space-y-6">
     {{-- Header with navigation tabs --}}
     @include('livewire.zoffline.ecommerce.partials.header', ['title' => 'Pengaturan E-Commerce & Mobile App'])
 
@@ -160,7 +160,7 @@
                         </div>
                     </div>
 
-                    <a href="{{ route('admin.settings.payment-methods') }}" wire:navigate
+                    <a href="{{ route('zoffline.ecommerce.payment-methods') }}" wire:navigate
                         class="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline">
                         Kelola
                     </a>
@@ -182,15 +182,19 @@
                     @endforelse
                 </div>
 
-                <p class="text-[11px] text-gray-400 mt-3 pt-3 border-t border-gray-100">
-                    Aktifkan/nonaktifkan rekening di menu <strong>List Bank</strong> dengan menyalakan toggle <em>Tampilkan di Mobile</em>.
-                </p>
+                <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                    <span class="text-[11px] text-gray-400">Atur rekening di menu khusus:</span>
+                    <a href="{{ route('zoffline.ecommerce.payment-methods') }}" wire:navigate
+                        class="text-xs font-extrabold text-indigo-600 hover:text-indigo-800">
+                        Buka Menu Bank &rarr;
+                    </a>
+                </div>
             </div>
 
-            {{-- Online Warehouse Overview --}}
-            <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center gap-3">
+            {{-- Online Warehouse Overview & Switcher --}}
+            <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center gap-3 mb-4">
                         <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
                             🏬
                         </div>
@@ -200,24 +204,33 @@
                         </div>
                     </div>
 
-                    <a href="{{ route('admin.settings.warehouse') }}" wire:navigate
-                        class="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline">
-                        Ubah
-                    </a>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5">Pilih Gudang Utama Online</label>
+                            <select wire:model="selectedWarehouseId"
+                                class="w-full text-xs font-semibold rounded-xl border-gray-200 px-3.5 py-2.5 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition">
+                                <option value="">-- Pilih Gudang Online --</option>
+                                @foreach($allWarehouses as $wh)
+                                    <option value="{{ $wh->id }}">
+                                        {{ $wh->name }} {{ $wh->is_online_store ? '★ (Aktif Saat Ini)' : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/60 text-xs text-amber-900">
+                            <span class="font-bold">Gudang Aktif:</span> {{ $onlineWarehouse ? $onlineWarehouse->name : 'Belum Ditentukan' }}
+                        </div>
+                    </div>
                 </div>
 
-                <div class="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200/60 text-xs space-y-1.5">
-                    <div class="font-black text-amber-900 text-sm">
-                        {{ $onlineWarehouse ? $onlineWarehouse->name : 'Belum Ditentukan' }}
-                    </div>
-                    <div class="text-amber-800 text-[11px]">
-                        {{ $onlineWarehouse ? ($onlineWarehouse->address ?: 'Kode: ' . $onlineWarehouse->code) : 'Pilih gudang utama toko online di menu Pengaturan Gudang.' }}
-                    </div>
+                <div class="pt-4 mt-4 border-t border-gray-100">
+                    <button type="button" wire:click="saveWarehouse"
+                        class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition duration-150 flex items-center justify-center gap-2 shadow-sm shadow-amber-600/25">
+                        <span wire:loading.remove wire:target="saveWarehouse">Tetapkan Gudang Online</span>
+                        <span wire:loading wire:target="saveWarehouse">Menyimpan...</span>
+                    </button>
                 </div>
-
-                <p class="text-[11px] text-gray-400 mt-4 leading-relaxed">
-                    Stok produk dan nomor seri IMEI yang tampil pada aplikasi mobile dipotong langsung dari gudang ini saat pelanggan checkout.
-                </p>
             </div>
 
         </div>

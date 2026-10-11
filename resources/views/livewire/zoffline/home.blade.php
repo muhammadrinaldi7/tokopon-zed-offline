@@ -792,7 +792,18 @@
                                 <span class="block text-xs font-bold text-center leading-tight">Analisa Closing</span>
                             </button>
 
-                            {{-- 6. Pengaturan App & Remote Config --}}
+                            {{-- 6. Rekening Bank Mobile --}}
+                            <button wire:click="navigateToPaymentMethods" @click="openEcommerceModal = false"
+                                class="w-full aspect-square p-2.5 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
+                                <div class="w-11 h-11 rounded-xl bg-blue-100/70 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                    </svg>
+                                </div>
+                                <span class="block text-xs font-bold text-center leading-tight">Rekening Bank</span>
+                            </button>
+
+                            {{-- 7. Pengaturan App & Remote Config --}}
                             <button wire:click="navigateToEcommerceSettings" @click="openEcommerceModal = false"
                                 class="w-full aspect-square p-2.5 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
                                 <div class="w-11 h-11 rounded-xl bg-purple-100/70 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
