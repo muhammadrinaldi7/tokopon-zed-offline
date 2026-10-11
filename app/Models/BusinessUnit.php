@@ -3,9 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class BusinessUnit extends Model
+class BusinessUnit extends Model implements HasMedia
 {
+    use InteractsWithMedia;
+
     protected $fillable = [
         'code',
         'customer_prefix',
@@ -26,6 +30,8 @@ class BusinessUnit extends Model
         'mobile_display_name',
         'mobile_category',
         'mobile_description',
+        'brand_color',
+        'warranty_highlight',
         'telegram_approval_webhook',
         'telegram_log_webhook',
     ];
@@ -55,5 +61,16 @@ class BusinessUnit extends Model
     public function businessUnitProjects()
     {
         return $this->hasMany(BusinessUnitProject::class);
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('logo')
+            ->singleFile();
+    }
+
+    public function getLogoUrlAttribute(): ?string
+    {
+        return $this->hasMedia('logo') ? $this->getFirstMediaUrl('logo') : null;
     }
 }

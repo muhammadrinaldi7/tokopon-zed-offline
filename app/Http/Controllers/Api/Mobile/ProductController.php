@@ -67,7 +67,7 @@ class ProductController extends Controller
                     ->where('warehouse_stocks.stock', '>', 0);
             })
             ->with([
-                'businessUnit',
+                'businessUnit.media',
                 'media',
                 'product.media',
                 'productVariants.media',
@@ -161,6 +161,9 @@ class ProductController extends Controller
                     'name' => $product->businessUnit->mobile_display_name ?: $product->businessUnit->name,
                     'code' => $product->businessUnit->code,
                     'category' => $product->businessUnit->mobile_category ?: 'GENERAL',
+                    'logo_url' => $product->businessUnit->getFirstMediaUrl('logo') ?: null,
+                    'brand_color' => $product->businessUnit->brand_color,
+                    'warranty_highlight' => $product->businessUnit->warranty_highlight,
                 ] : null,
             ];
         });
@@ -186,7 +189,7 @@ class ProductController extends Controller
         $onlineWarehouseIds = Warehouse::where('is_online_store', true)->pluck('id')->toArray();
 
         $product = ProductAccurate::with([
-            'businessUnit',
+            'businessUnit.media',
             'media',
             'product.media',
             'productVariants.media',
@@ -268,6 +271,9 @@ class ProductController extends Controller
                     'name' => $product->businessUnit->mobile_display_name ?: $product->businessUnit->name,
                     'code' => $product->businessUnit->code,
                     'category' => $product->businessUnit->mobile_category ?: 'GENERAL',
+                    'logo_url' => $product->businessUnit->getFirstMediaUrl('logo') ?: null,
+                    'brand_color' => $product->businessUnit->brand_color,
+                    'warranty_highlight' => $product->businessUnit->warranty_highlight,
                 ] : null,
                 'stock_per_warehouse' => $stockBreakdown,
             ]

@@ -22,14 +22,20 @@ class BusinessUnitController extends Controller
             ->unique()
             ->toArray();
 
-        $businessUnits = BusinessUnit::query()
+        $query = BusinessUnit::query()
+            ->with('media')
             ->where('is_active', true)
-            ->where('is_visible_mobile', true)
-            ->whereIn('id', $onlineBuIdsWithWarehouse)
-            ->orderBy('id')
-            ->get();
+            ->where('is_visible_mobile', true);
+
+        if (count($onlineBuIdsWithWarehouse) > 1) {
+            $query->whereIn('id', $onlineBuIdsWithWarehouse);
+        }
+
+        $businessUnits = $query->orderBy('id')->get();
 
         $data = $businessUnits->map(function ($bu) {
+            $isSecond = ($bu->mobile_category === 'SECOND') || str_contains(strtoupper($bu->name), 'SECOND');
+
             return [
                 'id' => $bu->id,
                 'name' => $bu->mobile_display_name ?: $bu->name,
@@ -37,6 +43,10 @@ class BusinessUnitController extends Controller
                 'category' => $bu->mobile_category ?: 'GENERAL',
                 'description' => $bu->mobile_description,
                 'store_title' => $bu->store_title ?: $bu->name,
+                'logo_url' => $bu->getFirstMediaUrl('logo') ?: null,
+                'brand_color' => $bu->brand_color,
+                'warranty_highlight' => $bu->warranty_highlight,
+                'is_second' => $isSecond,
             ];
         });
 
