@@ -90,7 +90,7 @@ class ProductController extends Controller
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('item_no', 'like', "%{$search}%");
+                    ->orWhere('item_no', 'like', "%{$search}%");
             });
         }
 
@@ -150,6 +150,7 @@ class ProductController extends Controller
                 'name' => $product->name,
                 'category' => $product->categoryName,
                 'brand' => $product->brandName,
+                'proyek' => $product->proyek,
                 'price' => (float) $product->base_price,
                 'formatted_price' => 'Rp ' . number_format($product->base_price, 0, ',', '.'),
                 'stock' => (int) $totalOnlineStock,

@@ -193,9 +193,4 @@ class User extends Authenticatable implements HasMedia
     {
         return $this->hasMany(SellPhoneIssue::class);
     }
-
-    public function profile()
-    {
-        return $this->hasOne(UserProfile::class);
-    }
 }
