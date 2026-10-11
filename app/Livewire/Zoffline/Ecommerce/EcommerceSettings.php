@@ -16,6 +16,8 @@ class EcommerceSettings extends Component
     public bool $instantPayment = false;
     public string $csPhone = '081298765432';
     public ?int $selectedWarehouseId = null;
+    public string $defaultBranchName = 'Banjarbaru';
+    public ?int $defaultSalesId = null;
 
     public function mount(SettingService $settingService): void
     {
@@ -23,6 +25,9 @@ class EcommerceSettings extends Component
         $this->instantPayment = filter_var($settingService->get('ecommerce_instant_payment', false), FILTER_VALIDATE_BOOLEAN);
         $this->csPhone = (string) $settingService->get('ecommerce_cs_phone', '081298765432');
         $this->selectedWarehouseId = Warehouse::where('is_online_store', true)->value('id');
+        $this->defaultBranchName = (string) $settingService->get('ecommerce_default_branch_name', 'Banjarbaru');
+        $rawSalesId = $settingService->get('ecommerce_default_sales_id');
+        $this->defaultSalesId = !empty($rawSalesId) ? (int) $rawSalesId : null;
     }
 
     public function toggleDynamicShipping(SettingService $settingService): void
@@ -63,11 +68,27 @@ class EcommerceSettings extends Component
         }
     }
 
+    public function saveDefaultBranch(SettingService $settingService): void
+    {
+        $this->validate(['defaultBranchName' => 'required|string|max:100']);
+        $settingService->set('ecommerce_default_branch_name', trim($this->defaultBranchName), 'string');
+        $this->dispatch('toast', title: 'Berhasil', message: "Cabang Default Accurate diatur ke: {$this->defaultBranchName}", type: 'success');
+    }
+
+    public function saveDefaultSales(SettingService $settingService): void
+    {
+        $settingService->set('ecommerce_default_sales_id', $this->defaultSalesId ? (string) $this->defaultSalesId : null, 'string');
+        $salesName = $this->defaultSalesId ? \App\Models\Employe::find($this->defaultSalesId)?->name : 'Tanpa Sales Default';
+        $this->dispatch('toast', title: 'Berhasil', message: "Sales Default E-Commerce diatur ke: {$salesName}", type: 'success');
+    }
+
     public function render(SettingService $settingService)
     {
         $mobileBanks = PaymentMethod::where('is_visible_mobile', true)->get();
         $onlineWarehouse = Warehouse::where('is_online_store', true)->first();
         $allWarehouses = Warehouse::orderBy('name')->get();
+        $allBranches = \App\Models\Branch::orderBy('name')->get();
+        $allSales = \App\Models\Employe::active()->orderBy('name')->get();
         $hasBiteshipKey = !empty($settingService->get('biteship_api_key'));
         $hasXenditKey = !empty($settingService->get('xendit_secret_key'));
 
@@ -75,6 +96,8 @@ class EcommerceSettings extends Component
             'mobileBanks' => $mobileBanks,
             'onlineWarehouse' => $onlineWarehouse,
             'allWarehouses' => $allWarehouses,
+            'allBranches' => $allBranches,
+            'allSales' => $allSales,
             'hasBiteshipKey' => $hasBiteshipKey,
             'hasXenditKey' => $hasXenditKey,
         ]);

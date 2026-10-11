@@ -84,12 +84,18 @@ class SyncOrderToAccurateJob implements ShouldQueue
             ? $customerUser->getAccurateCustomerNo($databaseSource)
             : 'PELANGGAN-UMUM';
 
-        $branchName = $order->branch?->name ?? 'Banjarbaru';
+        $defaultBranch = app(\App\Services\SettingService::class)->get('ecommerce_default_branch_name', 'Banjarbaru');
+        $branchName = $order->branch?->name ?: $defaultBranch;
         $warehouseName = $order->warehouse?->name ?? 'Head Office';
 
         // 2. Buat Sales Invoice (jika belum ada)
         if (!$order->accurate_invoice_no) {
             $detailItems = [];
+
+            $detailSalesman = [];
+            if ($order->salesBy && !empty($order->salesBy->employee_no)) {
+                $detailSalesman[] = (string) $order->salesBy->employee_no;
+            }
 
             foreach ($order->items as $item) {
                 $rawSns = !empty($item->serial_number) ? explode(',', $item->serial_number) : [];
@@ -112,6 +118,10 @@ class SyncOrderToAccurateJob implements ShouldQueue
                     'itemCashDiscount' => (float) (($item->discount_amount ?? 0) + ($item->promo_discount_amount ?? 0)),
                 ];
 
+                if (!empty($detailSalesman)) {
+                    $itemRow['salesmanListNumber'] = $detailSalesman;
+                }
+
                 if (!empty($detailSN)) {
                     $itemRow['detailSerialNumber'] = $detailSN;
                 }
@@ -121,6 +131,9 @@ class SyncOrderToAccurateJob implements ShouldQueue
 
             $isTaxable = (bool) ($order->businessUnit?->is_taxable ?? false);
 
+            $handledByName = $order->handledBy?->name ?? 'Admin';
+            $salesInfo = $order->salesBy?->name ? " | Sales: {$order->salesBy->name}" : "";
+
             $siData = [
                 'customerNo' => $customerNo,
                 'branchName' => $branchName,
@@ -129,7 +142,7 @@ class SyncOrderToAccurateJob implements ShouldQueue
                 'inclusiveTax' => $isTaxable,
                 'taxable' => $isTaxable,
                 'useTax1' => $isTaxable,
-                'description' => "Pesanan Mobile App #{$order->order_number}" . ($order->notes ? " - {$order->notes}" : ''),
+                'description' => "Pesanan Mobile App #{$order->order_number} (Verifikasi: {$handledByName}{$salesInfo})" . ($order->notes ? " - {$order->notes}" : ''),
             ];
 
             try {

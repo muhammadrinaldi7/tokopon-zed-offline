@@ -233,6 +233,85 @@
                 </div>
             </div>
 
+            {{-- Default Branch Settings --}}
+            <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl">
+                            🏢
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-black text-gray-900">Cabang Pembukuan Accurate</h4>
+                            <p class="text-[11px] text-gray-400">Target cabang header faktur penjualan</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5">Nama Cabang Default</label>
+                            @if($allBranches->isNotEmpty())
+                                <select wire:model="defaultBranchName"
+                                    class="w-full text-xs font-semibold rounded-xl border-gray-200 px-3.5 py-2.5 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition mb-2">
+                                    @foreach($allBranches as $branch)
+                                        <option value="{{ $branch->name }}">{{ $branch->name }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
+                            <input type="text" wire:model="defaultBranchName" placeholder="Contoh: Banjarbaru"
+                                class="w-full text-xs font-semibold rounded-xl border-gray-200 px-3.5 py-2.5 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition">
+                            <span class="text-[11px] text-gray-400 mt-1 block">Pastikan nama cabang sama persis dengan master Cabang di Accurate Online.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4 mt-4 border-t border-gray-100">
+                    <button type="button" wire:click="saveDefaultBranch"
+                        class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition duration-150 flex items-center justify-center gap-2 shadow-sm shadow-teal-600/25">
+                        <span wire:loading.remove wire:target="saveDefaultBranch">Simpan Cabang Default</span>
+                        <span wire:loading wire:target="saveDefaultBranch">Menyimpan...</span>
+                    </button>
+                </div>
+            </div>
+
+            {{-- Default Sales / CS Person Settings --}}
+            <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
+                            🧑‍💼
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-black text-gray-900">Default Sales E-Commerce</h4>
+                            <p class="text-[11px] text-gray-400">Pramuniaga / CS default order mobile</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5">Pilih Karyawan Sales Default</label>
+                            <select wire:model="defaultSalesId"
+                                class="w-full text-xs font-semibold rounded-xl border-gray-200 px-3.5 py-2.5 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition">
+                                <option value="">-- Tanpa Sales Default (Kosong) --</option>
+                                @foreach($allSales as $sales)
+                                    <option value="{{ $sales->id }}">
+                                        {{ $sales->name }} {{ $sales->employee_no ? "({$sales->employee_no})" : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <span class="text-[11px] text-gray-400 mt-1 block">Jika disetel, order mobile otomatis tercatat atas nama sales ini di Accurate.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4 mt-4 border-t border-gray-100">
+                    <button type="button" wire:click="saveDefaultSales"
+                        class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition duration-150 flex items-center justify-center gap-2 shadow-sm shadow-purple-600/25">
+                        <span wire:loading.remove wire:target="saveDefaultSales">Simpan Sales Default</span>
+                        <span wire:loading wire:target="saveDefaultSales">Menyimpan...</span>
+                    </button>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>

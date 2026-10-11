@@ -176,11 +176,19 @@ class MobileOrderService
                 'customer_name' => User::find($userId)?->name ?? 'Customer',
             ];
 
+            $settingService = app(\App\Services\SettingService::class);
+            $defaultSalesId = $settingService->get('ecommerce_default_sales_id');
+            $salesId = $data['sales_id'] ?? (!empty($defaultSalesId) ? (int) $defaultSalesId : null);
+            $defaultBranchName = $settingService->get('ecommerce_default_branch_name', 'Banjarbaru');
+            $branchId = $data['branch_id'] ?? \App\Models\Branch::where('name', $defaultBranchName)->value('id');
+
             // 4. Create Order
             $order = Order::create([
                 'business_unit_id' => $businessUnitId,
                 'user_id' => $userId,
                 'warehouse_id' => $warehouse->id,
+                'branch_id' => $branchId,
+                'sales_id' => $salesId,
                 'order_number' => $orderNumber,
                 'order_date' => $dateNow->format('Y-m-d'),
                 'total_amount' => $subtotal,
@@ -270,19 +278,83 @@ class MobileOrderService
      * @return Order
      * @throws Exception
      */
-    public function approvePayment(Order $order, ?User $actor = null): Order
+    public function approvePayment(Order $order, ?User $actor = null, array $overrides = []): Order
     {
         if ($order->order_status === 'COMPLETED') {
             return $order;
         }
 
-        DB::transaction(function () use ($order, $actor) {
-            // 1. Update Order Status
-            $order->update([
+        DB::transaction(function () use ($order, $actor, $overrides) {
+            $warehouseId = $overrides['warehouse_id'] ?? $order->warehouse_id;
+            $salesId = array_key_exists('sales_id', $overrides) ? $overrides['sales_id'] : $order->sales_id;
+            $branchId = array_key_exists('branch_id', $overrides) ? $overrides['branch_id'] : $order->branch_id;
+            $branchName = $overrides['branch_name'] ?? null;
+
+            if ($branchName && !$branchId) {
+                $b = \App\Models\Branch::where('name', $branchName)->first();
+                if ($b) {
+                    $branchId = $b->id;
+                }
+            }
+
+            // 1. Update Order Status & Data Overrides
+            $orderUpdates = [
                 'order_status' => 'COMPLETED',
                 'handled_by' => $actor ? $actor->id : $order->handled_by,
                 'payment_expired_at' => null,
-            ]);
+            ];
+
+            if ($warehouseId && $warehouseId != $order->warehouse_id) {
+                // Jika gudang diganti oleh admin saat approval, migrasikan kuota stok
+                $oldWhId = $order->warehouse_id;
+                $newWhId = $warehouseId;
+                foreach ($order->items as $item) {
+                    $oldStock = WarehouseStock::where('warehouse_id', $oldWhId)
+                        ->where('variant_id', $item->product_variant_id)
+                        ->first();
+                    if ($oldStock) {
+                        $oldStock->increment('stock', (int) $item->qty);
+                    }
+                    $newStock = WarehouseStock::where('warehouse_id', $newWhId)
+                        ->where('variant_id', $item->product_variant_id)
+                        ->first();
+                    if ($newStock) {
+                        $newStock->decrement('stock', (int) $item->qty);
+                    }
+                }
+                $orderUpdates['warehouse_id'] = $newWhId;
+            }
+
+            if ($salesId !== $order->sales_id) {
+                $orderUpdates['sales_id'] = $salesId;
+            }
+            if ($branchId !== $order->branch_id) {
+                $orderUpdates['branch_id'] = $branchId;
+            }
+
+            // Ganti IMEI jika admin menukar nomor seri di modal verifikasi
+            if (!empty($overrides['item_sns']) && is_array($overrides['item_sns'])) {
+                foreach ($overrides['item_sns'] as $itemId => $newSn) {
+                    $item = $order->items()->find($itemId);
+                    if ($item && $item->serial_number !== $newSn) {
+                        $oldSns = !empty($item->serial_number) ? array_map('trim', explode(',', $item->serial_number)) : [];
+                        $newSns = !empty($newSn) ? array_map('trim', explode(',', $newSn)) : [];
+
+                        if (!empty($oldSns)) {
+                            ProductSerialNumber::whereIn('serial_number', $oldSns)
+                                ->where('status', 'Reserved')
+                                ->update(['status' => 'Available']);
+                        }
+                        if (!empty($newSns)) {
+                            ProductSerialNumber::whereIn('serial_number', $newSns)
+                                ->update(['status' => 'Reserved']);
+                        }
+                        $item->update(['serial_number' => $newSn]);
+                    }
+                }
+            }
+
+            $order->update($orderUpdates);
 
             // 2. Update Order Payments status PAID
             $order->payments()
@@ -293,9 +365,9 @@ class MobileOrderService
                 ]);
 
             // 3. Update status Serial Number dari 'Reserved' menjadi 'Sold'
-            $orderItems = $order->items;
+            $order->refresh();
             $allSns = [];
-            foreach ($orderItems as $item) {
+            foreach ($order->items as $item) {
                 if (!empty($item->serial_number)) {
                     $sns = array_values(array_filter(array_map('trim', explode(',', $item->serial_number))));
                     $allSns = array_merge($allSns, $sns);

@@ -279,7 +279,7 @@
     {{-- MODAL: Verifikasi Bukti Pembayaran Mobile App --}}
     @if ($showVerificationModal && $selectedMobileOrder)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-3xl w-full overflow-hidden flex flex-col max-h-[92vh]">
                 <!-- Modal Header -->
                 <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
                     <div class="flex items-center gap-3">
@@ -289,7 +289,7 @@
                             </svg>
                         </div>
                         <div>
-                            <h3 class="font-extrabold text-gray-900 text-base">Verifikasi Bukti Pembayaran</h3>
+                            <h3 class="font-extrabold text-gray-900 text-base">Verifikasi Pembayaran & Pemenuhan Pesanan</h3>
                             <p class="text-xs text-gray-500 font-mono">Pesanan #{{ $selectedMobileOrder->order_number }}</p>
                         </div>
                     </div>
@@ -327,7 +327,7 @@
                     </div>
 
                     <!-- Ringkasan Pembayaran & Pelanggan -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm">
                         <div>
                             <span class="text-xs text-gray-400 block">Total Tagihan</span>
                             <span class="text-lg font-black text-[#1c69d4]">Rp {{ number_format($selectedMobileOrder->grand_total, 0, ',', '.') }}</span>
@@ -340,31 +340,117 @@
                             @endif
                         </div>
                         <div>
-                            <span class="text-xs text-gray-400 block">Pembeli</span>
+                            <span class="text-xs text-gray-400 block">Pembeli / Kontak</span>
                             <span class="font-bold text-gray-800">{{ $selectedMobileOrder->user?->name ?? '-' }}</span>
-                            <span class="block text-xs text-gray-500">{{ $selectedMobileOrder->user?->profile?->phone_number ?? '-' }}</span>
-                        </div>
-                        <div>
-                            <span class="text-xs text-gray-400 block">Gudang Penyedia</span>
-                            <span class="font-bold text-gray-800">{{ $selectedMobileOrder->warehouse?->name ?? 'Gudang Online' }}</span>
+                            <span class="block text-xs text-gray-500 font-mono">{{ $selectedMobileOrder->user?->profile?->phone_number ?? '-' }}</span>
                         </div>
                     </div>
 
-                    <!-- Item Pesanan -->
-                    <div>
-                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Item Produk Pesanan</h4>
-                        <div class="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden bg-white">
-                            @foreach ($selectedMobileOrder->items as $item)
-                                <div class="p-3 flex items-center justify-between text-sm">
-                                    <div>
-                                        <p class="font-bold text-gray-800">{{ $item->product_name }}</p>
-                                        @if ($item->serial_number)
-                                            <p class="text-xs text-indigo-600 font-mono mt-0.5">SN / IMEI: {{ $item->serial_number }}</p>
+                    <!-- PENGATURAN PEMENUHAN & ACCURATE ONLINE -->
+                    <div class="bg-gradient-to-br from-indigo-50/60 to-blue-50/40 border border-indigo-100 rounded-xl p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                Pengaturan Pemenuhan & Accurate Online
+                            </h4>
+                            <span class="text-[10px] font-semibold text-indigo-600 bg-white border border-indigo-200 px-2 py-0.5 rounded-full">
+                                Fleksibel Sebelum Sinkronisasi
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <!-- Gudang Penyedia -->
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Gudang Pengeluaran</label>
+                                <select wire:model.live="verificationWarehouseId"
+                                    class="w-full text-xs font-medium rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white">
+                                    @foreach ($warehouses as $wh)
+                                        <option value="{{ $wh->id }}">
+                                            {{ $wh->name }} {{ $wh->is_online_store ? '(Online)' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-[10px] text-gray-500 mt-1">Stok akan dipindahkan jika gudang diubah.</p>
+                            </div>
+
+                            <!-- Cabang Accurate -->
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Cabang Accurate</label>
+                                <select wire:model="verificationBranchName"
+                                    class="w-full text-xs font-medium rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white">
+                                    <option value="Banjarbaru">Banjarbaru</option>
+                                    @foreach ($branches as $br)
+                                        @if ($br->name !== 'Banjarbaru')
+                                            <option value="{{ $br->name }}">{{ $br->name }}</option>
                                         @endif
+                                    @endforeach
+                                </select>
+                                <p class="text-[10px] text-gray-500 mt-1">Cabang tujuan Sales Invoice Accurate.</p>
+                            </div>
+
+                            <!-- Karyawan Sales -->
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Sales Person (Accurate)</label>
+                                <select wire:model="verificationSalesId"
+                                    class="w-full text-xs font-medium rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white">
+                                    <option value="">-- Tanpa Sales / Default Online --</option>
+                                    @foreach ($salesEmployees as $emp)
+                                        <option value="{{ $emp->id }}">
+                                            {{ $emp->name }} ({{ $emp->employee_no ?? 'No: -' }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-[10px] text-gray-500 mt-1">Salesman pencatat omset di Accurate.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item Pesanan & Alokasi Nomor Seri -->
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Item Produk & Alokasi Nomor Seri / IMEI</h4>
+                        <div class="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden bg-white shadow-sm">
+                            @foreach ($selectedMobileOrder->items as $item)
+                                <div class="p-3.5 space-y-2">
+                                    <div class="flex items-start justify-between text-sm">
+                                        <div>
+                                            <p class="font-bold text-gray-800">{{ $item->product_name }}</p>
+                                            <p class="text-xs text-gray-500">{{ $item->qty }}x Rp {{ number_format($item->price_at_checkout, 0, ',', '.') }}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="font-bold text-gray-900">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</p>
+                                        </div>
                                     </div>
-                                    <div class="text-right">
-                                        <span class="text-xs text-gray-500">{{ $item->qty }}x Rp {{ number_format($item->price_at_checkout, 0, ',', '.') }}</span>
-                                        <p class="font-bold text-gray-900">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</p>
+
+                                    <!-- Input SN / IMEI -->
+                                    <div class="bg-gray-50/80 p-2.5 rounded-lg border border-gray-200 space-y-1.5">
+                                        <div class="flex items-center justify-between">
+                                            <label class="text-xs font-bold text-gray-700">Nomor Seri / IMEI yang Dikirim:</label>
+                                            @if ($item->serial_number)
+                                                <span class="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                                    Status: Ter-reservasi
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <input type="text"
+                                            wire:model="verificationItemSns.{{ $item->id }}"
+                                            placeholder="Ketik atau pilih IMEI / SN..."
+                                            class="w-full text-xs font-mono font-semibold rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white">
+
+                                        @if (!empty($availableSns[$item->id]))
+                                            <div class="flex flex-wrap items-center gap-1.5 pt-1">
+                                                <span class="text-[10px] font-semibold text-gray-500">Unit Tersedia di Gudang ini:</span>
+                                                @foreach ($availableSns[$item->id] as $snOpt)
+                                                    <button type="button"
+                                                        wire:click="setItemSn({{ $item->id }}, '{{ $snOpt }}')"
+                                                        class="px-2 py-0.5 text-[11px] font-mono bg-white border border-indigo-200 text-indigo-700 rounded hover:bg-indigo-50 hover:border-indigo-400 transition"
+                                                        title="Klik untuk memasang nomor seri ini">
+                                                        {{ $snOpt }}
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             @endforeach
@@ -390,7 +476,7 @@
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                             </svg>
-                            Setujui Pembayaran
+                            Setujui & Terbitkan ke Accurate
                         </button>
                     </div>
                 </div>

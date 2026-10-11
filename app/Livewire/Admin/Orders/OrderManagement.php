@@ -28,6 +28,10 @@ class OrderManagement extends Component
     // Properties for Mobile Payment Verification Modal
     public $showVerificationModal = false;
     public $selectedMobileOrder = null;
+    public $verificationWarehouseId = null;
+    public $verificationBranchName = null;
+    public $verificationSalesId = null;
+    public $verificationItemSns = []; // [order_item_id => serial_number]
 
     // Properties for Issue Modal
     public $showIssueModal = false;
@@ -72,8 +76,31 @@ class OrderManagement extends Component
 
     public function openVerification(int $orderId): void
     {
-        $this->selectedMobileOrder = Order::with(['payments.media', 'payments.paymentMethod', 'items', 'user', 'warehouse'])->find($orderId);
+        $this->selectedMobileOrder = Order::with([
+            'payments.media',
+            'payments.paymentMethod',
+            'items.variant',
+            'user.profile',
+            'warehouse',
+            'salesBy',
+            'branch'
+        ])->find($orderId);
+
         if ($this->selectedMobileOrder) {
+            $this->verificationWarehouseId = $this->selectedMobileOrder->warehouse_id;
+
+            $settingService = app(\App\Services\SettingService::class);
+            $defaultBranchName = $settingService->get('ecommerce_default_branch_name', 'Banjarbaru');
+            $this->verificationBranchName = $this->selectedMobileOrder->branch?->name ?? $defaultBranchName;
+
+            $defaultSalesId = $settingService->get('ecommerce_default_sales_id');
+            $this->verificationSalesId = $this->selectedMobileOrder->sales_id ?? (!empty($defaultSalesId) ? (int) $defaultSalesId : null);
+
+            $this->verificationItemSns = [];
+            foreach ($this->selectedMobileOrder->items as $item) {
+                $this->verificationItemSns[$item->id] = $item->serial_number ?? '';
+            }
+
             $this->showVerificationModal = true;
         }
     }
@@ -82,6 +109,44 @@ class OrderManagement extends Component
     {
         $this->showVerificationModal = false;
         $this->selectedMobileOrder = null;
+        $this->verificationWarehouseId = null;
+        $this->verificationBranchName = null;
+        $this->verificationSalesId = null;
+        $this->verificationItemSns = [];
+    }
+
+    public function setItemSn(int $itemId, string $sn): void
+    {
+        $this->verificationItemSns[$itemId] = $sn;
+    }
+
+    public function getAvailableSerialNumbersForOrder(): array
+    {
+        if (!$this->selectedMobileOrder || !$this->verificationWarehouseId) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($this->selectedMobileOrder->items as $item) {
+            $itemNo = $item->variant?->item_no ?? null;
+            if (!$itemNo) {
+                $itemNo = \App\Models\ProductAccurate::where('id', $item->product_variant_id)->value('item_no');
+            }
+
+            if ($itemNo) {
+                $available = \App\Models\ProductSerialNumber::where('item_no', $itemNo)
+                    ->where('warehouse_id', $this->verificationWarehouseId)
+                    ->where('status', 'Available')
+                    ->limit(10)
+                    ->pluck('serial_number')
+                    ->toArray();
+                $result[$item->id] = $available;
+            } else {
+                $result[$item->id] = [];
+            }
+        }
+
+        return $result;
     }
 
     public function approveMobilePayment(int $orderId): void
@@ -92,7 +157,14 @@ class OrderManagement extends Component
         }
 
         try {
-            app(\App\Services\MobileOrderService::class)->approvePayment($order, Auth::user());
+            $overrides = [
+                'warehouse_id' => $this->verificationWarehouseId ? (int) $this->verificationWarehouseId : null,
+                'branch_name' => $this->verificationBranchName ? trim($this->verificationBranchName) : null,
+                'sales_id' => $this->verificationSalesId ? (int) $this->verificationSalesId : null,
+                'item_sns' => $this->verificationItemSns,
+            ];
+
+            app(\App\Services\MobileOrderService::class)->approvePayment($order, Auth::user(), $overrides);
             $this->closeVerification();
             $this->dispatch('toast', title: 'Berhasil', message: "Pembayaran pesanan #{$order->order_number} disetujui & sinkronisasi Accurate diproses.", type: 'success');
         } catch (\Throwable $e) {
@@ -520,14 +592,46 @@ class OrderManagement extends Component
         }
 
         if ($this->warehouseFilter) {
-            $query->whereHas('handledBy', function ($q) {
-                $q->where('warehouse_id', $this->warehouseFilter);
+            $query->where(function ($q) {
+                $q->where('warehouse_id', $this->warehouseFilter)
+                    ->orWhereHas('handledBy', function ($hq) {
+                        $hq->where('warehouse_id', $this->warehouseFilter);
+                    });
             });
+        }
+
+        $businessUnitId = $this->selectedMobileOrder?->business_unit_id;
+
+        $warehouses = \App\Models\Warehouse::when($businessUnitId, fn($q) => $q->where('business_unit_id', $businessUnitId))
+            ->orderBy('name')
+            ->get();
+        if ($warehouses->isEmpty()) {
+            $warehouses = \App\Models\Warehouse::orderBy('name')->get();
+        }
+
+        $salesQuery = \App\Models\Employe::active();
+        if ($businessUnitId) {
+            $salesQuery->where('business_unit_id', $businessUnitId);
+        }
+        $salesEmployees = $salesQuery->orderBy('name')->get();
+        if ($salesEmployees->isEmpty()) {
+            $salesEmployees = \App\Models\Employe::active()->orderBy('name')->get();
+        }
+
+        $branches = \App\Models\Branch::when($businessUnitId, fn($q) => $q->where('business_unit_id', $businessUnitId))
+            ->orderBy('name')
+            ->get();
+        if ($branches->isEmpty()) {
+            $branches = \App\Models\Branch::orderBy('name')->get();
         }
 
         return view('livewire.admin.orders.order-management', [
             'orders' => $query->paginate(10),
-            'warehouses' => \App\Models\Warehouse::all(),
+            'warehouses' => $warehouses,
+            'allWarehouses' => \App\Models\Warehouse::orderBy('name')->get(),
+            'salesEmployees' => $salesEmployees,
+            'branches' => $branches,
+            'availableSns' => $this->getAvailableSerialNumbersForOrder(),
             'openIssuesTotal' => OrderIssue::where('status', 'OPEN')->count(),
         ]);
     }
