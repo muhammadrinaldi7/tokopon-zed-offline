@@ -84,7 +84,11 @@ class SyncOrderToAccurateJob implements ShouldQueue
             ? $customerUser->getAccurateCustomerNo($databaseSource)
             : 'PELANGGAN-UMUM';
 
-        $defaultBranch = app(\App\Services\SettingService::class)->get('ecommerce_default_branch_name', 'Banjarbaru');
+        $buId = $order->business_unit_id;
+        $settingService = app(\App\Services\SettingService::class);
+        $defaultBranch = $buId
+            ? $settingService->get("ecommerce_branch_{$buId}", $settingService->get('ecommerce_default_branch_name', 'Banjarbaru'))
+            : $settingService->get('ecommerce_default_branch_name', 'Banjarbaru');
         $branchName = $order->branch?->name ?: $defaultBranch;
         $warehouseName = $order->warehouse?->name ?? 'Head Office';
 

@@ -90,10 +90,15 @@ class OrderManagement extends Component
             $this->verificationWarehouseId = $this->selectedMobileOrder->warehouse_id;
 
             $settingService = app(\App\Services\SettingService::class);
-            $defaultBranchName = $settingService->get('ecommerce_default_branch_name', 'Banjarbaru');
+            $buId = $this->selectedMobileOrder->business_unit_id;
+            $defaultBranchName = $buId
+                ? $settingService->get("ecommerce_branch_{$buId}", $settingService->get('ecommerce_default_branch_name', 'Banjarbaru'))
+                : $settingService->get('ecommerce_default_branch_name', 'Banjarbaru');
             $this->verificationBranchName = $this->selectedMobileOrder->branch?->name ?? $defaultBranchName;
 
-            $defaultSalesId = $settingService->get('ecommerce_default_sales_id');
+            $defaultSalesId = $buId
+                ? $settingService->get("ecommerce_sales_{$buId}", $settingService->get('ecommerce_default_sales_id'))
+                : $settingService->get('ecommerce_default_sales_id');
             $this->verificationSalesId = $this->selectedMobileOrder->sales_id ?? (!empty($defaultSalesId) ? (int) $defaultSalesId : null);
 
             $this->verificationItemSns = [];

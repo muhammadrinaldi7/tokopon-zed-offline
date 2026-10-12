@@ -42,6 +42,17 @@ class MobileOrderService
         $businessUnitId = $data['business_unit_id'] ?? null;
         $warehouseId = $data['warehouse_id'] ?? null;
 
+        // Auto-detect businessUnitId dari produk pertama di keranjang jika belum ditentukan
+        if (!$businessUnitId && !empty($items)) {
+            $firstProductAccurateId = $items[0]['product_accurate_id'] ?? $items[0]['product_id'] ?? null;
+            if ($firstProductAccurateId) {
+                $p = ProductAccurate::find($firstProductAccurateId);
+                if ($p && $p->business_unit_id) {
+                    $businessUnitId = $p->business_unit_id;
+                }
+            }
+        }
+
         // 1. Tentukan Gudang Online Store yang valid
         $warehouse = null;
         if ($warehouseId) {
@@ -177,10 +188,18 @@ class MobileOrderService
             ];
 
             $settingService = app(\App\Services\SettingService::class);
-            $defaultSalesId = $settingService->get('ecommerce_default_sales_id');
+            
+            // Prioritas lookup Sales per Business Unit -> Fallback global
+            $defaultSalesId = $settingService->get("ecommerce_sales_{$businessUnitId}", $settingService->get('ecommerce_default_sales_id'));
             $salesId = $data['sales_id'] ?? (!empty($defaultSalesId) ? (int) $defaultSalesId : null);
-            $defaultBranchName = $settingService->get('ecommerce_default_branch_name', 'Banjarbaru');
+
+            // Prioritas lookup Cabang per Business Unit -> Fallback global
+            $defaultBranchName = $settingService->get("ecommerce_branch_{$businessUnitId}", $settingService->get('ecommerce_default_branch_name', 'Banjarbaru'));
             $branchId = $data['branch_id'] ?? \App\Models\Branch::where('name', $defaultBranchName)->value('id');
+
+            // Prioritas lookup Kasir / Handled By per Business Unit -> Fallback global
+            $defaultHandledById = $settingService->get("ecommerce_handled_by_{$businessUnitId}", $settingService->get('ecommerce_default_handled_by_id'));
+            $handledBy = $data['handled_by'] ?? (!empty($defaultHandledById) ? (int) $defaultHandledById : null);
 
             // 4. Create Order
             $order = Order::create([
@@ -189,6 +208,7 @@ class MobileOrderService
                 'warehouse_id' => $warehouse->id,
                 'branch_id' => $branchId,
                 'sales_id' => $salesId,
+                'handled_by' => $handledBy,
                 'order_number' => $orderNumber,
                 'order_date' => $dateNow->format('Y-m-d'),
                 'total_amount' => $subtotal,
