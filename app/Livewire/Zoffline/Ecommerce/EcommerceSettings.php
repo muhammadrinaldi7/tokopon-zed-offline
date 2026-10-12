@@ -8,6 +8,7 @@ use App\Models\PaymentMethod;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\SettingService;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -34,7 +35,7 @@ class EcommerceSettings extends Component
 
         // Pilih Unit Usaha awal (dari user/session atau yang pertama aktif)
         $firstBu = BusinessUnit::where('is_active', true)->first();
-        $this->selectedBusinessUnitId = auth()->user()?->getActiveBusinessUnitId() ?? $firstBu?->id;
+        $this->selectedBusinessUnitId = Auth::user()?->getActiveBusinessUnitId() ?? $firstBu?->id;
 
         $this->loadBusinessUnitSettings();
     }
@@ -93,7 +94,7 @@ class EcommerceSettings extends Component
     {
         $this->dynamicShipping = !$this->dynamicShipping;
         $settingService->set('ecommerce_dynamic_shipping', $this->dynamicShipping ? 'true' : 'false', 'boolean');
-        
+
         $statusText = $this->dynamicShipping ? 'DIPERLUKAN (Kalkulator Ekspedisi Biteship)' : 'NON-AKTIF (Mode Ambil di Toko / Free Ongkir)';
         $this->dispatch('toast', title: 'Pengaturan Diperbarui', message: "Logistik Dinamis sekarang {$statusText}", type: 'success');
     }
@@ -230,11 +231,11 @@ class EcommerceSettings extends Component
 
         // Kasir / Handled By users (User admin/kasir milik BU terpilih)
         $buCashiers = User::when($this->selectedBusinessUnitId, function ($q) {
-                $q->where(function ($sub) {
-                    $sub->where('business_unit_id', $this->selectedBusinessUnitId)
-                        ->orWhereNull('business_unit_id');
-                });
-            })
+            $q->where(function ($sub) {
+                $sub->where('business_unit_id', $this->selectedBusinessUnitId)
+                    ->orWhereNull('business_unit_id');
+            });
+        })
             ->orderBy('name')
             ->get();
 
