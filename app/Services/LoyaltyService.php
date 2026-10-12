@@ -525,7 +525,7 @@ class LoyaltyService
     }
 
     /**
-     * Dapatkan status metrik sinkronisasi pemetaan akun loyalty vs user lama.
+     * Dapatkan status metrik sinkronisasi pemetaan akun loyalty vs user lama secara efisien (database subqueries).
      */
     public function getSyncStatus(): array
     {
@@ -535,160 +535,204 @@ class LoyaltyService
             ->count();
         $totalLoyaltyAccounts = LoyaltyAccount::count();
 
-        $mappedPhones = LoyaltyAccount::pluck('phone_number')->toArray();
-
-        $unmappedProfiles = \App\Models\UserProfile::with('user')
-            ->whereNotNull('phone_number')
+        // 1. Profil belum terpetakan: query langsung di database via subquery (bebas timeout & tanpa N+1)
+        $unmappedProfilesQuery = \App\Models\UserProfile::whereNotNull('phone_number')
             ->where('phone_number', '!=', '')
-            ->get();
+            ->whereNotIn('user_id', function ($sub) {
+                $sub->select('user_id')->from('loyalty_accounts')->whereNotNull('user_id');
+            });
 
-        $unmappedCount = 0;
-        $unmappedSamples = [];
+        $unmappedCount = $unmappedProfilesQuery->count();
 
-        foreach ($unmappedProfiles as $p) {
-            $norm = $this->normalizePhone($p->phone_number);
-            if (!empty($norm) && !in_array($norm, $mappedPhones)) {
-                $unmappedCount++;
-                if (count($unmappedSamples) < 15) {
-                    $unmappedSamples[] = [
-                        'user_id' => $p->user_id,
-                        'name' => $p->full_name ?: ($p->user?->name ?? 'Pelanggan'),
-                        'raw_phone' => $p->phone_number,
-                        'normalized_phone' => $norm,
-                        'email' => $p->user?->email,
-                        'registered_at' => $p->user?->created_at?->format('d M Y') ?? '-',
-                    ];
-                }
-            }
-        }
+        // 2. Akun internal belanja tamu yang belum terpetakan (08xxx@tokopon.internal)
+        $unmappedInternalCount = User::where('email', 'like', '%@tokopon.internal')
+            ->whereNotIn('id', function ($sub) {
+                $sub->select('user_id')->from('loyalty_accounts')->whereNotNull('user_id');
+            })
+            ->count();
+
+        $totalUnmapped = $unmappedCount + $unmappedInternalCount;
+
+        // Ambil sampel maksimal 15 baris untuk preview antrean tanpa membebani memory
+        $unmappedSamples = (clone $unmappedProfilesQuery)
+            ->with('user')
+            ->latest('id')
+            ->limit(15)
+            ->get()
+            ->map(function ($p) {
+                return [
+                    'user_id' => $p->user_id,
+                    'name' => $p->full_name ?: ($p->user?->name ?? 'Pelanggan'),
+                    'raw_phone' => $p->phone_number,
+                    'normalized_phone' => $this->normalizePhone($p->phone_number),
+                    'email' => $p->user?->email,
+                    'registered_at' => $p->user?->created_at?->format('d M Y') ?? '-',
+                ];
+            })
+            ->toArray();
 
         return [
             'total_users' => $totalUsers,
             'total_profiles_with_phone' => $totalProfilesWithPhone,
             'total_loyalty_accounts' => $totalLoyaltyAccounts,
-            'unmapped_count' => $unmappedCount,
+            'unmapped_count' => $totalUnmapped,
             'unmapped_samples' => $unmappedSamples,
         ];
     }
 
     /**
-     * Sinkronisasikan semua user dan profil lama yang memiliki nomor HP ke dalam tabel loyalty_accounts.
+     * Sinkronisasikan semua user dan profil lama ke dalam tabel loyalty_accounts secara efisien (Batch Chunked).
      */
     public function syncExistingUsers(bool $calculateHistoricalSpend = true): array
     {
-        $profiles = \App\Models\UserProfile::with('user')
-            ->whereNotNull('phone_number')
-            ->where('phone_number', '!=', '')
-            ->get();
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
 
         $totalScanned = 0;
         $newlyCreated = 0;
         $linkedExisting = 0;
         $skipped = 0;
 
-        foreach ($profiles as $profile) {
-            $totalScanned++;
-            $rawPhone = $profile->phone_number;
-            $cleanPhone = $this->normalizePhone($rawPhone);
+        // 1. Pra-kalkulasi total belanja semua user lampau dalam 1 SQL Query (menghindari puluhan ribu query N+1)
+        $userSpends = [];
+        if ($calculateHistoricalSpend) {
+            $userSpends = DB::table('orders')
+                ->where('order_status', 'COMPLETED')
+                ->whereNotNull('user_id')
+                ->groupBy('user_id')
+                ->select('user_id', DB::raw('SUM(grand_total) as total_spent'))
+                ->pluck('total_spent', 'user_id')
+                ->toArray();
+        }
 
-            if (empty($cleanPhone) || strlen($cleanPhone) < 8) {
-                $skipped++;
-                continue;
-            }
-
-            $user = $profile->user;
-            $name = $profile->full_name ?: ($user?->name ?? 'Pelanggan Tokopon');
-
-            $account = LoyaltyAccount::where('phone_number', $cleanPhone)->first();
-
-            if (!$account) {
-                $historicalSpend = 0;
-                if ($calculateHistoricalSpend && $user) {
-                    $historicalSpend = (float) Order::where('user_id', $user->id)
-                        ->where('order_status', 'COMPLETED')
-                        ->sum('grand_total');
-                }
-
-                $tier = $this->evaluateTier($historicalSpend);
-
-                LoyaltyAccount::create([
-                    'phone_number' => $cleanPhone,
-                    'user_id' => $user?->id,
-                    'customer_name' => $name,
-                    'points_balance' => 0,
-                    'lifetime_points' => 0,
-                    'total_spend' => $historicalSpend,
-                    'tier' => $tier,
-                    'tier_updated_at' => now(),
-                ]);
-
-                $newlyCreated++;
-            } else {
-                $updated = false;
-                if ($account->user_id === null && $user) {
-                    $account->user_id = $user->id;
-                    $updated = true;
-                }
-                if (empty($account->customer_name) && !empty($name)) {
-                    $account->customer_name = $name;
-                    $updated = true;
-                }
-                if ($calculateHistoricalSpend && $user && (float) $account->total_spend === 0.0) {
-                    $historicalSpend = (float) Order::where('user_id', $user->id)
-                        ->where('order_status', 'COMPLETED')
-                        ->sum('grand_total');
-                    if ($historicalSpend > 0) {
-                        $account->total_spend = $historicalSpend;
-                        $account->tier = $this->evaluateTier($historicalSpend);
-                        $updated = true;
+        // 2. Proses data UserProfile secara bertahap dalam batch chunk (500 per iterasi)
+        \App\Models\UserProfile::with('user')
+            ->whereNotNull('phone_number')
+            ->where('phone_number', '!=', '')
+            ->chunkById(500, function ($profiles) use (&$totalScanned, &$newlyCreated, &$linkedExisting, &$skipped, $userSpends, $calculateHistoricalSpend) {
+                $phoneMap = [];
+                foreach ($profiles as $p) {
+                    $norm = $this->normalizePhone($p->phone_number);
+                    if ($norm && strlen($norm) >= 8) {
+                        $phoneMap[$norm][] = $p;
                     }
                 }
 
-                if ($updated) {
-                    $account->save();
-                    $linkedExisting++;
-                } else {
-                    $skipped++;
+                if (empty($phoneMap)) {
+                    return;
                 }
-            }
-        }
 
-        // Juga scan users yang memiliki email 08xxx@tokopon.internal (customer mobile/checkout)
-        $internalUsers = User::where('email', 'like', '%@tokopon.internal')
-            ->whereNotIn('id', LoyaltyAccount::whereNotNull('user_id')->pluck('user_id'))
-            ->get();
+                // Batch fetch akun loyalty yang sudah ada pada chunk ini
+                $existingAccounts = LoyaltyAccount::whereIn('phone_number', array_keys($phoneMap))
+                    ->get()
+                    ->keyBy('phone_number');
 
-        foreach ($internalUsers as $u) {
-            $rawPhone = explode('@', $u->email)[0];
-            $cleanPhone = $this->normalizePhone($rawPhone);
-            if (empty($cleanPhone) || strlen($cleanPhone) < 8) continue;
+                $now = now();
 
-            $totalScanned++;
-            $account = LoyaltyAccount::where('phone_number', $cleanPhone)->first();
+                foreach ($phoneMap as $cleanPhone => $chunkProfiles) {
+                    $totalScanned += count($chunkProfiles);
+                    $profile = $chunkProfiles[0];
+                    $user = $profile->user;
+                    $userId = $user?->id ?? $profile->user_id;
+                    $name = $profile->full_name ?: ($user?->name ?? 'Pelanggan Tokopon');
+                    $historicalSpend = ($calculateHistoricalSpend && $userId) ? (float) ($userSpends[$userId] ?? 0) : 0;
 
-            if (!$account) {
-                $historicalSpend = $calculateHistoricalSpend
-                    ? (float) Order::where('user_id', $u->id)->where('order_status', 'COMPLETED')->sum('grand_total')
-                    : 0;
+                    if ($existingAccounts->has($cleanPhone)) {
+                        $account = $existingAccounts->get($cleanPhone);
+                        $needsUpdate = false;
 
-                LoyaltyAccount::create([
-                    'phone_number' => $cleanPhone,
-                    'user_id' => $u->id,
-                    'customer_name' => $u->name ?: 'Pelanggan Tokopon',
-                    'points_balance' => 0,
-                    'lifetime_points' => 0,
-                    'total_spend' => $historicalSpend,
-                    'tier' => $this->evaluateTier($historicalSpend),
-                    'tier_updated_at' => now(),
-                ]);
-                $newlyCreated++;
-            } else {
-                if ($account->user_id === null) {
-                    $account->update(['user_id' => $u->id]);
-                    $linkedExisting++;
+                        if ($account->user_id === null && $userId) {
+                            $account->user_id = $userId;
+                            $needsUpdate = true;
+                        }
+                        if (empty($account->customer_name) && !empty($name)) {
+                            $account->customer_name = $name;
+                            $needsUpdate = true;
+                        }
+                        if ($calculateHistoricalSpend && $historicalSpend > (float) $account->total_spend) {
+                            $account->total_spend = $historicalSpend;
+                            $account->tier = $this->evaluateTier($historicalSpend);
+                            $needsUpdate = true;
+                        }
+
+                        if ($needsUpdate) {
+                            $account->save();
+                            $linkedExisting++;
+                        } else {
+                            $skipped++;
+                        }
+                    } else {
+                        $tier = $this->evaluateTier($historicalSpend);
+                        $newAccount = LoyaltyAccount::create([
+                            'phone_number' => $cleanPhone,
+                            'user_id' => $userId,
+                            'customer_name' => $name,
+                            'points_balance' => 0,
+                            'lifetime_points' => 0,
+                            'total_spend' => $historicalSpend,
+                            'tier' => $tier,
+                            'tier_updated_at' => $now,
+                        ]);
+                        $existingAccounts->put($cleanPhone, $newAccount);
+                        $newlyCreated++;
+                    }
                 }
-            }
-        }
+            });
+
+        // 3. Proses data internal users (tamu belanja mobile e.g. 08xxx@tokopon.internal) dalam batch chunk
+        User::where('email', 'like', '%@tokopon.internal')
+            ->whereNotIn('id', function ($sub) {
+                $sub->select('user_id')->from('loyalty_accounts')->whereNotNull('user_id');
+            })
+            ->chunkById(500, function ($internalUsers) use (&$totalScanned, &$newlyCreated, &$linkedExisting, &$skipped, $userSpends, $calculateHistoricalSpend) {
+                $phoneMap = [];
+                foreach ($internalUsers as $u) {
+                    $rawPhone = explode('@', $u->email)[0];
+                    $norm = $this->normalizePhone($rawPhone);
+                    if ($norm && strlen($norm) >= 8) {
+                        $phoneMap[$norm] = $u;
+                    }
+                }
+
+                if (empty($phoneMap)) {
+                    return;
+                }
+
+                $existingAccounts = LoyaltyAccount::whereIn('phone_number', array_keys($phoneMap))
+                    ->get()
+                    ->keyBy('phone_number');
+
+                $now = now();
+
+                foreach ($phoneMap as $cleanPhone => $u) {
+                    $totalScanned++;
+                    $historicalSpend = ($calculateHistoricalSpend) ? (float) ($userSpends[$u->id] ?? 0) : 0;
+
+                    if ($existingAccounts->has($cleanPhone)) {
+                        $account = $existingAccounts->get($cleanPhone);
+                        if ($account->user_id === null) {
+                            $account->update(['user_id' => $u->id]);
+                            $linkedExisting++;
+                        } else {
+                            $skipped++;
+                        }
+                    } else {
+                        $tier = $this->evaluateTier($historicalSpend);
+                        $newAccount = LoyaltyAccount::create([
+                            'phone_number' => $cleanPhone,
+                            'user_id' => $u->id,
+                            'customer_name' => $u->name ?: 'Pelanggan Tokopon',
+                            'points_balance' => 0,
+                            'lifetime_points' => 0,
+                            'total_spend' => $historicalSpend,
+                            'tier' => $tier,
+                            'tier_updated_at' => $now,
+                        ]);
+                        $existingAccounts->put($cleanPhone, $newAccount);
+                        $newlyCreated++;
+                    }
+                }
+            });
 
         return [
             'total_scanned' => $totalScanned,

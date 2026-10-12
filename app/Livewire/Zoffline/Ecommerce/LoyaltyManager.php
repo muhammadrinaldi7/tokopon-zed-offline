@@ -114,8 +114,10 @@ class LoyaltyManager extends Component
 
     public function runSync(LoyaltyService $loyaltyService): void
     {
+        @set_time_limit(300);
         try {
             $this->syncResult = $loyaltyService->syncExistingUsers($this->calcHistoricalSpend);
+            \Illuminate\Support\Facades\Cache::forget('loyalty_manager_stats');
             $this->dispatch('toast', [
                 'type' => 'success',
                 'title' => 'Sinkronisasi Selesai',
@@ -135,6 +137,7 @@ class LoyaltyManager extends Component
         try {
             $account = $loyaltyService->mapSingleUser($userId, $this->calcHistoricalSpend);
             if ($account) {
+                \Illuminate\Support\Facades\Cache::forget('loyalty_manager_stats');
                 $this->dispatch('toast', [
                     'type' => 'success',
                     'title' => 'Berhasil Dipetakan',
@@ -202,6 +205,7 @@ class LoyaltyManager extends Component
 
         try {
             $loyaltyService->adjustPointsManually($account, $delta, $this->adjustDescription, Auth::id());
+            \Illuminate\Support\Facades\Cache::forget('loyalty_manager_stats');
             $this->closeAdjustModal();
             $this->dispatch('toast', [
                 'type' => 'success',
@@ -223,8 +227,11 @@ class LoyaltyManager extends Component
     {
         $accounts = LoyaltyAccount::with('user')
             ->when($this->search, function ($q) {
-                $q->where('phone_number', 'like', "%{$this->search}%")
-                  ->orWhere('customer_name', 'like', "%{$this->search}%");
+                $term = trim($this->search);
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('phone_number', 'like', "%{$term}%")
+                        ->orWhere('customer_name', 'like', "%{$term}%");
+                });
             })
             ->when($this->filterTier, function ($q) {
                 $q->where('tier', $this->filterTier);
@@ -240,13 +247,21 @@ class LoyaltyManager extends Component
             ? $loyaltyService->getSyncStatus()
             : [];
 
-        // Global stats for banner
-        $stats = [
-            'total_members' => LoyaltyAccount::count(),
-            'total_points_circulating' => LoyaltyAccount::sum('points_balance'),
-            'total_spend_recorded' => LoyaltyAccount::sum('total_spend'),
-            'total_transactions' => LoyaltyTransaction::count(),
-        ];
+        // Global stats with cache for 30 seconds to eliminate redundant query load
+        $stats = \Illuminate\Support\Facades\Cache::remember('loyalty_manager_stats', 30, function () {
+            $accStats = \Illuminate\Support\Facades\DB::table('loyalty_accounts')
+                ->selectRaw('COUNT(*) as total_members, COALESCE(SUM(points_balance), 0) as total_points, COALESCE(SUM(total_spend), 0) as total_spend')
+                ->first();
+
+            $txCount = \Illuminate\Support\Facades\DB::table('loyalty_transactions')->count();
+
+            return [
+                'total_members' => (int) ($accStats->total_members ?? 0),
+                'total_points_circulating' => (int) ($accStats->total_points ?? 0),
+                'total_spend_recorded' => (float) ($accStats->total_spend ?? 0),
+                'total_transactions' => (int) $txCount,
+            ];
+        });
 
         return view('livewire.zoffline.ecommerce.loyalty-manager', [
             'accounts' => $accounts,
