@@ -144,6 +144,11 @@ class Order extends Model
         return $this->belongsTo(PaymentMethodRate::class);
     }
 
+    public function loyaltyTransactions()
+    {
+        return $this->hasMany(LoyaltyTransaction::class);
+    }
+
 
     // ─── Scopes ────────────────────────────────────────────────
 
