@@ -163,9 +163,11 @@ class PromoReportTest extends TestCase
             return $orders->count() === 1 && $orders->first()->order_number === 'ORD-10001';
         });
 
-        // Verify that getClaimRows maps tanggal using order_date
+        // Verify that getClaimRows maps tanggal using order_date and includes updated_at
         $rows = invade($component->instance())->getClaimRows();
         $this->assertNotEmpty($rows);
         $this->assertEquals($targetDate, $rows[0]['tanggal']);
+        $this->assertArrayHasKey('updated_at', $rows[0]);
+        $this->assertNotEquals('-', $rows[0]['updated_at']);
     }
 }

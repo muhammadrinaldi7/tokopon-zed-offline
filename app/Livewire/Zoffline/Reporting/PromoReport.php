@@ -148,6 +148,9 @@ class PromoReport extends Component
             $orderDate = $order->order_date
                 ? $order->order_date->format('Y-m-d')
                 : $order->created_at->format('Y-m-d');
+            $updatedAt = $order->updated_at
+                ? $order->updated_at->format('Y-m-d')
+                : '-';
             $orderNo = $order->order_number;
             $invNo = $order->accurate_invoice_no ?? '-';
 
@@ -169,6 +172,7 @@ class PromoReport extends Component
                     if ($discountAmount > 0) {
                         $rows[] = [
                             'tanggal' => $orderDate,
+                            'updated_at' => $updatedAt,
                             'order_no' => $orderNo,
                             'inv_no' => $invNo,
                             'cabang' => $branch,
@@ -216,6 +220,7 @@ class PromoReport extends Component
 
             fputcsv($file, [
                 'TANGGAL',
+                'UPDATED AT',
                 'NO. ORDER',
                 'NO. INVOICE',
                 'CABANG',
