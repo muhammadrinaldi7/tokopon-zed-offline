@@ -94,11 +94,16 @@
             <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div class="relative flex-1 max-w-md">
                     <input type="text" wire:model.live.debounce.300ms="search"
-                        placeholder="Cari nomor HP atau nama member..."
-                        class="w-full pl-10 pr-4 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-neutral-900 focus:outline-none transition-all">
+                        placeholder="Cari nomor HP (08xx / 628xx), email, atau nama member..."
+                        class="w-full pl-10 pr-9 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-neutral-900 focus:outline-none transition-all">
                     <svg class="w-4 h-4 text-gray-400 absolute left-3.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
+                    @if($search)
+                        <button wire:click="$set('search', '')" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    @endif
                 </div>
 
                 <div class="flex items-center gap-2 flex-wrap">
@@ -150,8 +155,11 @@
                                             <div>
                                                 <p class="font-bold text-gray-900 text-xs">{{ $acc->customer_name ?: 'Pelanggan Tokopon' }}</p>
                                                 <p class="text-[11px] font-mono text-gray-500 mt-0.5">📱 {{ $acc->phone_number }}</p>
+                                                @if($acc->user?->email)
+                                                    <p class="text-[10px] text-gray-400 mt-0.5">✉️ {{ $acc->user->email }}</p>
+                                                @endif
                                                 @if($acc->user_id)
-                                                    <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-semibold bg-blue-50 text-blue-700">
+                                                    <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-semibold bg-blue-50 text-blue-700 mt-0.5">
                                                         User ID #{{ $acc->user_id }}
                                                     </span>
                                                 @endif
@@ -282,12 +290,39 @@
                 </div>
             </div>
 
-            {{-- Unmapped Preview Table --}}
+            {{-- Unmapped / Search Table --}}
             <div class="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-                <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h4 class="font-bold text-sm text-gray-900">Daftar Pengguna Belum Terpetakan (Sampel Antrean)</h4>
-                        <p class="text-[11px] text-gray-500">Pengguna berikut memiliki nomor HP di profil mereka namun belum tercatat di tabel loyalty.</p>
+                        <h4 class="font-bold text-sm text-gray-900">
+                            @if(!empty($mappingSearch))
+                                Hasil Pencarian Pelanggan ("{{ $mappingSearch }}")
+                            @else
+                                Daftar Pengguna Belum Terpetakan (Sampel Antrean)
+                            @endif
+                        </h4>
+                        <p class="text-[11px] text-gray-500">
+                            @if(!empty($mappingSearch))
+                                Menampilkan data pengguna berdasarkan pencarian nomor HP, email, atau nama.
+                            @else
+                                Pengguna berikut memiliki nomor HP di profil mereka namun belum tercatat di tabel loyalty.
+                            @endif
+                        </p>
+                    </div>
+
+                    {{-- Search Input for Mapping --}}
+                    <div class="relative w-full md:w-80">
+                        <input type="text" wire:model.live.debounce.300ms="mappingSearch"
+                            placeholder="Cari nomor HP (08xx / 628xx) atau email..."
+                            class="w-full pl-9 pr-8 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-indigo-600 focus:outline-none transition-all">
+                        <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        @if(!empty($mappingSearch))
+                            <button wire:click="clearMappingSearch" class="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        @endif
                     </div>
                 </div>
 
@@ -300,33 +335,59 @@
                                 <th class="p-3.5">No. HP Mentah</th>
                                 <th class="p-3.5">No. HP Standar (Normalized)</th>
                                 <th class="p-3.5">Email</th>
-                                <th class="p-3.5">Tgl Terdaftar</th>
-                                <th class="p-3.5 text-right">Aksi Cepat</th>
+                                <th class="p-3.5">Status Loyalty</th>
+                                <th class="p-3.5 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            @forelse ($syncStatus['unmapped_samples'] ?? [] as $sample)
+                            @php
+                                $displayList = !empty($mappingSearch) 
+                                    ? ($mappingResults ?? []) 
+                                    : ($syncStatus['unmapped_samples'] ?? []);
+                            @endphp
+
+                            @forelse ($displayList as $item)
                                 <tr class="hover:bg-gray-50/70">
-                                    <td class="p-3.5 font-mono text-gray-400">#{{ $sample['user_id'] }}</td>
-                                    <td class="p-3.5 font-bold text-gray-900">{{ $sample['name'] }}</td>
-                                    <td class="p-3.5 font-mono text-gray-500">{{ $sample['raw_phone'] }}</td>
-                                    <td class="p-3.5 font-mono text-emerald-600 font-bold">{{ $sample['normalized_phone'] }}</td>
-                                    <td class="p-3.5 text-gray-500">{{ $sample['email'] ?: '-' }}</td>
-                                    <td class="p-3.5 text-gray-400">{{ $sample['registered_at'] }}</td>
+                                    <td class="p-3.5 font-mono text-gray-400">#{{ $item['user_id'] }}</td>
+                                    <td class="p-3.5 font-bold text-gray-900">{{ $item['name'] }}</td>
+                                    <td class="p-3.5 font-mono text-gray-500">{{ $item['raw_phone'] ?: '-' }}</td>
+                                    <td class="p-3.5 font-mono text-emerald-600 font-bold">{{ $item['normalized_phone'] ?: '-' }}</td>
+                                    <td class="p-3.5 text-gray-500">{{ $item['email'] ?: '-' }}</td>
+                                    <td class="p-3.5">
+                                        @if(isset($item['is_mapped']) && $item['is_mapped'])
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                <span>✓</span> Terdaftar ({{ $item['tier'] }} - {{ number_format($item['points_balance'] ?? 0) }} Pts)
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                                Belum Terpetakan
+                                            </span>
+                                        @endif
+                                    </td>
                                     <td class="p-3.5 text-right">
-                                        <button wire:click="mapSingleUser({{ $sample['user_id'] }})"
-                                            class="px-3 py-1 rounded-lg text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
-                                            Map Akun Ini
-                                        </button>
+                                        @if(isset($item['is_mapped']) && $item['is_mapped'])
+                                            <span class="text-[11px] text-gray-400 font-medium">Sudah Aktif</span>
+                                        @else
+                                            <button wire:click="mapSingleUser({{ $item['user_id'] }})"
+                                                class="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition">
+                                                + Petakan Sekarang
+                                            </button>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
                                     <td colspan="7" class="p-8 text-center text-gray-400">
                                         <div class="max-w-xs mx-auto space-y-1">
-                                            <span class="text-2xl">✨</span>
-                                            <p class="font-bold text-gray-700 text-xs">Semua Data Pengguna Telah Terpetakan!</p>
-                                            <p class="text-[11px]">Seluruh pengguna dengan nomor HP aktif telah terdaftar ke akun Loyalty Tokopon.</p>
+                                            @if(!empty($mappingSearch))
+                                                <span class="text-2xl">🔍</span>
+                                                <p class="font-bold text-gray-700 text-xs">Tidak Ada Hasil Ditemukan</p>
+                                                <p class="text-[11px]">Tidak ada pengguna dengan nomor HP atau email "{{ $mappingSearch }}".</p>
+                                            @else
+                                                <span class="text-2xl">✨</span>
+                                                <p class="font-bold text-gray-700 text-xs">Semua Data Pengguna Telah Terpetakan!</p>
+                                                <p class="text-[11px]">Seluruh pengguna dengan nomor HP aktif telah terdaftar ke akun Loyalty Tokopon.</p>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>

@@ -35,6 +35,7 @@ class LoyaltyManager extends Component
     // Tab 2: Mapping Pelanggan Lama
     public bool $calcHistoricalSpend = true;
     public ?array $syncResult = null;
+    public string $mappingSearch = '';
 
     // Tab 3: Settings Form
     public bool $loyalty_is_active = true;
@@ -221,6 +222,11 @@ class LoyaltyManager extends Component
         }
     }
 
+    public function clearMappingSearch(): void
+    {
+        $this->mappingSearch = '';
+    }
+
     // ─── RENDER ────────────────────────────────────────────────────
 
     public function render(LoyaltyService $loyaltyService)
@@ -228,9 +234,26 @@ class LoyaltyManager extends Component
         $accounts = LoyaltyAccount::with('user')
             ->when($this->search, function ($q) {
                 $term = trim($this->search);
-                $q->where(function ($sub) use ($term) {
-                    $sub->where('phone_number', 'like', "%{$term}%")
-                        ->orWhere('customer_name', 'like', "%{$term}%");
+                $cleanPhone = preg_replace('/[^0-9]/', '', $term);
+
+                $q->where(function ($sub) use ($term, $cleanPhone) {
+                    $sub->where('customer_name', 'like', "%{$term}%")
+                        ->orWhere('phone_number', 'like', "%{$term}%")
+                        ->orWhereHas('user', function ($uq) use ($term) {
+                            $uq->where('email', 'like', "%{$term}%")
+                               ->orWhere('name', 'like', "%{$term}%");
+                        });
+
+                    if (!empty($cleanPhone) && strlen($cleanPhone) >= 4) {
+                        $sub->orWhere('phone_number', 'like', "%{$cleanPhone}%");
+                        if (str_starts_with($cleanPhone, '08')) {
+                            $alt = '628' . substr($cleanPhone, 2);
+                            $sub->orWhere('phone_number', 'like', "%{$alt}%");
+                        } elseif (str_starts_with($cleanPhone, '628')) {
+                            $alt = '08' . substr($cleanPhone, 3);
+                            $sub->orWhere('phone_number', 'like', "%{$alt}%");
+                        }
+                    }
                 });
             })
             ->when($this->filterTier, function ($q) {
@@ -246,6 +269,11 @@ class LoyaltyManager extends Component
         $syncStatus = ($this->activeTab === 'mapping')
             ? $loyaltyService->getSyncStatus()
             : [];
+
+        $mappingResults = [];
+        if ($this->activeTab === 'mapping' && !empty(trim($this->mappingSearch))) {
+            $mappingResults = $loyaltyService->searchUsersForMapping($this->mappingSearch, 25);
+        }
 
         // Global stats with cache for 30 seconds to eliminate redundant query load
         $stats = \Illuminate\Support\Facades\Cache::remember('loyalty_manager_stats', 30, function () {
@@ -267,6 +295,7 @@ class LoyaltyManager extends Component
             'accounts' => $accounts,
             'selectedAccount' => $selectedAccount,
             'syncStatus' => $syncStatus,
+            'mappingResults' => $mappingResults,
             'stats' => $stats,
         ]);
     }

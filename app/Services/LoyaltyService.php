@@ -581,6 +581,109 @@ class LoyaltyService
     }
 
     /**
+     * Cari pengguna lama secara spesifik berdasarkan nomor HP, email, atau nama untuk dipetakan ke Loyalty.
+     */
+    public function searchUsersForMapping(string $search, int $limit = 25): array
+    {
+        $term = trim($search);
+        if (empty($term)) {
+            return [];
+        }
+
+        $cleanPhone = preg_replace('/[^0-9]/', '', $term);
+
+        // Cari di UserProfile dan User
+        $profiles = \App\Models\UserProfile::with(['user.loyaltyAccount'])
+            ->where(function ($q) use ($term, $cleanPhone) {
+                $q->where('phone_number', 'like', "%{$term}%")
+                  ->orWhere('full_name', 'like', "%{$term}%")
+                  ->orWhereHas('user', function ($uq) use ($term) {
+                      $uq->where('name', 'like', "%{$term}%")
+                         ->orWhere('email', 'like', "%{$term}%");
+                  });
+
+                if (!empty($cleanPhone) && strlen($cleanPhone) >= 4) {
+                    $q->orWhere('phone_number', 'like', "%{$cleanPhone}%");
+                    if (str_starts_with($cleanPhone, '08')) {
+                        $alt = '628' . substr($cleanPhone, 2);
+                        $q->orWhere('phone_number', 'like', "%{$alt}%");
+                    } elseif (str_starts_with($cleanPhone, '628')) {
+                        $alt = '08' . substr($cleanPhone, 3);
+                        $q->orWhere('phone_number', 'like', "%{$alt}%");
+                    }
+                }
+            })
+            ->limit($limit)
+            ->get();
+
+        $results = [];
+        $foundUserIds = [];
+
+        foreach ($profiles as $p) {
+            $user = $p->user;
+            $userId = $p->user_id;
+            $foundUserIds[] = $userId;
+
+            $normPhone = $this->normalizePhone($p->phone_number);
+            $loyaltyAcc = $user?->loyaltyAccount;
+            if (!$loyaltyAcc && $normPhone) {
+                $loyaltyAcc = LoyaltyAccount::where('phone_number', $normPhone)->first();
+            }
+
+            $results[] = [
+                'user_id' => $userId,
+                'name' => $p->full_name ?: ($user?->name ?? 'Pelanggan'),
+                'raw_phone' => $p->phone_number,
+                'normalized_phone' => $normPhone,
+                'email' => $user?->email,
+                'registered_at' => $user?->created_at?->format('d M Y') ?? '-',
+                'is_mapped' => (bool) $loyaltyAcc,
+                'tier' => $loyaltyAcc?->tier,
+                'points_balance' => (int) ($loyaltyAcc?->points_balance ?? 0),
+            ];
+        }
+
+        // Cari juga pengguna yang mungkin belum memiliki profile tapi punya email atau guest internal user
+        if (count($results) < $limit) {
+            $remainingLimit = $limit - count($results);
+            $usersDirect = User::with('loyaltyAccount')
+                ->whereNotIn('id', $foundUserIds)
+                ->where(function ($q) use ($term) {
+                    $q->where('email', 'like', "%{$term}%")
+                      ->orWhere('name', 'like', "%{$term}%");
+                })
+                ->limit($remainingLimit)
+                ->get();
+
+            foreach ($usersDirect as $u) {
+                $rawPhone = '';
+                if (str_contains($u->email, '@tokopon.internal')) {
+                    $rawPhone = explode('@', $u->email)[0];
+                }
+                $normPhone = $this->normalizePhone($rawPhone);
+                $loyaltyAcc = $u->loyaltyAccount;
+                if (!$loyaltyAcc && $normPhone) {
+                    $loyaltyAcc = LoyaltyAccount::where('phone_number', $normPhone)->first();
+                }
+
+                $results[] = [
+                    'user_id' => $u->id,
+                    'name' => $u->name,
+                    'raw_phone' => $rawPhone ?: '-',
+                    'normalized_phone' => $normPhone ?: '-',
+                    'email' => $u->email,
+                    'registered_at' => $u->created_at?->format('d M Y') ?? '-',
+                    'is_mapped' => (bool) $loyaltyAcc,
+                    'tier' => $loyaltyAcc?->tier,
+                    'points_balance' => (int) ($loyaltyAcc?->points_balance ?? 0),
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
      * Sinkronisasikan semua user dan profil lama ke dalam tabel loyalty_accounts secara efisien (Batch Chunked).
      */
     public function syncExistingUsers(bool $calculateHistoricalSpend = true): array
