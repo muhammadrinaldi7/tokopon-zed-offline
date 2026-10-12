@@ -179,13 +179,37 @@ class MobileOrderService
             );
 
             $shippingCost = (float) ($data['shipping_cost'] ?? 0);
-            $grandTotal = max(0, $subtotal - $totalDiscount) + $shippingCost;
 
             $shippingSnapshot = $data['shipping_address_snapshot'] ?? [
                 'type' => 'ONLINE_DELIVERY',
                 'store' => $warehouse->name,
                 'customer_name' => User::find($userId)?->name ?? 'Customer',
             ];
+
+            // 3.1 Perhitungan & Validasi Penukaran Poin Loyalty
+            $redeemPoints = (int) ($data['redeem_points'] ?? 0);
+            $loyaltyService = app(\App\Services\LoyaltyService::class);
+            $loyaltyDiscount = 0;
+
+            if ($redeemPoints > 0 && $loyaltyService->isActive()) {
+                $userModel = User::find($userId);
+                $customerPhone = $shippingSnapshot['phone'] ?? $userModel?->profile?->phone_number;
+                $loyaltyAccount = $customerPhone ? $loyaltyService->getOrCreateAccount($customerPhone, $shippingSnapshot['name'] ?? null, $userModel) : null;
+
+                if (!$loyaltyAccount || !$loyaltyAccount->canRedeem($redeemPoints)) {
+                    $sisa = $loyaltyAccount ? $loyaltyAccount->points_balance : 0;
+                    throw new Exception("Saldo poin loyalty tidak mencukupi (Tersedia: {$sisa} poin, Diminta: {$redeemPoints} poin).");
+                }
+
+                $loyaltyDiscount = $loyaltyService->calculatePointDiscount($redeemPoints);
+                // Maksimal diskon poin tidak boleh melebihi sisa tagihan belanja
+                $netBill = max(0, $subtotal - $totalDiscount + $shippingCost);
+                $loyaltyDiscount = min($loyaltyDiscount, $netBill);
+            } else {
+                $redeemPoints = 0;
+            }
+
+            $grandTotal = max(0, ($subtotal - $totalDiscount + $shippingCost) - $loyaltyDiscount);
 
             $settingService = app(\App\Services\SettingService::class);
             
@@ -214,6 +238,8 @@ class MobileOrderService
                 'total_amount' => $subtotal,
                 'shipping_cost' => $shippingCost,
                 'discount_amount' => $totalDiscount,
+                'loyalty_points_redeemed' => $redeemPoints,
+                'loyalty_discount_amount' => $loyaltyDiscount,
                 'grand_total' => $grandTotal,
                 'order_status' => 'WAITING_PAYMENT',
                 'order_channel' => 'MOBILE_APP',
@@ -221,6 +247,11 @@ class MobileOrderService
                 'shipping_address_snapshot' => $shippingSnapshot,
                 'notes' => $data['notes'] ?? null,
             ]);
+
+            // Eksekusi penukaran poin jika digunakan
+            if ($redeemPoints > 0) {
+                $loyaltyService->redeemPoints($order, $redeemPoints, User::find($userId));
+            }
 
             // 5. Create Order Items
             foreach ($orderItemsToCreate as $itemData) {
@@ -399,6 +430,13 @@ class MobileOrderService
                     ->where('status', 'Reserved')
                     ->update(['status' => 'Sold']);
             }
+
+            // 4. Catat perolehan Poin Loyalty atas transaksi selesai
+            try {
+                app(\App\Services\LoyaltyService::class)->earnPoints($order);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Gagal menambahkan poin loyalty untuk order #{$order->order_number}: " . $e->getMessage());
+            }
         });
 
         // 4. Dispatch Queue Job untuk sinkronisasi ke Accurate Online di background
@@ -469,6 +507,13 @@ class MobileOrderService
                 'order_status' => 'CANCELLED',
                 'notes' => trim(($order->notes ? $order->notes . ' ' : '') . $notesAddition),
             ]);
+
+            // 5. Kembalikan poin loyalty jika pernah menukar atau memperoleh poin
+            try {
+                app(\App\Services\LoyaltyService::class)->refundPoints($order);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Gagal memulihkan poin loyalty untuk order #{$order->order_number}: " . $e->getMessage());
+            }
 
             return $order->refresh();
         });

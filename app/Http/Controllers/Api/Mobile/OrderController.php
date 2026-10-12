@@ -181,6 +181,7 @@ class OrderController extends Controller
             'shipping_address.address' => 'required|string',
             'shipping_address.city' => 'nullable|string|max:100',
             'shipping_cost' => 'nullable|numeric|min:0',
+            'redeem_points' => 'nullable|integer|min:0',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -254,6 +255,7 @@ class OrderController extends Controller
                 'business_unit_id' => $validated['business_unit_id'] ?? null,
                 'payment_method_id' => $validated['payment_method_id'] ?? null,
                 'shipping_cost' => $validated['shipping_cost'] ?? 0,
+                'redeem_points' => (int) ($validated['redeem_points'] ?? 0),
                 'notes' => $validated['notes'] ?? null,
                 'shipping_address_snapshot' => $validated['shipping_address'],
                 'expiry_minutes' => 60, // Batas waktu 60 menit

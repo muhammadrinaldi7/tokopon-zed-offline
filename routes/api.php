@@ -199,4 +199,12 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
         ->name('api.mobile.chat.send');
     Route::post('/chat/conversations/{conversationId}/read', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'markAsRead'])
         ->name('api.mobile.chat.read');
+
+    // 6. Loyalty & Membership Poin
+    Route::prefix('loyalty')->name('api.mobile.loyalty.')->group(function () {
+        Route::get('/summary', [\App\Http\Controllers\Api\Mobile\LoyaltyController::class, 'summary'])
+            ->name('summary');
+        Route::get('/history', [\App\Http\Controllers\Api\Mobile\LoyaltyController::class, 'history'])
+            ->name('history');
+    });
 });
