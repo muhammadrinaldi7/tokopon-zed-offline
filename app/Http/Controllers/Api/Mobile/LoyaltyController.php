@@ -151,17 +151,12 @@ class LoyaltyController extends Controller
     {
         $user = $request->user();
 
-        // 1. Dari profil user terautentikasi
-        if ($user && $user->profile && !empty($user->profile->phone_number)) {
-            return $user->profile->phone_number;
+        // 1. Dari data terautentikasi (memeriksa profil, loyalty account, dan email internal)
+        if ($user && !empty($user->customer_phone)) {
+            return $user->customer_phone;
         }
 
-        // 2. Dari email user internal nomor HP (08xxx@tokopon.internal)
-        if ($user && str_contains($user->email, '@tokopon.internal')) {
-            return explode('@', $user->email)[0];
-        }
-
-        // 3. Dari parameter query / header
+        // 2. Dari parameter query / header
         $phoneParam = $request->query('phone') ?? $request->header('X-Customer-Phone');
         if (!empty($phoneParam)) {
             return (string) $phoneParam;

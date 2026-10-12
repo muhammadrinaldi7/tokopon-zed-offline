@@ -57,14 +57,7 @@ class AuthController extends Controller
             'data' => [
                 'token' => $token,
                 'token_type' => 'Bearer',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->identity ?? ($user->phone ?? '081298765432'),
-                    'address' => $user->address ?? 'Indonesia',
-                    'roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames() : [],
-                ],
+                'user' => $this->formatUserData($user),
             ],
         ]);
     }
@@ -85,14 +78,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->identity ?? ($user->phone ?? ''),
-                'address' => $user->address ?? '',
-                'roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames() : [],
-            ],
+            'data' => $this->formatUserData($user),
         ]);
     }
 
@@ -149,8 +135,17 @@ class AuthController extends Controller
                     'user_id' => $user->id,
                     'full_name' => $user->name,
                     'phone_number' => $cleanPhone ?: null,
-                    'address' => $request->input('address'),
+                    'domisili' => $request->input('address'),
                 ]);
+
+                if (!empty($cleanPhone)) {
+                    try {
+                        $loyaltyService = app(\App\Services\LoyaltyService::class);
+                        $loyaltyService->getOrCreateAccount($cleanPhone, $user->id, $user->name);
+                    } catch (\Throwable $e) {
+                        \Log::warning('Gagal membuat loyalty account saat registrasi: ' . $e->getMessage());
+                    }
+                }
 
                 if (Role::where('name', 'customer')->exists()) {
                     $user->assignRole('customer');
@@ -165,14 +160,7 @@ class AuthController extends Controller
                     'data' => [
                         'token' => $token,
                         'token_type' => 'Bearer',
-                        'user' => [
-                            'id' => $user->id,
-                            'name' => $user->name,
-                            'email' => $user->email,
-                            'phone' => $cleanPhone,
-                            'address' => $request->input('address', ''),
-                            'roles' => ['customer'],
-                        ],
+                        'user' => $this->formatUserData($user),
                     ],
                 ], 201);
             });
@@ -219,21 +207,35 @@ class AuthController extends Controller
 
         $profile = $user->profile ?: new UserProfile(['user_id' => $user->id]);
         if ($request->has('name')) $profile->full_name = $user->name;
-        if ($request->has('phone')) $profile->phone_number = preg_replace('/[^0-9]/', '', (string) $request->phone);
-        if ($request->has('address')) $profile->address = $request->address;
+        if ($request->has('phone')) {
+            $cleanPhone = preg_replace('/[^0-9]/', '', (string) $request->phone);
+            $profile->phone_number = $cleanPhone ?: null;
+        }
+        if ($request->has('address')) {
+            $profile->domisili = $request->address;
+        }
         $profile->save();
+
+        if (!empty($profile->phone_number)) {
+            try {
+                $loyaltyService = app(\App\Services\LoyaltyService::class);
+                $loyaltyAccount = $loyaltyService->getOrCreateAccount($profile->phone_number, $user->id, $user->name);
+                if ($loyaltyAccount && $loyaltyAccount->user_id !== $user->id) {
+                    $loyaltyAccount->user_id = $user->id;
+                    $loyaltyAccount->customer_name = $user->name;
+                    $loyaltyAccount->save();
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Gagal sinkronisasi loyalty saat update profil: ' . $e->getMessage());
+            }
+        }
+
+        $user->refresh();
 
         return response()->json([
             'success' => true,
             'message' => 'Profil berhasil diperbarui.',
-            'data' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $profile->phone_number ?? '',
-                'address' => $profile->address ?? '',
-                'roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames() : [],
-            ],
+            'data' => $this->formatUserData($user),
         ]);
     }
 
@@ -270,5 +272,22 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Push token updated',
         ]);
+    }
+
+    /**
+     * Format payload seragam data pengguna untuk Mobile App.
+     */
+    protected function formatUserData(User $user): array
+    {
+        $user->loadMissing(['profile', 'loyaltyAccount', 'addresses']);
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->customer_phone,
+            'address' => $user->customer_address,
+            'roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames() : [],
+        ];
     }
 }

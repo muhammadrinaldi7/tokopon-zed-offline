@@ -156,7 +156,7 @@ class OrderController extends Controller
         $rawShipping = $request->input('shipping_address');
         if (is_string($rawShipping)) {
             $customerName = $request->input('customer_name') ?? $request->user()?->name ?? 'Pelanggan Tokopon';
-            $customerPhone = $request->input('customer_phone') ?? $request->user()?->profile?->phone_number ?? '';
+            $customerPhone = $request->input('customer_phone') ?? $request->user()?->customer_phone ?? '';
             $request->merge([
                 'shipping_address' => [
                     'name' => $customerName,
