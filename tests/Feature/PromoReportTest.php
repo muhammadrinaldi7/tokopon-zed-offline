@@ -142,4 +142,30 @@ class PromoReportTest extends TestCase
 
         $response->assertFileDownloaded();
     }
+
+    public function test_promo_report_uses_order_date_for_filtering_and_claim_rows()
+    {
+        $targetDate = now()->subDays(5)->format('Y-m-d');
+
+        // Update order to have a specific order_date 5 days ago, while created_at is today
+        $this->order->update([
+            'order_date' => $targetDate,
+        ]);
+
+        // When date range matches targetDate, it should find the order
+        $component = Livewire::actingAs($this->user)
+            ->test(PromoReport::class)
+            ->set('dateRange', 'custom')
+            ->set('startDate', $targetDate)
+            ->set('endDate', $targetDate);
+
+        $component->assertViewHas('orders', function ($orders) {
+            return $orders->count() === 1 && $orders->first()->order_number === 'ORD-10001';
+        });
+
+        // Verify that getClaimRows maps tanggal using order_date
+        $rows = invade($component->instance())->getClaimRows();
+        $this->assertNotEmpty($rows);
+        $this->assertEquals($targetDate, $rows[0]['tanggal']);
+    }
 }
