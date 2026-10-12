@@ -49,11 +49,53 @@ trait WithPaymentAndPromo
         $this->recalculatePaymentAmount();
     }
 
+    // ─── Loyalty Points ─────────────────────────────────────────
+    public $useLoyaltyPoints = false;
+    public $customLoyaltyPoints = null;
+    public $loyaltyDiscountAmount = 0;
+
+    public function updatedUseLoyaltyPoints()
+    {
+        if ($this->useLoyaltyPoints && $this->availableLoyaltyPoints >= 50) {
+            $pointValue = (int) app(\App\Services\SettingService::class)->get('loyalty_point_value', 100);
+            $grandTotalBeforeLoyalty = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0));
+            $maxPointsNeeded = (int) floor($grandTotalBeforeLoyalty / max(1, $pointValue));
+            $pointsToUse = min($this->availableLoyaltyPoints, $maxPointsNeeded);
+            $this->customLoyaltyPoints = $pointsToUse;
+            $this->loyaltyDiscountAmount = $pointsToUse * $pointValue;
+        } else {
+            $this->customLoyaltyPoints = null;
+            $this->loyaltyDiscountAmount = 0;
+        }
+
+        $this->recalculatePaymentAmount();
+    }
+
+    public function updatedCustomLoyaltyPoints()
+    {
+        $pointValue = (int) app(\App\Services\SettingService::class)->get('loyalty_point_value', 100);
+        $grandTotalBeforeLoyalty = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0));
+        $maxPointsNeeded = (int) floor($grandTotalBeforeLoyalty / max(1, $pointValue));
+        $maxAllowed = min($this->availableLoyaltyPoints, $maxPointsNeeded);
+
+        $cleanedPoints = (int) preg_replace('/[^0-9]/', '', (string)$this->customLoyaltyPoints);
+
+        if ($cleanedPoints > $maxAllowed) {
+            $this->customLoyaltyPoints = $maxAllowed;
+        } elseif ($cleanedPoints < 0 || empty($this->customLoyaltyPoints)) {
+            $this->customLoyaltyPoints = 0;
+        }
+
+        $this->loyaltyDiscountAmount = (int)$this->customLoyaltyPoints * $pointValue;
+        $this->recalculatePaymentAmount();
+    }
+
     protected function recalculatePaymentAmount()
     {
         if ($this->paymentMode !== 'split' && isset($this->payments[0])) {
             $depositToUse = $this->depositToUseAmount();
-            $remaining = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0) - $depositToUse);
+            $loyaltyDiscount = $this->useLoyaltyPoints ? ($this->loyaltyDiscountAmount ?? 0) : 0;
+            $remaining = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0) - $depositToUse - $loyaltyDiscount);
 
             // Jika partial payment diizinkan (seperti DP), jangan paksa nominal ke sisa tagihan
             if (!$this->isPartialPaymentAllowed) {
@@ -88,6 +130,7 @@ trait WithPaymentAndPromo
     {
         $this->paymentMode = $mode;
         $depositToUse = $this->depositToUseAmount();
+        $loyaltyDiscount = $this->useLoyaltyPoints ? ($this->loyaltyDiscountAmount ?? 0) : 0;
 
         if ($mode === 'tunai') {
             $this->payments = [
@@ -97,7 +140,7 @@ trait WithPaymentAndPromo
                     'payment_method_id' => '',
                     'payment_method_rate_id' => '',
                     'no_kontrak' => '',
-                    'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0) - $depositToUse),
+                    'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0) - $depositToUse - $loyaltyDiscount),
                 ]
             ];
             $this->activePaymentIndex = 0;
@@ -110,7 +153,7 @@ trait WithPaymentAndPromo
                     'payment_method_id' => '',
                     'payment_method_rate_id' => '',
                     'no_kontrak' => '',
-                    'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0) - $depositToUse),
+                    'amount' => max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0) - $depositToUse - $loyaltyDiscount),
                 ]
             ];
             $this->activePaymentIndex = 0;
@@ -123,7 +166,8 @@ trait WithPaymentAndPromo
 
     public function addSplitPayment($category) // 'TUNAI' or 'NON-TUNAI'
     {
-        $remaining = max(0, ($this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0)) - $this->paymentsTotalBase());
+        $loyaltyDiscount = $this->useLoyaltyPoints ? ($this->loyaltyDiscountAmount ?? 0) : 0;
+        $remaining = max(0, ($this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0) - $loyaltyDiscount) - $this->paymentsTotalBase());
         $this->payments[] = [
             'category' => $category,
             'bank_name' => '',

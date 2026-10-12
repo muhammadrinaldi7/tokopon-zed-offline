@@ -348,24 +348,31 @@ class LoyaltyService
     }
 
     /**
+     * Hitung status tier membership berdasarkan akumulasi nominal belanja.
+     */
+    public function evaluateTier(float $spend): string
+    {
+        $silverThreshold = (float) ($this->settingService->get('loyalty_silver_min_spend') ?? $this->settingService->get('loyalty_tier_silver_spend', 5000000));
+        $goldThreshold = (float) ($this->settingService->get('loyalty_gold_min_spend') ?? $this->settingService->get('loyalty_tier_gold_spend', 15000000));
+        $platinumThreshold = (float) ($this->settingService->get('loyalty_platinum_min_spend') ?? $this->settingService->get('loyalty_tier_platinum_spend', 50000000));
+
+        if ($spend >= $platinumThreshold) {
+            return 'PLATINUM';
+        } elseif ($spend >= $goldThreshold) {
+            return 'GOLD';
+        } elseif ($spend >= $silverThreshold) {
+            return 'SILVER';
+        }
+
+        return 'BRONZE';
+    }
+
+    /**
      * Evaluasi dan sinkronisasi Membership Tier berdasarkan akumulasi total belanja.
      */
     public function updateTier(LoyaltyAccount $account): void
     {
-        $silverThreshold = (float) $this->settingService->get('loyalty_silver_min_spend', 5000000);
-        $goldThreshold = (float) $this->settingService->get('loyalty_gold_min_spend', 15000000);
-        $platinumThreshold = (float) $this->settingService->get('loyalty_platinum_min_spend', 50000000);
-
-        $spend = (float) $account->total_spend;
-
-        $newTier = 'BRONZE';
-        if ($spend >= $platinumThreshold) {
-            $newTier = 'PLATINUM';
-        } elseif ($spend >= $goldThreshold) {
-            $newTier = 'GOLD';
-        } elseif ($spend >= $silverThreshold) {
-            $newTier = 'SILVER';
-        }
+        $newTier = $this->evaluateTier((float) $account->total_spend);
 
         if ($account->tier !== $newTier) {
             $account->tier = $newTier;
@@ -471,5 +478,318 @@ class LoyaltyService
         }
 
         return $order->user?->name;
+    }
+
+    /**
+     * Dapatkan konfigurasi pengaturan sistem loyalty.
+     */
+    public function getSettings(): array
+    {
+        return [
+            'loyalty_is_active' => filter_var($this->settingService->get('loyalty_is_active', true), FILTER_VALIDATE_BOOLEAN),
+            'loyalty_earn_ratio' => (int) $this->settingService->get('loyalty_earn_ratio', 10000),
+            'loyalty_point_value' => (int) $this->settingService->get('loyalty_point_value', 100),
+            'loyalty_min_redeem_points' => (int) $this->settingService->get('loyalty_min_redeem_points', 50),
+            'loyalty_tier_silver_spend' => (float) $this->settingService->get('loyalty_tier_silver_spend', 5000000),
+            'loyalty_tier_gold_spend' => (float) $this->settingService->get('loyalty_tier_gold_spend', 15000000),
+            'loyalty_tier_platinum_spend' => (float) $this->settingService->get('loyalty_tier_platinum_spend', 50000000),
+        ];
+    }
+
+    /**
+     * Simpan konfigurasi pengaturan sistem loyalty.
+     */
+    public function saveSettings(array $settings): void
+    {
+        if (isset($settings['loyalty_is_active'])) {
+            $this->settingService->set('loyalty_is_active', (bool) $settings['loyalty_is_active']);
+        }
+        if (isset($settings['loyalty_earn_ratio'])) {
+            $this->settingService->set('loyalty_earn_ratio', max(1000, (int) $settings['loyalty_earn_ratio']));
+        }
+        if (isset($settings['loyalty_point_value'])) {
+            $this->settingService->set('loyalty_point_value', max(1, (int) $settings['loyalty_point_value']));
+        }
+        if (isset($settings['loyalty_min_redeem_points'])) {
+            $this->settingService->set('loyalty_min_redeem_points', max(0, (int) $settings['loyalty_min_redeem_points']));
+        }
+        if (isset($settings['loyalty_tier_silver_spend'])) {
+            $this->settingService->set('loyalty_tier_silver_spend', (float) $settings['loyalty_tier_silver_spend']);
+        }
+        if (isset($settings['loyalty_tier_gold_spend'])) {
+            $this->settingService->set('loyalty_tier_gold_spend', (float) $settings['loyalty_tier_gold_spend']);
+        }
+        if (isset($settings['loyalty_tier_platinum_spend'])) {
+            $this->settingService->set('loyalty_tier_platinum_spend', (float) $settings['loyalty_tier_platinum_spend']);
+        }
+    }
+
+    /**
+     * Dapatkan status metrik sinkronisasi pemetaan akun loyalty vs user lama.
+     */
+    public function getSyncStatus(): array
+    {
+        $totalUsers = User::count();
+        $totalProfilesWithPhone = \App\Models\UserProfile::whereNotNull('phone_number')
+            ->where('phone_number', '!=', '')
+            ->count();
+        $totalLoyaltyAccounts = LoyaltyAccount::count();
+
+        $mappedPhones = LoyaltyAccount::pluck('phone_number')->toArray();
+
+        $unmappedProfiles = \App\Models\UserProfile::with('user')
+            ->whereNotNull('phone_number')
+            ->where('phone_number', '!=', '')
+            ->get();
+
+        $unmappedCount = 0;
+        $unmappedSamples = [];
+
+        foreach ($unmappedProfiles as $p) {
+            $norm = $this->normalizePhone($p->phone_number);
+            if (!empty($norm) && !in_array($norm, $mappedPhones)) {
+                $unmappedCount++;
+                if (count($unmappedSamples) < 15) {
+                    $unmappedSamples[] = [
+                        'user_id' => $p->user_id,
+                        'name' => $p->full_name ?: ($p->user?->name ?? 'Pelanggan'),
+                        'raw_phone' => $p->phone_number,
+                        'normalized_phone' => $norm,
+                        'email' => $p->user?->email,
+                        'registered_at' => $p->user?->created_at?->format('d M Y') ?? '-',
+                    ];
+                }
+            }
+        }
+
+        return [
+            'total_users' => $totalUsers,
+            'total_profiles_with_phone' => $totalProfilesWithPhone,
+            'total_loyalty_accounts' => $totalLoyaltyAccounts,
+            'unmapped_count' => $unmappedCount,
+            'unmapped_samples' => $unmappedSamples,
+        ];
+    }
+
+    /**
+     * Sinkronisasikan semua user dan profil lama yang memiliki nomor HP ke dalam tabel loyalty_accounts.
+     */
+    public function syncExistingUsers(bool $calculateHistoricalSpend = true): array
+    {
+        $profiles = \App\Models\UserProfile::with('user')
+            ->whereNotNull('phone_number')
+            ->where('phone_number', '!=', '')
+            ->get();
+
+        $totalScanned = 0;
+        $newlyCreated = 0;
+        $linkedExisting = 0;
+        $skipped = 0;
+
+        foreach ($profiles as $profile) {
+            $totalScanned++;
+            $rawPhone = $profile->phone_number;
+            $cleanPhone = $this->normalizePhone($rawPhone);
+
+            if (empty($cleanPhone) || strlen($cleanPhone) < 8) {
+                $skipped++;
+                continue;
+            }
+
+            $user = $profile->user;
+            $name = $profile->full_name ?: ($user?->name ?? 'Pelanggan Tokopon');
+
+            $account = LoyaltyAccount::where('phone_number', $cleanPhone)->first();
+
+            if (!$account) {
+                $historicalSpend = 0;
+                if ($calculateHistoricalSpend && $user) {
+                    $historicalSpend = (float) Order::where('user_id', $user->id)
+                        ->where('order_status', 'COMPLETED')
+                        ->sum('grand_total');
+                }
+
+                $tier = $this->evaluateTier($historicalSpend);
+
+                LoyaltyAccount::create([
+                    'phone_number' => $cleanPhone,
+                    'user_id' => $user?->id,
+                    'customer_name' => $name,
+                    'points_balance' => 0,
+                    'lifetime_points' => 0,
+                    'total_spend' => $historicalSpend,
+                    'tier' => $tier,
+                    'tier_updated_at' => now(),
+                ]);
+
+                $newlyCreated++;
+            } else {
+                $updated = false;
+                if ($account->user_id === null && $user) {
+                    $account->user_id = $user->id;
+                    $updated = true;
+                }
+                if (empty($account->customer_name) && !empty($name)) {
+                    $account->customer_name = $name;
+                    $updated = true;
+                }
+                if ($calculateHistoricalSpend && $user && (float) $account->total_spend === 0.0) {
+                    $historicalSpend = (float) Order::where('user_id', $user->id)
+                        ->where('order_status', 'COMPLETED')
+                        ->sum('grand_total');
+                    if ($historicalSpend > 0) {
+                        $account->total_spend = $historicalSpend;
+                        $account->tier = $this->evaluateTier($historicalSpend);
+                        $updated = true;
+                    }
+                }
+
+                if ($updated) {
+                    $account->save();
+                    $linkedExisting++;
+                } else {
+                    $skipped++;
+                }
+            }
+        }
+
+        // Juga scan users yang memiliki email 08xxx@tokopon.internal (customer mobile/checkout)
+        $internalUsers = User::where('email', 'like', '%@tokopon.internal')
+            ->whereNotIn('id', LoyaltyAccount::whereNotNull('user_id')->pluck('user_id'))
+            ->get();
+
+        foreach ($internalUsers as $u) {
+            $rawPhone = explode('@', $u->email)[0];
+            $cleanPhone = $this->normalizePhone($rawPhone);
+            if (empty($cleanPhone) || strlen($cleanPhone) < 8) continue;
+
+            $totalScanned++;
+            $account = LoyaltyAccount::where('phone_number', $cleanPhone)->first();
+
+            if (!$account) {
+                $historicalSpend = $calculateHistoricalSpend
+                    ? (float) Order::where('user_id', $u->id)->where('order_status', 'COMPLETED')->sum('grand_total')
+                    : 0;
+
+                LoyaltyAccount::create([
+                    'phone_number' => $cleanPhone,
+                    'user_id' => $u->id,
+                    'customer_name' => $u->name ?: 'Pelanggan Tokopon',
+                    'points_balance' => 0,
+                    'lifetime_points' => 0,
+                    'total_spend' => $historicalSpend,
+                    'tier' => $this->evaluateTier($historicalSpend),
+                    'tier_updated_at' => now(),
+                ]);
+                $newlyCreated++;
+            } else {
+                if ($account->user_id === null) {
+                    $account->update(['user_id' => $u->id]);
+                    $linkedExisting++;
+                }
+            }
+        }
+
+        return [
+            'total_scanned' => $totalScanned,
+            'newly_created' => $newlyCreated,
+            'linked_existing' => $linkedExisting,
+            'skipped' => $skipped,
+        ];
+    }
+
+    /**
+     * Petakan 1 user secara spesifik ke dalam akun loyalty.
+     */
+    public function mapSingleUser(int $userId, bool $calculateHistoricalSpend = true): ?LoyaltyAccount
+    {
+        $user = User::with('profile')->find($userId);
+        if (!$user) return null;
+
+        $rawPhone = $user->profile?->phone_number;
+        if (empty($rawPhone) && str_contains($user->email, '@tokopon.internal')) {
+            $rawPhone = explode('@', $user->email)[0];
+        }
+
+        if (empty($rawPhone)) return null;
+
+        $cleanPhone = $this->normalizePhone($rawPhone);
+        if (empty($cleanPhone)) return null;
+
+        $account = LoyaltyAccount::where('phone_number', $cleanPhone)->first();
+
+        $historicalSpend = 0;
+        if ($calculateHistoricalSpend) {
+            $historicalSpend = (float) Order::where('user_id', $user->id)
+                ->where('order_status', 'COMPLETED')
+                ->sum('grand_total');
+        }
+
+        $tier = $this->evaluateTier($historicalSpend);
+
+        if (!$account) {
+            return LoyaltyAccount::create([
+                'phone_number' => $cleanPhone,
+                'user_id' => $user->id,
+                'customer_name' => $user->name ?: 'Pelanggan Tokopon',
+                'points_balance' => 0,
+                'lifetime_points' => 0,
+                'total_spend' => $historicalSpend,
+                'tier' => $tier,
+                'tier_updated_at' => now(),
+            ]);
+        }
+
+        $account->update([
+            'user_id' => $user->id,
+            'customer_name' => $user->name ?: $account->customer_name,
+            'total_spend' => max((float) $account->total_spend, $historicalSpend),
+            'tier' => $this->evaluateTier(max((float) $account->total_spend, $historicalSpend)),
+        ]);
+
+        return $account;
+    }
+
+    /**
+     * Penyesuaian manual saldo poin oleh Admin / CS (Adjustment).
+     */
+    public function adjustPointsManually(
+        LoyaltyAccount $account,
+        int $pointsDelta,
+        string $description,
+        ?int $adminUserId = null
+    ): LoyaltyTransaction {
+        if ($pointsDelta === 0) {
+            throw new Exception("Jumlah penyesuaian poin tidak boleh 0.");
+        }
+
+        return DB::transaction(function () use ($account, $pointsDelta, $description, $adminUserId) {
+            $lockedAccount = LoyaltyAccount::where('id', $account->id)->lockForUpdate()->first();
+            $oldBalance = (int) $lockedAccount->points_balance;
+            $newBalance = $oldBalance + $pointsDelta;
+
+            if ($newBalance < 0) {
+                throw new Exception("Pengurangan poin melebihi sisa saldo member (Saldo: {$oldBalance}, Pengurangan: " . abs($pointsDelta) . ").");
+            }
+
+            $lockedAccount->points_balance = $newBalance;
+            if ($pointsDelta > 0) {
+                $lockedAccount->lifetime_points += $pointsDelta;
+            }
+            $lockedAccount->save();
+
+            return LoyaltyTransaction::create([
+                'loyalty_account_id' => $lockedAccount->id,
+                'order_id' => null,
+                'channel' => 'ADMIN_MANUAL',
+                'type' => 'ADJUSTMENT',
+                'points' => $pointsDelta,
+                'balance_before' => $oldBalance,
+                'balance_after' => $newBalance,
+                'discount_amount' => 0,
+                'description' => $description,
+                'created_by' => $adminUserId,
+            ]);
+        });
     }
 }

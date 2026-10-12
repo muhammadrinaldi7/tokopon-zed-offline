@@ -94,6 +94,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/products', \App\Livewire\Zoffline\Ecommerce\ProductCuration::class)->name('products');
         Route::get('/closing-analytics', \App\Livewire\Zoffline\Ecommerce\ClosingAnalytics::class)->name('closing-analytics');
         Route::get('/payment-methods', \App\Livewire\Zoffline\Ecommerce\PaymentMethodManager::class)->name('payment-methods');
+        Route::get('/loyalty', \App\Livewire\Zoffline\Ecommerce\LoyaltyManager::class)->name('loyalty');
         Route::get('/settings', \App\Livewire\Zoffline\Ecommerce\EcommerceSettings::class)->name('settings');
     });
 

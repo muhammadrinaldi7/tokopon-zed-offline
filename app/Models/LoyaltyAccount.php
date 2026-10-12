@@ -41,4 +41,9 @@ class LoyaltyAccount extends Model
     {
         return $points > 0 && $this->points_balance >= $points;
     }
+
+    public function getTierLevelAttribute(): string
+    {
+        return $this->tier ?: 'BRONZE';
+    }
 }

@@ -59,6 +59,12 @@
                 <span>Rekening Bank</span>
             </a>
 
+            <a href="{{ route('zoffline.ecommerce.loyalty') }}" wire:navigate
+                class="px-3.5 py-2 rounded-lg transition-all duration-150 flex items-center gap-1.5 {{ request()->routeIs('zoffline.ecommerce.loyalty') ? 'bg-white text-indigo-600 shadow-sm border border-gray-200/40' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50' }}">
+                <span>👑</span>
+                <span>Member Loyalty</span>
+            </a>
+
             <a href="{{ route('zoffline.ecommerce.settings') }}" wire:navigate
                 class="px-3.5 py-2 rounded-lg transition-all duration-150 flex items-center gap-1.5 {{ request()->routeIs('zoffline.ecommerce.settings') ? 'bg-white text-indigo-600 shadow-sm border border-gray-200/40' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50' }}">
                 <span>⚙️</span>

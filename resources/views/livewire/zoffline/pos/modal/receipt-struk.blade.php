@@ -308,6 +308,12 @@
                                {{ number_format($completedOrder->discount_amount, 0, ',', '.') }}</span>
                        </div>
                    @endif
+                   @if ($completedOrder->loyalty_discount_amount > 0)
+                       <div class="flex justify-between text-amber-700 font-semibold">
+                           <span>Diskon Poin Rewards</span><span>-Rp
+                               {{ number_format($completedOrder->loyalty_discount_amount, 0, ',', '.') }}</span>
+                       </div>
+                   @endif
                    <div class="border-t border-dashed border-gray-300 my-1"></div>
                    <div class="flex justify-between font-bold text-sm"><span>TOTAL</span><span>Rp
                            {{ number_format($completedOrder->grand_total, 0, ',', '.') }}</span></div>
@@ -324,6 +330,33 @@
                    </div>
                    @if ($completedOrder->accurate_invoice_no)
                        <p class="text-[10px] text-gray-400">Inv: {{ $completedOrder->accurate_invoice_no }}</p>
+                   @endif
+                   @if ($completedOrder->loyalty_points_earned > 0 || $completedOrder->loyalty_points_redeemed > 0)
+                       <div class="border-t border-dashed border-gray-300 my-2"></div>
+                       <div class="bg-amber-50/80 p-2 rounded-lg border border-amber-200 my-1 space-y-0.5 text-[10px]">
+                           <p class="font-bold text-amber-900 text-center text-[11px] mb-1">★ TOKOPON REWARDS ★</p>
+                           @if ($completedOrder->loyalty_points_redeemed > 0)
+                               <div class="flex justify-between text-amber-800">
+                                   <span>Poin Ditukar:</span>
+                                   <span>-{{ number_format($completedOrder->loyalty_points_redeemed, 0, ',', '.') }} pts</span>
+                               </div>
+                           @endif
+                           @if ($completedOrder->loyalty_points_earned > 0)
+                               <div class="flex justify-between text-emerald-700 font-semibold">
+                                   <span>Poin Didapat:</span>
+                                   <span>+{{ number_format($completedOrder->loyalty_points_earned, 0, ',', '.') }} pts</span>
+                               </div>
+                           @endif
+                           @php
+                               $acc = \App\Models\LoyaltyAccount::where('user_id', $completedOrder->user_id)->first();
+                           @endphp
+                           @if ($acc)
+                               <div class="flex justify-between text-neutral-600 border-t border-amber-200/50 pt-0.5 mt-0.5">
+                                   <span>Saldo Poin / Tier:</span>
+                                   <span>{{ number_format($acc->points_balance, 0, ',', '.') }} pts ({{ $acc->tier_level }})</span>
+                               </div>
+                           @endif
+                       </div>
                    @endif
                    <div class="text-start mt-2">
                        <p class="text-[10px] text-gray-400">Catatan : {{ $completedOrder->notes ?? '' }}</p>
