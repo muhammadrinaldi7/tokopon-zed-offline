@@ -185,11 +185,16 @@ class EcommerceSettings extends Component
 
     public function render(SettingService $settingService)
     {
-        $businessUnits = BusinessUnit::where('is_active', true)->orderBy('name')->get();
-        $currentBU = BusinessUnit::find($this->selectedBusinessUnitId);
+        $businessUnits = BusinessUnit::select('id', 'name', 'code', 'is_active')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        $currentBU = BusinessUnit::select('id', 'name')->find($this->selectedBusinessUnitId);
 
         // Bank terfilter berdasarkan BU terpilih
-        $mobileBanks = PaymentMethod::where('is_visible_mobile', true)
+        $mobileBanks = PaymentMethod::select('id', 'name', 'bank_name', 'account_number', 'account_owner', 'business_unit_id', 'is_visible_mobile')
+            ->where('is_visible_mobile', true)
             ->when($this->selectedBusinessUnitId, function ($q) {
                 $q->where(function ($sub) {
                     $sub->where('business_unit_id', $this->selectedBusinessUnitId)
@@ -199,24 +204,25 @@ class EcommerceSettings extends Component
             ->get();
 
         // Gudang milik BU terpilih
-        $buWarehouses = Warehouse::when($this->selectedBusinessUnitId, fn($q) => $q->where('business_unit_id', $this->selectedBusinessUnitId))
+        $buWarehouses = Warehouse::select('id', 'name', 'business_unit_id', 'is_online_store')
+            ->when($this->selectedBusinessUnitId, fn($q) => $q->where('business_unit_id', $this->selectedBusinessUnitId))
             ->orderBy('name')
             ->get();
 
-        $onlineWarehouse = Warehouse::when($this->selectedBusinessUnitId, fn($q) => $q->where('business_unit_id', $this->selectedBusinessUnitId))
-            ->where('is_online_store', true)
-            ->first();
+        $onlineWarehouse = $buWarehouses->firstWhere('is_online_store', true);
 
         // Cabang milik BU terpilih (fallback ke semua jika belum ada)
-        $buBranches = \App\Models\Branch::when($this->selectedBusinessUnitId, fn($q) => $q->where('business_unit_id', $this->selectedBusinessUnitId))
+        $buBranches = \App\Models\Branch::select('id', 'name', 'business_unit_id')
+            ->when($this->selectedBusinessUnitId, fn($q) => $q->where('business_unit_id', $this->selectedBusinessUnitId))
             ->orderBy('name')
             ->get();
         if ($buBranches->isEmpty()) {
-            $buBranches = \App\Models\Branch::orderBy('name')->get();
+            $buBranches = \App\Models\Branch::select('id', 'name', 'business_unit_id')->orderBy('name')->get();
         }
 
         // Sales milik BU terpilih (fallback ke semua aktif jika kosong)
-        $buSales = Employe::active()
+        $buSales = Employe::select('id', 'name', 'employee_no', 'business_unit_id')
+            ->active()
             ->when($this->selectedBusinessUnitId, function ($q) {
                 $q->where(function ($sub) {
                     $sub->where('business_unit_id', $this->selectedBusinessUnitId)
@@ -226,18 +232,64 @@ class EcommerceSettings extends Component
             ->orderBy('name')
             ->get();
         if ($buSales->isEmpty()) {
-            $buSales = Employe::active()->orderBy('name')->get();
+            $buSales = Employe::select('id', 'name', 'employee_no', 'business_unit_id')->active()->orderBy('name')->get();
         }
 
-        // Kasir / Handled By users (User admin/kasir milik BU terpilih)
-        $buCashiers = User::when($this->selectedBusinessUnitId, function ($q) {
-            $q->where(function ($sub) {
-                $sub->where('business_unit_id', $this->selectedBusinessUnitId)
-                    ->orWhereNull('business_unit_id');
-            });
-        })
+        // Kasir / Handled By users: Khusus staf internal/kasir/admin (JANGAN ambil jutaan user mobile/pelanggan)
+        $buCashiers = User::select('id', 'name', 'email')
+            ->where('email', 'not like', '%@tokopon.internal')
+            ->where(function ($q) {
+                $q->whereHas('roles', function ($r) {
+                    $r->whereIn('name', ['admin', 'cs', 'fl', 'kasir_sju', 'superadmin', 'director', 'manager']);
+                })
+                ->orWhereNotNull('branch_id')
+                ->orWhereNotNull('warehouse_id');
+            })
+            ->when($this->selectedBusinessUnitId, function ($q) {
+                $q->where(function ($sub) {
+                    $sub->where('business_unit_id', $this->selectedBusinessUnitId)
+                        ->orWhereNull('business_unit_id');
+                });
+            })
             ->orderBy('name')
             ->get();
+
+        if ($buCashiers->isEmpty()) {
+            // Fallback aman untuk staf jika role belum diset lengkap di database
+            $buCashiers = User::select('id', 'name', 'email')
+                ->where('email', 'not like', '%@tokopon.internal')
+                ->whereDoesntHave('roles', fn($r) => $r->where('name', 'user'))
+                ->when($this->selectedBusinessUnitId, function ($q) {
+                    $q->where(function ($sub) {
+                        $sub->where('business_unit_id', $this->selectedBusinessUnitId)
+                            ->orWhereNull('business_unit_id');
+                    });
+                })
+                ->limit(50)
+                ->orderBy('name')
+                ->get();
+        }
+
+        // Format array opsi ringan untuk komponen Searchable Dropdown Alpine.js
+        $warehouseOptions = $buWarehouses->map(fn($w) => [
+            'id' => (string) $w->id,
+            'name' => $w->name . ($w->is_online_store ? ' ★ (Aktif Saat Ini)' : '')
+        ])->values()->all();
+
+        $branchOptions = $buBranches->map(fn($b) => [
+            'id' => $b->name,
+            'name' => $b->name
+        ])->values()->all();
+
+        $salesOptions = $buSales->map(fn($s) => [
+            'id' => (string) $s->id,
+            'name' => $s->name . ($s->employee_no ? " ({$s->employee_no})" : '')
+        ])->values()->all();
+
+        $cashierOptions = $buCashiers->map(fn($c) => [
+            'id' => (string) $c->id,
+            'name' => $c->name . " ({$c->email})"
+        ])->values()->all();
 
         $hasBiteshipKey = !empty($settingService->get('biteship_api_key'));
         $hasXenditKey = !empty($settingService->get('xendit_secret_key'));
@@ -251,6 +303,10 @@ class EcommerceSettings extends Component
             'buBranches' => $buBranches,
             'buSales' => $buSales,
             'buCashiers' => $buCashiers,
+            'warehouseOptions' => $warehouseOptions,
+            'branchOptions' => $branchOptions,
+            'salesOptions' => $salesOptions,
+            'cashierOptions' => $cashierOptions,
             'hasBiteshipKey' => $hasBiteshipKey,
             'hasXenditKey' => $hasXenditKey,
         ]);

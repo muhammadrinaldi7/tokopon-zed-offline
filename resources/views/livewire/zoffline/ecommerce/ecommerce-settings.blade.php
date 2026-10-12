@@ -174,7 +174,7 @@
             {{-- Grid Setting Per Unit Usaha --}}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                {{-- 1. Online Warehouse for this BU --}}
+                {{-- 1. Online Warehouse for this BU (Searchable) --}}
                 <div class="bg-neutral-50 rounded-2xl p-5 border border-gray-200/70 flex flex-col justify-between hover:border-amber-200 transition">
                     <div>
                         <div class="flex items-center gap-3 mb-3">
@@ -190,15 +190,94 @@
                         <div class="space-y-3 mt-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1.5">Pilih Gudang Online Unit Ini</label>
-                                <select wire:model="selectedWarehouseId"
-                                    class="w-full text-xs font-semibold rounded-xl border-gray-200 px-3.5 py-2.5 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition bg-white">
-                                    <option value="">-- Tidak Ada Gudang Online Aktif --</option>
-                                    @foreach($buWarehouses as $wh)
-                                        <option value="{{ $wh->id }}">
-                                            {{ $wh->name }} {{ $wh->is_online_store ? '★ (Aktif Saat Ini)' : '' }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                
+                                {{-- Searchable Dropdown Gudang --}}
+                                <div wire:key="searchable-wh-{{ $selectedBusinessUnitId }}"
+                                    x-data="{
+                                        open: false,
+                                        search: '',
+                                        selectedId: @entangle('selectedWarehouseId').live,
+                                        selectedName: '',
+                                        options: {{ json_encode($warehouseOptions) }},
+                                        init() {
+                                            this.updateLabel();
+                                            this.$watch('selectedId', () => this.updateLabel());
+                                        },
+                                        updateLabel() {
+                                            if (!this.selectedId) {
+                                                this.selectedName = '-- Tidak Ada Gudang Online Aktif --';
+                                                return;
+                                            }
+                                            let found = this.options.find(o => String(o.id) === String(this.selectedId));
+                                            this.selectedName = found ? found.name : '-- Pilih Gudang Online --';
+                                        },
+                                        get filteredOptions() {
+                                            if (!this.search) return this.options;
+                                            let s = this.search.toLowerCase();
+                                            return this.options.filter(o => o.name.toLowerCase().includes(s));
+                                        },
+                                        selectOption(id) {
+                                            this.selectedId = id ? parseInt(id) : null;
+                                            this.updateLabel();
+                                            this.open = false;
+                                            this.search = '';
+                                        }
+                                    }" 
+                                    @click.outside="open = false" 
+                                    class="relative">
+                                    
+                                    <button @click="open = !open" type="button" 
+                                        class="w-full pl-3.5 pr-10 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 bg-white text-left cursor-pointer flex items-center justify-between shadow-2xs hover:border-amber-400 transition">
+                                        <span class="truncate" x-text="selectedName">-- Pilih Gudang Online --</span>
+                                        <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200" :class="{'rotate-180': open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </button>
+
+                                    <div x-show="open" 
+                                         x-transition:enter="transition ease-out duration-100"
+                                         x-transition:enter-start="transform opacity-0 scale-95"
+                                         x-transition:enter-end="transform opacity-100 scale-100"
+                                         x-transition:leave="transition ease-in duration-75"
+                                         x-transition:leave-start="transform opacity-100 scale-100"
+                                         x-transition:leave-end="transform opacity-0 scale-95"
+                                         class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-2xl shadow-xl max-h-64 overflow-hidden flex flex-col" 
+                                         style="display: none;">
+                                        
+                                        <div class="p-2 border-b border-gray-100 bg-gray-50/70 relative">
+                                            <input x-model="search" 
+                                                   x-ref="whSearchInput"
+                                                   type="text" 
+                                                   placeholder="Ketik cari nama gudang..." 
+                                                   class="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 bg-white"
+                                                   x-init="$watch('open', value => { if (value) setTimeout(() => $refs.whSearchInput.focus(), 50) })">
+                                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                            </svg>
+                                        </div>
+
+                                        <div class="overflow-y-auto max-h-48 divide-y divide-gray-50">
+                                            <button @click="selectOption(null)" type="button" 
+                                                class="w-full text-left px-3.5 py-2.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-between font-medium">
+                                                <span>-- Tidak Ada Gudang Online Aktif --</span>
+                                                <span x-show="!selectedId" class="text-amber-600 font-bold">✓</span>
+                                            </button>
+
+                                            <template x-for="item in filteredOptions" :key="item.id">
+                                                <button @click="selectOption(item.id)" type="button" 
+                                                    class="w-full text-left px-3.5 py-2.5 text-xs hover:bg-amber-50 transition-colors flex items-center justify-between" 
+                                                    :class="String(selectedId) === String(item.id) ? 'bg-amber-50/80 text-amber-700 font-bold' : 'text-gray-700'">
+                                                    <span x-text="item.name" class="truncate"></span>
+                                                    <span x-show="String(selectedId) === String(item.id)" class="text-amber-600 font-black">✓</span>
+                                                </button>
+                                            </template>
+
+                                            <div x-show="filteredOptions.length === 0" class="px-4 py-4 text-center text-xs text-gray-400">
+                                                Tidak ada gudang yang cocok.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="p-3 rounded-xl bg-amber-50 border border-amber-200/60 text-xs text-amber-900">
@@ -216,7 +295,7 @@
                     </div>
                 </div>
 
-                {{-- 2. Accurate Default Branch for this BU --}}
+                {{-- 2. Accurate Default Branch for this BU (Searchable) --}}
                 <div class="bg-neutral-50 rounded-2xl p-5 border border-gray-200/70 flex flex-col justify-between hover:border-teal-200 transition">
                     <div>
                         <div class="flex items-center gap-3 mb-3">
@@ -231,18 +310,89 @@
 
                         <div class="space-y-3 mt-4">
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1.5">Nama Cabang Default</label>
-                                @if($buBranches->isNotEmpty())
-                                    <select wire:model="defaultBranchName"
-                                        class="w-full text-xs font-semibold rounded-xl border-gray-200 px-3.5 py-2.5 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition mb-2 bg-white">
-                                        @foreach($buBranches as $branch)
-                                            <option value="{{ $branch->name }}">{{ $branch->name }}</option>
-                                        @endforeach
-                                    </select>
-                                @endif
-                                <input type="text" wire:model="defaultBranchName" placeholder="Contoh: Banjarbaru"
-                                    class="w-full text-xs font-semibold rounded-xl border-gray-200 px-3.5 py-2.5 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition bg-white">
-                                <span class="text-[11px] text-gray-400 mt-1 block">Pastikan sesuai master Cabang Accurate Online unit ini.</span>
+                                <label class="block text-xs font-bold text-gray-700 mb-1.5">Pilih / Ketik Cabang Default</label>
+                                
+                                {{-- Searchable Dropdown Cabang --}}
+                                <div wire:key="searchable-branch-{{ $selectedBusinessUnitId }}"
+                                    x-data="{
+                                        open: false,
+                                        search: '',
+                                        selectedName: @entangle('defaultBranchName').live,
+                                        options: {{ json_encode($branchOptions) }},
+                                        get filteredOptions() {
+                                            if (!this.search) return this.options;
+                                            let s = this.search.toLowerCase();
+                                            return this.options.filter(o => o.name.toLowerCase().includes(s));
+                                        },
+                                        selectBranch(name) {
+                                            this.selectedName = name;
+                                            $wire.set('defaultBranchName', name);
+                                            this.open = false;
+                                            this.search = '';
+                                        }
+                                    }" 
+                                    @click.outside="open = false" 
+                                    class="relative">
+                                    
+                                    <button @click="open = !open" type="button" 
+                                        class="w-full pl-3.5 pr-10 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white text-left cursor-pointer flex items-center justify-between shadow-2xs hover:border-teal-400 transition mb-2">
+                                        <span class="truncate" x-text="selectedName || '-- Pilih Cabang Accurate --'">-- Pilih Cabang Accurate --</span>
+                                        <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200" :class="{'rotate-180': open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </button>
+
+                                    <div x-show="open" 
+                                         x-transition:enter="transition ease-out duration-100"
+                                         x-transition:enter-start="transform opacity-0 scale-95"
+                                         x-transition:enter-end="transform opacity-100 scale-100"
+                                         x-transition:leave="transition ease-in duration-75"
+                                         x-transition:leave-start="transform opacity-100 scale-100"
+                                         x-transition:leave-end="transform opacity-0 scale-95"
+                                         class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-2xl shadow-xl max-h-64 overflow-hidden flex flex-col" 
+                                         style="display: none;">
+                                        
+                                        <div class="p-2 border-b border-gray-100 bg-gray-50/70 relative">
+                                            <input x-model="search" 
+                                                   x-ref="branchSearchInput"
+                                                   type="text" 
+                                                   placeholder="Ketik cari nama cabang..." 
+                                                   class="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white"
+                                                   x-init="$watch('open', value => { if (value) setTimeout(() => $refs.branchSearchInput.focus(), 50) })">
+                                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                            </svg>
+                                        </div>
+
+                                        <div class="overflow-y-auto max-h-48 divide-y divide-gray-50">
+                                            <template x-for="item in filteredOptions" :key="item.id">
+                                                <button @click="selectBranch(item.name)" type="button" 
+                                                    class="w-full text-left px-3.5 py-2.5 text-xs hover:bg-teal-50 transition-colors flex items-center justify-between" 
+                                                    :class="selectedName === item.name ? 'bg-teal-50/80 text-teal-700 font-bold' : 'text-gray-700'">
+                                                    <span x-text="item.name" class="truncate"></span>
+                                                    <span x-show="selectedName === item.name" class="text-teal-600 font-black">✓</span>
+                                                </button>
+                                            </template>
+
+                                            <!-- Custom typed name option -->
+                                            <button x-show="search && !filteredOptions.some(o => o.name.toLowerCase() === search.toLowerCase())" 
+                                                @click="selectBranch(search)" type="button"
+                                                class="w-full text-left px-3.5 py-2.5 text-xs text-teal-700 bg-teal-50/50 hover:bg-teal-100 transition-colors flex items-center gap-1.5 font-bold">
+                                                <span>+ Gunakan cabang:</span>
+                                                <span class="underline" x-text="search"></span>
+                                            </button>
+
+                                            <div x-show="filteredOptions.length === 0 && !search" class="px-4 py-4 text-center text-xs text-gray-400">
+                                                Belum ada data cabang. Ketik nama cabang di bawah ini.
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Manual input for precise editing -->
+                                    <input type="text" wire:model.live="defaultBranchName" placeholder="Contoh: Banjarbaru"
+                                        class="w-full text-xs font-semibold rounded-xl border-gray-200 px-3.5 py-2.5 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition bg-white">
+                                </div>
+                                <span class="text-[11px] text-gray-400 mt-1 block">Pastikan sama persis dengan master Cabang Accurate Online.</span>
                             </div>
                         </div>
                     </div>
@@ -256,7 +406,7 @@
                     </div>
                 </div>
 
-                {{-- 3. Default Sales / CS for this BU --}}
+                {{-- 3. Default Sales / CS for this BU (Searchable) --}}
                 <div class="bg-neutral-50 rounded-2xl p-5 border border-gray-200/70 flex flex-col justify-between hover:border-purple-200 transition">
                     <div>
                         <div class="flex items-center gap-3 mb-3">
@@ -272,15 +422,94 @@
                         <div class="space-y-3 mt-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1.5">Pilih Karyawan Sales Unit Ini</label>
-                                <select wire:model="defaultSalesId"
-                                    class="w-full text-xs font-semibold rounded-xl border-gray-200 px-3.5 py-2.5 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition bg-white">
-                                    <option value="">-- Tanpa Sales Default (Kosong) --</option>
-                                    @foreach($buSales as $sales)
-                                        <option value="{{ $sales->id }}">
-                                            {{ $sales->name }} {{ $sales->employee_no ? "({$sales->employee_no})" : '' }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                
+                                {{-- Searchable Dropdown Sales --}}
+                                <div wire:key="searchable-sales-{{ $selectedBusinessUnitId }}"
+                                    x-data="{
+                                        open: false,
+                                        search: '',
+                                        selectedId: @entangle('defaultSalesId').live,
+                                        selectedName: '',
+                                        options: {{ json_encode($salesOptions) }},
+                                        init() {
+                                            this.updateLabel();
+                                            this.$watch('selectedId', () => this.updateLabel());
+                                        },
+                                        updateLabel() {
+                                            if (!this.selectedId) {
+                                                this.selectedName = '-- Tanpa Sales Default (Kosong) --';
+                                                return;
+                                            }
+                                            let found = this.options.find(o => String(o.id) === String(this.selectedId));
+                                            this.selectedName = found ? found.name : '-- Pilih Karyawan Sales --';
+                                        },
+                                        get filteredOptions() {
+                                            if (!this.search) return this.options;
+                                            let s = this.search.toLowerCase();
+                                            return this.options.filter(o => o.name.toLowerCase().includes(s));
+                                        },
+                                        selectOption(id) {
+                                            this.selectedId = id ? parseInt(id) : null;
+                                            this.updateLabel();
+                                            this.open = false;
+                                            this.search = '';
+                                        }
+                                    }" 
+                                    @click.outside="open = false" 
+                                    class="relative">
+                                    
+                                    <button @click="open = !open" type="button" 
+                                        class="w-full pl-3.5 pr-10 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 bg-white text-left cursor-pointer flex items-center justify-between shadow-2xs hover:border-purple-400 transition">
+                                        <span class="truncate" x-text="selectedName">-- Pilih Karyawan Sales --</span>
+                                        <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200" :class="{'rotate-180': open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </button>
+
+                                    <div x-show="open" 
+                                         x-transition:enter="transition ease-out duration-100"
+                                         x-transition:enter-start="transform opacity-0 scale-95"
+                                         x-transition:enter-end="transform opacity-100 scale-100"
+                                         x-transition:leave="transition ease-in duration-75"
+                                         x-transition:leave-start="transform opacity-100 scale-100"
+                                         x-transition:leave-end="transform opacity-0 scale-95"
+                                         class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-2xl shadow-xl max-h-64 overflow-hidden flex flex-col" 
+                                         style="display: none;">
+                                        
+                                        <div class="p-2 border-b border-gray-100 bg-gray-50/70 relative">
+                                            <input x-model="search" 
+                                                   x-ref="salesSearchInput"
+                                                   type="text" 
+                                                   placeholder="Ketik nama atau no karyawan..." 
+                                                   class="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 bg-white"
+                                                   x-init="$watch('open', value => { if (value) setTimeout(() => $refs.salesSearchInput.focus(), 50) })">
+                                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                            </svg>
+                                        </div>
+
+                                        <div class="overflow-y-auto max-h-48 divide-y divide-gray-50">
+                                            <button @click="selectOption(null)" type="button" 
+                                                class="w-full text-left px-3.5 py-2.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-between font-medium">
+                                                <span>-- Tanpa Sales Default (Kosong) --</span>
+                                                <span x-show="!selectedId" class="text-purple-600 font-bold">✓</span>
+                                            </button>
+
+                                            <template x-for="item in filteredOptions" :key="item.id">
+                                                <button @click="selectOption(item.id)" type="button" 
+                                                    class="w-full text-left px-3.5 py-2.5 text-xs hover:bg-purple-50 transition-colors flex items-center justify-between" 
+                                                    :class="String(selectedId) === String(item.id) ? 'bg-purple-50/80 text-purple-700 font-bold' : 'text-gray-700'">
+                                                    <span x-text="item.name" class="truncate"></span>
+                                                    <span x-show="String(selectedId) === String(item.id)" class="text-purple-600 font-black">✓</span>
+                                                </button>
+                                            </template>
+
+                                            <div x-show="filteredOptions.length === 0" class="px-4 py-4 text-center text-xs text-gray-400">
+                                                Tidak ada karyawan sales yang cocok.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 <span class="text-[11px] text-gray-400 mt-1 block">Otomatis tercatat atas nama sales ini di Accurate untuk pesanan {{ $currentBU?->name }}.</span>
                             </div>
                         </div>
@@ -295,7 +524,7 @@
                     </div>
                 </div>
 
-                {{-- 4. Default Cashier / Handled By for this BU --}}
+                {{-- 4. Default Cashier / Handled By for this BU (Searchable) --}}
                 <div class="bg-neutral-50 rounded-2xl p-5 border border-gray-200/70 flex flex-col justify-between hover:border-blue-200 transition">
                     <div>
                         <div class="flex items-center gap-3 mb-3">
@@ -311,15 +540,94 @@
                         <div class="space-y-3 mt-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1.5">Pilih Kasir / Admin Penanggung Jawab</label>
-                                <select wire:model="defaultHandledById"
-                                    class="w-full text-xs font-semibold rounded-xl border-gray-200 px-3.5 py-2.5 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition bg-white">
-                                    <option value="">-- Tanpa Kasir Default (Admin Approval Manual) --</option>
-                                    @foreach($buCashiers as $cashier)
-                                        <option value="{{ $cashier->id }}">
-                                            {{ $cashier->name }} ({{ $cashier->email }})
-                                        </option>
-                                    @endforeach
-                                </select>
+                                
+                                {{-- Searchable Dropdown Kasir --}}
+                                <div wire:key="searchable-cashier-{{ $selectedBusinessUnitId }}"
+                                    x-data="{
+                                        open: false,
+                                        search: '',
+                                        selectedId: @entangle('defaultHandledById').live,
+                                        selectedName: '',
+                                        options: {{ json_encode($cashierOptions) }},
+                                        init() {
+                                            this.updateLabel();
+                                            this.$watch('selectedId', () => this.updateLabel());
+                                        },
+                                        updateLabel() {
+                                            if (!this.selectedId) {
+                                                this.selectedName = '-- Tanpa Kasir Default (Admin Manual) --';
+                                                return;
+                                            }
+                                            let found = this.options.find(o => String(o.id) === String(this.selectedId));
+                                            this.selectedName = found ? found.name : '-- Pilih Kasir / Admin --';
+                                        },
+                                        get filteredOptions() {
+                                            if (!this.search) return this.options;
+                                            let s = this.search.toLowerCase();
+                                            return this.options.filter(o => o.name.toLowerCase().includes(s));
+                                        },
+                                        selectOption(id) {
+                                            this.selectedId = id ? parseInt(id) : null;
+                                            this.updateLabel();
+                                            this.open = false;
+                                            this.search = '';
+                                        }
+                                    }" 
+                                    @click.outside="open = false" 
+                                    class="relative">
+                                    
+                                    <button @click="open = !open" type="button" 
+                                        class="w-full pl-3.5 pr-10 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 bg-white text-left cursor-pointer flex items-center justify-between shadow-2xs hover:border-blue-400 transition">
+                                        <span class="truncate" x-text="selectedName">-- Pilih Kasir / Admin --</span>
+                                        <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200" :class="{'rotate-180': open}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </button>
+
+                                    <div x-show="open" 
+                                         x-transition:enter="transition ease-out duration-100"
+                                         x-transition:enter-start="transform opacity-0 scale-95"
+                                         x-transition:enter-end="transform opacity-100 scale-100"
+                                         x-transition:leave="transition ease-in duration-75"
+                                         x-transition:leave-start="transform opacity-100 scale-100"
+                                         x-transition:leave-end="transform opacity-0 scale-95"
+                                         class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-2xl shadow-xl max-h-64 overflow-hidden flex flex-col" 
+                                         style="display: none;">
+                                        
+                                        <div class="p-2 border-b border-gray-100 bg-gray-50/70 relative">
+                                            <input x-model="search" 
+                                                   x-ref="cashierSearchInput"
+                                                   type="text" 
+                                                   placeholder="Ketik nama atau email staf..." 
+                                                   class="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white"
+                                                   x-init="$watch('open', value => { if (value) setTimeout(() => $refs.cashierSearchInput.focus(), 50) })">
+                                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                            </svg>
+                                        </div>
+
+                                        <div class="overflow-y-auto max-h-48 divide-y divide-gray-50">
+                                            <button @click="selectOption(null)" type="button" 
+                                                class="w-full text-left px-3.5 py-2.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors flex items-center justify-between font-medium">
+                                                <span>-- Tanpa Kasir Default (Admin Approval Manual) --</span>
+                                                <span x-show="!selectedId" class="text-blue-600 font-bold">✓</span>
+                                            </button>
+
+                                            <template x-for="item in filteredOptions" :key="item.id">
+                                                <button @click="selectOption(item.id)" type="button" 
+                                                    class="w-full text-left px-3.5 py-2.5 text-xs hover:bg-blue-50 transition-colors flex items-center justify-between" 
+                                                    :class="String(selectedId) === String(item.id) ? 'bg-blue-50/80 text-blue-700 font-bold' : 'text-gray-700'">
+                                                    <span x-text="item.name" class="truncate"></span>
+                                                    <span x-show="String(selectedId) === String(item.id)" class="text-blue-600 font-black">✓</span>
+                                                </button>
+                                            </template>
+
+                                            <div x-show="filteredOptions.length === 0" class="px-4 py-4 text-center text-xs text-gray-400">
+                                                Tidak ada kasir/staf yang cocok.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 <span class="text-[11px] text-gray-400 mt-1 block">Ditugaskan pada kolom <code class="text-[10px] bg-gray-200 px-1 py-0.5 rounded">handled_by</code> order mobile saat pesanan dibuat.</span>
                             </div>
                         </div>
