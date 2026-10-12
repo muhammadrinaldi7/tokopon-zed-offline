@@ -204,7 +204,7 @@ class InvoiceReport extends Component
                         $pmrName = $payment->paymentMethodRate->name ?? null;
                         $mdrPct = $payment->paymentMethodRate->mdr_percentage ?? 0;
                         $amount = (float)($payment->amount ?? 0);
-                        $jamBayar = $payment ? $payment->created_at->format('H:i:s') : null;
+                        $jamBayar = $paymentDate ? $paymentDate->format('H:i:s') : null;
                         $mdr = round(($amount * $mdrPct) / 100);
 
                         // 2. Kalkulasi nominal pembayaran per proyek

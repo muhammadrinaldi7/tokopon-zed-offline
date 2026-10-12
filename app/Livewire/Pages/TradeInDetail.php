@@ -126,6 +126,7 @@ class TradeInDetail extends Component
                     'xendit_external_id' => $order->order_number,
                     'amount' => 0,
                     'status' => 'PAID',
+                    'paid_at' => now(),
                 ]);
                 $order->update(['order_status' => 'COMPLETED']);
                 $this->tradeIn->update(['status' => 'COMPLETED', 'order_id' => $order->id]);
