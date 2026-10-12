@@ -199,6 +199,29 @@ class CsChat extends Component
         $sentText = $this->message;
         $this->message = '';
 
+        // Dapatkan percakapan dan kirim push notification ke mobile app jika token tersedia
+        $conversation = Conversation::with('user')->find($this->activeConversationId);
+        if ($conversation) {
+            $recipientPushToken = $conversation->user?->push_token ?: $conversation->push_token;
+
+            if (!empty($recipientPushToken)) {
+                try {
+                    \App\Jobs\SendExpoPushNotificationJob::dispatch(
+                        $recipientPushToken,
+                        $user->name ?: 'Admin CS Tokopon',
+                        $sentText,
+                        [
+                            'url' => '/(tabs)/chat',
+                            'conversation_id' => (string) $this->activeConversationId,
+                        ],
+                        'chat-messages'
+                    )->afterResponse();
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error("Gagal dispatch push notification di CsChat: " . $e->getMessage());
+                }
+            }
+        }
+
         try {
             broadcast(new MessageSent(
                 user: $user->name,

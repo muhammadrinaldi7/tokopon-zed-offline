@@ -61,6 +61,7 @@ class ChatController extends Controller
         $guestToken = $request->input('guest_token');
         $guestName = $request->input('guest_name');
         $guestPhone = $request->input('guest_phone');
+        $pushToken = $request->input('push_token');
         $businessUnitId = $request->input('business_unit_id');
         $productAccurateId = $request->input('product_accurate_id') ?: $request->input('product_id');
 
@@ -68,6 +69,10 @@ class ChatController extends Controller
 
         // 1. Skenario Customer Login
         if ($user) {
+            if (!empty($pushToken) && $user->push_token !== $pushToken) {
+                $user->update(['push_token' => $pushToken]);
+            }
+
             $conversation = Conversation::where('user_id', $user->id)
                 ->where('status', 'open')
                 ->latest()
@@ -78,12 +83,20 @@ class ChatController extends Controller
                     'user_id' => $user->id,
                     'business_unit_id' => $businessUnitId,
                     'product_accurate_id' => $productAccurateId,
+                    'push_token' => $pushToken,
                     'status' => 'open',
                 ]);
             } else {
+                $updateData = [];
                 // Update konteks produk jika ada pertanyaan tentang produk baru
                 if ($productAccurateId && $conversation->product_accurate_id != $productAccurateId) {
-                    $conversation->update(['product_accurate_id' => $productAccurateId]);
+                    $updateData['product_accurate_id'] = $productAccurateId;
+                }
+                if (!empty($pushToken) && $conversation->push_token !== $pushToken) {
+                    $updateData['push_token'] = $pushToken;
+                }
+                if (!empty($updateData)) {
+                    $conversation->update($updateData);
                 }
             }
         } 
@@ -99,6 +112,7 @@ class ChatController extends Controller
                     'guest_token' => $guestToken,
                     'guest_name' => $guestName ?: 'Tamu Mobile',
                     'guest_phone' => $guestPhone,
+                    'push_token' => $pushToken,
                     'business_unit_id' => $businessUnitId,
                     'product_accurate_id' => $productAccurateId,
                     'status' => 'open',
@@ -107,6 +121,7 @@ class ChatController extends Controller
                 $updateData = [];
                 if ($guestName && $conversation->guest_name !== $guestName) $updateData['guest_name'] = $guestName;
                 if ($guestPhone && $conversation->guest_phone !== $guestPhone) $updateData['guest_phone'] = $guestPhone;
+                if (!empty($pushToken) && $conversation->push_token !== $pushToken) $updateData['push_token'] = $pushToken;
                 if ($productAccurateId) $updateData['product_accurate_id'] = $productAccurateId;
                 if (!empty($updateData)) {
                     $conversation->update($updateData);
@@ -273,6 +288,29 @@ class ChatController extends Controller
         if ($message->product_accurate_id) {
             $product = ProductAccurate::with(['product', 'productVariants'])->find($message->product_accurate_id);
             $productData = $this->formatProduct($product);
+        }
+
+        // Jika pengirim adalah CS/Admin, kirimkan push notification ke HP pelanggan
+        if ($senderType === 'cs') {
+            $conversation->loadMissing('user');
+            $recipientPushToken = $conversation->user?->push_token ?: $conversation->push_token;
+
+            if (!empty($recipientPushToken)) {
+                try {
+                    \App\Jobs\SendExpoPushNotificationJob::dispatch(
+                        $recipientPushToken,
+                        $user?->name ?: 'Admin CS Tokopon',
+                        $message->message ?: 'Mengirim lampiran...',
+                        [
+                            'url' => '/(tabs)/chat',
+                            'conversation_id' => (string) $conversation->id,
+                        ],
+                        'chat-messages'
+                    )->afterResponse();
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error("Gagal dispatch push notification dari ChatController: " . $e->getMessage());
+                }
+            }
         }
 
         return response()->json([

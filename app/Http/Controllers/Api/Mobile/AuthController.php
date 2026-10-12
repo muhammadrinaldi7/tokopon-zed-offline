@@ -236,4 +236,39 @@ class AuthController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Memperbarui Expo Push Token milik pengguna yang sedang login.
+     */
+    public function updatePushToken(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'push_token' => 'required|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Format push token tidak valid: ' . $validator->errors()->first(),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sesi tidak valid atau telah berakhir.',
+            ], 401);
+        }
+
+        $user->update([
+            'push_token' => trim($request->input('push_token')),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Push token updated',
+        ]);
+    }
 }

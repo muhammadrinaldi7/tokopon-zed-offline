@@ -33,7 +33,8 @@ class User extends Authenticatable implements HasMedia
         'business_unit_id',
         'warehouse_id',
         'branch_id',
-        'telegram_chat_id'
+        'telegram_chat_id',
+        'push_token',
     ];
 
     public function businessUnit()

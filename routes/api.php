@@ -7,6 +7,15 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+// Expo Push Token update endpoint
+Route::post('/user/push-token', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'updatePushToken'])
+    ->middleware('auth:sanctum')
+    ->name('api.user.push-token');
+
+// Chat Init root alias
+Route::post('/chat/init', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'initConversation'])
+    ->name('api.chat.init');
+
 // Xendit Webhooks
 Route::post('/webhooks/xendit/invoice', [\App\Http\Controllers\Api\XenditWebhookController::class, 'handleInvoiceCallback'])
     ->name('api.webhooks.xendit.invoice');
@@ -139,6 +148,8 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
             ->name('api.mobile.auth.profile');
         Route::post('/auth/logout', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'logout'])
             ->name('api.mobile.auth.logout');
+        Route::post('/user/push-token', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'updatePushToken'])
+            ->name('api.mobile.user.push-token');
     });
 
     // 1. Daftar Unit Bisnis / Toko Online (Store Switcher)

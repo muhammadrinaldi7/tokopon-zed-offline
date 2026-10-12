@@ -13,6 +13,7 @@ class Conversation extends Model
         'guest_token',
         'guest_name',
         'guest_phone',
+        'push_token',
         'product_accurate_id',
         'closing_status',
         'closing_amount',
