@@ -131,9 +131,12 @@
                                 <h3 class="font-bold text-gray-900 text-sm">
                                     {{ $activeConv->user?->name ?? ($activeConv->guest_name ?: 'Tamu (Guest)') }}
                                 </h3>
-                                @if($activeConv->guest_phone)
+                                @php
+                                    $custPhone = $activeConv->guest_phone ?: ($activeConv->user?->customer_phone ?? null);
+                                @endphp
+                                @if($custPhone)
                                     <span class="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                                        📱 {{ $activeConv->guest_phone }}
+                                        📱 {{ $custPhone }}
                                     </span>
                                 @endif
                             </div>
@@ -146,8 +149,23 @@
                         </div>
                     </div>
 
-                    {{-- Action Button: Tag Closing & Info --}}
+                    {{-- Action Button: Tag Closing & WhatsApp --}}
                     <div class="flex items-center gap-2">
+                        @php
+                            $waUrl = $this->getWhatsAppUrl($activeConv);
+                        @endphp
+
+                        @if($waUrl)
+                            <a href="{{ $waUrl }}" target="_blank" rel="noopener noreferrer"
+                                class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5"
+                                title="Lanjut chat ke WhatsApp pelanggan">
+                                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.861.174.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086.159.058 1.011.477 1.184.564.173.087.289.13.332.203.043.072.043.419-.101.824z"/>
+                                </svg>
+                                <span>Chat via WhatsApp</span>
+                            </a>
+                        @endif
+
                         <button wire:click="openClosingModal({{ $activeConv->id }})"
                             class="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -180,10 +198,30 @@
                                 </div>
                             @endif
 
+                            {{-- File / Image Attachments --}}
+                            @if(!empty($msg['attachments']))
+                                <div class="mb-2 space-y-1.5 max-w-sm">
+                                    @foreach($msg['attachments'] as $att)
+                                        @if(!empty($att['is_image']))
+                                            <a href="{{ $att['url'] }}" target="_blank" class="block group overflow-hidden rounded-2xl border border-gray-200 shadow-2xs">
+                                                <img src="{{ $att['url'] }}" class="max-h-56 w-auto object-cover rounded-2xl hover:scale-102 transition-transform" />
+                                            </a>
+                                        @else
+                                            <a href="{{ $att['url'] }}" target="_blank" class="flex items-center gap-2 p-2.5 bg-white border border-gray-200 rounded-xl text-xs text-indigo-600 hover:underline shadow-2xs">
+                                                <span class="text-sm">📎</span>
+                                                <span class="truncate font-semibold">{{ $att['file_name'] }}</span>
+                                            </a>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            @endif
+
                             {{-- Message Text Bubble --}}
-                            <div class="px-4 py-2.5 rounded-2xl max-w-md text-xs leading-relaxed shadow-xs {{ $msg['isCs'] ? 'bg-indigo-600 text-white rounded-tr-xs' : 'bg-white text-gray-800 border border-gray-200/80 rounded-tl-xs' }}">
-                                {{ $msg['text'] }}
-                            </div>
+                            @if(!empty(trim($msg['text'])))
+                                <div class="px-4 py-2.5 rounded-2xl max-w-md text-xs leading-relaxed shadow-xs {{ $msg['isCs'] ? 'bg-indigo-600 text-white rounded-tr-xs' : 'bg-white text-gray-800 border border-gray-200/80 rounded-tl-xs' }}">
+                                    {{ $msg['text'] }}
+                                </div>
+                            @endif
                         </div>
                     @empty
                         <div class="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
@@ -193,11 +231,68 @@
                     @endforelse
                 </div>
 
+                {{-- Quick Replies Chips Bar --}}
+                <div class="px-3.5 pt-2 pb-1 border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto text-[11px] bg-slate-50/70">
+                    <span class="text-gray-400 font-bold shrink-0 text-[10px] uppercase tracking-wider">Balas Cepat:</span>
+                    @foreach($quickReplies as $qr)
+                        <button type="button" wire:click="applyQuickReply(@js($qr['text']))"
+                            class="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition-all shrink-0 font-medium shadow-2xs">
+                            {{ $qr['label'] }}
+                        </button>
+                    @endforeach
+                </div>
+
+                {{-- Attached Product / Uploaded Image Preview Chips (Sebelum Dikirim) --}}
+                @if($selectedProductPreview || $attachment)
+                    <div class="px-3.5 py-2 bg-indigo-50/50 border-t border-indigo-100 flex items-center gap-3">
+                        @if($selectedProductPreview)
+                            <div class="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-indigo-200 shadow-2xs">
+                                <img src="{{ $selectedProductPreview['thumbnail'] }}" class="w-7 h-7 rounded-lg object-cover" />
+                                <div class="text-[11px] min-w-0">
+                                    <span class="font-bold text-gray-800 truncate block max-w-xs">{{ $selectedProductPreview['name'] }}</span>
+                                    <span class="font-extrabold text-indigo-600">{{ $selectedProductPreview['price'] }}</span>
+                                </div>
+                                <button type="button" wire:click="removeSelectedProduct" class="text-gray-400 hover:text-rose-500 font-bold ml-1 text-xs">✕</button>
+                            </div>
+                        @endif
+
+                        @if($attachment)
+                            <div class="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-indigo-200 shadow-2xs">
+                                <span class="text-sm">📷</span>
+                                <span class="text-[11px] font-medium text-gray-700 max-w-xs truncate">{{ $attachment->getClientOriginalName() }}</span>
+                                <button type="button" wire:click="removeAttachment" class="text-gray-400 hover:text-rose-500 font-bold ml-1 text-xs">✕</button>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
                 {{-- Chat Input Bar --}}
                 <div class="p-3.5 bg-white border-t border-gray-100">
                     <form wire:submit.prevent="sendMessage" class="flex items-center gap-2">
+                        {{-- Tombol Tag / Rekomendasi Produk --}}
+                        <button type="button" wire:click="openProductPicker"
+                            class="p-2.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-gray-200"
+                            title="Rekomendasikan Produk Shopee-style">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                            </svg>
+                        </button>
+
+                        {{-- Tombol Unggah Foto / File --}}
+                        <label for="cs-chat-file-input"
+                            class="p-2.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-gray-200 cursor-pointer"
+                            title="Unggah Foto / Gambar">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </label>
+                        <input type="file" wire:model="attachment" id="cs-chat-file-input" class="hidden" accept="image/*,application/pdf">
+
+                        {{-- Input Teks --}}
                         <input type="text" wire:model="message" placeholder="Ketik balasan Anda ke pelanggan..."
                             class="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-medium focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none">
+
+                        {{-- Tombol Kirim --}}
                         <button type="submit"
                             class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5">
                             <span>Kirim</span>
@@ -220,6 +315,58 @@
             @endif
         </div>
     </div>
+
+    {{-- MODAL DIALOG: PILIH REKOMENDASI PRODUK (SHOPEE-STYLE) --}}
+    @if($showProductPickerModal)
+        <div class="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-3xl shadow-xl w-full max-w-lg p-6 space-y-4" @click.away="$wire.set('showProductPickerModal', false)">
+                <div class="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <div>
+                        <h3 class="text-base font-extrabold text-gray-900">Rekomendasikan Produk</h3>
+                        <p class="text-xs text-gray-400 mt-0.5">Pilih produk inventori untuk dikirimkan sebagai kartu rekomendasi ke chat customer.</p>
+                    </div>
+                    <button wire:click="$set('showProductPickerModal', false)" class="text-gray-400 hover:text-gray-600 text-sm">✕</button>
+                </div>
+
+                {{-- Search Bar --}}
+                <div class="relative">
+                    <input type="text" wire:model.live.debounce.300ms="productSearch" placeholder="Cari nama produk atau kode item..."
+                        class="w-full pl-9 pr-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-medium focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none">
+                    <svg class="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+
+                {{-- Search Results List --}}
+                <div class="max-h-72 overflow-y-auto space-y-2 divide-y divide-gray-50 pr-1">
+                    @forelse($productSearchResults as $prod)
+                        <div wire:click="selectProduct({{ $prod['id'] }})"
+                            class="pt-2 flex items-center justify-between p-2 rounded-xl hover:bg-indigo-50/70 cursor-pointer transition-all border border-transparent hover:border-indigo-100">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <img src="{{ $prod['thumbnail'] }}" class="w-12 h-12 rounded-xl object-cover border border-gray-100 shrink-0" />
+                                <div class="min-w-0">
+                                    <h4 class="text-xs font-bold text-gray-900 truncate">{{ $prod['name'] }}</h4>
+                                    <span class="text-[10px] text-gray-400 font-mono">{{ $prod['item_no'] }}</span>
+                                    <p class="text-xs font-extrabold text-indigo-600 mt-0.5">{{ $prod['formatted_price'] }}</p>
+                                </div>
+                            </div>
+                            <button type="button" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shrink-0">
+                                Pilih
+                            </button>
+                        </div>
+                    @empty
+                        <div class="p-8 text-center text-gray-400 text-xs">
+                            Tidak ada produk ditemukan.
+                        </div>
+                    @endforelse
+                </div>
+
+                <div class="flex items-center justify-end pt-2 border-t border-gray-100">
+                    <button wire:click="$set('showProductPickerModal', false)" class="px-4 py-2 text-xs font-bold text-gray-500 hover:bg-gray-100 rounded-xl">Batal</button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- MODAL DIALOG: TANDAI STATUS CLOSING --}}
     @if($showClosingModal)

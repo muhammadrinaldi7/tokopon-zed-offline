@@ -30,6 +30,43 @@ class CsChat extends Component
     public ?string $closingAmount = null;
     public string $closingNotes = '';
 
+    public array $quickReplies = [
+        [
+            'label' => '👋 Sapaan',
+            'text' => 'Halo kak! Ada yang bisa kami bantu seputar produk atau promo Tokopon hari ini?',
+        ],
+        [
+            'label' => '📦 Stok Ready',
+            'text' => 'Unit yang kakak tanyakan saat ini ready siap kirim ya kak. Mau kami bantu proses pemesanannya?',
+        ],
+        [
+            'label' => '🏦 Info Rekening',
+            'text' => 'Pembayaran resmi Tokopon hanya melalui Rekening BCA: 123-456-7890 a/n PT Tokopon Indonesia. Mohon konfirmasi bukti transfer jika sudah ya kak.',
+        ],
+        [
+            'label' => '🛡️ Garansi Unit',
+            'text' => 'Semua unit gadget bergaransi resmi/toko, garansi ganti unit 7 hari jika ada kendala fungsional & garansi sinyal/IMEI seumur hidup.',
+        ],
+        [
+            'label' => '🚚 Pengiriman',
+            'text' => 'Kami melayani pengiriman Instant (Gosend/Grab) untuk area lokal toko kami, serta JNE/J&T berasuransi untuk kiriman luar kota.',
+        ],
+        [
+            'label' => '📍 Jam Buka Toko',
+            'text' => 'Toko kami buka setiap hari pukul 09.00 - 21.00 WITA. Silakan berkunjung langsung ke store kami ya kak.',
+        ],
+    ];
+
+    // Lampiran File / Gambar oleh CS
+    public $attachment = null;
+
+    // Rekomendasi Produk untuk CS (Product Picker)
+    public bool $showProductPickerModal = false;
+    public string $productSearch = '';
+    public array $productSearchResults = [];
+    public ?int $selectedProductAccurateId = null;
+    public ?array $selectedProductPreview = null;
+
     public function mount()
     {
         $this->loadConversations();
@@ -74,6 +111,8 @@ class CsChat extends Component
                 }
             }
 
+            $phone = $conv->guest_phone ?: ($conv->user?->customer_phone ?? null);
+
             return [
                 'id' => $conv->id,
                 'userName' => $userName,
@@ -84,7 +123,7 @@ class CsChat extends Component
                 'closedByName' => $conv->closedBy?->name,
                 'businessUnitName' => $conv->businessUnit?->name,
                 'isGuest' => is_null($conv->user_id),
-                'guestPhone' => $conv->guest_phone,
+                'guestPhone' => $phone,
                 'productName' => $conv->productAccurate?->name,
                 'productPrice' => $conv->productAccurate ? 'Rp ' . number_format($conv->productAccurate->base_price, 0, ',', '.') : null,
                 'lastMessage' => $conv->latestMessage?->message ?? 'Belum ada pesan',
@@ -99,6 +138,8 @@ class CsChat extends Component
     public function selectConversation(int $id)
     {
         $this->activeConversationId = $id;
+        $this->removeAttachment();
+        $this->removeSelectedProduct();
         $this->loadMessages();
     }
 
@@ -155,6 +196,17 @@ class CsChat extends Component
                 ];
             }
 
+            $attachmentUrls = [];
+            foreach ($msg->getMedia('attachments') as $media) {
+                $attachmentUrls[] = [
+                    'id' => $media->id,
+                    'file_name' => $media->file_name,
+                    'url' => $media->getFullUrl(),
+                    'mime_type' => $media->mime_type,
+                    'is_image' => str_starts_with($media->mime_type ?? '', 'image/'),
+                ];
+            }
+
             return [
                 'id' => $msg->id,
                 'user' => $senderName,
@@ -163,16 +215,143 @@ class CsChat extends Component
                 'userId' => $msg->user_id,
                 'isCs' => $isCs,
                 'product' => $productInfo,
+                'attachments' => $attachmentUrls,
             ];
         })->toArray();
 
         $this->dispatch('cs-messages-loaded');
     }
 
+    public function applyQuickReply(string $text)
+    {
+        if (empty(trim($this->message))) {
+            $this->message = $text;
+        } else {
+            $this->message = trim($this->message) . ' ' . $text;
+        }
+    }
+
+    public function openProductPicker()
+    {
+        $this->productSearch = '';
+        $this->productSearchResults = [];
+        $this->showProductPickerModal = true;
+        $this->searchProducts();
+    }
+
+    public function updatedProductSearch()
+    {
+        $this->searchProducts();
+    }
+
+    public function searchProducts()
+    {
+        $query = ProductAccurate::with(['product', 'productVariants']);
+        if (!empty(trim($this->productSearch))) {
+            $s = trim($this->productSearch);
+            $query->where(function ($q) use ($s) {
+                $q->where('name', 'like', "%{$s}%")
+                  ->orWhere('item_no', 'like', "%{$s}%");
+            });
+        }
+        $this->productSearchResults = $query->take(8)->get()->map(function ($p) {
+            $img = 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&q=80';
+            if ($p->product && $p->product->hasMedia('cover')) {
+                $img = $p->product->getFirstMediaUrl('cover');
+            } elseif ($p->productVariants && $p->productVariants->isNotEmpty()) {
+                $first = $p->productVariants->first();
+                if ($first && $first->hasMedia('variant_image')) {
+                    $img = $first->getFirstMediaUrl('variant_image');
+                }
+            }
+            return [
+                'id' => $p->id,
+                'name' => $p->name,
+                'item_no' => $p->item_no,
+                'price' => (float) $p->base_price,
+                'formatted_price' => 'Rp ' . number_format($p->base_price, 0, ',', '.'),
+                'thumbnail' => $img,
+            ];
+        })->toArray();
+    }
+
+    public function selectProduct(int $productId)
+    {
+        $p = ProductAccurate::with(['product', 'productVariants'])->find($productId);
+        if ($p) {
+            $img = 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=300&q=80';
+            if ($p->product && $p->product->hasMedia('cover')) {
+                $img = $p->product->getFirstMediaUrl('cover');
+            } elseif ($p->productVariants && $p->productVariants->isNotEmpty()) {
+                $first = $p->productVariants->first();
+                if ($first && $first->hasMedia('variant_image')) {
+                    $img = $first->getFirstMediaUrl('variant_image');
+                }
+            }
+            $this->selectedProductAccurateId = $p->id;
+            $this->selectedProductPreview = [
+                'id' => $p->id,
+                'name' => $p->name,
+                'price' => 'Rp ' . number_format($p->base_price, 0, ',', '.'),
+                'thumbnail' => $img,
+            ];
+        }
+        $this->showProductPickerModal = false;
+    }
+
+    public function removeSelectedProduct()
+    {
+        $this->selectedProductAccurateId = null;
+        $this->selectedProductPreview = null;
+    }
+
+    public function removeAttachment()
+    {
+        $this->attachment = null;
+    }
+
+    public function getWhatsAppUrl(?Conversation $conv): ?string
+    {
+        if (!$conv) return null;
+
+        $phone = $conv->guest_phone ?: ($conv->user?->customer_phone ?? null);
+        if (empty($phone)) return null;
+
+        $cleanPhone = preg_replace('/[^0-9]/', '', (string) $phone);
+        if (str_starts_with($cleanPhone, '0')) {
+            $cleanPhone = '62' . substr($cleanPhone, 1);
+        } elseif (str_starts_with($cleanPhone, '8')) {
+            $cleanPhone = '62' . $cleanPhone;
+        }
+
+        $custName = $conv->user?->name ?? ($conv->guest_name ?: 'Kak');
+        $csName = Auth::user()?->name ?: 'Admin CS Tokopon';
+        $prodName = $conv->productAccurate?->name ?? '';
+
+        $text = "Halo {$custName}, saya {$csName} dari Customer Service Tokopon.";
+        if (!empty($prodName)) {
+            $text .= " Terkait pertanyaan Anda mengenai produk *{$prodName}* di Tokopon:";
+        } else {
+            $text .= " Terkait konsultasi Anda di Tokopon:";
+        }
+
+        return 'https://wa.me/' . $cleanPhone . '?text=' . urlencode($text);
+    }
+
     public function sendMessage()
     {
-        if (trim($this->message) === '' || !$this->activeConversationId) {
+        $hasText = trim($this->message) !== '';
+        $hasAttachment = !is_null($this->attachment);
+        $hasProduct = !is_null($this->selectedProductAccurateId);
+
+        if ((!$hasText && !$hasAttachment && !$hasProduct) || !$this->activeConversationId) {
             return;
+        }
+
+        if ($this->attachment) {
+            $this->validate([
+                'attachment' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf|max:5120',
+            ]);
         }
 
         $user = Auth::user();
@@ -181,23 +360,29 @@ class CsChat extends Component
             'conversation_id' => $this->activeConversationId,
             'user_id' => $user->id,
             'sender_type' => 'cs',
+            'product_accurate_id' => $this->selectedProductAccurateId,
             'message' => trim($this->message),
         ]);
 
+        if ($this->attachment) {
+            $createdMsg->addMedia($this->attachment->getRealPath())
+                ->usingFileName($this->attachment->getClientOriginalName())
+                ->toMediaCollection('attachments');
+            $createdMsg->refresh();
+        }
+
         Conversation::where('id', $this->activeConversationId)->update(['updated_at' => now()]);
 
-        $this->messages[] = [
-            'id' => $createdMsg->id,
-            'user' => $user->name,
-            'text' => $createdMsg->message,
-            'time' => now()->format('H:i'),
-            'userId' => $user->id,
-            'isCs' => true,
-            'product' => null,
-        ];
-
         $sentText = $this->message;
+        $attachedProduct = $this->selectedProductPreview;
+
         $this->message = '';
+        $this->attachment = null;
+        $this->selectedProductAccurateId = null;
+        $this->selectedProductPreview = null;
+
+        // Reload messages to include media and products
+        $this->loadMessages();
 
         // Dapatkan percakapan dan kirim push notification ke mobile app jika token tersedia
         $conversation = Conversation::with('user')->find($this->activeConversationId);
@@ -205,11 +390,12 @@ class CsChat extends Component
             $recipientPushToken = $conversation->user?->push_token ?: $conversation->push_token;
 
             if (!empty($recipientPushToken)) {
+                $pushBody = $sentText ?: ($attachedProduct ? 'Rekomendasi produk: ' . $attachedProduct['name'] : 'Mengirim lampiran...');
                 try {
                     \App\Jobs\SendExpoPushNotificationJob::dispatch(
                         $recipientPushToken,
                         $user->name ?: 'Admin CS Tokopon',
-                        $sentText,
+                        $pushBody,
                         [
                             'url' => '/(tabs)/chat',
                             'conversation_id' => (string) $this->activeConversationId,
@@ -225,7 +411,7 @@ class CsChat extends Component
         try {
             broadcast(new MessageSent(
                 user: $user->name,
-                message: $sentText,
+                message: $sentText ?: 'Mengirim lampiran...',
                 time: now()->format('H:i'),
                 userId: $user->id,
                 conversationId: $this->activeConversationId

@@ -313,6 +313,20 @@ class ChatController extends Controller
             }
         }
 
+        // Broadcast event realtime untuk Livewire CS dashboard / websocket listener
+        try {
+            $senderDisplayName = $user?->name ?: ($conversation->guest_name ?: 'Tamu');
+            broadcast(new \App\Events\MessageSent(
+                user: $senderDisplayName,
+                message: $message->message ?: 'Mengirim lampiran...',
+                time: now()->format('H:i'),
+                userId: $user?->id ?: 0,
+                conversationId: $conversation->id
+            ))->toOthers();
+        } catch (\Throwable $e) {
+            // broadcast fallback silently
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Pesan berhasil dikirim.',
