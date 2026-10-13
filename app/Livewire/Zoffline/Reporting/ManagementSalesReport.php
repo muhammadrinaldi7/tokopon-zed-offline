@@ -250,10 +250,7 @@ class ManagementSalesReport extends Component
                         $qi->whereNull('serial_number')->orWhere('serial_number', '');
                     });
                 } else {
-                    $snList = ProductSerialNumber::when($buId && $buId !== 'all', function ($q) use ($buId) {
-                            $q->where('business_unit_id', $buId);
-                        })
-                        ->whereHas('vendor', function ($qv) {
+                    $snList = ProductSerialNumber::whereHas('vendor', function ($qv) {
                             $qv->where('vendor_name', $this->vendorFilter);
                         })->pluck('serial_number')->toArray();
 
@@ -338,7 +335,7 @@ class ManagementSalesReport extends Component
         $allSns = array_unique($allSns);
 
         $buId = $this->businessUnitFilter ?: (Auth::user()?->getActiveBusinessUnitId() ?? '');
-        $snMap = [];
+        $snMap = collect();
         if (!empty($allSns)) {
             $snMap = ProductSerialNumber::when($buId && $buId !== 'all', function ($q) use ($buId) {
                     $q->where('business_unit_id', $buId);
@@ -347,6 +344,36 @@ class ManagementSalesReport extends Component
                 ->whereIn('serial_number', $allSns)
                 ->get()
                 ->keyBy('serial_number');
+
+            // Cross-BU Fallback: jika ada SN yang tidak ditemukan di BU aktif (misal transfer/cross-BU)
+            $missingSns = array_values(array_diff($allSns, $snMap->keys()->toArray()));
+            if (!empty($missingSns)) {
+                $fallbackSnMap = ProductSerialNumber::with('vendor')
+                    ->whereIn('serial_number', $missingSns)
+                    ->get()
+                    ->keyBy('serial_number');
+
+                foreach ($fallbackSnMap as $sn => $model) {
+                    $snMap->put($sn, $model);
+                }
+            }
+        }
+
+        $sellPhoneMap = collect();
+        if (!empty($allSns)) {
+            $sellPhones = \App\Models\SellPhone::with('user')
+                ->whereIn('imei', $allSns)
+                ->where('status', 'COMPLETED')
+                ->where('appraised_value', '>', 0)
+                ->latest()
+                ->get();
+
+            foreach ($sellPhones as $sp) {
+                $sellPhoneMap->put($sp->imei . '_' . $sp->business_unit_id, $sp);
+                if (!$sellPhoneMap->has($sp->imei)) {
+                    $sellPhoneMap->put($sp->imei, $sp);
+                }
+            }
         }
 
         $rows = [];
@@ -382,18 +409,56 @@ class ManagementSalesReport extends Component
             $itemHpp = 0;
             $qty = (float)$item->qty;
 
-            if (!empty($snList)) {
-                // Sesuai Aturan: Jika produk ber-SN, ambil HPP dari product_serial_numbers
-                $vendorNames = [];
-                foreach ($snList as $sn) {
-                    $snModel = $snMap->get($sn);
-                    if ($snModel?->vendor?->vendor_name) {
-                        $vendorNames[] = $snModel->vendor->vendor_name;
+            // 1. Prioritas Utama: Baca langsung dari kolom total_hpp yang sudah di-snapshot di order_items
+            if (isset($item->total_hpp) && (float)$item->total_hpp != 0) {
+                $itemHpp = (float)$item->total_hpp;
+                // Ambil info vendor untuk display
+                if (!empty($snList)) {
+                    $vendorNames = [];
+                    $orderBuId = $order->business_unit_id;
+                    foreach ($snList as $sn) {
+                        $spModel = $sellPhoneMap->get($sn . '_' . $orderBuId) ?? ($orderBuId == 2 ? $sellPhoneMap->get($sn) : null);
+                        if ($spModel && (float)$spModel->appraised_value > 0) {
+                            $customerName = $spModel->bank_account_name ?: ($spModel->user?->name ?? 'Customer');
+                            $vendorNames[] = 'Customer: ' . $customerName;
+                        } else {
+                            $snModel = $snMap->get($sn);
+                            if ($snModel?->vendor?->vendor_name) {
+                                $vendorNames[] = $snModel->vendor->vendor_name;
+                            }
+                        }
                     }
-                    $snHpp = (float)($snModel?->hpp ?? 0);
-                    // Fallback jika HPP SN belum terisi / 0: ambil HPP rata-rata base_cost
+                    $vendorNames = array_unique($vendorNames);
+                    $vendor = !empty($vendorNames) ? implode(', ', $vendorNames) : '-';
+                } else {
+                    $vendor = $variant?->vendor_name ?? '-';
+                }
+            } elseif (!empty($snList)) {
+                // Fallback runtime jika data belum di-backfill
+                $vendorNames = [];
+                $orderBuId = $order->business_unit_id;
+                foreach ($snList as $sn) {
+                    $snHpp = 0;
+                    // Cek apakah perangkat dibeli via SellPhone (Buyback dari customer)
+                    $spModel = $sellPhoneMap->get($sn . '_' . $orderBuId) ?? ($orderBuId == 2 ? $sellPhoneMap->get($sn) : null);
+                    if ($spModel && (float)$spModel->appraised_value > 0) {
+                        $snHpp = (float)$spModel->appraised_value;
+                        $customerName = $spModel->bank_account_name ?: ($spModel->user?->name ?? 'Customer');
+                        $vendorNames[] = 'Customer: ' . $customerName;
+                    } else {
+                        $snModel = $snMap->get($sn);
+                        if ($snModel?->vendor?->vendor_name) {
+                            $vendorNames[] = $snModel->vendor->vendor_name;
+                        }
+                        $snHpp = (float)($snModel?->hpp ?? 0);
+                    }
+
+                    // Fallback jika HPP SN belum terisi / 0: ambil base_cost -> buy_price
                     if ($snHpp <= 0) {
                         $snHpp = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                        if ($snHpp <= 0) {
+                            $snHpp = (float)($variant?->buy_price ?? $variant?->accurateData?->buy_price ?? 0);
+                        }
                     }
                     $itemHpp += $snHpp;
                 }
@@ -410,8 +475,11 @@ class ManagementSalesReport extends Component
                 if (!empty($variant?->vendor_name)) {
                     $vendor = $variant->vendor_name;
                 }
-                // Sesuai Aturan: Jika non-SN, ambil HPP rata-rata (base_cost dari ProductAccurate) * qty
+                // Sesuai Aturan: Jika non-SN, ambil base_cost -> buy_price * qty
                 $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                if ($baseCost <= 0) {
+                    $baseCost = (float)($variant?->buy_price ?? $variant?->accurateData?->buy_price ?? 0);
+                }
                 $itemHpp = $baseCost * $qty;
                 if ($isReturn && $itemHpp > 0) {
                     $itemHpp = -$itemHpp;
@@ -554,6 +622,31 @@ class ManagementSalesReport extends Component
                 ->whereIn('serial_number', $summarySns)
                 ->pluck('hpp', 'serial_number')
                 ->toArray();
+
+            // Cross-BU Fallback: jika ada SN yang tidak ditemukan di BU aktif
+            $missingSns = array_values(array_diff($summarySns, array_keys($summarySnMap)));
+            if (!empty($missingSns)) {
+                $fallbackSnMap = ProductSerialNumber::whereIn('serial_number', $missingSns)
+                    ->pluck('hpp', 'serial_number')
+                    ->toArray();
+
+                $summarySnMap = $summarySnMap + $fallbackSnMap;
+            }
+        }
+
+        $sellPhoneMap = collect();
+        if (!empty($summarySns)) {
+            $sellPhones = \App\Models\SellPhone::whereIn('imei', $summarySns)
+                ->where('status', 'COMPLETED')
+                ->where('appraised_value', '>', 0)
+                ->get(['imei', 'business_unit_id', 'appraised_value']);
+
+            foreach ($sellPhones as $sp) {
+                $sellPhoneMap->put($sp->imei . '_' . $sp->business_unit_id, (float)$sp->appraised_value);
+                if (!$sellPhoneMap->has($sp->imei)) {
+                    $sellPhoneMap->put($sp->imei, (float)$sp->appraised_value);
+                }
+            }
         }
 
         foreach ($items as $item) {
@@ -572,12 +665,24 @@ class ManagementSalesReport extends Component
             $itemHpp = 0;
             $qty = (float)$item->qty;
 
-            if (!empty($item->serial_number)) {
+            // Prioritas Utama: gunakan total_hpp dari order_items jika sudah terisi
+            if (isset($item->total_hpp) && (float)$item->total_hpp != 0) {
+                $itemHpp = (float)$item->total_hpp;
+            } elseif (!empty($item->serial_number)) {
                 $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                $orderBuId = $order?->business_unit_id;
                 foreach ($sns as $sn) {
-                    $snHpp = isset($summarySnMap[$sn]) ? (float)$summarySnMap[$sn] : 0;
+                    $spHpp = $sellPhoneMap->get($sn . '_' . $orderBuId) ?? ($orderBuId == 2 ? $sellPhoneMap->get($sn) : null);
+                    if ($spHpp && $spHpp > 0) {
+                        $snHpp = $spHpp;
+                    } else {
+                        $snHpp = isset($summarySnMap[$sn]) ? (float)$summarySnMap[$sn] : 0;
+                    }
                     if ($snHpp <= 0) {
                         $snHpp = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                        if ($snHpp <= 0) {
+                            $snHpp = (float)($variant?->buy_price ?? $variant?->accurateData?->buy_price ?? 0);
+                        }
                     }
                     $itemHpp += $snHpp;
                 }
@@ -590,6 +695,9 @@ class ManagementSalesReport extends Component
                 }
             } else {
                 $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                if ($baseCost <= 0) {
+                    $baseCost = (float)($variant?->buy_price ?? $variant?->accurateData?->buy_price ?? 0);
+                }
                 $itemHpp = $baseCost * $qty;
                 if ($isReturn && $itemHpp > 0) {
                     $itemHpp = -$itemHpp;
@@ -630,7 +738,7 @@ class ManagementSalesReport extends Component
         }
         $pageSns = array_unique($pageSns);
 
-        $snDataMap = [];
+        $snDataMap = collect();
         if (!empty($pageSns)) {
             $snDataMap = ProductSerialNumber::when($buId && $buId !== 'all', function ($q) use ($buId) {
                     $q->where('business_unit_id', $buId);
@@ -639,6 +747,36 @@ class ManagementSalesReport extends Component
                 ->whereIn('serial_number', $pageSns)
                 ->get()
                 ->keyBy('serial_number');
+
+            // Cross-BU Fallback: jika ada SN yang tidak ditemukan di BU aktif
+            $missingSns = array_values(array_diff($pageSns, $snDataMap->keys()->toArray()));
+            if (!empty($missingSns)) {
+                $fallbackSnMap = ProductSerialNumber::with('vendor')
+                    ->whereIn('serial_number', $missingSns)
+                    ->get()
+                    ->keyBy('serial_number');
+
+                foreach ($fallbackSnMap as $sn => $model) {
+                    $snDataMap->put($sn, $model);
+                }
+            }
+        }
+
+        $sellPhoneMap = collect();
+        if (!empty($pageSns)) {
+            $sellPhones = \App\Models\SellPhone::with('user')
+                ->whereIn('imei', $pageSns)
+                ->where('status', 'COMPLETED')
+                ->where('appraised_value', '>', 0)
+                ->latest()
+                ->get();
+
+            foreach ($sellPhones as $sp) {
+                $sellPhoneMap->put($sp->imei . '_' . $sp->business_unit_id, $sp);
+                if (!$sellPhoneMap->has($sp->imei)) {
+                    $sellPhoneMap->put($sp->imei, $sp);
+                }
+            }
         }
 
         // Hitung metrik ringkasan (Summary Cards) secara optimal dan hemat memori
@@ -673,6 +811,7 @@ class ManagementSalesReport extends Component
         return view('livewire.zoffline.reporting.management-sales-report', [
             'items' => $paginatedItems,
             'snDataMap' => $snDataMap,
+            'sellPhoneMap' => $sellPhoneMap,
             'businessUnits' => $businessUnits,
             'availableBranches' => $availableBranches,
             'availableVendors' => $availableVendors,

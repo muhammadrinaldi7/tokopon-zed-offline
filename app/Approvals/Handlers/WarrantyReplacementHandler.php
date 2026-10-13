@@ -216,6 +216,20 @@ class WarrantyReplacementHandler implements ApprovalHandlerInterface
                 ]);
 
                 if ($claim->warranty->orderItem) {
+                    $oldUnitHpp = (float)($claim->warranty->orderItem->unit_hpp ?? 0);
+                    $oldTotalHpp = -$oldUnitHpp;
+                    if ($oldUnitHpp <= 0) {
+                        $hppData = \App\Services\OrderHppResolverService::resolve(
+                            $claim->warranty->orderItem->variant,
+                            $oldSn ? [$oldSn] : [],
+                            $retOrder->business_unit_id,
+                            -1,
+                            true
+                        );
+                        $oldUnitHpp = $hppData['unit_hpp'];
+                        $oldTotalHpp = $hppData['total_hpp'];
+                    }
+
                     OrderItem::create([
                         'order_id' => $retOrder->id,
                         'product_id' => $claim->warranty->orderItem->product_id,
@@ -225,6 +239,8 @@ class WarrantyReplacementHandler implements ApprovalHandlerInterface
                         'serial_number' => $oldSn,
                         'qty' => -1,
                         'price_at_checkout' => $originalPriceForAccurate,
+                        'unit_hpp' => $oldUnitHpp,
+                        'total_hpp' => $oldTotalHpp,
                         'vendor_name_snapshot' => $claim->warranty->orderItem->vendor_name_snapshot,
                         'discount_amount' => 0,
                         'promo_discount_amount' => 0,
@@ -285,6 +301,15 @@ class WarrantyReplacementHandler implements ApprovalHandlerInterface
                     ]);
                 }
 
+                $repVariant = $newVariant ?? $claim->warranty->orderItem?->variant;
+                $repHpp = \App\Services\OrderHppResolverService::resolve(
+                    $repVariant,
+                    $replacement_imei ? [$replacement_imei] : [],
+                    $order->business_unit_id,
+                    1,
+                    false
+                );
+
                 $orderItem = OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $claim->warranty->orderItem?->product_id ?? 1,
@@ -300,6 +325,8 @@ class WarrantyReplacementHandler implements ApprovalHandlerInterface
                     'serial_number' => $replacement_imei,
                     'qty' => 1,
                     'price_at_checkout' => $newPrice,
+                    'unit_hpp' => $repHpp['unit_hpp'],
+                    'total_hpp' => $repHpp['total_hpp'],
                     'vendor_name_snapshot' => $claim->warranty->orderItem?->vendor_name_snapshot,
                     'discount_amount' => 0,
                     'promo_discount_amount' => 0,

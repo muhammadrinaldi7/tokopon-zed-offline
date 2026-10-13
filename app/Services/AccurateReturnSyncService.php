@@ -458,6 +458,15 @@ class AccurateReturnSyncService
                         $productId = $defaultProductId;
                     }
 
+                    $variantModel = $variantType ? $variantType::find($variantId) : null;
+                    $hppData = \App\Services\OrderHppResolverService::resolve(
+                        $variantModel,
+                        $snList,
+                        $order->business_unit_id,
+                        -$qty,
+                        true
+                    );
+
                     OrderItem::create([
                         'order_id' => $order->id,
                         'product_id' => $productId,
@@ -467,6 +476,8 @@ class AccurateReturnSyncService
                         'serial_number' => $snString,
                         'qty' => -$qty,
                         'price_at_checkout' => $unitPrice,
+                        'unit_hpp' => $hppData['unit_hpp'],
+                        'total_hpp' => $hppData['total_hpp'],
                         'discount_amount' => 0,
                         'promo_discount_amount' => 0,
                         'subtotal' => -$itemSubtotal,

@@ -8,6 +8,15 @@ class OrderItem extends Model
 {
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'unit_hpp' => 'float',
+        'total_hpp' => 'float',
+        'price_at_checkout' => 'float',
+        'subtotal' => 'float',
+        'discount_amount' => 'float',
+        'promo_discount_amount' => 'float',
+    ];
+
     protected static function booted()
     {
         static::created(function ($orderItem) {

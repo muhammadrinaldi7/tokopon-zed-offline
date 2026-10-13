@@ -573,15 +573,28 @@ class Create extends Component
 
             // Create Items
             foreach ($this->items as $item) {
+                $itemSns = isset($item['serial_numbers']) ? array_filter(array_map('trim', $item['serial_numbers'])) : [];
+                $variant = \App\Models\ProductAccurate::find($item['variant_id']);
+
+                $hppData = \App\Services\OrderHppResolverService::resolve(
+                    $variant,
+                    $itemSns,
+                    $order->business_unit_id,
+                    $item['qty'],
+                    false
+                );
+
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
                     'product_variant_type' => \App\Models\ProductAccurate::class,
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['unit_price'],
+                    'unit_hpp' => $hppData['unit_hpp'],
+                    'total_hpp' => $hppData['total_hpp'],
                     'discount_amount' => $item['discount'],
                     'subtotal' => $item['total'],
-                    'serial_number' => isset($item['serial_numbers']) ? implode(',', array_filter(array_map('trim', $item['serial_numbers']))) : null, // Simpan IMEI gabungan
+                    'serial_number' => !empty($itemSns) ? implode(',', $itemSns) : null, // Simpan IMEI gabungan
                     'sales_ids' => !empty($item['sales_ids']) ? json_encode($item['sales_ids']) : ($this->sales_id ? json_encode([$this->sales_id]) : null),
                 ]);
             }

@@ -377,18 +377,41 @@
                             }
                             $penjualanBersih = round($actualSubtotal);
 
-                            // Kalkulasi HPP (SN vs Non-SN HPP rata-rata)
+                            // Kalkulasi HPP (Prioritas: kolom total_hpp yang sudah di-snapshot di order_items)
                             $snList = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
-                            $itemHpp = 0;
                             $hasSn = !empty($snList);
                             $qty = (float)$item->qty;
+                            $hasBuyback = false;
 
-                            if ($hasSn) {
+                            if (isset($item->total_hpp) && (float)$item->total_hpp != 0) {
+                                $itemHpp = (float)$item->total_hpp;
+                                if ($hasSn) {
+                                    foreach ($snList as $sn) {
+                                        $orderBuId = $order?->business_unit_id;
+                                        $spModel = isset($sellPhoneMap) ? ($sellPhoneMap->get($sn . '_' . $orderBuId) ?? ($orderBuId == 2 ? $sellPhoneMap->get($sn) : null)) : null;
+                                        if ($spModel && (float)$spModel->appraised_value > 0) {
+                                            $hasBuyback = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            } elseif ($hasSn) {
+                                $itemHpp = 0;
                                 foreach ($snList as $sn) {
-                                    $snModel = $snDataMap->get($sn);
-                                    $snHpp = (float)($snModel?->hpp ?? 0);
+                                    $orderBuId = $order?->business_unit_id;
+                                    $spModel = isset($sellPhoneMap) ? ($sellPhoneMap->get($sn . '_' . $orderBuId) ?? ($orderBuId == 2 ? $sellPhoneMap->get($sn) : null)) : null;
+                                    if ($spModel && (float)$spModel->appraised_value > 0) {
+                                        $hasBuyback = true;
+                                        $snHpp = (float)$spModel->appraised_value;
+                                    } else {
+                                        $snModel = $snDataMap->get($sn);
+                                        $snHpp = (float)($snModel?->hpp ?? 0);
+                                    }
                                     if ($snHpp <= 0) {
                                         $snHpp = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                                        if ($snHpp <= 0) {
+                                            $snHpp = (float)($variant?->buy_price ?? $variant?->accurateData?->buy_price ?? 0);
+                                        }
                                     }
                                     $itemHpp += $snHpp;
                                 }
@@ -401,6 +424,9 @@
                                 }
                             } else {
                                 $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                                if ($baseCost <= 0) {
+                                    $baseCost = (float)($variant?->buy_price ?? $variant?->accurateData?->buy_price ?? 0);
+                                }
                                 $itemHpp = $baseCost * $qty;
                                 if ($isReturn && $itemHpp > 0) {
                                     $itemHpp = -$itemHpp;
@@ -500,8 +526,8 @@
                             {{-- HPP --}}
                             <td class="px-4 py-3 text-right align-top">
                                 <p class="font-bold {{ $itemHpp < 0 ? 'text-amber-700' : 'text-gray-700' }}">Rp {{ number_format($itemHpp, 0, ',', '.') }}</p>
-                                <span class="inline-block text-[9px] font-semibold px-1 py-0.2 rounded {{ $isReturn ? 'bg-rose-50 text-rose-600' : ($hasSn ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500') }}">
-                                    {{ $isReturn ? 'Retur Modal' : ($hasSn ? 'HPP SN' : 'HPP Avg') }}
+                                <span class="inline-block text-[9px] font-semibold px-1 py-0.2 rounded {{ $isReturn ? 'bg-rose-50 text-rose-600' : ($hasSn ? ($hasBuyback ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-600') : 'bg-gray-100 text-gray-500') }}">
+                                    {{ $isReturn ? 'Retur Modal' : ($hasSn ? ($hasBuyback ? 'HPP Buyback' : 'HPP SN') : 'HPP Avg') }}
                                 </span>
                             </td>
 

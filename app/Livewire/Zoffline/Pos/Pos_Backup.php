@@ -1518,7 +1518,19 @@ class Pos extends Component
                 $rawSns = $item['serial_numbers'] ?? [];
 
                 // 2. Bersihkan spasi berlebih dan buang array yang kosong
-                $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
+                $variant = null;
+                if (!empty($item['variant_type']) && !empty($item['variant_id'])) {
+                    $variant = $item['variant_type']::find($item['variant_id']);
+                }
+
+                $hppData = \App\Services\OrderHppResolverService::resolve(
+                    $variant,
+                    $cleanSns,
+                    $order->business_unit_id,
+                    $item['qty'],
+                    false
+                );
+
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
@@ -1526,6 +1538,8 @@ class Pos extends Component
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
+                    'unit_hpp' => $hppData['unit_hpp'],
+                    'total_hpp' => $hppData['total_hpp'],
                     'discount_amount' => (int) ($item['discount_amount'] ?? 0),
                     // 3. Simpan ke database. Jika ada 2 SN, jadinya: "SN001, SN002"
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
@@ -2011,6 +2025,19 @@ class Pos extends Component
                 $rawSns = $item['serial_numbers'] ?? (!empty(trim($item['serial_number'] ?? '')) ? [$item['serial_number']] : []);
                 $cleanSns = array_values(array_filter(array_map('trim', $rawSns)));
 
+                $variant = null;
+                if (!empty($item['variant_type']) && !empty($item['variant_id'])) {
+                    $variant = $item['variant_type']::find($item['variant_id']);
+                }
+
+                $hppData = \App\Services\OrderHppResolverService::resolve(
+                    $variant,
+                    $cleanSns,
+                    $order->business_unit_id,
+                    $item['qty'],
+                    false
+                );
+
                 \App\Models\OrderItem::create([
                     'order_id' => $order->id,
                     'product_variant_id' => $item['variant_id'],
@@ -2018,6 +2045,8 @@ class Pos extends Component
                     'qty' => $item['qty'],
                     'price_at_checkout' => $item['price'],
                     'subtotal' => $item['price'] * $item['qty'],
+                    'unit_hpp' => $hppData['unit_hpp'],
+                    'total_hpp' => $hppData['total_hpp'],
                     'discount_amount' => (int) ($item['discount_amount'] ?? 0),
                     'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
                 ]);

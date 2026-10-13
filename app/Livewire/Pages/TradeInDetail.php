@@ -80,13 +80,23 @@ class TradeInDetail extends Component
                 'shipping_address_snapshot' => ['address' => 'Tukar Tambah Unit', 'phone_number' => '0000', 'city' => '-', 'postal_code' => '0000'],
             ]);
 
+            $hppData = \App\Services\OrderHppResolverService::resolve(
+                $variant,
+                [],
+                $order->business_unit_id,
+                1,
+                false
+            );
+
             \App\Models\OrderItem::create([
                 'order_id' => $order->id,
                 'product_variant_id' => $variant->id,
                 'product_variant_type' => get_class($variant),
                 'qty' => 1,
                 'price_at_checkout' => $variant->price,
-                'subtotal' => $variant->price
+                'subtotal' => $variant->price,
+                'unit_hpp' => $hppData['unit_hpp'],
+                'total_hpp' => $hppData['total_hpp'],
             ]);
             
             // Deduct Stock immediately
