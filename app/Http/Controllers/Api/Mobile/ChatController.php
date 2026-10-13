@@ -14,6 +14,14 @@ use Illuminate\Support\Str;
 class ChatController extends Controller
 {
     /**
+     * Resolves authenticated user reliably for mobile API (Sanctum Bearer token) and web session.
+     */
+    protected function resolveUser(Request $request)
+    {
+        return $request->user('sanctum') ?? auth('sanctum')->user() ?? $request->user();
+    }
+
+    /**
      * Helper untuk memformat objek produk konsisten untuk mobile app dan kartu chat Shopee-style.
      */
     protected function formatProduct(?ProductAccurate $product): ?array
@@ -57,8 +65,8 @@ class ChatController extends Controller
      */
     public function initConversation(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $guestToken = $request->input('guest_token');
+        $user = $this->resolveUser($request);
+        $guestToken = $request->input('guest_token') ?: $request->header('X-Guest-Token');
         $guestName = $request->input('guest_name');
         $guestPhone = $request->input('guest_phone');
         $pushToken = $request->input('push_token');
@@ -73,14 +81,31 @@ class ChatController extends Controller
                 $user->update(['push_token' => $pushToken]);
             }
 
-            $conversation = Conversation::where('user_id', $user->id)
-                ->where('status', 'open')
-                ->latest()
-                ->first();
+            // Jika user sebelumnya memiliki sesi guest yang masih open, otomatis klaim percakapan tersebut
+            if ($guestToken) {
+                $guestConversation = Conversation::where('guest_token', $guestToken)
+                    ->whereNull('user_id')
+                    ->where('status', 'open')
+                    ->latest()
+                    ->first();
+
+                if ($guestConversation) {
+                    $guestConversation->update(['user_id' => $user->id]);
+                    $conversation = $guestConversation;
+                }
+            }
+
+            if (!$conversation) {
+                $conversation = Conversation::where('user_id', $user->id)
+                    ->where('status', 'open')
+                    ->latest()
+                    ->first();
+            }
 
             if (!$conversation) {
                 $conversation = Conversation::create([
                     'user_id' => $user->id,
+                    'guest_token' => $guestToken,
                     'business_unit_id' => $businessUnitId,
                     'product_accurate_id' => $productAccurateId,
                     'push_token' => $pushToken,
@@ -249,7 +274,7 @@ class ChatController extends Controller
             ], 422);
         }
 
-        $user = $request->user();
+        $user = $this->resolveUser($request);
         $senderType = 'guest';
 
         if ($user) {
@@ -362,7 +387,7 @@ class ChatController extends Controller
 
         $this->authorizeConversationAccess($request, $conversation);
 
-        $user = $request->user();
+        $user = $this->resolveUser($request);
         $targetSenderTypes = $user ? ['cs', 'system'] : ['cs', 'system'];
 
         $updatedCount = Message::where('conversation_id', $conversationId)
@@ -381,10 +406,10 @@ class ChatController extends Controller
      */
     protected function authorizeConversationAccess(Request $request, Conversation $conversation): void
     {
-        $user = $request->user();
+        $user = $this->resolveUser($request);
 
         if ($user) {
-            if ($user->id === $conversation->user_id) {
+            if ((int) $user->id === (int) $conversation->user_id) {
                 return;
             }
             if ($user->hasRole(['admin', 'superadmin', 'cs', 'manager', 'kasir_sju'])) {
@@ -393,7 +418,11 @@ class ChatController extends Controller
         }
 
         $guestToken = $request->header('X-Guest-Token') ?: $request->input('guest_token');
-        if ($guestToken && $conversation->guest_token === $guestToken) {
+        if ($guestToken && $conversation->guest_token && hash_equals((string) $conversation->guest_token, (string) $guestToken)) {
+            // Jika user login membuka sesi guest miliknya yang belum ber-user_id, klaim percakapan ini
+            if ($user && !$conversation->user_id) {
+                $conversation->update(['user_id' => $user->id]);
+            }
             return;
         }
 
@@ -448,7 +477,7 @@ class ChatController extends Controller
                 return response()->json(['message' => 'Percakapan tidak ditemukan.'], 404);
             }
 
-            $user = auth('sanctum')->user();
+            $user = $this->resolveUser($request);
             $isAuthorized = false;
 
             if ($user) {
@@ -457,10 +486,17 @@ class ChatController extends Controller
                     || $user->can('access-cs-chat')) {
                     $isAuthorized = true;
                 }
-            } else {
+            }
+
+            // Fallback: Cek jika guest_token cocok (misal sesi dimulai sebelum login)
+            if (!$isAuthorized) {
                 $guestToken = $request->header('X-Guest-Token') ?: $request->input('guest_token');
                 if ($guestToken && $conversation->guest_token && hash_equals((string) $conversation->guest_token, (string) $guestToken)) {
                     $isAuthorized = true;
+                    // Auto-claim jika user sudah login
+                    if ($user && !$conversation->user_id) {
+                        $conversation->update(['user_id' => $user->id]);
+                    }
                 }
             }
 
