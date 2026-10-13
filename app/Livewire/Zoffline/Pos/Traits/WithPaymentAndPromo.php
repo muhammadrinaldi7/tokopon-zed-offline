@@ -50,17 +50,19 @@ trait WithPaymentAndPromo
     }
 
     // ─── Loyalty Points ─────────────────────────────────────────
+    public $availableLoyaltyPoints = 0;
     public $useLoyaltyPoints = false;
     public $customLoyaltyPoints = null;
     public $loyaltyDiscountAmount = 0;
 
     public function updatedUseLoyaltyPoints()
     {
-        if ($this->useLoyaltyPoints && $this->availableLoyaltyPoints >= 50) {
+        $available = (int) ($this->availableLoyaltyPoints ?? 0);
+        if ($this->useLoyaltyPoints && $available >= 50) {
             $pointValue = (int) app(\App\Services\SettingService::class)->get('loyalty_point_value', 100);
             $grandTotalBeforeLoyalty = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0));
             $maxPointsNeeded = (int) floor($grandTotalBeforeLoyalty / max(1, $pointValue));
-            $pointsToUse = min($this->availableLoyaltyPoints, $maxPointsNeeded);
+            $pointsToUse = min($available, $maxPointsNeeded);
             $this->customLoyaltyPoints = $pointsToUse;
             $this->loyaltyDiscountAmount = $pointsToUse * $pointValue;
         } else {
@@ -76,7 +78,8 @@ trait WithPaymentAndPromo
         $pointValue = (int) app(\App\Services\SettingService::class)->get('loyalty_point_value', 100);
         $grandTotalBeforeLoyalty = max(0, $this->subtotal() - (int)$this->totalDiscount() - ($this->soPaidAmount ?? 0));
         $maxPointsNeeded = (int) floor($grandTotalBeforeLoyalty / max(1, $pointValue));
-        $maxAllowed = min($this->availableLoyaltyPoints, $maxPointsNeeded);
+        $available = (int) ($this->availableLoyaltyPoints ?? 0);
+        $maxAllowed = min($available, $maxPointsNeeded);
 
         $cleanedPoints = (int) preg_replace('/[^0-9]/', '', (string)$this->customLoyaltyPoints);
 
