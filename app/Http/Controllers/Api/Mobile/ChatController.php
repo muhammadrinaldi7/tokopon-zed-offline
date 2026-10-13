@@ -426,4 +426,59 @@ class ChatController extends Controller
             \Illuminate\Support\Facades\Log::warning("Gagal mengirim auto-greeting chat: " . $e->getMessage());
         }
     }
+
+    /**
+     * Autentikasi channel broadcasting Pusher / Reverb untuk Mobile Client (Sanctum & Guest).
+     */
+    public function broadcastAuth(Request $request)
+    {
+        $request->validate([
+            'channel_name' => 'required|string',
+            'socket_id' => 'required|string',
+        ]);
+
+        $channelName = (string) $request->input('channel_name');
+        $socketId = (string) $request->input('socket_id');
+
+        if (str_starts_with($channelName, 'private-conversation.')) {
+            $conversationId = (int) str_replace('private-conversation.', '', $channelName);
+            $conversation = Conversation::find($conversationId);
+
+            if (!$conversation) {
+                return response()->json(['message' => 'Percakapan tidak ditemukan.'], 404);
+            }
+
+            $user = auth('sanctum')->user();
+            $isAuthorized = false;
+
+            if ($user) {
+                if ((int) $user->id === (int) $conversation->user_id
+                    || $user->hasRole(['admin', 'superadmin', 'cs', 'manager', 'kasir_sju'])
+                    || $user->can('access-cs-chat')) {
+                    $isAuthorized = true;
+                }
+            } else {
+                $guestToken = $request->header('X-Guest-Token') ?: $request->input('guest_token');
+                if ($guestToken && $conversation->guest_token && hash_equals((string) $conversation->guest_token, (string) $guestToken)) {
+                    $isAuthorized = true;
+                }
+            }
+
+            if (!$isAuthorized) {
+                return response()->json(['message' => 'Akses ke channel percakapan ditolak.'], 403);
+            }
+
+            try {
+                $pusher = \Illuminate\Support\Facades\Broadcast::driver()->getPusher();
+                $authResponse = $pusher->authorizeChannel($channelName, $socketId);
+
+                return response($authResponse, 200, ['Content-Type' => 'application/json']);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("Broadcasting auth error: " . $e->getMessage());
+                return response()->json(['message' => 'Gagal membuat tanda tangan autentikasi channel.'], 500);
+            }
+        }
+
+        return response()->json(['message' => 'Channel tidak didukung.'], 403);
+    }
 }
