@@ -20,12 +20,20 @@ class Conversation extends Model
         'closing_notes',
         'closed_by_user_id',
         'closed_at',
+        'assigned_to_user_id',
+        'assigned_at',
     ];
 
     protected $casts = [
         'closing_amount' => 'decimal:2',
         'closed_at' => 'datetime',
+        'assigned_at' => 'datetime',
     ];
+
+    public function assignedTo()
+    {
+        return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
 
     public function closedBy()
     {

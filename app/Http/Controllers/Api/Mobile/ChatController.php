@@ -86,6 +86,7 @@ class ChatController extends Controller
                     'push_token' => $pushToken,
                     'status' => 'open',
                 ]);
+                $this->sendAutoGreeting($conversation);
             } else {
                 $updateData = [];
                 // Update konteks produk jika ada pertanyaan tentang produk baru
@@ -117,6 +118,7 @@ class ChatController extends Controller
                     'product_accurate_id' => $productAccurateId,
                     'status' => 'open',
                 ]);
+                $this->sendAutoGreeting($conversation);
             } else {
                 $updateData = [];
                 if ($guestName && $conversation->guest_name !== $guestName) $updateData['guest_name'] = $guestName;
@@ -321,7 +323,8 @@ class ChatController extends Controller
                 message: $message->message ?: 'Mengirim lampiran...',
                 time: now()->format('H:i'),
                 userId: $user?->id ?: 0,
-                conversationId: $conversation->id
+                conversationId: $conversation->id,
+                senderType: $senderType
             ))->toOthers();
         } catch (\Throwable $e) {
             // broadcast fallback silently
@@ -395,5 +398,32 @@ class ChatController extends Controller
         }
 
         abort(403, 'Akses ke percakapan ini ditolak.');
+    }
+
+    /**
+     * Kirim pesan sambutan otomatis (Auto-Greeting Bot) untuk sesi obrolan baru.
+     */
+    protected function sendAutoGreeting(Conversation $conversation): void
+    {
+        try {
+            if ($conversation->messages()->count() === 0) {
+                $settingService = app(\App\Services\SettingService::class);
+                $isEnabled = filter_var($settingService->get('ecommerce_chat_autogreeting_enabled', true), FILTER_VALIDATE_BOOLEAN);
+
+                if ($isEnabled) {
+                    $defaultGreeting = "Halo! Selamat datang di Tokopon Gadget 👋\nTim Customer Service kami telah menerima sesi obrolan Anda dan siap membantu. Silakan sampaikan pertanyaan Anda ya kak! (Jam operasional toko: 09.00 - 21.00 WITA)";
+                    $greetingText = (string) $settingService->get('ecommerce_chat_autogreeting_message', $defaultGreeting);
+
+                    Message::create([
+                        'conversation_id' => $conversation->id,
+                        'user_id' => null,
+                        'sender_type' => 'cs',
+                        'message' => $greetingText,
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Gagal mengirim auto-greeting chat: " . $e->getMessage());
+        }
     }
 }

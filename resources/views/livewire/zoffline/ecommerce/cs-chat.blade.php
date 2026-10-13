@@ -1,4 +1,4 @@
-<div class="p-4 sm:p-6 min-h-screen bg-neutral-100" wire:poll.5s="refreshData">
+<div class="p-4 sm:p-6 min-h-screen bg-neutral-100" wire:poll.25s="refreshData">
     {{-- Header Modul E-Commerce --}}
     @include('livewire.zoffline.ecommerce.partials.header', ['title' => 'Live Chat CS & Penjualan'])
 
@@ -23,6 +23,18 @@
                     <button wire:click="setFilterTab('all')"
                         class="px-2.5 py-1 rounded-lg transition-all {{ $filterTab === 'all' ? 'bg-neutral-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
                         Semua
+                    </button>
+                    <button wire:click="setFilterTab('my_chats')"
+                        class="px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 {{ $filterTab === 'my_chats' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}"
+                        title="Hanya obrolan yang ditangani oleh saya">
+                        <span>👤</span>
+                        <span>Chat Saya</span>
+                    </button>
+                    <button wire:click="setFilterTab('unassigned')"
+                        class="px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 {{ $filterTab === 'unassigned' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}"
+                        title="Obrolan terbuka yang belum di-handle CS">
+                        <span>⏳</span>
+                        <span>Belum Diambil</span>
                     </button>
                     <button wire:click="setFilterTab('open')"
                         class="px-2.5 py-1 rounded-lg transition-all {{ $filterTab === 'open' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200' }}">
@@ -73,7 +85,7 @@
 
                                 {{-- Badges Row --}}
                                 <div class="flex items-center justify-between mt-1.5 pt-0.5">
-                                    <div class="flex items-center gap-1">
+                                    <div class="flex items-center gap-1 flex-wrap">
                                         {{-- Closing Badge --}}
                                         @if($conv['closingStatus'] === 'deal')
                                             <span class="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
@@ -90,6 +102,18 @@
                                         @else
                                             <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-gray-100 text-gray-600">
                                                 Aktif
+                                            </span>
+                                        @endif
+
+                                        {{-- CS Assignment Badge --}}
+                                        @if($conv['assignedToName'])
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] font-medium {{ $conv['isAssignedToMe'] ? 'bg-indigo-100 text-indigo-700 font-bold border border-indigo-200' : 'bg-gray-100 text-gray-600 border border-gray-200' }}"
+                                                title="Ditangani oleh {{ $conv['assignedToName'] }}">
+                                                👤 {{ $conv['isAssignedToMe'] ? 'Saya' : Str::limit($conv['assignedToName'], 10) }}
+                                            </span>
+                                        @else
+                                            <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Belum ada CS yang mengambil">
+                                                ⏳ Bebas
                                             </span>
                                         @endif
 
@@ -140,17 +164,43 @@
                                     </span>
                                 @endif
                             </div>
-                            <div class="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                            <div class="flex items-center gap-2 text-xs text-gray-400 mt-0.5 flex-wrap">
                                 <span>Toko: <strong class="text-gray-600">{{ $activeConv->businessUnit?->name ?? 'Toko Retail' }}</strong></span>
                                 @if($activeConv->closing_status && $activeConv->closing_status !== 'none')
-                                    <span>• Status Closing: <strong class="text-indigo-600 uppercase">{{ $activeConv->closing_status }}</strong></span>
+                                    <span>• Status: <strong class="text-indigo-600 uppercase">{{ $activeConv->closing_status }}</strong></span>
+                                @endif
+                                @if($activeConv->assignedTo)
+                                    <span>• CS: <strong class="{{ $activeConv->assigned_to_user_id === auth()->id() ? 'text-indigo-600 font-bold' : 'text-gray-700' }}">{{ $activeConv->assigned_to_user_id === auth()->id() ? 'Anda Sendiri' : $activeConv->assignedTo->name }}</strong></span>
+                                @else
+                                    <span class="text-amber-600 font-medium bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">• Belum Diambil CS</span>
                                 @endif
                             </div>
                         </div>
                     </div>
 
-                    {{-- Action Button: Tag Closing & WhatsApp --}}
+                    {{-- Action Button: Claim/Release, WhatsApp & Tag Closing --}}
                     <div class="flex items-center gap-2">
+                        {{-- Tombol CS Handle / Claim / Release --}}
+                        @if(!$activeConv->assigned_to_user_id)
+                            <button wire:click="claimConversation"
+                                class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5"
+                                title="Ambil dan tangani percakapan pelanggan ini">
+                                <span>🙋 Ambil Chat Ini</span>
+                            </button>
+                        @elseif($activeConv->assigned_to_user_id === auth()->id())
+                            <button wire:click="releaseConversation"
+                                class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                                title="Lepas ke antrean umum agar staf CS lain bisa mengambil alih">
+                                <span>Lepas Handle</span>
+                            </button>
+                        @else
+                            <button wire:click="claimConversation"
+                                class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1"
+                                title="Ambil alih dari {{ $activeConv->assignedTo?->name }}">
+                                <span>Ambil Alih</span>
+                            </button>
+                        @endif
+
                         @php
                             $waUrl = $this->getWhatsAppUrl($activeConv);
                         @endphp
@@ -162,7 +212,7 @@
                                 <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
                                     <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.861.174.086.275.072.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086.159.058 1.011.477 1.184.564.173.087.289.13.332.203.043.072.043.419-.101.824z"/>
                                 </svg>
-                                <span>Chat via WhatsApp</span>
+                                <span>WhatsApp</span>
                             </a>
                         @endif
 
@@ -171,7 +221,7 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
-                            <span>Tandai Closing (Deal)</span>
+                            <span>Closing (Deal)</span>
                         </button>
                     </div>
                 </div>
@@ -408,4 +458,105 @@
             </div>
         </div>
     @endif
+
+    {{-- AUDIO SYNTHESIZER & REALTIME REVERB ECHO INTEGRATION --}}
+    @script
+    <script>
+        // Synthesize notification chime using Web Audio API (smooth 2-tone melodic chime)
+        function playNotificationChime() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+                const now = ctx.currentTime;
+
+                // First chime note: 587.33 Hz (D5)
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(587.33, now);
+                gain1.gain.setValueAtTime(0.18, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.35);
+
+                // Second chime note: 880 Hz (A5)
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(880, now + 0.12);
+                gain2.gain.setValueAtTime(0.22, now + 0.12);
+                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start(now + 0.12);
+                osc2.stop(now + 0.6);
+            } catch (err) {
+                console.warn('Notification chime skipped:', err);
+            }
+        }
+
+        function scrollMessagesBottom() {
+            const container = document.getElementById('chat-messages-container');
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        // Setup Laravel Reverb Echo Listeners
+        if (window.Echo) {
+            // Channel 1: Global CS Chats channel for new incoming messages & sidebar updates
+            window.Echo.private('cs-chats')
+                .listen('.message.sent', (e) => {
+                    if (e.senderType !== 'cs') {
+                        playNotificationChime();
+                    }
+                    $wire.refreshData();
+                });
+
+            // Channel 2: Active Conversation specific channel
+            let activeSubscribedId = null;
+
+            function subscribeToActiveConv(convId) {
+                if (activeSubscribedId && activeSubscribedId !== convId) {
+                    window.Echo.leave(`conversation.${activeSubscribedId}`);
+                    activeSubscribedId = null;
+                }
+
+                if (convId && activeSubscribedId !== convId) {
+                    activeSubscribedId = convId;
+                    window.Echo.private(`conversation.${convId}`)
+                        .listen('.message.sent', (e) => {
+                            $wire.refreshData().then(() => {
+                                setTimeout(scrollMessagesBottom, 60);
+                            });
+                        });
+                }
+            }
+
+            // Initial subscription
+            const initConvId = @js($activeConversationId);
+            if (initConvId) {
+                subscribeToActiveConv(initConvId);
+            }
+
+            // Watch for changes in active conversation
+            $wire.$watch('activeConversationId', (newId) => {
+                subscribeToActiveConv(newId);
+                setTimeout(scrollMessagesBottom, 120);
+            });
+        }
+
+        // Auto-scroll when messages loaded or view mounted
+        setTimeout(scrollMessagesBottom, 150);
+        $wire.on('cs-messages-loaded', () => {
+            setTimeout(scrollMessagesBottom, 50);
+        });
+    </script>
+    @endscript
 </div>

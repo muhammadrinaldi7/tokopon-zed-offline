@@ -74,10 +74,14 @@ class CsChat extends Component
 
     public function loadConversations()
     {
-        $query = Conversation::with(['user', 'latestMessage.user', 'productAccurate', 'closedBy', 'businessUnit'])
+        $query = Conversation::with(['user', 'latestMessage.user', 'productAccurate', 'closedBy', 'businessUnit', 'assignedTo'])
             ->orderByDesc('updated_at');
 
-        if ($this->filterTab === 'open') {
+        if ($this->filterTab === 'my_chats') {
+            $query->where('assigned_to_user_id', Auth::id());
+        } elseif ($this->filterTab === 'unassigned') {
+            $query->whereNull('assigned_to_user_id')->where('status', 'open');
+        } elseif ($this->filterTab === 'open') {
             $query->where('status', 'open')->where('closing_status', 'none');
         } elseif ($this->filterTab === 'deal') {
             $query->where('closing_status', 'deal');
@@ -124,6 +128,9 @@ class CsChat extends Component
                 'businessUnitName' => $conv->businessUnit?->name,
                 'isGuest' => is_null($conv->user_id),
                 'guestPhone' => $phone,
+                'assignedToName' => $conv->assignedTo?->name,
+                'assignedToId' => $conv->assigned_to_user_id,
+                'isAssignedToMe' => $conv->assigned_to_user_id === Auth::id(),
                 'productName' => $conv->productAccurate?->name,
                 'productPrice' => $conv->productAccurate ? 'Rp ' . number_format($conv->productAccurate->base_price, 0, ',', '.') : null,
                 'lastMessage' => $conv->latestMessage?->message ?? 'Belum ada pesan',
@@ -414,7 +421,8 @@ class CsChat extends Component
                 message: $sentText ?: 'Mengirim lampiran...',
                 time: now()->format('H:i'),
                 userId: $user->id,
-                conversationId: $this->activeConversationId
+                conversationId: $this->activeConversationId,
+                senderType: 'cs'
             ))->toOthers();
         } catch (\Throwable $e) {
             // broadcast fallback silently
@@ -472,9 +480,44 @@ class CsChat extends Component
         }
     }
 
+    public function claimConversation(?int $id = null)
+    {
+        $convId = $id ?: $this->activeConversationId;
+        if (!$convId) return;
+
+        $conv = Conversation::find($convId);
+        if (!$conv) return;
+
+        $user = Auth::user();
+        $conv->update([
+            'assigned_to_user_id' => $user->id,
+            'assigned_at' => now(),
+        ]);
+
+        $this->loadConversations();
+        $this->dispatch('toast', title: 'Berhasil', message: "Obrolan berhasil di-handle oleh {$user->name}.", type: 'success');
+    }
+
+    public function releaseConversation(?int $id = null)
+    {
+        $convId = $id ?: $this->activeConversationId;
+        if (!$convId) return;
+
+        $conv = Conversation::find($convId);
+        if (!$conv) return;
+
+        $conv->update([
+            'assigned_to_user_id' => null,
+            'assigned_at' => null,
+        ]);
+
+        $this->loadConversations();
+        $this->dispatch('toast', title: 'Info', message: 'Penugasan obrolan dilepas ke antrean umum.', type: 'info');
+    }
+
     public function render()
     {
-        $activeConv = $this->activeConversationId ? Conversation::with(['user', 'productAccurate', 'closedBy'])->find($this->activeConversationId) : null;
+        $activeConv = $this->activeConversationId ? Conversation::with(['user', 'productAccurate', 'closedBy', 'assignedTo'])->find($this->activeConversationId) : null;
 
         return view('livewire.zoffline.ecommerce.cs-chat', [
             'activeConv' => $activeConv,
