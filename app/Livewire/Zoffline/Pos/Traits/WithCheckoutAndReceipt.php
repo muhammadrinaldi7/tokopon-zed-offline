@@ -1428,7 +1428,7 @@ trait WithCheckoutAndReceipt
         $printer->text($separator);
 
         // Loyalty Rewards Section
-        if ($this->completedOrder->loyalty_points_earned > 0 || $this->completedOrder->loyalty_points_redeemed > 0) {
+        if (false && ($this->completedOrder->loyalty_points_earned > 0 || $this->completedOrder->loyalty_points_redeemed > 0)) {
             $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
             $printer->text("* TOKOPON REWARDS *\n");
             $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_LEFT);

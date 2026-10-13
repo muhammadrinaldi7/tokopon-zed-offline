@@ -64,6 +64,8 @@ new class extends Component {
             Dashboard
         </a>
 
+        {{-- Chat CS (Disembunyikan sementara) --}}
+        @if(false)
         @role('cs')
             <a href="/admin/cs-chat" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.cs-chat') ? $activeClass : $inactiveClass }}">
@@ -81,6 +83,7 @@ new class extends Component {
                 @endif
             </a>
         @endrole
+        @endif
 
 
         <a href="#"

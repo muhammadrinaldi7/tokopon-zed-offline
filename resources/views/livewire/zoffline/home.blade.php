@@ -710,8 +710,8 @@
             </div>
         @endcan
 
-        {{-- Card: E-Commerce & CS Live --}}
-        @if(auth()->user()->can('access-cs-chat') || auth()->user()->hasAnyRole(['admin', 'superadmin', 'cs']))
+        {{-- Card: E-Commerce & CS Live (Disembunyikan dari Tampilan Dashboard POS) --}}
+        @if(false && (auth()->user()->can('access-cs-chat') || auth()->user()->hasAnyRole(['admin', 'superadmin', 'cs'])))
             <div x-data="{ openEcommerceModal: false }" class="md:nth-[3n+1]:col-span-2 w-full">
                 <div @click="openEcommerceModal = true"
                     class="w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">

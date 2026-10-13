@@ -331,7 +331,7 @@
                    @if ($completedOrder->accurate_invoice_no)
                        <p class="text-[10px] text-gray-400">Inv: {{ $completedOrder->accurate_invoice_no }}</p>
                    @endif
-                   @if ($completedOrder->loyalty_points_earned > 0 || $completedOrder->loyalty_points_redeemed > 0)
+                   @if (false && ($completedOrder->loyalty_points_earned > 0 || $completedOrder->loyalty_points_redeemed > 0))
                        <div class="border-t border-dashed border-gray-300 my-2"></div>
                        <div class="bg-amber-50/80 p-2 rounded-lg border border-amber-200 my-1 space-y-0.5 text-[10px]">
                            <p class="font-bold text-amber-900 text-center text-[11px] mb-1">★ TOKOPON REWARDS ★</p>
