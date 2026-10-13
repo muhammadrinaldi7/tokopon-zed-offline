@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Spatie\Permission\Models\Role;
 
@@ -143,7 +144,7 @@ class AuthController extends Controller
                         $loyaltyService = app(\App\Services\LoyaltyService::class);
                         $loyaltyService->getOrCreateAccount($cleanPhone, $user->id, $user->name);
                     } catch (\Throwable $e) {
-                        \Log::warning('Gagal membuat loyalty account saat registrasi: ' . $e->getMessage());
+                        Log::warning('Gagal membuat loyalty account saat registrasi: ' . $e->getMessage());
                     }
                 }
 
@@ -226,7 +227,7 @@ class AuthController extends Controller
                     $loyaltyAccount->save();
                 }
             } catch (\Throwable $e) {
-                \Log::warning('Gagal sinkronisasi loyalty saat update profil: ' . $e->getMessage());
+                Log::warning('Gagal sinkronisasi loyalty saat update profil: ' . $e->getMessage());
             }
         }
 
