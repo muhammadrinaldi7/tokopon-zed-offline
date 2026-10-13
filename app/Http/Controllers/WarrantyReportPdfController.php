@@ -13,6 +13,7 @@ class WarrantyReportPdfController extends Controller
         $component->startDate = $request->query('startDate', now()->startOfMonth()->format('Y-m-d'));
         $component->endDate = $request->query('endDate', now()->endOfMonth()->format('Y-m-d'));
         $component->search = $request->query('search', '');
+        $component->businessUnitFilter = $request->query('businessUnitFilter', '');
         $component->branchId = $request->query('branchId', '');
         $component->activationStatus = $request->query('activationStatus', 'activated');
         

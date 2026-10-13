@@ -3,6 +3,7 @@
 namespace App\Livewire\Zoffline\Reporting;
 
 use App\Models\Branch;
+use App\Models\BusinessUnit;
 use App\Models\Warranty;
 use Carbon\Carbon;
 use Livewire\Attributes\Layout;
@@ -21,6 +22,7 @@ class WarrantyReport extends Component
     public $startDate;
     public $endDate;
     public $search = '';
+    public $businessUnitFilter = '';
     public $branchId;
     public $csvSeparator = ';';
     public $activationStatus = 'activated';
@@ -28,6 +30,12 @@ class WarrantyReport extends Component
     public function mount()
     {
         $this->setDateRange();
+    }
+
+    public function updatedBusinessUnitFilter()
+    {
+        $this->branchId = '';
+        $this->resetPage();
     }
 
     public function updatedBranchId()
@@ -93,9 +101,22 @@ class WarrantyReport extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        return \App\Models\OrderItemSerialNumber::with(['orderItem.order.salesBy', 'orderItem.order.user', 'orderItem.order.branch', 'orderItem.variant', 'warranty.policy', 'warranty.deviceInspection.inspector'])
+        return \App\Models\OrderItemSerialNumber::with([
+            'orderItem.order.salesBy',
+            'orderItem.order.user',
+            'orderItem.order.branch',
+            'orderItem.order.businessUnit',
+            'orderItem.variant',
+            'warranty.policy',
+            'warranty.deviceInspection.inspector'
+        ])
             ->whereHas('orderItem.order', function ($q) use ($start, $end) {
                 $q->whereBetween('created_at', [$start, $end]);
+            })
+            ->when($this->businessUnitFilter && $this->businessUnitFilter !== 'all', function ($query) {
+                $query->whereHas('orderItem.order', function ($q) {
+                    $q->where('business_unit_id', $this->businessUnitFilter);
+                });
             })
             ->when($this->activationStatus === 'activated', function($q) {
                 $q->whereHas('warranty');
@@ -136,6 +157,7 @@ class WarrantyReport extends Component
             $productName = $w->orderItem->variant->name ?? '-';
             
             $orderNumber = $w->orderItem->order->order_number ?? '-';
+            $businessUnit = $w->orderItem->order->businessUnit->name ?? '-';
             $branch = $w->orderItem->order->branch->name ?? '-';
             $customerName = $w->orderItem->order->user->name ?? '-';
             $policyName = $w->warranty->policy->name ?? '-';
@@ -143,12 +165,18 @@ class WarrantyReport extends Component
             $promotor = $w->orderItem->order->salesBy->name ?? '-';
 
             $activatedAt = $w->warranty && $w->warranty->activated_at ? $w->warranty->activated_at->format('Y-m-d H:i:s') : '-';
-            $status = $w->warranty ? $w->warranty->status : 'BELUM AKTIVASI';
+            
+            $status = 'BELUM AKTIVASI';
+            if ($w->warranty) {
+                $rawStatus = strtoupper($w->warranty->status);
+                $status = $rawStatus === 'ACTIVE' ? 'AKTIF' : $rawStatus;
+            }
 
             $rows[] = [
                 'order_date' => $orderDate,
                 'activated_at' => $activatedAt,
                 'order_number' => $orderNumber,
+                'business_unit' => $businessUnit,
                 'branch' => $branch,
                 'serial_number' => $w->serial_number,
                 'category' => $category,
@@ -198,6 +226,7 @@ class WarrantyReport extends Component
                 'Tgl Transaksi',
                 'Tgl Aktivasi',
                 'No. Order',
+                'Unit Bisnis',
                 'Cabang',
                 'SN / Perangkat',
                 'Kategori',
@@ -216,6 +245,7 @@ class WarrantyReport extends Component
                     $row['order_date'],
                     $row['activated_at'],
                     $row['order_number'],
+                    $row['business_unit'],
                     $row['branch'],
                     $row['serial_number'],
                     $row['category'],
@@ -241,7 +271,13 @@ class WarrantyReport extends Component
     #[Layout('layouts.z')]
     public function render()
     {
-        $branches = Branch::where('business_unit_id', Auth::user()->business_unit_id)->get();
+        $businessUnits = BusinessUnit::orderBy('name')->get();
+
+        $branchQuery = Branch::query();
+        if ($this->businessUnitFilter && $this->businessUnitFilter !== 'all') {
+            $branchQuery->where('business_unit_id', $this->businessUnitFilter);
+        }
+        $branches = $branchQuery->orderBy('name')->get();
         
         // Clone the query builder so paginate() doesn't mutate the query for get()
         $baseQuery = clone $this->warrantiesQuery;
@@ -274,6 +310,7 @@ class WarrantyReport extends Component
             'totalActivations' => $totalActivations,
             'topInspectors' => $topInspectors,
             'topPromotors' => $topPromotors,
+            'businessUnits' => $businessUnits,
             'branches' => $branches,
         ]);
     }
