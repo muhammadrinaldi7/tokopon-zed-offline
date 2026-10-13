@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Models\BusinessUnit;
 use App\Models\ProductAccurate;
 use App\Models\Warehouse;
 use App\Models\WarehouseStock;
+use App\Services\SettingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -85,6 +87,9 @@ class ProductController extends Controller
                 $buQuery->where('is_active', true)->where('is_visible_mobile', true);
             });
         }
+
+        // Terapkan kurasi Kategori & Merek Aktif per Unit Usaha
+        $this->applyCurationFilters($query, $businessUnitId ? (int) $businessUnitId : null);
 
         // Filter Pencarian
         if (!empty($search)) {
@@ -206,6 +211,25 @@ class ProductController extends Controller
             ], 404);
         }
 
+        // Validasi kurasi kategori & merek aktif untuk Unit Usaha produk ini
+        if ($product->business_unit_id) {
+            $cats = $this->getActiveCategoriesForBu($product->business_unit_id);
+            if ($cats !== null && !in_array($product->categoryName, $cats)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Produk ini tidak tersedia untuk e-commerce.',
+                ], 404);
+            }
+
+            $brands = $this->getActiveBrandsForBu($product->business_unit_id);
+            if ($brands !== null && !in_array($product->brandName, $brands)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Produk ini tidak tersedia untuk e-commerce.',
+                ], 404);
+            }
+        }
+
         $totalOnlineStock = $product->warehouseStocks->sum('stock');
 
         // Kumpulkan semua foto produk
@@ -316,7 +340,10 @@ class ProductController extends Controller
             });
         }
 
-        $categories = $query->distinct()->pluck('categoryName')->values();
+        // Terapkan kurasi Kategori & Merek Aktif per Unit Usaha
+        $this->applyCurationFilters($query, $businessUnitId ? (int) $businessUnitId : null);
+
+        $categories = $query->distinct()->pluck('categoryName')->filter()->values();
 
         return response()->json([
             'success' => true,
@@ -360,7 +387,10 @@ class ProductController extends Controller
             });
         }
 
-        $brands = $query->distinct()->pluck('brandName')->values();
+        // Terapkan kurasi Kategori & Merek Aktif per Unit Usaha
+        $this->applyCurationFilters($query, $businessUnitId ? (int) $businessUnitId : null);
+
+        $brands = $query->distinct()->pluck('brandName')->filter()->values();
 
         return response()->json([
             'success' => true,
@@ -419,5 +449,88 @@ class ProductController extends Controller
             'message' => 'Daftar nomor seri (SN/IMEI) yang tersedia berhasil dimuat.',
             'data' => $serialNumbers,
         ]);
+    }
+
+    /**
+     * Dapatkan daftar kategori yang diizinkan untuk Unit Usaha tertentu.
+     * Mengembalikan null jika belum dikonfigurasi (akan menggunakan filter default).
+     */
+    protected function getActiveCategoriesForBu(int $buId): ?array
+    {
+        $settingService = app(SettingService::class);
+        $saved = $settingService->get("ecommerce_active_categories_{$buId}");
+        return is_array($saved) ? $saved : null;
+    }
+
+    /**
+     * Dapatkan daftar merek yang diizinkan untuk Unit Usaha tertentu.
+     * Mengembalikan null jika belum dikonfigurasi.
+     */
+    protected function getActiveBrandsForBu(int $buId): ?array
+    {
+        $settingService = app(SettingService::class);
+        $saved = $settingService->get("ecommerce_active_brands_{$buId}");
+        return is_array($saved) ? $saved : null;
+    }
+
+    /**
+     * Terapkan filter kurasi kategori & merek aktif ke query produk per Unit Usaha.
+     */
+    protected function applyCurationFilters($query, ?int $businessUnitId): void
+    {
+        if ($businessUnitId) {
+            $cats = $this->getActiveCategoriesForBu($businessUnitId);
+            if ($cats !== null) {
+                $query->whereIn('categoryName', $cats);
+            } else {
+                // Safety filter default: sembunyikan LDU atau DEMO jika belum dikurasi secara manual
+                $query->where(function ($q) {
+                    $q->whereNull('categoryName')
+                      ->orWhere(function ($sub) {
+                          $sub->where('categoryName', 'not like', '%LDU%')
+                              ->where('categoryName', 'not like', '%DEMO%');
+                      });
+                });
+            }
+
+            $brands = $this->getActiveBrandsForBu($businessUnitId);
+            if ($brands !== null) {
+                $query->whereIn('brandName', $brands);
+            }
+        } else {
+            // Berlaku per unit usaha masing-masing untuk mode multi-toko
+            $visibleBus = BusinessUnit::where('is_active', true)
+                ->where('is_visible_mobile', true)
+                ->get();
+
+            if ($visibleBus->isNotEmpty()) {
+                $query->where(function ($rootQ) use ($visibleBus) {
+                    foreach ($visibleBus as $bu) {
+                        $cats = $this->getActiveCategoriesForBu($bu->id);
+                        $brands = $this->getActiveBrandsForBu($bu->id);
+
+                        $rootQ->orWhere(function ($buQ) use ($bu, $cats, $brands) {
+                            $buQ->where('business_unit_id', $bu->id);
+
+                            if ($cats !== null) {
+                                $buQ->whereIn('categoryName', $cats);
+                            } else {
+                                $buQ->where(function ($q) {
+                                    $q->whereNull('categoryName')
+                                      ->orWhere(function ($sub) {
+                                          $sub->where('categoryName', 'not like', '%LDU%')
+                                              ->where('categoryName', 'not like', '%DEMO%');
+                                      });
+                                });
+                            }
+
+                            if ($brands !== null) {
+                                $buQ->whereIn('brandName', $brands);
+                            }
+                        });
+                    }
+                });
+            }
+        }
     }
 }

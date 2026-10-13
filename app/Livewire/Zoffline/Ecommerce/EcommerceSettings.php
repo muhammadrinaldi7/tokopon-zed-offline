@@ -5,6 +5,7 @@ namespace App\Livewire\Zoffline\Ecommerce;
 use App\Models\BusinessUnit;
 use App\Models\Employe;
 use App\Models\PaymentMethod;
+use App\Models\ProductAccurate;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\SettingService;
@@ -26,6 +27,15 @@ class EcommerceSettings extends Component
     public string $defaultBranchName = 'Banjarbaru';
     public ?int $defaultSalesId = null;
     public ?int $defaultHandledById = null;
+
+    // Category & Brand Curation per Business Unit
+    public array $buCategories = [];
+    public array $activeCategories = [];
+    public array $categoryCounts = [];
+
+    public array $buBrands = [];
+    public array $activeBrands = [];
+    public array $brandCounts = [];
 
     public function mount(SettingService $settingService): void
     {
@@ -61,6 +71,12 @@ class EcommerceSettings extends Component
             $this->defaultBranchName = 'Banjarbaru';
             $this->defaultSalesId = null;
             $this->defaultHandledById = null;
+            $this->buCategories = [];
+            $this->activeCategories = [];
+            $this->categoryCounts = [];
+            $this->buBrands = [];
+            $this->activeBrands = [];
+            $this->brandCounts = [];
             return;
         }
 
@@ -88,6 +104,110 @@ class EcommerceSettings extends Component
             $settingService->get('ecommerce_default_handled_by_id')
         );
         $this->defaultHandledById = !empty($rawHandledById) ? (int) $rawHandledById : null;
+
+        // 5. Kurasi Kategori Produk BU ini
+        $this->buCategories = ProductAccurate::where('business_unit_id', $buId)
+            ->whereNotNull('categoryName')
+            ->where('categoryName', '!=', '')
+            ->distinct()
+            ->orderBy('categoryName')
+            ->pluck('categoryName')
+            ->toArray();
+
+        $this->categoryCounts = ProductAccurate::where('business_unit_id', $buId)
+            ->whereNotNull('categoryName')
+            ->where('categoryName', '!=', '')
+            ->selectRaw('categoryName, count(*) as count')
+            ->groupBy('categoryName')
+            ->pluck('count', 'categoryName')
+            ->toArray();
+
+        $savedCats = $settingService->get("ecommerce_active_categories_{$buId}");
+        if ($savedCats === null) {
+            // Default aktifkan semua KECUALI yang mengandung kata LDU atau DEMO
+            $this->activeCategories = array_values(array_filter($this->buCategories, function ($cat) {
+                $upper = strtoupper($cat);
+                return !str_contains($upper, 'LDU') && !str_contains($upper, 'DEMO');
+            }));
+        } else {
+            $this->activeCategories = is_array($savedCats) ? $savedCats : [];
+        }
+
+        // 6. Kurasi Merek/Brand Produk BU ini
+        $this->buBrands = ProductAccurate::where('business_unit_id', $buId)
+            ->whereNotNull('brandName')
+            ->where('brandName', '!=', '')
+            ->distinct()
+            ->orderBy('brandName')
+            ->pluck('brandName')
+            ->toArray();
+
+        $this->brandCounts = ProductAccurate::where('business_unit_id', $buId)
+            ->whereNotNull('brandName')
+            ->where('brandName', '!=', '')
+            ->selectRaw('brandName, count(*) as count')
+            ->groupBy('brandName')
+            ->pluck('count', 'brandName')
+            ->toArray();
+
+        $savedBrands = $settingService->get("ecommerce_active_brands_{$buId}");
+        if ($savedBrands === null) {
+            $this->activeBrands = $this->buBrands;
+        } else {
+            $this->activeBrands = is_array($savedBrands) ? $savedBrands : [];
+        }
+    }
+
+    public function toggleCategory(string $category): void
+    {
+        if (in_array($category, $this->activeCategories)) {
+            $this->activeCategories = array_values(array_diff($this->activeCategories, [$category]));
+        } else {
+            $this->activeCategories[] = $category;
+        }
+        $this->saveActiveCategories();
+    }
+
+    public function toggleAllCategories(bool $enable): void
+    {
+        $this->activeCategories = $enable ? $this->buCategories : [];
+        $this->saveActiveCategories();
+    }
+
+    public function saveActiveCategories(): void
+    {
+        if (!$this->selectedBusinessUnitId) return;
+        $settingService = app(SettingService::class);
+        $settingService->set("ecommerce_active_categories_{$this->selectedBusinessUnitId}", $this->activeCategories, 'json');
+        
+        $buName = BusinessUnit::find($this->selectedBusinessUnitId)?->name ?? 'Unit Usaha';
+        $this->dispatch('toast', title: 'Tersimpan', message: "Daftar kategori aktif untuk {$buName} berhasil diperbarui (" . count($this->activeCategories) . " aktif).", type: 'success');
+    }
+
+    public function toggleBrand(string $brand): void
+    {
+        if (in_array($brand, $this->activeBrands)) {
+            $this->activeBrands = array_values(array_diff($this->activeBrands, [$brand]));
+        } else {
+            $this->activeBrands[] = $brand;
+        }
+        $this->saveActiveBrands();
+    }
+
+    public function toggleAllBrands(bool $enable): void
+    {
+        $this->activeBrands = $enable ? $this->buBrands : [];
+        $this->saveActiveBrands();
+    }
+
+    public function saveActiveBrands(): void
+    {
+        if (!$this->selectedBusinessUnitId) return;
+        $settingService = app(SettingService::class);
+        $settingService->set("ecommerce_active_brands_{$this->selectedBusinessUnitId}", $this->activeBrands, 'json');
+
+        $buName = BusinessUnit::find($this->selectedBusinessUnitId)?->name ?? 'Unit Usaha';
+        $this->dispatch('toast', title: 'Tersimpan', message: "Daftar merek aktif untuk {$buName} berhasil diperbarui (" . count($this->activeBrands) . " aktif).", type: 'success');
     }
 
     public function toggleDynamicShipping(SettingService $settingService): void

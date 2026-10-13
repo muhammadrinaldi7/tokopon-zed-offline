@@ -697,6 +697,157 @@
 
             </div>
 
+            {{-- ========================================================== --}}
+            {{-- KURASI KATALOG: KATEGORI & MEREK AKTIF UNTUK BU INI        --}}
+            {{-- ========================================================== --}}
+            <div class="mt-8 pt-8 border-t border-gray-100 space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-black uppercase tracking-wider mb-1.5">
+                            <span>🏷️</span> Filter Katalog Mobile: {{ $currentBU?->name }}
+                        </div>
+                        <h4 class="text-lg font-black text-gray-900 tracking-tight">
+                            Kurasi Kategori & Merek yang Tayang di Mobile App
+                        </h4>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            Hanya kategori dan merek yang dicentang aktif yang akan tampil di katalog e-commerce mobile. Produk non-jual seperti <strong>LDU (Live Demo Unit)</strong>, <strong>Sparepart</strong>, atau unit internal dapat disembunyikan dengan mudah per Unit Usaha.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                    {{-- 1. Card Kategori Aktif --}}
+                    <div class="bg-neutral-50 rounded-2xl p-5 border border-gray-200/80 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between pb-3 border-b border-gray-200/60 mb-4">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-black text-sm">
+                                        📁
+                                    </div>
+                                    <div>
+                                        <h5 class="text-xs font-black text-gray-900 uppercase tracking-wide">Kategori Produk</h5>
+                                        <div class="text-[11px] text-gray-500">
+                                            <span class="font-bold text-amber-600">{{ count($activeCategories) }}</span> dari {{ count($buCategories) }} aktif
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2 text-xs">
+                                    <button type="button" wire:click="toggleAllCategories(true)"
+                                        class="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 font-bold text-[11px] transition">
+                                        Pilih Semua
+                                    </button>
+                                    <button type="button" wire:click="toggleAllCategories(false)"
+                                        class="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-500 hover:bg-gray-100 font-medium text-[11px] transition">
+                                        Kosongkan
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                @forelse($buCategories as $cat)
+                                    @php
+                                        $isActive = in_array($cat, $activeCategories);
+                                        $count = $categoryCounts[$cat] ?? 0;
+                                        $isSuspicious = str_contains(strtoupper($cat), 'LDU') || str_contains(strtoupper($cat), 'DEMO');
+                                    @endphp
+                                    <label class="flex items-center justify-between p-3 rounded-xl border transition cursor-pointer {{ $isActive ? 'bg-white border-amber-300 shadow-2xs' : 'bg-gray-100/70 border-gray-200 opacity-60 hover:opacity-100' }}">
+                                        <div class="flex items-center gap-3">
+                                            <input type="checkbox" wire:click="toggleCategory('{{ addslashes($cat) }}')" {{ $isActive ? 'checked' : '' }}
+                                                class="rounded border-gray-300 text-amber-600 focus:ring-amber-500 h-4 w-4">
+                                            <div>
+                                                <div class="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                                                    <span>{{ $cat }}</span>
+                                                    @if($isSuspicious)
+                                                        <span class="px-1.5 py-0.2 rounded text-[10px] bg-red-100 text-red-700 font-black">Demo/LDU</span>
+                                                    @endif
+                                                </div>
+                                                <div class="text-[11px] text-gray-400 mt-0.5">{{ $count }} produk di sistem</div>
+                                            </div>
+                                        </div>
+
+                                        <span class="text-[11px] font-black uppercase px-2 py-0.5 rounded-full {{ $isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500' }}">
+                                            {{ $isActive ? 'Tayang' : 'Disembunyikan' }}
+                                        </span>
+                                    </label>
+                                @empty
+                                    <div class="text-center py-8 text-xs text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+                                        Belum ada data kategori produk untuk {{ $currentBU?->name }}.
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        <div class="mt-4 pt-3 border-t border-gray-200/60 text-[11px] text-gray-400">
+                            💡 Kategori yang dinonaktifkan tidak akan muncul di filter dan produknya tidak dapat dicari di aplikasi mobile.
+                        </div>
+                    </div>
+
+                    {{-- 2. Card Merek / Brand Aktif --}}
+                    <div class="bg-neutral-50 rounded-2xl p-5 border border-gray-200/80 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between pb-3 border-b border-gray-200/60 mb-4">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-sm">
+                                        🏷️
+                                    </div>
+                                    <div>
+                                        <h5 class="text-xs font-black text-gray-900 uppercase tracking-wide">Merek / Brand</h5>
+                                        <div class="text-[11px] text-gray-500">
+                                            <span class="font-bold text-indigo-600">{{ count($activeBrands) }}</span> dari {{ count($buBrands) }} aktif
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2 text-xs">
+                                    <button type="button" wire:click="toggleAllBrands(true)"
+                                        class="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 font-bold text-[11px] transition">
+                                        Pilih Semua
+                                    </button>
+                                    <button type="button" wire:click="toggleAllBrands(false)"
+                                        class="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-500 hover:bg-gray-100 font-medium text-[11px] transition">
+                                        Kosongkan
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                @forelse($buBrands as $brand)
+                                    @php
+                                        $isActive = in_array($brand, $activeBrands);
+                                        $count = $brandCounts[$brand] ?? 0;
+                                    @endphp
+                                    <label class="flex items-center justify-between p-3 rounded-xl border transition cursor-pointer {{ $isActive ? 'bg-white border-indigo-300 shadow-2xs' : 'bg-gray-100/70 border-gray-200 opacity-60 hover:opacity-100' }}">
+                                        <div class="flex items-center gap-3">
+                                            <input type="checkbox" wire:click="toggleBrand('{{ addslashes($brand) }}')" {{ $isActive ? 'checked' : '' }}
+                                                class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
+                                            <div>
+                                                <div class="text-xs font-bold text-gray-800">{{ $brand }}</div>
+                                                <div class="text-[11px] text-gray-400 mt-0.5">{{ $count }} produk di sistem</div>
+                                            </div>
+                                        </div>
+
+                                        <span class="text-[11px] font-black uppercase px-2 py-0.5 rounded-full {{ $isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500' }}">
+                                            {{ $isActive ? 'Tayang' : 'Disembunyikan' }}
+                                        </span>
+                                    </label>
+                                @empty
+                                    <div class="text-center py-8 text-xs text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+                                        Belum ada data merek produk untuk {{ $currentBU?->name }}.
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        <div class="mt-4 pt-3 border-t border-gray-200/60 text-[11px] text-gray-400">
+                            💡 Pengaturan ini tersimpan otomatis secara independen untuk unit usaha <strong>{{ $currentBU?->name }}</strong>.
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
         </div>
 
     </div>
