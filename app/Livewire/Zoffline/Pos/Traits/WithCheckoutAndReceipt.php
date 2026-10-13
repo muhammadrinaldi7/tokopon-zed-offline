@@ -285,7 +285,8 @@ trait WithCheckoutAndReceipt
             $subtotal = $this->subtotal();
             $manualDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1));
             $promoDiscountAmount = collect($this->cart)->sum(fn($item) => (int)($item['promo_discount'] ?? 0));
-            $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount;
+            $loyaltyDiscount = ($this->useLoyaltyPoints && $this->loyaltyDiscountAmount > 0) ? (float)$this->loyaltyDiscountAmount : 0;
+            $totalDiscountAmount = $manualDiscountAmount + $promoDiscountAmount + $loyaltyDiscount;
 
             $mdrAmt = $this->mdrAmount();
             $grandTotal = max(0, $subtotal - $totalDiscountAmount);
@@ -519,6 +520,8 @@ trait WithCheckoutAndReceipt
                     'shipping_address_snapshot' => ['type' => 'POS', 'store' => Auth::user()->branch->name ?? 'Toko'],
                     'notes' => $this->notes,
                     'branch_id' => Auth::user()->branch_id,
+                    'loyalty_points_redeemed' => ($this->useLoyaltyPoints && $this->customLoyaltyPoints > 0) ? (int)$this->customLoyaltyPoints : 0,
+                    'loyalty_discount_amount' => ($this->useLoyaltyPoints && $this->loyaltyDiscountAmount > 0) ? (float)$this->loyaltyDiscountAmount : 0,
                 ]);
             }
 
@@ -528,8 +531,23 @@ trait WithCheckoutAndReceipt
                 $service->recordPromosToOrder($order, $this->cart, $this->selectedPromos);
             }
 
-
             $this->createOrderItemsFromCart($order);
+
+            // Eksekusi penukaran poin loyalty jika dipilih kasir
+            if ($this->useLoyaltyPoints && $this->customLoyaltyPoints > 0) {
+                try {
+                    app(\App\Services\LoyaltyService::class)->redeemPoints($order, (int)$this->customLoyaltyPoints, Auth::user());
+                } catch (\Exception $e) {
+                    Log::channel('pos_accurate')->warning('POS Loyalty Redeem Warning: ' . $e->getMessage());
+                }
+            }
+
+            // Otomatis catat perolehan poin belanja baru untuk pelanggan
+            try {
+                app(\App\Services\LoyaltyService::class)->earnPoints($order);
+            } catch (\Exception $e) {
+                Log::channel('pos_accurate')->warning('POS Loyalty Earn Warning: ' . $e->getMessage());
+            }
 
             // Create OrderPayments (for each split payment row)
             foreach ($this->payments as $payment) {
@@ -1055,6 +1073,14 @@ trait WithCheckoutAndReceipt
         $this->availableCustomerDeposits = [];
         $this->availableCustomerDepositTotal = 0;
         $this->customDepositAmount = null;
+
+        // Reset loyalty state
+        $this->useLoyaltyPoints = false;
+        $this->customLoyaltyPoints = null;
+        $this->loyaltyDiscountAmount = 0;
+        $this->availableLoyaltyPoints = 0;
+        $this->availableLoyaltyCashValue = 0;
+        $this->customerLoyaltyTier = 'BRONZE';
     }
 
     public function closeReceipt()
@@ -1097,6 +1123,14 @@ trait WithCheckoutAndReceipt
         $this->availableCustomerDeposits = [];
         $this->availableCustomerDepositTotal = 0;
         $this->customDepositAmount = null;
+
+        // Reset loyalty state
+        $this->useLoyaltyPoints = false;
+        $this->customLoyaltyPoints = null;
+        $this->loyaltyDiscountAmount = 0;
+        $this->availableLoyaltyPoints = 0;
+        $this->availableLoyaltyCashValue = 0;
+        $this->customerLoyaltyTier = 'BRONZE';
     }
 
     // ─── Kirim Struk via Email (SMTP) ─────────────────────────
@@ -1392,6 +1426,25 @@ trait WithCheckoutAndReceipt
             $printer->text($this->formatLine("No. SI", $this->completedOrder->accurate_invoice_no, $maxColumns) . "\n");
         }
         $printer->text($separator);
+
+        // Loyalty Rewards Section
+        if ($this->completedOrder->loyalty_points_earned > 0 || $this->completedOrder->loyalty_points_redeemed > 0) {
+            $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
+            $printer->text("* TOKOPON REWARDS *\n");
+            $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_LEFT);
+            if ($this->completedOrder->loyalty_points_redeemed > 0) {
+                $printer->text($this->formatLine("Poin Digunakan", number_format($this->completedOrder->loyalty_points_redeemed, 0, ',', '.') . " pts", $maxColumns) . "\n");
+            }
+            if ($this->completedOrder->loyalty_points_earned > 0) {
+                $printer->text($this->formatLine("Poin Didapat", "+" . number_format($this->completedOrder->loyalty_points_earned, 0, ',', '.') . " pts", $maxColumns) . "\n");
+            }
+            $loyaltyAcc = \App\Models\LoyaltyAccount::where('user_id', $this->completedOrder->user_id)->first();
+            if ($loyaltyAcc) {
+                $printer->text($this->formatLine("Sisa Saldo Poin", number_format($loyaltyAcc->points_balance, 0, ',', '.') . " pts", $maxColumns) . "\n");
+                $printer->text($this->formatLine("Tier Member", $loyaltyAcc->tier_level, $maxColumns) . "\n");
+            }
+            $printer->text($separator);
+        }
 
         // Footer (Center)
         $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);

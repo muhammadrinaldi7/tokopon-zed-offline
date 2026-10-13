@@ -45,18 +45,28 @@
                 placeholder="Cari No. Pesanan atau Nama Pembeli..."
                 class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-[#1c69d4]/20 focus:border-[#1c69d4]">
         </div>
-        <div class="w-full md:w-64 shrink-0">
+        <div class="w-full md:w-52 shrink-0">
+            <select wire:model.live="channelFilter"
+                class="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-[#1c69d4]/20 focus:border-[#1c69d4]">
+                <option value="">Semua Saluran</option>
+                <option value="POS">Hanya Kasir POS</option>
+                <option value="MOBILE_APP">Hanya Mobile App</option>
+            </select>
+        </div>
+        <div class="w-full md:w-56 shrink-0">
             <select wire:model.live="statusFilter"
                 class="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-[#1c69d4]/20 focus:border-[#1c69d4]">
                 <option value="">Semua Status</option>
-                <option value="PENDING">Menunggu Bayar</option>
+                <option value="WAITING_VERIFICATION">Menunggu Verifikasi (Mobile)</option>
+                <option value="WAITING_PAYMENT">Menunggu Bayar (Mobile)</option>
+                <option value="PENDING">Pending (POS)</option>
                 <option value="PROCESSING">Diproses</option>
                 <option value="SHIPPED">Dikirim</option>
                 <option value="COMPLETED">Selesai</option>
                 <option value="CANCELLED">Dibatalkan</option>
             </select>
         </div>
-        <div class="w-full md:w-64 shrink-0">
+        <div class="w-full md:w-52 shrink-0">
             <select wire:model.live="warehouseFilter"
                 class="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-lg text-sm focus:ring-[#1c69d4]/20 focus:border-[#1c69d4]">
                 <option value="">Semua Warehouse</option>
@@ -84,7 +94,18 @@
                     @forelse ($orders as $order)
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="px-6 py-4">
-                                <span class="font-bold text-gray-900text-sm">{{ $order->order_number }}</span>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="font-bold text-gray-900 text-sm">{{ $order->order_number }}</span>
+                                    @if ($order->order_channel === 'MOBILE_APP')
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                            📱 Mobile
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                            🏪 POS
+                                        </span>
+                                    @endif
+                                </div>
                                 <div class="text-[10px] text-gray-400 font-mono mt-1 select-all"
                                     title="Klik untuk menyalin (segera hadir)">
                                     ID: {{ $order->id }}
@@ -103,22 +124,47 @@
                             <td class="px-6 py-4">
                                 @php
                                     $statusColors = [
+                                        'WAITING_PAYMENT' => 'bg-amber-50 text-amber-600 border-amber-200',
+                                        'WAITING_VERIFICATION' => 'bg-orange-50 text-orange-700 border-orange-300 font-black animate-pulse',
                                         'PENDING' => 'bg-amber-50 text-amber-600 border-amber-100',
                                         'PROCESSING' => 'bg-blue-50 text-blue-600 border-blue-100',
                                         'SHIPPED' => 'bg-purple-50 text-purple-600 border-purple-100',
                                         'COMPLETED' => 'bg-emerald-50 text-emerald-600 border-emerald-100',
                                         'CANCELLED' => 'bg-rose-50 text-rose-600 border-rose-100',
                                     ];
+                                    $statusLabels = [
+                                        'WAITING_PAYMENT' => 'Menunggu Bayar',
+                                        'WAITING_VERIFICATION' => 'Verifikasi Bukti',
+                                        'PENDING' => 'Pending (POS)',
+                                        'PROCESSING' => 'Diproses',
+                                        'SHIPPED' => 'Dikirim',
+                                        'COMPLETED' => 'Selesai',
+                                        'CANCELLED' => 'Dibatalkan',
+                                    ];
                                 @endphp
                                 <span
                                     class="text-xs font-bold px-3 py-1 rounded-lg border {{ $statusColors[$order->order_status] ?? 'bg-gray-100 text-gray-600' }}">
-                                    {{ $order->order_status }}
+                                    {{ $statusLabels[$order->order_status] ?? $order->order_status }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-center">
                                 <div class="flex items-center justify-center gap-2">
                                     {{-- Quick Actions for Order Progress --}}
-                                    @if ($order->order_status === 'PENDING')
+                                    @if ($order->order_status === 'WAITING_VERIFICATION')
+                                        <button wire:click="openVerification({{ $order->id }})"
+                                            class="text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-sm">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Verifikasi
+                                        </button>
+                                    @elseif ($order->order_status === 'WAITING_PAYMENT')
+                                        <button wire:click="updateOrderStatus({{ $order->id }}, 'CANCELLED')"
+                                            wire:confirm="Batalkan pesanan mobile yang belum dibayar ini?"
+                                            class="text-xs font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg transition">
+                                            Batal
+                                        </button>
+                                    @elseif ($order->order_status === 'PENDING')
                                         <button wire:click="updateOrderStatus({{ $order->id }}, 'PROCESSING')"
                                             wire:confirm="Proses pesanan ini?"
                                             class="text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">
@@ -234,4 +280,212 @@
 
     {{-- MODAL: Catatan & Kesalahan Order (Issues) --}}
     @include('livewire.admin.orders.modal.order-issues-modal')
+
+    {{-- MODAL: Verifikasi Bukti Pembayaran Mobile App --}}
+    @if ($showVerificationModal && $selectedMobileOrder)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-3xl w-full overflow-hidden flex flex-col max-h-[92vh]">
+                <!-- Modal Header -->
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-extrabold text-gray-900 text-base">Verifikasi Pembayaran & Pemenuhan Pesanan</h3>
+                            <p class="text-xs text-gray-500 font-mono">Pesanan #{{ $selectedMobileOrder->order_number }}</p>
+                        </div>
+                    </div>
+                    <button wire:click="closeVerification" class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 overflow-y-auto space-y-6">
+                    <!-- Bukti Transfer Image -->
+                    @php
+                        $payment = $selectedMobileOrder->payments->last();
+                        $proofUrl = $payment && $payment->hasMedia('payment_proof') ? $payment->getFirstMediaUrl('payment_proof') : null;
+                    @endphp
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Foto Bukti Transfer</h4>
+                        @if ($proofUrl)
+                            <div class="relative bg-gray-100 rounded-xl p-2 border border-gray-200 flex justify-center max-h-80 overflow-hidden group">
+                                <img src="{{ $proofUrl }}" alt="Bukti Transfer" class="max-h-76 object-contain rounded-lg">
+                                <a href="{{ $proofUrl }}" target="_blank" class="absolute bottom-4 right-4 bg-black/70 hover:bg-black text-white text-xs px-3 py-1.5 rounded-lg shadow transition flex items-center gap-1.5">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    </svg>
+                                    Buka Ukuran Penuh
+                                </a>
+                            </div>
+                        @else
+                            <div class="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-6 text-center text-gray-400 text-sm">
+                                Tidak ada file bukti transfer yang terlampir.
+                            </div>
+                        @endif
+                    </div>
+
+                    <!-- Ringkasan Pembayaran & Pelanggan -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm">
+                        <div>
+                            <span class="text-xs text-gray-400 block">Total Tagihan</span>
+                            <span class="text-lg font-black text-[#1c69d4]">Rp {{ number_format($selectedMobileOrder->grand_total, 0, ',', '.') }}</span>
+                        </div>
+                        <div>
+                            <span class="text-xs text-gray-400 block">Metode Pembayaran</span>
+                            <span class="font-bold text-gray-800">{{ $payment?->paymentMethod?->name ?? 'Transfer Bank' }}</span>
+                            @if ($payment?->paymentMethod?->account_number)
+                                <span class="block text-xs text-gray-500 font-mono">{{ $payment->paymentMethod->account_number }} (a.n. {{ $payment->paymentMethod->account_owner }})</span>
+                            @endif
+                        </div>
+                        <div>
+                            <span class="text-xs text-gray-400 block">Pembeli / Kontak</span>
+                            <span class="font-bold text-gray-800">{{ $selectedMobileOrder->user?->name ?? '-' }}</span>
+                            <span class="block text-xs text-gray-500 font-mono">{{ $selectedMobileOrder->user?->profile?->phone_number ?? '-' }}</span>
+                        </div>
+                    </div>
+
+                    <!-- PENGATURAN PEMENUHAN & ACCURATE ONLINE -->
+                    <div class="bg-gradient-to-br from-indigo-50/60 to-blue-50/40 border border-indigo-100 rounded-xl p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                Pengaturan Pemenuhan & Accurate Online
+                            </h4>
+                            <span class="text-[10px] font-semibold text-indigo-600 bg-white border border-indigo-200 px-2 py-0.5 rounded-full">
+                                Fleksibel Sebelum Sinkronisasi
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <!-- Gudang Penyedia -->
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Gudang Pengeluaran</label>
+                                <select wire:model.live="verificationWarehouseId"
+                                    class="w-full text-xs font-medium rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white">
+                                    @foreach ($warehouses as $wh)
+                                        <option value="{{ $wh->id }}">
+                                            {{ $wh->name }} {{ $wh->is_online_store ? '(Online)' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-[10px] text-gray-500 mt-1">Stok akan dipindahkan jika gudang diubah.</p>
+                            </div>
+
+                            <!-- Cabang Accurate -->
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Cabang Accurate</label>
+                                <select wire:model="verificationBranchName"
+                                    class="w-full text-xs font-medium rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white">
+                                    <option value="Banjarbaru">Banjarbaru</option>
+                                    @foreach ($branches as $br)
+                                        @if ($br->name !== 'Banjarbaru')
+                                            <option value="{{ $br->name }}">{{ $br->name }}</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                                <p class="text-[10px] text-gray-500 mt-1">Cabang tujuan Sales Invoice Accurate.</p>
+                            </div>
+
+                            <!-- Karyawan Sales -->
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1">Sales Person (Accurate)</label>
+                                <select wire:model="verificationSalesId"
+                                    class="w-full text-xs font-medium rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white">
+                                    <option value="">-- Tanpa Sales / Default Online --</option>
+                                    @foreach ($salesEmployees as $emp)
+                                        <option value="{{ $emp->id }}">
+                                            {{ $emp->name }} ({{ $emp->employee_no ?? 'No: -' }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-[10px] text-gray-500 mt-1">Salesman pencatat omset di Accurate.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item Pesanan & Alokasi Nomor Seri -->
+                    <div>
+                        <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Item Produk & Alokasi Nomor Seri / IMEI</h4>
+                        <div class="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden bg-white shadow-sm">
+                            @foreach ($selectedMobileOrder->items as $item)
+                                <div class="p-3.5 space-y-2">
+                                    <div class="flex items-start justify-between text-sm">
+                                        <div>
+                                            <p class="font-bold text-gray-800">{{ $item->product_name }}</p>
+                                            <p class="text-xs text-gray-500">{{ $item->qty }}x Rp {{ number_format($item->price_at_checkout, 0, ',', '.') }}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="font-bold text-gray-900">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Input SN / IMEI -->
+                                    <div class="bg-gray-50/80 p-2.5 rounded-lg border border-gray-200 space-y-1.5">
+                                        <div class="flex items-center justify-between">
+                                            <label class="text-xs font-bold text-gray-700">Nomor Seri / IMEI yang Dikirim:</label>
+                                            @if ($item->serial_number)
+                                                <span class="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                                    Status: Ter-reservasi
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <input type="text"
+                                            wire:model="verificationItemSns.{{ $item->id }}"
+                                            placeholder="Ketik atau pilih IMEI / SN..."
+                                            class="w-full text-xs font-mono font-semibold rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white">
+
+                                        @if (!empty($availableSns[$item->id]))
+                                            <div class="flex flex-wrap items-center gap-1.5 pt-1">
+                                                <span class="text-[10px] font-semibold text-gray-500">Unit Tersedia di Gudang ini:</span>
+                                                @foreach ($availableSns[$item->id] as $snOpt)
+                                                    <button type="button"
+                                                        wire:click="setItemSn({{ $item->id }}, '{{ $snOpt }}')"
+                                                        class="px-2 py-0.5 text-[11px] font-mono bg-white border border-indigo-200 text-indigo-700 rounded hover:bg-indigo-50 hover:border-indigo-400 transition"
+                                                        title="Klik untuk memasang nomor seri ini">
+                                                        {{ $snOpt }}
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer Actions -->
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                    <button wire:click="rejectMobilePayment({{ $selectedMobileOrder->id }})"
+                        wire:confirm="Yakin ingin MENOLAK bukti transfer dan membatalkan pesanan ini? Stok dan nomor seri akan dikembalikan ke status Available."
+                        class="px-4 py-2.5 bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold text-sm rounded-xl transition">
+                        Tolak & Batalkan Pesanan
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <button wire:click="closeVerification"
+                            class="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-sm rounded-xl transition">
+                            Tutup
+                        </button>
+                        <button wire:click="approveMobilePayment({{ $selectedMobileOrder->id }})"
+                            wire:confirm="Setujui pembayaran pesanan ini? Pesanan akan diubah menjadi COMPLETED, status nomor seri menjadi Sold, dan transaksi otomatis disinkronkan ke Accurate Online."
+                            class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Setujui & Terbitkan ke Accurate
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

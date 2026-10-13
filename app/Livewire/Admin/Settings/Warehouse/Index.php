@@ -81,6 +81,25 @@ class Index extends Component
         }
     }
 
+    public function toggleOnlineStore($warehouseId)
+    {
+        try {
+            $item = Warehouse::findOrFail($warehouseId);
+            $item->is_online_store = !$item->is_online_store;
+            $item->save();
+
+            $this->loadAll();
+            $statusLabel = $item->is_online_store ? 'diaktifkan sebagai Online Store' : 'dinonaktifkan dari Online Store';
+            $this->dispatch('toast', [
+                'type' => 'success',
+                'title' => 'Status Berubah',
+                'message' => "Gudang {$item->name} berhasil {$statusLabel}."
+            ]);
+        } catch (\Exception $e) {
+            $this->dispatch('toast', ['type' => 'error', 'title' => 'Gagal', 'message' => $e->getMessage()]);
+        }
+    }
+
     public function loadAll()
     {
         $this->warehouse = Warehouse::all();

@@ -18,21 +18,29 @@ class MessageSent implements ShouldBroadcast
     public string $time;
     public int $userId;
     public int $conversationId;
+    public string $senderType;
 
-    public function __construct(string $user, string $message, string $time, int $userId, int $conversationId)
+    public function __construct(string $user, string $message, string $time, int $userId, int $conversationId, string $senderType = 'customer')
     {
         $this->user = $user;
         $this->message = $message;
         $this->time = $time;
         $this->userId = $userId;
         $this->conversationId = $conversationId;
+        $this->senderType = $senderType;
     }
 
     public function broadcastOn(): array
     {
         return [
             new PrivateChannel('conversation.' . $this->conversationId),
+            new PrivateChannel('cs-chats'),
         ];
+    }
+
+    public function broadcastAs(): string
+    {
+        return 'message.sent';
     }
 
     public function broadcastWith(): array
@@ -43,6 +51,7 @@ class MessageSent implements ShouldBroadcast
             'time' => $this->time,
             'userId' => $this->userId,
             'conversationId' => $this->conversationId,
+            'senderType' => $this->senderType,
         ];
     }
 }

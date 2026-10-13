@@ -45,6 +45,39 @@ trait WithCustomerAndSales
     public $selectedSales = []; // Array untuk menampung lebih dari 1 sales
     public $searchSales = '';
 
+    // ─── Customer Loyalty ──────────────────────────────────────
+    public $availableLoyaltyPoints = 0;
+    public $availableLoyaltyCashValue = 0;
+    public $customerLoyaltyTier = 'BRONZE';
+
+    public function loadCustomerLoyalty(): void
+    {
+        $phone = $this->displayCustomerPhone();
+        if (empty($phone)) {
+            $this->availableLoyaltyPoints = 0;
+            $this->availableLoyaltyCashValue = 0;
+            $this->customerLoyaltyTier = 'BRONZE';
+            return;
+        }
+
+        try {
+            $loyaltyService = app(\App\Services\LoyaltyService::class);
+            $summary = $loyaltyService->getSummary($phone);
+            $this->availableLoyaltyPoints = (int) ($summary['points_balance'] ?? 0);
+            $this->availableLoyaltyCashValue = (int) ($summary['point_cash_value'] ?? 0);
+            $this->customerLoyaltyTier = $summary['tier'] ?? 'BRONZE';
+        } catch (\Exception $e) {
+            $this->availableLoyaltyPoints = 0;
+            $this->availableLoyaltyCashValue = 0;
+            $this->customerLoyaltyTier = 'BRONZE';
+        }
+    }
+
+    public function updatedCustomerPhone()
+    {
+        $this->loadCustomerLoyalty();
+    }
+
     // ─── Customer Actions ──────────────────────────────────────
 
     public function selectCustomer($id)
@@ -58,6 +91,7 @@ trait WithCustomerAndSales
         }
         $this->searchCustomer = '';
         $this->useCustomerDeposit = false;
+        $this->loadCustomerLoyalty();
     }
 
     public function clearSelectedCustomer()
@@ -68,6 +102,12 @@ trait WithCustomerAndSales
         $this->customerEmail = '';
         $this->isNewCustomer = false;
         $this->useCustomerDeposit = false;
+        $this->availableLoyaltyPoints = 0;
+        $this->availableLoyaltyCashValue = 0;
+        $this->customerLoyaltyTier = 'BRONZE';
+        $this->useLoyaltyPoints = false;
+        $this->customLoyaltyPoints = null;
+        $this->loyaltyDiscountAmount = 0;
     }
 
     // ─── Sales Actions ──────────────────────────────────────

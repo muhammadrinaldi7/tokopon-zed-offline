@@ -140,6 +140,41 @@ class Home extends Component
     {
         return $this->redirectRoute('reporting.dashboard-bm', navigate: true);
     }
+
+    public function navigateToCsChat()
+    {
+        return $this->redirectRoute('zoffline.cs-chat', navigate: true);
+    }
+
+    public function navigateToFlashSale()
+    {
+        return $this->redirectRoute('zoffline.ecommerce.flash-sale', navigate: true);
+    }
+
+    public function navigateToBanners()
+    {
+        return $this->redirectRoute('zoffline.ecommerce.banners', navigate: true);
+    }
+
+    public function navigateToProductCuration()
+    {
+        return $this->redirectRoute('zoffline.ecommerce.products', navigate: true);
+    }
+
+    public function navigateToClosingAnalytics()
+    {
+        return $this->redirectRoute('zoffline.ecommerce.closing-analytics', navigate: true);
+    }
+
+    public function navigateToEcommerceSettings()
+    {
+        return $this->redirectRoute('zoffline.ecommerce.settings', navigate: true);
+    }
+
+    public function navigateToPaymentMethods()
+    {
+        return $this->redirectRoute('zoffline.ecommerce.payment-methods', navigate: true);
+    }
     public function render()
     {
         return view('livewire.zoffline.home');

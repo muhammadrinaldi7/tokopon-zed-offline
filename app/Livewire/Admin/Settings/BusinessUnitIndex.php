@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Settings;
 
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use App\Models\BusinessUnit;
 use App\Services\AccurateService;
 use App\Services\SettingService;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class BusinessUnitIndex extends Component
 {
+    use WithFileUploads;
+
     public $units = [];
     
     // Webhook Renew & Schedule State
@@ -39,6 +42,14 @@ class BusinessUnitIndex extends Component
     public $accurate_return_warehouse_name;
     public $is_taxable = false;
     public $is_active = true;
+    public $is_visible_mobile = false;
+    public $mobile_display_name;
+    public $mobile_category;
+    public $mobile_description;
+    public $brand_color = '#006B5F';
+    public $warranty_highlight;
+    public $logo;
+    public $currentLogoUrl;
 
     public $showModal = false;
 
@@ -49,7 +60,7 @@ class BusinessUnitIndex extends Component
 
     public function loadData()
     {
-        $this->units = BusinessUnit::all();
+        $this->units = BusinessUnit::with('media')->get();
         $settingService = app(SettingService::class);
         $this->renewFrequency = $settingService->get('accurate_webhook_renew_frequency', 'monthly');
         $this->lastRenewedAt = $settingService->get('accurate_webhook_last_renewed_at');
@@ -78,6 +89,14 @@ class BusinessUnitIndex extends Component
         $this->accurate_return_warehouse_name = '';
         $this->is_taxable = false;
         $this->is_active = true;
+        $this->is_visible_mobile = false;
+        $this->mobile_display_name = '';
+        $this->mobile_category = '';
+        $this->mobile_description = '';
+        $this->brand_color = '#006B5F';
+        $this->warranty_highlight = '';
+        $this->logo = null;
+        $this->currentLogoUrl = null;
     }
 
     public function openModal()
@@ -115,7 +134,28 @@ class BusinessUnitIndex extends Component
         $this->accurate_return_warehouse_name = $unit->accurate_return_warehouse_name;
         $this->is_taxable = (bool)$unit->is_taxable;
         $this->is_active = $unit->is_active;
+        $this->is_visible_mobile = (bool)$unit->is_visible_mobile;
+        $this->mobile_display_name = $unit->mobile_display_name;
+        $this->mobile_category = $unit->mobile_category;
+        $this->mobile_description = $unit->mobile_description;
+        $this->brand_color = $unit->brand_color ?: '#006B5F';
+        $this->warranty_highlight = $unit->warranty_highlight;
+        $this->currentLogoUrl = $unit->getFirstMediaUrl('logo') ?: null;
+        $this->logo = null;
         $this->showModal = true;
+    }
+
+    public function removeLogo()
+    {
+        if ($this->unitId) {
+            $unit = BusinessUnit::find($this->unitId);
+            if ($unit) {
+                $unit->clearMediaCollection('logo');
+            }
+        }
+        $this->logo = null;
+        $this->currentLogoUrl = null;
+        $this->dispatch('toast', title: 'Logo Dihapus', message: 'Logo unit usaha berhasil dihapus.', type: 'info');
     }
 
     public function save()
@@ -131,9 +171,16 @@ class BusinessUnitIndex extends Component
             'receipt_show_discount' => 'boolean',
             'telegram_approval_webhook' => 'nullable|url',
             'telegram_log_webhook' => 'nullable|url',
+            'is_visible_mobile' => 'boolean',
+            'mobile_display_name' => 'nullable|string|max:100',
+            'mobile_category' => 'nullable|string|max:50',
+            'mobile_description' => 'nullable|string|max:500',
+            'brand_color' => 'nullable|string|max:20',
+            'warranty_highlight' => 'nullable|string|max:255',
+            'logo' => 'nullable|image|max:3072',
         ]);
 
-        BusinessUnit::updateOrCreate(
+        $unit = BusinessUnit::updateOrCreate(
             ['id' => $this->unitId],
             [
                 'name' => $this->name,
@@ -155,8 +202,21 @@ class BusinessUnitIndex extends Component
                 'accurate_return_warehouse_name' => $this->accurate_return_warehouse_name,
                 'is_taxable' => $this->is_taxable,
                 'is_active' => $this->is_active,
+                'is_visible_mobile' => (bool)$this->is_visible_mobile,
+                'mobile_display_name' => $this->mobile_display_name ?: null,
+                'mobile_category' => $this->mobile_category ? strtoupper($this->mobile_category) : null,
+                'mobile_description' => $this->mobile_description ?: null,
+                'brand_color' => $this->brand_color ?: null,
+                'warranty_highlight' => $this->warranty_highlight ?: null,
             ]
         );
+
+        if ($this->logo) {
+            $unit->clearMediaCollection('logo');
+            $unit->addMedia($this->logo->getRealPath())
+                ->usingFileName($this->logo->getClientOriginalName())
+                ->toMediaCollection('logo');
+        }
 
         $this->closeModal();
         $this->loadData();
@@ -167,6 +227,13 @@ class BusinessUnitIndex extends Component
     {
         $unit = BusinessUnit::findOrFail($id);
         $unit->update(['is_active' => !$unit->is_active]);
+        $this->loadData();
+    }
+
+    public function toggleVisibleMobile($id)
+    {
+        $unit = BusinessUnit::findOrFail($id);
+        $unit->update(['is_visible_mobile' => !$unit->is_visible_mobile]);
         $this->loadData();
     }
 

@@ -29,7 +29,8 @@
                 <thead class="text-xs text-gray-500 bg-gray-50 uppercase font-semibold">
                     <tr>
                         <th class="px-6 py-4">Nama</th>
-                        {{-- <th class="px-6 py-4 text-right">Aksi</th> --}}
+                        <th class="px-6 py-4 text-center">Online Store (Mobile)</th>
+                        <th class="px-6 py-4 text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -49,11 +50,30 @@
                                     </div>
                                 </div>
                             </td>
-                            {{-- <td class="px-6 py-4 text-right">
-                                <a wire:navigate class="text-[#1c69d4] hover:text-[#3f36b8] font-semibold text-sm">
-                                    Detail →
-                                </a>
-                            </td> --}}
+                            <td class="px-6 py-4 text-center whitespace-nowrap">
+                                @if ($item->is_online_store)
+                                    <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold px-2.5 py-1 rounded-full">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        Aktif di Mobile
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 bg-gray-50 text-gray-500 border border-gray-200 text-xs font-medium px-2.5 py-1 rounded-full">
+                                        Offline Saja
+                                    </span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 text-right whitespace-nowrap">
+                                <button wire:click="toggleOnlineStore({{ $item->id }})" wire:loading.attr="disabled"
+                                    class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition {{ $item->is_online_store ? 'border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100' : 'border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100' }}">
+                                    @if ($item->is_online_store)
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                                        Nonaktifkan
+                                    @else
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        Jadikan Online
+                                    @endif
+                                </button>
+                            </td>
                         </tr>
                     @empty
                         <tr>

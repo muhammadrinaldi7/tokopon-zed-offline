@@ -285,6 +285,45 @@
                 </div>
             </div>
 
+            {{-- Loyalty Member Badge & Points Info --}}
+            @if ($selectedCustomerId)
+                <div class="md:col-span-3 p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-200/80 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-700 flex items-center justify-center font-bold text-xl shadow-sm">
+                            👑
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold uppercase tracking-wider text-amber-800">Member Tokopon Rewards</span>
+                                <span class="px-2 py-0.5 text-[11px] font-black rounded-full uppercase
+                                    @if($customerLoyaltyTier === 'PLATINUM') bg-purple-100 text-purple-700 border border-purple-200
+                                    @elseif($customerLoyaltyTier === 'GOLD') bg-amber-100 text-amber-800 border border-amber-300
+                                    @elseif($customerLoyaltyTier === 'SILVER') bg-slate-100 text-slate-700 border border-slate-300
+                                    @else bg-orange-100 text-orange-800 border border-orange-200 @endif">
+                                    {{ $customerLoyaltyTier }}
+                                </span>
+                            </div>
+                            <p class="text-xs text-neutral-600 mt-0.5">
+                                Saldo: <strong class="text-neutral-900 font-semibold">{{ number_format($availableLoyaltyPoints, 0, ',', '.') }} Poin</strong> 
+                                (senilai Rp {{ number_format($availableLoyaltyCashValue, 0, ',', '.') }})
+                            </p>
+                        </div>
+                    </div>
+                    <div>
+                        @if($availableLoyaltyPoints > 0)
+                            <span class="text-xs text-emerald-700 font-semibold bg-emerald-100/80 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5 shadow-sm">
+                                <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Poin dapat ditukarkan saat pembayaran (Step 4)
+                            </span>
+                        @else
+                            <span class="text-xs text-neutral-500 bg-neutral-100 px-3 py-1.5 rounded-xl">
+                                Transaksi ini akan mendapatkan poin reward
+                            </span>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
             {{-- Sales Input --}}
             <div class="relative md:col-span-3">
                 <label class="block text-xs lg:text-sm font-semibold text-gray-700 mb-3 uppercase tracking-widest">3.

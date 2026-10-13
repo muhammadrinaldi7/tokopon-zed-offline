@@ -37,6 +37,62 @@
         </div>
     @endif
 
+    {{-- KARTU TUKAR POIN TOKOPON REWARDS --}}
+    @if ($availableLoyaltyPoints > 0)
+        <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 mb-4 flex items-center justify-between">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center font-bold text-lg shrink-0 mt-0.5">
+                    👑
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-bold text-amber-950">Tukar Poin Tokopon Rewards</h3>
+                        <span class="px-2 py-0.5 text-[11px] font-black rounded-full uppercase
+                            @if($customerLoyaltyTier === 'PLATINUM') bg-purple-100 text-purple-700 border border-purple-200
+                            @elseif($customerLoyaltyTier === 'GOLD') bg-amber-100 text-amber-800 border border-amber-300
+                            @elseif($customerLoyaltyTier === 'SILVER') bg-slate-100 text-slate-700 border border-slate-300
+                            @else bg-orange-100 text-orange-800 border border-orange-200 @endif">
+                            {{ $customerLoyaltyTier }}
+                        </span>
+                    </div>
+                    <p class="text-sm text-amber-800 mt-1">
+                        Tersedia <strong>{{ number_format($availableLoyaltyPoints, 0, ',', '.') }} Poin</strong> (senilai Rp {{ number_format($availableLoyaltyCashValue, 0, ',', '.') }}).
+                        @if ($useLoyaltyPoints)
+                            <div class="mt-2 flex items-center gap-2">
+                                <span class="font-semibold text-gray-700 text-xs">Poin yang ditukar:</span>
+                                <div class="relative max-w-xs">
+                                    <input type="number"
+                                        wire:model.live.debounce.500ms="customLoyaltyPoints"
+                                        min="1"
+                                        max="{{ $availableLoyaltyPoints }}"
+                                        class="block w-36 px-3 py-1 text-sm border-amber-300 rounded-lg focus:ring-amber-500 focus:border-amber-500 bg-white"
+                                        placeholder="{{ $availableLoyaltyPoints }}">
+                                </div>
+                                <span class="text-xs text-emerald-700 font-bold bg-emerald-100 px-2.5 py-1 rounded-lg">
+                                    Potongan -Rp {{ number_format($loyaltyDiscountAmount, 0, ',', '.') }}
+                                </span>
+                            </div>
+                        @endif
+                    </p>
+                </div>
+            </div>
+            <div>
+                <label class="flex items-center cursor-pointer">
+                    <div class="relative">
+                        <input type="checkbox" wire:model.live="useLoyaltyPoints" class="sr-only peer">
+                        <div
+                            class="block bg-gray-300 w-14 h-8 rounded-full transition-colors duration-300 ease-in-out peer-checked:bg-amber-500 @if ($useLoyaltyPoints) bg-amber-500 @endif">
+                        </div>
+                        <div
+                            class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition transform duration-300 ease-in-out @if ($useLoyaltyPoints) translate-x-6 @endif">
+                        </div>
+                    </div>
+                    <span class="ml-3 text-sm font-medium text-gray-800">Tukar Poin</span>
+                </label>
+            </div>
+        </div>
+    @endif
+
     {{-- METODE PEMBAYARAN WIZARD (Dipindah ke atas) --}}
     <div class="flex flex-col">
         <div class="flex items-center justify-between mb-4">
@@ -545,7 +601,8 @@
                             $this->subtotal() -
                                 (int) $this->totalDiscount() -
                                 ($isSoFulfillment ? $soPaidAmount ?? 0 : 0) -
-                                ($useCustomerDeposit ? $availableCustomerDepositTotal : 0),
+                                ($useCustomerDeposit ? $availableCustomerDepositTotal : 0) -
+                                ($useLoyaltyPoints ? $loyaltyDiscountAmount : 0),
                         );
                         $kurang = $target - $totalPaid;
                     @endphp
@@ -970,11 +1027,18 @@
                                                         {{ number_format($availableCustomerDepositTotal, 0, ',', '.') }}</span>
                                                 </div>
                                             @endif
+                                            @if ($useLoyaltyPoints && $loyaltyDiscountAmount > 0)
+                                                <div class="flex justify-between items-center text-sm">
+                                                    <span class="text-amber-800 font-medium">Diskon Poin Rewards</span>
+                                                    <span class="font-bold text-amber-600">- Rp
+                                                        {{ number_format($loyaltyDiscountAmount, 0, ',', '.') }}</span>
+                                                </div>
+                                            @endif
                                             <div class="border-t border-[#1c69d4]/20 my-2 pt-2">
                                                 <div class="flex justify-between items-center">
                                                     <span class="text-gray-800 font-black">Grand Total</span>
                                                     <span class="font-black text-xl sm:text-2xl text-[#1c69d4]">Rp
-                                                        {{ number_format(max(0, $this->subtotal - $this->totalDiscount - ($isSoFulfillment ? $soPaidAmount ?? 0 : 0) - ($useCustomerDeposit ? $availableCustomerDepositTotal : 0)), 0, ',', '.') }}</span>
+                                                        {{ number_format(max(0, $this->subtotal - $this->totalDiscount - ($isSoFulfillment ? $soPaidAmount ?? 0 : 0) - ($useCustomerDeposit ? $availableCustomerDepositTotal : 0) - ($useLoyaltyPoints ? $loyaltyDiscountAmount : 0)), 0, ',', '.') }}</span>
                                                 </div>
                                             </div>
                                         </div>

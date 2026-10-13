@@ -126,6 +126,7 @@
                         <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Nama & Kode</th>
                         <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Accurate Info & Status Webhook</th>
                         <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Prefix / Awalan</th>
+                        <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Mobile App</th>
                         <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                         <th scope="col" class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Aksi</th>
                     </tr>
@@ -137,8 +138,25 @@
                         @endphp
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="font-bold text-gray-900">{{ $unit->name }}</div>
-                                <div class="text-xs text-gray-500 font-mono mt-0.5">{{ $unit->code }}</div>
+                                <div class="flex items-center gap-3">
+                                    @if($unit->hasMedia('logo'))
+                                        <img src="{{ $unit->getFirstMediaUrl('logo') }}" alt="{{ $unit->name }}" class="w-10 h-10 rounded-xl object-contain bg-white border border-gray-200 p-1 shadow-xs shrink-0">
+                                    @else
+                                        <div class="w-10 h-10 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0 text-gray-500 font-black text-xs uppercase"
+                                             @if($unit->brand_color) style="background-color: {{ $unit->brand_color }}15; color: {{ $unit->brand_color }}; border-color: {{ $unit->brand_color }}30;" @endif>
+                                            {{ substr($unit->name, 0, 2) }}
+                                        </div>
+                                    @endif
+                                    <div>
+                                        <div class="font-bold text-gray-900 flex items-center gap-1.5">
+                                            {{ $unit->name }}
+                                            @if($unit->brand_color)
+                                                <span class="w-2.5 h-2.5 rounded-full inline-block border border-white shadow-xs" style="background-color: {{ $unit->brand_color }}" title="Brand Color: {{ $unit->brand_color }}"></span>
+                                            @endif
+                                        </div>
+                                        <div class="text-xs text-gray-500 font-mono mt-0.5">{{ $unit->code }}</div>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-800 font-medium">{{ $unit->accurate_host ?: '-' }}</div>
@@ -165,6 +183,20 @@
                                 <div class="flex flex-col gap-1">
                                     @if($unit->prefix) <span class="text-xs text-gray-600">Global: <strong class="font-mono">{{ $unit->prefix }}</strong></span> @endif
                                     @if($unit->order_prefix) <span class="text-xs text-gray-600">Order: <strong class="font-mono">{{ $unit->order_prefix }}</strong></span> @endif
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <div class="flex flex-col items-center gap-1">
+                                    <button wire:click="toggleVisibleMobile({{ $unit->id }})"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all {{ $unit->is_visible_mobile ? 'bg-sky-100 text-sky-800 hover:bg-sky-200 border border-sky-300' : 'bg-gray-100 text-gray-500 hover:bg-gray-200' }}">
+                                        <span class="w-2 h-2 rounded-full {{ $unit->is_visible_mobile ? 'bg-sky-500' : 'bg-gray-400' }}"></span>
+                                        {{ $unit->is_visible_mobile ? 'Tampil' : 'Sembunyi' }}
+                                    </button>
+                                    @if($unit->mobile_category)
+                                        <span class="text-[10px] font-semibold text-gray-600 font-mono uppercase bg-gray-100 px-1.5 py-0.5 rounded">
+                                            {{ $unit->mobile_category }}
+                                        </span>
+                                    @endif
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -197,7 +229,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-8 text-center">
+                            <td colspan="6" class="px-6 py-8 text-center">
                                 <div class="flex flex-col items-center justify-center text-gray-400 space-y-2">
                                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                                     <span class="font-medium text-gray-500">Belum ada unit usaha.</span>
@@ -388,6 +420,119 @@
                                     </div>
                                     <span class="ml-3 text-sm font-semibold text-gray-700 group-hover:text-gray-900 transition-colors">Status Aktif</span>
                                 </label>
+                            </div>
+                        </div>
+
+                        {{-- Seksi 6: Pengaturan Tampilan Mobile E-Commerce --}}
+                        <div class="bg-gradient-to-br from-sky-50/70 via-indigo-50/40 to-white p-5 rounded-xl border border-sky-200/80 space-y-4">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-sky-100">
+                                <h4 class="text-sm font-bold text-sky-950 uppercase tracking-wider flex items-center gap-2">
+                                    <span class="w-6 h-6 rounded bg-sky-600 text-white flex items-center justify-center">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                    </span>
+                                    Katalog Aplikasi Mobile (E-Commerce)
+                                </h4>
+                                <label class="flex items-center cursor-pointer group">
+                                    <div class="relative flex items-center">
+                                        <input type="checkbox" wire:model="is_visible_mobile" class="peer sr-only">
+                                        <div class="w-10 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-600"></div>
+                                    </div>
+                                    <span class="ml-2.5 text-xs font-bold text-sky-900 group-hover:text-sky-950 transition-colors">Tampilkan di Mobile App</span>
+                                </label>
+                            </div>
+                            <p class="text-xs text-sky-800/80 leading-relaxed">
+                                Jika diaktifkan, unit usaha ini akan muncul sebagai opsi pilihan toko/katalog di aplikasi smartphone pembeli. Produk dari unit usaha non-aktif (seperti POS Resto/FnB) akan otomatis disembunyikan dari aplikasi pembeli.
+                            </p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                                {{-- Logo Toko Upload (Ke Cloudflare R2) --}}
+                                <div class="col-span-1 md:col-span-2 bg-white/80 p-3.5 rounded-xl border border-sky-100 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                    <div class="relative group shrink-0">
+                                        @if ($logo)
+                                            <div class="w-16 h-16 rounded-2xl overflow-hidden border-2 border-sky-500 shadow-sm bg-white flex items-center justify-center p-1">
+                                                <img src="{{ $logo->temporaryUrl() }}" class="w-full h-full object-contain">
+                                            </div>
+                                        @elseif($currentLogoUrl)
+                                            <div class="w-16 h-16 rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white flex items-center justify-center p-1">
+                                                <img src="{{ $currentLogoUrl }}" class="w-full h-full object-contain">
+                                            </div>
+                                        @else
+                                            <div class="w-16 h-16 rounded-2xl bg-sky-50 border-2 border-dashed border-sky-200 flex flex-col items-center justify-center text-sky-400">
+                                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                <span class="text-[9px] font-bold mt-0.5">Logo</span>
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <label class="text-xs font-bold text-gray-800">Logo Unit Usaha (Cloudflare R2)</label>
+                                            <span class="text-[10px] font-semibold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full">Format PNG / JPG / WebP</span>
+                                        </div>
+                                        <p class="text-[11px] text-gray-500 mb-2">
+                                            Tampil di aplikasi mobile pada Store Switcher Bar, Header, dan Store Picker. Rekomendasi rasio 1:1 transparan atau persegi rounded.
+                                        </p>
+                                        <div class="flex items-center gap-2">
+                                            <label class="relative cursor-pointer bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-xs">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                                <span>{{ $logo || $currentLogoUrl ? 'Ganti Logo' : 'Upload Logo Toko' }}</span>
+                                                <input type="file" wire:model="logo" class="sr-only" accept="image/*">
+                                            </label>
+
+                                            @if($currentLogoUrl || $logo)
+                                                <button type="button" wire:click="removeLogo"
+                                                    class="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg transition-colors border border-rose-200">
+                                                    Hapus
+                                                </button>
+                                            @endif
+
+                                            <div wire:loading wire:target="logo" class="text-xs text-sky-600 font-bold flex items-center gap-1">
+                                                <svg class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                Mengunggah...
+                                            </div>
+                                        </div>
+                                        @error('logo') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Nama Tampilan di Mobile (Mobile Display Name)</label>
+                                    <input type="text" wire:model="mobile_display_name" placeholder="Contoh: Tokopon Official / GSK Second"
+                                        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-xs font-medium focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                                    @error('mobile_display_name') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Badge Kategori Mobile (Contoh: BARU, SECOND)</label>
+                                    <input type="text" wire:model="mobile_category" placeholder="BARU / SECOND / AKSESORIS"
+                                        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-xs font-bold uppercase focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all font-mono">
+                                    @error('mobile_category') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Warna Aksen Identitas Toko (Brand Accent Color)</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="color" wire:model="brand_color" class="w-9 h-9 p-0.5 rounded-lg border border-gray-300 cursor-pointer bg-white">
+                                        <input type="text" wire:model="brand_color" placeholder="#006B5F"
+                                            class="w-28 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-xs font-mono uppercase focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                                        <span class="text-[11px] text-gray-500">Warna tombol aktif & badge</span>
+                                    </div>
+                                    @error('brand_color') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Keunggulan Garansi / Tagline Toko</label>
+                                    <input type="text" wire:model="warranty_highlight" placeholder="Contoh: Garansi Resmi 1 Tahun / Garansi Toko 30 Hari"
+                                        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-xs font-medium focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                                    @error('warranty_highlight') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                </div>
+
+                                <div class="col-span-1 md:col-span-2">
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Deskripsi Singkat Toko di Mobile</label>
+                                    <textarea wire:model="mobile_description" rows="2" placeholder="Pusat handphone baru garansi resmi Indonesia..."
+                                        class="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-xs font-medium focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all"></textarea>
+                                    @error('mobile_description') <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> @enderror
+                                </div>
                             </div>
                         </div>
 

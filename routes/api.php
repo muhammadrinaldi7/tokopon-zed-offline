@@ -7,6 +7,15 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+// Expo Push Token update endpoint
+Route::post('/user/push-token', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'updatePushToken'])
+    ->middleware('auth:sanctum')
+    ->name('api.user.push-token');
+
+// Chat Init root alias
+Route::post('/chat/init', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'initConversation'])
+    ->name('api.chat.init');
+
 // Xendit Webhooks
 Route::post('/webhooks/xendit/invoice', [\App\Http\Controllers\Api\XenditWebhookController::class, 'handleInvoiceCallback'])
     ->name('api.webhooks.xendit.invoice');
@@ -118,4 +127,86 @@ Route::prefix('v1/executive')->group(function () {
     });
 });
 
+// ============================================
+// MOBILE APP E-COMMERCE & REALTIME CHAT API
+// ============================================
+Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
+    // 0. Remote Config & Feature Flags
+    Route::get('/config', [\App\Http\Controllers\Api\Mobile\ConfigController::class, 'index'])
+        ->name('api.mobile.config');
 
+    // 0.1 Autentikasi Pengguna Mobile App
+    Route::post('/auth/login', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'login'])
+        ->name('api.mobile.auth.login');
+    Route::post('/auth/register', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'register'])
+        ->name('api.mobile.auth.register');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/auth/me', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'me'])
+            ->name('api.mobile.auth.me');
+        Route::put('/auth/profile', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'updateProfile'])
+            ->name('api.mobile.auth.profile');
+        Route::post('/auth/logout', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'logout'])
+            ->name('api.mobile.auth.logout');
+        Route::post('/user/push-token', [\App\Http\Controllers\Api\Mobile\AuthController::class, 'updatePushToken'])
+            ->name('api.mobile.user.push-token');
+    });
+
+    // 1. Daftar Unit Bisnis / Toko Online (Store Switcher)
+    Route::get('/business-units', [\App\Http\Controllers\Api\Mobile\BusinessUnitController::class, 'index'])
+        ->name('api.mobile.business-units.index');
+
+    // 1.1 Promo Banners & Flash Sales
+    Route::get('/banners', [\App\Http\Controllers\Api\Mobile\BannerController::class, 'index'])
+        ->name('api.mobile.banners.index');
+    Route::get('/flash-sales', [\App\Http\Controllers\Api\Mobile\FlashSaleController::class, 'index'])
+        ->name('api.mobile.flash-sales.index');
+
+    // 2. Katalog Produk Toko Online
+    Route::get('/products', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'index'])
+        ->name('api.mobile.products.index');
+    Route::get('/products/categories', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'categories'])
+        ->name('api.mobile.products.categories');
+    Route::get('/products/brands', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'brands'])
+        ->name('api.mobile.products.brands');
+    Route::get('/products/{id}', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'show'])
+        ->name('api.mobile.products.show');
+    Route::get('/products/{id}/serial-numbers', [\App\Http\Controllers\Api\Mobile\ProductController::class, 'serialNumbers'])
+        ->name('api.mobile.products.serial-numbers');
+
+    // 3. Rekening Pembayaran Manual
+    Route::get('/payment-methods', [\App\Http\Controllers\Api\Mobile\PaymentMethodController::class, 'index'])
+        ->name('api.mobile.payment-methods.index');
+
+    // 4. Transaksi & Checkout Pesanan
+    Route::get('/orders', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'index'])
+        ->name('api.mobile.orders.index');
+    Route::post('/orders/checkout', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'checkout'])
+        ->name('api.mobile.orders.checkout');
+    Route::get('/orders/{orderNumber}', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'show'])
+        ->name('api.mobile.orders.show');
+    Route::post('/orders/{orderNumber}/upload-proof', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'uploadProof'])
+        ->name('api.mobile.orders.upload-proof');
+    Route::post('/orders/{orderNumber}/cancel', [\App\Http\Controllers\Api\Mobile\OrderController::class, 'cancel'])
+        ->name('api.mobile.orders.cancel');
+
+    // 5. Realtime Chat (Customer & Guest)
+    Route::post('/chat/init', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'initConversation'])
+        ->name('api.mobile.chat.init');
+    Route::get('/chat/conversations/{conversationId}/messages', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'getMessages'])
+        ->name('api.mobile.chat.messages');
+    Route::post('/chat/conversations/{conversationId}/messages', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'sendMessage'])
+        ->name('api.mobile.chat.send');
+    Route::post('/chat/conversations/{conversationId}/read', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'markAsRead'])
+        ->name('api.mobile.chat.read');
+    Route::post('/broadcasting/auth', [\App\Http\Controllers\Api\Mobile\ChatController::class, 'broadcastAuth'])
+        ->name('api.mobile.broadcasting.auth');
+
+    // 6. Loyalty & Membership Poin
+    Route::prefix('loyalty')->name('api.mobile.loyalty.')->group(function () {
+        Route::get('/summary', [\App\Http\Controllers\Api\Mobile\LoyaltyController::class, 'summary'])
+            ->name('summary');
+        Route::get('/history', [\App\Http\Controllers\Api\Mobile\LoyaltyController::class, 'history'])
+            ->name('history');
+    });
+});

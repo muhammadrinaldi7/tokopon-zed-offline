@@ -33,7 +33,8 @@ class User extends Authenticatable implements HasMedia
         'business_unit_id',
         'warehouse_id',
         'branch_id',
-        'telegram_chat_id'
+        'telegram_chat_id',
+        'push_token',
     ];
 
     public function businessUnit()
@@ -192,5 +193,59 @@ class User extends Authenticatable implements HasMedia
     public function sellPhoneIssues()
     {
         return $this->hasMany(SellPhoneIssue::class);
+    }
+
+    public function loyaltyAccount()
+    {
+        return $this->hasOne(LoyaltyAccount::class);
+    }
+
+    /**
+     * Mendapatkan nomor HP customer yang valid dari berbagai relasi/sumber.
+     * Prioritas:
+     * 1. UserProfile (phone_number)
+     * 2. LoyaltyAccount (phone_number)
+     * 3. Prefix email akun internal (08xxx@tokopon.internal)
+     * 4. Fallback string kosong '' (tidak boleh hardcode nomor dummy)
+     */
+    public function getCustomerPhoneAttribute(): string
+    {
+        // 1. Cek UserProfile
+        if (!empty($this->profile?->phone_number)) {
+            return (string) $this->profile->phone_number;
+        }
+
+        // 2. Cek LoyaltyAccount
+        if (!empty($this->loyaltyAccount?->phone_number)) {
+            return (string) $this->loyaltyAccount->phone_number;
+        }
+
+        // 3. Cek prefix jika email format nomor telepon internal
+        if (!empty($this->email) && str_contains($this->email, '@tokopon.internal')) {
+            $prefix = explode('@', $this->email)[0];
+            if (is_numeric($prefix)) {
+                return $prefix;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Mendapatkan alamat customer yang valid dari profile domisili atau daftar alamat.
+     */
+    public function getCustomerAddressAttribute(): string
+    {
+        if (!empty($this->profile?->domisili)) {
+            return (string) $this->profile->domisili;
+        }
+
+        $primaryAddress = $this->addresses?->firstWhere('is_primary', true) 
+            ?? $this->addresses?->first();
+        if ($primaryAddress && !empty($primaryAddress->full_address)) {
+            return (string) $primaryAddress->full_address;
+        }
+
+        return '';
     }
 }

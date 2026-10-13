@@ -37,7 +37,8 @@
                     {{-- <th class="p-4">MDR (%)</th> --}}
                     <th class="p-4">Kategori</th>
                     <th class="p-4 text-center">Unit Usaha</th>
-                    <th class="p-4 text-center">Status</th>
+                    <th class="p-4 text-center">POS Aktif</th>
+                    <th class="p-4 text-center">Mobile App</th>
                     <th class="p-4 text-right">Aksi</th>
                 </tr>
             </thead>
@@ -84,10 +85,17 @@
                             </span>
                         </td>
                         <td class="p-4 text-center">
-                            <button wire:click="toggleActive({{ $method->id }})"
+                            <button wire:click="toggleActive({{ $method->id }})" title="Aktif di POS"
                                 class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {{ $method->is_active ? 'bg-emerald-500' : 'bg-gray-200' }}">
                                 <span
                                     class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {{ $method->is_active ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                            </button>
+                        </td>
+                        <td class="p-4 text-center">
+                            <button wire:click="toggleMobileVisible({{ $method->id }})" title="Tampil di Mobile App"
+                                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {{ $method->is_visible_mobile ? 'bg-blue-600' : 'bg-gray-200' }}">
+                                <span
+                                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {{ $method->is_visible_mobile ? 'translate-x-6' : 'translate-x-1' }}"></span>
                             </button>
                         </td>
                         <td class="p-4 text-right">
@@ -259,10 +267,17 @@
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-2 mt-2">
-                        <input type="checkbox" wire:model="is_active" id="isActive"
-                            class="rounded  text-[#1c69d4] focus:ring-[#1c69d4] border-gray-300">
-                        <label for="isActive" class="text-sm text-gray-700">Aktifkan metode ini</label>
+                    <div class="flex flex-col gap-2 mt-2">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" wire:model="is_active" id="isActive"
+                                class="rounded text-[#1c69d4] focus:ring-[#1c69d4] border-gray-300">
+                            <label for="isActive" class="text-sm text-gray-700">Aktifkan metode ini di POS</label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" wire:model="is_visible_mobile" id="isVisibleMobile"
+                                class="rounded text-blue-600 focus:ring-blue-500 border-gray-300">
+                            <label for="isVisibleMobile" class="text-sm font-semibold text-blue-900">Tampilkan rekening ini di Mobile App untuk transfer manual</label>
+                        </div>
                     </div>
                 </div>
 

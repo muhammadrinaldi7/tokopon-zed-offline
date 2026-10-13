@@ -11,6 +11,14 @@ Broadcast::channel('conversation.{conversationId}', function ($user, $conversati
     $conversation = Conversation::find($conversationId);
     if (!$conversation) return false;
 
-    // User pemilik conversation ATAU user dengan role 'cs' boleh akses
-    return $user->id === $conversation->user_id || $user->hasRole('cs');
+    // User pemilik conversation ATAU user dengan role CS / admin
+    return (int) $user->id === (int) $conversation->user_id 
+        || $user->hasRole(['admin', 'superadmin', 'cs', 'manager', 'kasir_sju'])
+        || $user->can('access-cs-chat');
 });
+
+Broadcast::channel('cs-chats', function ($user) {
+    return $user->hasRole(['admin', 'superadmin', 'cs', 'manager', 'kasir_sju'])
+        || $user->can('access-cs-chat');
+});
+

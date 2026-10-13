@@ -828,17 +828,30 @@ class Pos extends Component
     #[Computed]
     public function customerResults()
     {
-        if (strlen($this->searchCustomer) < 2) return [];
+        $search = trim($this->searchCustomer);
+        if (strlen($search) < 2) return [];
+
+        $cleanPhone = preg_replace('/[^0-9]/', '', $search);
 
         return User::whereHas('roles', function ($q) {
             $q->where('name', 'user');
-        })->where(function ($q) {
-            $q->where('name', 'like', '%' . $this->searchCustomer . '%')
-                ->orWhere('email', 'like', '%' . $this->searchCustomer . '%')
-                ->orWhereHas('profile', function ($q2) {
-                    $q2->where('phone_number', 'like', '%' . $this->searchCustomer . '%');
+        })->where(function ($q) use ($search, $cleanPhone) {
+            $q->where('name', 'like', '%' . $search . '%')
+                ->orWhere('email', 'like', '%' . $search . '%')
+                ->orWhereHas('profile', function ($q2) use ($search, $cleanPhone) {
+                    $q2->where('phone_number', 'like', '%' . $search . '%');
+                    if (!empty($cleanPhone) && strlen($cleanPhone) >= 4) {
+                        $q2->orWhere('phone_number', 'like', '%' . $cleanPhone . '%');
+                        if (str_starts_with($cleanPhone, '08')) {
+                            $alt = '628' . substr($cleanPhone, 2);
+                            $q2->orWhere('phone_number', 'like', '%' . $alt . '%');
+                        } elseif (str_starts_with($cleanPhone, '628')) {
+                            $alt = '08' . substr($cleanPhone, 3);
+                            $q2->orWhere('phone_number', 'like', '%' . $alt . '%');
+                        }
+                    }
                 });
-        })->with('profile')->take(5)->get();
+        })->with('profile')->take(8)->get();
     }
     #[Computed]
     public function salesResults()

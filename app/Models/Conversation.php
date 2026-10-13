@@ -9,11 +9,50 @@ class Conversation extends Model
     protected $fillable = [
         'user_id',
         'status',
+        'business_unit_id',
+        'guest_token',
+        'guest_name',
+        'guest_phone',
+        'push_token',
+        'product_accurate_id',
+        'closing_status',
+        'closing_amount',
+        'closing_notes',
+        'closed_by_user_id',
+        'closed_at',
+        'assigned_to_user_id',
+        'assigned_at',
     ];
+
+    protected $casts = [
+        'closing_amount' => 'decimal:2',
+        'closed_at' => 'datetime',
+        'assigned_at' => 'datetime',
+    ];
+
+    public function assignedTo()
+    {
+        return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
+
+    public function closedBy()
+    {
+        return $this->belongsTo(User::class, 'closed_by_user_id');
+    }
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function businessUnit()
+    {
+        return $this->belongsTo(BusinessUnit::class);
+    }
+
+    public function productAccurate()
+    {
+        return $this->belongsTo(ProductAccurate::class);
     }
 
     public function messages()
@@ -29,8 +68,8 @@ class Conversation extends Model
     public function unreadCountForCs()
     {
         return $this->messages()
-            ->where('is_read', false)
-            ->where('user_id', $this->user_id) // pesan dari user, bukan dari CS
+            ->whereNull('read_at')
+            ->whereIn('sender_type', ['customer', 'guest'])
             ->count();
     }
 }
