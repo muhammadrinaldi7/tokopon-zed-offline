@@ -209,4 +209,12 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
         Route::get('/history', [\App\Http\Controllers\Api\Mobile\LoyaltyController::class, 'history'])
             ->name('history');
     });
+
+    // 7. Voucher & Kupon Diskon E-Commerce
+    Route::prefix('coupons')->name('api.mobile.coupons.')->group(function () {
+        Route::get('/available', [\App\Http\Controllers\Api\Mobile\CouponController::class, 'available'])
+            ->name('available');
+        Route::post('/validate', [\App\Http\Controllers\Api\Mobile\CouponController::class, 'validateCoupon'])
+            ->name('validate');
+    });
 });

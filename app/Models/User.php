@@ -205,6 +205,11 @@ class User extends Authenticatable implements HasMedia
         return $this->hasManyThrough(LoyaltyTransaction::class, LoyaltyAccount::class, 'user_id', 'loyalty_account_id');
     }
 
+    public function couponRedemptions()
+    {
+        return $this->hasMany(EcommerceCouponRedemption::class, 'user_id');
+    }
+
     public function getLoyaltyPointsAttribute(): int
     {
         return (int) ($this->loyaltyAccount?->points_balance ?? 0);

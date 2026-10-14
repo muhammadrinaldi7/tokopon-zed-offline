@@ -13,6 +13,7 @@ class Order extends Model
         'shipping_address_snapshot' => 'array',
         'order_date' => 'date',
         'payment_expired_at' => 'datetime',
+        'coupon_discount_amount' => 'decimal:2',
     ];
 
     protected static function booted(): void
@@ -26,6 +27,12 @@ class Order extends Model
                         app(\App\Services\LoyaltyService::class)->refundPoints($order);
                     } catch (\Throwable $e) {
                         \Illuminate\Support\Facades\Log::warning("Loyalty refundPoints listener error on Order #{$order->order_number}: " . $e->getMessage());
+                    }
+
+                    try {
+                        app(\App\Services\EcommerceCouponService::class)->rollbackCoupon($order);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning("Coupon rollbackCoupon listener error on Order #{$order->order_number}: " . $e->getMessage());
                     }
                 } elseif (in_array($status, ['PAID', 'COMPLETED', 'PROCESSING', 'SHIPPED'], true)) {
                     try {
@@ -170,6 +177,16 @@ class Order extends Model
     public function loyaltyTransactions()
     {
         return $this->hasMany(LoyaltyTransaction::class);
+    }
+
+    public function coupon()
+    {
+        return $this->belongsTo(EcommerceCoupon::class, 'coupon_id');
+    }
+
+    public function couponRedemption()
+    {
+        return $this->hasOne(EcommerceCouponRedemption::class, 'order_id');
     }
 
 

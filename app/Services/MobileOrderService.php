@@ -186,13 +186,30 @@ class MobileOrderService
                 'customer_name' => User::find($userId)?->name ?? 'Customer',
             ];
 
-            // 3.1 Perhitungan & Validasi Penukaran Poin Loyalty
+            $userModel = User::find($userId);
+
+            // 3.1 Perhitungan & Validasi Kupon Diskon E-Commerce
+            $couponCode = !empty($data['coupon_code']) ? trim((string) $data['coupon_code']) : null;
+            $coupon = null;
+            $couponDiscount = 0.0;
+            $couponService = app(\App\Services\EcommerceCouponService::class);
+
+            if ($couponCode) {
+                $netSubtotal = max(0, $subtotal - $totalDiscount);
+                $validation = $couponService->validateCoupon($couponCode, $userModel, $netSubtotal, $shippingCost);
+                if (!$validation['valid']) {
+                    throw new Exception($validation['message']);
+                }
+                $coupon = $validation['coupon'];
+                $couponDiscount = (float) $validation['discount'];
+            }
+
+            // 3.2 Perhitungan & Validasi Penukaran Poin Loyalty
             $redeemPoints = (int) ($data['redeem_points'] ?? 0);
             $loyaltyService = app(\App\Services\LoyaltyService::class);
             $loyaltyDiscount = 0;
 
             if ($redeemPoints > 0 && $loyaltyService->isActive()) {
-                $userModel = User::find($userId);
                 $customerPhone = $shippingSnapshot['phone'] ?? $userModel?->profile?->phone_number;
                 $loyaltyAccount = $customerPhone ? $loyaltyService->getOrCreateAccount($customerPhone, $shippingSnapshot['name'] ?? null, $userModel) : null;
 
@@ -202,14 +219,14 @@ class MobileOrderService
                 }
 
                 $loyaltyDiscount = $loyaltyService->calculatePointDiscount($redeemPoints);
-                // Maksimal diskon poin tidak boleh melebihi sisa tagihan belanja
-                $netBill = max(0, $subtotal - $totalDiscount + $shippingCost);
+                // Maksimal diskon poin tidak boleh melebihi sisa tagihan belanja setelah diskon kupon
+                $netBill = max(0, ($subtotal - $totalDiscount + $shippingCost) - $couponDiscount);
                 $loyaltyDiscount = min($loyaltyDiscount, $netBill);
             } else {
                 $redeemPoints = 0;
             }
 
-            $grandTotal = max(0, ($subtotal - $totalDiscount + $shippingCost) - $loyaltyDiscount);
+            $grandTotal = max(0, ($subtotal - $totalDiscount + $shippingCost) - $couponDiscount - $loyaltyDiscount);
 
             $settingService = app(\App\Services\SettingService::class);
             
@@ -238,6 +255,9 @@ class MobileOrderService
                 'total_amount' => $subtotal,
                 'shipping_cost' => $shippingCost,
                 'discount_amount' => $totalDiscount,
+                'coupon_id' => $coupon?->id,
+                'coupon_code' => $coupon?->code,
+                'coupon_discount_amount' => $couponDiscount,
                 'loyalty_points_redeemed' => $redeemPoints,
                 'loyalty_discount_amount' => $loyaltyDiscount,
                 'grand_total' => $grandTotal,
@@ -248,9 +268,14 @@ class MobileOrderService
                 'notes' => $data['notes'] ?? null,
             ]);
 
+            // Eksekusi penerapan kupon diskon jika digunakan
+            if ($coupon && $couponDiscount > 0) {
+                $couponService->applyCouponToOrder($coupon, $order, $userModel, $couponDiscount);
+            }
+
             // Eksekusi penukaran poin jika digunakan
             if ($redeemPoints > 0) {
-                $loyaltyService->redeemPoints($order, $redeemPoints, User::find($userId));
+                $loyaltyService->redeemPoints($order, $redeemPoints, $userModel);
             }
 
             // 5. Create Order Items
@@ -514,6 +539,13 @@ class MobileOrderService
                 app(\App\Services\LoyaltyService::class)->refundPoints($order, $actor);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning("Gagal memulihkan poin loyalty untuk order #{$order->order_number}: " . $e->getMessage());
+            }
+
+            // 6. Kembalikan kuota voucher jika pernah digunakan
+            try {
+                app(\App\Services\EcommerceCouponService::class)->rollbackCoupon($order);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Gagal rollback kupon untuk order #{$order->order_number}: " . $e->getMessage());
             }
 
             return $order->refresh();
