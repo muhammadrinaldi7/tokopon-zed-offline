@@ -189,7 +189,7 @@ class ProfitReport extends Component
                     $o->user->name ?? 'Pelanggan Umum',
                     $o->shipping_address_snapshot['store'] ?? '-',
                     round($o->total_amount, 2),
-                    round($o->discount_amount, 2),
+                    round((float)(($o->discount_amount ?? 0) + ($o->coupon_discount_amount ?? 0) + ($o->loyalty_discount_amount ?? 0)), 2),
                     round($o->grand_total, 2),
                     round($o->calculated_hpp, 2),
                     round($o->calculated_mdr, 2),
