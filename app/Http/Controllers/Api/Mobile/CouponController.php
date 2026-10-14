@@ -26,10 +26,11 @@ class CouponController extends Controller
     {
         $subtotal = (float) $request->query('subtotal', 0);
         $shippingCost = (float) $request->query('shipping_cost', 0);
+        $businessUnitId = $request->query('business_unit_id') ? (int) $request->query('business_unit_id') : null;
 
         $user = $this->resolveCustomerUser($request);
 
-        $coupons = $this->couponService->getAvailableCoupons($user, $subtotal, $shippingCost);
+        $coupons = $this->couponService->getAvailableCoupons($user, $subtotal, $shippingCost, $businessUnitId);
 
         $formatted = $coupons->map(function (EcommerceCoupon $coupon) {
             $typeLabel = match ($coupon->type) {
@@ -76,17 +77,21 @@ class CouponController extends Controller
             'code' => 'required|string|max:50',
             'subtotal' => 'required|numeric|min:0',
             'shipping_cost' => 'nullable|numeric|min:0',
+            'business_unit_id' => 'nullable|integer|exists:business_units,id',
+            'phone' => 'nullable|string|max:30',
         ]);
 
         $subtotal = (float) $validated['subtotal'];
         $shippingCost = (float) ($validated['shipping_cost'] ?? 0);
+        $businessUnitId = isset($validated['business_unit_id']) ? (int) $validated['business_unit_id'] : null;
         $user = $this->resolveCustomerUser($request);
 
         $result = $this->couponService->validateCoupon(
             $validated['code'],
             $user,
             $subtotal,
-            $shippingCost
+            $shippingCost,
+            $businessUnitId
         );
 
         if (!$result['valid']) {
@@ -115,7 +120,7 @@ class CouponController extends Controller
     }
 
     /**
-     * Temukan user dari token otentikasi atau variasi nomor telepon header/query.
+     * Temukan user dari token otentikasi atau variasi nomor telepon header/query/body.
      */
     protected function resolveCustomerUser(Request $request): ?User
     {
@@ -124,7 +129,7 @@ class CouponController extends Controller
             return $user;
         }
 
-        $phone = $request->query('phone') ?? $request->header('X-Customer-Phone');
+        $phone = $request->input('phone') ?? $request->query('phone') ?? $request->header('X-Customer-Phone');
         if (!empty($phone)) {
             $cleanPhone = preg_replace('/[^0-9]/', '', (string) $phone);
             if (!empty($cleanPhone)) {

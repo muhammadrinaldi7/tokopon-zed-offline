@@ -149,6 +149,11 @@ class SyncOrderToAccurateJob implements ShouldQueue
                 'description' => "Pesanan Mobile App #{$order->order_number} (Verifikasi: {$handledByName}{$salesInfo})" . ($order->notes ? " - {$order->notes}" : ''),
             ];
 
+            $headerDiscount = (float) (($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0));
+            if ($headerDiscount > 0) {
+                $siData['cashDiscount'] = $headerDiscount;
+            }
+
             try {
                 $siResult = $accurateService->postSalesInvoice($siData, $databaseSource);
 
