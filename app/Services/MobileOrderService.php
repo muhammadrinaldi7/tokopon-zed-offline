@@ -196,7 +196,7 @@ class MobileOrderService
 
             if ($couponCode) {
                 $netSubtotal = max(0, $subtotal - $totalDiscount);
-                $validation = $couponService->validateCoupon($couponCode, $userModel, $netSubtotal, $shippingCost);
+                $validation = $couponService->validateCoupon($couponCode, $userModel, $netSubtotal, $shippingCost, $businessUnitId);
                 if (!$validation['valid']) {
                     throw new Exception($validation['message']);
                 }
@@ -227,6 +227,7 @@ class MobileOrderService
             }
 
             $grandTotal = max(0, ($subtotal - $totalDiscount + $shippingCost) - $couponDiscount - $loyaltyDiscount);
+            $initialStatus = $grandTotal == 0 ? 'PROCESSING' : 'WAITING_PAYMENT';
 
             $settingService = app(\App\Services\SettingService::class);
             
@@ -261,9 +262,9 @@ class MobileOrderService
                 'loyalty_points_redeemed' => $redeemPoints,
                 'loyalty_discount_amount' => $loyaltyDiscount,
                 'grand_total' => $grandTotal,
-                'order_status' => 'WAITING_PAYMENT',
+                'order_status' => $initialStatus,
                 'order_channel' => 'MOBILE_APP',
-                'payment_expired_at' => now()->addMinutes($expiryMinutes),
+                'payment_expired_at' => $grandTotal == 0 ? null : now()->addMinutes($expiryMinutes),
                 'shipping_address_snapshot' => $shippingSnapshot,
                 'notes' => $data['notes'] ?? null,
             ]);
@@ -284,12 +285,13 @@ class MobileOrderService
                 OrderItem::create($itemData);
             }
 
-            // 6. Create Initial Pending Payment Record
+            // 6. Create Initial Payment Record
             OrderPayment::create([
                 'order_id' => $order->id,
                 'xendit_external_id' => 'ORD-MOB-' . date('YmdHis') . rand(1000, 9999),
                 'amount' => $grandTotal,
-                'status' => 'PENDING',
+                'status' => $grandTotal == 0 ? 'PAID' : 'PENDING',
+                'paid_at' => $grandTotal == 0 ? now() : null,
                 'payment_method_id' => $data['payment_method_id'] ?? null,
             ]);
 

@@ -172,8 +172,11 @@ class LoyaltyService
             return null;
         }
 
-        // Hitung nilai belanja bersih yang berhak mendapatkan poin
-        $netSubtotal = max(0, (float) $order->total_amount - (float) ($order->discount_amount ?? 0) - (float) ($order->loyalty_discount_amount ?? 0));
+        // Hitung nilai belanja bersih yang berhak mendapatkan poin (setelah diskon produk, diskon kupon, dan diskon loyalty)
+        $netSubtotal = max(0, (float) $order->total_amount 
+            - (float) ($order->discount_amount ?? 0) 
+            - (float) ($order->coupon_discount_amount ?? 0) 
+            - (float) ($order->loyalty_discount_amount ?? 0));
         $pointsToEarn = $this->calculateEarnablePoints($netSubtotal);
 
         if ($pointsToEarn <= 0) {

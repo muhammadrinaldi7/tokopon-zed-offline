@@ -21,11 +21,18 @@ class EcommerceCouponService
      * @param float $shippingCost
      * @return Collection
      */
-    public function getAvailableCoupons(?User $user = null, float $subtotal = 0, float $shippingCost = 0): Collection
+    public function getAvailableCoupons(?User $user = null, float $subtotal = 0, float $shippingCost = 0, ?int $businessUnitId = null): Collection
     {
-        $coupons = EcommerceCoupon::active()
-            ->validNow()
-            ->get();
+        $query = EcommerceCoupon::active()
+            ->validNow();
+
+        if ($businessUnitId !== null) {
+            $query->where(function ($q) use ($businessUnitId) {
+                $q->whereNull('business_unit_id')->orWhere('business_unit_id', $businessUnitId);
+            });
+        }
+
+        $coupons = $query->get();
 
         return $coupons->map(function (EcommerceCoupon $coupon) use ($user, $subtotal, $shippingCost) {
             $isEligible = true;
@@ -75,7 +82,7 @@ class EcommerceCouponService
      * @param float $shippingCost
      * @return array{valid: bool, message: string, coupon: ?EcommerceCoupon, discount: float, discount_type: ?string}
      */
-    public function validateCoupon(string $code, ?User $user = null, float $subtotal = 0, float $shippingCost = 0): array
+    public function validateCoupon(string $code, ?User $user = null, float $subtotal = 0, float $shippingCost = 0, ?int $businessUnitId = null): array
     {
         $normalizedCode = strtoupper(trim($code));
 
@@ -105,6 +112,16 @@ class EcommerceCouponService
             return [
                 'valid' => false,
                 'message' => 'Voucher saat ini sedang tidak aktif.',
+                'coupon' => null,
+                'discount' => 0.0,
+                'discount_type' => null,
+            ];
+        }
+
+        if ($coupon->business_unit_id !== null && $businessUnitId !== null && (int) $coupon->business_unit_id !== (int) $businessUnitId) {
+            return [
+                'valid' => false,
+                'message' => 'Voucher ini tidak berlaku untuk toko yang dipilih.',
                 'coupon' => null,
                 'discount' => 0.0,
                 'discount_type' => null,
