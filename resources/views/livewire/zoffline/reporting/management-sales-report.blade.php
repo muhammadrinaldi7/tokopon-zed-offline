@@ -371,7 +371,14 @@
 
                             // Kalkulasi Penjualan Bersih
                             $itemPromosTotal = (float)$item->promos->sum('pivot.discount_amount');
-                            $actualSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - $itemPromosTotal;
+                            $orderCouponDiscount = (float)($order->coupon_discount_amount ?? 0);
+                            $orderLoyaltyDiscount = (float)($order->loyalty_discount_amount ?? 0);
+                            $orderTotalAmt = (float)($order->total_amount ?? 0);
+                            $itemRatio = ($orderTotalAmt > 0) ? ((float)$item->subtotal / $orderTotalAmt) : 0;
+                            $itemCouponDiscount = round($orderCouponDiscount * $itemRatio);
+                            $itemLoyaltyDiscount = round($orderLoyaltyDiscount * $itemRatio);
+
+                            $actualSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - $itemPromosTotal - $itemCouponDiscount - $itemLoyaltyDiscount;
                             if ($isReturn && $actualSubtotal > 0) {
                                 $actualSubtotal = -$actualSubtotal;
                             }
@@ -516,9 +523,13 @@
                             {{-- Penjualan Bersih --}}
                             <td class="px-4 py-3 text-right align-top font-bold {{ $penjualanBersih < 0 ? 'text-rose-600' : 'text-[#1c69d4]' }}">
                                 Rp {{ number_format($penjualanBersih, 0, ',', '.') }}
-                                @if ($item->discount_amount > 0 || $itemPromosTotal > 0)
+                                @php $totalPotonganItem = ($item->discount_amount ?? 0) + $itemPromosTotal + $itemCouponDiscount + $itemLoyaltyDiscount; @endphp
+                                @if ($totalPotonganItem > 0)
                                     <p class="text-[10px] text-gray-400 font-normal">
-                                        Disc: Rp {{ number_format(($item->discount_amount ?? 0) + $itemPromosTotal, 0, ',', '.') }}
+                                        Disc: Rp {{ number_format($totalPotonganItem, 0, ',', '.') }}
+                                        @if ($itemCouponDiscount > 0)
+                                            <span class="text-purple-600 font-semibold" title="Voucher: {{ $order->coupon_code }}">({{ $order->coupon_code }})</span>
+                                        @endif
                                     </p>
                                 @endif
                             </td>

@@ -121,7 +121,7 @@ class Dashboard extends Component
         // --- 1. KPI OVERVIEW ---
         $orderIds = (clone $query)->pluck('id');
         $totalGross = (clone $query)->sum('total_amount');
-        $totalDiscount = (clone $query)->sum('discount_amount');
+        $totalDiscount = (clone $query)->sum(DB::raw('COALESCE(discount_amount, 0) + COALESCE(coupon_discount_amount, 0) + COALESCE(loyalty_discount_amount, 0)'));
 
         $totalMdr = \App\Models\OrderPayment::whereIn('order_id', $orderIds)
             ->with(['paymentMethod', 'paymentMethodRate'])
@@ -213,8 +213,8 @@ class Dashboard extends Component
         $mtdQty = OrderItem::whereIn('order_id', $mtdOrderIds)->sum('qty');
         $lastMtdQty = OrderItem::whereIn('order_id', $lastMtdOrderIds)->sum('qty');
 
-        $mtdDiscount = (clone $mtdQuery)->sum('discount_amount');
-        $lastMtdDiscount = (clone $lastMtdQuery)->sum('discount_amount');
+        $mtdDiscount = (clone $mtdQuery)->sum(DB::raw('COALESCE(discount_amount, 0) + COALESCE(coupon_discount_amount, 0) + COALESCE(loyalty_discount_amount, 0)'));
+        $lastMtdDiscount = (clone $lastMtdQuery)->sum(DB::raw('COALESCE(discount_amount, 0) + COALESCE(coupon_discount_amount, 0) + COALESCE(loyalty_discount_amount, 0)'));
 
         $calculateGrowth = function ($current, $last) {
             if ($last > 0) {

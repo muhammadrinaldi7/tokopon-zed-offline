@@ -115,6 +115,9 @@ class IncomeStatement extends Component
                 }
             }
 
+            $orderHeaderDiscount = (float)(($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0));
+            $orderTotalAmt = (float)($order->total_amount ?? 0);
+
             foreach ($order->items as $item) {
                 // Simulasi hitung promo prorata singkat untuk summary global
                 $itemPromosTotal = 0; 
@@ -122,7 +125,12 @@ class IncomeStatement extends Component
                     // Jika ada perhitungan diskon promo, panggil logic prorata di sini agar seimbang
                 }
 
-                $penjualanBersihItem = round(($item->subtotal / 1.11) - ($item->discount_amount ?? 0) - $itemPromosTotal);
+                $itemOrderDiscountDpp = 0;
+                if ($orderHeaderDiscount > 0 && $orderTotalAmt > 0) {
+                    $itemOrderDiscountDpp = (($item->subtotal / $orderTotalAmt) * $orderHeaderDiscount) / 1.11;
+                }
+
+                $penjualanBersihItem = round(($item->subtotal / 1.11) - ($item->discount_amount ?? 0) - $itemPromosTotal - $itemOrderDiscountDpp);
                 $totalPenjualanBersihKeseluruhan += $penjualanBersihItem;
 
                 // Hitung COGS global terfilter
@@ -189,7 +197,14 @@ class IncomeStatement extends Component
 
             $itemPromosTotal = 0; // Sesuaikan jika menggunakan pivot promo diskon prorata
 
-            $penjualanBersihItem = round(($item->subtotal / 1.11) - ($item->discount_amount ?? 0) - $itemPromosTotal);
+            $orderHeaderDiscount = (float)(($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0));
+            $orderTotalAmt = (float)($order->total_amount ?? 0);
+            $itemOrderDiscountDpp = 0;
+            if ($orderHeaderDiscount > 0 && $orderTotalAmt > 0) {
+                $itemOrderDiscountDpp = (($item->subtotal / $orderTotalAmt) * $orderHeaderDiscount) / 1.11;
+            }
+
+            $penjualanBersihItem = round(($item->subtotal / 1.11) - ($item->discount_amount ?? 0) - $itemPromosTotal - $itemOrderDiscountDpp);
 
             $itemCogsSum = 0;
             $vendorsList = [];

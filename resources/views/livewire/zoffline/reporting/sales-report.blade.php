@@ -552,11 +552,21 @@
                                         <p class="text-[11px] text-red-500 font-medium">Diskon: Rp
                                             {{ number_format($order->discount_amount, 0, ',', '.') }}</p>
                                     @endif
+                                    @if (($order->coupon_discount_amount ?? 0) > 0)
+                                        <p class="text-[11px] text-purple-600 font-medium">
+                                            Voucher ({{ $order->coupon_code }}): -Rp {{ number_format($order->coupon_discount_amount, 0, ',', '.') }}
+                                        </p>
+                                    @endif
+                                    @if (($order->loyalty_discount_amount ?? 0) > 0)
+                                        <p class="text-[11px] text-emerald-600 font-medium">
+                                            Poin: -Rp {{ number_format($order->loyalty_discount_amount, 0, ',', '.') }}
+                                        </p>
+                                    @endif
                                     @if ($order->mdr_amount > 0)
                                         <p class="text-[11px] text-orange-500 font-medium">MDR: Rp
                                             {{ number_format($order->mdr_amount, 0, ',', '.') }}</p>
                                     @endif
-                                    @if ($order->discount_amount == 0 && $order->mdr_amount == 0)
+                                    @if ($order->discount_amount == 0 && ($order->coupon_discount_amount ?? 0) == 0 && ($order->loyalty_discount_amount ?? 0) == 0 && $order->mdr_amount == 0)
                                         <p class="text-[11px] text-gray-400">-</p>
                                     @endif
                                 </td>

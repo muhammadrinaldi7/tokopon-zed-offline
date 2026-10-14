@@ -296,7 +296,7 @@ class ExecutiveMetricsService
         }
 
         $grossSales = (float)$order->total_amount;
-        $discount = (float)$order->discount_amount;
+        $discount = (float)(($order->discount_amount ?? 0) + ($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0));
         $grandTotal = (float)$order->grand_total;
         $netSales = $grandTotal; // Samakan dengan Omset Faktur Riil!
         $grossProfit = $netSales - $totalHpp; // Laba Kotor = Omset Faktur - Total HPP (sebelum potongan MDR)

@@ -390,7 +390,16 @@ class ManagementSalesReport extends Component
             $promoNamesArray = $item->promos->pluck('name')->unique()->toArray();
             $promoNamesStr = !empty($promoNamesArray) ? implode(', ', $promoNamesArray) : '-';
 
-            $actualItemSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - $itemPromosTotal;
+            $orderCouponDiscount = (float)($order->coupon_discount_amount ?? 0);
+            $orderLoyaltyDiscount = (float)($order->loyalty_discount_amount ?? 0);
+            $orderCouponCode = $order->coupon_code ?: '-';
+
+            $orderTotalAmt = (float)($order->total_amount ?? 0);
+            $itemRatio = ($orderTotalAmt > 0) ? ((float)$item->subtotal / $orderTotalAmt) : 0;
+            $itemCouponDiscount = round($orderCouponDiscount * $itemRatio);
+            $itemLoyaltyDiscount = round($orderLoyaltyDiscount * $itemRatio);
+
+            $actualItemSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - $itemPromosTotal - $itemCouponDiscount - $itemLoyaltyDiscount;
             if ($isReturn && $actualItemSubtotal > 0) {
                 $actualItemSubtotal = -$actualItemSubtotal;
             }
@@ -516,6 +525,9 @@ class ManagementSalesReport extends Component
                 $item->discount_amount ?? 0,
                 $promoNamesStr,
                 $itemPromosTotal,
+                $orderCouponCode,
+                $itemCouponDiscount,
+                $itemLoyaltyDiscount,
                 $item->subtotal,
                 $penjualanBersih,
                 $itemHpp,
@@ -561,6 +573,9 @@ class ManagementSalesReport extends Component
                 'DISKON ITEM (Rp)',
                 'NAMA PROMO',
                 'DISKON PROMO (Rp)',
+                'KODE VOUCHER',
+                'DISKON VOUCHER (Rp)',
+                'DISKON POIN (Rp)',
                 'SUBTOTAL ITEM (Rp)',
                 'PENJUALAN BERSIH (Rp)',
                 'HPP (Rp)',
@@ -591,7 +606,7 @@ class ManagementSalesReport extends Component
 
         $items = $this->buildBaseItemsQuery()
             ->with([
-                'order:id,order_number,accurate_invoice_no,shipping_address_snapshot,total_amount',
+                'order:id,order_number,accurate_invoice_no,shipping_address_snapshot,total_amount,coupon_discount_amount,loyalty_discount_amount',
                 'variant'
             ])
             ->withSum('promos as item_promos_discount', 'order_item_promos.discount_amount')
@@ -654,7 +669,11 @@ class ManagementSalesReport extends Component
             $isReturn = $this->isReturnItem($item, $order);
 
             $itemPromosTotal = (float)($item->item_promos_discount ?? 0);
-            $actualItemSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - $itemPromosTotal;
+            $orderHeaderDiscount = (float)(($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0));
+            $orderTotalAmt = (float)($order->total_amount ?? 0);
+            $itemOrderDiscount = ($orderTotalAmt > 0 && $orderHeaderDiscount > 0) ? round(((float)$item->subtotal / $orderTotalAmt) * $orderHeaderDiscount) : 0;
+
+            $actualItemSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - $itemPromosTotal - $itemOrderDiscount;
             if ($isReturn && $actualItemSubtotal > 0) {
                 $actualItemSubtotal = -$actualItemSubtotal;
             }

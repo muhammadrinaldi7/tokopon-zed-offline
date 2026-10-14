@@ -296,7 +296,13 @@ class SalesReport extends Component
             // Render Baris dengan Bobot
             $allocatedPaymentsTracker = [];
             $allocatedMdrTracker = [];
+            $allocatedCouponTracker = 0;
+            $allocatedLoyaltyTracker = 0;
             $currentIndex = 0;
+
+            $orderCouponDiscount = (float)($order->coupon_discount_amount ?? 0);
+            $orderLoyaltyDiscount = (float)($order->loyalty_discount_amount ?? 0);
+            $orderCouponCode = $order->coupon_code ?: '-';
 
             if ($itemCount > 0) {
                 foreach ($order->items as $item) {
@@ -305,6 +311,18 @@ class SalesReport extends Component
 
                     $actualItemSubtotal = $itemPromoData[$item->id]['actual_subtotal'];
                     $weight = $actualItemSubtotal / $totalOrderActualSubtotal;
+
+                    // Alokasi diskon voucher & loyalty per item proporsional
+                    if ($isLastItem) {
+                        $itemCouponDiscount = max(0, $orderCouponDiscount - $allocatedCouponTracker);
+                        $itemLoyaltyDiscount = max(0, $orderLoyaltyDiscount - $allocatedLoyaltyTracker);
+                    } else {
+                        $itemCouponDiscount = round($orderCouponDiscount * $weight);
+                        $allocatedCouponTracker += $itemCouponDiscount;
+
+                        $itemLoyaltyDiscount = round($orderLoyaltyDiscount * $weight);
+                        $allocatedLoyaltyTracker += $itemLoyaltyDiscount;
+                    }
 
                     $variant = $item->variant;
                     $sku = $variant?->item_no ?? $variant?->sku ?? $variant?->accurateData?->item_no ?? '-';
@@ -333,7 +351,7 @@ class SalesReport extends Component
 
                     $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
                     $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];
-                    $penjualanBersih = round($actualItemSubtotal);
+                    $penjualanBersih = round($actualItemSubtotal - $itemCouponDiscount - $itemLoyaltyDiscount);
                     $proyek = $variant?->proyek ?? '-';
 
                     $rowData = [
@@ -361,6 +379,9 @@ class SalesReport extends Component
                         $item->discount_amount ?? 0,
                         $promoNamesStr,
                         $itemPromosTotal,
+                        $orderCouponCode,
+                        $itemCouponDiscount,
+                        $itemLoyaltyDiscount,
                         $item->subtotal,
                         $penjualanBersih,
                         $itemModal,
@@ -436,6 +457,9 @@ class SalesReport extends Component
                     0,
                     $promoNamesStr,
                     $itemPromosTotal,
+                    $order->coupon_code ?: '-',
+                    (float)($order->coupon_discount_amount ?? 0),
+                    (float)($order->loyalty_discount_amount ?? 0),
                     0, // Subtotal
                     0, // Penjualan Bersih
                     0, // Modal
@@ -509,6 +533,9 @@ class SalesReport extends Component
                 'DISKON ITEM (Rp)',
                 'NAMA PROMO',
                 'DISKON PROMO (Rp)',
+                'KODE VOUCHER',
+                'DISKON VOUCHER (Rp)',
+                'DISKON POIN (Rp)',
                 'SUBTOTAL ITEM (Rp)',
                 'PENJUALAN BERSIH',
                 'MODAL (Rp)',
@@ -897,6 +924,14 @@ class SalesReport extends Component
                 // Hitung total nilai kotor, diskon, dan bersih item
                 $itemPromosTotal = $item->promos->sum('pivot.discount_amount');
                 $actualItemSubtotal = $item->subtotal - ($item->discount_amount ?? 0) - $itemPromosTotal;
+
+                // Alokasikan diskon voucher & loyalty per item jika ada
+                $orderHeaderDiscount = (float)(($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0));
+                if ($orderHeaderDiscount > 0 && (float)$order->total_amount > 0) {
+                    $itemOrderDiscount = round(($item->subtotal / $order->total_amount) * $orderHeaderDiscount);
+                    $actualItemSubtotal = max(0, $actualItemSubtotal - $itemOrderDiscount);
+                }
+
                 $priceAtCheckout = $item->price_at_checkout ?? 0;
                 $grossItemTotal = $priceAtCheckout * $item->qty;
                 $discountItemTotal = $grossItemTotal - $actualItemSubtotal;
