@@ -185,13 +185,11 @@ class LoyaltyOrderLifecycleTest extends TestCase
         $this->account->refresh();
         $this->assertEquals(10, $this->account->points_balance);
 
-        // Batalkan order
+        // Batalkan order (otomatis memicu Order::booted listener yang memanggil refundPoints)
         $order->update(['order_status' => 'CANCELLED']);
-        $refundResults = $this->loyaltyService->refundPoints($order, $this->user);
 
-        $this->assertEquals(10, $refundResults['revoked_earn_points']);
         $this->account->refresh();
-        $this->assertEquals(0, $this->account->points_balance, 'Saldo poin harus ditarik kembali menjadi 0.');
+        $this->assertEquals(0, $this->account->points_balance, 'Saldo poin harus otomatis ditarik kembali menjadi 0.');
 
         $this->assertDatabaseHas('loyalty_transactions', [
             'order_id' => $order->id,
