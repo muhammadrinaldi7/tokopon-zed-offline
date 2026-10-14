@@ -95,10 +95,16 @@ class PromoReport extends Component
     public function getOrdersQueryProperty()
     {
         return Order::with(['items.variant', 'items.promos', 'promos'])
-            ->whereBetween('created_at', [
-                Carbon::parse($this->startDate)->startOfDay(),
-                Carbon::parse($this->endDate)->endOfDay(),
-            ])
+            ->where(function ($q) {
+                $q->whereBetween('order_date', [$this->startDate, $this->endDate])
+                    ->orWhere(function ($sub) {
+                        $sub->whereNull('order_date')
+                            ->whereBetween('created_at', [
+                                Carbon::parse($this->startDate)->startOfDay(),
+                                Carbon::parse($this->endDate)->endOfDay(),
+                            ]);
+                    });
+            })
             ->whereHas('promos') // Hanya ambil order yang pakai promo
             ->when($this->search, function ($query) {
                 $search = trim($this->search);
@@ -129,7 +135,7 @@ class PromoReport extends Component
             ->when($this->businessUnitFilter, function ($query) {
                 $query->where('business_unit_id', $this->businessUnitFilter);
             })
-            ->latest();
+            ->latest('order_date');
     }
 
     protected function getClaimRows(): array
@@ -139,7 +145,12 @@ class PromoReport extends Component
 
         foreach ($orders as $order) {
             $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
-            $orderDate = $order->created_at->format('Y-m-d H:i');
+            $orderDate = $order->order_date
+                ? $order->order_date->format('Y-m-d')
+                : $order->created_at->format('Y-m-d');
+            $updatedAt = $order->updated_at
+                ? $order->updated_at->format('Y-m-d')
+                : '-';
             $orderNo = $order->order_number;
             $invNo = $order->accurate_invoice_no ?? '-';
 
@@ -161,6 +172,7 @@ class PromoReport extends Component
                     if ($discountAmount > 0) {
                         $rows[] = [
                             'tanggal' => $orderDate,
+                            'updated_at' => $updatedAt,
                             'order_no' => $orderNo,
                             'inv_no' => $invNo,
                             'cabang' => $branch,
@@ -208,6 +220,7 @@ class PromoReport extends Component
 
             fputcsv($file, [
                 'TANGGAL',
+                'UPDATED AT',
                 'NO. ORDER',
                 'NO. INVOICE',
                 'CABANG',

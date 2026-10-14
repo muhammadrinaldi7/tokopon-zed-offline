@@ -40,6 +40,8 @@
                 x-show="sidebarCollapsed" style="display:none;" x-cloak>Dashboard</span>
         </a>
 
+        {{-- Chat CS (Disembunyikan sementara dari Sidebar Admin) --}}
+        @if(false)
         @can('access-cs-chat')
             <a href="/admin/cs-chat" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.cs-chat') ? $activeClass : $inactiveClass }}">
@@ -59,6 +61,7 @@
                 @endif
             </a>
         @endcan
+        @endif
 
         <!--<a href="#"-->
         <!--    class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->is('admin/services') ? $activeClass : $inactiveClass }}">-->

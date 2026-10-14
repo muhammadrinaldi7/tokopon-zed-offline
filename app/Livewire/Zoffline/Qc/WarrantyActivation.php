@@ -303,9 +303,18 @@ class WarrantyActivation extends Component
         $now = \Carbon\Carbon::now();
         $this->generatedWarranties = [];
 
+        $actualSn = collect(explode(',', $this->foundItem->serial_number))
+            ->map(fn($s) => trim($s))
+            ->first(fn($s) => strcasecmp($s, trim($this->searchQuery)) === 0)
+            ?? trim($this->searchQuery);
+        $snToUse = strtoupper($actualSn);
+
         // 1. Cek apakah ada garansi yang sudah ada untuk SN ini dari proses Ganti Unit (replacement)
         //    Ini terjadi ketika unit pengganti sudah memiliki garansi yang di-transfer dari unit lama.
-        $existingWarranties = \App\Models\Warranty::where('serial_number', $this->searchQuery)
+        $existingWarranties = \App\Models\Warranty::where(function($q) use ($snToUse) {
+                $q->where('serial_number', $snToUse)
+                  ->orWhere('serial_number', strtolower($snToUse));
+            })
             ->where('order_item_id', $this->foundItem->id)
             ->whereNull('device_inspection_id') // Belum pernah di-QC aktivasi
             ->where('status', 'active')
@@ -315,6 +324,7 @@ class WarrantyActivation extends Component
             // Garansi dari replacement sudah ada, cukup tautkan inspeksi QC saja
             foreach ($existingWarranties as $warranty) {
                 $warranty->device_inspection_id = $inspection->id;
+                $warranty->serial_number = $snToUse;
                 $warranty->save();
                 $this->generatedWarranties[] = $warranty;
             }
@@ -323,7 +333,10 @@ class WarrantyActivation extends Component
 
         // 2. Otomatis batalkan (void) garansi aktif dari transaksi sebelumnya untuk SN ini
         //    karena unit telah berpindah kepemilikan / dijual kembali ke pembeli baru.
-        \App\Models\Warranty::where('serial_number', $this->searchQuery)
+        \App\Models\Warranty::where(function($q) use ($snToUse) {
+                $q->where('serial_number', $snToUse)
+                  ->orWhere('serial_number', strtolower($snToUse));
+            })
             ->where('status', 'active')
             ->where('order_item_id', '!=', $this->foundItem->id)
             ->update([
@@ -338,7 +351,7 @@ class WarrantyActivation extends Component
             $warranty = \App\Models\Warranty::create([
                 'warranty_policy_id' => $policy->id, 
                 'order_item_id' => $this->foundItem->id,
-                'serial_number' => $this->searchQuery,
+                'serial_number' => $snToUse,
                 'customer_user_id' => $order->user_id,
                 'type' => $policy->coverage_type, // full_cover atau ganti_unit
                 'duration_days' => $policy->duration_days,

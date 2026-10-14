@@ -53,6 +53,18 @@
 
                     <div
                         class="flex items-center gap-2 bg-white px-2 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                        <label class="text-xs text-gray-500 font-medium">Unit Bisnis</label>
+                        <select wire:model.live="businessUnitFilter"
+                            class="border-none text-xs font-bold focus:ring-0 text-gray-700 bg-transparent py-2 pl-1 pr-3 cursor-pointer hover:bg-gray-50 rounded-lg">
+                            <option value="">Semua Unit Bisnis</option>
+                            @foreach ($businessUnits as $bu)
+                                <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div
+                        class="flex items-center gap-2 bg-white px-2 py-1.5 rounded-xl border border-gray-200 shadow-sm">
                         <label class="text-xs text-gray-500 font-medium">Cabang</label>
                         <select wire:model.live="branchId"
                             class="border-none text-xs font-bold focus:ring-0 text-gray-700 bg-transparent py-2 pl-1 pr-3 cursor-pointer hover:bg-gray-50 rounded-lg">
@@ -100,6 +112,7 @@
                             url.searchParams.set('startDate', $wire.startDate);
                             url.searchParams.set('endDate', $wire.endDate);
                             url.searchParams.set('search', $wire.search);
+                            url.searchParams.set('businessUnitFilter', $wire.businessUnitFilter || '');
                             url.searchParams.set('branchId', $wire.branchId || '');
                             url.searchParams.set('activationStatus', $wire.activationStatus);
                             
@@ -208,7 +221,7 @@
                             <th class="px-6 py-4 font-bold text-left">Tgl Transaksi</th>
                             <th class="px-6 py-4 font-bold text-left">Tgl Aktivasi</th>
                             <th class="px-6 py-4 font-bold text-left">No. Order / SN</th>
-                            <th class="px-6 py-4 font-bold text-left">Cabang</th>
+                            <th class="px-6 py-4 font-bold text-left">Unit Bisnis / Cabang</th>
                             <th class="px-6 py-4 font-bold text-left">Kategori / Nama Barang</th>
                             <th class="px-6 py-4 font-bold text-left">Pelanggan</th>
                             <th class="px-6 py-4 font-bold text-left">Tipe Garansi</th>
@@ -244,6 +257,8 @@
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-xs font-bold text-gray-500 mb-0.5">
+                                        {{ $w->orderItem->order->businessUnit->name ?? '-' }}</div>
                                     <div class="text-sm font-bold text-gray-800">
                                         {{ $w->orderItem->order->branch->name ?? '-' }}</div>
                                 </td>
@@ -284,7 +299,7 @@
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    @if ($warranty && $warranty->status === 'ACTIVE')
+                                    @if ($warranty && strtoupper($warranty->status) === 'ACTIVE')
                                         <span
                                             class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-green-100 text-green-800">
                                             AKTIF
@@ -297,7 +312,7 @@
                                     @else
                                         <span
                                             class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-yellow-100 text-yellow-800">
-                                            {{ $warranty->status }}
+                                            {{ strtoupper($warranty->status) }}
                                         </span>
                                     @endif
                                 </td>

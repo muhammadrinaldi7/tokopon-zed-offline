@@ -285,8 +285,8 @@
                 </div>
             </div>
 
-            {{-- Loyalty Member Badge & Points Info --}}
-            @if ($selectedCustomerId)
+            {{-- Loyalty Member Badge & Points Info (Disembunyikan dari Tampilan POS) --}}
+            @if (false && $selectedCustomerId)
                 <div class="md:col-span-3 p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-200/80 flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center gap-3">
                         <div class="w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-700 flex items-center justify-center font-bold text-xl shadow-sm">

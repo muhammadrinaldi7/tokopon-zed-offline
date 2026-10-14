@@ -27,6 +27,7 @@ class PromoReportExport implements FromArray, WithHeadings, ShouldAutoSize, With
     {
         return [
             'TANGGAL',
+            'UPDATED AT',
             'NO. ORDER',
             'NO. INVOICE',
             'CABANG',

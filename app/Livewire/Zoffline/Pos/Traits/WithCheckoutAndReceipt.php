@@ -354,11 +354,15 @@ trait WithCheckoutAndReceipt
                 foreach ($this->payments as $payment) {
                     $rowTotal = (float)$payment['amount'];
 
+                    $pm = \App\Models\PaymentMethod::find($payment['payment_method_id']);
+                    $isFinance = $pm && !empty($pm->accurate_customer_no);
+
                     OrderPayment::create([
                         'order_id' => $order->id,
                         'xendit_external_id' => 'ORD-PTG-' . date('YmdHis') . rand(1000, 9999),
                         'amount' => $rowTotal,
-                        'status' => 'PAID',
+                        'status' => $isFinance ? 'PENDING' : 'PAID',
+                        'paid_at' => $isFinance ? null : \Carbon\Carbon::now(),
                         'payment_method_id' => $payment['payment_method_id'],
                         'payment_method_rate_id' => $payment['payment_method_rate_id'] ?: null,
                         'no_kontrak' => $payment['no_kontrak'] ?? null,
@@ -557,6 +561,7 @@ trait WithCheckoutAndReceipt
                     'xendit_external_id' => 'ORD-BUY-' . date('YmdHis') . rand(1000, 9999),
                     'amount' => $rowTotal,
                     'status' => $isFinance ? 'PENDING' : 'PAID',
+                    'paid_at' => $isFinance ? null : \Carbon\Carbon::now(),
                     'payment_method_id' => $payment['payment_method_id'],
                     'payment_method_rate_id' => $payment['payment_method_rate_id'] ?: null,
                     'no_kontrak' => $payment['no_kontrak'] ?? null,
@@ -1423,7 +1428,7 @@ trait WithCheckoutAndReceipt
         $printer->text($separator);
 
         // Loyalty Rewards Section
-        if ($this->completedOrder->loyalty_points_earned > 0 || $this->completedOrder->loyalty_points_redeemed > 0) {
+        if (false && ($this->completedOrder->loyalty_points_earned > 0 || $this->completedOrder->loyalty_points_redeemed > 0)) {
             $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
             $printer->text("* TOKOPON REWARDS *\n");
             $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_LEFT);
@@ -1714,6 +1719,19 @@ trait WithCheckoutAndReceipt
                     ->update(['status' => 'Unavailable']);
             }
 
+            $variant = null;
+            if (!empty($item['variant_type']) && !empty($item['variant_id'])) {
+                $variant = $item['variant_type']::find($item['variant_id']);
+            }
+
+            $hppData = \App\Services\OrderHppResolverService::resolve(
+                $variant,
+                $cleanSns,
+                $order->business_unit_id,
+                $item['qty'],
+                false
+            );
+
             $orderItem = OrderItem::create([
                 'order_id' => $order->id,
                 'product_variant_id' => $item['variant_id'],
@@ -1722,6 +1740,8 @@ trait WithCheckoutAndReceipt
                 'qty' => $item['qty'],
                 'price_at_checkout' => $item['price'],
                 'subtotal' => $item['price'] * $item['qty'],
+                'unit_hpp' => $hppData['unit_hpp'],
+                'total_hpp' => $hppData['total_hpp'],
                 'discount_amount' => (int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1),
                 'promo_discount_amount' => (int)($item['promo_discount'] ?? 0),
                 'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',
@@ -1958,11 +1978,15 @@ trait WithCheckoutAndReceipt
                 $rowTotal = (float)($payment['amount'] ?? 0);
                 if ($rowTotal <= 0) continue;
 
+                $pm = \App\Models\PaymentMethod::find($payment['payment_method_id']);
+                $isFinance = $pm && !empty($pm->accurate_customer_no);
+
                 OrderPayment::create([
                     'order_id' => $order->id,
                     'xendit_external_id' => 'ORD-SO-POS-' . date('YmdHis') . rand(1000, 9999),
                     'amount' => $rowTotal,
-                    'status' => 'PAID',
+                    'status' => $isFinance ? 'PENDING' : 'PAID',
+                    'paid_at' => $isFinance ? null : \Carbon\Carbon::now(),
                     'payment_method_id' => $payment['payment_method_id'],
                     'payment_method_rate_id' => $payment['payment_method_rate_id'] ?: null,
                     'no_kontrak' => $payment['no_kontrak'] ?? null,

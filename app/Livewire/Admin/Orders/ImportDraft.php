@@ -256,6 +256,15 @@ class ImportDraft extends Component
                 $subtotal += $itemSubtotal;
                 $totalDiscount += $itemData['discount'];
 
+                $itemSns = !empty($itemData['sn']) ? array_filter(array_map('trim', explode(',', $itemData['sn']))) : [];
+                $hppData = \App\Services\OrderHppResolverService::resolve(
+                    $variant,
+                    $itemSns,
+                    $order->business_unit_id,
+                    $itemData['qty'],
+                    false
+                );
+
                 // Insert Local OrderItem
                 OrderItem::create([
                     'order_id' => $order->id,
@@ -264,6 +273,8 @@ class ImportDraft extends Component
                     'qty' => $itemData['qty'],
                     'price_at_checkout' => $itemData['price'],
                     'subtotal' => $itemSubtotal,
+                    'unit_hpp' => $hppData['unit_hpp'],
+                    'total_hpp' => $hppData['total_hpp'],
                     'discount_amount' => $itemData['discount'],
                     'serial_number' => $itemData['sn'],
                 ]);

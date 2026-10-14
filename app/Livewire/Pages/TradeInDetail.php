@@ -80,13 +80,23 @@ class TradeInDetail extends Component
                 'shipping_address_snapshot' => ['address' => 'Tukar Tambah Unit', 'phone_number' => '0000', 'city' => '-', 'postal_code' => '0000'],
             ]);
 
+            $hppData = \App\Services\OrderHppResolverService::resolve(
+                $variant,
+                [],
+                $order->business_unit_id,
+                1,
+                false
+            );
+
             \App\Models\OrderItem::create([
                 'order_id' => $order->id,
                 'product_variant_id' => $variant->id,
                 'product_variant_type' => get_class($variant),
                 'qty' => 1,
                 'price_at_checkout' => $variant->price,
-                'subtotal' => $variant->price
+                'subtotal' => $variant->price,
+                'unit_hpp' => $hppData['unit_hpp'],
+                'total_hpp' => $hppData['total_hpp'],
             ]);
             
             // Deduct Stock immediately
@@ -126,6 +136,7 @@ class TradeInDetail extends Component
                     'xendit_external_id' => $order->order_number,
                     'amount' => 0,
                     'status' => 'PAID',
+                    'paid_at' => now(),
                 ]);
                 $order->update(['order_status' => 'COMPLETED']);
                 $this->tradeIn->update(['status' => 'COMPLETED', 'order_id' => $order->id]);

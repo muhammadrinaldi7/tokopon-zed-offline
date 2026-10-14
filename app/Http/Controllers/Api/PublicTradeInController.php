@@ -74,7 +74,7 @@ class PublicTradeInController extends Controller
         $brand = $request->query('brand');
         $proyek = $request->query('proyek');
         $search = $request->query('search');
-        $limit = min((int)($request->query('limit', 1000)), 2000);
+        $limit = min((int)($request->query('limit', 5000)), 10000);
 
         $query = ProductAccurate::query()
             ->where(function ($q) {
@@ -144,7 +144,7 @@ class PublicTradeInController extends Controller
         $brand = $request->query('brand');
         $proyek = $request->query('proyek');
         $search = $request->query('search');
-        $limit = min((int)($request->query('limit', 1000)), 2000);
+        $limit = min((int)($request->query('limit', 5000)), 10000);
 
         $query = ProductAccurate::query()
             ->where('base_price', '>', 0);
@@ -330,7 +330,7 @@ class PublicTradeInController extends Controller
                 WHEN name LIKE ? THEN 1 
                 WHEN name LIKE ? THEN 2 
                 ELSE 3 
-            END", 
+            END",
             ["{$searchClean}%", "%{$searchClean}%"]
         );
 

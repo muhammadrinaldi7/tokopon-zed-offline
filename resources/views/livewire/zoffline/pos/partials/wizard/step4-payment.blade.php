@@ -37,8 +37,8 @@
         </div>
     @endif
 
-    {{-- KARTU TUKAR POIN TOKOPON REWARDS --}}
-    @if ($availableLoyaltyPoints > 0)
+    {{-- KARTU TUKAR POIN TOKOPON REWARDS (Disembunyikan dari Tampilan POS) --}}
+    @if (false && $availableLoyaltyPoints > 0)
         <div class="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 mb-4 flex items-center justify-between">
             <div class="flex items-start gap-3">
                 <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center font-bold text-lg shrink-0 mt-0.5">

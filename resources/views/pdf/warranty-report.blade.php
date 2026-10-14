@@ -181,7 +181,10 @@
                     <td>{{ $orderDate ? $orderDate->format('d/m/Y') : '-' }}</td>
                     <td>{{ $warranty && $warranty->activated_at ? $warranty->activated_at->format('d/m/Y H:i') : '-' }}</td>
                     <td>{{ $w->orderItem->order->order_number ?? '-' }}</td>
-                    <td>{{ $w->orderItem->order->branch->name ?? '-' }}</td>
+                    <td>
+                        <div style="font-size: 7.5pt; color: #666;">{{ $w->orderItem->order->businessUnit->name ?? '-' }}</div>
+                        <div>{{ $w->orderItem->order->branch->name ?? '-' }}</div>
+                    </td>
                     <td><strong>{{ $w->serial_number }}</strong></td>
                     <td>{{ $w->orderItem->variant->categoryName ?? '-' }}</td>
                     <td>{{ Str::limit($w->orderItem->variant->name ?? '-', 30) }}</td>

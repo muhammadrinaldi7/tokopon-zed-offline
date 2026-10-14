@@ -128,7 +128,7 @@
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm font-bold text-gray-900">{{ $order->order_number }}</div>
-                                <div class="text-xs text-gray-500">{{ $order->created_at->format('d M Y H:i') }}</div>
+                                <div class="text-xs text-gray-500">{{ ($order->order_date ?? $order->created_at)?->format('d M Y') ?? '-' }}</div>
                                 <div class="text-xs text-gray-400 mt-0.5">Inv: {{ $order->accurate_invoice_no ?? '-' }}
                                 </div>
                             </td>

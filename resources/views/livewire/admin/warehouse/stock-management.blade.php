@@ -5,23 +5,64 @@
             <p class="text-sm text-gray-500 mt-1">Lihat dan sinkronisasikan stok produk di setiap cabang/gudang langsung dari Accurate Online.</p>
         </div>
 
-        <button wire:click="syncAllStocks" wire:loading.attr="disabled"
-            class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#1c69d4] hover:bg-[#1552a8] active:bg-[#0f3d82] rounded-lg transition-colors shadow-sm disabled:opacity-50">
-            <svg wire:loading.remove class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        <button wire:click="syncAllStocks" wire:loading.attr="disabled" :disabled="$isSyncing"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#1c69d4] hover:bg-[#1552a8] active:bg-[#0f3d82] rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg wire:loading.remove wire:target="syncAllStocks" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                 stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round"
                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <svg wire:loading class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+            <svg wire:loading wire:target="syncAllStocks" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
                 </circle>
                 <path class="opacity-75" fill="currentColor"
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                 </path>
             </svg>
-            <span>Sync Semua Stok Halaman Ini</span>
+            <span>Sync Semua Stok Gudang</span>
         </button>
     </div>
+
+    {{-- Progress Card saat Progressive Batching Sync Berjalan --}}
+    @if ($isSyncing)
+        <div class="p-4 bg-blue-50 border border-blue-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-pulse">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h4 class="text-sm font-bold text-blue-900">Menyinkronkan Stok dari Accurate...</h4>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-200 text-blue-800">
+                            Gudang: {{ $currentWarehouseName }}
+                        </span>
+                        @if ($totalWarehousesToSync > 1)
+                            <span class="text-xs text-blue-600 font-medium">
+                                (Gudang ke-{{ $completedWarehousesCount + 1 }} dari {{ $totalWarehousesToSync }})
+                            </span>
+                        @endif
+                    </div>
+                    <p class="text-xs text-blue-700 mt-0.5">
+                        Memproses Accurate API Halaman ke-{{ $syncCurrentPage }} (100 item/halaman)
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4 self-end sm:self-center">
+                <div class="text-right">
+                    <span class="text-2xl font-black text-blue-600">{{ $syncImportedCount }}</span>
+                    <span class="text-xs text-blue-500 font-medium block uppercase tracking-wider">Item Masuk</span>
+                </div>
+                <button wire:click="cancelSync"
+                    class="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
+                    Hentikan
+                </button>
+            </div>
+        </div>
+    @endif
 
     <!-- Tabs and Filters -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-200 pb-1">
@@ -58,25 +99,28 @@
                         <th class="px-6 py-4">Item No (SKU)</th>
                         <th class="px-6 py-4">Nama Produk Accurate</th>
                         @foreach ($warehouses as $warehouse)
-                            <th class="px-6 py-4 text-center">{{ $warehouse->name }}
-                                <button wire:click="syncProductPerWh('{{ $warehouse->name }}')"
-                                    wire:loading.attr="disabled"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#1c69d4] hover:bg-[#1c69d4]/10 rounded-lg transition-all active:scale-95 disabled:opacity-50">
-                                    <svg wire:loading.remove wire:target="syncProductPerWh('{{ $warehouse->name }}')"
-                                        class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                        stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                    <svg wire:loading wire:target="syncProductPerWh('{{ $warehouse->name }}')"
-                                        class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10"
-                                            stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor"
-                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                        </path>
-                                    </svg>
-                                </button>
+                            <th class="px-6 py-4 text-center">
+                                <div class="flex items-center justify-center gap-1.5">
+                                    <span>{{ $warehouse->name }}</span>
+                                    <button wire:click="syncProductPerWh('{{ $warehouse->name }}')"
+                                        wire:loading.attr="disabled"
+                                        :disabled="$isSyncing"
+                                        title="Sinkronisasi stok gudang {{ $warehouse->name }}"
+                                        class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-[#1c69d4] hover:bg-[#1c69d4]/10 rounded-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                                        @if ($isSyncing && $currentWarehouseName === $warehouse->name)
+                                            <svg class="animate-spin w-3.5 h-3.5 text-[#1c69d4]" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span class="text-[10px] font-mono">P{{ $syncCurrentPage }}</span>
+                                        @else
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                        @endif
+                                    </button>
+                                </div>
                             </th>
                         @endforeach
                     </tr>
