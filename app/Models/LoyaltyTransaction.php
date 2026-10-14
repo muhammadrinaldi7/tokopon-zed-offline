@@ -43,4 +43,9 @@ class LoyaltyTransaction extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
+    public function user()
+    {
+        return $this->hasOneThrough(User::class, LoyaltyAccount::class, 'id', 'id', 'loyalty_account_id', 'user_id');
+    }
 }
