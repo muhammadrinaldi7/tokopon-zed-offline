@@ -449,6 +449,16 @@ class OrderController extends Controller
             ], 404);
         }
 
+        $user = $request->user();
+
+        // Verifikasi kepemilikan pesanan jika request terautentikasi (customer tidak boleh membatalkan pesanan user lain)
+        if ($user && $order->user_id && (int) $order->user_id !== (int) $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki hak akses untuk membatalkan pesanan ini.',
+            ], 403);
+        }
+
         if ($order->order_status !== 'WAITING_PAYMENT') {
             return response()->json([
                 'success' => false,
@@ -457,14 +467,16 @@ class OrderController extends Controller
         }
 
         try {
-            $cancelledOrder = $this->orderService->cancelOrExpireOrder($order, 'DIBATALKAN_PELANGGAN');
+            $cancelledOrder = $this->orderService->cancelOrExpireOrder($order, 'DIBATALKAN_PELANGGAN', $user);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Pesanan berhasil dibatalkan dan stok telah dikembalikan.',
+                'message' => 'Pesanan berhasil dibatalkan. Poin loyalitas dan stok barang telah dikembalikan.',
                 'data' => [
                     'order_number' => $cancelledOrder->order_number,
                     'order_status' => $cancelledOrder->order_status,
+                    'loyalty_points_refunded' => (int) ($cancelledOrder->loyalty_points_redeemed ?? 0),
+                    'loyalty_points_revoked' => (int) ($cancelledOrder->loyalty_points_earned ?? 0),
                 ]
             ]);
         } catch (Exception $e) {

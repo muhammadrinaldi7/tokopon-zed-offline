@@ -108,7 +108,14 @@ class OrderCancellationHandler implements ApprovalHandlerInterface
             ->where('status', 'USED')
             ->update(['status' => 'AVAILABLE']);
 
-        Log::info("Order cancellation approved: Order #{$order->order_number} cancelled. Warranties voided, SNs restored to Available, Stock replenished.");
+        // 5. Kembalikan / batalkan poin loyalty terkait
+        try {
+            app(\App\Services\LoyaltyService::class)->refundPoints($order, Auth::user());
+        } catch (\Throwable $e) {
+            Log::warning("OrderCancellationHandler: Gagal memulihkan poin loyalty untuk order #{$order->order_number}: " . $e->getMessage());
+        }
+
+        Log::info("Order cancellation approved: Order #{$order->order_number} cancelled. Warranties voided, SNs restored to Available, Stock replenished, Loyalty refunded.");
     }
 
     public function handleRejected(ApprovalRequest $request, array $params = []): void
