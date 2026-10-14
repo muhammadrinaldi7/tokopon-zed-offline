@@ -1,4 +1,7 @@
-<div class="p-4 sm:p-6 min-h-screen bg-neutral-100" wire:poll.2500ms="pollNewMessages">
+<div class="p-4 sm:p-6 min-h-screen bg-neutral-100" wire:poll.keep-alive.2500ms="pollNewMessages">
+    {{-- Audio Chime Player (Dapat Berbunyi di Background Tab) --}}
+    <audio id="chat-chime-player" preload="auto" src="{{ asset('sounds/notification.wav') }}" class="hidden"></audio>
+
     {{-- Header Modul E-Commerce --}}
     @include('livewire.zoffline.ecommerce.partials.header', ['title' => 'Live Chat CS & Penjualan'])
 
@@ -12,26 +15,34 @@
             <span class="font-bold text-gray-800">Status Live Chat:</span>
             <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 font-semibold text-[11px] flex items-center gap-1">
                 <span>⚡</span>
-                <span>Realtime Cepat (2.5s)</span>
+                <span>Realtime Aktif (Background Guard)</span>
             </span>
-            <span class="text-gray-400 text-[11px] hidden sm:inline">• Pesan pelanggan masuk otomatis dengan bunyi notifikasi.</span>
+            <span class="text-gray-400 text-[11px] hidden sm:inline">• Pesan tetap masuk & berbunyi saat buka tab lain / YouTube.</span>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
             {{-- Tombol Toggle Suara --}}
             <button type="button" id="toggle-sound-btn" onclick="toggleChatSound()"
                 class="px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold flex items-center gap-1.5 transition-all shadow-2xs text-[11px]"
-                title="Aktifkan atau bisukan suara lonceng pesan masuk">
+                title="Aktifkan atau bisukan nada lonceng pesan masuk">
                 <span id="sound-icon">🔊</span>
                 <span id="sound-label">Bunyi: Aktif</span>
             </button>
 
-            {{-- Tombol Tes Suara & Izin Desktop Notification --}}
-            <button type="button" onclick="testNotificationSoundAndPermission()"
-                class="px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold flex items-center gap-1.5 transition-all shadow-2xs text-[11px]"
-                title="Uji coba bunyi lonceng dan aktifkan popup notifikasi desktop browser">
-                <span>🔔</span>
-                <span>Tes Suara & Notif Desktop</span>
+            {{-- Tombol Tes Bunyi Lonceng --}}
+            <button type="button" onclick="testNotificationSoundOnly()"
+                class="px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 font-bold flex items-center gap-1.5 transition-all shadow-2xs text-[11px]"
+                title="Putar uji coba nada lonceng untuk mengecek volume suara">
+                <span>🎵</span>
+                <span>Tes Suara</span>
+            </button>
+
+            {{-- Tombol Status Izin Notifikasi Desktop Browser --}}
+            <button type="button" id="notif-perm-btn" onclick="requestDesktopNotificationPermission()"
+                class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold flex items-center gap-1.5 transition-all shadow-xs text-[11px]"
+                title="Klik untuk mengizinkan popup notifikasi di layar Windows saat buka YouTube/aplikasi lain">
+                <span id="notif-perm-icon">🔔</span>
+                <span id="notif-perm-label">Izinkan Notif Desktop</span>
             </button>
         </div>
     </div>
@@ -493,7 +504,7 @@
         </div>
     @endif
 
-    {{-- AUDIO SYNTHESIZER & REALTIME REVERB ECHO INTEGRATION --}}
+    {{-- AUDIO SYNTHESIZER, WEB WORKER & REALTIME REVERB ECHO INTEGRATION --}}
     @script
     <script>
         // --- 1. STATE SUARA & DOKUMEN ---
@@ -501,6 +512,7 @@
         let sharedAudioCtx = null;
         let titleFlashingTimer = null;
         const originalDocTitle = document.title;
+        const audioElement = document.getElementById('chat-chime-player');
 
         // Inisialisasi tampilan tombol suara saat halaman dimuat
         function initSoundUI() {
@@ -521,7 +533,7 @@
                 }
             }
         }
-        setTimeout(initSoundUI, 100);
+        setTimeout(initSoundUI, 80);
 
         // Toggle mute/unmute
         window.toggleChatSound = function() {
@@ -529,11 +541,11 @@
             localStorage.setItem('tokopon_cs_sound_muted', isSoundMuted ? 'true' : 'false');
             initSoundUI();
             if (!isSoundMuted) {
-                playNotificationChime(true);
+                playNotificationSound(true);
             }
         };
 
-        // --- 2. AUDIO CONTEXT UNLOCK & MELODIC CHIME ---
+        // --- 2. AUDIO PLAYBACK & UNLOCK UNTUK BACKGROUND TAB ---
         function getSharedAudioContext() {
             try {
                 if (!sharedAudioCtx) {
@@ -551,26 +563,34 @@
             }
         }
 
-        // Gesture unlock audio context pada interaksi pertama pengguna
-        const unlockAudioContext = () => {
+        // Gesture unlock audio pada interaksi klik pertama agar browser mengizinkan audio berbunyi di background
+        const unlockAllAudio = () => {
+            if (audioElement) {
+                audioElement.muted = true;
+                const p = audioElement.play();
+                if (p !== undefined) {
+                    p.then(() => {
+                        audioElement.pause();
+                        audioElement.currentTime = 0;
+                        audioElement.muted = false;
+                    }).catch(() => {});
+                }
+            }
             getSharedAudioContext();
-            document.removeEventListener('click', unlockAudioContext);
-            document.removeEventListener('keydown', unlockAudioContext);
+            document.removeEventListener('click', unlockAllAudio);
+            document.removeEventListener('keydown', unlockAllAudio);
         };
-        document.addEventListener('click', unlockAudioContext, { passive: true });
-        document.addEventListener('keydown', unlockAudioContext, { passive: true });
+        document.addEventListener('click', unlockAllAudio, { passive: true });
+        document.addEventListener('keydown', unlockAllAudio, { passive: true });
 
-        // Bunyikan nada lonceng 2-nada (crisp & pleasant chime)
-        function playNotificationChime(forcePlay = false) {
-            if (isSoundMuted && !forcePlay) return;
-
+        // Sintesis suara lonceng cadangan via Web Audio API jika file audio dicegah
+        function playWebAudioSynthesizer() {
             try {
                 const ctx = getSharedAudioContext();
                 if (!ctx) return;
 
                 const now = ctx.currentTime;
-
-                // Nada 1: 587.33 Hz (D5) - lembut
+                // Nada 1: 587.33 Hz (D5)
                 const osc1 = ctx.createOscillator();
                 const gain1 = ctx.createGain();
                 osc1.type = 'sine';
@@ -582,7 +602,7 @@
                 osc1.start(now);
                 osc1.stop(now + 0.3);
 
-                // Nada 2: 880 Hz (A5) - nada lonceng jernih
+                // Nada 2: 880 Hz (A5)
                 const osc2 = ctx.createOscillator();
                 const gain2 = ctx.createGain();
                 osc2.type = 'sine';
@@ -594,13 +614,67 @@
                 osc2.start(now + 0.1);
                 osc2.stop(now + 0.6);
             } catch (err) {
-                console.warn('Gagal memainkan audio chime:', err);
+                console.warn('Fallback Web Audio synthesizer gagal:', err);
             }
         }
 
-        // --- 3. DESKTOP NOTIFICATION BROWSER ---
-        window.testNotificationSoundAndPermission = function() {
-            playNotificationChime(true);
+        // Putar audio lonceng utama (menggunakan file WAV yang dapat berbunyi di background tab)
+        function playNotificationSound(forcePlay = false) {
+            if (isSoundMuted && !forcePlay) return;
+
+            if (audioElement) {
+                audioElement.currentTime = 0;
+                audioElement.volume = 0.9;
+                const promise = audioElement.play();
+                if (promise !== undefined) {
+                    promise.catch(() => {
+                        // Jika audio tag diblokir browser background, jalankan Web Audio synthesizer
+                        playWebAudioSynthesizer();
+                    });
+                    return;
+                }
+            }
+            playWebAudioSynthesizer();
+        }
+
+        window.testNotificationSoundOnly = function() {
+            playNotificationSound(true);
+        };
+
+        // --- 3. STATUS & IZIN DESKTOP NOTIFICATION BROWSER ---
+        function updateNotificationPermissionUI() {
+            const btn = document.getElementById('notif-perm-btn');
+            const icon = document.getElementById('notif-perm-icon');
+            const label = document.getElementById('notif-perm-label');
+            if (!btn || !label) return;
+
+            if (!('Notification' in window)) {
+                label.textContent = 'Notif: Tidak Didukung';
+                btn.className = "px-3 py-1.5 rounded-xl bg-gray-100 border border-gray-200 text-gray-500 font-bold flex items-center gap-1.5 text-[11px] cursor-not-allowed";
+                return;
+            }
+
+            if (Notification.permission === 'granted') {
+                btn.className = "px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold flex items-center gap-1.5 transition-all shadow-2xs text-[11px]";
+                if (icon) icon.textContent = '🔔';
+                label.textContent = 'Notif Desktop: Aktif';
+                btn.title = "Notifikasi desktop aktif! Anda akan mendapatkan popup di Windows saat buka YouTube / aplikasi lain.";
+            } else if (Notification.permission === 'denied') {
+                btn.className = "px-3.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold flex items-center gap-1.5 transition-all shadow-2xs text-[11px]";
+                if (icon) icon.textContent = '🚫';
+                label.textContent = 'Notif Diblokir Browser';
+                btn.title = "Izin notifikasi diblokir di browser. Klik ikon gembok di sebelah URL bar untuk mengubah izin ke 'Izinkan / Allow'.";
+            } else {
+                btn.className = "px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold flex items-center gap-1.5 transition-all shadow-sm text-[11px] animate-pulse";
+                if (icon) icon.textContent = '⚠️';
+                label.textContent = 'Klik Izinkan Notif Desktop';
+                btn.title = "PENTING: Klik tombol ini dan pilih 'Izinkan / Allow' agar pesan tetap masuk saat Anda membuka YouTube / app lain!";
+            }
+        }
+        setTimeout(updateNotificationPermissionUI, 120);
+
+        window.requestDesktopNotificationPermission = function() {
+            playNotificationSound(true);
 
             if (!('Notification' in window)) {
                 alert('Browser Anda tidak mendukung Web Notifications API.');
@@ -609,6 +683,7 @@
 
             if (Notification.permission === 'default') {
                 Notification.requestPermission().then((permission) => {
+                    updateNotificationPermissionUI();
                     if (permission === 'granted') {
                         showDesktopNotification({
                             sender: 'Tokopon Live Chat CS',
@@ -620,11 +695,11 @@
             } else if (Notification.permission === 'granted') {
                 showDesktopNotification({
                     sender: 'Tokopon Live Chat (Tes)',
-                    text: 'Bunyi dan notifikasi desktop berhasil diaktifkan dengan baik!',
+                    text: 'Bunyi dan notifikasi desktop aktif! Popup ini akan muncul walau Anda membuka YouTube / aplikasi lain.',
                     conversationId: null
                 });
             } else {
-                alert('Izin notifikasi desktop diblokir di browser. Silakan klik ikon gembok di sebelah URL bar browser untuk mengizinkan (Allow Notifications).');
+                alert('Izin notifikasi desktop diblokir di browser. Silakan klik ikon gembok/setelan situs di sebelah kiri URL bar browser lalu ubah izin Notifikasi ke "Izinkan / Allow".');
             }
         };
 
@@ -636,7 +711,8 @@
                     body: data.text || 'Membalas percakapan Anda...',
                     icon: '/favicon.ico',
                     tag: data.conversationId ? 'conv-' + data.conversationId : 'tokopon-cs',
-                    renotify: true
+                    renotify: true,
+                    requireInteraction: true // Menjaga notifikasi tetap tampil di pojok layar Windows
                 });
 
                 notif.onclick = () => {
@@ -691,9 +767,9 @@
             if (!payload) return;
 
             // 1. Bunyikan nada lonceng
-            playNotificationChime();
+            playNotificationSound();
 
-            // 2. Tampilkan notifikasi desktop browser jika CS sedang buka tab lain
+            // 2. Tampilkan notifikasi desktop browser (muncul di layar Windows saat buka YouTube/aplikasi lain)
             showDesktopNotification(payload);
 
             // 3. Kedipkan judul tab jika CS sedang di tab lain
@@ -705,7 +781,38 @@
             }
         });
 
-        // --- 7. WEBSOCKET LARAVEL REVERB ECHO (INSTANT ZERO-LATENCY JIKA AKTIF) ---
+        // --- 7. INLINE WEB WORKER (PENGAMAN AGAR TIDAK DI-THROTTLE DI BACKGROUND TAB) ---
+        // Browser seperti Chrome/Edge membatasi timer JavaScript saat membuka YouTube.
+        // Web Worker berjalan di thread terpisah sehingga timer 2.5s tetap berjalan 100% tanpa henti!
+        let bgWorker = null;
+        try {
+            const workerCode = `
+                let timer = null;
+                self.onmessage = function(e) {
+                    if (e.data === 'start') {
+                        if (timer) clearInterval(timer);
+                        timer = setInterval(() => {
+                            self.postMessage('poll');
+                        }, 2500);
+                    } else if (e.data === 'stop') {
+                        if (timer) clearInterval(timer);
+                        timer = null;
+                    }
+                };
+            `;
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            bgWorker = new Worker(URL.createObjectURL(blob));
+            bgWorker.onmessage = function(e) {
+                if (e.data === 'poll') {
+                    $wire.pollNewMessages();
+                }
+            };
+            bgWorker.postMessage('start');
+        } catch (err) {
+            console.warn('Web Worker timer tidak aktif:', err);
+        }
+
+        // --- 8. WEBSOCKET LARAVEL REVERB ECHO (INSTANT ZERO-LATENCY JIKA AKTIF) ---
         if (window.Echo) {
             window.Echo.private('cs-chats')
                 .listen('.message.sent', (e) => {
