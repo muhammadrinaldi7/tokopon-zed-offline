@@ -67,8 +67,12 @@ class CsChat extends Component
     public ?int $selectedProductAccurateId = null;
     public ?array $selectedProductPreview = null;
 
+    // Tracker ID pesan untuk deteksi real-time & notifikasi
+    public ?int $lastKnownMaxMessageId = null;
+
     public function mount()
     {
+        $this->lastKnownMaxMessageId = Message::max('id') ?? 0;
         $this->loadConversations();
     }
 
@@ -428,6 +432,7 @@ class CsChat extends Component
             // broadcast fallback silently
         }
 
+        $this->lastKnownMaxMessageId = Message::max('id') ?? $this->lastKnownMaxMessageId;
         $this->dispatch('cs-messages-loaded');
     }
 
@@ -474,9 +479,57 @@ class CsChat extends Component
 
     public function refreshData()
     {
+        $this->lastKnownMaxMessageId = Message::max('id') ?? 0;
         $this->loadConversations();
         if ($this->activeConversationId) {
             $this->loadMessages();
+        }
+    }
+
+    /**
+     * Polling cepat (low-overhead check) untuk mendeteksi pesan baru secara realtime.
+     * Menggunakan index Message::max('id') (< 1ms query) tanpa render ulang jika tidak ada pesan baru.
+     */
+    public function pollNewMessages()
+    {
+        $currentMaxId = Message::max('id') ?? 0;
+
+        if ($this->lastKnownMaxMessageId === null) {
+            $this->lastKnownMaxMessageId = $currentMaxId;
+            return;
+        }
+
+        if ($currentMaxId > $this->lastKnownMaxMessageId) {
+            // Periksa pesan baru dari customer atau guest
+            $incomingCustomerMessages = Message::with(['user', 'conversation'])
+                ->where('id', '>', $this->lastKnownMaxMessageId)
+                ->whereIn('sender_type', ['customer', 'guest'])
+                ->orderBy('id', 'asc')
+                ->get();
+
+            if ($incomingCustomerMessages->isNotEmpty()) {
+                $latestMsg = $incomingCustomerMessages->last();
+                $senderName = $latestMsg->user?->name 
+                    ?? ($latestMsg->conversation?->guest_name ?: 'Pelanggan');
+
+                $previewText = !empty($latestMsg->message) 
+                    ? \Illuminate\Support\Str::limit($latestMsg->message, 80)
+                    : ($latestMsg->product_accurate_id ? 'Menanyakan rekomendasi produk' : 'Mengirim lampiran...');
+
+                // Dispatch event browser untuk memicu audio chime & desktop notification
+                $this->dispatch('incoming-customer-message', [
+                    'sender' => $senderName,
+                    'text' => $previewText,
+                    'conversationId' => $latestMsg->conversation_id,
+                    'isActiveConv' => $latestMsg->conversation_id === $this->activeConversationId,
+                ]);
+            }
+
+            $this->lastKnownMaxMessageId = $currentMaxId;
+            $this->loadConversations();
+            if ($this->activeConversationId) {
+                $this->loadMessages();
+            }
         }
     }
 

@@ -1,10 +1,44 @@
-<div class="p-4 sm:p-6 min-h-screen bg-neutral-100" wire:poll.25s="refreshData">
+<div class="p-4 sm:p-6 min-h-screen bg-neutral-100" wire:poll.2500ms="pollNewMessages">
     {{-- Header Modul E-Commerce --}}
     @include('livewire.zoffline.ecommerce.partials.header', ['title' => 'Live Chat CS & Penjualan'])
 
+    {{-- Notification & Live Sync Control Bar --}}
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-2.5 rounded-2xl border border-gray-200/80 shadow-xs text-xs">
+        <div class="flex items-center gap-2">
+            <span class="relative flex h-2.5 w-2.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span class="font-bold text-gray-800">Status Live Chat:</span>
+            <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 font-semibold text-[11px] flex items-center gap-1">
+                <span>⚡</span>
+                <span>Realtime Cepat (2.5s)</span>
+            </span>
+            <span class="text-gray-400 text-[11px] hidden sm:inline">• Pesan pelanggan masuk otomatis dengan bunyi notifikasi.</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+            {{-- Tombol Toggle Suara --}}
+            <button type="button" id="toggle-sound-btn" onclick="toggleChatSound()"
+                class="px-3 py-1.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold flex items-center gap-1.5 transition-all shadow-2xs text-[11px]"
+                title="Aktifkan atau bisukan suara lonceng pesan masuk">
+                <span id="sound-icon">🔊</span>
+                <span id="sound-label">Bunyi: Aktif</span>
+            </button>
+
+            {{-- Tombol Tes Suara & Izin Desktop Notification --}}
+            <button type="button" onclick="testNotificationSoundAndPermission()"
+                class="px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold flex items-center gap-1.5 transition-all shadow-2xs text-[11px]"
+                title="Uji coba bunyi lonceng dan aktifkan popup notifikasi desktop browser">
+                <span>🔔</span>
+                <span>Tes Suara & Notif Desktop</span>
+            </button>
+        </div>
+    </div>
+
     {{-- Main Chat Container --}}
     <div class="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row"
-        style="height: calc(100vh - 190px); min-height: 560px;">
+        style="height: calc(100vh - 240px); min-height: 540px;">
 
         {{-- 1. Sidebar: List Percakapan Pelanggan --}}
         <div class="w-full md:w-88 border-r border-gray-200 flex flex-col bg-gray-50/60 shrink-0">
@@ -462,45 +496,188 @@
     {{-- AUDIO SYNTHESIZER & REALTIME REVERB ECHO INTEGRATION --}}
     @script
     <script>
-        // Synthesize notification chime using Web Audio API (smooth 2-tone melodic chime)
-        function playNotificationChime() {
-            try {
-                const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                if (!AudioCtx) return;
-                const ctx = new AudioCtx();
-                if (ctx.state === 'suspended') {
-                    ctx.resume();
+        // --- 1. STATE SUARA & DOKUMEN ---
+        let isSoundMuted = localStorage.getItem('tokopon_cs_sound_muted') === 'true';
+        let sharedAudioCtx = null;
+        let titleFlashingTimer = null;
+        const originalDocTitle = document.title;
+
+        // Inisialisasi tampilan tombol suara saat halaman dimuat
+        function initSoundUI() {
+            const icon = document.getElementById('sound-icon');
+            const label = document.getElementById('sound-label');
+            const btn = document.getElementById('toggle-sound-btn');
+            if (icon && label && btn) {
+                if (isSoundMuted) {
+                    icon.textContent = '🔇';
+                    label.textContent = 'Bunyi: Bisu';
+                    btn.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-200');
+                    btn.classList.remove('bg-gray-50', 'text-gray-700');
+                } else {
+                    icon.textContent = '🔊';
+                    label.textContent = 'Bunyi: Aktif';
+                    btn.classList.remove('bg-rose-50', 'text-rose-700', 'border-rose-200');
+                    btn.classList.add('bg-gray-50', 'text-gray-700');
                 }
+            }
+        }
+        setTimeout(initSoundUI, 100);
+
+        // Toggle mute/unmute
+        window.toggleChatSound = function() {
+            isSoundMuted = !isSoundMuted;
+            localStorage.setItem('tokopon_cs_sound_muted', isSoundMuted ? 'true' : 'false');
+            initSoundUI();
+            if (!isSoundMuted) {
+                playNotificationChime(true);
+            }
+        };
+
+        // --- 2. AUDIO CONTEXT UNLOCK & MELODIC CHIME ---
+        function getSharedAudioContext() {
+            try {
+                if (!sharedAudioCtx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        sharedAudioCtx = new AudioCtx();
+                    }
+                }
+                if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+                    sharedAudioCtx.resume();
+                }
+                return sharedAudioCtx;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Gesture unlock audio context pada interaksi pertama pengguna
+        const unlockAudioContext = () => {
+            getSharedAudioContext();
+            document.removeEventListener('click', unlockAudioContext);
+            document.removeEventListener('keydown', unlockAudioContext);
+        };
+        document.addEventListener('click', unlockAudioContext, { passive: true });
+        document.addEventListener('keydown', unlockAudioContext, { passive: true });
+
+        // Bunyikan nada lonceng 2-nada (crisp & pleasant chime)
+        function playNotificationChime(forcePlay = false) {
+            if (isSoundMuted && !forcePlay) return;
+
+            try {
+                const ctx = getSharedAudioContext();
+                if (!ctx) return;
+
                 const now = ctx.currentTime;
 
-                // First chime note: 587.33 Hz (D5)
+                // Nada 1: 587.33 Hz (D5) - lembut
                 const osc1 = ctx.createOscillator();
                 const gain1 = ctx.createGain();
                 osc1.type = 'sine';
                 osc1.frequency.setValueAtTime(587.33, now);
-                gain1.gain.setValueAtTime(0.18, now);
-                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                gain1.gain.setValueAtTime(0.22, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
                 osc1.connect(gain1);
                 gain1.connect(ctx.destination);
                 osc1.start(now);
-                osc1.stop(now + 0.35);
+                osc1.stop(now + 0.3);
 
-                // Second chime note: 880 Hz (A5)
+                // Nada 2: 880 Hz (A5) - nada lonceng jernih
                 const osc2 = ctx.createOscillator();
                 const gain2 = ctx.createGain();
                 osc2.type = 'sine';
-                osc2.frequency.setValueAtTime(880, now + 0.12);
-                gain2.gain.setValueAtTime(0.22, now + 0.12);
+                osc2.frequency.setValueAtTime(880, now + 0.1);
+                gain2.gain.setValueAtTime(0.28, now + 0.1);
                 gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
                 osc2.connect(gain2);
                 gain2.connect(ctx.destination);
-                osc2.start(now + 0.12);
+                osc2.start(now + 0.1);
                 osc2.stop(now + 0.6);
             } catch (err) {
-                console.warn('Notification chime skipped:', err);
+                console.warn('Gagal memainkan audio chime:', err);
             }
         }
 
+        // --- 3. DESKTOP NOTIFICATION BROWSER ---
+        window.testNotificationSoundAndPermission = function() {
+            playNotificationChime(true);
+
+            if (!('Notification' in window)) {
+                alert('Browser Anda tidak mendukung Web Notifications API.');
+                return;
+            }
+
+            if (Notification.permission === 'default') {
+                Notification.requestPermission().then((permission) => {
+                    if (permission === 'granted') {
+                        showDesktopNotification({
+                            sender: 'Tokopon Live Chat CS',
+                            text: 'Notifikasi desktop aktif! Anda akan diberi tahu setiap ada pesan masuk dari pembeli.',
+                            conversationId: null
+                        });
+                    }
+                });
+            } else if (Notification.permission === 'granted') {
+                showDesktopNotification({
+                    sender: 'Tokopon Live Chat (Tes)',
+                    text: 'Bunyi dan notifikasi desktop berhasil diaktifkan dengan baik!',
+                    conversationId: null
+                });
+            } else {
+                alert('Izin notifikasi desktop diblokir di browser. Silakan klik ikon gembok di sebelah URL bar browser untuk mengizinkan (Allow Notifications).');
+            }
+        };
+
+        function showDesktopNotification(data) {
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+            try {
+                const notif = new Notification(`💬 ${data.sender || 'Pesan Baru'}`, {
+                    body: data.text || 'Membalas percakapan Anda...',
+                    icon: '/favicon.ico',
+                    tag: data.conversationId ? 'conv-' + data.conversationId : 'tokopon-cs',
+                    renotify: true
+                });
+
+                notif.onclick = () => {
+                    window.focus();
+                    if (data.conversationId) {
+                        $wire.selectConversation(data.conversationId);
+                    }
+                    notif.close();
+                };
+            } catch (e) {
+                console.warn('Gagal menampilkan desktop notification:', e);
+            }
+        }
+
+        // --- 4. FLASHING TITLE PADA TAB BROWSER ---
+        function startFlashingTitle(sender) {
+            if (!document.hidden) return; // Hanya kedipkan jika sedang di background tab
+
+            let isAlert = true;
+            if (titleFlashingTimer) clearInterval(titleFlashingTimer);
+
+            titleFlashingTimer = setInterval(() => {
+                document.title = isAlert ? `🔔 (1) Pesan Baru: ${sender}!` : originalDocTitle;
+                isAlert = !isAlert;
+            }, 1000);
+        }
+
+        function stopFlashingTitle() {
+            if (titleFlashingTimer) {
+                clearInterval(titleFlashingTimer);
+                titleFlashingTimer = null;
+            }
+            document.title = originalDocTitle;
+        }
+
+        window.addEventListener('focus', stopFlashingTitle);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) stopFlashingTitle();
+        });
+
+        // --- 5. HELPER SCROLL KE BAWAH ---
         function scrollMessagesBottom() {
             const container = document.getElementById('chat-messages-container');
             if (container) {
@@ -508,20 +685,36 @@
             }
         }
 
-        // Setup Laravel Reverb Echo Listeners
+        // --- 6. EVENT LISTENER DARI LIVEWIRE (POLLING & BROADCAST) ---
+        $wire.on('incoming-customer-message', (data) => {
+            const payload = Array.isArray(data) ? data[0] : data;
+            if (!payload) return;
+
+            // 1. Bunyikan nada lonceng
+            playNotificationChime();
+
+            // 2. Tampilkan notifikasi desktop browser jika CS sedang buka tab lain
+            showDesktopNotification(payload);
+
+            // 3. Kedipkan judul tab jika CS sedang di tab lain
+            startFlashingTitle(payload.sender);
+
+            // 4. Auto scroll jika berada di percakapan aktif
+            if (payload.isActiveConv) {
+                setTimeout(scrollMessagesBottom, 60);
+            }
+        });
+
+        // --- 7. WEBSOCKET LARAVEL REVERB ECHO (INSTANT ZERO-LATENCY JIKA AKTIF) ---
         if (window.Echo) {
-            // Channel 1: Global CS Chats channel for new incoming messages & sidebar updates
             window.Echo.private('cs-chats')
                 .listen('.message.sent', (e) => {
                     if (e.senderType !== 'cs') {
-                        playNotificationChime();
+                        $wire.pollNewMessages();
                     }
-                    $wire.refreshData();
                 });
 
-            // Channel 2: Active Conversation specific channel
             let activeSubscribedId = null;
-
             function subscribeToActiveConv(convId) {
                 if (activeSubscribedId && activeSubscribedId !== convId) {
                     window.Echo.leave(`conversation.${activeSubscribedId}`);
@@ -532,27 +725,25 @@
                     activeSubscribedId = convId;
                     window.Echo.private(`conversation.${convId}`)
                         .listen('.message.sent', (e) => {
-                            $wire.refreshData().then(() => {
+                            $wire.pollNewMessages().then(() => {
                                 setTimeout(scrollMessagesBottom, 60);
                             });
                         });
                 }
             }
 
-            // Initial subscription
             const initConvId = @js($activeConversationId);
             if (initConvId) {
                 subscribeToActiveConv(initConvId);
             }
 
-            // Watch for changes in active conversation
             $wire.$watch('activeConversationId', (newId) => {
                 subscribeToActiveConv(newId);
                 setTimeout(scrollMessagesBottom, 120);
             });
         }
 
-        // Auto-scroll when messages loaded or view mounted
+        // Auto-scroll saat chat pertama kali dimuat
         setTimeout(scrollMessagesBottom, 150);
         $wire.on('cs-messages-loaded', () => {
             setTimeout(scrollMessagesBottom, 50);
