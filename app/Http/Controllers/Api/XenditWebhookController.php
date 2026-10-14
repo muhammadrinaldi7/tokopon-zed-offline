@@ -58,9 +58,14 @@ class XenditWebhookController extends Controller
                     $tradeIn->update(['status' => 'COMPLETED']);
                 }
             } elseif ($status === 'EXPIRED') {
-                $orderPayment->order->update([
-                    'order_status' => 'CANCELLED'
-                ]);
+                $order = $orderPayment->order;
+                if ($order) {
+                    try {
+                        app(\App\Services\MobileOrderService::class)->cancelOrExpireOrder($order, 'PAYMENT_EXPIRED');
+                    } catch (\Throwable $e) {
+                        $order->update(['order_status' => 'CANCELLED']);
+                    }
+                }
             }
         } else {
              Log::warning('Xendit Webhook OrderPayment Not Found', [

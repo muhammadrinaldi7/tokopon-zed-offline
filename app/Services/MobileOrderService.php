@@ -451,10 +451,11 @@ class MobileOrderService
      *
      * @param Order $order
      * @param string $reason
+     * @param User|null $actor
      * @return Order
      * @throws Exception
      */
-    public function cancelOrExpireOrder(Order $order, string $reason = 'EXPIRED'): Order
+    public function cancelOrExpireOrder(Order $order, string $reason = 'EXPIRED', ?User $actor = null): Order
     {
         if ($order->order_status === 'COMPLETED') {
             throw new Exception("Order #{$order->order_number} sudah selesai (COMPLETED) dan tidak dapat dibatalkan.");
@@ -464,7 +465,7 @@ class MobileOrderService
             return $order;
         }
 
-        return DB::transaction(function () use ($order, $reason) {
+        return DB::transaction(function () use ($order, $reason, $actor) {
             $warehouseId = $order->warehouse_id;
 
             // 1. Kembalikan stok agregat di warehouse_stocks
@@ -510,7 +511,7 @@ class MobileOrderService
 
             // 5. Kembalikan poin loyalty jika pernah menukar atau memperoleh poin
             try {
-                app(\App\Services\LoyaltyService::class)->refundPoints($order);
+                app(\App\Services\LoyaltyService::class)->refundPoints($order, $actor);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning("Gagal memulihkan poin loyalty untuk order #{$order->order_number}: " . $e->getMessage());
             }

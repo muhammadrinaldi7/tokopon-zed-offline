@@ -15,6 +15,29 @@ class Order extends Model
         'payment_expired_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::updated(function (Order $order) {
+            if ($order->wasChanged('order_status')) {
+                $status = strtoupper((string) $order->order_status);
+
+                if ($status === 'CANCELLED') {
+                    try {
+                        app(\App\Services\LoyaltyService::class)->refundPoints($order);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning("Loyalty refundPoints listener error on Order #{$order->order_number}: " . $e->getMessage());
+                    }
+                } elseif (in_array($status, ['PAID', 'COMPLETED', 'PROCESSING', 'SHIPPED'], true)) {
+                    try {
+                        app(\App\Services\LoyaltyService::class)->earnPoints($order);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning("Loyalty earnPoints listener error on Order #{$order->order_number}: " . $e->getMessage());
+                    }
+                }
+            }
+        });
+    }
+
     // Accessor untuk menggantikan kolom legacy mdr_amount
     public function getMdrAmountAttribute()
     {

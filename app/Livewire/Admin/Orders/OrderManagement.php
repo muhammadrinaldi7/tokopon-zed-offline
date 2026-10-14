@@ -11,6 +11,7 @@ use Livewire\WithPagination;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\SalesReceiptMail;
 use App\Services\MessageDispatchService;
+use Illuminate\Support\Facades\Log;
 
 class OrderManagement extends Component
 {
@@ -288,6 +289,21 @@ class OrderManagement extends Component
         $order = Order::find($orderId);
         if ($order) {
             $order->update(['order_status' => $status]);
+
+            if ($status === 'CANCELLED') {
+                try {
+                    app(\App\Services\LoyaltyService::class)->refundPoints($order, Auth::user());
+                } catch (\Throwable $e) {
+                    Log::warning("OrderManagement: Gagal refund poin untuk #{$order->order_number}: " . $e->getMessage());
+                }
+            } elseif (in_array($status, ['COMPLETED', 'PAID', 'PROCESSING', 'SHIPPED'], true)) {
+                try {
+                    app(\App\Services\LoyaltyService::class)->earnPoints($order);
+                } catch (\Throwable $e) {
+                    Log::warning("OrderManagement: Gagal peroleh poin untuk #{$order->order_number}: " . $e->getMessage());
+                }
+            }
+
             $this->dispatch('toast', title: 'Berhasil', message: "Status pesanan diubah ke $status", type: 'success');
         }
     }

@@ -7,6 +7,7 @@ use App\Models\LoyaltyTransaction;
 use App\Models\Order;
 use App\Models\User;
 use Exception;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -134,11 +135,19 @@ class LoyaltyService
     }
 
     /**
-     * Tambahkan poin ke akun pelanggan saat transaksi selesai (COMPLETED di Mobile / POS).
+     * Tambahkan poin ke akun pelanggan saat transaksi selesai (COMPLETED / PAID di Mobile / POS).
      */
     public function earnPoints(Order $order): ?LoyaltyTransaction
     {
         if (!$this->isActive()) {
+            return null;
+        }
+
+        // Cegah perolehan poin jika order belum lunas atau belum berstatus selesai/diproses
+        $eligibleStatuses = ['PAID', 'COMPLETED', 'PROCESSING', 'SHIPPED'];
+        $currentStatus = strtoupper((string) ($order->order_status ?? ''));
+        if (!in_array($currentStatus, $eligibleStatuses, true)) {
+            Log::info("Loyalty earnPoints dilewati: Order #{$order->order_number} berstatus '{$order->order_status}' (hanya boleh PAID/COMPLETED).");
             return null;
         }
 
@@ -272,12 +281,18 @@ class LoyaltyService
     }
 
     /**
-     * Kembalikan poin yang ditukarkan atau batalkan poin yang didapat jika order dibatalkan/refund.
+     * Kembalikan poin yang ditukarkan (REFUND) atau tarik kembali poin yang didapat (REFUND_CANCEL)
+     * saat pesanan dibatalkan (CANCELLED).
      */
-    public function refundPoints(Order $order): void
+    public function refundPoints(Order $order, ?User $actor = null): array
     {
-        // 1. Kembalikan poin yang pernah di-redeem oleh pelanggan
-        if ($order->loyalty_points_redeemed > 0) {
+        $refundResults = [
+            'refunded_redeem_points' => 0,
+            'revoked_earn_points' => 0,
+        ];
+
+        // 1. Kasus Redeemed Point: Kembalikan poin yang pernah ditukarkan oleh pembeli untuk diskon
+        if ((int) $order->loyalty_points_redeemed > 0) {
             $redeemTx = LoyaltyTransaction::where('order_id', $order->id)
                 ->where('type', 'REDEEM')
                 ->first();
@@ -286,65 +301,111 @@ class LoyaltyService
                 ->where('type', 'REFUND')
                 ->exists();
 
-            if ($redeemTx && !$alreadyRefunded) {
-                DB::transaction(function () use ($redeemTx, $order) {
-                    $account = LoyaltyAccount::where('id', $redeemTx->loyalty_account_id)->lockForUpdate()->first();
-                    if ($account) {
-                        $pointsToReturn = abs($redeemTx->points);
-                        $before = $account->points_balance;
-                        $after = $before + $pointsToReturn;
+            if (!$alreadyRefunded) {
+                $targetAccountId = $redeemTx?->loyalty_account_id;
+                if (!$targetAccountId) {
+                    $fallbackPhone = $this->extractCustomerPhoneFromOrder($order);
+                    $fallbackAccount = $fallbackPhone ? $this->getOrCreateAccount($fallbackPhone, null, $order->user) : null;
+                    $targetAccountId = $fallbackAccount?->id;
+                }
 
-                        $account->points_balance = $after;
-                        $account->save();
+                if ($targetAccountId) {
+                    DB::transaction(function () use ($targetAccountId, $redeemTx, $order, $actor, &$refundResults) {
+                        /** @var LoyaltyAccount $account */
+                        $account = LoyaltyAccount::where('id', $targetAccountId)->lockForUpdate()->first();
+                        if ($account) {
+                            $pointsToReturn = $redeemTx ? abs($redeemTx->points) : (int) $order->loyalty_points_redeemed;
+                            $before = $account->points_balance;
+                            $after = $before + $pointsToReturn;
 
-                        LoyaltyTransaction::create([
-                            'loyalty_account_id' => $account->id,
-                            'order_id' => $order->id,
-                            'channel' => $redeemTx->channel,
-                            'type' => 'REFUND',
-                            'points' => $pointsToReturn,
-                            'balance_before' => $before,
-                            'balance_after' => $after,
-                            'discount_amount' => $redeemTx->discount_amount,
-                            'description' => "Pengembalian {$pointsToReturn} poin karena pesanan #{$order->order_number} dibatalkan",
-                        ]);
-                    }
-                });
+                            $account->points_balance = $after;
+                            $account->save();
+
+                            $channel = $redeemTx?->channel ?? (($order->order_channel === 'POS') ? 'POS' : 'MOBILE_APP');
+                            $discountAmount = $redeemTx?->discount_amount ?? (float) ($order->loyalty_discount_amount ?? 0);
+
+                            LoyaltyTransaction::create([
+                                'loyalty_account_id' => $account->id,
+                                'order_id' => $order->id,
+                                'channel' => $channel,
+                                'type' => 'REFUND',
+                                'points' => $pointsToReturn,
+                                'balance_before' => $before,
+                                'balance_after' => $after,
+                                'discount_amount' => $discountAmount,
+                                'description' => "Pengembalian {$pointsToReturn} poin karena pesanan #{$order->order_number} dibatalkan",
+                                'created_by' => $actor?->id ?? Auth::id(),
+                            ]);
+
+                            $refundResults['refunded_redeem_points'] = $pointsToReturn;
+                            Log::info("Loyalty REFUND sukses: {$pointsToReturn} poin dikembalikan ke akun {$account->phone_number} untuk order #{$order->order_number}");
+                        }
+                    });
+                }
             }
         }
 
-        // 2. Tarik kembali perolehan poin jika order dibatalkan setelah status earned
-        if ($order->loyalty_points_earned > 0) {
+        // 2. Kasus Earned Point: Tarik kembali perolehan poin jika order dibatalkan setelah pernah earned
+        if ((int) $order->loyalty_points_earned > 0) {
             $earnTx = LoyaltyTransaction::where('order_id', $order->id)
                 ->where('type', 'EARN')
                 ->first();
 
-            if ($earnTx) {
-                DB::transaction(function () use ($earnTx, $order) {
-                    $account = LoyaltyAccount::where('id', $earnTx->loyalty_account_id)->lockForUpdate()->first();
-                    if ($account) {
-                        $pointsToDeduct = $earnTx->points;
-                        $before = $account->points_balance;
-                        $after = max(0, $before - $pointsToDeduct);
+            $alreadyRevoked = LoyaltyTransaction::where('order_id', $order->id)
+                ->whereIn('type', ['REFUND_CANCEL', 'ADJUSTMENT'])
+                ->where('points', '<', 0)
+                ->exists();
 
-                        $account->points_balance = $after;
-                        $account->lifetime_points = max(0, $account->lifetime_points - $pointsToDeduct);
-                        $account->save();
+            if (!$alreadyRevoked) {
+                $targetAccountId = $earnTx?->loyalty_account_id;
+                if (!$targetAccountId) {
+                    $fallbackPhone = $this->extractCustomerPhoneFromOrder($order);
+                    $fallbackAccount = $fallbackPhone ? $this->getOrCreateAccount($fallbackPhone, null, $order->user) : null;
+                    $targetAccountId = $fallbackAccount?->id;
+                }
 
-                        LoyaltyTransaction::create([
-                            'loyalty_account_id' => $account->id,
-                            'order_id' => $order->id,
-                            'channel' => $earnTx->channel,
-                            'type' => 'ADJUSTMENT',
-                            'points' => -$pointsToDeduct,
-                            'balance_before' => $before,
-                            'balance_after' => $after,
-                            'description' => "Penarikan {$pointsToDeduct} poin perolehan karena pesanan #{$order->order_number} dibatalkan",
-                        ]);
-                    }
-                });
+                if ($targetAccountId) {
+                    DB::transaction(function () use ($targetAccountId, $earnTx, $order, $actor, &$refundResults) {
+                        /** @var LoyaltyAccount $account */
+                        $account = LoyaltyAccount::where('id', $targetAccountId)->lockForUpdate()->first();
+                        if ($account) {
+                            $pointsToDeduct = $earnTx ? (int) $earnTx->points : (int) $order->loyalty_points_earned;
+                            $before = $account->points_balance;
+                            $after = max(0, $before - $pointsToDeduct);
+
+                            $account->points_balance = $after;
+                            $account->lifetime_points = max(0, $account->lifetime_points - $pointsToDeduct);
+
+                            $netSubtotal = max(0, (float) $order->total_amount - (float) ($order->discount_amount ?? 0) - (float) ($order->loyalty_discount_amount ?? 0));
+                            $account->total_spend = max(0, (float) $account->total_spend - $netSubtotal);
+                            $account->save();
+
+                            $channel = $earnTx?->channel ?? (($order->order_channel === 'POS') ? 'POS' : 'MOBILE_APP');
+
+                            LoyaltyTransaction::create([
+                                'loyalty_account_id' => $account->id,
+                                'order_id' => $order->id,
+                                'channel' => $channel,
+                                'type' => 'REFUND_CANCEL',
+                                'points' => -$pointsToDeduct,
+                                'balance_before' => $before,
+                                'balance_after' => $after,
+                                'discount_amount' => 0,
+                                'description' => "Penarikan {$pointsToDeduct} poin perolehan karena pesanan #{$order->order_number} dibatalkan",
+                                'created_by' => $actor?->id ?? Auth::id(),
+                            ]);
+
+                            $this->updateTier($account);
+
+                            $refundResults['revoked_earn_points'] = $pointsToDeduct;
+                            Log::info("Loyalty REFUND_CANCEL sukses: {$pointsToDeduct} poin ditarik dari akun {$account->phone_number} untuk order #{$order->order_number}");
+                        }
+                    });
+                }
             }
         }
+
+        return $refundResults;
     }
 
     /**
@@ -452,7 +513,11 @@ class LoyaltyService
             }
         }
 
-        // 2. Coba dari profil user
+        // 2. Coba dari profil user atau helper customer_phone
+        if ($order->user && !empty($order->user->customer_phone)) {
+            return $order->user->customer_phone;
+        }
+
         if ($order->user && $order->user->profile && !empty($order->user->profile->phone_number)) {
             return $order->user->profile->phone_number;
         }
@@ -596,11 +661,11 @@ class LoyaltyService
         $profiles = \App\Models\UserProfile::with(['user.loyaltyAccount'])
             ->where(function ($q) use ($term, $cleanPhone) {
                 $q->where('phone_number', 'like', "%{$term}%")
-                  ->orWhere('full_name', 'like', "%{$term}%")
-                  ->orWhereHas('user', function ($uq) use ($term) {
-                      $uq->where('name', 'like', "%{$term}%")
-                         ->orWhere('email', 'like', "%{$term}%");
-                  });
+                    ->orWhere('full_name', 'like', "%{$term}%")
+                    ->orWhereHas('user', function ($uq) use ($term) {
+                        $uq->where('name', 'like', "%{$term}%")
+                            ->orWhere('email', 'like', "%{$term}%");
+                    });
 
                 if (!empty($cleanPhone) && strlen($cleanPhone) >= 4) {
                     $q->orWhere('phone_number', 'like', "%{$cleanPhone}%");
@@ -650,7 +715,7 @@ class LoyaltyService
                 ->whereNotIn('id', $foundUserIds)
                 ->where(function ($q) use ($term) {
                     $q->where('email', 'like', "%{$term}%")
-                      ->orWhere('name', 'like', "%{$term}%");
+                        ->orWhere('name', 'like', "%{$term}%");
                 })
                 ->limit($remainingLimit)
                 ->get();

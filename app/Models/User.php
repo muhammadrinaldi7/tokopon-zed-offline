@@ -200,6 +200,16 @@ class User extends Authenticatable implements HasMedia
         return $this->hasOne(LoyaltyAccount::class);
     }
 
+    public function loyaltyTransactions()
+    {
+        return $this->hasManyThrough(LoyaltyTransaction::class, LoyaltyAccount::class, 'user_id', 'loyalty_account_id');
+    }
+
+    public function getLoyaltyPointsAttribute(): int
+    {
+        return (int) ($this->loyaltyAccount?->points_balance ?? 0);
+    }
+
     /**
      * Mendapatkan nomor HP customer yang valid dari berbagai relasi/sumber.
      * Prioritas:
