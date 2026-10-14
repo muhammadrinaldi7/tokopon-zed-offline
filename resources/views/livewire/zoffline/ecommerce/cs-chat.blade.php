@@ -819,6 +819,9 @@
                     if (e.senderType !== 'cs') {
                         $wire.pollNewMessages();
                     }
+                })
+                .listen('.message.read', (e) => {
+                    $wire.refreshData();
                 });
 
             let activeSubscribedId = null;
@@ -835,6 +838,9 @@
                             $wire.pollNewMessages().then(() => {
                                 setTimeout(scrollMessagesBottom, 60);
                             });
+                        })
+                        .listen('.message.read', (e) => {
+                            $wire.refreshData();
                         });
                 }
             }

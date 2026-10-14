@@ -395,6 +395,15 @@ class ChatController extends Controller
             ->whereIn('sender_type', $targetSenderTypes)
             ->update(['read_at' => now()]);
 
+        if ($updatedCount > 0) {
+            try {
+                $readerType = ($user && $user->hasRole(['admin', 'superadmin', 'cs', 'manager', 'kasir_sju'])) ? 'cs' : 'customer';
+                broadcast(new \App\Events\MessageRead($conversationId, $readerType))->toOthers();
+            } catch (\Throwable $e) {
+                // fallback silently
+            }
+        }
+
         return response()->json([
             'success' => true,
             'message' => "{$updatedCount} pesan telah ditandai dibaca.",

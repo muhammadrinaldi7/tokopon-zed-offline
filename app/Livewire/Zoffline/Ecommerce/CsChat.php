@@ -166,10 +166,18 @@ class CsChat extends Component
         }
 
         // Tandai pesan sebagai terbaca
-        Message::where('conversation_id', $this->activeConversationId)
+        $updated = Message::where('conversation_id', $this->activeConversationId)
             ->whereNull('read_at')
             ->whereIn('sender_type', ['customer', 'guest'])
             ->update(['read_at' => now()]);
+
+        if ($updated > 0) {
+            try {
+                broadcast(new \App\Events\MessageRead($this->activeConversationId, 'cs'))->toOthers();
+            } catch (\Throwable $e) {
+                // fallback silently
+            }
+        }
 
         $dbMessages = Message::with(['user', 'media', 'productAccurate.product', 'productAccurate.productVariants'])
             ->where('conversation_id', $this->activeConversationId)
@@ -525,9 +533,13 @@ class CsChat extends Component
                 ]);
             }
 
+            $hasMessageForActiveConv = $incomingCustomerMessages->contains(function ($m) {
+                return (int) $m->conversation_id === (int) $this->activeConversationId;
+            });
+
             $this->lastKnownMaxMessageId = $currentMaxId;
             $this->loadConversations();
-            if ($this->activeConversationId) {
+            if ($this->activeConversationId && $hasMessageForActiveConv) {
                 $this->loadMessages();
             }
         }
