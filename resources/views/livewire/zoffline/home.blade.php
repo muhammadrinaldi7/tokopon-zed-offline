@@ -367,7 +367,8 @@
                                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                     </svg>
                                 </div>
-                                <span class="block text-xs sm:text-sm text-center leading-tight">Pemakaian<br>Inventaris</span>
+                                <span
+                                    class="block text-xs sm:text-sm text-center leading-tight">Pemakaian<br>Inventaris</span>
                             </button>
                         </div>
 
@@ -396,7 +397,8 @@
                 <div>
                     <h1 class="text-2xl ">Penerimaan <br> Barang (PO)</h1>
         {{-- Card: Stock Opname Cabang --}}
-        @if(auth()->user()->hasAnyRole(['bm', 'bm_gsk', 'admin', 'superadmin', 'manager_operasional_gsk']) || auth()->user()->can('manage-stock-opname'))
+        @if (auth()->user()->hasAnyRole(['bm', 'bm_gsk', 'admin', 'superadmin', 'manager_operasional_gsk']) ||
+                auth()->user()->can('manage-stock-opname'))
             <div wire:click="navigateToStockOpname"
                 class="md:nth-[3n+1]:col-span-2 w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
                 <div class="rounded-full w-20 h-20 bg-[#E0E7FF] flex items-center justify-center text-[#4E44DB]">
@@ -407,7 +409,8 @@
                 </div>
                 <div>
                     <h1 class="text-2xl ">Stock Opname <br> Cabang</h1>
-                    <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Pencatatan fisik riil dan berita acara audit stok</p>
+                    <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Pencatatan fisik riil dan berita acara audit
+                        stok</p>
                 </div>
             </div>
         @endif
@@ -711,19 +714,22 @@
         @endcan
 
         {{-- Card: E-Commerce & CS Live (Disembunyikan dari Tampilan Dashboard POS) --}}
-        @if(false && (auth()->user()->can('access-cs-chat') || auth()->user()->hasAnyRole(['admin', 'superadmin', 'cs'])))
+        @if (auth()->user()->can('access-cs-chat') ||
+                auth()->user()->hasAnyRole(['admin', 'superadmin', 'cs']))
             <div x-data="{ openEcommerceModal: false }" class="md:nth-[3n+1]:col-span-2 w-full">
                 <div @click="openEcommerceModal = true"
                     class="w-full h-70 md:h-80 bg-white rounded-2xl relative flex flex-col justify-between overflow-hidden p-6 lg:p-8 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-out">
                     <div class="rounded-full w-20 h-20 bg-indigo-50 flex items-center justify-center text-indigo-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-auto" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                 d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                         </svg>
                     </div>
                     <div>
                         <h1 class="text-2xl font-bold text-gray-900">E-Commerce <br> & CS Live</h1>
-                        <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Live chat pelanggan, banner promo, flash sale, dan closing sales</p>
+                        <p class="text-neutral-500 text-sm mt-3 line-clamp-2">Live chat pelanggan, banner promo, flash
+                            sale, dan closing sales</p>
                     </div>
                 </div>
 
@@ -731,7 +737,8 @@
                 <div x-show="openEcommerceModal" style="display: none;"
                     class="fixed inset-0 z-100 flex items-center justify-center px-4">
                     <div class="absolute inset-0 bg-black/20" @click="openEcommerceModal = false"></div>
-                    <div class="relative w-full max-w-lg bg-white/70 backdrop-blur-2xl border border-white/60 shadow-2xl rounded-[2.5rem] p-6 text-center transform">
+                    <div
+                        class="relative w-full max-w-lg bg-white/70 backdrop-blur-2xl border border-white/60 shadow-2xl rounded-[2.5rem] p-6 text-center transform">
                         <div class="w-12 h-1.5 bg-gray-400/40 rounded-full mx-auto mb-6"></div>
                         <h3 class="text-xl font-bold text-gray-800 mb-1">E-Commerce & CS Chat</h3>
                         <p class="text-xs text-gray-500 mb-6">Pilih menu manajemen toko online & percakapan pembeli</p>
@@ -740,9 +747,12 @@
                             {{-- 1. Live Chat CS --}}
                             <button wire:click="navigateToCsChat" @click="openEcommerceModal = false"
                                 class="w-full aspect-square p-2.5 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
-                                <div class="w-11 h-11 rounded-xl bg-indigo-100/70 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
+                                <div
+                                    class="w-11 h-11 rounded-xl bg-indigo-100/70 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z">
+                                        </path>
                                     </svg>
                                 </div>
                                 <span class="block text-xs font-bold text-center leading-tight">Live Chat CS</span>
@@ -751,9 +761,11 @@
                             {{-- 2. Flash Sale --}}
                             <button wire:click="navigateToFlashSale" @click="openEcommerceModal = false"
                                 class="w-full aspect-square p-2.5 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
-                                <div class="w-11 h-11 rounded-xl bg-amber-100/70 flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
+                                <div
+                                    class="w-11 h-11 rounded-xl bg-amber-100/70 flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                                     </svg>
                                 </div>
                                 <span class="block text-xs font-bold text-center leading-tight">Flash Sale</span>
@@ -762,9 +774,12 @@
                             {{-- 3. Banner Mobile --}}
                             <button wire:click="navigateToBanners" @click="openEcommerceModal = false"
                                 class="w-full aspect-square p-2.5 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
-                                <div class="w-11 h-11 rounded-xl bg-pink-100/70 flex items-center justify-center text-pink-600 group-hover:scale-110 transition-transform">
+                                <div
+                                    class="w-11 h-11 rounded-xl bg-pink-100/70 flex items-center justify-center text-pink-600 group-hover:scale-110 transition-transform">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
+                                        </path>
                                     </svg>
                                 </div>
                                 <span class="block text-xs font-bold text-center leading-tight">Banner Promo</span>
@@ -773,9 +788,11 @@
                             {{-- 4. Kurasi Produk --}}
                             <button wire:click="navigateToProductCuration" @click="openEcommerceModal = false"
                                 class="w-full aspect-square p-2.5 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
-                                <div class="w-11 h-11 rounded-xl bg-sky-100/70 flex items-center justify-center text-sky-600 group-hover:scale-110 transition-transform">
+                                <div
+                                    class="w-11 h-11 rounded-xl bg-sky-100/70 flex items-center justify-center text-sky-600 group-hover:scale-110 transition-transform">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                                     </svg>
                                 </div>
                                 <span class="block text-xs font-bold text-center leading-tight">Kurasi Produk</span>
@@ -784,9 +801,12 @@
                             {{-- 5. Analitik Closing --}}
                             <button wire:click="navigateToClosingAnalytics" @click="openEcommerceModal = false"
                                 class="w-full aspect-square p-2.5 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
-                                <div class="w-11 h-11 rounded-xl bg-emerald-100/70 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                                <div
+                                    class="w-11 h-11 rounded-xl bg-emerald-100/70 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                                        </path>
                                     </svg>
                                 </div>
                                 <span class="block text-xs font-bold text-center leading-tight">Analisa Closing</span>
@@ -795,9 +815,11 @@
                             {{-- 6. Rekening Bank Mobile --}}
                             <button wire:click="navigateToPaymentMethods" @click="openEcommerceModal = false"
                                 class="w-full aspect-square p-2.5 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
-                                <div class="w-11 h-11 rounded-xl bg-blue-100/70 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                                <div
+                                    class="w-11 h-11 rounded-xl bg-blue-100/70 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                                     </svg>
                                 </div>
                                 <span class="block text-xs font-bold text-center leading-tight">Rekening Bank</span>
@@ -806,10 +828,14 @@
                             {{-- 7. Pengaturan App & Remote Config --}}
                             <button wire:click="navigateToEcommerceSettings" @click="openEcommerceModal = false"
                                 class="w-full aspect-square p-2.5 bg-white/80 hover:bg-white text-gray-800 font-semibold rounded-2xl shadow-sm border border-white/50 transition-all duration-200 flex flex-col items-center justify-center gap-2 group">
-                                <div class="w-11 h-11 rounded-xl bg-purple-100/70 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
+                                <div
+                                    class="w-11 h-11 rounded-xl bg-purple-100/70 flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                                        </path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                     </svg>
                                 </div>
                                 <span class="block text-xs font-bold text-center leading-tight">Pengaturan App</span>
