@@ -6,8 +6,12 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 use App\Models\ProductAccurate;
+use App\Models\Warehouse;
+use App\Models\ProductSerialNumber;
 use Carbon\Carbon;
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Auth;
 use App\Exports\StockReportExport;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -19,55 +23,81 @@ class StockReport extends Component
     public $sortField = 'sku';
     public $sortDirection = 'asc';
     public $filterBU = '';
-    public $filterWarehouse = '';
-    public $filterCategory = '';
-    public $filterBrand = '';
-    public $filterProyek = '';
+    public array $filterWarehouse = [];
+    public array $filterCategory = [];
+    public array $filterBrand = [];
+    public array $filterProyek = [];
     public $isAdmin = false;
     public $businessUnits = [];
     public $csvSeparator = ';';
+    public $hasAppliedFilter = false;
 
     public function mount()
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
         if ($user->hasAnyRole(['superadmin', 'admin', 'director'])) {
             $this->isAdmin = true;
-            $this->businessUnits = \App\Models\BusinessUnit::all();
-            $this->filterBU = ''; // Semua BU
+            $allBU = \App\Models\BusinessUnit::all();
+            $this->businessUnits = $allBU;
+            // Default ke BU cabang aktif user (atau BU pertama)
+            $this->filterBU = $user->business_unit_id 
+                ? (string) $user->business_unit_id 
+                : (string) ($allBU->first()?->id ?? '');
         } else {
             $this->isAdmin = false;
-            $this->filterBU = $user->business_unit_id;
+            $this->filterBU = (string) $user->business_unit_id;
         }
+
+        // Data tidak langsung dimuat di awal (wajib filter terlebih dahulu)
+        $this->hasAppliedFilter = false;
     }
 
     public function updatingFilterBU()
     {
-        $this->filterWarehouse = '';
+        $this->filterWarehouse = [];
+        $this->filterCategory = [];
+        $this->filterBrand = [];
+        $this->filterProyek = [];
+        $this->hasAppliedFilter = false;
         $this->resetPage();
     }
 
-    public function updatingFilterWarehouse()
+    public function updatedFilterBU()
     {
+        $this->filterWarehouse = [];
+        $this->filterCategory = [];
+        $this->filterBrand = [];
+        $this->filterProyek = [];
+        $this->hasAppliedFilter = false;
         $this->resetPage();
     }
 
-    public function updatingFilterCategory()
+    /**
+     * Terapkan filter yang dipilih dan ambil data dari database
+     */
+    public function applyFilter()
     {
+        $this->hasAppliedFilter = true;
         $this->resetPage();
     }
 
-    public function updatingFilterBrand()
+    /**
+     * Reset filter ke kondisi default dan kembalikan ke empty state
+     */
+    public function resetFilter()
     {
-        $this->resetPage();
-    }
-
-    public function updatingFilterProyek()
-    {
-        $this->resetPage();
-    }
-
-    public function updatingSearch()
-    {
+        $user = Auth::user();
+        if ($this->isAdmin) {
+            $this->filterBU = $user->business_unit_id 
+                ? (string) $user->business_unit_id 
+                : (string) (collect($this->businessUnits)->first()?->id ?? '');
+        }
+        $this->filterWarehouse = [];
+        $this->filterCategory = [];
+        $this->filterBrand = [];
+        $this->filterProyek = [];
+        $this->search = '';
+        $this->hasAppliedFilter = false;
         $this->resetPage();
     }
 
@@ -79,230 +109,431 @@ class StockReport extends Component
             $this->sortDirection = 'asc';
             $this->sortField = $field;
         }
+
+        if ($this->hasAppliedFilter) {
+            $this->resetPage();
+        }
     }
 
+    /**
+     * Bangun query dasar yang menggabungkan produk, stok gudang, dan master gudang
+     * langsung pada level database (SQL JOIN) dengan seluruh filter diterapkan.
+     */
+    private function buildFilteredQuery()
+    {
+        $query = DB::table('product_accurates as pa')
+            ->leftJoin('warehouse_stocks as ws', function ($join) {
+                $join->on('ws.variant_id', '=', 'pa.id')
+                    ->whereIn('ws.variant_type', ['App\\Models\\ProductAccurate', 'ProductAccurate']);
+            })
+            ->leftJoin('warehouses as w', function ($join) {
+                $join->on('w.id', '=', 'ws.warehouse_id');
+                if (!empty($this->filterBU)) {
+                    $join->where('w.business_unit_id', '=', $this->filterBU);
+                }
+            });
+
+        // Filter Business Unit (Menggunakan index business_unit_id)
+        if (!empty($this->filterBU)) {
+            $query->where('pa.business_unit_id', $this->filterBU);
+        }
+
+        // Filter Search: SKU, Nama, Brand
+        if (!empty($this->search)) {
+            $searchTerm = '%' . trim($this->search) . '%';
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('pa.item_no', 'like', $searchTerm)
+                    ->orWhere('pa.name', 'like', $searchTerm)
+                    ->orWhere('pa.brandName', 'like', $searchTerm);
+            });
+        }
+
+        // Filter Kategori (Multi-select)
+        if (!empty($this->filterCategory)) {
+            $categories = is_array($this->filterCategory) ? array_filter($this->filterCategory) : [$this->filterCategory];
+            if (!empty($categories)) {
+                $query->whereIn('pa.categoryName', $categories);
+            }
+        }
+
+        // Filter Brand (Multi-select)
+        if (!empty($this->filterBrand)) {
+            $brands = is_array($this->filterBrand) ? array_filter($this->filterBrand) : [$this->filterBrand];
+            if (!empty($brands)) {
+                $query->whereIn('pa.brandName', $brands);
+            }
+        }
+
+        // Filter Proyek (Multi-select)
+        if (!empty($this->filterProyek)) {
+            $proyeks = is_array($this->filterProyek) ? array_filter($this->filterProyek) : [$this->filterProyek];
+            if (!empty($proyeks)) {
+                $query->whereIn('pa.proyek', $proyeks);
+            }
+        }
+
+        // Filter Gudang (Multi-select dengan dukungan 'Belum Dialokasikan')
+        if (!empty($this->filterWarehouse)) {
+            $warehouses = is_array($this->filterWarehouse) ? array_filter($this->filterWarehouse) : [$this->filterWarehouse];
+            if (!empty($warehouses)) {
+                $hasUnallocated = in_array('Belum Dialokasikan', $warehouses);
+                $namedWarehouses = array_values(array_filter($warehouses, fn($w) => $w !== 'Belum Dialokasikan'));
+
+                $query->where(function ($q) use ($hasUnallocated, $namedWarehouses) {
+                    if ($hasUnallocated && !empty($namedWarehouses)) {
+                        $q->whereNull('ws.id')->orWhereIn('w.name', $namedWarehouses);
+                    } elseif ($hasUnallocated) {
+                        $q->whereNull('ws.id');
+                    } else {
+                        $q->whereIn('w.name', $namedWarehouses);
+                    }
+                });
+            }
+        }
+
+        return $query;
+    }
+
+    /**
+     * Terapkan sorting pada level SQL query
+     */
+    private function applySorting($query)
+    {
+        $dir = strtolower($this->sortDirection) === 'desc' ? 'desc' : 'asc';
+
+        switch ($this->sortField) {
+            case 'name':
+                $query->orderBy('pa.name', $dir);
+                break;
+            case 'brand':
+                $query->orderBy('pa.brandName', $dir);
+                break;
+            case 'stock':
+                $query->orderByRaw("COALESCE(ws.stock, pa.stock, 0) {$dir}");
+                break;
+            case 'base_cost':
+                $query->orderBy('pa.base_cost', $dir);
+                break;
+            case 'base_price':
+                $query->orderBy('pa.base_price', $dir);
+                break;
+            case 'age_days':
+                // Umur terkecil = produk terbaru (created_at DESC ketika ASC)
+                $query->orderBy('pa.created_at', $dir === 'asc' ? 'desc' : 'asc');
+                break;
+            case 'sku':
+            default:
+                $query->orderBy('pa.item_no', $dir);
+                break;
+        }
+
+        return $query;
+    }
+
+    private function getSelectColumns()
+    {
+        return [
+            'pa.id as product_id',
+            'pa.item_no as sku',
+            'pa.name as name',
+            'pa.categoryName as category',
+            'pa.brandName as brand',
+            'pa.vendor_name',
+            'pa.proyek',
+            'pa.base_cost',
+            'pa.base_price',
+            'pa.created_at',
+            'pa.updated_at',
+            DB::raw("COALESCE(w.name, 'Belum Dialokasikan') as warehouse_name"),
+            DB::raw("COALESCE(ws.stock, pa.stock, 0) as stock"),
+            'ws.warehouse_id',
+        ];
+    }
+
+    /**
+     * Export Excel dengan pre-fetch serial number tunggal dan cursor database
+     */
     public function exportExcel()
     {
-        $data = $this->getStockData();
+        if (!$this->hasAppliedFilter) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Silakan klik Terapkan Filter terlebih dahulu sebelum mengekspor data.', type: 'warning');
+            return;
+        }
 
-        if ($data->isEmpty()) {
+        @ini_set('max_execution_time', 300);
+        @set_time_limit(300);
+        @ini_set('memory_limit', '1024M');
+
+        $baseQuery = $this->applySorting($this->buildFilteredQuery())->select($this->getSelectColumns());
+
+        $total = (clone $baseQuery)->count();
+        if ($total === 0) {
             $this->dispatch('toast', title: 'Perhatian', message: 'Tidak ada data stok untuk diexport sesuai filter yang dipilih.', type: 'warning');
             return;
         }
 
         $filename = "laporan_stok_" . date('Ymd_His') . ".xlsx";
-        return Excel::download(new StockReportExport($data->toArray()), $filename);
+
+        // Pre-fetch nomor seri hanya 1x ke memori (O(1) hash map) agar tidak query berulang dalam loop
+        $snLookup = ProductSerialNumber::query()
+            ->where('status', 'Available')
+            ->whereNotNull('product_accurate_id')
+            ->select('product_accurate_id', 'warehouse_id', 'serial_number')
+            ->get()
+            ->groupBy(fn($sn) => $sn->product_accurate_id . '_' . ($sn->warehouse_id ?? 'null'))
+            ->map(fn($group) => $group->pluck('serial_number')->implode(', '));
+
+        $exportData = [];
+        $now = now();
+        foreach ($baseQuery->cursor() as $row) {
+            $snKey = $row->product_id . '_' . ($row->warehouse_id ?? 'null');
+            $sns = $snLookup[$snKey] ?? '-';
+            $createdAt = $row->created_at ? Carbon::parse($row->created_at) : null;
+            $ageDays = $createdAt ? round($createdAt->diffInDays($now)) : 0;
+
+            $exportData[] = [
+                'sku' => $row->sku ?? '-',
+                'name' => $row->name ?? 'Unknown',
+                'brand' => $row->brand ?? '-',
+                'category' => $row->category ?? 'Lainnya',
+                'proyek' => $row->proyek ?? '-',
+                'warehouse_name' => $row->warehouse_name,
+                'stock' => (int) $row->stock,
+                'sn' => $sns,
+                'base_cost' => (float) ($row->base_cost ?? 0),
+                'base_price' => (float) ($row->base_price ?? 0),
+                'age_days' => $ageDays,
+            ];
+        }
+
+        return Excel::download(new StockReportExport($exportData), $filename);
     }
 
+    /**
+     * Export CSV streaming dengan streamDownload dan UTF-8 BOM untuk Microsoft Excel
+     */
     public function exportCsv()
     {
-        $data = $this->getStockData();
+        if (!$this->hasAppliedFilter) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Silakan klik Terapkan Filter terlebih dahulu sebelum mengekspor data.', type: 'warning');
+            return;
+        }
+
+        @ini_set('max_execution_time', 300);
+        @set_time_limit(300);
+
+        $baseQuery = $this->applySorting($this->buildFilteredQuery())->select($this->getSelectColumns());
+
+        $total = (clone $baseQuery)->count();
+        if ($total === 0) {
+            $this->dispatch('toast', title: 'Perhatian', message: 'Tidak ada data stok untuk diexport sesuai filter yang dipilih.', type: 'warning');
+            return;
+        }
 
         $filename = "laporan_stok_" . date('Ymd_His') . ".csv";
-
-        $headers = [
-            "Content-type" => "text/csv",
-            "Content-Disposition" => "attachment; filename=$filename",
-            "Pragma" => "no-cache",
-            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
-            "Expires" => "0"
-        ];
-
-        $columns = [
-            'SKU',
-            'NAMA PRODUK',
-            'MEREK',
-            'KATEGORI',
-            'PRYOEK',
-            'GUDANG',
-            'STOK GUDANG',
-            'SN',
-            'HARGA BELI (MODAL)',
-            'HARGA JUAL',
-            'UMUR PRODUK (HARI)'
-        ];
-
         $separator = $this->csvSeparator;
 
-        $callback = function () use ($data, $columns, $separator) {
-            $file = fopen('php://output', 'w');
-            fputcsv($file, $columns, $separator);
+        // Pre-fetch nomor seri hanya 1x ke memori (O(1) hash map)
+        $snLookup = ProductSerialNumber::query()
+            ->where('status', 'Available')
+            ->whereNotNull('product_accurate_id')
+            ->select('product_accurate_id', 'warehouse_id', 'serial_number')
+            ->get()
+            ->groupBy(fn($sn) => $sn->product_accurate_id . '_' . ($sn->warehouse_id ?? 'null'))
+            ->map(fn($group) => $group->pluck('serial_number')->implode(', '));
 
-            foreach ($data as $item) {
+        return response()->streamDownload(function () use ($baseQuery, $separator, $snLookup) {
+            $file = fopen('php://output', 'w');
+
+            // UTF-8 BOM agar Excel otomatis membaca format koma/titik-koma dan karakter bahasa Indonesia
+            fputs($file, "\xEF\xBB\xBF");
+
+            fputcsv($file, [
+                'SKU',
+                'NAMA PRODUK',
+                'MEREK',
+                'KATEGORI',
+                'PROYEK',
+                'GUDANG',
+                'STOK GUDANG',
+                'SN',
+                'HARGA BELI (MODAL)',
+                'HARGA JUAL',
+                'UMUR PRODUK (HARI)'
+            ], $separator);
+
+            $now = now();
+            foreach ($baseQuery->cursor() as $row) {
+                $snKey = $row->product_id . '_' . ($row->warehouse_id ?? 'null');
+                $sns = $snLookup[$snKey] ?? '-';
+                $createdAt = $row->created_at ? Carbon::parse($row->created_at) : null;
+                $ageDays = $createdAt ? round($createdAt->diffInDays($now)) : 0;
+
                 fputcsv($file, [
-                    $item['sku'],
-                    $item['name'],
-                    $item['brand'],
-                    $item['category'],
-                    $item['proyek'],
-                    $item['warehouse_name'],
-                    $item['stock'],
-                    $item['sn'],
-                    $item['base_cost'],
-                    $item['base_price'],
-                    $item['age_days']
+                    $row->sku ?? '-',
+                    $row->name ?? 'Unknown',
+                    $row->brand ?? '-',
+                    $row->category ?? 'Lainnya',
+                    $row->proyek ?? '-',
+                    $row->warehouse_name,
+                    $row->stock,
+                    $sns,
+                    round($row->base_cost ?? 0),
+                    round($row->base_price ?? 0),
+                    $ageDays
                 ], $separator);
             }
 
             fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
-    }
-
-    private function getStockData()
-    {
-        $query = ProductAccurate::select('id', 'item_no', 'name', 'categoryName', 'brandName', 'vendor_name', 'base_cost', 'base_price', 'created_at', 'updated_at', 'stock', 'business_unit_id', 'proyek')
-            ->with([
-                'warehouseStocks.warehouse:id,name',
-                'businessUnit:id,name',
-                'productSerialNumbers' => function ($q) {
-                    $q->select('serial_number', 'warehouse_id', 'product_accurate_id')->where('status', 'Available');
-                }
-            ]);
-
-        $validWarehouseIds = [];
-        if (!empty($this->filterBU)) {
-            $query->where('business_unit_id', $this->filterBU);
-            $validWarehouseIds = \App\Models\Warehouse::where('business_unit_id', $this->filterBU)->pluck('id')->toArray();
-        }
-
-        // DB Level Filter: Search
-        if (!empty($this->search)) {
-            $searchTerm = '%' . $this->search . '%';
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('item_no', 'like', $searchTerm)
-                    ->orWhere('name', 'like', $searchTerm)
-                    ->orWhere('brandName', 'like', $searchTerm);
-            });
-        }
-
-        // DB Level Filter: Category
-        if (!empty($this->filterCategory)) {
-            $query->where('categoryName', $this->filterCategory);
-        }
-
-        // DB Level Filter: Brand
-        if (!empty($this->filterBrand)) {
-            $query->where('brandName', $this->filterBrand);
-        }
-
-        // DB Level Filter: Proyek
-        if (!empty($this->filterProyek)) {
-            $query->where('proyek', $this->filterProyek);
-        }
-
-        // DB Level Filter: Warehouse
-        if (!empty($this->filterWarehouse)) {
-            if ($this->filterWarehouse === 'Belum Dialokasikan') {
-                $query->doesntHave('warehouseStocks');
-            } else {
-                $query->whereHas('warehouseStocks.warehouse', function ($q) {
-                    $q->where('name', $this->filterWarehouse);
-                });
-            }
-        }
-
-        $accurateProducts = $query->get()
-            ->flatMap(function ($variant) use ($validWarehouseIds) {
-                $items = [];
-                $baseItem = [
-                    'id' => 'a_' . $variant->id,
-                    'sku' => $variant->item_no ?? '-',
-                    'name' => $variant->name ?? 'Unknown',
-                    'brand' => $variant->brandName ?? '-',
-                    'vendor_name' => $variant->vendor_name ?? '-',
-                    'category' => $variant->categoryName ?? 'Lainnya',
-                    'proyek' => $variant->proyek ?? '-',
-                    'base_cost' => $variant->base_cost ?? 0,
-                    'base_price' => $variant->base_price ?? 0,
-                    'age_days' => $variant->created_at ? round($variant->created_at->diffInDays(now())) : 0,
-                    'created_at' => $variant->created_at,
-                    'sync_date' => $variant->updated_at ? $variant->updated_at->format('Y-m-d') : '-',
-                    'sync_datetime' => $variant->updated_at ? $variant->updated_at->format('Y-m-d H:i:s') : '-',
-                ];
-
-                if ($variant->warehouseStocks->isEmpty()) {
-                    if (empty($this->filterWarehouse) || $this->filterWarehouse === 'Belum Dialokasikan') {
-                        $baseItem['warehouse_name'] = 'Belum Dialokasikan';
-                        $baseItem['stock'] = $variant->stock ?? 0;
-                        $sns = $variant->productSerialNumbers->whereNull('warehouse_id')->pluck('serial_number')->implode(', ');
-                        $baseItem['sn'] = $sns ?: '-';
-                        $items[] = $baseItem;
-                    }
-                } else {
-                    foreach ($variant->warehouseStocks as $ws) {
-                        if (!empty($this->filterBU) && !in_array($ws->warehouse_id, $validWarehouseIds)) {
-                            continue;
-                        }
-
-                        $whName = $ws->warehouse->name ?? 'Unknown';
-
-                        if (!empty($this->filterWarehouse) && $whName !== $this->filterWarehouse) {
-                            continue;
-                        }
-
-                        $whItem = $baseItem;
-                        $whItem['warehouse_name'] = $whName;
-                        $whItem['stock'] = $ws->stock;
-                        $sns = $variant->productSerialNumbers->where('warehouse_id', $ws->warehouse_id)->pluck('serial_number')->implode(', ');
-                        $whItem['sn'] = $sns ?: '-';
-                        $items[] = $whItem;
-                    }
-                }
-                return $items;
-            });
-
-        return collect($accurateProducts)->sortBy([
-            [$this->sortField, $this->sortDirection]
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
 
     public function render()
     {
-        // Ambil opsi filter dari DB secara efisien
-        $brandQuery = ProductAccurate::query();
-        $catQuery = ProductAccurate::query();
-        $proyekQuery = ProductAccurate::query();
-        $whQuery = \App\Models\Warehouse::query();
+        @ini_set('max_execution_time', 180);
+        @set_time_limit(180);
 
-        if (!empty($this->filterBU)) {
-            $brandQuery->where('business_unit_id', $this->filterBU);
-            $catQuery->where('business_unit_id', $this->filterBU);
-            $proyekQuery->where('business_unit_id', $this->filterBU);
-            $whQuery->where('business_unit_id', $this->filterBU);
+        // 1. Cache opsi dropdown filter (1 jam) agar tidak scan tabel setiap render
+        $cacheKey = 'stock_report_filters_bu_' . ($this->filterBU ?: 'all');
+        $filterOptions = Cache::remember($cacheKey, 3600, function () {
+            // 1 query DISTINCT untuk mengambil semua merek, kategori, dan proyek sekaligus (memanfaatkan index BU)
+            $distinctData = DB::table('product_accurates')
+                ->when(!empty($this->filterBU), fn($q) => $q->where('business_unit_id', $this->filterBU))
+                ->selectRaw('DISTINCT brandName, categoryName, proyek')
+                ->get();
+
+            $whQuery = Warehouse::query();
+            if (!empty($this->filterBU)) {
+                $whQuery->where('business_unit_id', $this->filterBU);
+            }
+            $whList = $whQuery->pluck('name')->sort()->values();
+            if (!$whList->contains('Belum Dialokasikan')) {
+                $whList->push('Belum Dialokasikan');
+            }
+
+            // Ambil master proyek dari business_unit_projects agar sinkron dengan proyek BU aktif
+            $bupQuery = \App\Models\BusinessUnitProject::query();
+            if (!empty($this->filterBU)) {
+                $bupQuery->where('business_unit_id', $this->filterBU);
+            }
+            $bupNames = $bupQuery->pluck('name');
+
+            $allProyeks = $distinctData->pluck('proyek')
+                ->concat($bupNames)
+                ->map(fn($p) => trim((string)$p))
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values();
+
+            return [
+                'brands' => $distinctData->pluck('brandName')->filter()->unique()->sort()->values(),
+                'categories' => $distinctData->pluck('categoryName')->filter()->unique()->sort()->values(),
+                'proyeks' => $allProyeks,
+                'warehouses' => $whList,
+            ];
+        });
+
+        // KONDISI ON-DEMAND: Sebelum user klik "Terapkan Filter", jangan jalankan query apa pun
+        if (!$this->hasAppliedFilter) {
+            return view('livewire.zoffline.reporting.stock-report', [
+                'stocks' => new \Illuminate\Pagination\LengthAwarePaginator(collect(), 0, 15, 1),
+                'availableWarehouses' => $filterOptions['warehouses'],
+                'availableCategories' => $filterOptions['categories'],
+                'availableBrands' => $filterOptions['brands'],
+                'availableProyeks' => $filterOptions['proyeks'],
+                'summary' => [
+                    'total_items' => 0,
+                    'total_cost' => 0,
+                    'total_potential_revenue' => 0,
+                ],
+                'hasAppliedFilter' => false,
+            ])->layout('layouts.z');
         }
 
-        $availableBrands = $brandQuery->whereNotNull('brandName')->where('brandName', '!=', '')->distinct()->pluck('brandName')->filter()->sort()->values();
-        $availableCategories = $catQuery->whereNotNull('categoryName')->where('categoryName', '!=', '')->distinct()->pluck('categoryName')->filter()->sort()->values();
-        $availableProyeks = $proyekQuery->whereNotNull('proyek')->where('proyek', '!=', '')->distinct()->pluck('proyek')->filter()->sort()->values();
-        $availableWarehouses = $whQuery->pluck('name')->sort()->values();
+        // 2. Query dasar dengan seluruh filter aktif
+        $baseQuery = $this->buildFilteredQuery();
 
-        $allData = $this->getStockData();
+        // 3. Kalkulasi summary cards sekaligus total baris dalam 1 query saja (menghilangkan query COUNT ganda dari paginate)
+        $summaryRow = (clone $baseQuery)->selectRaw("
+            COALESCE(SUM(COALESCE(ws.stock, pa.stock, 0)), 0) as total_items,
+            COALESCE(SUM(COALESCE(pa.base_cost, 0) * COALESCE(ws.stock, pa.stock, 0)), 0) as total_cost,
+            COALESCE(SUM(COALESCE(pa.base_price, 0) * COALESCE(ws.stock, pa.stock, 0)), 0) as total_potential_revenue,
+            COUNT(*) as total_rows
+        ")->first();
 
-        // Pagination Manual untuk Collection
-        $perPage = 15;
-        $page = $this->getPage();
+        $totalRows = (int) ($summaryRow->total_rows ?? 0);
+        $summary = [
+            'total_items' => (int) ($summaryRow->total_items ?? 0),
+            'total_cost' => (float) ($summaryRow->total_cost ?? 0),
+            'total_potential_revenue' => (float) ($summaryRow->total_potential_revenue ?? 0),
+        ];
 
-        $paginatedData = new LengthAwarePaginator(
-            $allData->forPage($page, $perPage),
-            $allData->count(),
-            $perPage,
-            $page,
-            ['path' => LengthAwarePaginator::resolveCurrentPath()]
+        // 4. Ambil 15 item untuk halaman aktif (LIMIT 15 OFFSET ...) tanpa melakukan query count terpisah
+        $currentPage = $this->getPage();
+        $items = $this->applySorting(clone $baseQuery)
+            ->select($this->getSelectColumns())
+            ->forPage($currentPage, 15)
+            ->get();
+
+        $paginated = new \Illuminate\Pagination\LengthAwarePaginator(
+            $items,
+            $totalRows,
+            15,
+            $currentPage,
+            ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath()]
         );
 
+        // 5. Query nomor seri HANYA untuk 15 produk di halaman ini
+        $productIds = collect($paginated->items())->pluck('product_id')->unique()->filter()->all();
+
+        $serialNumbers = !empty($productIds)
+            ? ProductSerialNumber::query()
+                ->whereIn('product_accurate_id', $productIds)
+                ->where('status', 'Available')
+                ->select('product_accurate_id', 'warehouse_id', 'serial_number')
+                ->get()
+                ->groupBy(fn($sn) => $sn->product_accurate_id . '_' . ($sn->warehouse_id ?? 'null'))
+            : collect();
+
+        $stocks = $paginated->through(function ($row) use ($serialNumbers) {
+            $snKey = $row->product_id . '_' . ($row->warehouse_id ?? 'null');
+            $sns = isset($serialNumbers[$snKey]) ? $serialNumbers[$snKey]->pluck('serial_number')->implode(', ') : '-';
+
+            $createdAt = $row->created_at ? Carbon::parse($row->created_at) : null;
+            $updatedAt = $row->updated_at ? Carbon::parse($row->updated_at) : null;
+
+            return [
+                'id' => 'a_' . $row->product_id . '_' . ($row->warehouse_id ?? '0'),
+                'sku' => $row->sku ?? '-',
+                'name' => $row->name ?? 'Unknown',
+                'brand' => $row->brand ?? '-',
+                'vendor_name' => $row->vendor_name ?? '-',
+                'category' => $row->category ?? 'Lainnya',
+                'proyek' => $row->proyek ?? '-',
+                'warehouse_name' => $row->warehouse_name,
+                'stock' => (int) $row->stock,
+                'sn' => $sns ?: '-',
+                'base_cost' => (float) ($row->base_cost ?? 0),
+                'base_price' => (float) ($row->base_price ?? 0),
+                'age_days' => $createdAt ? round($createdAt->diffInDays(now())) : 0,
+                'created_at' => $createdAt,
+                'sync_date' => $updatedAt ? $updatedAt->format('Y-m-d') : '-',
+                'sync_datetime' => $updatedAt ? $updatedAt->format('Y-m-d H:i:s') : '-',
+            ];
+        });
+
         return view('livewire.zoffline.reporting.stock-report', [
-            'stocks' => $paginatedData,
-            'availableWarehouses' => $availableWarehouses,
-            'availableCategories' => $availableCategories,
-            'availableBrands' => $availableBrands,
-            'availableProyeks' => $availableProyeks,
-            'summary' => [
-                'total_items' => $allData->sum('stock'),
-                'total_cost' => $allData->sum(fn($item) => $item['base_cost'] * $item['stock']),
-                'total_potential_revenue' => $allData->sum(fn($item) => $item['base_price'] * $item['stock']),
-            ]
+            'stocks' => $stocks,
+            'availableWarehouses' => $filterOptions['warehouses'],
+            'availableCategories' => $filterOptions['categories'],
+            'availableBrands' => $filterOptions['brands'],
+            'availableProyeks' => $filterOptions['proyeks'],
+            'summary' => $summary,
+            'hasAppliedFilter' => true,
         ])->layout('layouts.z');
     }
 }

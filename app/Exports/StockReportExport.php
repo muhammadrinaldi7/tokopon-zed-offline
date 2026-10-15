@@ -4,12 +4,12 @@ namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class StockReportExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyles, WithTitle
+class StockReportExport implements FromArray, WithHeadings, WithColumnWidths, WithStyles, WithTitle
 {
     protected array $data;
 
@@ -57,6 +57,24 @@ class StockReportExport implements FromArray, WithHeadings, ShouldAutoSize, With
             'HARGA BELI (MODAL)',
             'HARGA JUAL',
             'UMUR PRODUK (HARI)',
+        ];
+    }
+
+    public function columnWidths(): array
+    {
+        return [
+            'A' => 6,   // No.
+            'B' => 18,  // SKU
+            'C' => 38,  // NAMA PRODUK
+            'D' => 16,  // MEREK
+            'E' => 18,  // KATEGORI
+            'F' => 16,  // PROYEK
+            'G' => 18,  // GUDANG
+            'H' => 14,  // STOK GUDANG
+            'I' => 32,  // SN
+            'J' => 20,  // HARGA BELI (MODAL)
+            'K' => 20,  // HARGA JUAL
+            'L' => 18,  // UMUR PRODUK (HARI)
         ];
     }
 
