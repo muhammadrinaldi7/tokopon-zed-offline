@@ -152,6 +152,7 @@ class CsChat extends Component
         $this->removeAttachment();
         $this->removeSelectedProduct();
         $this->loadMessages();
+        $this->loadConversations();
     }
 
     public function loadMessages()
@@ -538,10 +539,10 @@ class CsChat extends Component
             });
 
             $this->lastKnownMaxMessageId = $currentMaxId;
-            $this->loadConversations();
             if ($this->activeConversationId && $hasMessageForActiveConv) {
                 $this->loadMessages();
             }
+            $this->loadConversations();
         }
     }
 
