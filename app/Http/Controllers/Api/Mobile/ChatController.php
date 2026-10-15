@@ -210,10 +210,12 @@ class ChatController extends Controller
                     'url' => $media->getFullUrl(),
                     'mime_type' => $media->mime_type,
                     'size' => $media->size,
+                    'is_image' => str_starts_with($media->mime_type ?? '', 'image/'),
                 ];
             }
 
             $productData = $this->formatProduct($msg->productAccurate);
+            $attachmentUrl = !empty($attachmentUrls) ? $attachmentUrls[0]['url'] : null;
 
             return [
                 'id' => $msg->id,
@@ -224,6 +226,7 @@ class ChatController extends Controller
                 'product_reference' => $productData,
                 'product_id' => $msg->product_accurate_id,
                 'product_accurate_id' => $msg->product_accurate_id,
+                'attachment_url' => $attachmentUrl,
                 'attachments' => $attachmentUrls,
                 'read_at' => $msg->read_at?->toIso8601String(),
                 'is_read' => !is_null($msg->read_at),
@@ -368,6 +371,7 @@ class ChatController extends Controller
                 'product_reference' => $productData,
                 'product_id' => $message->product_accurate_id,
                 'product_accurate_id' => $message->product_accurate_id,
+                'attachment_url' => !empty($attachmentUrls) ? $attachmentUrls[0]['url'] : null,
                 'attachments' => $attachmentUrls,
                 'created_at' => $message->created_at?->toIso8601String(),
             ]
