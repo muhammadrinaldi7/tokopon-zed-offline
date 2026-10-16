@@ -597,6 +597,7 @@ class OrderManagement extends Component
 
         if ($this->search) {
             $query->where('order_number', 'like', '%' . $this->search . '%')
+                ->where('accurate_invoice_no', 'like', '%' . $this->search . '%')
                 ->orWhereHas('user', function ($q) {
                     $q->where('name', 'like', '%' . $this->search . '%');
                 })->orWhereHas('items', function ($iq) {
