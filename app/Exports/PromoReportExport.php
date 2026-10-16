@@ -31,6 +31,7 @@ class PromoReportExport implements FromArray, WithHeadings, ShouldAutoSize, With
             'NO. ORDER',
             'NO. INVOICE',
             'CABANG',
+            'SALES',
             'MERK PRODUK',
             'NAMA VENDOR',
             'NAMA PRODUK',
