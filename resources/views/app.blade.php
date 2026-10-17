@@ -18,6 +18,15 @@
         }
     </style>
 
+    <script>
+        window.reverbConfig = {
+            key: "{{ config('reverb.apps.apps.0.key') ?: env('VITE_REVERB_APP_KEY') ?: env('REVERB_APP_KEY', '') }}",
+            host: "{{ env('VITE_REVERB_HOST') ?: env('REVERB_HOST', request()->getHost()) }}",
+            port: "{{ env('VITE_REVERB_PORT') ?: env('REVERB_PORT', 443) }}",
+            scheme: "{{ env('VITE_REVERB_SCHEME') ?: (request()->secure() ? 'https' : 'http') }}"
+        };
+    </script>
+
     <!-- Scripts and Styles -->
     @viteReactRefresh
     @vite(['resources/css/app.css', 'resources/js/app.jsx'])
