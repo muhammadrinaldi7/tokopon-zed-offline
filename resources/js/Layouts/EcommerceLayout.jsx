@@ -23,7 +23,9 @@ import {
 } from 'lucide-react';
 
 export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Suite' }) {
-    const { auth, businessUnits, flash, url } = usePage().props;
+    const page = usePage();
+    const { auth, businessUnits, flash } = page.props || {};
+    const url = page.url || (typeof window !== 'undefined' ? window.location.pathname : '');
     const [soundEnabled, setSoundEnabled] = useState(true);
     const [wsConnected, setWsConnected] = useState(true);
     const [toast, setToast] = useState(null);
@@ -256,7 +258,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                 <nav className="mt-2.5 pt-2 border-t border-slate-100 flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5 text-xs font-bold">
                     {navItems.map((item) => {
                         const Icon = item.icon;
-                        const isActive = url.startsWith(item.href);
+                        const isActive = Boolean(url && url.startsWith(item.href));
 
                         return (
                             <Link
