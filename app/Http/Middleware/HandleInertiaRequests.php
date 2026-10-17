@@ -50,7 +50,19 @@ class HandleInertiaRequests extends Middleware
                     'roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames() : [],
                 ] : null,
             ],
-            'businessUnits' => fn () => \App\Models\BusinessUnit::all(['id', 'name', 'code', 'category', 'is_second']),
+            'businessUnits' => fn () => \App\Models\BusinessUnit::orderBy('name')
+                ->get(['id', 'name', 'code', 'mobile_category', 'is_active'])
+                ->map(function ($bu) {
+                    $isSecond = ($bu->mobile_category === 'SECOND') || str_contains(strtoupper($bu->name ?? ''), 'SECOND');
+                    return [
+                        'id' => $bu->id,
+                        'name' => $bu->name,
+                        'code' => $bu->code,
+                        'category' => $bu->mobile_category ?: 'GENERAL',
+                        'is_second' => $isSecond,
+                        'is_active' => (bool) $bu->is_active,
+                    ];
+                }),
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

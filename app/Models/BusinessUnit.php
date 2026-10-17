@@ -73,4 +73,14 @@ class BusinessUnit extends Model implements HasMedia
     {
         return $this->hasMedia('logo') ? $this->getFirstMediaUrl('logo') : null;
     }
+
+    public function getCategoryAttribute(): string
+    {
+        return $this->mobile_category ?: 'GENERAL';
+    }
+
+    public function getIsSecondAttribute(): bool
+    {
+        return ($this->mobile_category === 'SECOND') || str_contains(strtoupper($this->name ?? ''), 'SECOND');
+    }
 }
