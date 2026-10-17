@@ -76,10 +76,34 @@ class CsChat extends Component
         $this->loadConversations();
     }
 
+    public function updatedSearch()
+    {
+        $this->loadConversations();
+    }
+
+    public function clearSearch()
+    {
+        $this->search = '';
+        $this->loadConversations();
+    }
+
     public function loadConversations()
     {
-        $query = Conversation::with(['user', 'latestMessage.user', 'productAccurate', 'closedBy', 'businessUnit', 'assignedTo'])
-            ->orderByDesc('updated_at');
+        $query = Conversation::with([
+            'user.profile',
+            'user.loyaltyAccount',
+            'latestMessage.user',
+            'productAccurate',
+            'closedBy',
+            'businessUnit',
+            'assignedTo',
+        ])
+        ->withCount([
+            'messages as unread_count' => function ($q) {
+                $q->whereNull('read_at')->whereIn('sender_type', ['customer', 'guest']);
+            }
+        ])
+        ->orderByDesc('updated_at');
 
         if ($this->filterTab === 'my_chats') {
             $query->where('assigned_to_user_id', Auth::id());
@@ -95,14 +119,60 @@ class CsChat extends Component
             $query->where('closing_status', 'lost');
         }
 
-        if (!empty($this->search)) {
+        if (!empty(trim($this->search))) {
             $s = trim($this->search);
-            $query->where(function ($q) use ($s) {
-                $q->where('guest_name', 'like', "%{$s}%")
-                  ->orWhere('guest_phone', 'like', "%{$s}%")
-                  ->orWhereHas('user', function ($u) use ($s) {
-                      $u->where('name', 'like', "%{$s}%")->orWhere('email', 'like', "%{$s}%");
-                  });
+            $digits = preg_replace('/[^0-9]/', '', $s);
+
+            $phonePatterns = [];
+            if (!empty($digits) && strlen($digits) >= 3) {
+                $phonePatterns[] = $digits;
+                if (str_starts_with($digits, '628')) {
+                    $phonePatterns[] = '08' . substr($digits, 3);
+                    $phonePatterns[] = substr($digits, 2);
+                } elseif (str_starts_with($digits, '08')) {
+                    $phonePatterns[] = '628' . substr($digits, 2);
+                    $phonePatterns[] = substr($digits, 1);
+                } elseif (str_starts_with($digits, '8')) {
+                    $phonePatterns[] = '0' . $digits;
+                    $phonePatterns[] = '62' . $digits;
+                }
+                $phonePatterns = array_values(array_unique($phonePatterns));
+            }
+
+            $query->where(function ($q) use ($s, $phonePatterns) {
+                // 1. Cari pada kolom langsung tabel conversations
+                $q->where('conversations.guest_name', 'like', "%{$s}%");
+                foreach ($phonePatterns as $pat) {
+                    $q->orWhere('conversations.guest_phone', 'like', "%{$pat}%");
+                }
+
+                // 2. Cari pada akun user terdaftar (name, email, user_profiles, loyalty_accounts)
+                $q->orWhereHas('user', function ($uq) use ($s, $phonePatterns) {
+                    $uq->where('name', 'like', "%{$s}%")
+                       ->orWhere('email', 'like', "%{$s}%");
+
+                    // 2a. Relasi UserProfile (nama lengkap & no hp)
+                    $uq->orWhereHas('profile', function ($pq) use ($s, $phonePatterns) {
+                        $pq->where('full_name', 'like', "%{$s}%");
+                        foreach ($phonePatterns as $pat) {
+                            $pq->orWhere('phone_number', 'like', "%{$pat}%");
+                        }
+                    });
+
+                    // 2b. Relasi LoyaltyAccount (nama customer & no hp loyalty)
+                    $uq->orWhereHas('loyaltyAccount', function ($lq) use ($s, $phonePatterns) {
+                        $lq->where('customer_name', 'like', "%{$s}%");
+                        foreach ($phonePatterns as $pat) {
+                            $lq->orWhere('phone_number', 'like', "%{$pat}%");
+                        }
+                    });
+                });
+
+                // 3. Cari berdasarkan nama produk atau item_no yang dikonsultasikan
+                $q->orWhereHas('productAccurate', function ($prq) use ($s) {
+                    $prq->where('name', 'like', "%{$s}%")
+                        ->orWhere('item_no', 'like', "%{$s}%");
+                });
             });
         }
 
@@ -121,6 +191,11 @@ class CsChat extends Component
 
             $phone = $conv->guest_phone ?: ($conv->user?->customer_phone ?? null);
 
+            // Ringkasan profil CRM Loyalty untuk CS
+            $loyalty = $conv->user?->loyaltyAccount;
+            $loyaltyTier = $loyalty?->tier ?? null;
+            $loyaltyPoints = (int) ($loyalty?->points_balance ?? 0);
+
             return [
                 'id' => $conv->id,
                 'userName' => $userName,
@@ -132,6 +207,8 @@ class CsChat extends Component
                 'businessUnitName' => $conv->businessUnit?->name,
                 'isGuest' => is_null($conv->user_id),
                 'guestPhone' => $phone,
+                'loyaltyTier' => $loyaltyTier,
+                'loyaltyPoints' => $loyaltyPoints,
                 'assignedToName' => $conv->assignedTo?->name,
                 'assignedToId' => $conv->assigned_to_user_id,
                 'isAssignedToMe' => $conv->assigned_to_user_id === Auth::id(),
@@ -141,7 +218,7 @@ class CsChat extends Component
                 'lastTime' => $conv->latestMessage?->created_at?->format('H:i') ?? '',
                 'lastSender' => $lastSender,
                 'updatedAt' => $conv->updated_at?->diffForHumans() ?? '',
-                'unreadCount' => $conv->unreadCountForCs(),
+                'unreadCount' => (int) ($conv->unread_count ?? 0),
             ];
         })->toArray();
     }
@@ -583,7 +660,15 @@ class CsChat extends Component
 
     public function render()
     {
-        $activeConv = $this->activeConversationId ? Conversation::with(['user', 'productAccurate', 'closedBy', 'assignedTo'])->find($this->activeConversationId) : null;
+        $activeConv = $this->activeConversationId ? Conversation::with([
+            'user.profile',
+            'user.loyaltyAccount',
+            'user.addresses',
+            'productAccurate',
+            'closedBy',
+            'assignedTo',
+            'businessUnit',
+        ])->find($this->activeConversationId) : null;
 
         return view('livewire.zoffline.ecommerce.cs-chat', [
             'activeConv' => $activeConv,

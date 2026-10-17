@@ -56,11 +56,30 @@
             {{-- Search & Filter Bar --}}
             <div class="p-3.5 border-b border-gray-200 bg-white space-y-2.5">
                 <div class="relative">
-                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari nama atau nomor HP..."
-                        class="w-full pl-9 pr-3 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs font-medium focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none">
+                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Cari nama, nomor HP (08/62), atau produk..."
+                        class="w-full pl-9 pr-8 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs font-medium focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none">
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
+
+                    {{-- Loading indicator --}}
+                    <div wire:loading wire:target="search,clearSearch" class="absolute right-7 top-2.5">
+                        <svg class="animate-spin h-3.5 w-3.5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+
+                    {{-- Clear Search Button --}}
+                    @if(!empty($search))
+                        <button type="button" wire:click="clearSearch"
+                            class="absolute right-2.5 top-2 text-gray-400 hover:text-rose-500 transition-colors p-0.5"
+                            title="Hapus pencarian">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    @endif
                 </div>
 
                 {{-- Status Filter Pills --}}
@@ -125,6 +144,20 @@
                                     </div>
                                     <span class="text-[10px] text-gray-400 font-mono shrink-0">{{ $conv['lastTime'] }}</span>
                                 </div>
+
+                                {{-- Customer Phone & Loyalty Badge --}}
+                                @if(!empty($conv['guestPhone']))
+                                    <div class="flex items-center gap-1 mt-0.5">
+                                        <span class="text-[10.5px] font-mono text-gray-600 bg-gray-100/90 px-1.5 py-0.2 rounded font-medium">
+                                            📱 {{ $conv['guestPhone'] }}
+                                        </span>
+                                        @if(!empty($conv['loyaltyTier']))
+                                            <span class="text-[9px] font-extrabold px-1 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                                ⭐ {{ $conv['loyaltyTier'] }} ({{ number_format($conv['loyaltyPoints']) }}p)
+                                            </span>
+                                        @endif
+                                    </div>
+                                @endif
 
                                 <p class="text-xs text-gray-500 truncate mt-0.5">{{ $conv['lastMessage'] }}</p>
 
@@ -202,10 +235,28 @@
                                 </h3>
                                 @php
                                     $custPhone = $activeConv->guest_phone ?: ($activeConv->user?->customer_phone ?? null);
+                                    $loyaltyAcc = $activeConv->user?->loyaltyAccount;
+                                    $domisili = $activeConv->user?->profile?->domisili ?? null;
+                                    $addresses = $activeConv->user?->addresses ?? null;
+                                    $city = $domisili ?: ($addresses?->firstWhere('is_primary', true)?->city ?? $addresses?->first()?->city ?? null);
                                 @endphp
                                 @if($custPhone)
-                                    <span class="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                    <span class="text-xs font-mono text-gray-700 bg-gray-100 px-2 py-0.5 rounded-lg border border-gray-200">
                                         📱 {{ $custPhone }}
+                                    </span>
+                                @endif
+                                @if($loyaltyAcc)
+                                    <span class="text-xs font-extrabold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-lg flex items-center gap-1"
+                                        title="Total Belanja: Rp {{ number_format($loyaltyAcc->total_spend, 0, ',', '.') }}">
+                                        <span>👑 Tier: {{ $loyaltyAcc->tier }}</span>
+                                        <span>•</span>
+                                        <span class="text-amber-700">{{ number_format($loyaltyAcc->points_balance) }} Poin</span>
+                                    </span>
+                                @endif
+                                @if($city)
+                                    <span class="text-xs text-gray-500 bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-200 flex items-center gap-1">
+                                        <span>📍</span>
+                                        <span>{{ $city }}</span>
                                     </span>
                                 @endif
                             </div>
