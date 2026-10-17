@@ -25,7 +25,20 @@ export default function EcommerceSettingsIndex({
     employees = [],
     users = []
 }) {
-    const { businessUnits = [] } = usePage().props || {};
+    const pageProps = usePage().props || {};
+    const businessUnits = pageProps.businessUnits || [];
+
+    // Safe Array Coercions to prevent runtime type errors
+    const buList = Array.isArray(businessUnits) ? businessUnits : Object.values(businessUnits || {});
+    const warehouseList = Array.isArray(warehouses) ? warehouses : Object.values(warehouses || {});
+    const employeeList = Array.isArray(employees) ? employees : Object.values(employees || {});
+    const userList = Array.isArray(users) ? users : Object.values(users || {});
+    const allCategoriesList = Array.isArray(buSettings?.all_categories)
+        ? buSettings.all_categories
+        : Object.values(buSettings?.all_categories || {});
+    const allBrandsList = Array.isArray(buSettings?.all_brands)
+        ? buSettings.all_brands
+        : Object.values(buSettings?.all_brands || {});
 
     // Form Global Settings
     const [globalForm, setGlobalForm] = useState({
@@ -36,7 +49,7 @@ export default function EcommerceSettingsIndex({
     const [isSavingGlobal, setIsSavingGlobal] = useState(false);
 
     // Form Business Unit Settings
-    const [activeBuId, setActiveBuId] = useState(selectedBuId || businessUnits?.[0]?.id || null);
+    const [activeBuId, setActiveBuId] = useState(selectedBuId || buList?.[0]?.id || null);
     const [buForm, setBuForm] = useState({
         business_unit_id: activeBuId,
         online_warehouse_id: buSettings?.online_warehouse_id || '',
@@ -52,8 +65,8 @@ export default function EcommerceSettingsIndex({
     useEffect(() => {
         if (selectedBuId) {
             setActiveBuId(selectedBuId);
-        } else if (!activeBuId && businessUnits?.length > 0) {
-            setActiveBuId(businessUnits[0].id);
+        } else if (!activeBuId && buList?.length > 0) {
+            setActiveBuId(buList[0].id);
         }
     }, [selectedBuId, businessUnits]);
 
@@ -267,7 +280,7 @@ export default function EcommerceSettingsIndex({
 
                         {/* Store Switcher Tabs */}
                         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl text-xs font-bold">
-                            {businessUnits?.map((bu) => (
+                            {buList?.map((bu) => (
                                 <button
                                     key={bu.id}
                                     type="button"
@@ -295,7 +308,7 @@ export default function EcommerceSettingsIndex({
                                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/20"
                                 >
                                     <option value="">Pilih Gudang Online</option>
-                                    {warehouses?.map((wh) => (
+                                    {warehouseList?.map((wh) => (
                                         <option key={wh.id} value={wh.id}>
                                             {wh.name} {wh.is_online_store ? '(Online Aktif)' : ''}
                                         </option>
@@ -323,7 +336,7 @@ export default function EcommerceSettingsIndex({
                                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
                                 >
                                     <option value="">Pilih Sales Default</option>
-                                    {employees?.map((emp) => (
+                                    {employeeList?.map((emp) => (
                                         <option key={emp.id} value={emp.id}>
                                             {emp.name}
                                         </option>
@@ -339,7 +352,7 @@ export default function EcommerceSettingsIndex({
                                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
                                 >
                                     <option value="">Pilih Kasir Default</option>
-                                    {users?.map((u) => (
+                                    {userList?.map((u) => (
                                         <option key={u.id} value={u.id}>
                                             {u.name}
                                         </option>
@@ -365,10 +378,10 @@ export default function EcommerceSettingsIndex({
                             </div>
 
                             <div className="flex flex-wrap gap-2">
-                                {!buSettings?.all_categories || buSettings.all_categories.length === 0 ? (
+                                {allCategoriesList.length === 0 ? (
                                     <p className="text-xs text-slate-400 italic">Tidak ada kategori produk terdaftar di toko ini.</p>
                                 ) : (
-                                    buSettings.all_categories.map((cat) => {
+                                    allCategoriesList.map((cat) => {
                                         const isSelected = Array.isArray(buForm.active_categories) && buForm.active_categories.includes(cat.name);
                                         return (
                                             <button
@@ -409,10 +422,10 @@ export default function EcommerceSettingsIndex({
                             </div>
 
                             <div className="flex flex-wrap gap-2">
-                                {!buSettings?.all_brands || buSettings.all_brands.length === 0 ? (
+                                {allBrandsList.length === 0 ? (
                                     <p className="text-xs text-slate-400 italic">Tidak ada brand terdaftar di toko ini.</p>
                                 ) : (
-                                    buSettings.all_brands.map((br) => {
+                                    allBrandsList.map((br) => {
                                         const isSelected = Array.isArray(buForm.active_brands) && buForm.active_brands.includes(br.name);
                                         return (
                                             <button

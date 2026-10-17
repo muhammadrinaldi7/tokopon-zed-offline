@@ -24,128 +24,221 @@ class EcommerceSettingsController extends Controller
      */
     public function index(Request $request, SettingService $settingService): Response
     {
-        $selectedBuId = $request->input('bu');
-        if (!$selectedBuId) {
-            $userBuId = Auth::user()?->getActiveBusinessUnitId() ?? Auth::user()?->business_unit_id;
-            $firstBu = BusinessUnit::where('is_active', true)->first() ?: BusinessUnit::first();
-            $selectedBuId = $userBuId ?: $firstBu?->id;
-        }
+        try {
+            $selectedBuId = $request->input('bu');
+            if (!$selectedBuId) {
+                try {
+                    $userBuId = Auth::user()?->getActiveBusinessUnitId() ?? Auth::user()?->business_unit_id;
+                } catch (\Throwable $e) {
+                    $userBuId = null;
+                }
 
-        // 1. Pengaturan Global
-        $globalSettings = [
-            'dynamic_shipping' => filter_var($settingService->get('ecommerce_dynamic_shipping', false), FILTER_VALIDATE_BOOLEAN),
-            'instant_payment' => filter_var($settingService->get('ecommerce_instant_payment', false), FILTER_VALIDATE_BOOLEAN),
-            'cs_phone' => (string) $settingService->get('ecommerce_cs_phone', '081298765432'),
-        ];
-
-        // 2. Data Gudang & Master Cabang BU
-        $hasOnlineStoreCol = Schema::hasColumn('warehouses', 'is_online_store');
-        $whCols = ['id', 'name'];
-        if ($hasOnlineStoreCol) {
-            $whCols[] = 'is_online_store';
-        }
-
-        $warehouses = $selectedBuId
-            ? Warehouse::where('business_unit_id', $selectedBuId)->get($whCols)
-            : collect();
-
-        $onlineWarehouseId = $hasOnlineStoreCol
-            ? $warehouses->firstWhere('is_online_store', true)?->id
-            : null;
-
-        $defaultBranchName = (string) $settingService->get(
-            "ecommerce_branch_{$selectedBuId}",
-            $settingService->get('ecommerce_default_branch_name', 'Banjarbaru')
-        );
-
-        $defaultSalesId = $selectedBuId ? $settingService->get("ecommerce_sales_{$selectedBuId}", $settingService->get('ecommerce_default_sales_id')) : null;
-        $defaultHandledById = $selectedBuId ? $settingService->get("ecommerce_handled_by_{$selectedBuId}", $settingService->get('ecommerce_default_handled_by_id')) : null;
-
-        // 3. Kategori Produk BU
-        $allCategories = collect();
-        $activeCategories = [];
-        $allBrands = collect();
-        $activeBrands = [];
-
-        if ($selectedBuId) {
-            $allCategories = ProductAccurate::where('business_unit_id', $selectedBuId)
-                ->whereNotNull('categoryName')
-                ->where('categoryName', '!=', '')
-                ->selectRaw('categoryName, count(*) as count')
-                ->groupBy('categoryName')
-                ->orderBy('categoryName')
-                ->get()
-                ->map(function ($row) {
-                    return [
-                        'name' => (string) $row->categoryName,
-                        'count' => (int) $row->count,
-                    ];
-                });
-
-            $activeCatsRaw = $settingService->get("ecommerce_categories_{$selectedBuId}", $allCategories->pluck('name')->toArray());
-            if (is_string($activeCatsRaw)) {
-                $decoded = json_decode($activeCatsRaw, true);
-                $activeCategories = is_array($decoded) ? $decoded : [];
-            } elseif (is_array($activeCatsRaw)) {
-                $activeCategories = $activeCatsRaw;
-            } else {
-                $activeCategories = $allCategories->pluck('name')->toArray();
+                try {
+                    $firstBu = Schema::hasTable('business_units')
+                        ? (BusinessUnit::where('is_active', true)->first() ?: BusinessUnit::first())
+                        : null;
+                    $selectedBuId = $userBuId ?: $firstBu?->id;
+                } catch (\Throwable $e) {
+                    $selectedBuId = $userBuId;
+                }
             }
 
-            // 4. Merek Produk BU
-            $allBrands = ProductAccurate::where('business_unit_id', $selectedBuId)
-                ->whereNotNull('brandName')
-                ->where('brandName', '!=', '')
-                ->selectRaw('brandName, count(*) as count')
-                ->groupBy('brandName')
-                ->orderBy('brandName')
-                ->get()
-                ->map(function ($row) {
-                    return [
-                        'name' => (string) $row->brandName,
-                        'count' => (int) $row->count,
-                    ];
-                });
-
-            $activeBrandsRaw = $settingService->get("ecommerce_brands_{$selectedBuId}", $allBrands->pluck('name')->toArray());
-            if (is_string($activeBrandsRaw)) {
-                $decoded = json_decode($activeBrandsRaw, true);
-                $activeBrands = is_array($decoded) ? $decoded : [];
-            } elseif (is_array($activeBrandsRaw)) {
-                $activeBrands = $activeBrandsRaw;
-            } else {
-                $activeBrands = $allBrands->pluck('name')->toArray();
+            // 1. Pengaturan Global
+            try {
+                $globalSettings = [
+                    'dynamic_shipping' => filter_var($settingService->get('ecommerce_dynamic_shipping', false), FILTER_VALIDATE_BOOLEAN),
+                    'instant_payment' => filter_var($settingService->get('ecommerce_instant_payment', false), FILTER_VALIDATE_BOOLEAN),
+                    'cs_phone' => (string) $settingService->get('ecommerce_cs_phone', '081298765432'),
+                ];
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Settings: Failed to load global settings: ' . $e->getMessage());
+                $globalSettings = [
+                    'dynamic_shipping' => false,
+                    'instant_payment' => false,
+                    'cs_phone' => '081298765432',
+                ];
             }
+
+            // 2. Data Gudang & Master Cabang BU
+            $hasOnlineStoreCol = Schema::hasTable('warehouses') && Schema::hasColumn('warehouses', 'is_online_store');
+            $hasBuCol = Schema::hasTable('warehouses') && Schema::hasColumn('warehouses', 'business_unit_id');
+
+            $whCols = ['id', 'name'];
+            if ($hasOnlineStoreCol) {
+                $whCols[] = 'is_online_store';
+            }
+
+            $warehouses = collect();
+            try {
+                if (Schema::hasTable('warehouses')) {
+                    if ($selectedBuId && $hasBuCol) {
+                        $warehouses = Warehouse::where('business_unit_id', $selectedBuId)->get($whCols);
+                    } else {
+                        $warehouses = Warehouse::limit(50)->get($whCols);
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Settings: Failed to load warehouses: ' . $e->getMessage());
+            }
+
+            $onlineWarehouseId = $hasOnlineStoreCol
+                ? $warehouses->firstWhere('is_online_store', true)?->id
+                : null;
+
+            try {
+                $defaultBranchName = (string) $settingService->get(
+                    "ecommerce_branch_{$selectedBuId}",
+                    $settingService->get('ecommerce_default_branch_name', 'Banjarbaru')
+                );
+                $defaultSalesId = $selectedBuId ? $settingService->get("ecommerce_sales_{$selectedBuId}", $settingService->get('ecommerce_default_sales_id')) : null;
+                $defaultHandledById = $selectedBuId ? $settingService->get("ecommerce_handled_by_{$selectedBuId}", $settingService->get('ecommerce_default_handled_by_id')) : null;
+            } catch (\Throwable $e) {
+                $defaultBranchName = 'Banjarbaru';
+                $defaultSalesId = null;
+                $defaultHandledById = null;
+            }
+
+            // 3. Kategori Produk BU
+            $allCategories = collect();
+            $activeCategories = [];
+            $allBrands = collect();
+            $activeBrands = [];
+
+            if ($selectedBuId && Schema::hasTable('product_accurates')) {
+                try {
+                    $catCol = Schema::hasColumn('product_accurates', 'categoryName') ? 'categoryName' : null;
+                    if ($catCol) {
+                        $catQuery = ProductAccurate::whereNotNull($catCol)->where($catCol, '!=', '');
+                        if (Schema::hasColumn('product_accurates', 'business_unit_id')) {
+                            $catQuery->where('business_unit_id', $selectedBuId);
+                        }
+                        $allCategories = $catQuery->selectRaw("{$catCol}, count(*) as count")
+                            ->groupBy($catCol)
+                            ->orderBy($catCol)
+                            ->get()
+                            ->map(function ($row) use ($catCol) {
+                                return [
+                                    'name' => (string) $row->{$catCol},
+                                    'count' => (int) $row->count,
+                                ];
+                            });
+                    }
+
+                    $activeCatsRaw = $settingService->get("ecommerce_categories_{$selectedBuId}", $allCategories->pluck('name')->toArray());
+                    if (is_string($activeCatsRaw)) {
+                        $decoded = json_decode($activeCatsRaw, true);
+                        $activeCategories = is_array($decoded) ? $decoded : [];
+                    } elseif (is_array($activeCatsRaw)) {
+                        $activeCategories = $activeCatsRaw;
+                    } else {
+                        $activeCategories = $allCategories->pluck('name')->toArray();
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Settings: Failed to load categories: ' . $e->getMessage());
+                }
+
+                try {
+                    $brandCol = Schema::hasColumn('product_accurates', 'brandName') ? 'brandName' : null;
+                    if ($brandCol) {
+                        $brandQuery = ProductAccurate::whereNotNull($brandCol)->where($brandCol, '!=', '');
+                        if (Schema::hasColumn('product_accurates', 'business_unit_id')) {
+                            $brandQuery->where('business_unit_id', $selectedBuId);
+                        }
+                        $allBrands = $brandQuery->selectRaw("{$brandCol}, count(*) as count")
+                            ->groupBy($brandCol)
+                            ->orderBy($brandCol)
+                            ->get()
+                            ->map(function ($row) use ($brandCol) {
+                                return [
+                                    'name' => (string) $row->{$brandCol},
+                                    'count' => (int) $row->count,
+                                ];
+                            });
+                    }
+
+                    $activeBrandsRaw = $settingService->get("ecommerce_brands_{$selectedBuId}", $allBrands->pluck('name')->toArray());
+                    if (is_string($activeBrandsRaw)) {
+                        $decoded = json_decode($activeBrandsRaw, true);
+                        $activeBrands = is_array($decoded) ? $decoded : [];
+                    } elseif (is_array($activeBrandsRaw)) {
+                        $activeBrands = $activeBrandsRaw;
+                    } else {
+                        $activeBrands = $allBrands->pluck('name')->toArray();
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Settings: Failed to load brands: ' . $e->getMessage());
+                }
+            }
+
+            // Pastikan array selalu indexed dan bersih
+            $activeCategories = array_values(array_filter((array) $activeCategories, fn($v) => is_string($v) && $v !== ''));
+            $activeBrands = array_values(array_filter((array) $activeBrands, fn($v) => is_string($v) && $v !== ''));
+
+            // Karyawan & User untuk sales / kasir default
+            $employees = collect();
+            try {
+                if (Schema::hasTable('employes')) {
+                    $empCols = ['id'];
+                    if (Schema::hasColumn('employes', 'name')) $empCols[] = 'name';
+                    $employees = Employe::get($empCols);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Settings: Failed to load employes: ' . $e->getMessage());
+            }
+
+            $users = collect();
+            try {
+                if (Schema::hasTable('users')) {
+                    $userCols = ['id'];
+                    if (Schema::hasColumn('users', 'name')) $userCols[] = 'name';
+                    if (Schema::hasColumn('users', 'email')) $userCols[] = 'email';
+                    $users = User::get($userCols);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Settings: Failed to load users: ' . $e->getMessage());
+            }
+
+            return Inertia::render('Settings/Index', [
+                'globalSettings' => $globalSettings,
+                'selectedBuId' => $selectedBuId ? (int) $selectedBuId : null,
+                'buSettings' => [
+                    'online_warehouse_id' => $onlineWarehouseId,
+                    'default_branch_name' => $defaultBranchName,
+                    'default_sales_id' => $defaultSalesId ? (int) $defaultSalesId : null,
+                    'default_handled_by_id' => $defaultHandledById ? (int) $defaultHandledById : null,
+                    'all_categories' => $allCategories->values()->all(),
+                    'active_categories' => $activeCategories,
+                    'all_brands' => $allBrands->values()->all(),
+                    'active_brands' => $activeBrands,
+                ],
+                'warehouses' => $warehouses->values()->all(),
+                'employees' => $employees->values()->all(),
+                'users' => $users->values()->all(),
+            ]);
+        } catch (\Throwable $fatalError) {
+            \Illuminate\Support\Facades\Log::error('Settings: Fatal error in index(): ' . $fatalError->getMessage() . "\n" . $fatalError->getTraceAsString());
+            return Inertia::render('Settings/Index', [
+                'globalSettings' => [
+                    'dynamic_shipping' => false,
+                    'instant_payment' => false,
+                    'cs_phone' => '081298765432',
+                ],
+                'selectedBuId' => null,
+                'buSettings' => [
+                    'online_warehouse_id' => null,
+                    'default_branch_name' => 'Banjarbaru',
+                    'default_sales_id' => null,
+                    'default_handled_by_id' => null,
+                    'all_categories' => [],
+                    'active_categories' => [],
+                    'all_brands' => [],
+                    'active_brands' => [],
+                ],
+                'warehouses' => [],
+                'employees' => [],
+                'users' => [],
+            ]);
         }
-
-        // Pastikan array selalu indexed dan bersih
-        $activeCategories = array_values(array_filter((array) $activeCategories, fn($v) => is_string($v) && $v !== ''));
-        $activeBrands = array_values(array_filter((array) $activeBrands, fn($v) => is_string($v) && $v !== ''));
-
-        // Karyawan & User untuk sales / kasir default
-        $employees = collect();
-        if (Schema::hasTable('employes')) {
-            $employees = Employe::orderBy('name')->get(['id', 'name']);
-        }
-        $users = User::orderBy('name')->get(['id', 'name', 'email']);
-
-        return Inertia::render('Settings/Index', [
-            'globalSettings' => $globalSettings,
-            'selectedBuId' => $selectedBuId ? (int) $selectedBuId : null,
-            'buSettings' => [
-                'online_warehouse_id' => $onlineWarehouseId,
-                'default_branch_name' => $defaultBranchName,
-                'default_sales_id' => $defaultSalesId ? (int) $defaultSalesId : null,
-                'default_handled_by_id' => $defaultHandledById ? (int) $defaultHandledById : null,
-                'all_categories' => $allCategories,
-                'active_categories' => $activeCategories,
-                'all_brands' => $allBrands,
-                'active_brands' => $activeBrands,
-            ],
-            'warehouses' => $warehouses,
-            'employees' => $employees,
-            'users' => $users,
-        ]);
     }
 
     /**
