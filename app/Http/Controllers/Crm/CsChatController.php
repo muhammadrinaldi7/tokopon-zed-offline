@@ -666,4 +666,61 @@ class CsChatController extends Controller
 
         return response()->json($results);
     }
+
+    /**
+     * Polling pengaman pesan masuk pelanggan (Fallback jika WebSocket terputus / tab background)
+     */
+    public function pollMessages(Request $request): JsonResponse
+    {
+        $afterId = (int) $request->input('after_id', 0);
+        $activeConvId = (int) $request->input('active_conv_id', 0);
+
+        $maxId = Message::max('id') ?? 0;
+        if ($afterId >= $maxId && $afterId > 0) {
+            return response()->json([
+                'hasNew' => false,
+                'maxId' => $maxId,
+                'messages' => [],
+            ]);
+        }
+
+        // Jika afterId = 0 (inisialisasi awal), cukup kembalikan maxId saat ini
+        if ($afterId === 0) {
+            return response()->json([
+                'hasNew' => false,
+                'maxId' => $maxId,
+                'messages' => [],
+            ]);
+        }
+
+        $newMessages = Message::with(['user', 'conversation'])
+            ->where('id', '>', $afterId)
+            ->whereIn('sender_type', ['customer', 'guest'])
+            ->orderBy('id', 'asc')
+            ->limit(25)
+            ->get();
+
+        $formatted = $newMessages->map(function ($msg) use ($activeConvId) {
+            $senderName = $msg->user?->name 
+                ?? ($msg->conversation?->guest_name ?: 'Pelanggan');
+
+            return [
+                'id' => $msg->id,
+                'conversationId' => (int) $msg->conversation_id,
+                'sender' => $senderName,
+                'user' => $senderName,
+                'message' => $msg->message ?: ($msg->product_accurate_id ? 'Menanyakan rekomendasi produk' : 'Mengirim lampiran...'),
+                'text' => $msg->message ?: ($msg->product_accurate_id ? 'Menanyakan rekomendasi produk' : 'Mengirim lampiran...'),
+                'time' => $msg->created_at?->format('H:i') ?? '',
+                'senderType' => $msg->sender_type,
+                'isActiveConv' => (int) $msg->conversation_id === (int) $activeConvId,
+            ];
+        });
+
+        return response()->json([
+            'hasNew' => $newMessages->isNotEmpty(),
+            'maxId' => $maxId,
+            'messages' => $formatted,
+        ]);
+    }
 }

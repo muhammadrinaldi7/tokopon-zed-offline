@@ -112,6 +112,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/chat/{conversation}/closing', [\App\Http\Controllers\Crm\CsChatController::class, 'saveClosing'])->name('chat.closing');
         Route::post('/chat/quick-voucher', [\App\Http\Controllers\Crm\CsChatController::class, 'generateQuickVoucher'])->name('chat.quick-voucher');
         Route::get('/chat/search-products', [\App\Http\Controllers\Crm\CsChatController::class, 'searchProducts'])->name('chat.search-products');
+        Route::get('/chat/poll-messages', [\App\Http\Controllers\Crm\CsChatController::class, 'pollMessages'])->name('chat.poll');
 
         // ─── Sub-Modul: Voucher & Kupon Promo ───
         Route::get('/vouchers', [\App\Http\Controllers\Crm\VoucherController::class, 'index'])->name('vouchers');

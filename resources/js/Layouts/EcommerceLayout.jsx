@@ -99,6 +99,63 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
         },
     ];
 
+    // State Izin Desktop Notification Browser & Audio Context
+    const [desktopNotifStatus, setDesktopNotifStatus] = useState('default');
+    const sharedAudioCtxRef = useRef(null);
+    const titleFlashingTimerRef = useRef(null);
+    const seenMessageIdsRef = useRef(new Set());
+    const lastPolledIdRef = useRef(0);
+
+    const initAudioContext = () => {
+        try {
+            if (!sharedAudioCtxRef.current && typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                sharedAudioCtxRef.current = new AudioCtx();
+            }
+            if (sharedAudioCtxRef.current && sharedAudioCtxRef.current.state === 'suspended') {
+                sharedAudioCtxRef.current.resume();
+            }
+        } catch (e) {
+            console.warn('AudioContext init error:', e);
+        }
+        return sharedAudioCtxRef.current;
+    };
+
+    // Sintesis lonceng cadangan via Web Audio API jika audio tag diblokir browser
+    const playSynthChime = () => {
+        try {
+            const ctx = initAudioContext();
+            if (!ctx) return;
+            const now = ctx.currentTime;
+
+            // Nada 1: 587.33 Hz (D5)
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(587.33, now);
+            gain1.gain.setValueAtTime(0.25, now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.3);
+
+            // Nada 2: 880 Hz (A5)
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(880, now + 0.1);
+            gain2.gain.setValueAtTime(0.3, now + 0.1);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.start(now + 0.1);
+            osc2.stop(now + 0.65);
+        } catch (e) {
+            console.warn('Fallback synthesizer warning:', e);
+        }
+    };
+
     // Mainkan audio lonceng saat ada pesan baru
     const playChime = () => {
         if (!soundEnabled) return;
@@ -106,37 +163,247 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
             const audio = document.getElementById('global-chat-chime');
             if (audio) {
                 audio.currentTime = 0;
-                audio.play().catch(() => {});
+                audio.volume = 0.9;
+                const p = audio.play();
+                if (p !== undefined) {
+                    p.catch(() => playSynthChime());
+                    return;
+                }
             }
+            playSynthChime();
         } catch (e) {
-            console.warn('Audio chime playback restricted by browser policy:', e);
+            playSynthChime();
+        }
+    };
+
+    // Tampilkan notifikasi popup Windows (seperti WhatsApp Web)
+    const triggerDesktopNotification = (sender, message, conversationId) => {
+        if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') {
+            return;
+        }
+        try {
+            const notif = new Notification(`💬 ${sender || 'Pesan Baru'}`, {
+                body: message || 'Membalas percakapan Anda...',
+                icon: '/favicon.ico',
+                tag: conversationId ? `tokopon-conv-${conversationId}` : 'tokopon-cs',
+                renotify: true,
+                requireInteraction: true, // Menjaga notifikasi tetap tampil di pojok layar Windows
+            });
+
+            notif.onclick = () => {
+                window.focus();
+                if (conversationId && typeof window !== 'undefined' && !window.location.pathname.startsWith('/crm/chat')) {
+                    router.get('/crm/chat', { active: conversationId }, { preserveState: true, preserveScroll: true });
+                }
+                notif.close();
+            };
+        } catch (err) {
+            console.warn('Desktop notification error:', err);
+        }
+    };
+
+    // Minta izin notifikasi desktop Windows
+    const requestDesktopNotificationPermission = () => {
+        playChime();
+        if (!('Notification' in window)) {
+            alert('Browser Anda tidak mendukung Web Notifications API.');
+            return;
+        }
+
+        if (Notification.permission === 'default') {
+            Notification.requestPermission().then((permission) => {
+                setDesktopNotifStatus(permission);
+                if (permission === 'granted') {
+                    triggerDesktopNotification(
+                        'Tokopon Live Chat CS',
+                        'Notifikasi desktop aktif! Anda akan mendapatkan popup di Windows setiap ada pesan baru dari pelanggan.',
+                        null
+                    );
+                }
+            });
+        } else if (Notification.permission === 'granted') {
+            triggerDesktopNotification(
+                'Tokopon Live Chat (Tes)',
+                'Bunyi dan notifikasi desktop aktif! Popup ini akan muncul walau Anda membuka YouTube / aplikasi lain.',
+                null
+            );
+        } else {
+            alert('Izin notifikasi diblokir di browser. Silakan klik ikon setelan/gembok di sebelah URL bar dan ubah izin Notifikasi ke "Izinkan / Allow".');
+        }
+    };
+
+    // Kedipkan judul tab browser saat di background
+    const originalTitle = `${title} - Tokopon CRM`;
+    const startFlashingTitle = (sender) => {
+        if (typeof document === 'undefined' || !document.hidden) return;
+        let isAlert = true;
+        if (titleFlashingTimerRef.current) clearInterval(titleFlashingTimerRef.current);
+        titleFlashingTimerRef.current = setInterval(() => {
+            document.title = isAlert ? `🔔 (1) Pesan Baru: ${sender || 'Pelanggan'}!` : originalTitle;
+            isAlert = !isAlert;
+        }, 1000);
+    };
+
+    const stopFlashingTitle = () => {
+        if (titleFlashingTimerRef.current) {
+            clearInterval(titleFlashingTimerRef.current);
+            titleFlashingTimerRef.current = null;
+        }
+        document.title = originalTitle;
+    };
+
+    // Inisialisasi status notifikasi & auto-unlock audio saat user klik pertama kali
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            setDesktopNotifStatus(Notification.permission);
+        } else {
+            setDesktopNotifStatus('unsupported');
+        }
+
+        const unlockAllAudio = () => {
+            const audio = document.getElementById('global-chat-chime');
+            if (audio) {
+                audio.muted = true;
+                const p = audio.play();
+                if (p !== undefined) {
+                    p.then(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        audio.muted = false;
+                    }).catch(() => {});
+                }
+            }
+            initAudioContext();
+            document.removeEventListener('click', unlockAllAudio);
+            document.removeEventListener('keydown', unlockAllAudio);
+        };
+        document.addEventListener('click', unlockAllAudio, { passive: true });
+        document.addEventListener('keydown', unlockAllAudio, { passive: true });
+
+        const handleFocus = () => stopFlashingTitle();
+        const handleVisibilityChange = () => {
+            if (!document.hidden) stopFlashingTitle();
+        };
+
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener('click', unlockAllAudio);
+            document.removeEventListener('keydown', unlockAllAudio);
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            stopFlashingTitle();
+        };
+    }, [title]);
+
+    // Eksekusi notifikasi gabungan (Sound + Desktop Popup Windows + In-App Toast + Title Flash)
+    const handleIncomingCustomerMessage = (payload) => {
+        if (!payload) return;
+        const msgId = payload.id;
+        if (msgId && seenMessageIdsRef.current.has(msgId)) {
+            return;
+        }
+        if (msgId) {
+            seenMessageIdsRef.current.add(msgId);
+        }
+
+        const senderName = typeof payload.user === 'object' && payload.user !== null
+            ? (payload.user.name || 'Pelanggan')
+            : (payload.user || payload.sender || 'Pelanggan');
+
+        const messageText = payload.message || payload.text || 'Mengirim pesan baru...';
+
+        // 1. Putar suara lonceng
+        playChime();
+
+        // 2. Munculkan popup Windows native (seperti WA Web)
+        triggerDesktopNotification(senderName, messageText, payload.conversationId);
+
+        // 3. Kedipkan tab browser jika sedang di background
+        startFlashingTitle(senderName);
+
+        // 4. In-App toast
+        setToast({
+            type: 'info',
+            title: `Pesan Baru: ${senderName}`,
+            message: messageText,
+        });
+
+        // 5. Broadcast ke komponen internal (CsChat dsb)
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+                new CustomEvent('tokopon:incoming-message', {
+                    detail: {
+                        ...payload,
+                        sender: senderName,
+                        user: senderName,
+                        message: messageText,
+                        text: messageText,
+                    },
+                })
+            );
         }
     };
 
     // Dengarkan WebSocket Reverb secara global di Layout
     useEffect(() => {
-        if (window.Echo) {
-            // Channel private notifikasi CS untuk seluruh pesan masuk
-            const channel = window.Echo.private('cs-chats');
-            const handleMessage = (e) => {
-                if (e.senderType === 'customer' || e.senderType === 'guest') {
-                    playChime();
-                    setToast({
-                        type: 'info',
-                        title: `Pesan Baru: ${e.user || 'Pelanggan'}`,
-                        message: e.message || 'Mengirim pesan baru...',
+        if (!window.Echo) return;
+
+        const channel = window.Echo.private('cs-chats');
+        const handleMessage = (e) => {
+            if (e.senderType === 'customer' || e.senderType === 'guest') {
+                handleIncomingCustomerMessage(e);
+            }
+        };
+
+        channel.listen('.message.sent', handleMessage);
+        channel.listen('MessageSent', handleMessage);
+
+        return () => {
+            channel.stopListening('.message.sent', handleMessage);
+            channel.stopListening('MessageSent', handleMessage);
+        };
+    }, [soundEnabled, desktopNotifStatus]);
+
+    // Polling background timer pengaman (Setiap 3.5 detik untuk menjamin notif selalu masuk walau Reverb putus)
+    useEffect(() => {
+        let isPolling = false;
+        const pollInterval = setInterval(() => {
+            if (isPolling) return;
+            isPolling = true;
+
+            const activeConvId = (typeof window !== 'undefined' && window.__tokoponActiveConvId) || 0;
+
+            window.axios.get('/crm/chat/poll-messages', {
+                params: {
+                    after_id: lastPolledIdRef.current,
+                    active_conv_id: activeConvId,
+                }
+            })
+            .then((res) => {
+                if (res.data?.maxId) {
+                    if (lastPolledIdRef.current === 0) {
+                        lastPolledIdRef.current = res.data.maxId;
+                    } else if (res.data.maxId > lastPolledIdRef.current) {
+                        lastPolledIdRef.current = res.data.maxId;
+                    }
+                }
+
+                if (res.data?.messages && Array.isArray(res.data.messages)) {
+                    res.data.messages.forEach((msg) => {
+                        handleIncomingCustomerMessage(msg);
                     });
                 }
-            };
+            })
+            .catch(() => {})
+            .finally(() => {
+                isPolling = false;
+            });
+        }, 3500);
 
-            channel.listen('.message.sent', handleMessage);
-            channel.listen('MessageSent', handleMessage);
-
-            return () => {
-                window.Echo.leave('cs-chats');
-            };
-        }
-    }, [soundEnabled]);
+        return () => clearInterval(pollInterval);
+    }, [soundEnabled, desktopNotifStatus]);
 
     // Tangkap flash message dari Laravel session
     useEffect(() => {
@@ -193,7 +460,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                     </div>
 
                     {/* Controls & Quick Badges */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         {/* Status WebSocket Realtime */}
                         <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-xs font-bold">
                             <span className="relative flex h-2 w-2">
@@ -202,6 +469,35 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                             </span>
                             <span className="text-[11px]">Reverb Realtime</span>
                         </div>
+
+                        {/* Tombol Status Izin Notifikasi Desktop Windows */}
+                        <button
+                            type="button"
+                            onClick={requestDesktopNotificationPermission}
+                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs ${
+                                desktopNotifStatus === 'granted'
+                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                                    : desktopNotifStatus === 'denied'
+                                    ? 'bg-rose-50 border-rose-300 text-rose-700'
+                                    : 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
+                            }`}
+                            title={
+                                desktopNotifStatus === 'granted'
+                                    ? 'Notifikasi Desktop aktif! Popup Windows akan muncul walau Anda membuka YouTube/aplikasi lain. Klik untuk tes notif.'
+                                    : desktopNotifStatus === 'denied'
+                                    ? 'Notifikasi diblokir browser. Buka setelan izin situs di URL bar untuk mengizinkan.'
+                                    : 'Klik untuk mengizinkan notifikasi desktop agar pesan masuk selalu muncul di pojok layar Windows!'
+                            }
+                        >
+                            <Bell className={`w-3.5 h-3.5 ${desktopNotifStatus === 'granted' ? 'text-emerald-600' : ''}`} />
+                            <span className="text-[11px]">
+                                {desktopNotifStatus === 'granted'
+                                    ? 'Notif Desktop: Aktif'
+                                    : desktopNotifStatus === 'denied'
+                                    ? 'Notif Diblokir'
+                                    : 'Izinkan Notif Desktop'}
+                            </span>
+                        </button>
 
                         {/* Toggle Suara Chime */}
                         <button

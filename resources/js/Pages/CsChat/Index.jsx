@@ -81,6 +81,18 @@ export default function CsChatIndex({
         );
     };
 
+    // Simpan active conversation ID secara global agar polling helper tahu percakapan aktif
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            window.__tokoponActiveConvId = activeConv?.id ? parseInt(activeConv.id) : 0;
+        }
+        return () => {
+            if (typeof window !== 'undefined') {
+                window.__tokoponActiveConvId = 0;
+            }
+        };
+    }, [activeConv?.id]);
+
     // WebSocket real-time subscription untuk percakapan aktif
     useEffect(() => {
         if (!activeConv?.id || !window.Echo) return;
@@ -137,33 +149,65 @@ export default function CsChatIndex({
         channel.listen('MessageRead', handleReadReceipt);
 
         return () => {
+            channel.stopListening('.message.sent', handleNewMessage);
+            channel.stopListening('MessageSent', handleNewMessage);
+            channel.stopListening('.message.read', handleReadReceipt);
+            channel.stopListening('MessageRead', handleReadReceipt);
             window.Echo.leave(`conversation.${activeConv.id}`);
         };
     }, [activeConv?.id]);
 
-    // WebSocket real-time subscription untuk antrean chat global (sidebar updates)
+    // Sinkronisasi pesan masuk pelanggan dari event terpadu Layout (WebSocket & Polling Safeguard)
     useEffect(() => {
-        if (!window.Echo) return;
-
-        const channel = window.Echo.private('cs-chats');
-
-        const handleGlobalMessage = (e) => {
+        const handleIncomingFromLayout = (event) => {
+            const e = event.detail;
+            if (!e) return;
             const convId = parseInt(e.conversationId);
             const isActive = activeConv && parseInt(activeConv.id) === convId;
 
+            // Jika pesan ditujukan untuk obrolan yang sedang dibuka CS, append langsung
+            if (isActive) {
+                setActiveMessages((prev) => {
+                    const msgText = e.message || e.text || '';
+                    const msgTime = e.time || '';
+                    const exists = prev.some(
+                        (m) => (e.id && m.id === e.id) || (m.time === msgTime && (m.text === msgText || m.message === msgText))
+                    );
+                    if (exists) return prev;
+
+                    return [
+                        ...prev,
+                        {
+                            id: e.id || ('rt-' + Date.now() + Math.random()),
+                            sender_type: e.senderType,
+                            message: msgText,
+                            text: msgText,
+                            time: msgTime,
+                            created_at: msgTime,
+                            read_at: e.senderType === 'customer' || e.senderType === 'guest' ? new Date().toISOString() : null,
+                            user: e.user || 'Pelanggan',
+                            isCs: e.senderType === 'cs',
+                            attachments: e.attachments || [],
+                            product: e.product || null,
+                        },
+                    ];
+                });
+            }
+
+            // Update status & posisi percakapan di daftar sidebar
             setConvList((prev) => {
                 const targetIndex = prev.findIndex((c) => c.id === convId);
 
                 if (targetIndex !== -1) {
                     const target = { ...prev[targetIndex] };
-                    target.lastMessage = e.message;
+                    target.lastMessage = e.message || e.text;
                     target.lastTime = e.time;
                     target.lastMessageTime = e.time;
                     if (!isActive && (e.senderType === 'customer' || e.senderType === 'guest')) {
                         target.unreadCount = (target.unreadCount || 0) + 1;
                     }
 
-                    // Pindahkan ke paling atas antrean
+                    // Geser ke paling atas antrean
                     const filtered = prev.filter((c) => c.id !== convId);
                     return [target, ...filtered];
                 } else {
@@ -171,7 +215,6 @@ export default function CsChatIndex({
                         ? (e.user.name || 'Pelanggan')
                         : (e.user || 'Pelanggan');
 
-                    // Jika percakapan baru masuk
                     const newConvItem = {
                         id: convId,
                         userName: userName,
@@ -182,7 +225,7 @@ export default function CsChatIndex({
                         assignedToName: null,
                         assignedToId: null,
                         isAssignedToMe: false,
-                        lastMessage: e.message,
+                        lastMessage: e.message || e.text,
                         lastTime: e.time,
                         lastMessageTime: e.time,
                         unreadCount: isActive ? 0 : 1,
@@ -195,11 +238,9 @@ export default function CsChatIndex({
             });
         };
 
-        channel.listen('.message.sent', handleGlobalMessage);
-        channel.listen('MessageSent', handleGlobalMessage);
-
+        window.addEventListener('tokopon:incoming-message', handleIncomingFromLayout);
         return () => {
-            window.Echo.leave('cs-chats');
+            window.removeEventListener('tokopon:incoming-message', handleIncomingFromLayout);
         };
     }, [activeConv?.id]);
 
