@@ -192,14 +192,23 @@ export default function ChatSidebar({
                                                 : 'bg-indigo-100 text-indigo-700'
                                         }`}
                                     >
-                                        {conv.userInitial}
+                                        {(typeof conv.userInitial === 'string' && conv.userInitial.length > 0
+                                            ? conv.userInitial
+                                            : (typeof conv.userName === 'string' && conv.userName.length > 0
+                                                ? conv.userName.charAt(0)
+                                                : (typeof conv.userName === 'object' && conv.userName?.name
+                                                    ? conv.userName.name.charAt(0)
+                                                    : 'P'))
+                                        ).toUpperCase()}
                                     </div>
 
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between gap-1">
                                             <div className="flex items-center gap-1 min-w-0">
                                                 <span className="text-xs font-bold text-slate-800 truncate">
-                                                    {conv.userName}
+                                                    {typeof conv.userName === 'object' && conv.userName !== null
+                                                        ? (conv.userName.name || 'Pelanggan')
+                                                        : (conv.userName || 'Pelanggan')}
                                                 </span>
                                                 {conv.isGuest && (
                                                     <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200/80 px-1 rounded font-semibold shrink-0">
@@ -208,7 +217,7 @@ export default function ChatSidebar({
                                                 )}
                                             </div>
                                             <span className="text-[10px] text-slate-400 font-mono shrink-0">
-                                                {conv.lastTime}
+                                                {conv.lastTime || conv.lastMessageTime || ''}
                                             </span>
                                         </div>
 

@@ -132,13 +132,20 @@ export default function ChatStream({
                                 : 'bg-indigo-100 text-indigo-700'
                         }`}
                     >
-                        {activeConv.userName.charAt(0).toUpperCase()}
+                        {(typeof activeConv.userName === 'string' && activeConv.userName.length > 0
+                            ? activeConv.userName.charAt(0)
+                            : (typeof activeConv.userName === 'object' && activeConv.userName?.name
+                                ? activeConv.userName.name.charAt(0)
+                                : 'P')
+                        ).toUpperCase()}
                     </div>
 
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-extrabold text-slate-900 text-sm">
-                                {activeConv.userName}
+                                {typeof activeConv.userName === 'object' && activeConv.userName !== null
+                                    ? (activeConv.userName.name || 'Pelanggan')
+                                    : (activeConv.userName || 'Pelanggan')}
                             </h3>
 
                             {/* Phone Badge */}
@@ -269,10 +276,12 @@ export default function ChatStream({
                         >
                             <div className="flex items-center gap-1.5 mb-1 text-[11px] text-slate-400">
                                 <span className={`font-bold ${msg.isCs ? 'text-indigo-600' : 'text-slate-700'}`}>
-                                    {msg.user}
+                                    {typeof msg.user === 'object' && msg.user !== null
+                                        ? (msg.user.name || 'Pelanggan')
+                                        : (msg.user || 'Pelanggan')}
                                 </span>
                                 <span>•</span>
-                                <span>{msg.time}</span>
+                                <span>{msg.time || msg.created_at || ''}</span>
                             </div>
 
                             {/* Rekomendasi Produk Card */}
@@ -332,7 +341,7 @@ export default function ChatStream({
                             )}
 
                             {/* Message Text Bubble */}
-                            {msg.text && (
+                            {(msg.text || msg.message) && (
                                 <div
                                     className={`px-4 py-2.5 rounded-2xl max-w-md text-xs leading-relaxed shadow-2xs ${
                                         msg.isCs
@@ -340,7 +349,7 @@ export default function ChatStream({
                                             : 'bg-white text-slate-800 border border-slate-200/80 rounded-tl-xs'
                                     }`}
                                 >
-                                    {msg.text}
+                                    {msg.text || msg.message}
                                 </div>
                             )}
                         </div>

@@ -88,26 +88,33 @@ export default function CsChatIndex({
         const channel = window.Echo.private(`conversation.${activeConv.id}`);
 
         const handleNewMessage = (e) => {
-            if (parseInt(e.conversationId) === parseInt(activeConv.id)) {
+            if (activeConv?.id && parseInt(e.conversationId) === parseInt(activeConv.id)) {
                 setActiveMessages((prev) => {
-                    // Cek jika pesan sudah ada berdasarkan timestamp dan text
+                    const msgText = e.message || '';
+                    const msgTime = e.time || '';
                     const exists = prev.some(
-                        (m) => m.created_at === e.time && m.message === e.message
+                        (m) => (e.id && m.id === e.id) || (m.time === msgTime && (m.text === msgText || m.message === msgText))
                     );
                     if (exists) return prev;
+
+                    const userName = typeof e.user === 'object' && e.user !== null
+                        ? (e.user.name || 'Pelanggan')
+                        : (e.user || 'Pelanggan');
 
                     return [
                         ...prev,
                         {
-                            id: 'rt-' + Date.now() + Math.random(),
+                            id: e.id || ('rt-' + Date.now() + Math.random()),
                             sender_type: e.senderType,
-                            message: e.message,
-                            created_at: e.time,
+                            message: msgText,
+                            text: msgText,
+                            time: msgTime,
+                            created_at: msgTime,
                             read_at: e.senderType === 'customer' || e.senderType === 'guest' ? new Date().toISOString() : null,
-                            user: {
-                                name: e.user,
-                                avatar: null,
-                            },
+                            user: userName,
+                            isCs: e.senderType === 'cs',
+                            attachments: e.attachments || [],
+                            product: e.product || null,
                         },
                     ];
                 });
@@ -115,7 +122,7 @@ export default function CsChatIndex({
         };
 
         const handleReadReceipt = (e) => {
-            if (parseInt(e.conversationId) === parseInt(activeConv.id)) {
+            if (activeConv?.id && parseInt(e.conversationId) === parseInt(activeConv.id)) {
                 setActiveMessages((prev) =>
                     prev.map((m) =>
                         m.sender_type === 'cs' ? { ...m, read_at: e.readAt || new Date().toISOString() } : m
@@ -150,6 +157,7 @@ export default function CsChatIndex({
                 if (targetIndex !== -1) {
                     const target = { ...prev[targetIndex] };
                     target.lastMessage = e.message;
+                    target.lastTime = e.time;
                     target.lastMessageTime = e.time;
                     if (!isActive && (e.senderType === 'customer' || e.senderType === 'guest')) {
                         target.unreadCount = (target.unreadCount || 0) + 1;
@@ -159,15 +167,23 @@ export default function CsChatIndex({
                     const filtered = prev.filter((c) => c.id !== convId);
                     return [target, ...filtered];
                 } else {
+                    const userName = typeof e.user === 'object' && e.user !== null
+                        ? (e.user.name || 'Pelanggan')
+                        : (e.user || 'Pelanggan');
+
                     // Jika percakapan baru masuk
                     const newConvItem = {
                         id: convId,
-                        userName: e.user || 'Pelanggan',
+                        userName: userName,
+                        userInitial: (userName || 'P').charAt(0).toUpperCase(),
                         userPhone: '',
                         status: 'open',
                         closingStatus: 'none',
-                        assignedToUser: null,
+                        assignedToName: null,
+                        assignedToId: null,
+                        isAssignedToMe: false,
                         lastMessage: e.message,
+                        lastTime: e.time,
                         lastMessageTime: e.time,
                         unreadCount: isActive ? 0 : 1,
                         productName: null,
@@ -194,24 +210,26 @@ export default function CsChatIndex({
         try {
             const res = await axios.post(`/crm/chat/${activeConv.id}/${action}`);
             if (res.data?.success) {
-                const updatedAssigned =
-                    action === 'claim'
-                        ? {
-                              id: auth?.user?.id,
-                              name: auth?.user?.name,
-                              avatar: auth?.user?.avatar,
-                          }
-                        : null;
+                const isClaim = action === 'claim';
+                const currentUserName = auth?.user?.name || 'Saya';
+                const currentUserId = auth?.user?.id || null;
 
                 setActiveConv((prev) => ({
                     ...prev,
-                    assignedToUser: updatedAssigned,
+                    assignedToName: isClaim ? currentUserName : null,
+                    assignedToId: isClaim ? currentUserId : null,
+                    isAssignedToMe: isClaim,
                 }));
 
                 setConvList((prev) =>
                     prev.map((c) =>
                         c.id === activeConv.id
-                            ? { ...c, assignedToUser: updatedAssigned }
+                            ? {
+                                  ...c,
+                                  assignedToName: isClaim ? currentUserName : null,
+                                  assignedToId: isClaim ? currentUserId : null,
+                                  isAssignedToMe: isClaim,
+                              }
                             : c
                     )
                 );

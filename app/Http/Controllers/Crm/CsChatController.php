@@ -30,9 +30,9 @@ class CsChatController extends Controller
      */
     public function index(Request $request): Response
     {
-        $filterTab = $request->input('tab', 'all');
+        $filterTab = (string) ($request->input('tab') ?: 'all');
         $filterBu = $request->input('bu', null);
-        $search = $request->input('search', '');
+        $search = (string) ($request->input('search') ?? '');
         $activeId = $request->input('active', null);
 
         $conversations = $this->queryConversations($filterTab, $filterBu, $search);
@@ -123,8 +123,11 @@ class CsChatController extends Controller
     /**
      * Query percakapan dengan optimasi performa dan multi-varian nomor HP
      */
-    protected function queryConversations(string $filterTab, ?string $filterBu, string $search): array
+    protected function queryConversations(?string $filterTab = 'all', ?string $filterBu = null, ?string $search = ''): array
     {
+        $filterTab = $filterTab ?: 'all';
+        $search = (string) ($search ?? '');
+
         $query = Conversation::with([
             'user.profile',
             'user.loyaltyAccount',
