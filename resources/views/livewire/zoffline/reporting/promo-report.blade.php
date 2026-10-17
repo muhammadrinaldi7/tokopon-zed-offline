@@ -127,7 +127,14 @@
                     @forelse($orders as $order)
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-bold text-gray-900">{{ $order->order_number }}</div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-bold text-gray-900">{{ $order->order_number }}</span>
+                                    @if(strtoupper($order->order_status ?? '') === 'COMPLETED')
+                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800">LUNAS</span>
+                                    @elseif(strtoupper($order->order_status ?? '') === 'PIUTANG')
+                                        <span class="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-800">PIUTANG</span>
+                                    @endif
+                                </div>
                                 <div class="text-xs text-gray-500">{{ ($order->order_date ?? $order->created_at)?->format('d M Y') ?? '-' }}</div>
                                 <div class="text-xs text-gray-400 mt-0.5">Inv: {{ $order->accurate_invoice_no ?? '-' }}
                                 </div>
