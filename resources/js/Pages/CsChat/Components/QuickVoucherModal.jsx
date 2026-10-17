@@ -28,7 +28,10 @@ export default function QuickVoucherModal({
     const [errorMsg, setErrorMsg] = useState('');
 
     const handleShareExisting = (coupon) => {
-        const text = `🎉 Halo kak! Khusus untuk kakak hari ini, kakak bisa menggunakan kupon promo *${coupon.code}* untuk mendapatkan diskon ${coupon.discount_type === 'PERCENTAGE' ? coupon.discount_amount + '%' : 'Rp ' + Number(coupon.discount_amount).toLocaleString('id-ID')} saat checkout di aplikasi Tokopon ya!`;
+        const isPercent = coupon.discount_type === 'PERCENTAGE' || (coupon.type && coupon.type.includes('PERCENT'));
+        const amount = coupon.discount_amount ?? coupon.discount_value ?? 0;
+        const discText = isPercent ? `${amount}%` : `Rp ${Number(amount).toLocaleString('id-ID')}`;
+        const text = `🎉 Halo kak! Khusus untuk kakak hari ini, kakak bisa menggunakan kupon promo *${coupon.code}* untuk mendapatkan diskon ${discText} saat checkout di aplikasi Tokopon ya!`;
         onSendCouponText(text);
         onClose();
     };
@@ -138,10 +141,17 @@ export default function QuickVoucherModal({
                                         <h5 className="text-xs font-bold text-slate-900 mt-1">
                                             {coupon.title}
                                         </h5>
-                                        <p className="text-[11px] text-slate-500">
-                                            Diskon {coupon.discount_type === 'PERCENTAGE' ? coupon.discount_amount + '%' : 'Rp ' + Number(coupon.discount_amount).toLocaleString('id-ID')}
-                                            {coupon.min_order_amount > 0 ? ` (Min. Rp ${Number(coupon.min_order_amount).toLocaleString('id-ID')})` : ''}
-                                        </p>
+                                        {(() => {
+                                            const isPercent = coupon.discount_type === 'PERCENTAGE' || (coupon.type && coupon.type.includes('PERCENT'));
+                                            const amount = coupon.discount_amount ?? coupon.discount_value ?? 0;
+                                            const minOrder = coupon.min_order_amount ?? coupon.min_purchase_amount ?? 0;
+                                            return (
+                                                <p className="text-[11px] text-slate-500">
+                                                    Diskon {isPercent ? `${amount}%` : `Rp ${Number(amount).toLocaleString('id-ID')}`}
+                                                    {minOrder > 0 ? ` (Min. Rp ${Number(minOrder).toLocaleString('id-ID')})` : ''}
+                                                </p>
+                                            );
+                                        })()}
                                     </div>
                                     <button
                                         type="button"

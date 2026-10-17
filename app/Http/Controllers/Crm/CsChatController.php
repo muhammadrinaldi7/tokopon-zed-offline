@@ -83,7 +83,19 @@ class CsChatController extends Controller
             })
             ->latest()
             ->take(8)
-            ->get(['id', 'code', 'title', 'discount_type', 'discount_amount', 'min_order_amount']);
+            ->get(['id', 'code', 'title', 'type', 'discount_value', 'min_purchase_amount'])
+            ->map(function ($c) {
+                $isPercent = str_contains($c->type ?? '', 'PERCENT');
+                return [
+                    'id' => $c->id,
+                    'code' => $c->code,
+                    'title' => $c->title,
+                    'type' => $c->type,
+                    'discount_type' => $isPercent ? 'PERCENTAGE' : 'FIXED',
+                    'discount_amount' => (float) $c->discount_value,
+                    'min_order_amount' => (float) $c->min_purchase_amount,
+                ];
+            });
 
         return Inertia::render('CsChat/Index', [
             'conversations' => $conversations,
@@ -580,15 +592,20 @@ class CsChatController extends Controller
 
         $code = 'CSDEAL-' . strtoupper(Str::random(6));
 
+        $isPercent = $request->input('discount_type') === 'PERCENTAGE';
+        $type = $isPercent
+            ? EcommerceCoupon::TYPE_PRODUCT_PERCENT
+            : EcommerceCoupon::TYPE_PRODUCT_FIXED;
+
         $coupon = EcommerceCoupon::create([
             'code' => $code,
             'title' => $request->input('title') ?: 'Kupon Spesial Closing CS',
             'description' => 'Voucher diskon khusus dari Customer Service Tokopon',
-            'discount_type' => $request->input('discount_type'),
-            'discount_amount' => $request->input('discount_amount'),
-            'min_order_amount' => $request->input('min_order_amount', 0),
+            'type' => $type,
+            'discount_value' => $request->input('discount_amount'),
+            'min_purchase_amount' => $request->input('min_order_amount', 0),
             'usage_limit_per_user' => 1,
-            'total_usage_limit' => 1,
+            'usage_limit_total' => 1,
             'is_active' => true,
             'start_date' => now(),
             'end_date' => now()->addDays(2),
@@ -596,7 +613,15 @@ class CsChatController extends Controller
 
         return response()->json([
             'success' => true,
-            'coupon' => $coupon,
+            'coupon' => [
+                'id' => $coupon->id,
+                'code' => $coupon->code,
+                'title' => $coupon->title,
+                'type' => $coupon->type,
+                'discount_type' => $request->input('discount_type'),
+                'discount_amount' => (float) $coupon->discount_value,
+                'min_order_amount' => (float) $coupon->min_purchase_amount,
+            ],
             'shareText' => "Kak, ini kupon diskon spesial khusus hari ini dari kami ya! Gunakan kode: *{$coupon->code}* saat checkout.",
         ]);
     }

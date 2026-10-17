@@ -141,11 +141,30 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/banners/{banner}', [\App\Http\Controllers\Crm\BannerController::class, 'destroy'])->name('banners.destroy');
         Route::post('/banners/reorder', [\App\Http\Controllers\Crm\BannerController::class, 'reorder'])->name('banners.reorder');
 
-        // Aliases for unified sub-modules
-        Route::get('/products', fn () => redirect()->route('zoffline.ecommerce.products'))->name('products');
-        Route::get('/loyalty', fn () => redirect()->route('zoffline.ecommerce.loyalty'))->name('loyalty');
-        Route::get('/payments', fn () => redirect()->route('zoffline.ecommerce.payment-methods'))->name('payments');
-        Route::get('/settings', fn () => redirect()->route('zoffline.ecommerce.settings'))->name('settings');
+        // ─── Sub-Modul: Kurasi Produk Mobile ───
+        Route::get('/products', [\App\Http\Controllers\Crm\ProductCurationController::class, 'index'])->name('products');
+        Route::post('/products/{product}/photos', [\App\Http\Controllers\Crm\ProductCurationController::class, 'uploadPhotos'])->name('products.photos');
+        Route::delete('/products/{product}/cover', [\App\Http\Controllers\Crm\ProductCurationController::class, 'removeCoverPhoto'])->name('products.cover.destroy');
+
+        // ─── Sub-Modul: Member Loyalty & Poin ───
+        Route::get('/loyalty', [\App\Http\Controllers\Crm\LoyaltyController::class, 'index'])->name('loyalty');
+        Route::post('/loyalty/{account}/adjust', [\App\Http\Controllers\Crm\LoyaltyController::class, 'adjustPoints'])->name('loyalty.adjust');
+        Route::get('/loyalty/{account}/history', [\App\Http\Controllers\Crm\LoyaltyController::class, 'history'])->name('loyalty.history');
+        Route::post('/loyalty/settings', [\App\Http\Controllers\Crm\LoyaltyController::class, 'saveSettings'])->name('loyalty.settings');
+        Route::post('/loyalty/sync', [\App\Http\Controllers\Crm\LoyaltyController::class, 'syncUsers'])->name('loyalty.sync');
+
+        // ─── Sub-Modul: Rekening Bank Toko ───
+        Route::get('/payments', [\App\Http\Controllers\Crm\PaymentMethodController::class, 'index'])->name('payments');
+        Route::post('/payments', [\App\Http\Controllers\Crm\PaymentMethodController::class, 'store'])->name('payments.store');
+        Route::put('/payments/{paymentMethod}', [\App\Http\Controllers\Crm\PaymentMethodController::class, 'update'])->name('payments.update');
+        Route::post('/payments/{paymentMethod}/toggle-active', [\App\Http\Controllers\Crm\PaymentMethodController::class, 'toggleActive'])->name('payments.toggle-active');
+        Route::post('/payments/{paymentMethod}/toggle-mobile', [\App\Http\Controllers\Crm\PaymentMethodController::class, 'toggleMobile'])->name('payments.toggle-mobile');
+        Route::delete('/payments/{paymentMethod}', [\App\Http\Controllers\Crm\PaymentMethodController::class, 'destroy'])->name('payments.destroy');
+
+        // ─── Sub-Modul: Pengaturan E-Commerce ───
+        Route::get('/settings', [\App\Http\Controllers\Crm\EcommerceSettingsController::class, 'index'])->name('settings');
+        Route::post('/settings/global', [\App\Http\Controllers\Crm\EcommerceSettingsController::class, 'saveGlobalSettings'])->name('settings.global');
+        Route::post('/settings/business-unit', [\App\Http\Controllers\Crm\EcommerceSettingsController::class, 'saveBusinessUnitSettings'])->name('settings.business-unit');
     });
 
     // Reporting
