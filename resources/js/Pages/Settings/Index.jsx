@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import EcommerceLayout from '@/Layouts/EcommerceLayout';
 import {
@@ -25,28 +25,59 @@ export default function EcommerceSettingsIndex({
     employees = [],
     users = []
 }) {
-    const { businessUnits } = usePage().props;
+    const { businessUnits = [] } = usePage().props || {};
 
     // Form Global Settings
     const [globalForm, setGlobalForm] = useState({
         cs_phone: globalSettings?.cs_phone || '081298765432',
-        dynamic_shipping: globalSettings?.dynamic_shipping ?? false,
-        instant_payment: globalSettings?.instant_payment ?? false,
+        dynamic_shipping: Boolean(globalSettings?.dynamic_shipping),
+        instant_payment: Boolean(globalSettings?.instant_payment),
     });
     const [isSavingGlobal, setIsSavingGlobal] = useState(false);
 
     // Form Business Unit Settings
-    const [activeBuId, setActiveBuId] = useState(selectedBuId || businessUnits?.[0]?.id);
+    const [activeBuId, setActiveBuId] = useState(selectedBuId || businessUnits?.[0]?.id || null);
     const [buForm, setBuForm] = useState({
         business_unit_id: activeBuId,
         online_warehouse_id: buSettings?.online_warehouse_id || '',
         default_branch_name: buSettings?.default_branch_name || 'Banjarbaru',
         default_sales_id: buSettings?.default_sales_id || '',
         default_handled_by_id: buSettings?.default_handled_by_id || '',
-        active_categories: buSettings?.active_categories || [],
-        active_brands: buSettings?.active_brands || [],
+        active_categories: Array.isArray(buSettings?.active_categories) ? buSettings.active_categories : [],
+        active_brands: Array.isArray(buSettings?.active_brands) ? buSettings.active_brands : [],
     });
     const [isSavingBu, setIsSavingBu] = useState(false);
+
+    // Sync form when props update
+    useEffect(() => {
+        if (selectedBuId) {
+            setActiveBuId(selectedBuId);
+        } else if (!activeBuId && businessUnits?.length > 0) {
+            setActiveBuId(businessUnits[0].id);
+        }
+    }, [selectedBuId, businessUnits]);
+
+    useEffect(() => {
+        if (globalSettings) {
+            setGlobalForm({
+                cs_phone: globalSettings?.cs_phone || '081298765432',
+                dynamic_shipping: Boolean(globalSettings?.dynamic_shipping),
+                instant_payment: Boolean(globalSettings?.instant_payment),
+            });
+        }
+    }, [globalSettings]);
+
+    useEffect(() => {
+        setBuForm({
+            business_unit_id: activeBuId,
+            online_warehouse_id: buSettings?.online_warehouse_id || '',
+            default_branch_name: buSettings?.default_branch_name || 'Banjarbaru',
+            default_sales_id: buSettings?.default_sales_id || '',
+            default_handled_by_id: buSettings?.default_handled_by_id || '',
+            active_categories: Array.isArray(buSettings?.active_categories) ? buSettings.active_categories : [],
+            active_brands: Array.isArray(buSettings?.active_brands) ? buSettings.active_brands : [],
+        });
+    }, [buSettings, activeBuId]);
 
     // Switch BU Tab
     const handleSwitchBu = (buId) => {
@@ -54,7 +85,7 @@ export default function EcommerceSettingsIndex({
         router.get(
             '/crm/settings',
             { bu: buId },
-            { preserveState: false, preserveScroll: true }
+            { preserveState: true, preserveScroll: true }
         );
     };
 
@@ -90,7 +121,7 @@ export default function EcommerceSettingsIndex({
     // Toggle Category
     const handleToggleCategory = (catName) => {
         setBuForm((prev) => {
-            const current = prev.active_categories || [];
+            const current = Array.isArray(prev.active_categories) ? prev.active_categories : [];
             if (current.includes(catName)) {
                 return { ...prev, active_categories: current.filter((c) => c !== catName) };
             } else {
@@ -102,7 +133,7 @@ export default function EcommerceSettingsIndex({
     // Toggle Brand
     const handleToggleBrand = (brandName) => {
         setBuForm((prev) => {
-            const current = prev.active_brands || [];
+            const current = Array.isArray(prev.active_brands) ? prev.active_brands : [];
             if (current.includes(brandName)) {
                 return { ...prev, active_brands: current.filter((b) => b !== brandName) };
             } else {
@@ -111,7 +142,7 @@ export default function EcommerceSettingsIndex({
         });
     };
 
-    const currentBu = businessUnits?.find((b) => b.id === activeBuId) || businessUnits?.[0];
+    const currentBu = businessUnits?.find((b) => b.id === activeBuId) || businessUnits?.[0] || { name: 'Toko' };
 
     return (
         <EcommerceLayout title="Pengaturan E-Commerce">
@@ -322,23 +353,23 @@ export default function EcommerceSettingsIndex({
                             <div className="flex items-center justify-between mb-3">
                                 <div>
                                     <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">
-                                        Kurasi Kategori Produk yang Tampil di Mobile ({currentBu?.name})
+                                        Kurasi Kategori Produk yang Tampil di Mobile ({currentBu?.name || 'Toko'})
                                     </h3>
                                     <p className="text-[11px] text-slate-500">
                                         Klik untuk menyalakan/mematikan kategori yang ingin dimunculkan pada menu belanja pembeli.
                                     </p>
                                 </div>
                                 <span className="text-xs font-bold text-purple-600">
-                                    {buForm.active_categories.length} kategori aktif
+                                    {(Array.isArray(buForm.active_categories) ? buForm.active_categories.length : 0)} kategori aktif
                                 </span>
                             </div>
 
                             <div className="flex flex-wrap gap-2">
-                                {buSettings?.all_categories?.length === 0 ? (
+                                {!buSettings?.all_categories || buSettings.all_categories.length === 0 ? (
                                     <p className="text-xs text-slate-400 italic">Tidak ada kategori produk terdaftar di toko ini.</p>
                                 ) : (
-                                    buSettings?.all_categories?.map((cat) => {
-                                        const isSelected = buForm.active_categories.includes(cat.name);
+                                    buSettings.all_categories.map((cat) => {
+                                        const isSelected = Array.isArray(buForm.active_categories) && buForm.active_categories.includes(cat.name);
                                         return (
                                             <button
                                                 key={cat.name}
@@ -366,23 +397,23 @@ export default function EcommerceSettingsIndex({
                             <div className="flex items-center justify-between mb-3">
                                 <div>
                                     <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider">
-                                        Kurasi Brand / Merek Populer ({currentBu?.name})
+                                        Kurasi Brand / Merek Populer ({currentBu?.name || 'Toko'})
                                     </h3>
                                     <p className="text-[11px] text-slate-500">
                                         Merek yang terpilih akan tampil di filter cepat beranda aplikasi.
                                     </p>
                                 </div>
                                 <span className="text-xs font-bold text-purple-600">
-                                    {buForm.active_brands.length} brand aktif
+                                    {(Array.isArray(buForm.active_brands) ? buForm.active_brands.length : 0)} brand aktif
                                 </span>
                             </div>
 
                             <div className="flex flex-wrap gap-2">
-                                {buSettings?.all_brands?.length === 0 ? (
+                                {!buSettings?.all_brands || buSettings.all_brands.length === 0 ? (
                                     <p className="text-xs text-slate-400 italic">Tidak ada brand terdaftar di toko ini.</p>
                                 ) : (
-                                    buSettings?.all_brands?.map((br) => {
-                                        const isSelected = buForm.active_brands.includes(br.name);
+                                    buSettings.all_brands.map((br) => {
+                                        const isSelected = Array.isArray(buForm.active_brands) && buForm.active_brands.includes(br.name);
                                         return (
                                             <button
                                                 key={br.name}
@@ -412,7 +443,7 @@ export default function EcommerceSettingsIndex({
                                 className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-purple-500/20 disabled:opacity-50 transition-all"
                             >
                                 {isSavingBu ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                                Simpan Pengaturan {currentBu?.name}
+                                Simpan Pengaturan {currentBu?.name || 'Toko'}
                             </button>
                         </div>
                     </form>

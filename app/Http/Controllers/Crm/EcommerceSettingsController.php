@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -25,8 +26,9 @@ class EcommerceSettingsController extends Controller
     {
         $selectedBuId = $request->input('bu');
         if (!$selectedBuId) {
-            $firstBu = BusinessUnit::where('is_active', true)->first();
-            $selectedBuId = Auth::user()?->getActiveBusinessUnitId() ?? $firstBu?->id;
+            $userBuId = Auth::user()?->getActiveBusinessUnitId() ?? Auth::user()?->business_unit_id;
+            $firstBu = BusinessUnit::where('is_active', true)->first() ?: BusinessUnit::first();
+            $selectedBuId = $userBuId ?: $firstBu?->id;
         }
 
         // 1. Pengaturan Global
@@ -37,64 +39,99 @@ class EcommerceSettingsController extends Controller
         ];
 
         // 2. Data Gudang & Master Cabang BU
-        $warehouses = Warehouse::where('business_unit_id', $selectedBuId)->get(['id', 'name', 'is_online_store']);
-        $onlineWarehouseId = $warehouses->firstWhere('is_online_store', true)?->id;
+        $hasOnlineStoreCol = Schema::hasColumn('warehouses', 'is_online_store');
+        $whCols = ['id', 'name'];
+        if ($hasOnlineStoreCol) {
+            $whCols[] = 'is_online_store';
+        }
+
+        $warehouses = $selectedBuId
+            ? Warehouse::where('business_unit_id', $selectedBuId)->get($whCols)
+            : collect();
+
+        $onlineWarehouseId = $hasOnlineStoreCol
+            ? $warehouses->firstWhere('is_online_store', true)?->id
+            : null;
 
         $defaultBranchName = (string) $settingService->get(
             "ecommerce_branch_{$selectedBuId}",
             $settingService->get('ecommerce_default_branch_name', 'Banjarbaru')
         );
 
-        $defaultSalesId = $settingService->get("ecommerce_sales_{$selectedBuId}", $settingService->get('ecommerce_default_sales_id'));
-        $defaultHandledById = $settingService->get("ecommerce_handled_by_{$selectedBuId}", $settingService->get('ecommerce_default_handled_by_id'));
+        $defaultSalesId = $selectedBuId ? $settingService->get("ecommerce_sales_{$selectedBuId}", $settingService->get('ecommerce_default_sales_id')) : null;
+        $defaultHandledById = $selectedBuId ? $settingService->get("ecommerce_handled_by_{$selectedBuId}", $settingService->get('ecommerce_default_handled_by_id')) : null;
 
         // 3. Kategori Produk BU
-        $allCategories = ProductAccurate::where('business_unit_id', $selectedBuId)
-            ->whereNotNull('categoryName')
-            ->where('categoryName', '!=', '')
-            ->selectRaw('categoryName, count(*) as count')
-            ->groupBy('categoryName')
-            ->orderBy('categoryName')
-            ->get()
-            ->map(function ($row) {
-                return [
-                    'name' => $row->categoryName,
-                    'count' => $row->count,
-                ];
-            });
+        $allCategories = collect();
+        $activeCategories = [];
+        $allBrands = collect();
+        $activeBrands = [];
 
-        $activeCategories = $settingService->get("ecommerce_categories_{$selectedBuId}", $allCategories->pluck('name')->toArray());
-        if (!is_array($activeCategories)) {
-            $activeCategories = json_decode($activeCategories, true) ?? [];
+        if ($selectedBuId) {
+            $allCategories = ProductAccurate::where('business_unit_id', $selectedBuId)
+                ->whereNotNull('categoryName')
+                ->where('categoryName', '!=', '')
+                ->selectRaw('categoryName, count(*) as count')
+                ->groupBy('categoryName')
+                ->orderBy('categoryName')
+                ->get()
+                ->map(function ($row) {
+                    return [
+                        'name' => (string) $row->categoryName,
+                        'count' => (int) $row->count,
+                    ];
+                });
+
+            $activeCatsRaw = $settingService->get("ecommerce_categories_{$selectedBuId}", $allCategories->pluck('name')->toArray());
+            if (is_string($activeCatsRaw)) {
+                $decoded = json_decode($activeCatsRaw, true);
+                $activeCategories = is_array($decoded) ? $decoded : [];
+            } elseif (is_array($activeCatsRaw)) {
+                $activeCategories = $activeCatsRaw;
+            } else {
+                $activeCategories = $allCategories->pluck('name')->toArray();
+            }
+
+            // 4. Merek Produk BU
+            $allBrands = ProductAccurate::where('business_unit_id', $selectedBuId)
+                ->whereNotNull('brandName')
+                ->where('brandName', '!=', '')
+                ->selectRaw('brandName, count(*) as count')
+                ->groupBy('brandName')
+                ->orderBy('brandName')
+                ->get()
+                ->map(function ($row) {
+                    return [
+                        'name' => (string) $row->brandName,
+                        'count' => (int) $row->count,
+                    ];
+                });
+
+            $activeBrandsRaw = $settingService->get("ecommerce_brands_{$selectedBuId}", $allBrands->pluck('name')->toArray());
+            if (is_string($activeBrandsRaw)) {
+                $decoded = json_decode($activeBrandsRaw, true);
+                $activeBrands = is_array($decoded) ? $decoded : [];
+            } elseif (is_array($activeBrandsRaw)) {
+                $activeBrands = $activeBrandsRaw;
+            } else {
+                $activeBrands = $allBrands->pluck('name')->toArray();
+            }
         }
 
-        // 4. Merek Produk BU
-        $allBrands = ProductAccurate::where('business_unit_id', $selectedBuId)
-            ->whereNotNull('brandName')
-            ->where('brandName', '!=', '')
-            ->selectRaw('brandName, count(*) as count')
-            ->groupBy('brandName')
-            ->orderBy('brandName')
-            ->get()
-            ->map(function ($row) {
-                return [
-                    'name' => $row->brandName,
-                    'count' => $row->count,
-                ];
-            });
-
-        $activeBrands = $settingService->get("ecommerce_brands_{$selectedBuId}", $allBrands->pluck('name')->toArray());
-        if (!is_array($activeBrands)) {
-            $activeBrands = json_decode($activeBrands, true) ?? [];
-        }
+        // Pastikan array selalu indexed dan bersih
+        $activeCategories = array_values(array_filter((array) $activeCategories, fn($v) => is_string($v) && $v !== ''));
+        $activeBrands = array_values(array_filter((array) $activeBrands, fn($v) => is_string($v) && $v !== ''));
 
         // Karyawan & User untuk sales / kasir default
-        $employees = Employe::orderBy('name')->get(['id', 'name']);
+        $employees = collect();
+        if (Schema::hasTable('employes')) {
+            $employees = Employe::orderBy('name')->get(['id', 'name']);
+        }
         $users = User::orderBy('name')->get(['id', 'name', 'email']);
 
         return Inertia::render('Settings/Index', [
             'globalSettings' => $globalSettings,
-            'selectedBuId' => (int) $selectedBuId,
+            'selectedBuId' => $selectedBuId ? (int) $selectedBuId : null,
             'buSettings' => [
                 'online_warehouse_id' => $onlineWarehouseId,
                 'default_branch_name' => $defaultBranchName,
@@ -147,7 +184,7 @@ class EcommerceSettingsController extends Controller
         $buId = $validated['business_unit_id'];
 
         // Atur gudang online store
-        if (!empty($validated['online_warehouse_id'])) {
+        if (Schema::hasColumn('warehouses', 'is_online_store') && !empty($validated['online_warehouse_id'])) {
             Warehouse::where('business_unit_id', $buId)->update(['is_online_store' => false]);
             Warehouse::where('id', $validated['online_warehouse_id'])->update(['is_online_store' => true]);
         }

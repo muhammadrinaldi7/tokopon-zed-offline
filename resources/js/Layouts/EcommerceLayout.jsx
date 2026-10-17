@@ -26,6 +26,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
     const page = usePage();
     const { auth, businessUnits, flash } = page.props || {};
     const url = page.url || (typeof window !== 'undefined' ? window.location.pathname : '');
+    const isChatPage = Boolean(url && url.startsWith('/crm/chat'));
     const [soundEnabled, setSoundEnabled] = useState(true);
     const [wsConnected, setWsConnected] = useState(true);
     const [toast, setToast] = useState(null);
@@ -285,7 +286,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
             </header>
 
             {/* 3. Main Content View Area */}
-            <main className="flex-1 overflow-hidden relative">
+            <main className={`flex-1 relative min-h-0 ${isChatPage ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
                 {children}
 
                 {/* Global Toast Alert */}
