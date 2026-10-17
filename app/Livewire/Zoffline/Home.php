@@ -143,7 +143,7 @@ class Home extends Component
 
     public function navigateToCsChat()
     {
-        return $this->redirectRoute('zoffline.cs-chat', navigate: true);
+        return redirect()->route('crm.chat');
     }
 
     public function navigateToFlashSale()

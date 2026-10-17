@@ -23,8 +23,8 @@
 
         {{-- Segmented Sub-Navigation Tabs --}}
         <div class="flex flex-wrap items-center gap-1 bg-gray-100/80 p-1.5 rounded-xl border border-gray-200/50 text-xs font-bold">
-            <a href="{{ route('zoffline.cs-chat') }}" wire:navigate
-                class="px-3.5 py-2 rounded-lg transition-all duration-150 flex items-center gap-1.5 {{ request()->routeIs('zoffline.cs-chat') ? 'bg-white text-indigo-600 shadow-sm border border-gray-200/40' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50' }}">
+            <a href="{{ route('crm.chat') }}"
+                class="px-3.5 py-2 rounded-lg transition-all duration-150 flex items-center gap-1.5 {{ request()->routeIs('crm.chat') || request()->routeIs('zoffline.cs-chat') ? 'bg-white text-indigo-600 shadow-sm border border-gray-200/40' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50' }}">
                 <span>💬</span>
                 <span>Live Chat CS</span>
             </a>

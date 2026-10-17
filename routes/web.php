@@ -86,8 +86,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/zoffline/approvals', \App\Livewire\Admin\Approvals\Index::class)->name('zoffline.approvals.index');
     Route::get('/zoffline/approval-rules', \App\Livewire\Admin\Settings\ApprovalRule\Index::class)->name('zoffline.approval-rules.index')->middleware('can:manage-settings');
 
-    // Zoffline E-Commerce & CS Live Chat
-    Route::get('/zoffline/cs-chat', \App\Livewire\Zoffline\Ecommerce\CsChat::class)->name('zoffline.cs-chat')->middleware('can:access-cs-chat');
+    // Zoffline E-Commerce & CS Live Chat (Legacy Livewire & React Hub)
+    Route::get('/zoffline/cs-chat', function () {
+        return redirect()->route('crm.chat');
+    })->name('zoffline.cs-chat')->middleware('can:access-cs-chat');
+    Route::get('/zoffline/cs-chat-legacy', \App\Livewire\Zoffline\Ecommerce\CsChat::class)->name('zoffline.cs-chat-legacy')->middleware('can:access-cs-chat');
+
     Route::prefix('zoffline/ecommerce')->name('zoffline.ecommerce.')->middleware('can:access-cs-chat')->group(function () {
         Route::get('/flash-sale', \App\Livewire\Zoffline\Ecommerce\FlashSaleManager::class)->name('flash-sale');
         Route::get('/banners', \App\Livewire\Zoffline\Ecommerce\BannerManager::class)->name('banners');
@@ -97,6 +101,51 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/loyalty', \App\Livewire\Zoffline\Ecommerce\LoyaltyManager::class)->name('loyalty');
         Route::get('/vouchers', \App\Livewire\Zoffline\Ecommerce\VoucherManager::class)->name('vouchers');
         Route::get('/settings', \App\Livewire\Zoffline\Ecommerce\EcommerceSettings::class)->name('settings');
+    });
+
+    // ─── Modern React Inertia CRM Suite ───
+    Route::prefix('crm')->name('crm.')->middleware('can:access-cs-chat')->group(function () {
+        Route::get('/chat', [\App\Http\Controllers\Crm\CsChatController::class, 'index'])->name('chat');
+        Route::post('/chat/{conversation}/send', [\App\Http\Controllers\Crm\CsChatController::class, 'sendMessage'])->name('chat.send');
+        Route::post('/chat/{conversation}/claim', [\App\Http\Controllers\Crm\CsChatController::class, 'claim'])->name('chat.claim');
+        Route::post('/chat/{conversation}/release', [\App\Http\Controllers\Crm\CsChatController::class, 'release'])->name('chat.release');
+        Route::post('/chat/{conversation}/closing', [\App\Http\Controllers\Crm\CsChatController::class, 'saveClosing'])->name('chat.closing');
+        Route::post('/chat/quick-voucher', [\App\Http\Controllers\Crm\CsChatController::class, 'generateQuickVoucher'])->name('chat.quick-voucher');
+        Route::get('/chat/search-products', [\App\Http\Controllers\Crm\CsChatController::class, 'searchProducts'])->name('chat.search-products');
+
+        // ─── Sub-Modul: Voucher & Kupon Promo ───
+        Route::get('/vouchers', [\App\Http\Controllers\Crm\VoucherController::class, 'index'])->name('vouchers');
+        Route::post('/vouchers', [\App\Http\Controllers\Crm\VoucherController::class, 'store'])->name('vouchers.store');
+        Route::put('/vouchers/{coupon}', [\App\Http\Controllers\Crm\VoucherController::class, 'update'])->name('vouchers.update');
+        Route::post('/vouchers/{coupon}/toggle-active', [\App\Http\Controllers\Crm\VoucherController::class, 'toggleActive'])->name('vouchers.toggle-active');
+        Route::delete('/vouchers/{coupon}', [\App\Http\Controllers\Crm\VoucherController::class, 'destroy'])->name('vouchers.destroy');
+        Route::get('/vouchers/{coupon}/redemptions', [\App\Http\Controllers\Crm\VoucherController::class, 'redemptions'])->name('vouchers.redemptions');
+
+        // ─── Sub-Modul: Analitik Closing CS ───
+        Route::get('/analytics', [\App\Http\Controllers\Crm\ClosingAnalyticsController::class, 'index'])->name('analytics');
+
+        // ─── Sub-Modul: Flash Sale Kilat ───
+        Route::get('/flash-sale', [\App\Http\Controllers\Crm\FlashSaleController::class, 'index'])->name('flash-sale');
+        Route::post('/flash-sale/event', [\App\Http\Controllers\Crm\FlashSaleController::class, 'storeEvent'])->name('flash-sale.event.store');
+        Route::post('/flash-sale/event/{flashSale}/toggle', [\App\Http\Controllers\Crm\FlashSaleController::class, 'toggleEvent'])->name('flash-sale.event.toggle');
+        Route::delete('/flash-sale/event/{flashSale}', [\App\Http\Controllers\Crm\FlashSaleController::class, 'destroyEvent'])->name('flash-sale.event.destroy');
+        Route::post('/flash-sale/item', [\App\Http\Controllers\Crm\FlashSaleController::class, 'storeItem'])->name('flash-sale.item.store');
+        Route::delete('/flash-sale/item/{item}', [\App\Http\Controllers\Crm\FlashSaleController::class, 'destroyItem'])->name('flash-sale.item.destroy');
+        Route::get('/flash-sale/search-products', [\App\Http\Controllers\Crm\FlashSaleController::class, 'searchProducts'])->name('flash-sale.search-products');
+
+        // ─── Sub-Modul: Banner Promo Mobile ───
+        Route::get('/banners', [\App\Http\Controllers\Crm\BannerController::class, 'index'])->name('banners');
+        Route::post('/banners', [\App\Http\Controllers\Crm\BannerController::class, 'store'])->name('banners.store');
+        Route::post('/banners/{banner}/update', [\App\Http\Controllers\Crm\BannerController::class, 'update'])->name('banners.update');
+        Route::post('/banners/{banner}/toggle-active', [\App\Http\Controllers\Crm\BannerController::class, 'toggleActive'])->name('banners.toggle-active');
+        Route::delete('/banners/{banner}', [\App\Http\Controllers\Crm\BannerController::class, 'destroy'])->name('banners.destroy');
+        Route::post('/banners/reorder', [\App\Http\Controllers\Crm\BannerController::class, 'reorder'])->name('banners.reorder');
+
+        // Aliases for unified sub-modules
+        Route::get('/products', fn () => redirect()->route('zoffline.ecommerce.products'))->name('products');
+        Route::get('/loyalty', fn () => redirect()->route('zoffline.ecommerce.loyalty'))->name('loyalty');
+        Route::get('/payments', fn () => redirect()->route('zoffline.ecommerce.payment-methods'))->name('payments');
+        Route::get('/settings', fn () => redirect()->route('zoffline.ecommerce.settings'))->name('settings');
     });
 
     // Reporting
@@ -258,9 +307,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 // Route::get('/qc/device/{imei}', App\Livewire\Pages\PublicDeviceQc::class)->name('public.device-qc');
 
 // ─── CS Chat Route (Unified with Zoffline E-Commerce) ──
-Route::get('/admin/cs-chat', \App\Livewire\Zoffline\Ecommerce\CsChat::class)
-    ->middleware(['auth', 'can:access-cs-chat'])
-    ->name('admin.cs-chat');
+Route::get('/admin/cs-chat', function () {
+    return redirect()->route('crm.chat');
+})->middleware(['auth', 'can:access-cs-chat'])->name('admin.cs-chat');
 
 // ─── Logout ─────────────────────────────────────────────────────
 Route::post('/logout', function () {
