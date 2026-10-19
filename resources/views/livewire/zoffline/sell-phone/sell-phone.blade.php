@@ -568,6 +568,7 @@
             @endphp
 
             <div x-data="{ qcStep: 0 }"
+                @set-qc-step.window="qcStep = $event.detail.qcStep"
                 class="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-neutral-100 relative">
 
                 {{-- Progress Bar QC --}}
@@ -623,6 +624,7 @@
                                 @endphp
 
                                 <div x-data="{ localPreview: null }"
+                                    @reset-missing-photo-previews.window="if ($event.detail.slots && $event.detail.slots.includes('{{ $propertyName }}')) { localPreview = null; }"
                                     class="relative aspect-square rounded-3xl overflow-hidden transition-all duration-300 group
                                  {{ $photoFile ? 'border border-neutral-100 shadow-sm' : 'border-2 border-dashed bg-neutral-50/50 hover:bg-neutral-50/100 cursor-pointer' }}
                                 {{ $hasError ? 'border-rose-300 bg-rose-50/20' : 'border-neutral-200 hover:border-neutral-300' }}">
@@ -1542,6 +1544,26 @@
                                     <li>{{ $error }}</li>
                                 @endforeach
                             </ul>
+                            @php
+                                $hasPhotoErrors = false;
+                                foreach (['depan', 'belakang', 'kiri', 'kanan', 'atas', 'bawah', 'box', 'kelengkapan'] as $k) {
+                                    if ($errors->has('photo_' . $k)) { $hasPhotoErrors = true; break; }
+                                }
+                            @endphp
+                            @if ($hasPhotoErrors)
+                                <div class="mt-2.5 pt-2 border-t border-rose-200/80 flex justify-end">
+                                    <button type="button" @click="step = 2; $dispatch('set-qc-step', { qcStep: 0 })"
+                                        class="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-800 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">
+                                        <svg class="w-3.5 h-3.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        Ambil Ulang Foto di Step 2 &rarr;
+                                    </button>
+                                </div>
+                            @endif
                         </div>
                     @endif
 

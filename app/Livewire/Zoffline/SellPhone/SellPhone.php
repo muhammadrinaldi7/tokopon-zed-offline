@@ -8,10 +8,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\UnableToRetrieveMetadata;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Computed;
 use Livewire\WithFileUploads;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 #[Layout('layouts.z', ['title' => 'Sell-Phone'])]
 class SellPhone extends Component
@@ -1069,7 +1072,63 @@ class SellPhone extends Component
             }
         }
 
-        // Jalankan Validasi dengan tangkapan error detail
+        // -------------------------------------------------------------
+        // PRE-FLIGHT INTEGRITY CHECK UNTUK FILE UPLOAD FOTO
+        // -------------------------------------------------------------
+        $photoSlots = [
+            'photo_depan'       => 'Tampak Depan',
+            'photo_belakang'    => 'Tampak Belakang',
+            'photo_kiri'        => 'Samping Kiri',
+            'photo_kanan'       => 'Samping Kanan',
+            'photo_atas'        => 'Tampak Atas',
+            'photo_bawah'       => 'Tampak Bawah',
+            'photo_box'         => 'Box Belakang',
+            'photo_kelengkapan' => 'Kelengkapan / Box',
+        ];
+
+        $missingPhotos = [];
+        $resetSlots = [];
+
+        foreach ($photoSlots as $prop => $label) {
+            if ($this->$prop) {
+                if ($this->$prop instanceof TemporaryUploadedFile) {
+                    try {
+                        if (!$this->$prop->exists()) {
+                            $missingPhotos[] = $label;
+                            $resetSlots[] = $prop;
+                            $this->$prop = null;
+                        }
+                    } catch (\Throwable $th) {
+                        $missingPhotos[] = $label;
+                        $resetSlots[] = $prop;
+                        $this->$prop = null;
+                    }
+                }
+            }
+        }
+
+        if (!empty($missingPhotos)) {
+            $missingText = implode(', ', $missingPhotos);
+            Log::channel('sell_phone')->warning("File foto kedaluwarsa atau hilang dari disk saat submit:", [
+                'missing' => $missingPhotos,
+                'user_id' => $currentUser->id,
+                'imei' => $this->imei,
+            ]);
+
+            $this->dispatch('toast',
+                title: 'Foto Kedaluwarsa',
+                message: "Foto [{$missingText}] sudah kedaluwarsa atau tidak ditemukan di server. Silakan ambil ulang foto tersebut.",
+                type: 'error'
+            );
+
+            // Arahkan kembali ke Step 2 (Foto)
+            $this->dispatch('go-to-step', step: 2);
+            $this->dispatch('set-qc-step', qcStep: 0);
+            $this->dispatch('reset-missing-photo-previews', slots: $resetSlots);
+            return;
+        }
+
+        // Jalankan Validasi dengan tangkapan error detail & proteksi exception Flysystem
         try {
             $this->validate();
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -1083,9 +1142,46 @@ class SellPhone extends Component
                 'model' => $this->selected_model_name,
             ]);
 
+            // Jika error disebabkan oleh foto yang belum diisi/valid, arahkan kasir langsung ke step 2 foto
+            $photoKeys = array_keys($photoSlots);
+            $hasPhotoError = false;
+            foreach ($photoKeys as $pKey) {
+                if (isset($errorMap[$pKey])) {
+                    $hasPhotoError = true;
+                    break;
+                }
+            }
+
+            if ($hasPhotoError) {
+                $this->dispatch('go-to-step', step: 2);
+                $this->dispatch('set-qc-step', qcStep: 0);
+            }
+
             $firstError = $errors[0] ?? 'Silakan lengkapi formulir dengan benar.';
             $this->dispatch('toast', title: 'Validasi Gagal', message: $firstError, type: 'error');
             throw $e;
+        } catch (FilesystemException | UnableToRetrieveMetadata | \RuntimeException $e) {
+            Log::channel('sell_phone')->error("Flysystem/Metadata error saat validasi file foto:", [
+                'error'   => $e->getMessage(),
+                'user_id' => $currentUser->id,
+                'imei'    => $this->imei,
+            ]);
+
+            // Bersihkan semua properti foto agar tidak berulang
+            foreach ($photoSlots as $prop => $label) {
+                $this->$prop = null;
+            }
+
+            $this->dispatch('toast',
+                title: 'File Foto Kedaluwarsa',
+                message: 'Satu atau lebih file foto telah kedaluwarsa atau hilang dari server. Silakan ambil ulang foto pada Step 2.',
+                type: 'error'
+            );
+
+            $this->dispatch('go-to-step', step: 2);
+            $this->dispatch('set-qc-step', qcStep: 0);
+            $this->dispatch('reset-missing-photo-previews', slots: array_keys($photoSlots));
+            return;
         }
 
         // Cek apakah ada perubahan data pada pelanggan lama sebelum eksekusi transaksi

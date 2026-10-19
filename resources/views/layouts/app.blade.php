@@ -157,9 +157,19 @@
                         () => console.log(
                             `%c[Upload Success] File kompresi "${wirePropertyName}" terunggah!`,
                             'color: #16a34a; font-weight: bold;'),
-                        () => console.error(
-                            `[Upload Error] Gagal mengunggah file kompresi pada: ${wirePropertyName}`
-                        ),
+                        (error) => {
+                            console.error(
+                                `[Upload Error] Gagal mengunggah file kompresi pada: ${wirePropertyName}`,
+                                error
+                            );
+                            window.dispatchEvent(new CustomEvent('toast', {
+                                detail: {
+                                    title: 'Upload Gagal',
+                                    message: `Gagal mengunggah foto ke server. Silakan periksa koneksi internet Anda dan coba ambil ulang.`,
+                                    type: 'error'
+                                }
+                            }));
+                        },
                         (progress) => {}
                     );
                 }, 'image/jpeg', quality);
