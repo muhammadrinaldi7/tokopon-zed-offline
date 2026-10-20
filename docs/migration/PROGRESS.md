@@ -242,6 +242,16 @@ Seluruh audit sistematis terhadap monolit Laravel `tokopon-zed-offline` telah se
   7. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000002_create_pos_and_orders_tables.up.sql` dan `down.sql`).
   8. **Go Native Unit Tests (`usecase_test.go`, `handler_test.go`):** ✅ Lulus 100% (5 unit test POS module PASS; seluruh suite proyek `go test ./...` 100% PASS tanpa regresi).
 
+### [MOD-03] Store Inventory, Multi-Warehouse & Stock Opname (`module/inventory`)
+- **Status:** **SELESAI (100%) ✅**
+- **Dokumen Referensi:** [`docs/migration/29-module-inventory-stock-opname.md`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/docs/migration/29-module-inventory-stock-opname.md)
+- **Implementasi:**
+  1. **Domain & Entity Abstraction (`internal/modules/inventory/domain.go`):** ✅ SELESAI (Model InventoryStockItem, ProductStockBreakdown, WarehouseStockBreakdown, InventorySNItem, PurchaseOrder, PurchaseOrderItem, InboundScanRequest/Response, StockOpname, StockOpnameItem, StockOpnameSerial, StockAdjustment, serta error typed `ErrActiveOpnameExists`, `ErrNoActiveOpname`, `ErrOpnameAlreadyFinalized`, `ErrInsufficientStock`, `ErrSerialAlreadyScanned`, `ErrPOItemAlreadyFulfilled`).
+  2. **Repository SQL & Concurrency (`internal/modules/inventory/repository.go`):** ✅ SELESAI (Inquiry multi-gudang, breakdown stok, pelacakan SN, inbound PO receiving atomik, snapshot opname stok & serial number, perhitungan kuantitas fisik & selisih rugi/lebih, serta authorized stock adjustment dengan pessimistic lock `SELECT ... FOR UPDATE` dan sequence generator `ADJ-YYYYMMDD-XXXX`).
+  3. **UseCase & Invarian Bisnis (`internal/modules/inventory/usecase.go`):** ✅ SELESAI (Penegakan 1 sesi opname aktif per gudang, anti-negative stock pada penyesuaian OUT, validasi batas PO inbound, FSM serial number MATCHED/MISSING/UNEXPECTED, dan Rupiah formatter).
+  4. **HTTP Delivery Handler (`internal/modules/inventory/handler.go`):** ✅ SELESAI (Registrasi lengkap rute inventaris `/api/v1/inventory/*` terproteksi JWT Middleware).
+  5. **Router Wiring (`internal/delivery/http/router.go`):** ✅ SELESAI (Injeksi otomatis modul Inventory dengan fallback graceful jika tanpa DB).
+  6. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000003_create_inventory_tables.up.sql` dan `down.sql`).
+  7. **Go Native Unit Tests (`usecase_test.go`, `handler_test.go`):** ✅ Lulus 100% (6 unit test Inventory module PASS; seluruh suite proyek `go test ./...` 100% PASS tanpa regresi).
+
 ---
-
-
