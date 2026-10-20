@@ -180,4 +180,15 @@ Seluruh audit sistematis terhadap monolit Laravel `tokopon-zed-offline` telah se
   4. Middleware Go (`internal/delivery/http/middleware/auth_middleware.go`): ✅ SELESAI (`RequireRole`, `RequirePermission`, `RequireAllPermissions` dengan SuperAdmin automatic wildcard bypass ekuivalen `Gate::before`)
   5. Go Native Unit Tests: ✅ Lulus 100% (`auth_middleware_test.go`, `jwt_test.go`, `auth_usecase_test.go`, zero external mock/testing libraries)
 
+### Otomasi POS Kasir Checkout -> Accurate Online ERP & WhatsApp CRM Dispatcher — Opsi 1
+- **Status:** **SELESAI (100%) ✅**
+- **Dokumen Referensi:** [`docs/migration/19-wave-7-web-pos-kasir-api.md`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/docs/migration/19-wave-7-web-pos-kasir-api.md), [`docs/migration/24-step-2-accurate-erp-and-whatsapp-crm-engine.md`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/docs/migration/24-step-2-accurate-erp-and-whatsapp-crm-engine.md)
+- **Implementasi:**
+  1. Injeksi Queue Broker di POS UseCase (`internal/usecase/pos_usecase.go`): ✅ SELESAI (`NewPosUseCase(posRepo domain.PosRepository, qBroker queue.Broker)`)
+  2. Otomasi Asynchronous Dispatching di POS `Checkout`: ✅ SELESAI (Saat kasir berhasil menyelesaikan transaksi kasir offline berstatus `COMPLETED`, usecase secara otomatis memasukkan job `job:order:sync_accurate` dan `job:notification:whatsapp` ke background queue tanpa memblokir respon kasir dan thermal receipt)
+  3. Integrasi Webhook Xendit (`internal/usecase/webhook_usecase.go`): ✅ SELESAI (Otomasi dispatch job WhatsApp Struk digital saat status pembayaran invoice Xendit menjadi `PAID`/`SETTLED`)
+  4. Server Wiring (`cmd/server/main.go`): ✅ SELESAI (Injeksi broker antrian ke `posUC`)
+  5. Go Native Tests (`internal/usecase/pos_usecase_test.go`): ✅ Lulus 100% (`Checkout_Success_EnqueuesAccurateAndWhatsAppJobs` memvalidasi payload & urutan dispatching, zero external testing libraries)
+
+
 
