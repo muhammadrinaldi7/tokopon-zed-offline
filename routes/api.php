@@ -113,6 +113,20 @@ Route::prefix('v1/executive')->group(function () {
         Route::get('/piutang', [\App\Http\Controllers\Api\Executive\ExecutiveDashboardController::class, 'piutangReport'])
             ->name('api.executive.piutang');
 
+        // Financial & Accurate Real-time Accounting (AR, AP, Working Capital, Cash/Bank)
+        Route::prefix('financial')->group(function () {
+            Route::get('/ar-ap-summary', [\App\Http\Controllers\Api\Executive\ExecutiveFinancialController::class, 'arApSummary'])
+                ->name('api.executive.financial.ar-ap-summary');
+            Route::get('/receivables', [\App\Http\Controllers\Api\Executive\ExecutiveFinancialController::class, 'receivables'])
+                ->name('api.executive.financial.receivables');
+            Route::get('/payables', [\App\Http\Controllers\Api\Executive\ExecutiveFinancialController::class, 'payables'])
+                ->name('api.executive.financial.payables');
+            Route::get('/cash-bank', [\App\Http\Controllers\Api\Executive\ExecutiveFinancialController::class, 'cashBank'])
+                ->name('api.executive.financial.cash-bank');
+            Route::post('/sync', [\App\Http\Controllers\Api\Executive\ExecutiveFinancialController::class, 'sync'])
+                ->name('api.executive.financial.sync');
+        });
+
         // AI Executive Assistant Endpoints (Direct 9router Integration)
         Route::prefix('ai')->group(function () {
             Route::post('/chat', [\App\Http\Controllers\Api\Executive\ExecutiveAiController::class, 'chat'])
