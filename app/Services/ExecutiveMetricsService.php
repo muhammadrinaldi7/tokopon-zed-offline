@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ApprovalRequest;
 use App\Models\Branch;
 use App\Models\BusinessUnit;
+use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
@@ -128,13 +129,27 @@ class ExecutiveMetricsService
                 } else {
                     $q->where('shipping_address_snapshot->store', $branch);
                 }
+            })
+            ->when(!empty($filters['category']), function ($q) use ($filters) {
+                $category = $filters['category'];
+                $q->whereHas('items', function ($itemQuery) use ($category) {
+                    $itemQuery->where(function ($iq) use ($category) {
+                        $iq->whereHasMorph('variant', [ProductAccurate::class], function ($paQ) use ($category) {
+                            $paQ->where('categoryName', $category);
+                        })->orWhereHasMorph('variant', [ProductVariant::class], function ($pvQ) use ($category) {
+                            $pvQ->whereHas('product.category', function ($catQ) use ($category) {
+                                $catQ->where('name', $category);
+                            });
+                        });
+                    });
+                });
             });
     }
 
     /**
      * Pre-load lookup maps for high-performance HPP calculation in batch.
      */
-    protected function prepareHppLookups(Collection $orders): array
+    protected function prepareHppLookups(Collection $orders, array $filters = []): array
     {
         $allSns = [];
         $accurateIds = [];
@@ -166,14 +181,14 @@ class ExecutiveMetricsService
                 ->toArray();
         }
 
-        // 2. Batch lookup ProductAccurate ID -> base_cost
+        // 2. Batch lookup ProductAccurate ID -> base_cost & categoryName
         $accurateBaseCostMap = [];
+        $accurateCategoryMap = [];
         if (!empty($accurateIds)) {
             $accurateIds = array_unique($accurateIds);
-            $accurateBaseCostMap = ProductAccurate::whereIn('id', $accurateIds)
-                ->pluck('base_cost', 'id')
-                ->map(fn($v) => (float)$v)
-                ->toArray();
+            $accurateRows = ProductAccurate::whereIn('id', $accurateIds)->get(['id', 'base_cost', 'categoryName']);
+            $accurateBaseCostMap = $accurateRows->pluck('base_cost', 'id')->map(fn($v) => (float)$v)->toArray();
+            $accurateCategoryMap = $accurateRows->pluck('categoryName', 'id')->toArray();
         }
 
         // 3. Batch lookup ProductVariant ID -> base_cost (via accurateData)
@@ -248,9 +263,27 @@ class ExecutiveMetricsService
             || (str_starts_with($order->accurate_invoice_no ?? '', 'SRT'))
             || ((float)($order->total_amount ?? 0) < 0);
 
+        $filteredCategory = $lookups['filteredCategory'] ?? null;
+        $accurateCategoryMap = $lookups['accurateCategoryMap'] ?? [];
+        $variantCategoryMap = $lookups['variantCategoryMap'] ?? [];
+        $filteredItemSubtotal = 0;
+
         foreach ($order->items as $item) {
+            if (!empty($filteredCategory)) {
+                $itemCat = null;
+                if ($item->product_variant_type === ProductAccurate::class) {
+                    $itemCat = $accurateCategoryMap[$item->product_variant_id] ?? null;
+                } elseif ($item->product_variant_id) {
+                    $itemCat = $variantCategoryMap[$item->product_variant_id] ?? null;
+                }
+                if (!$itemCat || strcasecmp($itemCat, $filteredCategory) !== 0) {
+                    continue;
+                }
+            }
+
             $qty = (float)$item->qty;
             $totalQty += $qty;
+            $filteredItemSubtotal += (float)$item->subtotal;
             $itemHpp = 0;
             $isReturn = $isOrderReturn || ($qty < 0) || ((float)($item->subtotal ?? 0) < 0);
 
@@ -295,9 +328,18 @@ class ExecutiveMetricsService
             }
         }
 
-        $grossSales = (float)$order->total_amount;
-        $discount = (float)(($order->discount_amount ?? 0) + ($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0));
-        $grandTotal = (float)$order->grand_total;
+        if (!empty($filteredCategory)) {
+            $orderTotal = (float)$order->total_amount ?: 1;
+            $ratio = min(1, max(0, $filteredItemSubtotal / $orderTotal));
+            $grossSales = $filteredItemSubtotal;
+            $discount = (float)(($order->discount_amount ?? 0) + ($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0)) * $ratio;
+            $grandTotal = max(0, $grossSales - $discount);
+            $totalMdr = $totalMdr * $ratio;
+        } else {
+            $grossSales = (float)$order->total_amount;
+            $discount = (float)(($order->discount_amount ?? 0) + ($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0));
+            $grandTotal = (float)$order->grand_total;
+        }
         $netSales = $grandTotal; // Samakan dengan Omset Faktur Riil!
         $grossProfit = $netSales - $totalHpp; // Laba Kotor = Omset Faktur - Total HPP (sebelum potongan MDR)
         $marginPct = $netSales > 0 ? round(($grossProfit / $netSales) * 100, 2) : 0;
@@ -321,7 +363,7 @@ class ExecutiveMetricsService
     /**
      * Compute aggregated financial metrics for a set of orders.
      */
-    public function computeAggregates(Collection $orders): array
+    public function computeAggregates(Collection $orders, array $filters = []): array
     {
         if ($orders->isEmpty()) {
             return [
@@ -341,7 +383,7 @@ class ExecutiveMetricsService
             ];
         }
 
-        $lookups = $this->prepareHppLookups($orders);
+        $lookups = $this->prepareHppLookups($orders, $filters);
 
         $totalOrders = $orders->count();
         $totalQty = 0;
@@ -408,7 +450,7 @@ class ExecutiveMetricsService
             ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items'])
             ->get();
 
-        $currentAggregates = $this->computeAggregates($currentOrders);
+        $currentAggregates = $this->computeAggregates($currentOrders, $filters);
 
         // Compute Month-To-Date (MTD) and Last Month-To-Date (Last MTD)
         $now = now();
@@ -436,8 +478,8 @@ class ExecutiveMetricsService
             ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items'])
             ->get();
 
-        $mtdAggregates = $this->computeAggregates($mtdOrders);
-        $lastMtdAggregates = $this->computeAggregates($lastMtdOrders);
+        $mtdAggregates = $this->computeAggregates($mtdOrders, $mtdFilters);
+        $lastMtdAggregates = $this->computeAggregates($lastMtdOrders, $lastMtdFilters);
 
         $calculateGrowth = function ($current, $last) {
             if ($last > 0) {
@@ -496,7 +538,7 @@ class ExecutiveMetricsService
             return [];
         }
 
-        $lookups = $this->prepareHppLookups($orders);
+        $lookups = $this->prepareHppLookups($orders, $filters);
         $totalCompanyNetSales = 0;
 
         // Group orders by branch / store name
@@ -585,7 +627,7 @@ class ExecutiveMetricsService
             ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items'])
             ->get();
 
-        $lookups = $this->prepareHppLookups($orders);
+        $lookups = $this->prepareHppLookups($orders, $filters);
 
         $daysDiff = $start->diffInDays($end);
         $isSingleDay = $start->isSameDay($end);
@@ -722,6 +764,20 @@ class ExecutiveMetricsService
             ->whereIn('order_id', $orderIds)
             ->get();
 
+        if (!empty($filters['category'])) {
+            $catFilter = $filters['category'];
+            $orderItems = $orderItems->filter(function ($item) use ($catFilter) {
+                $variant = $item->variant;
+                $cat = null;
+                if ($variant instanceof ProductAccurate) {
+                    $cat = $variant->categoryName;
+                } elseif ($variant instanceof ProductVariant) {
+                    $cat = $variant->product?->category?->name;
+                }
+                return $cat && strcasecmp($cat, $catFilter) === 0;
+            });
+        }
+
         $grouped = $orderItems->groupBy('product_variant_id')->map(function ($items) {
             $first = $items->first();
             $variant = $first->variant;
@@ -839,10 +895,24 @@ class ExecutiveMetricsService
 
         $orderStores = $branchStores->concat($orderStoreNames)->unique()->values();
 
+        $accurateCategories = ProductAccurate::whereNotNull('categoryName')
+            ->where('categoryName', '!=', '')
+            ->distinct()
+            ->pluck('categoryName');
+
+        $dbCategories = Category::orderBy('name')->pluck('name');
+
+        $categories = $accurateCategories->concat($dbCategories)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
         return [
             'business_units' => $businessUnits,
             'branches' => $branches,
             'order_stores' => $orderStores,
+            'categories' => $categories,
             'date_presets' => [
                 ['value' => 'today', 'label' => 'Hari Ini'],
                 ['value' => 'yesterday', 'label' => 'Kemarin'],

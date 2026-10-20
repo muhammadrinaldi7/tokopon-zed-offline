@@ -29,6 +29,7 @@ class ExecutiveDashboardController extends Controller
             'start_date' => $request->input('start_date'),
             'end_date' => $request->input('end_date'),
             'branch' => $request->input('branch'),
+            'category' => $request->input('category'),
             'order_status' => $request->input('order_status', ['COMPLETED', 'PIUTANG']),
         ];
 
