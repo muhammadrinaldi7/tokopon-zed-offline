@@ -213,6 +213,23 @@ Seluruh audit sistematis terhadap monolit Laravel `tokopon-zed-offline` telah se
      - Memperbaiki query telepon customer di [`internal/repository/integration_repository.go`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/tokopon-go/internal/repository/integration_repository.go#L28) dengan melakukan JOIN ke tabel `user_profiles`.
   3. Verifikasi Eksekusi Live: ✅ Lulus 100% (Order POS terbuat dengan status `COMPLETED`, kedua job background ter-enqueue di tabel `jobs`, background worker berhasil memproses, endpoint backoffice mengembalikan respon yang valid, dan seluruh data dummy pengujian dibersihkan tanpa mengotori database toko).
 
+---
+
+## 🏗️ REFACTORING ARSITEKTUR MODULAR MONOLITH (SPRINT 1)
+
+### [MOD-01] Identity, Multi-Tenant & RBAC (`module/identity`)
+- **Status:** **SELESAI (100%) ✅**
+- **Dokumen Referensi:** [`docs/migration/27-module-identity-multi-tenant-rbac.md`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/docs/migration/27-module-identity-multi-tenant-rbac.md)
+- **Implementasi:**
+  1. **Domain & TenantContext Entity (`internal/modules/identity/domain.go`):** ✅ SELESAI (Model User, Role, Permission, BusinessUnit, Branch, DTO request/response, dan struct `TenantContext`).
+  2. **Repository SQL (`internal/modules/identity/repository.go`):** ✅ SELESAI (Kueri pengguna, profil, relasi Spatie RBAC `model_has_roles` & `role_has_permissions`, serta resolusi Unit Bisnis dan Cabang).
+  3. **UseCase & Tenant Resolver (`internal/modules/identity/usecase.go`):** ✅ SELESAI (Autentikasi Bcrypt, generasi token JWT terpusat, paritas `User.php::getActiveBusinessUnitId()`, switch BU khusus eksekutif via `POST /api/v1/auth/switch-bu`, dan proteksi anti-spoofing non-eksekutif).
+  4. **Middleware Terpadu (`internal/modules/identity/middleware.go`):** ✅ SELESAI (`JWTMiddleware`, `RequireRole`, `RequirePermission`, `RequireAllPermissions` dengan SuperAdmin wildcard bypass, serta `TenantContextMiddleware` untuk ekstraksi otomatis header `X-Business-Unit-Id` dan `X-Branch-Id`).
+  5. **HTTP Delivery Handler (`internal/modules/identity/handler.go`):** ✅ SELESAI (Registrasi ganda kompatibilitas jalur modern `/api/v1/auth/*` dan legacy mobile `/api/v1/mobile/auth/*`).
+  6. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000001_create_identity_and_rbac_tables.up.sql` dan `down.sql`).
+  7. **Go Native Unit Tests (`usecase_test.go`, `handler_test.go`, `middleware_test.go`):** ✅ Lulus 100% (13 unit test PASS; seluruh suite proyek `go test ./...` lulus tanpa regresi).
+
+
 
 
 
