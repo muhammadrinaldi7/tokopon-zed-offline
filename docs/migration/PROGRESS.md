@@ -190,5 +190,30 @@ Seluruh audit sistematis terhadap monolit Laravel `tokopon-zed-offline` telah se
   4. Server Wiring (`cmd/server/main.go`): ✅ SELESAI (Injeksi broker antrian ke `posUC`)
   5. Go Native Tests (`internal/usecase/pos_usecase_test.go`): ✅ Lulus 100% (`Checkout_Success_EnqueuesAccurateAndWhatsAppJobs` memvalidasi payload & urutan dispatching, zero external testing libraries)
 
+### Manual Re-Trigger & Monitoring API (Accurate & WhatsApp) — Opsi 2
+- **Status:** **SELESAI (100%) ✅**
+- **Dokumen Referensi:** [`docs/migration/26-backoffice-accurate-whatsapp-retry-api.md`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/docs/migration/26-backoffice-accurate-whatsapp-retry-api.md)
+- **Implementasi:**
+  1. Domain Entity & Abstraksi (`internal/domain/integration.go`): ✅ SELESAI (`AccurateSyncRetryResponse`, `WhatsAppResendResponse`, `AccurateSyncStatusResponse`, `WhatsAppDeliveryStatusResponse`, `IntegrationUseCase`, `IntegrationRepository`)
+  2. Repository SQL (`internal/repository/integration_repository.go`): ✅ SELESAI (Query data integrasi order, dokumen invoice & receipt di `order_accurate_docs`, serta riwayat pesan di `message_logs`)
+  3. UseCase (`internal/usecase/integration_usecase.go`): ✅ SELESAI (Logika manual retry Accurate sync asinkron/sinkron `?sync=true`, validasi status `COMPLETED`, logika resend struk WhatsApp, serta endpoint inquiry status sinkronisasi & riwayat audit)
+  4. Delivery HTTP Handler (`internal/delivery/http/integration_handler.go`): ✅ SELESAI (Endpoint `/api/v1/backoffice/accurate/sync-retry/:order_id`, `/api/v1/backoffice/accurate/status/:order_id`, `/api/v1/backoffice/whatsapp/resend/:order_id`, `/api/v1/backoffice/whatsapp/status/:order_id` terproteksi JWT)
+  5. Router & Server Wiring (`internal/delivery/http/router.go` & `cmd/server/main.go`): ✅ SELESAI
+  6. Go Native Tests: ✅ Lulus 100% (`integration_usecase_test.go` & `integration_handler_test.go`, zero external testing libraries)
+
+### Pengujian Integrasi End-to-End Live Database `zedpost-7` — Opsi 3
+- **Status:** **SELESAI (100%) ✅**
+- **Dokumen Referensi:** [Implementation Plan Opsi 3](file:///C:/Users/ADVAN/.gemini/antigravity-ide/brain/90ef3bf1-f595-435a-a2a6-d85ee1330691/implementation_plan_opsi3.md)
+- **Implementasi & Temuan Live:**
+  1. Runner Otomasi E2E (`cmd/e2e_runner/main.go`): ✅ SELESAI (Eksekusi lifecycle lengkap: Open Shift $\rightarrow$ Lookup Live Stock di `warehouse_stocks` $\rightarrow$ POS Checkout Atomik $\rightarrow$ Asynchronous Background Queue Dispatching $\rightarrow$ Background Worker Processing $\rightarrow$ Backoffice Retry & Monitoring API $\rightarrow$ Safe Data Sanitization)
+  2. Perbaikan Mismatch Skema Live DB:
+     - Mengubah tag struct [`domain.CashierShift`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/tokopon-go/internal/domain/pos.go#L42) dari `db:"-"` menjadi `db:"cashier_name"` dan `db:"branch_name"` agar hasil JOIN query `pos_repository.go` terbaca sempurna oleh sqlx.
+     - Menghapus kolom legacy `mdr_percentage` dan `mdr_amount` dari query `INSERT INTO orders` di [`internal/repository/pos_repository.go`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/tokopon-go/internal/repository/pos_repository.go#L532) karena sudah di-drop oleh migrasi Laravel dan dipindah ke tabel `order_payments`.
+     - Mengubah query order di [`internal/integration/accurate/service.go`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/tokopon-go/internal/integration/accurate/service.go#L56) untuk menggunakan kolom standar `discount_amount` serta `sales_id` dan `handled_by`.
+     - Memperbaiki query telepon customer di [`internal/repository/integration_repository.go`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/tokopon-go/internal/repository/integration_repository.go#L28) dengan melakukan JOIN ke tabel `user_profiles`.
+  3. Verifikasi Eksekusi Live: ✅ Lulus 100% (Order POS terbuat dengan status `COMPLETED`, kedua job background ter-enqueue di tabel `jobs`, background worker berhasil memproses, endpoint backoffice mengembalikan respon yang valid, dan seluruh data dummy pengujian dibersihkan tanpa mengotori database toko).
+
+
+
 
 
