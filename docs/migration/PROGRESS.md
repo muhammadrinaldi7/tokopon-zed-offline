@@ -1,7 +1,7 @@
 # PROGRESS — Laravel to Go Migration
 
 **Dibuat:** 2026-10-19  
-**Last Updated:** 2026-10-19  
+**Last Updated:** 2026-10-20  
 **Fase Saat Ini:** Phase 1 (Comprehensive Laravel Audit) — **COMPLETED ✅**
 
 ---
@@ -229,8 +229,19 @@ Seluruh audit sistematis terhadap monolit Laravel `tokopon-zed-offline` telah se
   6. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000001_create_identity_and_rbac_tables.up.sql` dan `down.sql`).
   7. **Go Native Unit Tests (`usecase_test.go`, `handler_test.go`, `middleware_test.go`):** ✅ Lulus 100% (13 unit test PASS; seluruh suite proyek `go test ./...` lulus tanpa regresi).
 
+### [MOD-02] Retail POS & Cashier Desk (`module/pos`)
+- **Status:** **SELESAI (100%) ✅**
+- **Dokumen Referensi:** [`docs/migration/28-module-pos-cashier-desk.md`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/docs/migration/28-module-pos-cashier-desk.md)
+- **Implementasi:**
+  1. **Domain & Entity Abstraction (`internal/modules/pos/domain.go`):** ✅ SELESAI (Model CashierShift, CashierShiftDenomination, Order, OrderItem, OrderPayment, PaymentMethod, PosScannedSN, PosCustomer, PosSalesman, serta error typed `ErrNoActiveShift`, `ErrInsufficientStock`, `ErrUnderpaid`, `ErrDeviceNotPassedQC`).
+  2. **Repository SQL & Pessimistic Concurrency (`internal/modules/pos/repository.go`):** ✅ SELESAI (Shift check & lifecycle, collision-free order sequence generator `POS-YYYYMMDD-XXXX`, pessimistic row lock `SELECT ... FOR UPDATE` pada `warehouse_stocks` & `product_serial_numbers`, dan atomic checkout transaction `sqlx.Tx`).
+  3. **UseCase & Business Invariants (`internal/modules/pos/usecase.go`):** ✅ SELESAI (Shift guard validation, cash reconciliation `balanced`/`over`/`short`, second-hand device QC status enforcement `PASSED`, QZ Tray digital signature RSA-SHA512, serta non-blocking background queue enqueue untuk Accurate Online ERP & WhatsApp struk).
+  4. **ESC/POS Generator & Rupiah Formatter (`internal/modules/pos/escpos.go`):** ✅ SELESAI (Thermal receipt layout 40-kolom siap cetak printer kasir dan standard Rupiah formatter).
+  5. **HTTP Delivery Handler (`internal/modules/pos/handler.go`):** ✅ SELESAI (Registrasi lengkap rute kasir `/api/v1/pos/*` terproteksi JWT).
+  6. **Router Wiring (`internal/delivery/http/router.go`):** ✅ SELESAI (Injeksi otomatis modul POS dengan fallback graceful jika tanpa DB).
+  7. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000002_create_pos_and_orders_tables.up.sql` dan `down.sql`).
+  8. **Go Native Unit Tests (`usecase_test.go`, `handler_test.go`):** ✅ Lulus 100% (5 unit test POS module PASS; seluruh suite proyek `go test ./...` 100% PASS tanpa regresi).
 
-
-
+---
 
 
