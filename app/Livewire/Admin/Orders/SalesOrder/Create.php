@@ -597,6 +597,24 @@ class Create extends Component
                     'serial_number' => !empty($itemSns) ? implode(',', $itemSns) : null, // Simpan IMEI gabungan
                     'sales_ids' => !empty($item['sales_ids']) ? json_encode($item['sales_ids']) : ($this->sales_id ? json_encode([$this->sales_id]) : null),
                 ]);
+
+                // Kunci IMEI di lokal dengan status Unavailable (mirip case draft) & potong stok gudang lokal
+                if (!empty($itemSns)) {
+                    \App\Models\ProductSerialNumber::whereIn('serial_number', $itemSns)
+                        ->update(['status' => 'Unavailable']);
+
+                    $warehouseId = Auth::user()->warehouse_id;
+                    if ($warehouseId) {
+                        $stockRecord = \App\Models\WarehouseStock::where([
+                            'warehouse_id' => $warehouseId,
+                            'variant_id'   => $item['variant_id'],
+                            'variant_type' => \App\Models\ProductAccurate::class,
+                        ])->first();
+                        if ($stockRecord) {
+                            $stockRecord->decrement('stock', (int)$item['qty']);
+                        }
+                    }
+                }
             }
 
             DB::commit();
@@ -695,75 +713,7 @@ class Create extends Component
                         'status' => 'SUCCESS',
                     ]);
                     Log::info('Berhasil Sync SO ke Accurate dengan Nomor: ' . $soResult['r']['number']);
-
-                    // CEK APAKAH ADA ITEM YANG PUNYA SN (JIKA YA, BUAT DELIVERY ORDER)
-                    $hasSN = false;
-                    foreach ($this->items as $item) {
-                        $joinedSnCheck = isset($item['serial_numbers']) ? implode(',', array_filter(array_map('trim', $item['serial_numbers']))) : '';
-                        if (!empty($joinedSnCheck)) {
-                            $hasSN = true;
-                            break;
-                        }
-                    }
-
-                    if ($hasSN) {
-                        Log::info('IMEI dideteksi pada SO, memulai pembuatan Delivery Order otomatis...');
-
-                        // Menentukan Gudang (Warehouse) untuk DO
-                        $handler = Auth::user();
-                        $warehouseName = $handler->warehouse->name ?? 'Gudang Utama';
-
-                        $doDetailItems = [];
-                        foreach ($this->items as $item) {
-                            $variant = \App\Models\ProductAccurate::find($item['variant_id']);
-
-                            $detailData = [
-                                'itemNo' => $variant->item_no ?? 'ITEM-UNKNOWN',
-                                'quantity' => (float)$item['qty'],
-                                'warehouseName' => $warehouseName,
-                                'salesOrderNumber' => $soResult['r']['number'],
-                            ];
-
-                            $joinedDoSn = isset($item['serial_numbers']) ? implode(',', array_filter(array_map('trim', $item['serial_numbers']))) : '';
-                            if (!empty($joinedDoSn)) {
-                                $sns = explode(',', $joinedDoSn);
-                                if (count($sns) > 0) {
-                                    $detailSNs = [];
-                                    foreach ($sns as $sn) {
-                                        $detailSNs[] = ['serialNumberNo' => $sn, 'quantity' => 1];
-                                    }
-                                    $detailData['detailSerialNumber'] = $detailSNs;
-                                }
-                            }
-
-                            $doDetailItems[] = $detailData;
-                        }
-
-                        $doData = [
-                            'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
-                            'branchName' => $accurateBranchName,
-                            'transDate' => Carbon::parse($this->order_date)->format('d/m/Y'),
-                            'salesOrderNumber' => $soResult['r']['number'],
-                            'description' => 'DO Otomatis dari SO (Kunci IMEI). ' . $this->notes,
-                            'detailItem' => $doDetailItems
-                        ];
-
-                        Log::info('Payload Delivery Order: ' . json_encode($doData));
-                        $doResult = $accurateService->postDeliveryOrder($doData, $dbSource);
-                        Log::info('Response API Accurate DO: ', is_array($doResult) ? $doResult : []);
-
-                        if (isset($doResult['r']['number'])) {
-                            \App\Models\OrderAccurateDoc::create([
-                                'order_id' => $order->id,
-                                'doc_type' => 'DELIVERY_ORDER',
-                                'doc_number' => $doResult['r']['number'],
-                                'accurate_id' => $doResult['r']['id'] ?? null,
-                                'amount' => $this->grand_total,
-                                'status' => 'SUCCESS',
-                            ]);
-                            Log::info('Berhasil membuat Delivery Order dengan Nomor: ' . $doResult['r']['number']);
-                        }
-                    }
+                    Log::info("IMEI dikunci di ZedPOS lokal (Unavailable). DO Accurate tidak dibuat di awal, stok Accurate tetap aman hingga pelunasan.");
                 }
             } catch (\Exception $e) {
                 Log::error('Accurate SO Sync Error: ' . $e->getMessage());

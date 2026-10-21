@@ -14,11 +14,12 @@ use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use App\Livewire\Zoffline\Pos\Traits\WithPaymentAndPromo;
 
 class Show extends Component
 {
-    use WithPaymentAndPromo;
+    use WithPaymentAndPromo, WithFileUploads;
     public Order $order;
 
     // DP Form
@@ -30,6 +31,17 @@ class Show extends Component
     public $dp_date;
     public $dp_notes;
     public $dp_contract_number;
+
+    // Refund DP Form
+    public $showRefundDpModal = false;
+    public $refundDepositId = null;
+    public $refundAmount = 0;
+    public $refundBankNo = '';
+    public $refundCustomerBankName = '';
+    public $refundCustomerAccountNo = '';
+    public $refundCustomerAccountName = '';
+    public $refundNotes = '';
+    public $refundReceipt = null;
 
     // Edit Item Price Modal
     public $showEditPriceModal = false;
@@ -659,6 +671,125 @@ class Show extends Component
 
         // Update amount di OrderAccurateDoc
         $soDoc->update(['amount' => $this->order->grand_total]);
+    }
+
+    #[Computed]
+    public function availableDeposits()
+    {
+        return \App\Models\CustomerDeposit::where('origin_order_id', $this->order->id)
+            ->where('status', 'AVAILABLE')
+            ->where('balance', '>', 0)
+            ->get();
+    }
+
+    public function openRefundDpModal($depositId = null)
+    {
+        $deposit = null;
+        if ($depositId) {
+            $deposit = \App\Models\CustomerDeposit::find($depositId);
+        } else {
+            $deposit = $this->availableDeposits->first();
+        }
+
+        if (!$deposit || $deposit->status !== 'AVAILABLE' || $deposit->balance <= 0) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Tidak ditemukan saldo DP yang tersedia untuk direfund.', type: 'error');
+            return;
+        }
+
+        $this->refundDepositId = $deposit->id;
+        $this->refundAmount = (float)$deposit->balance;
+        $this->refundBankNo = '';
+        $this->refundCustomerBankName = '';
+        $this->refundCustomerAccountNo = '';
+        $this->refundCustomerAccountName = $this->order->user->name ?? '';
+        $this->refundNotes = 'Refund DP Pembatalan SO ' . $this->order->order_number;
+        $this->refundReceipt = null;
+        $this->showRefundDpModal = true;
+    }
+
+    public function closeRefundDpModal()
+    {
+        $this->showRefundDpModal = false;
+        $this->refundDepositId = null;
+        $this->refundAmount = 0;
+        $this->refundBankNo = '';
+        $this->refundReceipt = null;
+    }
+
+    public function processRefundDp()
+    {
+        $this->validate([
+            'refundBankNo' => 'required',
+            'refundAmount' => 'required|numeric|min:1',
+            'refundReceipt' => 'required|image|max:5120',
+        ], [
+            'refundBankNo.required' => 'Pilih akun Kas/Bank toko terlebih dahulu.',
+            'refundAmount.required' => 'Nominal refund wajib diisi.',
+            'refundReceipt.required' => 'Bukti transfer / kwitansi pengembalian dana wajib diunggah.',
+            'refundReceipt.image' => 'File bukti harus berupa gambar (JPG, PNG, dll).',
+            'refundReceipt.max' => 'Ukuran gambar maksimal 5MB.',
+        ]);
+
+        $deposit = \App\Models\CustomerDeposit::find($this->refundDepositId);
+        if (!$deposit || $deposit->status !== 'AVAILABLE' || $deposit->balance <= 0) {
+            $this->dispatch('toast', title: 'Error', message: 'Data deposit tidak valid atau sudah direfund.', type: 'error');
+            return;
+        }
+
+        if ($this->refundAmount > $deposit->balance) {
+            $this->dispatch('toast', title: 'Error', message: 'Nominal refund melebihi saldo deposit yang tersedia.', type: 'error');
+            return;
+        }
+
+        $accurateService = app(AccurateService::class);
+        $businessUnit = $this->order->businessUnit;
+        $dbSource = strtolower($businessUnit ? $businessUnit->code : 'syihab');
+
+        DB::beginTransaction();
+        try {
+            // 1. Simpan bukti transfer
+            $receiptPath = null;
+            if ($this->refundReceipt) {
+                $receiptPath = $this->refundReceipt->store('finance/dp_refunds', 'public');
+            }
+
+            // 2. Sinkronkan ke Accurate jika deposit memiliki invoice DP Accurate
+            if (!empty($deposit->accurate_invoice_no)) {
+                $accurateService->refundDownPayment(
+                    $this->order,
+                    $deposit->accurate_invoice_no,
+                    $dbSource,
+                    $this->refundBankNo,
+                    $this->refundAmount
+                );
+            }
+
+            // 3. Update status deposit lokal
+            $newBalance = max(0, (float)$deposit->balance - (float)$this->refundAmount);
+            $newStatus = ($newBalance <= 0) ? 'REFUNDED' : 'AVAILABLE';
+
+            $noteDetails = "\n[" . now()->format('Y-m-d H:i') . "] REFUND DANA: Rp " . number_format($this->refundAmount, 0, ',', '.') .
+                " via Kas/Bank: " . $this->refundBankNo .
+                ($this->refundCustomerBankName ? " ke " . $this->refundCustomerBankName . " No: " . $this->refundCustomerAccountNo . " a/n " . $this->refundCustomerAccountName : '') .
+                ($this->refundNotes ? " (" . $this->refundNotes . ")" : "");
+
+            $deposit->update([
+                'balance' => $newBalance,
+                'status' => $newStatus,
+                'notes' => ($deposit->notes ?? '') . $noteDetails,
+            ]);
+
+            DB::commit();
+
+            $this->showRefundDpModal = false;
+            $this->order->refresh();
+            $this->dispatch('toast', title: 'Berhasil', message: 'Refund DP berhasil diproses dan disinkronkan ke Accurate.', type: 'success');
+            $this->dispatch('refreshOrderDetails');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Gagal proses refund DP SO {$this->order->order_number}: " . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal Refund', message: 'Gagal memproses refund: ' . $e->getMessage(), type: 'error');
+        }
     }
 
     public function render()

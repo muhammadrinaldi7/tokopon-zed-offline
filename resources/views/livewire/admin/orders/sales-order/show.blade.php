@@ -56,7 +56,7 @@
                     Ubah Barang (Swap)
                 </button>
 
-                <button type="button" @click="$dispatch('openCancelModal', { orderId: {{ $order->id }} })"
+                    <button type="button" @click="$dispatch('openCancelModal', { orderId: {{ $order->id }} })"
                     class="px-5 py-2.5 bg-white text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300 font-bold rounded-xl text-sm transition-all active:scale-95 shadow-sm flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -64,10 +64,36 @@
                     Batalkan SO
                 </button>
             @endif
+
+            @if (($order->order_status === 'CANCELLED' || $order->order_status === 'cancelled') && $this->availableDeposits->count() > 0)
+                <button type="button" wire:click="openRefundDpModal"
+                    class="px-5 py-2.5 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 transition-all active:scale-95 shadow-sm shadow-rose-600/20 flex items-center gap-2 text-sm">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
+                    </svg>
+                    Pencairan Refund DP
+                </button>
+            @endif
         </div>
     </div>
 
-
+    {{-- Banner Alert SO Dibatalkan yang memiliki DP --}}
+    @if (($order->order_status === 'CANCELLED' || $order->order_status === 'cancelled') && $this->availableDeposits->count() > 0)
+        <div class="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </div>
+                <div>
+                    <h4 class="font-bold text-amber-900 text-sm">SO Dibatalkan Masih Memiliki Saldo Uang Muka (DP)</h4>
+                    <p class="text-xs text-amber-700 mt-0.5">Total saldo DP: <strong>Rp {{ number_format($this->availableDeposits->sum('balance'), 0, ',', '.') }}</strong> saat ini tersimpan sebagai Saldo Deposit Pelanggan (Store Credit). Pelanggan dapat menggunakannya di POS atau Anda dapat memproses pengembalian dana via Transfer/Kas Toko.</p>
+                </div>
+            </div>
+            <button type="button" wire:click="openRefundDpModal" class="px-4 py-2 bg-rose-600 text-white font-bold text-xs rounded-xl hover:bg-rose-700 shrink-0 shadow-sm flex items-center gap-1.5 transition">
+                Proses Refund Dana
+            </button>
+        </div>
+    @endif
 
     {{-- SO Details --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -666,6 +692,106 @@
                         class="px-6 py-2.5 bg-[#1c69d4] hover:bg-blue-700 text-white font-bold rounded-xl transition flex items-center gap-2 shadow-sm shadow-blue-500/20">
                         <span wire:loading.remove wire:target="updateItemPrice">Simpan & Sinkron Accurate</span>
                         <span wire:loading wire:target="updateItemPrice">Menyimpan...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal Refund DP --}}
+    @if ($showRefundDpModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+                <div class="p-6 bg-gradient-to-r from-rose-600 to-rose-700 text-white flex justify-between items-center">
+                    <div>
+                        <h3 class="text-lg font-black tracking-tight flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
+                            </svg>
+                            Pencairan Refund Uang Muka (DP)
+                        </h3>
+                        <p class="text-xs text-rose-100 mt-1">Pengembalian dana DP untuk SO dibatalkan: {{ $order->order_number }}</p>
+                    </div>
+                    <button type="button" wire:click="closeRefundDpModal" class="p-1 rounded-full hover:bg-white/20 transition">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                    {{-- Info Saldo --}}
+                    <div class="p-4 bg-rose-50 rounded-2xl border border-rose-100 text-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="text-rose-700 font-medium">Saldo DP Tersedia:</span>
+                            <span class="text-lg font-black text-rose-700">Rp {{ number_format($refundAmount, 0, ',', '.') }}</span>
+                        </div>
+                        <p class="text-xs text-rose-500 mt-1">Pelanggan: <strong class="text-rose-800">{{ $order->user->name ?? 'Pelanggan Umum' }}</strong></p>
+                    </div>
+
+                    {{-- Form Nominal --}}
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nominal Refund (Rp) <span class="text-rose-500">*</span></label>
+                        <input type="number" wire:model="refundAmount" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-base font-bold text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none" min="1" max="{{ $refundAmount }}">
+                        @error('refundAmount') <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Akun Kas/Bank Toko --}}
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Akun Kas / Bank Pengeluaran Toko <span class="text-rose-500">*</span></label>
+                        <select wire:model="refundBankNo" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none">
+                            <option value="">-- Pilih Akun Bank Toko --</option>
+                            @foreach ($paymentMethods->whereNotNull('accurate_bank_no') as $pm)
+                                <option value="{{ $pm->accurate_bank_no }}">{{ $pm->name }} (Accurate: {{ $pm->accurate_bank_no }})</option>
+                            @endforeach
+                            <option value="KAS-CASH">Kas Tunai Kasir (KAS-CASH)</option>
+                        </select>
+                        @error('refundBankNo') <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Data Rekening Tujuan Customer --}}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Bank Customer</label>
+                            <input type="text" wire:model="refundCustomerBankName" placeholder="Contoh: BCA / Mandiri / Tunai" class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">No. Rekening / No. HP</label>
+                            <input type="text" wire:model="refundCustomerAccountNo" placeholder="Nomor rekening" class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nama Pemilik Rekening</label>
+                            <input type="text" wire:model="refundCustomerAccountName" placeholder="Nama pemilik rekening" class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none">
+                        </div>
+                    </div>
+
+                    {{-- Bukti Transfer --}}
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Unggah Bukti Transfer / Kwitansi <span class="text-rose-500">*</span></label>
+                        <input type="file" wire:model="refundReceipt" accept="image/*" class="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100 transition">
+                        @error('refundReceipt') <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span> @enderror
+                        @if ($refundReceipt)
+                            <div class="mt-2 text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                File terpilih: {{ $refundReceipt->getClientOriginalName() }}
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Catatan --}}
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Catatan Tambahan</label>
+                        <textarea wire:model="refundNotes" rows="2" class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none"></textarea>
+                    </div>
+                </div>
+
+                <div class="p-5 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                    <button type="button" wire:click="closeRefundDpModal" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-100 transition text-sm">
+                        Batal
+                    </button>
+                    <button type="button" wire:click="processRefundDp" wire:loading.attr="disabled" class="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition flex items-center gap-2 shadow-sm shadow-rose-600/20 text-sm">
+                        <span wire:loading.remove wire:target="processRefundDp">Konfirmasi & Cairkan Refund</span>
+                        <span wire:loading wire:target="processRefundDp">Memproses...</span>
                     </button>
                 </div>
             </div>

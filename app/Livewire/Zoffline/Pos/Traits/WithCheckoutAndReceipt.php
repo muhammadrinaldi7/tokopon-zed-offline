@@ -2133,42 +2133,30 @@ trait WithCheckoutAndReceipt
                     $siDetailItems[] = $siItem;
                 }
 
-                // 2. Check if DO exists, if not and has SN -> Create DO
+                // 2. Check legacy DO jika ada (untuk SO lama), untuk SO baru langsung ke Faktur (SI) dengan detailSerialNumber
                 $doDoc = $order->accurateDocs()->where('doc_type', 'DELIVERY_ORDER')->where('status', 'SUCCESS')->first();
-
-                if (!$doDoc && $hasSN) {
-                    $doData = [
-                        'customerNo' => $invoiceCustomerNo,
-                        'branchName' => $accurateBranchName,
-                        'transDate' => now()->format('d/m/Y'),
-                        'description' => 'DO Otomatis dari Pelunasan POS' . (!empty($this->notes) ? ' - ' . $this->notes : ''),
-                        'detailItem' => $doDetailItems
-                    ];
-
-                    if (!$isFinance) {
-                        $doData['salesOrderNumber'] = $order->accurate_so_number;
-                    }
-
-                    $doResult = $accurateService->postDeliveryOrder($doData, $dbSource);
-                    if (isset($doResult['r']['number'])) {
-                        $doDoc = \App\Models\OrderAccurateDoc::create([
-                            'order_id' => $order->id,
-                            'doc_type' => 'DELIVERY_ORDER',
-                            'doc_number' => $doResult['r']['number'],
-                            'accurate_id' => $doResult['r']['id'] ?? null,
-                            'amount' => $order->grand_total,
-                            'status' => 'SUCCESS',
-                        ]);
-                    } else {
-                        throw new \Exception('Gagal membuat Pengiriman Pesanan (DO) di Accurate: ' . ($doResult['d'][0] ?? json_encode($doResult)));
-                    }
-                }
 
                 // 3. Create SI (Sales Invoice)
                 if (!$order->accurate_invoice_no) {
                     if ($doDoc) {
-                        foreach ($siDetailItems as $index => &$i) {
-                            $i['deliveryOrderNumber'] = $doDoc->doc_number;
+                        if ($isFinance) {
+                            // Jika SO lama sudah terlanjur memiliki DO atas nama customer asli,
+                            // Accurate akan menolak jika Faktur Finance (Kredivo) menautkan DO milik customer asli.
+                            // Hapus DO lama di Accurate agar IMEI bebas dan Faktur Finance langsung memotong persediaan.
+                            if ($doDoc->accurate_id) {
+                                try {
+                                    $accurateService->deleteDeliveryOrder($doDoc->accurate_id, $dbSource);
+                                    $doDoc->update(['status' => 'CANCELLED']);
+                                    $doDoc = null;
+                                    Log::channel('pos_accurate')->info("Legacy DO berhasil dibatalkan di Accurate karena pelunasan dialihkan ke Finance.");
+                                } catch (\Exception $e) {
+                                    Log::channel('pos_accurate')->warning("Peringatan: Gagal menghapus legacy DO saat pelunasan finance: " . $e->getMessage());
+                                }
+                            }
+                        } else {
+                            foreach ($siDetailItems as $index => &$i) {
+                                $i['deliveryOrderNumber'] = $doDoc->doc_number;
+                            }
                         }
                     } elseif ($order->accurate_so_number && !$isFinance) {
                         foreach ($siDetailItems as $index => &$i) {

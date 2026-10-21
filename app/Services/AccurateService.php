@@ -2535,15 +2535,60 @@ class AccurateService
     /**
      * Memproses pengembalian uang muka (Refund DP) ke customer akibat pembatalan SO
      */
-    public function refundDownPayment(\App\Models\Order $order, $dpInvoiceNo, $dbSource)
+    public function refundDownPayment(\App\Models\Order $order, $dpInvoiceNo, $dbSource, $customBankNo = null, $customAmount = null)
     {
+        $branchName = \Illuminate\Support\Facades\Auth::user()->branch->name ?? 'Cabang Utama';
+        if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
+            $branchName = 'GSK ' . $branchName;
+        }
+        $customerNo = $order->user ? $order->user->getAccurateCustomerNo($dbSource) : 'UMUM';
+
+        // 1. Jika dipanggil dari Form Refund Manual dengan akun Bank & Nominal spesifik
+        if ($customBankNo && $customAmount !== null) {
+            $refundAmount = (float)$customAmount;
+            if ($refundAmount <= 0) {
+                throw new \Exception('Nominal refund harus lebih dari 0.');
+            }
+
+            $receiptPayload = [
+                'customerNo' => $customerNo,
+                'bankNo' => $customBankNo,
+                'transDate' => now()->format('d/m/Y'),
+                'branchName' => $branchName,
+                'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
+                'useCredit' => false,
+                'description' => "Pengembalian Dana (Refund DP) Pembatalan SO: {$order->order_number}",
+                'detailInvoice' => [
+                    [
+                        'invoiceNo' => $dpInvoiceNo,
+                        'paymentAmount' => -$refundAmount
+                    ]
+                ]
+            ];
+
+            Log::info("Payload Manual Refund DP (Uang Keluar) SO {$order->order_number}:", $receiptPayload);
+
+            $result = $this->postSalesReceipt($receiptPayload, $dbSource);
+            if (isset($result['r']['number'])) {
+                return \App\Models\OrderAccurateDoc::create([
+                    'order_id' => $order->id,
+                    'doc_type' => 'DP_REFUND',
+                    'doc_number' => $result['r']['number'],
+                    'accurate_id' => $result['r']['id'] ?? null,
+                    'amount' => -$refundAmount,
+                    'status' => 'SUCCESS',
+                ]);
+            } else {
+                $err = $result['d'][0] ?? json_encode($result);
+                throw new \Exception("Gagal mencatat Refund DP di Accurate: {$err}");
+            }
+        }
+
+        // 2. Fallback otomatis berdasarkan metode pembayaran historis
         $payments = $order->payments()->where('status', 'PAID')->get();
         if ($payments->isEmpty()) {
             return;
         }
-
-        $branchName = \Illuminate\Support\Facades\Auth::user()->branch->name ?? 'Cabang Utama';
-        $customerNo = $order->user ? $order->user->getAccurateCustomerNo($dbSource) : 'UMUM';
 
         foreach ($payments as $payment) {
             $refundAmount = (float)$payment->amount;

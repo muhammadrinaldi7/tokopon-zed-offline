@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ApprovalRequest;
 use App\Models\Branch;
 use App\Models\BusinessUnit;
+use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
@@ -826,23 +827,67 @@ class ExecutiveMetricsService
             ->orderBy('name')
             ->get(['id', 'business_unit_id', 'name']);
 
-        // Distinct stores recorded in branches and recent orders (driver agnostic)
-        $branchStores = Branch::orderBy('name')->pluck('name');
-        $orderStoreNames = Order::whereNotNull('shipping_address_snapshot')
+        $branchItems = $branches->map(fn($b) => [
+            'id' => $b->id,
+            'name' => $b->name,
+            'business_unit_id' => (int)$b->business_unit_id,
+        ]);
+
+        $orderStores = Order::whereNotNull('shipping_address_snapshot')
             ->latest('id')
             ->take(500)
-            ->get(['shipping_address_snapshot'])
+            ->get(['business_unit_id', 'shipping_address_snapshot'])
             ->map(function ($o) {
-                return $o->shipping_address_snapshot['store'] ?? null;
+                $store = $o->shipping_address_snapshot['store'] ?? null;
+                return $store ? [
+                    'id' => $store,
+                    'name' => $store,
+                    'business_unit_id' => (int)$o->business_unit_id,
+                ] : null;
             })
             ->filter();
 
-        $orderStores = $branchStores->concat($orderStoreNames)->unique()->values();
+        $allBranches = $branchItems->concat($orderStores)
+            ->unique(fn($b) => $b['name'] . '_' . ($b['business_unit_id'] ?? '0'))
+            ->sortBy('name')
+            ->values();
+
+        if ($allBranches->isEmpty()) {
+            $allBranches = collect([
+                ['id' => 'GSK - Veteran', 'name' => 'GSK - Veteran', 'business_unit_id' => 1],
+                ['id' => 'GSK - Sultan Adam', 'name' => 'GSK - Sultan Adam', 'business_unit_id' => 1],
+                ['id' => 'GSK - Kayutangi', 'name' => 'GSK - Kayutangi', 'business_unit_id' => 1],
+                ['id' => 'GSK - Martapura', 'name' => 'GSK - Martapura', 'business_unit_id' => 1],
+                ['id' => 'GSK - Banjarbaru', 'name' => 'GSK - Banjarbaru', 'business_unit_id' => 2],
+                ['id' => 'GSK - Sampit', 'name' => 'GSK - Sampit', 'business_unit_id' => 2],
+            ]);
+        }
+        $orderStoreNames = $allBranches->pluck('name')->unique()->values();
+
+        $accurateCategories = ProductAccurate::whereNotNull('categoryName')
+            ->where('categoryName', '!=', '')
+            ->select('categoryName as name', 'business_unit_id')
+            ->distinct()
+            ->get();
+
+        $dbCategories = Category::select('name', 'business_unit_id')->get();
+
+        $categories = $accurateCategories->concat($dbCategories)
+            ->filter(fn($c) => !empty(trim($c->name)))
+            ->map(fn($c) => [
+                'name' => trim($c->name),
+                'business_unit_id' => $c->business_unit_id ? (int)$c->business_unit_id : null,
+            ])
+            ->unique(fn($c) => $c['name'] . '_' . ($c['business_unit_id'] ?? 'global'))
+            ->sortBy('name')
+            ->values();
 
         return [
             'business_units' => $businessUnits,
-            'branches' => $branches,
-            'order_stores' => $orderStores,
+            'branches' => $allBranches,
+            'order_stores' => $orderStoreNames,
+            'categories' => $categories,
+            'category_names' => $categories->pluck('name')->unique()->values(),
             'date_presets' => [
                 ['value' => 'today', 'label' => 'Hari Ini'],
                 ['value' => 'yesterday', 'label' => 'Kemarin'],
