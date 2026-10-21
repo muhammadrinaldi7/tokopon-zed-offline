@@ -201,10 +201,14 @@ class Pos extends Component
 
         if ($step == 4 && $this->selectedCustomerId) {
             $orderId = $this->loadedSoOrderId ?? 0;
+            $activeBuId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
             $this->availableCustomerDeposits = \App\Models\CustomerDeposit::where('user_id', $this->selectedCustomerId)
                 ->where('status', 'AVAILABLE')
                 ->where('balance', '>', 0)
-                ->where('business_unit_id', \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId())
+                ->where(function ($q) use ($activeBuId) {
+                    $q->where('business_unit_id', $activeBuId)
+                        ->orWhereNull('business_unit_id');
+                })
                 ->where(function ($q) use ($orderId) {
                     $q->whereNull('origin_order_id')
                         ->orWhere('origin_order_id', '!=', $orderId);

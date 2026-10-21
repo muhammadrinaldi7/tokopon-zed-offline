@@ -222,10 +222,15 @@ class Show extends Component
         $this->dp_notes = '';
         $this->dp_contract_number = '';
         
+        $soBuId = $this->order->business_unit_id;
         $this->availableCustomerDeposits = \App\Models\CustomerDeposit::where('user_id', $this->order->user_id)
             ->where('status', 'AVAILABLE')
             ->where('balance', '>', 0)
-            ->where('business_unit_id', $this->order->business_unit_id)
+            ->where(function($q) use ($soBuId) {
+                if ($soBuId) {
+                    $q->where('business_unit_id', $soBuId)->orWhereNull('business_unit_id');
+                }
+            })
             ->where(function($q) {
                 $q->whereNull('origin_order_id')
                   ->orWhere('origin_order_id', '!=', $this->order->id);
