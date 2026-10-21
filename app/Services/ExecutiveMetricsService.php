@@ -94,25 +94,83 @@ class ExecutiveMetricsService
     /**
      * Build base query for orders with standard executive filters.
      */
+        /**
+     * Apply multi-select or single branch filter to a query.
+     */
+    public function applyBranchFilter($query, $branchFilter, string $storeColumn = 'shipping_address_snapshot->store')
+    {
+        if (empty($branchFilter)) {
+            return $query;
+        }
+
+        $branches = is_array($branchFilter) ? $branchFilter : array_map('trim', explode(',', (string) $branchFilter));
+        $branches = array_values(array_filter($branches));
+        if (empty($branches)) {
+            return $query;
+        }
+
+        return $query->where(function ($sub) use ($branches, $storeColumn) {
+            $numericIds = array_filter($branches, 'is_numeric');
+            $storeNames = array_diff($branches, $numericIds);
+
+            if (!empty($numericIds)) {
+                $sub->whereIn('branch_id', $numericIds);
+            }
+            if (!empty($storeNames)) {
+                if (!empty($numericIds)) {
+                    $sub->orWhereIn($storeColumn, $storeNames);
+                } else {
+                    $sub->whereIn($storeColumn, $storeNames);
+                }
+            }
+        });
+    }
+
+    /**
+     * Apply multi-select or single category filter to a query.
+     */
+    public function applyCategoryFilter($query, $categoryFilter)
+    {
+        if (empty($categoryFilter)) {
+            return $query;
+        }
+
+        $categories = is_array($categoryFilter) ? $categoryFilter : array_map('trim', explode(',', (string) $categoryFilter));
+        $categories = array_values(array_filter($categories));
+        if (empty($categories)) {
+            return $query;
+        }
+
+        return $query->whereHas('items', function ($itemQuery) use ($categories) {
+            $itemQuery->where(function ($iq) use ($categories) {
+                $iq->whereHasMorph('variant', [ProductAccurate::class], function ($paQ) use ($categories) {
+                    $paQ->whereIn('categoryName', $categories);
+                })->orWhereHasMorph('variant', [ProductVariant::class], function ($pvQ) use ($categories) {
+                    $pvQ->whereHas('product.category', function ($catQ) use ($categories) {
+                        $catQ->whereIn('name', $categories);
+                    });
+                });
+            });
+        });
+    }
+
     public function baseOrderQuery(array $filters): Builder
     {
-        [$start, $end] = $this->parseDateRange(
-            $filters['date_range'] ?? ($filters['period'] ?? null),
+        [$startDate, $endDate, $range] = $this->parseDateRange(
+            $filters['date_range'] ?? 'this_month',
             $filters['start_date'] ?? null,
             $filters['end_date'] ?? null
         );
 
         $statuses = $filters['order_status'] ?? ['COMPLETED', 'PIUTANG'];
-        if (is_string($statuses)) {
-            $statuses = array_map('trim', explode(',', $statuses));
-        }
 
-        return Order::whereIn('order_status', $statuses)
-            ->where(function ($q) use ($start, $end) {
-                $q->whereBetween('order_date', [$start->format('Y-m-d 00:00:00'), $end->format('Y-m-d 23:59:59')])
-                    ->orWhere(function ($sub) use ($start, $end) {
+        $query = Order::query()
+            ->whereIn('order_status', (array) $statuses)
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->whereBetween('order_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->orWhere(function ($sub) use ($startDate, $endDate) {
                         $sub->whereNull('order_date')
-                            ->whereBetween('created_at', [$start->format('Y-m-d 00:00:00'), $end->format('Y-m-d 23:59:59')]);
+                            ->whereBetween('created_at', [$startDate, $endDate]);
                     });
             })
             ->when(!empty($filters['business_unit_id']), function ($q) use ($filters) {
@@ -121,29 +179,12 @@ class ExecutiveMetricsService
                 } else {
                     $q->where('business_unit_id', $filters['business_unit_id']);
                 }
-            })
-            ->when(!empty($filters['branch']), function ($q) use ($filters) {
-                $branch = $filters['branch'];
-                if (is_numeric($branch)) {
-                    $q->where('branch_id', $branch);
-                } else {
-                    $q->where('shipping_address_snapshot->store', $branch);
-                }
-            })
-            ->when(!empty($filters['category']), function ($q) use ($filters) {
-                $category = $filters['category'];
-                $q->whereHas('items', function ($itemQuery) use ($category) {
-                    $itemQuery->where(function ($iq) use ($category) {
-                        $iq->whereHasMorph('variant', [ProductAccurate::class], function ($paQ) use ($category) {
-                            $paQ->where('categoryName', $category);
-                        })->orWhereHasMorph('variant', [ProductVariant::class], function ($pvQ) use ($category) {
-                            $pvQ->whereHas('product.category', function ($catQ) use ($category) {
-                                $catQ->where('name', $category);
-                            });
-                        });
-                    });
-                });
             });
+
+        $query = $this->applyBranchFilter($query, $filters['branch'] ?? null);
+        $query = $this->applyCategoryFilter($query, $filters['category'] ?? null);
+
+        return $query;
     }
 
     /**
@@ -2169,6 +2210,8 @@ class ExecutiveMetricsService
                 $q->where('business_unit_id', $businessUnitFilter);
             });
 
+        $completedOrdersQuery = $this->applyBranchFilter($completedOrdersQuery, $branchFilter);
+        $completedOrdersQuery = $this->applyCategoryFilter($completedOrdersQuery, $filters['category'] ?? null);
         $completedOrders = $completedOrdersQuery->get();
 
         $piutangData = [];
@@ -2238,7 +2281,7 @@ class ExecutiveMetricsService
         }
 
         // 2. Pure Piutang Toko (order_status = 'PIUTANG')
-        $purePiutangOrders = Order::with([
+        $purePiutangQuery = Order::with([
                 'branch',
                 'user',
                 'handledBy.branch',
@@ -2247,13 +2290,13 @@ class ExecutiveMetricsService
             ])
             ->where($dateFilter)
             ->where('order_status', 'PIUTANG')
-            ->when($branchFilter, function ($q) use ($branchFilter) {
-                $q->where('shipping_address_snapshot->store', $branchFilter);
-            })
             ->when($businessUnitFilter, function ($q) use ($businessUnitFilter) {
                 $q->where('business_unit_id', $businessUnitFilter);
-            })
-            ->get();
+            });
+
+        $purePiutangQuery = $this->applyBranchFilter($purePiutangQuery, $branchFilter);
+        $purePiutangQuery = $this->applyCategoryFilter($purePiutangQuery, $filters['category'] ?? null);
+        $purePiutangOrders = $purePiutangQuery->get();
 
         if ($purePiutangOrders->isNotEmpty()) {
             $pureTotal = $purePiutangOrders->sum('grand_total');
