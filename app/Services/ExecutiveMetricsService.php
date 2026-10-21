@@ -936,18 +936,86 @@ class ExecutiveMetricsService
 
         $orderStores = $branchStores->concat($orderStoreNames)->unique()->values();
 
-        $accurateCategories = ProductAccurate::whereNotNull('categoryName')
+                $accurateCategories = ProductAccurate::whereNotNull('categoryName')
             ->where('categoryName', '!=', '')
+            ->select('categoryName as name', 'business_unit_id')
             ->distinct()
-            ->pluck('categoryName');
+            ->get();
 
-        $dbCategories = Category::orderBy('name')->pluck('name');
+        $dbCategories = Category::select('name', 'business_unit_id')->get();
 
-        $categories = $accurateCategories->concat($dbCategories)
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values();
+        $allBuList = $businessUnits->pluck('id')->map(fn($id) => (int)$id)->all();
+
+        $rawCategories = $accurateCategories->concat($dbCategories)
+            ->filter(fn($c) => !empty(trim($c->name ?? '')));
+
+        $categoryMap = [];
+        foreach ($rawCategories as $item) {
+            $cName = trim($item->name);
+            $buId = $item->business_unit_id ? (int)$item->business_unit_id : null;
+
+            if (!isset($categoryMap[$cName])) {
+                $categoryMap[$cName] = [
+                    'name' => $cName,
+                    'business_unit_ids' => [],
+                    'is_global' => false,
+                ];
+            }
+
+            if ($buId === null) {
+                $categoryMap[$cName]['is_global'] = true;
+            } else {
+                if (!in_array($buId, $categoryMap[$cName]['business_unit_ids'], true)) {
+                    $categoryMap[$cName]['business_unit_ids'][] = $buId;
+                }
+            }
+        }
+
+        if (empty($categoryMap)) {
+            $categoryMap = [
+                'Aksesoris' => ['name' => 'Aksesoris', 'business_unit_ids' => $allBuList, 'is_global' => true],
+                'Smartphone' => ['name' => 'Smartphone', 'business_unit_ids' => $allBuList, 'is_global' => true],
+                'iPhone Baru' => ['name' => 'iPhone Baru', 'business_unit_ids' => [1], 'is_global' => false],
+                'iPhone Second' => ['name' => 'iPhone Second', 'business_unit_ids' => [2], 'is_global' => false],
+            ];
+        } else {
+            if (isset($categoryMap['Aksesoris'])) {
+                $categoryMap['Aksesoris']['business_unit_ids'] = $allBuList;
+                $categoryMap['Aksesoris']['is_global'] = true;
+            }
+            if (isset($categoryMap['iPhone Second']) && !in_array(2, $categoryMap['iPhone Second']['business_unit_ids'])) {
+                $categoryMap['iPhone Second']['business_unit_ids'] = [2];
+            }
+        }
+
+        $categories = collect($categoryMap)->map(function ($cat) use ($allBuList) {
+            $buIds = $cat['business_unit_ids'];
+            if ($cat['is_global'] || empty($buIds)) {
+                $buIds = $allBuList;
+            }
+            sort($buIds);
+
+            $isAllBu = count($buIds) >= count($allBuList);
+
+            return [
+                'name' => $cat['name'],
+                'business_unit_id' => count($buIds) === 1 ? $buIds[0] : null,
+                'business_unit_ids' => $buIds,
+                'is_all_bu' => $isAllBu,
+                'bu_count' => count($buIds),
+            ];
+        })->sortBy('name')->values();
+
+        if ($branches->isEmpty()) {
+            $branches = collect([
+                ['id' => 'GSK - Veteran', 'name' => 'GSK - Veteran', 'business_unit_id' => 1],
+                ['id' => 'GSK - Sultan Adam', 'name' => 'GSK - Sultan Adam', 'business_unit_id' => 1],
+                ['id' => 'GSK - Kayutangi', 'name' => 'GSK - Kayutangi', 'business_unit_id' => 1],
+                ['id' => 'GSK - Martapura', 'name' => 'GSK - Martapura', 'business_unit_id' => 1],
+                ['id' => 'GSK - Banjarbaru', 'name' => 'GSK - Banjarbaru', 'business_unit_id' => 2],
+                ['id' => 'GSK - Sampit', 'name' => 'GSK - Sampit', 'business_unit_id' => 2],
+            ]);
+        }
 
         return [
             'business_units' => $businessUnits,
