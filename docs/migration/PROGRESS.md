@@ -280,6 +280,20 @@ Seluruh audit sistematis terhadap monolit Laravel `tokopon-zed-offline` telah se
   7. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000005_create_loyalty_and_coupon_tables.up.sql` dan `down.sql`).
   8. **Go Native Unit Tests (`service_test.go`, `usecase_test.go`, `handler_test.go`):** ✅ Lulus 100% (11 unit test Loyalty & Coupon PASS; seluruh suite proyek `go test ./...` 100% PASS tanpa regresi).
 
+### [MOD-06] Retail Trade-In, Buyback & Digital Device Passport (`module/tradein`)
+- **Status:** **SELESAI (100%) ✅**
+- **Dokumen Referensi:** [`docs/migration/32-module-tradein-device-passport.md`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/docs/migration/32-module-tradein-device-passport.md)
+- **Implementasi:**
+  1. **Domain & Entity Abstraction (`internal/modules/tradein/domain.go`):** ✅ SELESAI (Model TradeIn, SellPhone, QcTemplate, DeviceInspection, DevicePassportResponse, DeviceTimelineEvent, AppraisalCalculateRequest/Response, serta error typed `ErrTradeInNotFound`, `ErrSellPhoneNotFound`, `ErrFatalQCInspection`, `ErrInvalidInspectionVerdict`, `ErrInvalidIMEI`, `ErrInvalidTradeInStatus`, `ErrBuybackAlreadyCompleted`, `ErrInvalidWarehouse`, `ErrInvalidAppraisalValue`, `ErrQcTemplateNotFound`).
+  2. **Domain Service Logic (`internal/modules/tradein/service.go`):** ✅ SELESAI (Evaluasi checklist QC `EvaluateQCChecklist` dengan pendeteksian cacat fatal `is_fatal`, vonis `pass`/`conditional`/`fail`, kalkulator penalti nilai taksiran `CalculateAppraisal`, format mata uang Rupiah, dan validasi Finite State Machine status trade-in).
+  3. **Repository SQL & Concurrency (`internal/modules/tradein/repository.go`):** ✅ SELESAI (Operasi CRUD trade-in dan buyback, penguncian baris pesimistik `SELECT ... FOR UPDATE` saat penyelesaian buyback, auto-intake registrasi ke `product_serial_numbers` dan `warehouse_stocks`, registrasi cepat pelanggan walk-in, kueri template dan inspeksi QC, serta agregator riwayat Digital Device Passport multi-tabel berdasarkan IMEI).
+  4. **UseCase & Business Logic (`internal/modules/tradein/usecase.go`):** ✅ SELESAI (Orkestrator pengajuan trade-in dan top-up amount, pembuatan dan penyelesaian buyback idempoten, kalkulasi taksiran harga, submit inspeksi QC teknisi toko dengan update status nomor seri, serta pencarian paspor perangkat IMEI).
+  5. **HTTP Delivery Handler (`internal/modules/tradein/handler.go`):** ✅ SELESAI (Registrasi lengkap rute `/api/v1/trade-in/*`, `/api/v1/buyback/*`, `/api/v1/qc/*`, dan `/api/v1/passport/:imei` terproteksi JWT).
+  6. **Router Wiring (`internal/delivery/http/router.go`):** ✅ SELESAI (Injeksi otomatis modul Trade-In & Passport ke router Echo).
+  7. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000006_create_tradein_and_passport_tables.up.sql` dan `down.sql`).
+  8. **Go Native Unit Tests (`service_test.go`, `usecase_test.go`, `handler_test.go`):** ✅ Lulus 100% (21 unit test Trade-In, Buyback, QC, dan Passport PASS; seluruh suite proyek `go test ./...` 100% PASS tanpa regresi).
+
 ---
+
 
 
