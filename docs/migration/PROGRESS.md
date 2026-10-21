@@ -267,5 +267,19 @@ Seluruh audit sistematis terhadap monolit Laravel `tokopon-zed-offline` telah se
   7. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000004_create_catalog_and_promos_tables.up.sql` dan `down.sql`).
   8. **Go Native Unit Tests (`promo_engine_test.go`, `usecase_test.go`, `handler_test.go`):** ✅ Lulus 100% (14 unit test Catalog & Promo engine PASS; seluruh suite proyek `go test ./...` 100% PASS tanpa regresi).
 
+### [MOD-05] Customer Loyalty & CRM (`module/loyalty`)
+- **Status:** **SELESAI (100%) ✅**
+- **Dokumen Referensi:** [`docs/migration/31-module-loyalty-points-crm.md`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/docs/migration/31-module-loyalty-points-crm.md)
+- **Implementasi:**
+  1. **Domain & Entity Abstraction (`internal/modules/loyalty/domain.go`):** ✅ SELESAI (Model LoyaltyAccount, LoyaltyTransaction, EcommerceCoupon, EcommerceCouponRedemption, CustomerLoyaltySummary, DTO CalculateRedeem/ValidateCoupon, serta error typed `ErrLoyaltyAccountNotFound`, `ErrInsufficientPoints`, `ErrBelowMinimumRedeemPoints`, `ErrCouponNotFound`, `ErrCouponInactive`, `ErrCouponExpired`, `ErrCouponUsageLimitExceeded`, `ErrCouponUserLimitExceeded`, `ErrCouponMinPurchaseNotMet`).
+  2. **Domain Service Logic (`internal/modules/loyalty/service.go`):** ✅ SELESAI (Normalisasi nomor telepon Indonesia `628...`, kalkulasi perolehan 1 poin / Rp 10.000, nilai tukar 1 poin = Rp 100, evaluasi tier BRONZE/SILVER/GOLD/PLATINUM berdasarkan total belanja, dan validasi kupon produk/ongkir dengan batasan minimum belanja & max discount cap).
+  3. **Repository SQL & Concurrency (`internal/modules/loyalty/repository.go`):** ✅ SELESAI (Pencatatan buku besar mutasi ganda `loyalty_transactions`, penguncian baris pesimistik `SELECT ... FOR UPDATE` saat redeem dan apply kupon, pelacakan kuota kupon per-user, serta rollback otomatis saat pesanan dibatalkan).
+  4. **UseCase & Business Logic (`internal/modules/loyalty/usecase.go`):** ✅ SELESAI (Orkestrator GetCustomerSummary, CalculateRedeem, ExecuteRedeemInTx, ExecuteEarnInTx, ExecuteRefundInTx, ValidateCoupon, ApplyCouponInTx, dan RollbackCouponInTx).
+  5. **HTTP Delivery Handler (`internal/modules/loyalty/handler.go`):** ✅ SELESAI (Registrasi lengkap rute `/api/v1/pos/loyalty/customer`, `/api/v1/pos/loyalty/calculate-redeem`, `/api/v1/pos/coupons/validate`, `/api/v1/loyalty/account`, `/api/v1/loyalty/history`, `/api/v1/coupons`).
+  6. **Router Wiring (`internal/delivery/http/router.go`):** ✅ SELESAI (Injeksi otomatis modul Loyalty & CRM).
+  7. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000005_create_loyalty_and_coupon_tables.up.sql` dan `down.sql`).
+  8. **Go Native Unit Tests (`service_test.go`, `usecase_test.go`, `handler_test.go`):** ✅ Lulus 100% (11 unit test Loyalty & Coupon PASS; seluruh suite proyek `go test ./...` 100% PASS tanpa regresi).
+
 ---
+
 
