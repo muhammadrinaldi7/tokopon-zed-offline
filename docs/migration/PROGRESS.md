@@ -254,4 +254,18 @@ Seluruh audit sistematis terhadap monolit Laravel `tokopon-zed-offline` telah se
   6. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000003_create_inventory_tables.up.sql` dan `down.sql`).
   7. **Go Native Unit Tests (`usecase_test.go`, `handler_test.go`):** ✅ Lulus 100% (6 unit test Inventory module PASS; seluruh suite proyek `go test ./...` 100% PASS tanpa regresi).
 
+### [MOD-04] Product Catalog & Promo Engine (`module/catalog`)
+- **Status:** **SELESAI (100%) ✅**
+- **Dokumen Referensi:** [`docs/migration/30-module-catalog-promo-engine.md`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/docs/migration/30-module-catalog-promo-engine.md)
+- **Implementasi:**
+  1. **Domain & Entity Abstraction (`internal/modules/catalog/domain.go`):** ✅ SELESAI (Model Promo, PromoSKU, PromoBundleSKU, PromoBranch, OrderPromo, ManualDiscountPreset, Category, Brand, CartItem, DTO Eligible/Calculate, serta error typed `ErrPromoQuotaExceeded`, `ErrPromoNotCombinable`, `ErrPromoInactive`, `ErrPromoNotStarted`, `ErrPromoExpired`, `ErrPromoBUInvalid`, `ErrPromoBranchInvalid`).
+  2. **In-Memory Promo Engine (`internal/modules/catalog/promo_engine.go`):** ✅ SELESAI (Replikasi 100% presisi dari Laravel `PromoCalculatorService`: potongan fixed/percentage, pembatasan max discount cap, multiplier `is_multiply`, capping `max_qty`, bundling diskon dengan `bundle_max_qty` & override SKU-level, alokasi proporsional bulat ke setiap item cart, dan invariant strict combinability).
+  3. **Repository SQL (`internal/modules/catalog/repository.go`):** ✅ SELESAI (Kueri aktif promo terfilter tanggal, kuota, BU & cabang, batch loading relasi SKUs/BundleSKUs/Branches, penguncian baris pesimistik `SELECT ... FOR UPDATE` saat checkout, insert pivot `order_promos`, dan manual discount presets).
+  4. **UseCase & Business Logic (`internal/modules/catalog/usecase.go`):** ✅ SELESAI (Evaluasi promo eligible, simulasi kalkulasi diskon cart, alokasi ringkasan promo, validasi pra-checkout, atomisitas kuota decrement, dan Rupiah formatter).
+  5. **HTTP Delivery Handler (`internal/modules/catalog/handler.go`):** ✅ SELESAI (Registrasi lengkap rute `/api/v1/pos/promos/eligible`, `/api/v1/pos/promos/calculate`, `/api/v1/pos/manual-discounts`, `/api/v1/catalog/promos`, `/api/v1/catalog/categories`, `/api/v1/catalog/brands`).
+  6. **Router Wiring (`internal/delivery/http/router.go`):** ✅ SELESAI (Injeksi otomatis modul Catalog & Promo Engine).
+  7. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000004_create_catalog_and_promos_tables.up.sql` dan `down.sql`).
+  8. **Go Native Unit Tests (`promo_engine_test.go`, `usecase_test.go`, `handler_test.go`):** ✅ Lulus 100% (14 unit test Catalog & Promo engine PASS; seluruh suite proyek `go test ./...` 100% PASS tanpa regresi).
+
 ---
+
