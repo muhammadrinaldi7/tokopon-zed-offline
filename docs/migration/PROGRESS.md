@@ -293,6 +293,20 @@ Seluruh audit sistematis terhadap monolit Laravel `tokopon-zed-offline` telah se
   7. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000006_create_tradein_and_passport_tables.up.sql` dan `down.sql`).
   8. **Go Native Unit Tests (`service_test.go`, `usecase_test.go`, `handler_test.go`):** ✅ Lulus 100% (21 unit test Trade-In, Buyback, QC, dan Passport PASS; seluruh suite proyek `go test ./...` 100% PASS tanpa regresi).
 
+### [MOD-07] External Gateway & Integration Engine (`module/integration`)
+- **Status:** **SELESAI (100%) ✅**
+- **Dokumen Referensi:** [`docs/migration/33-module-integration-external-gateway.md`](file:///c:/Users/ADVAN/Herd/tokopon-zed-offline/docs/migration/33-module-integration-external-gateway.md)
+- **Implementasi:**
+  1. **Domain & Entity Abstraction (`internal/modules/integration/domain.go`):** ✅ SELESAI (Model OrderAccurateDoc, AccurateWebhookLog, MessageLog, Setting, DTOs AccurateSync, WhatsAppResend, XenditInvoiceWebhook, WebhookProcessing, serta error typed `ErrOrderNotFound`, `ErrOrderNotCompleted`, `ErrAccurateSyncFailed`, `ErrAccurateServiceOffline`, `ErrWhatsAppServiceOffline`, `ErrInvalidWebhookSignature`, `ErrSettingNotFound`).
+  2. **Domain Service Logic (`internal/modules/integration/service.go`):** ✅ SELESAI (Strategi Exponential Backoff Retry 500ms/2s/5s/10s, verifikasi tanda tangan HMAC-SHA256 callback approval, pengecekan idempoten faktur penjualan Accurate `IsIdempotentInvoice` untuk mencegah tagihan ganda, normalisasi nomor telepon `08...`/`628...`, dan templating pesan struk digital WhatsApp).
+  3. **Repository SQL (`internal/modules/integration/repository.go`):** ✅ SELESAI (Kueri audit log `order_accurate_docs`, `accurate_webhook_logs`, `message_logs`, key-value upsert `settings`, dan update status pembayaran order).
+  4. **UseCase & Orchestration (`internal/modules/integration/usecase.go`):** ✅ SELESAI (Orkestrator manual retry Accurate sync, WhatsApp receipt resend, ingest webhook Xendit Invoice, Accurate Webhooks, Telegram Approval Callback, Dynamic Settings CRUD, dan Background Queue Job Processors `ProcessSyncOrderJob` & `ProcessWhatsAppJob` dengan kepatuhan Strict Invariant 1 & 2).
+  5. **HTTP Delivery Handler (`internal/modules/integration/handler.go`):** ✅ SELESAI (Registrasi lengkap rute `/api/v1/backoffice/accurate/*`, `/api/v1/backoffice/whatsapp/*`, `/api/v1/settings/*`, dan `/api/v1/webhooks/*`).
+  6. **Router Wiring (`internal/delivery/http/router.go`):** ✅ SELESAI (Injeksi otomatis modul Integration Engine ke router Echo dengan fallback pengujian).
+  7. **Dedicated Background Queue Worker:** ✅ SELESAI (`tokopon-go/cmd/worker/main.go` binary mandiri untuk asinkronus queue consumption).
+  8. **Kesiapan Migrasi Database Mandiri:** ✅ SELESAI (`migrations/000007_create_integration_and_jobs_tables.up.sql` dan `down.sql`).
+  9. **Go Native Unit Tests (`service_test.go`, `usecase_test.go`, `handler_test.go`):** ✅ Lulus 100% (24 unit test Integration Engine PASS; seluruh suite proyek `go test ./...` 100% PASS tanpa regresi).
+
 ---
 
 
