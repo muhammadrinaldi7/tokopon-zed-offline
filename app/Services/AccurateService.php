@@ -2238,10 +2238,11 @@ class AccurateService
     {
         $config = $this->getHeaders($databaseSource);
 
+        $payload = is_numeric($id) ? ['id' => (int)$id] : ['number' => $id];
         $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
-            ->post($config['host'] . '/sales-receipt/delete.do', ['id' => $id]);
+            ->post($config['host'] . '/sales-receipt/delete.do', $payload);
 
-        Log::info("API Accurate Delete Sales Receipt ({$databaseSource}) ID: {$id} Response: " . $response->body());
+        Log::info("API Accurate Delete Sales Receipt ({$databaseSource}) ID/No: {$id} Response: " . $response->body());
 
         if ($response->successful()) {
             $data = $response->json();
@@ -2268,10 +2269,11 @@ class AccurateService
     {
         $config = $this->getHeaders($databaseSource);
 
+        $payload = is_numeric($id) ? ['id' => (int)$id] : ['number' => $id];
         $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
-            ->post($config['host'] . '/sales-invoice/delete.do', ['id' => $id]);
+            ->post($config['host'] . '/sales-invoice/delete.do', $payload);
 
-        Log::info("API Accurate Delete Sales Invoice ({$databaseSource}) ID: {$id} Response: " . $response->body());
+        Log::info("API Accurate Delete Sales Invoice ({$databaseSource}) ID/No: {$id} Response: " . $response->body());
 
         if ($response->successful()) {
             $data = $response->json();
@@ -2289,10 +2291,11 @@ class AccurateService
     {
         $config = $this->getHeaders($databaseSource);
 
+        $payload = is_numeric($id) ? ['id' => (int)$id] : ['number' => $id];
         $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
-            ->post($config['host'] . '/delivery-order/delete.do', ['id' => $id]);
+            ->post($config['host'] . '/delivery-order/delete.do', $payload);
 
-        Log::info("API Accurate Delete Delivery Order ({$databaseSource}) ID: {$id} Response: " . $response->body());
+        Log::info("API Accurate Delete Delivery Order ({$databaseSource}) ID/No: {$id} Response: " . $response->body());
 
         if ($response->successful()) {
             $data = $response->json();
@@ -2311,10 +2314,11 @@ class AccurateService
     {
         $config = $this->getHeaders($databaseSource);
 
+        $payload = is_numeric($id) ? ['id' => (int)$id] : ['number' => $id];
         $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
-            ->post($config['host'] . '/sales-order/delete.do', ['id' => $id]);
+            ->post($config['host'] . '/sales-order/delete.do', $payload);
 
-        Log::info("API Accurate Delete Sales Order ({$databaseSource}) ID: {$id} Response: " . $response->body());
+        Log::info("API Accurate Delete Sales Order ({$databaseSource}) ID/No: {$id} Response: " . $response->body());
 
         if ($response->successful()) {
             $data = $response->json();
@@ -2632,6 +2636,74 @@ class AccurateService
                 Log::error("Refund DP Gagal untuk SO {$order->order_number}: " . $e->getMessage());
                 // Jangan me-lempar error agar proses rollback (penghapusan DO/SI) tetap bisa berjalan
             }
+        }
+    }
+
+    /**
+     * Memproses pengembalian uang muka (Refund DP) langsung dari model CustomerDeposit
+     */
+    public function refundCustomerDeposit(\App\Models\CustomerDeposit $deposit, $customBankNo, $customAmount, $customNotes = null)
+    {
+        $businessUnit = $deposit->businessUnit;
+        $dbSource = strtolower($businessUnit ? $businessUnit->code : 'syihab');
+
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $branchName = $user->branch->name ?? 'Cabang Utama';
+        if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
+            $branchName = 'GSK ' . $branchName;
+        }
+
+        $customerUser = $deposit->user;
+        $customerNo = $customerUser ? $customerUser->getAccurateCustomerNo($dbSource) : 'UMUM';
+
+        $refundAmount = (float)$customAmount;
+        if ($refundAmount <= 0) {
+            throw new \Exception('Nominal refund harus lebih dari 0.');
+        }
+
+        if (empty($deposit->accurate_invoice_no)) {
+            throw new \Exception('Deposit tidak memiliki nomor Faktur DP Accurate.');
+        }
+
+        $description = $customNotes ?: ("Pengembalian Dana (Refund DP) Pelanggan: " . ($customerUser->name ?? 'Umum'));
+        if ($deposit->originOrder) {
+            $description .= " (SO: {$deposit->originOrder->order_number})";
+        }
+
+        $receiptPayload = [
+            'customerNo' => $customerNo,
+            'bankNo' => $customBankNo,
+            'transDate' => now()->format('d/m/Y'),
+            'branchName' => $branchName,
+            'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
+            'useCredit' => false,
+            'description' => $description,
+            'detailInvoice' => [
+                [
+                    'invoiceNo' => $deposit->accurate_invoice_no,
+                    'paymentAmount' => -$refundAmount
+                ]
+            ]
+        ];
+
+        Log::info("Payload Refund Customer Deposit ({$dbSource}) Deposit #{$deposit->id}:", $receiptPayload);
+
+        $result = $this->postSalesReceipt($receiptPayload, $dbSource);
+        if (isset($result['r']['number'])) {
+            if ($deposit->origin_order_id) {
+                \App\Models\OrderAccurateDoc::create([
+                    'order_id' => $deposit->origin_order_id,
+                    'doc_type' => 'DP_REFUND',
+                    'doc_number' => $result['r']['number'],
+                    'accurate_id' => $result['r']['id'] ?? null,
+                    'amount' => -$refundAmount,
+                    'status' => 'SUCCESS',
+                ]);
+            }
+            return $result['r'];
+        } else {
+            $err = $result['d'][0] ?? json_encode($result);
+            throw new \Exception("Gagal mencatat Refund DP di Accurate: {$err}");
         }
     }
 
