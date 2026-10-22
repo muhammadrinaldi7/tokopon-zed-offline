@@ -167,7 +167,10 @@ class ExecutiveMetricsService
         $query = Order::query()
             ->whereIn('order_status', (array) $statuses)
             ->where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('order_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                $q->where(function ($dateQ) use ($startDate, $endDate) {
+                    $dateQ->whereDate('order_date', '>=', $startDate->format('Y-m-d'))
+                          ->whereDate('order_date', '<=', $endDate->format('Y-m-d'));
+                })
                     ->orWhere(function ($sub) use ($startDate, $endDate) {
                         $sub->whereNull('order_date')
                             ->whereBetween('created_at', [$startDate, $endDate]);
@@ -222,24 +225,49 @@ class ExecutiveMetricsService
                 ->toArray();
         }
 
-        // 2. Batch lookup ProductAccurate ID -> base_cost & categoryName
+        // 1b. Batch lookup SellPhone (Buyback second handphone dari customer)
+        $sellPhoneMap = [];
+        if (!empty($allSns)) {
+            $sellPhones = SellPhone::whereIn('imei', $allSns)
+                ->where('status', 'COMPLETED')
+                ->where('appraised_value', '>', 0)
+                ->get(['imei', 'business_unit_id', 'appraised_value']);
+            foreach ($sellPhones as $sp) {
+                $sellPhoneMap[$sp->imei . '_' . $sp->business_unit_id] = (float)$sp->appraised_value;
+                if (!isset($sellPhoneMap[$sp->imei])) {
+                    $sellPhoneMap[$sp->imei] = (float)$sp->appraised_value;
+                }
+            }
+        }
+
+        // 2. Batch lookup ProductAccurate ID -> base_cost, buy_price & categoryName
         $accurateBaseCostMap = [];
+        $accurateBuyPriceMap = [];
         $accurateCategoryMap = [];
         if (!empty($accurateIds)) {
             $accurateIds = array_unique($accurateIds);
-            $accurateRows = ProductAccurate::whereIn('id', $accurateIds)->get(['id', 'base_cost', 'categoryName']);
+            $accurateRows = ProductAccurate::whereIn('id', $accurateIds)->get(['id', 'base_cost', 'buy_price', 'categoryName']);
             $accurateBaseCostMap = $accurateRows->pluck('base_cost', 'id')->map(fn($v) => (float)$v)->toArray();
+            $accurateBuyPriceMap = $accurateRows->pluck('buy_price', 'id')->map(fn($v) => (float)$v)->toArray();
             $accurateCategoryMap = $accurateRows->pluck('categoryName', 'id')->toArray();
         }
 
-        // 3. Batch lookup ProductVariant ID -> base_cost (via accurateData)
+        // 3. Batch lookup ProductVariant ID -> base_cost, buy_price & category (via accurateData or product.category)
         $variantBaseCostMap = [];
+        $variantBuyPriceMap = [];
+        $variantCategoryMap = [];
         if (!empty($variantIds)) {
             $variantIds = array_unique($variantIds);
-            $variants = ProductVariant::with('accurateData')->whereIn('id', $variantIds)->get();
+            $variants = ProductVariant::with(['accurateData', 'product.category'])->whereIn('id', $variantIds)->get();
             foreach ($variants as $variant) {
-                $baseCost = $variant->accurateData?->base_cost ?? 0;
+                $baseCost = $variant->accurateData?->base_cost ?? ($variant->base_cost ?? 0);
+                $buyPrice = $variant->accurateData?->buy_price ?? ($variant->buy_price ?? 0);
+                $category = $variant->accurateData?->categoryName ?? ($variant->product?->category?->name ?? null);
                 $variantBaseCostMap[$variant->id] = (float)$baseCost;
+                $variantBuyPriceMap[$variant->id] = (float)$buyPrice;
+                if ($category) {
+                    $variantCategoryMap[$variant->id] = $category;
+                }
             }
         }
 
@@ -276,8 +304,14 @@ class ExecutiveMetricsService
 
         return [
             'snHppMap' => $snHppMap,
+            'sellPhoneMap' => $sellPhoneMap,
             'accurateBaseCostMap' => $accurateBaseCostMap,
+            'accurateBuyPriceMap' => $accurateBuyPriceMap,
+            'accurateCategoryMap' => $accurateCategoryMap,
             'variantBaseCostMap' => $variantBaseCostMap,
+            'variantBuyPriceMap' => $variantBuyPriceMap,
+            'variantCategoryMap' => $variantCategoryMap,
+            'filteredCategory' => $filters['category'] ?? null,
             'sn_hpp' => $snHppMap,
             'accurate_cost' => $accurateBaseCostMap,
             'variant_cost' => $variantBaseCostMap,
@@ -293,20 +327,28 @@ class ExecutiveMetricsService
     public function computeSingleOrderMetrics($order, array $lookups): array
     {
         $snHppMap = $lookups['snHppMap'] ?? ($lookups['sn_hpp'] ?? []);
+        $sellPhoneMap = $lookups['sellPhoneMap'] ?? [];
         $accurateBaseCostMap = $lookups['accurateBaseCostMap'] ?? ($lookups['accurate_cost'] ?? []);
+        $accurateBuyPriceMap = $lookups['accurateBuyPriceMap'] ?? [];
+        $accurateCategoryMap = $lookups['accurateCategoryMap'] ?? [];
         $variantBaseCostMap = $lookups['variantBaseCostMap'] ?? ($lookups['variant_cost'] ?? []);
+        $variantBuyPriceMap = $lookups['variantBuyPriceMap'] ?? [];
+        $variantCategoryMap = $lookups['variantCategoryMap'] ?? [];
 
         $totalHpp = 0;
         $totalQty = 0;
+        $totalItemNetSales = 0;
 
         $isOrderReturn = str_starts_with($order->order_number ?? '', 'RET-') 
             || !empty($order->shipping_address_snapshot['is_warranty_return'])
             || (str_starts_with($order->accurate_invoice_no ?? '', 'SRT'))
             || ((float)($order->total_amount ?? 0) < 0);
 
+        $orderHeaderDiscount = (float)(($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0));
+        $orderTotalAmt = (float)($order->total_amount ?? 0);
+        $orderBuId = $order->business_unit_id;
+
         $filteredCategory = $lookups['filteredCategory'] ?? null;
-        $accurateCategoryMap = $lookups['accurateCategoryMap'] ?? [];
-        $variantCategoryMap = $lookups['variantCategoryMap'] ?? [];
         $filteredItemSubtotal = 0;
 
         foreach ($order->items as $item) {
@@ -328,32 +370,61 @@ class ExecutiveMetricsService
             $itemHpp = 0;
             $isReturn = $isOrderReturn || ($qty < 0) || ((float)($item->subtotal ?? 0) < 0);
 
+            // Hitung Penjualan Bersih Item persis ManagementSalesReport
+            $itemPromosTotal = $item->promos ? (float)$item->promos->sum('pivot.discount_amount') : (float)($item->item_promos_discount ?? 0);
+            $itemOrderDiscount = ($orderTotalAmt > 0 && $orderHeaderDiscount > 0) ? round(((float)$item->subtotal / $orderTotalAmt) * $orderHeaderDiscount) : 0;
+            $actualItemSubtotal = (float)$item->subtotal - (float)($item->discount_amount ?? 0) - $itemPromosTotal - $itemOrderDiscount;
+            if ($isReturn && $actualItemSubtotal > 0) {
+                $actualItemSubtotal = -$actualItemSubtotal;
+            }
+            $totalItemNetSales += round($actualItemSubtotal);
+
             $sns = array_filter(array_map('trim', explode(',', $item->serial_number ?? '')));
 
             $baseCost = 0;
+            $buyPrice = 0;
             if ($item->product_variant_type === ProductAccurate::class) {
                 $baseCost = (float)($accurateBaseCostMap[$item->product_variant_id] ?? 0);
+                $buyPrice = (float)($accurateBuyPriceMap[$item->product_variant_id] ?? 0);
             } else {
                 $baseCost = (float)($variantBaseCostMap[$item->product_variant_id] ?? 0);
+                $buyPrice = (float)($variantBuyPriceMap[$item->product_variant_id] ?? 0);
             }
 
-            // 1. Sesuai Aturan ManagementSalesReport: Jika produk ber-SN, ambil HPP dari product_serial_numbers
-            if (!empty($sns)) {
+            // 1. Prioritas Utama: Baca langsung total_hpp yang sudah di-snapshot di order_items
+            if (isset($item->total_hpp) && (float)$item->total_hpp != 0) {
+                $itemHpp = (float)$item->total_hpp;
+            } elseif (!empty($sns)) {
+                // 2. Jika ber-SN: Cek SellPhone (buyback) -> ProductSerialNumber (hpp) -> base_cost -> buy_price
                 foreach ($sns as $sn) {
-                    $snCost = (float)($snHppMap[$sn] ?? 0);
-                    // Fallback jika HPP SN belum terisi / 0: ambil base_cost
+                    $snCost = 0;
+                    $spCost = $sellPhoneMap[$sn . '_' . $orderBuId] ?? ($orderBuId == 2 ? ($sellPhoneMap[$sn] ?? 0) : 0);
+                    if ($spCost > 0) {
+                        $snCost = (float)$spCost;
+                    } elseif (isset($snHppMap[$sn]) && (float)$snHppMap[$sn] > 0) {
+                        $snCost = (float)$snHppMap[$sn];
+                    }
+
+                    // Fallback jika HPP SN belum terisi / 0: base_cost -> buy_price
                     if ($snCost <= 0) {
-                        $snCost = $baseCost;
+                        $snCost = $baseCost > 0 ? $baseCost : $buyPrice;
                     }
                     $itemHpp += $snCost;
                 }
+                if ($isReturn) {
+                    if ($qty < 0 && $itemHpp > 0) {
+                        $itemHpp = -$itemHpp;
+                    } elseif ($qty > 0 && $itemHpp > 0) {
+                        $itemHpp = -$itemHpp;
+                    }
+                }
             } else {
-                // Sesuai Aturan ManagementSalesReport: Jika non-SN, ambil base_cost * qty
-                $itemHpp = $baseCost * $qty;
-            }
-
-            if ($isReturn) {
-                $itemHpp = -abs($itemHpp);
+                // 3. Sesuai Aturan ManagementSalesReport: Jika non-SN, ambil base_cost -> buy_price * qty
+                $unitCost = $baseCost > 0 ? $baseCost : $buyPrice;
+                $itemHpp = $unitCost * $qty;
+                if ($isReturn && $itemHpp > 0) {
+                    $itemHpp = -$itemHpp;
+                }
             }
 
             $totalHpp += round($itemHpp);
@@ -376,14 +447,19 @@ class ExecutiveMetricsService
             $discount = (float)(($order->discount_amount ?? 0) + ($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0)) * $ratio;
             $grandTotal = max(0, $grossSales - $discount);
             $totalMdr = $totalMdr * $ratio;
+            $netSales = (float)$totalItemNetSales;
         } else {
             $grossSales = (float)$order->total_amount;
             $discount = (float)(($order->discount_amount ?? 0) + ($order->coupon_discount_amount ?? 0) + ($order->loyalty_discount_amount ?? 0));
             $grandTotal = (float)$order->grand_total;
+            $netSales = ($order->items && $order->items->isNotEmpty()) ? (float)$totalItemNetSales : (float)$grandTotal;
         }
-        $netSales = $grandTotal; // Samakan dengan Omset Faktur Riil!
-        $grossProfit = $netSales - $totalHpp; // Laba Kotor = Omset Faktur - Total HPP (sebelum potongan MDR)
-        $marginPct = $netSales > 0 ? round(($grossProfit / $netSales) * 100, 2) : 0;
+
+        if ($isOrderReturn && $netSales > 0) {
+            $netSales = -$netSales;
+        }
+        $grossProfit = $netSales - $totalHpp;
+        $marginPct = $netSales != 0 ? round(($grossProfit / abs($netSales)) * 100, 2) : 0;
 
         return [
             'order_id' => $order->id,
@@ -431,6 +507,7 @@ class ExecutiveMetricsService
         $grossSales = 0;
         $totalDiscount = 0;
         $grandTotal = 0;
+        $totalNetSales = 0;
         $totalMdr = 0;
         $totalHpp = 0;
         $piutangAmount = 0;
@@ -442,6 +519,7 @@ class ExecutiveMetricsService
             $grossSales += $metrics['gross_sales'];
             $totalDiscount += $metrics['discount'];
             $grandTotal += $metrics['grand_total'];
+            $totalNetSales += $metrics['net_sales'];
             $totalMdr += $metrics['mdr'];
             $totalHpp += $metrics['hpp'];
             $totalQty += $metrics['qty'];
@@ -453,9 +531,9 @@ class ExecutiveMetricsService
             }
         }
 
-        $netSales = $grandTotal;
+        $netSales = $totalNetSales;
         $grossProfit = $netSales - $totalHpp;
-        $profitMargin = $netSales > 0 ? round(($grossProfit / $netSales) * 100, 2) : 0;
+        $profitMargin = $netSales != 0 ? round(($grossProfit / abs($netSales)) * 100, 2) : 0;
         $aov = $totalOrders > 0 ? round($netSales / $totalOrders, 2) : 0;
 
         return [
@@ -488,7 +566,7 @@ class ExecutiveMetricsService
 
         // Fetch current period orders
         $currentOrders = $this->baseOrderQuery($filters)
-            ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items'])
+            ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items.promos'])
             ->get();
 
         $currentAggregates = $this->computeAggregates($currentOrders, $filters);
@@ -512,11 +590,11 @@ class ExecutiveMetricsService
         ]);
 
         $mtdOrders = $this->baseOrderQuery($mtdFilters)
-            ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items'])
+            ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items.promos'])
             ->get();
 
         $lastMtdOrders = $this->baseOrderQuery($lastMtdFilters)
-            ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items'])
+            ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items.promos'])
             ->get();
 
         $mtdAggregates = $this->computeAggregates($mtdOrders, $mtdFilters);
@@ -572,7 +650,7 @@ class ExecutiveMetricsService
     public function getBranchComparison(array $filters): array
     {
         $orders = $this->baseOrderQuery($filters)
-            ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items'])
+            ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items.promos'])
             ->get();
 
         if ($orders->isEmpty()) {
@@ -594,6 +672,7 @@ class ExecutiveMetricsService
             $branchGross = 0;
             $branchDiscount = 0;
             $branchGrandTotal = 0;
+            $branchNetSales = 0;
             $branchMdr = 0;
             $branchHpp = 0;
             $branchPiutang = 0;
@@ -606,6 +685,7 @@ class ExecutiveMetricsService
                 $branchGross += $metrics['gross_sales'];
                 $branchDiscount += $metrics['discount'];
                 $branchGrandTotal += $metrics['grand_total'];
+                $branchNetSales += $metrics['net_sales'];
                 $branchMdr += $metrics['mdr'];
                 $branchHpp += $metrics['hpp'];
 
@@ -616,9 +696,8 @@ class ExecutiveMetricsService
                 }
             }
 
-            $branchNetSales = $branchGrandTotal;
             $branchGrossProfit = $branchNetSales - $branchHpp;
-            $marginPct = $branchNetSales > 0 ? round(($branchGrossProfit / $branchNetSales) * 100, 2) : 0;
+            $marginPct = $branchNetSales != 0 ? round(($branchGrossProfit / abs($branchNetSales)) * 100, 2) : 0;
             $aov = count($branchOrders) > 0 ? round($branchNetSales / count($branchOrders), 2) : 0;
 
             $totalCompanyNetSales += $branchNetSales;
@@ -665,7 +744,7 @@ class ExecutiveMetricsService
         );
 
         $orders = $this->baseOrderQuery($filters)
-            ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items'])
+            ->with(['payments.paymentMethod', 'payments.paymentMethodRate', 'items.promos'])
             ->get();
 
         $lookups = $this->prepareHppLookups($orders, $filters);
@@ -1155,15 +1234,35 @@ class ExecutiveMetricsService
         }
 
         $snHppMap = !empty($allSns) ? ProductSerialNumber::whereIn('serial_number', array_unique($allSns))->pluck('hpp', 'serial_number')->map(fn($v) => (float)$v)->toArray() : [];
-        $accurateBaseCostMap = !empty($accurateIds) ? ProductAccurate::whereIn('id', array_unique($accurateIds))->pluck('base_cost', 'id')->map(fn($v) => (float)$v)->toArray() : [];
-        $accurateBrandMap = !empty($accurateIds) ? ProductAccurate::whereIn('id', array_unique($accurateIds))->whereNotNull('brandName')->pluck('brandName', 'id')->toArray() : [];
+        $sellPhoneMap = [];
+        if (!empty($allSns)) {
+            $sellPhones = SellPhone::whereIn('imei', array_unique($allSns))
+                ->where('status', 'COMPLETED')
+                ->where('appraised_value', '>', 0)
+                ->get(['imei', 'business_unit_id', 'appraised_value']);
+            foreach ($sellPhones as $sp) {
+                $sellPhoneMap[$sp->imei] = (float)$sp->appraised_value;
+            }
+        }
+
+        $accurateBaseCostMap = [];
+        $accurateBuyPriceMap = [];
+        $accurateBrandMap = [];
+        if (!empty($accurateIds)) {
+            $accRows = ProductAccurate::whereIn('id', array_unique($accurateIds))->get(['id', 'base_cost', 'buy_price', 'brandName']);
+            $accurateBaseCostMap = $accRows->pluck('base_cost', 'id')->map(fn($v) => (float)$v)->toArray();
+            $accurateBuyPriceMap = $accRows->pluck('buy_price', 'id')->map(fn($v) => (float)$v)->toArray();
+            $accurateBrandMap = $accRows->whereNotNull('brandName')->pluck('brandName', 'id')->toArray();
+        }
 
         $variantBaseCostMap = [];
+        $variantBuyPriceMap = [];
         $variantBrandMap = [];
         if (!empty($variantIds)) {
             $variants = ProductVariant::with(['accurateData', 'product.brand'])->whereIn('id', array_unique($variantIds))->get();
             foreach ($variants as $variant) {
-                $variantBaseCostMap[$variant->id] = (float)($variant->accurateData?->base_cost ?? 0);
+                $variantBaseCostMap[$variant->id] = (float)($variant->accurateData?->base_cost ?? ($variant->base_cost ?? 0));
+                $variantBuyPriceMap[$variant->id] = (float)($variant->accurateData?->buy_price ?? ($variant->buy_price ?? 0));
                 $brand = $variant->accurateData?->brandName ?: ($variant->product?->brand?->name ?: null);
                 if ($brand) {
                     $variantBrandMap[$variant->id] = trim($brand);
@@ -1179,25 +1278,31 @@ class ExecutiveMetricsService
                 return $variantBrandMap[$item->product_variant_id];
             }
             return 'Lainnya / Aksesoris';
-        })->map(function ($brandItems, $brandName) use ($snHppMap, $accurateBaseCostMap, $variantBaseCostMap) {
+        })->map(function ($brandItems, $brandName) use ($snHppMap, $sellPhoneMap, $accurateBaseCostMap, $accurateBuyPriceMap, $variantBaseCostMap, $variantBuyPriceMap) {
             $totalQty = $brandItems->sum('qty');
             $grossSales = $brandItems->sum('subtotal');
 
-            // HPP computation: SN -> Accurate/Variant base_cost -> estimated price_at_checkout
-            $hpp = $brandItems->sum(function ($it) use ($snHppMap, $accurateBaseCostMap, $variantBaseCostMap) {
+            // HPP computation: total_hpp -> SN (SellPhone / ProductSerialNumber) -> base_cost -> buy_price -> estimated price_at_checkout
+            $hpp = $brandItems->sum(function ($it) use ($snHppMap, $sellPhoneMap, $accurateBaseCostMap, $accurateBuyPriceMap, $variantBaseCostMap, $variantBuyPriceMap) {
+                if (isset($it->total_hpp) && (float)$it->total_hpp != 0) {
+                    return (float)$it->total_hpp;
+                }
+
                 $cost = 0;
                 $sns = array_filter(array_map('trim', explode(',', $it->serial_number ?? '')));
                 if (!empty($sns)) {
                     foreach ($sns as $sn) {
-                        $val = $snHppMap[$sn] ?? 0;
+                        $val = $sellPhoneMap[$sn] ?? ($snHppMap[$sn] ?? 0);
                         if ($val > 0) $cost += $val;
                     }
                 }
                 if ($cost <= 0) {
                     if ($it->product_variant_type === ProductAccurate::class) {
-                        $cost = ($accurateBaseCostMap[$it->product_variant_id] ?? 0) * (int)$it->qty;
+                        $unitCost = ($accurateBaseCostMap[$it->product_variant_id] ?? 0) ?: ($accurateBuyPriceMap[$it->product_variant_id] ?? 0);
+                        $cost = $unitCost * (int)$it->qty;
                     } elseif ($it->product_variant_id) {
-                        $cost = ($variantBaseCostMap[$it->product_variant_id] ?? 0) * (int)$it->qty;
+                        $unitCost = ($variantBaseCostMap[$it->product_variant_id] ?? 0) ?: ($variantBuyPriceMap[$it->product_variant_id] ?? 0);
+                        $cost = $unitCost * (int)$it->qty;
                     }
                 }
                 if ($cost <= 0 && (float)($it->price_at_checkout ?? 0) > 0) {
@@ -1763,23 +1868,38 @@ class ExecutiveMetricsService
 
                 // Determine item HPP with fallback hierarchy
                 $itemHpp = 0;
-                if (!empty($item->serial_number)) {
+                $orderBuId = $order->business_unit_id;
+
+                if (isset($item->total_hpp) && (float)$item->total_hpp != 0) {
+                    $itemHpp = (float)$item->total_hpp;
+                } elseif (!empty($item->serial_number)) {
                     $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
                     foreach ($sns as $sn) {
-                        $snCost = $lookups['snHppMap'][$sn] ?? ($lookups['sn_hpp'][$sn] ?? 0);
+                        $spCost = $lookups['sellPhoneMap'][$sn . '_' . $orderBuId] ?? ($orderBuId == 2 ? ($lookups['sellPhoneMap'][$sn] ?? 0) : 0);
+                        if ($spCost > 0) {
+                            $snCost = (float)$spCost;
+                        } else {
+                            $snCost = $lookups['snHppMap'][$sn] ?? ($lookups['sn_hpp'][$sn] ?? 0);
+                        }
                         if ($snCost > 0) {
                             $itemHpp += $snCost;
                         }
                     }
                 }
 
-                // Fallback: jika nomor seri belum memiliki HPP (> 0), ambil dari base_cost Accurate / Varian
+                // Fallback: jika nomor seri belum memiliki HPP (> 0), ambil dari base_cost -> buy_price Accurate / Varian
                 if ($itemHpp <= 0) {
                     if ($item->product_variant_type === ProductAccurate::class) {
                         $baseCost = $lookups['accurateBaseCostMap'][$item->product_variant_id] ?? ($lookups['accurate_cost'][$item->product_variant_id] ?? 0);
+                        if ($baseCost <= 0) {
+                            $baseCost = $lookups['accurateBuyPriceMap'][$item->product_variant_id] ?? 0;
+                        }
                         $itemHpp = $baseCost * $qty;
                     } elseif ($item->product_variant_id) {
                         $baseCost = $lookups['variantBaseCostMap'][$item->product_variant_id] ?? ($lookups['variant_cost'][$item->product_variant_id] ?? 0);
+                        if ($baseCost <= 0) {
+                            $baseCost = $lookups['variantBuyPriceMap'][$item->product_variant_id] ?? 0;
+                        }
                         $itemHpp = $baseCost * $qty;
                     }
                 }
