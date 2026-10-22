@@ -114,6 +114,13 @@ Route::prefix('v1/executive')->group(function () {
             ->name('api.executive.piutang');
 
         // Financial & Accurate Real-time Accounting (AR, AP, Working Capital, Cash/Bank)
+        Route::prefix('inventory')->group(function () {
+            Route::get('/valuation', [\App\Http\Controllers\Api\Executive\ExecutiveInventoryController::class, 'valuation'])
+                ->name('api.executive.inventory.valuation');
+            Route::post('/sync', [\App\Http\Controllers\Api\Executive\ExecutiveInventoryController::class, 'sync'])
+                ->name('api.executive.inventory.sync');
+        });
+
         Route::prefix('financial')->group(function () {
             Route::get('/ar-ap-summary', [\App\Http\Controllers\Api\Executive\ExecutiveFinancialController::class, 'arApSummary'])
                 ->name('api.executive.financial.ar-ap-summary');
