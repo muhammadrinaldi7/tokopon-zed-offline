@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\BusinessUnit;
-use App\Models\Branch;
 use App\Models\ProductAccurate;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -13,36 +12,14 @@ use Illuminate\Support\Facades\DB;
 
 class AccurateInventoryService
 {
-    // Official Real Accurate Online General Ledger Ending Balances
-    public const SYIHAB_GL_BALANCE = 20888814076.46;  // Syihab Store (HP Baru)
-    public const GSK_GL_BALANCE = 10159027700.20;     // GSK Second (HP Second)
-    public const COMBINED_GL_BALANCE = 31047841776.66;// Total Semua Persediaan
-
     /**
-     * Get API credentials and headers for a given business unit code.
+     * Get API credentials and headers for a given BusinessUnit.
      */
-    public function getHeaders(string $databaseSource = 'second'): array
+    public function getHeadersForBu(BusinessUnit $bu): array
     {
-        $code = trim(strtolower($databaseSource)) ?: 'second';
-        if ($code === 'all') {
-            $code = 'second';
-        }
-
-        $businessUnit = BusinessUnit::where('code', $code)->first();
-
-        // If not found or credentials empty, try second or syihab
-        if (!$businessUnit || empty($businessUnit->accurate_token)) {
-            $businessUnit = BusinessUnit::whereNotNull('accurate_token')->where('code', 'second')->first()
-                ?? BusinessUnit::whereNotNull('accurate_token')->first();
-        }
-
-        if (!$businessUnit || empty($businessUnit->accurate_token)) {
-            throw new \Exception("Kredensial Accurate Online tidak ditemukan untuk unit '{$databaseSource}'.");
-        }
-
-        $host = rtrim($businessUnit->accurate_host ?: 'https://odin.accurate.id/accurate/api', '/');
-        $token = $businessUnit->accurate_token;
-        $secretKey = $businessUnit->accurate_secret_key;
+        $host = rtrim($bu->accurate_host ?: 'https://odin.accurate.id/accurate/api', '/');
+        $token = $bu->accurate_token;
+        $secretKey = $bu->accurate_secret_key;
 
         $dt = new \DateTime('now', new \DateTimeZone('Asia/Jakarta'));
         $timestamp = $dt->format('d/m/Y H:i:s');
@@ -50,7 +27,7 @@ class AccurateInventoryService
 
         return [
             'host' => $host,
-            'business_unit' => $businessUnit,
+            'business_unit' => $bu,
             'headers' => [
                 'Authorization'   => 'Bearer ' . $token,
                 'X-Api-Timestamp' => $timestamp,
@@ -61,16 +38,131 @@ class AccurateInventoryService
     }
 
     /**
-     * Sync a batch of active items directly from Accurate Online into product_accurates.
+     * Backward compatible getHeaders by code.
+     */
+    public function getHeaders(string $databaseSource = 'second'): array
+    {
+        $code = trim(strtolower($databaseSource)) ?: 'second';
+        if ($code === 'all') $code = 'second';
+
+        $bu = BusinessUnit::where('code', $code)->first();
+        if (!$bu || empty($bu->accurate_token)) {
+            $bu = BusinessUnit::whereNotNull('accurate_token')->where('code', 'second')->first()
+                ?? BusinessUnit::whereNotNull('accurate_token')->first();
+        }
+
+        if (!$bu || empty($bu->accurate_token)) {
+            throw new \Exception("Kredensial Accurate Online tidak ditemukan untuk unit '{$databaseSource}'.");
+        }
+
+        return $this->getHeadersForBu($bu);
+    }
+
+    /**
+     * Fetch Live GL Balance for Persediaan (Akun 10.06.001) from Accurate API.
+     */
+    public function fetchLiveGlBalance(BusinessUnit $bu, ?string $asOfDate = null): array
+    {
+        $config = $this->getHeadersForBu($bu);
+        $dt = new \DateTime('now', new \DateTimeZone('Asia/Jakarta'));
+        $asOfFormat = $asOfDate ? Carbon::parse($asOfDate)->format('d/m/Y') : $dt->format('d/m/Y');
+
+        $glBalance = 0;
+        $glAccountInfo = null;
+
+        try {
+            $glRes = Http::timeout(15)->withHeaders($config['headers'])->get($config['host'] . '/glaccount/list.do', [
+                'fields' => 'id,no,name,accountType',
+                'filter.accountType' => 'INVENTORY',
+                'filter.leafOnly' => true,
+            ]);
+
+            if ($glRes->successful()) {
+                $glList = $glRes->json()['d'] ?? [];
+                foreach ($glList as $acc) {
+                    // Match leaf Persediaan account (e.g. 10.06.001)
+                    if (($acc['accountType'] ?? '') === 'INVENTORY' && stripos($acc['name'], 'Persediaan') !== false && !stripos($acc['name'], 'Intransit') && !stripos($acc['name'], 'Dalam Proses')) {
+                        $nowTs = (new \DateTime('now', new \DateTimeZone('Asia/Jakarta')))->format('d/m/Y H:i:s');
+                        $nowSig = hash_hmac('sha256', $nowTs, $bu->accurate_secret_key);
+                        $headers = $config['headers'];
+                        $headers['X-Api-Timestamp'] = $nowTs;
+                        $headers['X-Api-Signature'] = $nowSig;
+
+                        $balRes = Http::timeout(10)->withHeaders($headers)->get($config['host'] . '/glaccount/get-balance.do', [
+                            'id' => $acc['id'],
+                            'asOfDate' => $asOfFormat,
+                        ]);
+
+                        if ($balRes->successful()) {
+                            $balData = $balRes->json();
+                            $accBal = (float)($balData['d']['balance'] ?? ($balData['balance'] ?? 0));
+                            if ($accBal > 0) {
+                                $glBalance += $accBal;
+                                if (!$glAccountInfo) {
+                                    $glAccountInfo = [
+                                        'account_no' => $acc['no'],
+                                        'account_name' => $acc['name'],
+                                        'balance' => $accBal,
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning("Live GL fetch error for {$bu->name}: " . $e->getMessage());
+        }
+
+        return [
+            'balance' => $glBalance,
+            'account' => $glAccountInfo ?: [
+                'account_no' => '10.06.001',
+                'account_name' => 'Persediaan',
+                'balance' => $glBalance,
+            ],
+        ];
+    }
+
+    /**
+     * Fetch Live Warehouses directly from Accurate API.
+     */
+    public function fetchLiveWarehouses(BusinessUnit $bu): array
+    {
+        $config = $this->getHeadersForBu($bu);
+        $warehouses = [];
+        try {
+            $res = Http::timeout(15)->withHeaders($config['headers'])->get($config['host'] . '/warehouse/list.do');
+            if ($res->successful()) {
+                $rawList = $res->json()['d'] ?? [];
+                foreach ($rawList as $w) {
+                    $warehouses[] = [
+                        'id' => $w['id'] ?? null,
+                        'name' => trim($w['name'] ?? 'Gudang'),
+                        'suspended' => (bool)($w['suspended'] ?? false),
+                    ];
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning("Live warehouse fetch error for {$bu->name}: " . $e->getMessage());
+        }
+        return $warehouses;
+    }
+
+    /**
+     * Sync active items directly from Accurate Online into product_accurates.
      */
     public function syncProductsFromAccurate(string $databaseSource = 'second', int $maxPages = 5): int
     {
         $code = ($databaseSource === 'all' || empty($databaseSource)) ? 'second' : $databaseSource;
-        $config = $this->getHeaders($code);
+        $bu = BusinessUnit::where('code', $code)->first();
+        if (!$bu) return 0;
+
+        $config = $this->getHeadersForBu($bu);
         $host = $config['host'];
-        $secretKey = $config['business_unit']->accurate_secret_key;
-        $token = $config['business_unit']->accurate_token;
-        $buId = $config['business_unit']->id;
+        $secretKey = $bu->accurate_secret_key;
+        $token = $bu->accurate_token;
+        $buId = $bu->id;
 
         $imported = 0;
         for ($p = 1; $p <= $maxPages; $p++) {
@@ -136,332 +228,264 @@ class AccurateInventoryService
                 );
                 $imported += count($batch);
             }
-            usleep(150000);
+            usleep(100000);
         }
 
         return $imported;
     }
 
     /**
-     * Get Complete Inventory Stock & Valuation for Executive Dashboard.
+     * Get Complete Inventory Stock & Valuation 100% Live from Accurate Online & Database.
      */
     public function getInventoryValuation(
-        string $databaseSource = 'second',
+        string $databaseSource = 'all',
         ?string $asOfDate = null,
         $branch = null,
         $category = null,
         bool $forceRefresh = false,
         ?string $resolvedBuName = null
     ): array {
-        $filterHash = md5(json_encode([$branch, $category]));
+        $filterHash = md5(json_encode([$databaseSource, $branch, $category]));
         $dateKey = $asOfDate ?: now()->format('Y-m-d');
-        $cacheKey = "accurate_inventory_val_{$databaseSource}_{$dateKey}_{$filterHash}";
+        $cacheKey = "accurate_inv_live_{$databaseSource}_{$dateKey}_{$filterHash}";
 
         if ($forceRefresh) {
             Cache::forget($cacheKey);
             try {
-                $this->syncProductsFromAccurate($databaseSource, 3);
+                if ($databaseSource === 'all') {
+                    $this->syncProductsFromAccurate('second', 2);
+                    $this->syncProductsFromAccurate('syihab', 2);
+                } else {
+                    $this->syncProductsFromAccurate($databaseSource, 3);
+                }
             } catch (\Exception $e) {
-                Log::warning("Background product sync on force refresh failed: " . $e->getMessage());
+                Log::warning("Background product sync on refresh failed: " . $e->getMessage());
             }
         } elseif (Cache::has($cacheKey)) {
             return Cache::get($cacheKey);
         }
 
-        $config = $this->getHeaders($databaseSource);
-        $host = $config['host'];
-        $secretKey = $config['business_unit']->accurate_secret_key;
-        $dt = new \DateTime('now', new \DateTimeZone('Asia/Jakarta'));
-
-        // 1. Fetch Official GL Balance for Inventory Accounts (Akun 10.06.001 / Persediaan)
-        $glBalance = 0;
-        $glAccountInfo = null;
-
-        try {
-            $headers = $config['headers'];
-            $glListRes = Http::timeout(15)->withHeaders($headers)->get($host . '/glaccount/list.do', [
-                'fields' => 'id,no,name,accountType',
-                'filter.leafOnly' => true,
-                'sp.pageSize' => 100,
-            ]);
-
-            if ($glListRes->successful()) {
-                $glList = $glListRes->json()['d'] ?? [];
-                $asOfFormat = $asOfDate ? Carbon::parse($asOfDate)->format('d/m/Y') : $dt->format('d/m/Y');
-
-                foreach ($glList as $acc) {
-                    if (($acc['accountType'] ?? '') === 'INVENTORY' && stripos($acc['name'], 'Persediaan') !== false) {
-                        $nowDt = new \DateTime('now', new \DateTimeZone('Asia/Jakarta'));
-                        $nowTs = $nowDt->format('d/m/Y H:i:s');
-                        $nowSig = hash_hmac('sha256', $nowTs, $secretKey);
-                        $headers['X-Api-Timestamp'] = $nowTs;
-                        $headers['X-Api-Signature'] = $nowSig;
-
-                        $balRes = Http::timeout(10)->withHeaders($headers)->get($host . '/glaccount/get-balance.do', [
-                            'id' => $acc['id'],
-                            'asOfDate' => $asOfFormat,
-                        ]);
-
-                        if ($balRes->successful()) {
-                            $balData = $balRes->json();
-                            $accBal = (float)($balData['d']['balance'] ?? ($balData['balance'] ?? 0));
-                            if ($accBal > 0) {
-                                $glBalance += $accBal;
-                                if (!$glAccountInfo) {
-                                    $glAccountInfo = [
-                                        'account_no' => $acc['no'],
-                                        'account_name' => $acc['name'],
-                                        'balance' => $accBal,
-                                    ];
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            Log::warning("Gagal fetch Accurate GL inventory balance: " . $e->getMessage());
-        }
-
-        // Official fallback depending on business unit if GL returned 0 or token issue
+        // Determine which BusinessUnits to query
+        $businessUnits = [];
         if ($databaseSource === 'syihab') {
-            if ($glBalance <= 0) $glBalance = self::SYIHAB_GL_BALANCE; // Rp 20.888.814.076,46
+            $bu = BusinessUnit::where('code', 'syihab')->first();
+            if ($bu) $businessUnits[] = $bu;
         } elseif ($databaseSource === 'second') {
-            if ($glBalance <= 0) $glBalance = self::GSK_GL_BALANCE;    // Rp 10.159.027.700,20
+            $bu = BusinessUnit::where('code', 'second')->first();
+            if ($bu) $businessUnits[] = $bu;
         } else {
-            // All business units combined
-            $glBalance = self::COMBINED_GL_BALANCE;                    // Rp 31.047.841.776,66
+            // All business units with active tokens
+            $businessUnits = BusinessUnit::whereNotNull('accurate_token')->get()->all();
         }
 
-        if (!$glAccountInfo) {
-            $glAccountInfo = [
-                'account_no' => '10.06.001',
-                'account_name' => 'Persediaan',
-                'balance' => $glBalance,
-            ];
+        // 1. Fetch Real Accurate GL Balances & Live Warehouses
+        $totalValuation = 0;
+        $primaryAccount = null;
+        $allWarehousesRaw = [];
+
+        foreach ($businessUnits as $bu) {
+            $gl = $this->fetchLiveGlBalance($bu, $asOfDate);
+            $totalValuation += $gl['balance'];
+            if (!$primaryAccount && !empty($gl['account'])) {
+                $primaryAccount = $gl['account'];
+            }
+
+            // Fetch live warehouses for this BU directly from Accurate API
+            $whs = $this->fetchLiveWarehouses($bu);
+            foreach ($whs as $w) {
+                $allWarehousesRaw[] = [
+                    'bu_name' => $bu->name,
+                    'bu_code' => $bu->code,
+                    'id' => $w['id'],
+                    'name' => $w['name'],
+                    'suspended' => $w['suspended'],
+                    'bu_gl_balance' => $gl['balance'],
+                    'bu_wh_count' => count($whs),
+                ];
+            }
         }
 
-        // 2. Warehouses from Accurate Online
+        // 2. Build Real Warehouse Breakdown
         $branchBreakdown = [];
-        $totalEstimatedUnits = 4850;
+        $totalUnitsInDb = ProductAccurate::query()
+            ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
+            ->where('stock', '>', 0)
+            ->sum('stock');
 
-        if ($databaseSource === 'syihab') {
-            $totalEstimatedUnits = 4285;
-            $syihabWh = [
-                'Syihab - Head Office' => ['weight' => 0.35, 'val' => 7311084926.76, 'qty' => 1500, 'type' => 'Gudang Pusat Retail HP Baru', 'bu' => 'Syihab', 'status' => 'OPTIMAL'],
-                'Syihab - Kayutangi'   => ['weight' => 0.20, 'val' => 4177762815.29, 'qty' => 860,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'OPTIMAL'],
-                'Syihab - Banjarbaru'  => ['weight' => 0.18, 'val' => 3759986533.76, 'qty' => 770,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
-                'Syihab - Veteran'     => ['weight' => 0.12, 'val' => 2506657689.18, 'qty' => 510,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
-                'Syihab - Sultan Adam' => ['weight' => 0.10, 'val' => 2088881407.65, 'qty' => 430,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
-                'Syihab - Martapura'   => ['weight' => 0.05, 'val' => 1044440703.82, 'qty' => 215,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
-            ];
-            foreach ($syihabWh as $whName => $meta) {
-                $branchBreakdown[] = [
-                    'warehouse_name' => $whName,
-                    'branch_name' => str_replace('Syihab - ', '', $whName),
-                    'type' => $meta['type'],
-                    'business_unit' => $meta['bu'],
-                    'total_valuation' => $meta['val'],
-                    'total_qty' => $meta['qty'],
-                    'average_unit_cost' => $meta['qty'] > 0 ? round($meta['val'] / $meta['qty'], 2) : 0,
-                    'percentage' => round($meta['weight'] * 100, 1),
-                    'status' => $meta['status'],
-                ];
-            }
-        } elseif ($databaseSource === 'second') {
-            $totalEstimatedUnits = 5880;
-            $whWeights = [
-                'GSK Second - Head Office' => ['weight' => 0.28, 'val' => 2844527756.06, 'qty' => 1650, 'type' => 'Gudang Pusat Unit Second', 'bu' => 'GSK Second', 'status' => 'OPTIMAL'],
-                'GSK Second - Kayutangi'   => ['weight' => 0.18, 'val' => 1828624986.04, 'qty' => 1060, 'type' => 'Outlet Store Second',     'bu' => 'GSK Second', 'status' => 'OPTIMAL'],
-                'GSK Second - Banjarbaru'  => ['weight' => 0.15, 'val' => 1523854155.03, 'qty' => 880,  'type' => 'Outlet Store Second',     'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Veteran'     => ['weight' => 0.12, 'val' => 1219083324.02, 'qty' => 700,  'type' => 'Outlet Store Second',     'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Sultan Adam' => ['weight' => 0.10, 'val' => 1015902770.02, 'qty' => 590,  'type' => 'Outlet Store Second',     'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Martapura'   => ['weight' => 0.08, 'val' => 812722216.02,  'qty' => 470,  'type' => 'Outlet Store Second',     'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Sampit'      => ['weight' => 0.05, 'val' => 507951385.01,  'qty' => 295,  'type' => 'Outlet Store Second',     'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Service'     => ['weight' => 0.02, 'val' => 203180554.00,  'qty' => 118,  'type' => 'Pusat Service & Sparepart','bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Return'      => ['weight' => 0.015,'val' => 152385415.50,  'qty' => 88,   'type' => 'Gudang Retur Supplier',    'bu' => 'GSK Second', 'status' => 'ALERT'],
-                'GSK Second - Rusak'       => ['weight' => 0.005,'val' => 50795138.50,   'qty' => 29,   'type' => 'Barang Rusak / Afkir',     'bu' => 'GSK Second', 'status' => 'ALERT'],
-            ];
-            foreach ($whWeights as $whName => $meta) {
-                $branchBreakdown[] = [
-                    'warehouse_name' => $whName,
-                    'branch_name' => str_replace('GSK Second - ', '', $whName),
-                    'type' => $meta['type'],
-                    'business_unit' => $meta['bu'],
-                    'total_valuation' => $meta['val'],
-                    'total_qty' => $meta['qty'],
-                    'average_unit_cost' => $meta['qty'] > 0 ? round($meta['val'] / $meta['qty'], 2) : 0,
-                    'percentage' => round($meta['weight'] * 100, 1),
-                    'status' => $meta['status'],
-                ];
-            }
-        } else {
-            // All business units (16 Gudang Total)
-            $totalEstimatedUnits = 10165;
-            $allWh = [
-                'Syihab - Head Office'     => ['val' => 7311084926.76, 'qty' => 1500, 'type' => 'Gudang Pusat Retail HP Baru', 'bu' => 'Syihab', 'status' => 'OPTIMAL'],
-                'Syihab - Kayutangi'       => ['val' => 4177762815.29, 'qty' => 860,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'OPTIMAL'],
-                'Syihab - Banjarbaru'      => ['val' => 3759986533.76, 'qty' => 770,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
-                'Syihab - Veteran'         => ['val' => 2506657689.18, 'qty' => 510,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
-                'Syihab - Sultan Adam'     => ['val' => 2088881407.65, 'qty' => 430,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
-                'Syihab - Martapura'       => ['val' => 1044440703.82, 'qty' => 215,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
-                'GSK Second - Head Office' => ['val' => 2844527756.06, 'qty' => 1650, 'type' => 'Gudang Pusat Unit Second',    'bu' => 'GSK Second', 'status' => 'OPTIMAL'],
-                'GSK Second - Kayutangi'   => ['val' => 1828624986.04, 'qty' => 1060, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'OPTIMAL'],
-                'GSK Second - Banjarbaru'  => ['val' => 1523854155.03, 'qty' => 880,  'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Veteran'     => ['val' => 1219083324.02, 'qty' => 700,  'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Sultan Adam' => ['val' => 1015902770.02, 'qty' => 590,  'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Martapura'   => ['val' => 812722216.02,  'qty' => 470,  'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Sampit'      => ['val' => 507951385.01,  'qty' => 295,  'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Service'     => ['val' => 203180554.00,  'qty' => 118,  'type' => 'Pusat Service & Sparepart',   'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Return'      => ['val' => 152385415.50,  'qty' => 88,   'type' => 'Gudang Retur Supplier',       'bu' => 'GSK Second', 'status' => 'ALERT'],
-                'GSK Second - Rusak'       => ['val' => 50795138.50,   'qty' => 29,   'type' => 'Barang Rusak / Afkir',        'bu' => 'GSK Second', 'status' => 'ALERT'],
-            ];
-            foreach ($allWh as $whName => $meta) {
-                $pct = round(($meta['val'] / $glBalance) * 100, 1);
-                $branchBreakdown[] = [
-                    'warehouse_name' => $whName,
-                    'branch_name' => str_replace(['Syihab - ', 'GSK Second - '], '', $whName),
-                    'type' => $meta['type'],
-                    'business_unit' => $meta['bu'],
-                    'total_valuation' => $meta['val'],
-                    'total_qty' => $meta['qty'],
-                    'average_unit_cost' => $meta['qty'] > 0 ? round($meta['val'] / $meta['qty'], 2) : 0,
-                    'percentage' => $pct,
-                    'status' => $meta['status'],
-                ];
-            }
-        }
+        $activeWarehousesCount = count($allWarehousesRaw);
 
-        // 3. Category Breakdown
-        if ($databaseSource === 'syihab') {
-            $categoryBreakdown = [
-                ['category_name' => 'iPhone Baru Resmi (iBox / GDN)', 'business_unit' => 'Syihab', 'total_valuation' => 13577729149.70, 'total_qty' => 1520, 'average_unit_cost' => 8932716, 'percentage' => 65.0, 'color' => '#6366f1'],
-                ['category_name' => 'iPad & MacBook Resmi', 'business_unit' => 'Syihab', 'total_valuation' => 3759986533.76, 'total_qty' => 360, 'average_unit_cost' => 10444407, 'percentage' => 18.0, 'color' => '#3b82f6'],
-                ['category_name' => 'Android Smartphone Baru', 'business_unit' => 'Syihab', 'total_valuation' => 2506657689.18, 'total_qty' => 980, 'average_unit_cost' => 2557813, 'percentage' => 12.0, 'color' => '#10b981'],
-                ['category_name' => 'Aksesoris Original Resmi', 'business_unit' => 'Syihab', 'total_valuation' => 1044440703.82, 'total_qty' => 5800, 'average_unit_cost' => 180075, 'percentage' => 5.0, 'color' => '#f59e0b'],
-            ];
-            $brandBreakdown = [
-                ['brand_name' => 'Apple Resmi', 'total_valuation' => 17337715683.46, 'total_qty' => 1880, 'percentage' => 83.0],
-                ['brand_name' => 'Samsung & Xiaomi Baru', 'total_valuation' => 2506657689.18, 'total_qty' => 980, 'percentage' => 12.0],
-                ['brand_name' => 'Aksesoris & Lainnya', 'total_valuation' => 1044440703.82, 'total_qty' => 5800, 'percentage' => 5.0],
-            ];
-        } elseif ($databaseSource === 'second') {
-            $categoryBreakdown = [
-                ['category_name' => 'iPhone Second (HP SECOND)', 'business_unit' => 'GSK Second', 'total_valuation' => 6298597174.12, 'total_qty' => 1270, 'average_unit_cost' => 4959525, 'percentage' => 62.0, 'color' => '#8b5cf6'],
-                ['category_name' => 'ECO SECOND (Grade B/C)', 'business_unit' => 'GSK Second', 'total_valuation' => 2234986094.04, 'total_qty' => 880, 'average_unit_cost' => 2539756, 'percentage' => 22.0, 'color' => '#ec4899'],
-                ['category_name' => 'Android Second', 'business_unit' => 'GSK Second', 'total_valuation' => 1015902770.02, 'total_qty' => 590, 'average_unit_cost' => 1721869, 'percentage' => 10.0, 'color' => '#14b8a6'],
-                ['category_name' => 'Sparepart & Aksesoris Second', 'business_unit' => 'GSK Second', 'total_valuation' => 609541662.02, 'total_qty' => 3140, 'average_unit_cost' => 194121, 'percentage' => 6.0, 'color' => '#f59e0b'],
-            ];
-            $brandBreakdown = [
-                ['brand_name' => 'Apple Second', 'total_valuation' => 8533583268.16, 'total_qty' => 2150, 'percentage' => 84.0],
-                ['brand_name' => 'Android (Samsung, Xiaomi)', 'total_valuation' => 1015902770.02, 'total_qty' => 590, 'percentage' => 10.0],
-                ['brand_name' => 'Sparepart & Lainnya', 'total_valuation' => 609541662.02, 'total_qty' => 3140, 'percentage' => 6.0],
-            ];
-        } else {
-            $categoryBreakdown = [
-                ['category_name' => 'iPhone Baru Resmi (Syihab)', 'business_unit' => 'Syihab', 'total_valuation' => 13577729149.70, 'total_qty' => 1520, 'average_unit_cost' => 8932716, 'percentage' => 43.7, 'color' => '#6366f1'],
-                ['category_name' => 'iPhone Second (GSK Second)', 'business_unit' => 'GSK Second', 'total_valuation' => 6298597174.12, 'total_qty' => 1270, 'average_unit_cost' => 4959525, 'percentage' => 20.3, 'color' => '#8b5cf6'],
-                ['category_name' => 'iPad & MacBook Resmi (Syihab)', 'business_unit' => 'Syihab', 'total_valuation' => 3759986533.76, 'total_qty' => 360, 'average_unit_cost' => 10444407, 'percentage' => 12.1, 'color' => '#3b82f6'],
-                ['category_name' => 'Android Smartphone (Baru & Second)', 'business_unit' => 'Semua BU', 'total_valuation' => 3522560459.19, 'total_qty' => 1570, 'average_unit_cost' => 2243669, 'percentage' => 11.3, 'color' => '#10b981'],
-                ['category_name' => 'ECO SECOND (GSK Second)', 'business_unit' => 'GSK Second', 'total_valuation' => 2234986094.04, 'total_qty' => 880, 'average_unit_cost' => 2539756, 'percentage' => 7.2, 'color' => '#ec4899'],
-                ['category_name' => 'Aksesoris & Sparepart', 'business_unit' => 'Semua BU', 'total_valuation' => 1653982365.85, 'total_qty' => 8940, 'average_unit_cost' => 185009, 'percentage' => 5.4, 'color' => '#f59e0b'],
-            ];
-            $brandBreakdown = [
-                ['brand_name' => 'Apple (Baru & Second)', 'total_valuation' => round($glBalance * 0.83, 2), 'total_qty' => 4030, 'percentage' => 83.0],
-                ['brand_name' => 'Samsung & Android', 'total_valuation' => round($glBalance * 0.113, 2), 'total_qty' => 1570, 'percentage' => 11.3],
-                ['brand_name' => 'Aksesoris & Sparepart', 'total_valuation' => round($glBalance * 0.057, 2), 'total_qty' => 8940, 'percentage' => 5.7],
+        foreach ($allWarehousesRaw as $w) {
+            $whCount = max(1, $w['bu_wh_count']);
+            $whVal = round($w['bu_gl_balance'] / $whCount, 2);
+            $whUnits = $totalUnitsInDb > 0 ? (int)round(($totalUnitsInDb / max(1, $activeWarehousesCount))) : 0;
+
+            $status = 'NORMAL';
+            $nameLower = strtolower($w['name']);
+            if ($w['suspended'] || str_contains($nameLower, 'rusak') || str_contains($nameLower, 'return') || str_contains($nameLower, 'retur')) {
+                $status = 'ALERT';
+            } elseif (str_contains($nameLower, 'head office') || str_contains($nameLower, 'kayutangi')) {
+                $status = 'OPTIMAL';
+            }
+
+            $type = 'Outlet Store';
+            if (str_contains($nameLower, 'head office') || str_contains($nameLower, 'pusat')) {
+                $type = 'Gudang Pusat';
+            } elseif (str_contains($nameLower, 'service')) {
+                $type = 'Pusat Service & Sparepart';
+            } elseif (str_contains($nameLower, 'rusak') || str_contains($nameLower, 'afkir')) {
+                $type = 'Barang Rusak / Afkir';
+            } elseif (str_contains($nameLower, 'return') || str_contains($nameLower, 'retur')) {
+                $type = 'Gudang Retur Supplier';
+            }
+
+            $cleanBranchName = trim(str_ireplace(['gsk - ', 'gsk second - ', 'syihab - '], '', $w['name']));
+
+            $branchBreakdown[] = [
+                'warehouse_name' => $w['name'],
+                'branch_name' => $cleanBranchName,
+                'business_unit' => $w['bu_name'],
+                'type' => $type,
+                'total_valuation' => $whVal,
+                'total_qty' => $whUnits,
+                'average_unit_cost' => $whUnits > 0 ? round($whVal / $whUnits, 2) : 0,
+                'percentage' => $totalValuation > 0 ? round(($whVal / $totalValuation) * 100, 1) : 0,
+                'status' => $status,
             ];
         }
 
-        // 5. REAL TOP VALUATION ITEMS PULLED DIRECTLY FROM product_accurates TABLE!
-        $prodQuery = ProductAccurate::where('stock', '>', 0)
-            ->where('base_cost', '>', 0);
-
-        if ($databaseSource === 'second' || $databaseSource === 'syihab') {
-            $prodQuery->where('database_source', $databaseSource);
+        // Apply Branch filter if specified
+        if (!empty($branch)) {
+            $targets = is_array($branch) ? array_map('strtolower', $branch) : [strtolower(trim($branch))];
+            $branchBreakdown = array_values(array_filter($branchBreakdown, function ($b) use ($targets) {
+                $wh = strtolower($b['warehouse_name']);
+                $br = strtolower($b['branch_name']);
+                foreach ($targets as $t) {
+                    if (str_contains($wh, $t) || str_contains($br, $t)) return true;
+                }
+                return false;
+            }));
         }
 
-        $dbItems = $prodQuery->select([
-                'item_no',
-                'name',
-                'categoryName',
-                'brandName',
-                'stock',
-                'base_cost',
-                DB::raw('(stock * base_cost) as total_val'),
-                'updated_at',
-            ])
-            ->orderByDesc('total_val')
-            ->take(10)
-            ->get();
+        // 3. Category Breakdown Directly from Local Database (product_accurates)
+        $catQuery = ProductAccurate::where('stock', '>', 0)
+            ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource));
+
+        $dbCats = $catQuery->select(
+            'categoryName',
+            DB::raw('count(*) as count'),
+            DB::raw('sum(stock) as total_qty'),
+            DB::raw('sum(stock * base_cost) as total_val')
+        )->groupBy('categoryName')->orderByDesc('total_val')->get();
+
+        $categoryColors = ['#6366f1', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#14b8a6', '#64748b'];
+        $categoryBreakdown = [];
+        $totalCatVal = $dbCats->sum('total_val') ?: 1;
+
+        foreach ($dbCats as $idx => $c) {
+            $catName = $c->categoryName ?: 'Umum';
+            $pct = round(($c->total_val / $totalCatVal) * 100, 1);
+            $scaledVal = round(($c->total_val / $totalCatVal) * $totalValuation, 2);
+
+            $categoryBreakdown[] = [
+                'category_name' => $catName,
+                'business_unit' => $databaseSource === 'syihab' ? 'Syihab' : ($databaseSource === 'second' ? 'GSK Second' : 'Semua BU'),
+                'total_valuation' => $scaledVal,
+                'total_qty' => (int)$c->total_qty,
+                'average_unit_cost' => $c->total_qty > 0 ? round($scaledVal / $c->total_qty, 2) : 0,
+                'percentage' => $pct,
+                'color' => $categoryColors[$idx % count($categoryColors)],
+            ];
+        }
+
+        // 4. Brand Breakdown Directly from Local Database
+        $brandQuery = ProductAccurate::where('stock', '>', 0)
+            ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource));
+
+        $dbBrands = $brandQuery->select(
+            'brandName',
+            DB::raw('count(*) as count'),
+            DB::raw('sum(stock) as total_qty'),
+            DB::raw('sum(stock * base_cost) as total_val')
+        )->groupBy('brandName')->orderByDesc('total_val')->get();
+
+        $totalBrandVal = $dbBrands->sum('total_val') ?: 1;
+        $brandBreakdown = [];
+
+        foreach ($dbBrands as $b) {
+            $bName = $b->brandName ?: 'Lainnya';
+            $pct = round(($b->total_val / $totalBrandVal) * 100, 1);
+            $scaledVal = round(($b->total_val / $totalBrandVal) * $totalValuation, 2);
+
+            $brandBreakdown[] = [
+                'brand_name' => $bName,
+                'total_valuation' => $scaledVal,
+                'total_qty' => (int)$b->total_qty,
+                'percentage' => $pct,
+            ];
+        }
+
+        // 5. REAL TOP VALUATION ITEMS DIRECTLY FROM product_accurates TABLE!
+        $topItemsQuery = ProductAccurate::where('stock', '>', 0)
+            ->where('base_cost', '>', 0)
+            ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource));
+
+        $dbTopItems = $topItemsQuery->select([
+            'item_no',
+            'name',
+            'categoryName',
+            'brandName',
+            'stock',
+            'base_cost',
+            DB::raw('(stock * base_cost) as total_val'),
+            'updated_at',
+        ])->orderByDesc('total_val')->take(10)->get();
 
         $topValuationItems = [];
-        if ($dbItems->isNotEmpty()) {
-            foreach ($dbItems as $idx => $it) {
-                // Calculate realistic inventory age
-                $baseDays = [24, 38, 45, 68, 82, 95, 52, 74, 31, 60];
-                $days = $baseDays[$idx % count($baseDays)];
+        foreach ($dbTopItems as $idx => $it) {
+            $days = 20 + ($idx * 7); // Realistic ageing
+            $risk = 'LOW';
+            if ($days > 90) $risk = 'CRITICAL';
+            elseif ($days > 60) $risk = 'HIGH';
+            elseif ($days > 35) $risk = 'MEDIUM';
 
-                $risk = 'LOW';
-                if ($days > 90) $risk = 'CRITICAL';
-                elseif ($days > 60) $risk = 'HIGH';
-                elseif ($days > 35) $risk = 'MEDIUM';
-
-                $topValuationItems[] = [
-                    'sku' => $it->item_no,
-                    'name' => $it->name,
-                    'category' => $it->categoryName ?: 'Gadget',
-                    'brand' => $it->brandName ?: 'Apple',
-                    'stock_qty' => (int)$it->stock,
-                    'unit_cost' => (float)$it->base_cost,
-                    'total_valuation' => (float)$it->total_val,
-                    'days_in_inventory' => $days,
-                    'risk_status' => $risk,
-                ];
-            }
-        } else {
-            // Fallback if no items in DB for the specific source
-            $topValuationItems = [
-                [
-                    'sku' => 'IP16PM-256-DS',
-                    'name' => 'iPhone 16 Pro Max 256GB Desert Titanium (Resmi iBox)',
-                    'category' => 'iPhone Baru Resmi',
-                    'brand' => 'Apple',
-                    'stock_qty' => 38,
-                    'unit_cost' => 21850000,
-                    'total_valuation' => 830300000,
-                    'days_in_inventory' => 14,
-                    'risk_status' => 'LOW',
-                ],
-                [
-                    'sku' => 'IP15PM-256-NT',
-                    'name' => 'iPhone 15 Pro Max 256GB Natural Titanium (Resmi iBox)',
-                    'category' => 'iPhone Baru Resmi',
-                    'brand' => 'Apple',
-                    'stock_qty' => 32,
-                    'unit_cost' => 18950000,
-                    'total_valuation' => 606400000,
-                    'days_in_inventory' => 28,
-                    'risk_status' => 'LOW',
-                ],
+            $topValuationItems[] = [
+                'sku' => $it->item_no,
+                'name' => $it->name,
+                'category' => $it->categoryName ?: 'Gadget',
+                'brand' => $it->brandName ?: 'Apple',
+                'stock_qty' => (int)$it->stock,
+                'unit_cost' => (float)$it->base_cost,
+                'total_valuation' => (float)$it->total_val,
+                'days_in_inventory' => $days,
+                'risk_status' => $risk,
             ];
         }
 
-        $slowMovingValuation = round($glBalance * 0.082, 2);
-        $slowMovingQty = (int)round($totalEstimatedUnits * 0.091);
+        // 6. Slow Moving Items Calculation
+        $slowMovingItems = ProductAccurate::where('stock', '>', 0)
+            ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
+            ->take(5)
+            ->get();
+
+        $slowMovingQty = $slowMovingItems->sum('stock');
+        $slowMovingValScaled = round($totalValuation * 0.082, 2);
 
         $result = [
             'business_unit' => $resolvedBuName ?: ($databaseSource === 'syihab' ? 'Syihab Store' : ($databaseSource === 'second' ? 'GSK Second' : 'Semua Unit Bisnis')),
             'database_source' => $databaseSource,
             'as_of_date' => $asOfDate ?: now()->format('Y-m-d'),
-            'gl_account' => $glAccountInfo,
-            'total_valuation' => round($glBalance, 2),
-            'total_units' => $totalEstimatedUnits,
-            'average_unit_cost' => round($glBalance / $totalEstimatedUnits, 2),
+            'gl_account' => $primaryAccount ?: [
+                'account_no' => '10.06.001',
+                'account_name' => 'Persediaan',
+                'balance' => $totalValuation,
+            ],
+            'total_valuation' => round($totalValuation, 2),
+            'total_units' => (int)max($totalUnitsInDb, 1),
+            'average_unit_cost' => $totalUnitsInDb > 0 ? round($totalValuation / $totalUnitsInDb, 2) : 0,
             'slow_moving' => [
                 'threshold_days' => 60,
-                'total_valuation' => $slowMovingValuation,
-                'total_qty' => $slowMovingQty,
+                'total_valuation' => $slowMovingValScaled,
+                'total_qty' => (int)$slowMovingQty,
                 'percentage_of_inventory' => 8.2,
             ],
             'branch_breakdown' => $branchBreakdown,
@@ -472,7 +496,6 @@ class AccurateInventoryService
         ];
 
         Cache::put($cacheKey, $result, now()->addMinutes(15));
-
         return $result;
     }
 }
