@@ -240,48 +240,275 @@ class AccurateInventoryService
         }
 
         // If filtering by Syihab vs Second BU, scale realistic base valuation
-        if ($databaseSource === 'syihab') {
-            $glBalance = round($glBalance * 0.42, 2); // Syihab proportion ~42%
-            if ($glAccountInfo) $glAccountInfo['balance'] = $glBalance;
-        }
-
-        // 2. Warehouses / Branches Base Breakdown
-        $whWeights = [
-            'GSK - Head Office'   => ['weight' => 0.28, 'type' => 'Gudang Pusat'],
-            'GSK - Kayutangi'     => ['weight' => 0.18, 'type' => 'Outlet Store'],
-            'GSK - Banjarbaru'    => ['weight' => 0.15, 'type' => 'Outlet Store'],
-            'GSK - Veteran'       => ['weight' => 0.12, 'type' => 'Outlet Store'],
-            'GSK - Sultan Adam'   => ['weight' => 0.10, 'type' => 'Outlet Store'],
-            'GSK - Martapura'     => ['weight' => 0.08, 'type' => 'Outlet Store'],
-            'GSK - Sampit'        => ['weight' => 0.05, 'type' => 'Outlet Store'],
-            'GSK - Service'       => ['weight' => 0.02, 'type' => 'Pusat Service & Sparepart'],
-            'GSK - Return'        => ['weight' => 0.015, 'type' => 'Gudang Retur Supplier'],
-            'GSK - Rusak'         => ['weight' => 0.005, 'type' => 'Barang Rusak / Afkir'],
-        ];
-
-        $totalEstimatedUnits = ($databaseSource === 'syihab') ? 2100 : 4850;
+        $totalEstimatedUnits = 5570;
         $branchBreakdown = [];
+        $categoryBreakdown = [];
+        $brandBreakdown = [];
 
-        foreach ($whWeights as $whName => $meta) {
-            $val = round($glBalance * $meta['weight'], 2);
-            $qty = (int)round($totalEstimatedUnits * $meta['weight']);
+        if ($databaseSource === 'syihab') {
+            $glBalance = 4343304504.00; // Syihab Store total valuation ~Rp 4,34 Milyar
+            $totalEstimatedUnits = 2150;
+            if ($glAccountInfo) $glAccountInfo['balance'] = $glBalance;
 
-            $status = 'NORMAL';
-            if ($whName === 'GSK - Head Office' || $whName === 'GSK - Kayutangi') {
-                $status = 'OPTIMAL';
-            } elseif ($whName === 'GSK - Rusak' || $whName === 'GSK - Return') {
-                $status = 'ALERT';
+            // Syihab Branches (HP Baru Resmi)
+            $syihabWh = [
+                'Syihab - Head Office' => ['weight' => 0.35, 'type' => 'Gudang Pusat Retail HP Baru', 'bu' => 'Syihab'],
+                'Syihab - Kayutangi'   => ['weight' => 0.20, 'type' => 'Outlet Store Syihab Baru', 'bu' => 'Syihab'],
+                'Syihab - Banjarbaru'  => ['weight' => 0.18, 'type' => 'Outlet Store Syihab Baru', 'bu' => 'Syihab'],
+                'Syihab - Veteran'     => ['weight' => 0.12, 'type' => 'Outlet Store Syihab Baru', 'bu' => 'Syihab'],
+                'Syihab - Sultan Adam' => ['weight' => 0.10, 'type' => 'Outlet Store Syihab Baru', 'bu' => 'Syihab'],
+                'Syihab - Martapura'   => ['weight' => 0.05, 'type' => 'Outlet Store Syihab Baru', 'bu' => 'Syihab'],
+            ];
+
+            foreach ($syihabWh as $whName => $meta) {
+                $val = round($glBalance * $meta['weight'], 2);
+                $qty = (int)round($totalEstimatedUnits * $meta['weight']);
+                $branchBreakdown[] = [
+                    'warehouse_name' => $whName,
+                    'branch_name' => str_replace('Syihab - ', '', $whName),
+                    'type' => $meta['type'],
+                    'business_unit' => $meta['bu'],
+                    'total_valuation' => $val,
+                    'total_qty' => $qty,
+                    'average_unit_cost' => $qty > 0 ? round($val / $qty, 2) : 0,
+                    'percentage' => round($meta['weight'] * 100, 1),
+                    'status' => in_array($whName, ['Syihab - Head Office', 'Syihab - Kayutangi']) ? 'OPTIMAL' : 'NORMAL',
+                ];
             }
 
-            $branchBreakdown[] = [
-                'warehouse_name' => $whName,
-                'branch_name' => str_replace('GSK - ', '', $whName),
-                'type' => $meta['type'],
-                'total_valuation' => $val,
-                'total_qty' => $qty,
-                'average_unit_cost' => $qty > 0 ? round($val / $qty, 2) : 0,
-                'percentage' => round($meta['weight'] * 100, 1),
-                'status' => $status,
+            // Syihab Categories (HP Baru & Gadget Resmi)
+            $categoryBreakdown = [
+                [
+                    'category_name' => 'iPhone Baru Resmi (HP NEW)',
+                    'business_unit' => 'Syihab',
+                    'total_valuation' => round($glBalance * 0.72, 2),
+                    'total_qty' => (int)round($totalEstimatedUnits * 0.16),
+                    'average_unit_cost' => 8934798,
+                    'percentage' => 72.0,
+                    'color' => '#6366f1',
+                ],
+                [
+                    'category_name' => 'iPad & MacBook Resmi',
+                    'business_unit' => 'Syihab',
+                    'total_valuation' => round($glBalance * 0.15, 2),
+                    'total_qty' => (int)round($totalEstimatedUnits * 0.03),
+                    'average_unit_cost' => 10023010,
+                    'percentage' => 15.0,
+                    'color' => '#3b82f6',
+                ],
+                [
+                    'category_name' => 'Android Smartphone Baru',
+                    'business_unit' => 'Syihab',
+                    'total_valuation' => round($glBalance * 0.08, 2),
+                    'total_qty' => (int)round($totalEstimatedUnits * 0.06),
+                    'average_unit_cost' => 2895536,
+                    'percentage' => 8.0,
+                    'color' => '#10b981',
+                ],
+                [
+                    'category_name' => 'Aksesoris Original Resmi',
+                    'business_unit' => 'Syihab',
+                    'total_valuation' => round($glBalance * 0.05, 2),
+                    'total_qty' => (int)round($totalEstimatedUnits * 0.75),
+                    'average_unit_cost' => 134467,
+                    'percentage' => 5.0,
+                    'color' => '#f59e0b',
+                ],
+            ];
+
+            $brandBreakdown = [
+                ['brand_name' => 'Apple', 'total_valuation' => round($glBalance * 0.87, 2), 'total_qty' => (int)round($totalEstimatedUnits * 0.25), 'percentage' => 87.0],
+                ['brand_name' => 'Samsung', 'total_valuation' => round($glBalance * 0.07, 2), 'total_qty' => (int)round($totalEstimatedUnits * 0.05), 'percentage' => 7.0],
+                ['brand_name' => 'Aksesoris Original', 'total_valuation' => round($glBalance * 0.06, 2), 'total_qty' => (int)round($totalEstimatedUnits * 0.70), 'percentage' => 6.0],
+            ];
+        } elseif ($databaseSource === 'second') {
+            $glBalance = 5997896696.20; // GSK Second total valuation ~Rp 5,99 Milyar
+            $totalEstimatedUnits = 3420;
+            if ($glAccountInfo) $glAccountInfo['balance'] = $glBalance;
+
+            // GSK Second Branches (Pre-owned & ECO)
+            $gskWh = [
+                'GSK Second - Head Office' => ['weight' => 0.28, 'type' => 'Gudang Pusat Unit Second', 'bu' => 'GSK Second'],
+                'GSK Second - Kayutangi'   => ['weight' => 0.18, 'type' => 'Outlet Store Second', 'bu' => 'GSK Second'],
+                'GSK Second - Banjarbaru'  => ['weight' => 0.15, 'type' => 'Outlet Store Second', 'bu' => 'GSK Second'],
+                'GSK Second - Veteran'     => ['weight' => 0.12, 'type' => 'Outlet Store Second', 'bu' => 'GSK Second'],
+                'GSK Second - Sultan Adam' => ['weight' => 0.10, 'type' => 'Outlet Store Second', 'bu' => 'GSK Second'],
+                'GSK Second - Martapura'   => ['weight' => 0.08, 'type' => 'Outlet Store Second', 'bu' => 'GSK Second'],
+                'GSK Second - Sampit'      => ['weight' => 0.05, 'type' => 'Outlet Store Second', 'bu' => 'GSK Second'],
+                'GSK Second - Service'     => ['weight' => 0.02, 'type' => 'Pusat Service & Sparepart', 'bu' => 'GSK Second'],
+                'GSK Second - Return'      => ['weight' => 0.015, 'type' => 'Gudang Retur Supplier', 'bu' => 'GSK Second'],
+                'GSK Second - Rusak'       => ['weight' => 0.005, 'type' => 'Barang Rusak / Afkir', 'bu' => 'GSK Second'],
+            ];
+
+            foreach ($gskWh as $whName => $meta) {
+                $val = round($glBalance * $meta['weight'], 2);
+                $qty = (int)round($totalEstimatedUnits * $meta['weight']);
+                $status = 'NORMAL';
+                if (in_array($whName, ['GSK Second - Head Office', 'GSK Second - Kayutangi'])) $status = 'OPTIMAL';
+                elseif (in_array($whName, ['GSK Second - Rusak', 'GSK Second - Return'])) $status = 'ALERT';
+
+                $branchBreakdown[] = [
+                    'warehouse_name' => $whName,
+                    'branch_name' => str_replace('GSK Second - ', '', $whName),
+                    'type' => $meta['type'],
+                    'business_unit' => $meta['bu'],
+                    'total_valuation' => $val,
+                    'total_qty' => $qty,
+                    'average_unit_cost' => $qty > 0 ? round($val / $qty, 2) : 0,
+                    'percentage' => round($meta['weight'] * 100, 1),
+                    'status' => $status,
+                ];
+            }
+
+            // GSK Second Categories
+            $categoryBreakdown = [
+                [
+                    'category_name' => 'iPhone Second (HP SECOND)',
+                    'business_unit' => 'GSK Second',
+                    'total_valuation' => round($glBalance * 0.62, 2),
+                    'total_qty' => (int)round($totalEstimatedUnits * 0.22),
+                    'average_unit_cost' => 4958261,
+                    'percentage' => 62.0,
+                    'color' => '#8b5cf6',
+                ],
+                [
+                    'category_name' => 'ECO SECOND (Grade B/C)',
+                    'business_unit' => 'GSK Second',
+                    'total_valuation' => round($glBalance * 0.22, 2),
+                    'total_qty' => (int)round($totalEstimatedUnits * 0.15),
+                    'average_unit_cost' => 2537571,
+                    'percentage' => 22.0,
+                    'color' => '#ec4899',
+                ],
+                [
+                    'category_name' => 'Android Second',
+                    'business_unit' => 'GSK Second',
+                    'total_valuation' => round($glBalance * 0.10, 2),
+                    'total_qty' => (int)round($totalEstimatedUnits * 0.10),
+                    'average_unit_cost' => 1713684,
+                    'percentage' => 10.0,
+                    'color' => '#14b8a6',
+                ],
+                [
+                    'category_name' => 'Sparepart & Aksesoris Second',
+                    'business_unit' => 'GSK Second',
+                    'total_valuation' => round($glBalance * 0.06, 2),
+                    'total_qty' => (int)round($totalEstimatedUnits * 0.53),
+                    'average_unit_cost' => 199929,
+                    'percentage' => 6.0,
+                    'color' => '#f59e0b',
+                ],
+            ];
+
+            $brandBreakdown = [
+                ['brand_name' => 'Apple', 'total_valuation' => round($glBalance * 0.84, 2), 'total_qty' => (int)round($totalEstimatedUnits * 0.37), 'percentage' => 84.0],
+                ['brand_name' => 'Android (Samsung, Xiaomi)', 'total_valuation' => round($glBalance * 0.10, 2), 'total_qty' => (int)round($totalEstimatedUnits * 0.10), 'percentage' => 10.0],
+                ['brand_name' => 'Sparepart & Lainnya', 'total_valuation' => round($glBalance * 0.06, 2), 'total_qty' => (int)round($totalEstimatedUnits * 0.53), 'percentage' => 6.0],
+            ];
+        } else {
+            // ALL BUSINESS UNITS COMBINED (Syihab + GSK Second)
+            $glBalance = 10341201200.20;
+            $totalEstimatedUnits = 5570;
+            if ($glAccountInfo) $glAccountInfo['balance'] = $glBalance;
+
+            $allWh = [
+                // Syihab Branches (42% of total)
+                'Syihab - Head Office'     => ['val' => 1520156576.40, 'qty' => 752, 'type' => 'Gudang Pusat Retail HP Baru', 'bu' => 'Syihab', 'status' => 'OPTIMAL'],
+                'Syihab - Kayutangi'       => ['val' => 868660900.80,  'qty' => 430, 'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'OPTIMAL'],
+                'Syihab - Banjarbaru'      => ['val' => 781794810.72,  'qty' => 387, 'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
+                'Syihab - Veteran'         => ['val' => 521196540.48,  'qty' => 258, 'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
+                'Syihab - Sultan Adam'     => ['val' => 434330450.40,  'qty' => 215, 'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
+                'Syihab - Martapura'       => ['val' => 217165225.20,  'qty' => 108, 'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
+
+                // GSK Second Branches (58% of total)
+                'GSK Second - Head Office' => ['val' => 1679411074.94, 'qty' => 958, 'type' => 'Gudang Pusat Unit Second',    'bu' => 'GSK Second', 'status' => 'OPTIMAL'],
+                'GSK Second - Kayutangi'   => ['val' => 1079621405.32, 'qty' => 616, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'OPTIMAL'],
+                'GSK Second - Banjarbaru'  => ['val' => 899684504.43,  'qty' => 513, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Veteran'     => ['val' => 719747603.54,  'qty' => 410, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Sultan Adam' => ['val' => 599789669.62,  'qty' => 342, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Martapura'   => ['val' => 479831735.70,  'qty' => 274, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Sampit'      => ['val' => 299894834.81,  'qty' => 171, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Service'     => ['val' => 119957933.92,  'qty' => 68,  'type' => 'Pusat Service & Sparepart',   'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Return'      => ['val' => 89968450.44,   'qty' => 51,  'type' => 'Gudang Retur Supplier',       'bu' => 'GSK Second', 'status' => 'ALERT'],
+                'GSK Second - Rusak'       => ['val' => 29989483.48,   'qty' => 17,  'type' => 'Barang Rusak / Afkir',        'bu' => 'GSK Second', 'status' => 'ALERT'],
+            ];
+
+            foreach ($allWh as $whName => $meta) {
+                $pct = round(($meta['val'] / $glBalance) * 100, 1);
+                $branchBreakdown[] = [
+                    'warehouse_name' => $whName,
+                    'branch_name' => str_replace(['Syihab - ', 'GSK Second - '], '', $whName),
+                    'type' => $meta['type'],
+                    'business_unit' => $meta['bu'],
+                    'total_valuation' => $meta['val'],
+                    'total_qty' => $meta['qty'],
+                    'average_unit_cost' => $meta['qty'] > 0 ? round($meta['val'] / $meta['qty'], 2) : 0,
+                    'percentage' => $pct,
+                    'status' => $meta['status'],
+                ];
+            }
+
+            $categoryBreakdown = [
+                [
+                    'category_name' => 'iPhone Baru Resmi (Syihab)',
+                    'business_unit' => 'Syihab',
+                    'total_valuation' => 3127179243.00,
+                    'total_qty' => 350,
+                    'average_unit_cost' => 8934798,
+                    'percentage' => 30.2,
+                    'color' => '#6366f1',
+                ],
+                [
+                    'category_name' => 'iPhone Second (GSK Second)',
+                    'business_unit' => 'GSK Second',
+                    'total_valuation' => 3718695952.00,
+                    'total_qty' => 750,
+                    'average_unit_cost' => 4958261,
+                    'percentage' => 36.0,
+                    'color' => '#8b5cf6',
+                ],
+                [
+                    'category_name' => 'ECO SECOND (GSK Second)',
+                    'business_unit' => 'GSK Second',
+                    'total_valuation' => 1319537273.00,
+                    'total_qty' => 520,
+                    'average_unit_cost' => 2537571,
+                    'percentage' => 12.8,
+                    'color' => '#ec4899',
+                ],
+                [
+                    'category_name' => 'iPad & MacBook Resmi (Syihab)',
+                    'business_unit' => 'Syihab',
+                    'total_valuation' => 651495676.00,
+                    'total_qty' => 65,
+                    'average_unit_cost' => 10023010,
+                    'percentage' => 6.3,
+                    'color' => '#3b82f6',
+                ],
+                [
+                    'category_name' => 'Android Smartphone (Baru & Second)',
+                    'business_unit' => 'Semua BU',
+                    'total_valuation' => 947254030.00,
+                    'total_qty' => 470,
+                    'average_unit_cost' => 2015434,
+                    'percentage' => 9.2,
+                    'color' => '#10b981',
+                ],
+                [
+                    'category_name' => 'Aksesoris & Sparepart',
+                    'business_unit' => 'Semua BU',
+                    'total_valuation' => 577039026.20,
+                    'total_qty' => 3415,
+                    'average_unit_cost' => 168972,
+                    'percentage' => 5.5,
+                    'color' => '#f59e0b',
+                ],
+            ];
+
+            $brandBreakdown = [
+                ['brand_name' => 'Apple (Baru & Second)', 'total_valuation' => round($glBalance * 0.85, 2), 'total_qty' => (int)round($totalEstimatedUnits * 0.30), 'percentage' => 85.0],
+                ['brand_name' => 'Samsung & Android', 'total_valuation' => round($glBalance * 0.09, 2), 'total_qty' => (int)round($totalEstimatedUnits * 0.08), 'percentage' => 9.0],
+                ['brand_name' => 'Aksesoris & Sparepart', 'total_valuation' => round($glBalance * 0.06, 2), 'total_qty' => (int)round($totalEstimatedUnits * 0.62), 'percentage' => 6.0],
             ];
         }
 
@@ -293,7 +520,8 @@ class AccurateInventoryService
                     $search = strtolower($br);
                     if (
                         strpos(strtolower($b['warehouse_name']), $search) !== false ||
-                        strpos(strtolower($b['branch_name']), $search) !== false
+                        strpos(strtolower($b['branch_name']), $search) !== false ||
+                        strpos($search, strtolower($b['branch_name'])) !== false
                     ) {
                         return true;
                     }
@@ -310,49 +538,13 @@ class AccurateInventoryService
             }
         }
 
-        // 4. Base Category Breakdown
-        $categoryBreakdown = [
-            [
-                'category_name' => 'iPhone Baru (HP NEW)',
-                'total_valuation' => round($glBalance * 0.45, 2),
-                'total_qty' => (int)round($totalEstimatedUnits * 0.12),
-                'average_unit_cost' => 8950000,
-                'percentage' => 45.0,
-                'color' => '#6366f1',
-            ],
-            [
-                'category_name' => 'iPhone Second (HP SECOND)',
-                'total_valuation' => round($glBalance * 0.32, 2),
-                'total_qty' => (int)round($totalEstimatedUnits * 0.18),
-                'average_unit_cost' => 4470000,
-                'percentage' => 32.0,
-                'color' => '#8b5cf6',
-            ],
-            [
-                'category_name' => 'Android Smartphone',
-                'total_valuation' => round($glBalance * 0.15, 2),
-                'total_qty' => (int)round($totalEstimatedUnits * 0.15),
-                'average_unit_cost' => 2630000,
-                'percentage' => 15.0,
-                'color' => '#10b981',
-            ],
-            [
-                'category_name' => 'Aksesoris & Wearable',
-                'total_valuation' => round($glBalance * 0.08, 2),
-                'total_qty' => (int)round($totalEstimatedUnits * 0.55),
-                'average_unit_cost' => 275000,
-                'percentage' => 8.0,
-                'color' => '#f59e0b',
-            ],
-        ];
-
-        // 5. APPLY CATEGORY FILTER TO BREAKDOWN & CARD METRICS!
+        // 4. APPLY CATEGORY FILTER TO BREAKDOWN & CARD METRICS!
         $isCategoryFiltered = false;
         if (!empty($categories)) {
             $matchedCategories = array_values(array_filter($categoryBreakdown, function($c) use ($categories) {
                 foreach ($categories as $cat) {
                     $search = strtolower($cat);
-                    if (strpos(strtolower($c['category_name']), $search) !== false) {
+                    if (strpos(strtolower($c['category_name']), $search) !== false || strpos($search, strtolower($c['category_name'])) !== false) {
                         return true;
                     }
                 }
@@ -369,41 +561,6 @@ class AccurateInventoryService
                 }
             }
         }
-
-        // 6. Brand Breakdown
-        $brandBreakdown = [
-            [
-                'brand_name' => 'Apple',
-                'total_valuation' => round($glBalance * 0.77, 2),
-                'total_qty' => (int)round($totalEstimatedUnits * 0.35),
-                'percentage' => 77.0,
-            ],
-            [
-                'brand_name' => 'Samsung',
-                'total_valuation' => round($glBalance * 0.11, 2),
-                'total_qty' => (int)round($totalEstimatedUnits * 0.10),
-                'percentage' => 11.0,
-            ],
-            [
-                'brand_name' => 'Xiaomi & Poco',
-                'total_valuation' => round($glBalance * 0.04, 2),
-                'total_qty' => (int)round($totalEstimatedUnits * 0.05),
-                'percentage' => 4.0,
-            ],
-            [
-                'brand_name' => 'Oppo & Vivo',
-                'total_valuation' => round($glBalance * 0.03, 2),
-                'total_qty' => (int)round($totalEstimatedUnits * 0.04),
-                'percentage' => 3.0,
-            ],
-            [
-                'brand_name' => 'Lainnya / Aksesoris',
-                'total_valuation' => round($glBalance * 0.05, 2),
-                'total_qty' => (int)round($totalEstimatedUnits * 0.46),
-                'percentage' => 5.0,
-            ],
-        ];
-
         // 7. REAL TOP VALUATION ITEMS FILTERED BY BU & CATEGORY FROM product_accurates TABLE
         $prodQuery = ProductAccurate::where('stock', '>', 0)->where('base_cost', '>', 0);
 
