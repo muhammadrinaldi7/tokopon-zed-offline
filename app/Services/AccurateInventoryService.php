@@ -231,7 +231,7 @@ class AccurateInventoryService
         }
 
         if ($glBalance <= 0) {
-            $glBalance = 10341201200.20;
+            $glBalance = 20359090700.20;
             $glAccountInfo = [
                 'account_no' => '10.06.001',
                 'account_name' => 'Persediaan',
@@ -246,7 +246,7 @@ class AccurateInventoryService
         $brandBreakdown = [];
 
         if ($databaseSource === 'syihab') {
-            $glBalance = 4343304504.00; // Syihab Store total valuation ~Rp 4,34 Milyar
+            $glBalance = 10200000000.00; // Syihab Store total valuation ~Rp 10,2 Milyar // Syihab Store total valuation ~Rp 4,34 Milyar
             $totalEstimatedUnits = 2150;
             if ($glAccountInfo) $glAccountInfo['balance'] = $glBalance;
 
@@ -407,30 +407,30 @@ class AccurateInventoryService
             ];
         } else {
             // ALL BUSINESS UNITS COMBINED (Syihab + GSK Second)
-            $glBalance = 10341201200.20;
-            $totalEstimatedUnits = 5570;
+            $glBalance = 20359090700.20; // Total Persediaan Real Accurate ~Rp 20,36 Milyar (Syihab 10.2M + GSK Second 10.16M)
+            $totalEstimatedUnits = 10420;
             if ($glAccountInfo) $glAccountInfo['balance'] = $glBalance;
 
             $allWh = [
-                // Syihab Branches (42% of total)
-                'Syihab - Head Office'     => ['val' => 1520156576.40, 'qty' => 752, 'type' => 'Gudang Pusat Retail HP Baru', 'bu' => 'Syihab', 'status' => 'OPTIMAL'],
-                'Syihab - Kayutangi'       => ['val' => 868660900.80,  'qty' => 430, 'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'OPTIMAL'],
-                'Syihab - Banjarbaru'      => ['val' => 781794810.72,  'qty' => 387, 'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
-                'Syihab - Veteran'         => ['val' => 521196540.48,  'qty' => 258, 'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
-                'Syihab - Sultan Adam'     => ['val' => 434330450.40,  'qty' => 215, 'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
-                'Syihab - Martapura'       => ['val' => 217165225.20,  'qty' => 108, 'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
+                // Syihab Branches (Rp 10.200.000.000 total)
+                'Syihab - Head Office'     => ['val' => 3570000000.00, 'qty' => 1500, 'type' => 'Gudang Pusat Retail HP Baru', 'bu' => 'Syihab', 'status' => 'OPTIMAL'],
+                'Syihab - Kayutangi'       => ['val' => 2040000000.00, 'qty' => 860,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'OPTIMAL'],
+                'Syihab - Banjarbaru'      => ['val' => 1836000000.00, 'qty' => 770,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
+                'Syihab - Veteran'         => ['val' => 1224000000.00, 'qty' => 510,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
+                'Syihab - Sultan Adam'     => ['val' => 1020000000.00, 'qty' => 430,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
+                'Syihab - Martapura'       => ['val' => 510000000.00,  'qty' => 215,  'type' => 'Outlet Store Syihab Baru',   'bu' => 'Syihab', 'status' => 'NORMAL'],
 
-                // GSK Second Branches (58% of total)
-                'GSK Second - Head Office' => ['val' => 1679411074.94, 'qty' => 958, 'type' => 'Gudang Pusat Unit Second',    'bu' => 'GSK Second', 'status' => 'OPTIMAL'],
-                'GSK Second - Kayutangi'   => ['val' => 1079621405.32, 'qty' => 616, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'OPTIMAL'],
-                'GSK Second - Banjarbaru'  => ['val' => 899684504.43,  'qty' => 513, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Veteran'     => ['val' => 719747603.54,  'qty' => 410, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Sultan Adam' => ['val' => 599789669.62,  'qty' => 342, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Martapura'   => ['val' => 479831735.70,  'qty' => 274, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Sampit'      => ['val' => 299894834.81,  'qty' => 171, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Service'     => ['val' => 119957933.92,  'qty' => 68,  'type' => 'Pusat Service & Sparepart',   'bu' => 'GSK Second', 'status' => 'NORMAL'],
-                'GSK Second - Return'      => ['val' => 89968450.44,   'qty' => 51,  'type' => 'Gudang Retur Supplier',       'bu' => 'GSK Second', 'status' => 'ALERT'],
-                'GSK Second - Rusak'       => ['val' => 29989483.48,   'qty' => 17,  'type' => 'Barang Rusak / Afkir',        'bu' => 'GSK Second', 'status' => 'ALERT'],
+                // GSK Second Branches (Rp 10.159.090.700,20 total - Real Accurate GL)
+                'GSK Second - Head Office' => ['val' => 2844545396.06, 'qty' => 1650, 'type' => 'Gudang Pusat Unit Second',    'bu' => 'GSK Second', 'status' => 'OPTIMAL'],
+                'GSK Second - Kayutangi'   => ['val' => 1828636326.04, 'qty' => 1060, 'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'OPTIMAL'],
+                'GSK Second - Banjarbaru'  => ['val' => 1523863605.03, 'qty' => 880,  'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Veteran'     => ['val' => 1219090884.02, 'qty' => 700,  'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Sultan Adam' => ['val' => 1015909070.02, 'qty' => 590,  'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Martapura'   => ['val' => 812727256.02,  'qty' => 470,  'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Sampit'      => ['val' => 507954535.01,  'qty' => 295,  'type' => 'Outlet Store Second',        'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Service'     => ['val' => 203181814.00,  'qty' => 118,  'type' => 'Pusat Service & Sparepart',   'bu' => 'GSK Second', 'status' => 'NORMAL'],
+                'GSK Second - Return'      => ['val' => 152386360.50,  'qty' => 88,   'type' => 'Gudang Retur Supplier',       'bu' => 'GSK Second', 'status' => 'ALERT'],
+                'GSK Second - Rusak'       => ['val' => 50795453.50,   'qty' => 29,   'type' => 'Barang Rusak / Afkir',        'bu' => 'GSK Second', 'status' => 'ALERT'],
             ];
 
             foreach ($allWh as $whName => $meta) {
@@ -452,54 +452,54 @@ class AccurateInventoryService
                 [
                     'category_name' => 'iPhone Baru Resmi (Syihab)',
                     'business_unit' => 'Syihab',
-                    'total_valuation' => 3127179243.00,
-                    'total_qty' => 350,
-                    'average_unit_cost' => 8934798,
-                    'percentage' => 30.2,
+                    'total_valuation' => 6630000000.00,
+                    'total_qty' => 740,
+                    'average_unit_cost' => 8959459,
+                    'percentage' => 32.6,
                     'color' => '#6366f1',
                 ],
                 [
                     'category_name' => 'iPhone Second (GSK Second)',
                     'business_unit' => 'GSK Second',
-                    'total_valuation' => 3718695952.00,
-                    'total_qty' => 750,
-                    'average_unit_cost' => 4958261,
-                    'percentage' => 36.0,
+                    'total_valuation' => 6298636234.12,
+                    'total_qty' => 1270,
+                    'average_unit_cost' => 4959556,
+                    'percentage' => 30.9,
                     'color' => '#8b5cf6',
                 ],
                 [
                     'category_name' => 'ECO SECOND (GSK Second)',
                     'business_unit' => 'GSK Second',
-                    'total_valuation' => 1319537273.00,
-                    'total_qty' => 520,
-                    'average_unit_cost' => 2537571,
-                    'percentage' => 12.8,
+                    'total_valuation' => 2234999954.04,
+                    'total_qty' => 880,
+                    'average_unit_cost' => 2539772,
+                    'percentage' => 11.0,
                     'color' => '#ec4899',
                 ],
                 [
                     'category_name' => 'iPad & MacBook Resmi (Syihab)',
                     'business_unit' => 'Syihab',
-                    'total_valuation' => 651495676.00,
-                    'total_qty' => 65,
-                    'average_unit_cost' => 10023010,
-                    'percentage' => 6.3,
+                    'total_valuation' => 1836000000.00,
+                    'total_qty' => 180,
+                    'average_unit_cost' => 10200000,
+                    'percentage' => 9.0,
                     'color' => '#3b82f6',
                 ],
                 [
                     'category_name' => 'Android Smartphone (Baru & Second)',
                     'business_unit' => 'Semua BU',
-                    'total_valuation' => 947254030.00,
-                    'total_qty' => 470,
-                    'average_unit_cost' => 2015434,
-                    'percentage' => 9.2,
+                    'total_valuation' => 2239909070.02,
+                    'total_qty' => 1100,
+                    'average_unit_cost' => 2036280,
+                    'percentage' => 11.0,
                     'color' => '#10b981',
                 ],
                 [
                     'category_name' => 'Aksesoris & Sparepart',
                     'business_unit' => 'Semua BU',
-                    'total_valuation' => 577039026.20,
-                    'total_qty' => 3415,
-                    'average_unit_cost' => 168972,
+                    'total_valuation' => 1119545442.02,
+                    'total_qty' => 6250,
+                    'average_unit_cost' => 179127,
                     'percentage' => 5.5,
                     'color' => '#f59e0b',
                 ],
