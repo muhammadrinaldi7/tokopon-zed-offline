@@ -18,43 +18,41 @@ class ExecutiveInventoryController extends Controller
     }
 
     /**
-     * Resolve database source code from request filters.
-     */
-    protected function resolveSource(Request $request): string
-    {
-        if ($request->filled('database_source')) {
-            return trim($request->input('database_source'));
-        }
-
-        if ($request->filled('business_unit_id')) {
-            $bu = BusinessUnit::find($request->input('business_unit_id'));
-            if ($bu && $bu->code) {
-                return $bu->code;
-            }
-        }
-
-        return 'second';
-    }
-
-    /**
      * Get Complete Inventory Valuation and Stock Analytics for Executive Dashboard.
      */
     public function valuation(Request $request): JsonResponse
     {
         try {
-            $source = $this->resolveSource($request);
+            $buName = 'Semua Unit Bisnis';
+            $source = 'all';
+
+            if ($request->filled('business_unit_id')) {
+                $bu = BusinessUnit::find($request->input('business_unit_id'));
+                if ($bu) {
+                    $source = $bu->code ?: 'second';
+                    $buName = $bu->name;
+                }
+            } elseif ($request->filled('database_source')) {
+                $source = trim($request->input('database_source'));
+                $bu = BusinessUnit::where('code', $source)->first();
+                if ($bu) {
+                    $buName = $bu->name;
+                }
+            }
+
             $asOfDate = $request->input('as_of_date') ?: ($request->input('end_date') ?: null);
             $forceRefresh = $request->boolean('force_refresh', false);
 
-            $branchIds = (array)$request->input('branch_ids', []);
-            $categoryIds = (array)$request->input('category_ids', []);
+            $branch = $request->input('branch');
+            $category = $request->input('category');
 
             $data = $this->inventoryService->getInventoryValuation(
                 $source,
                 $asOfDate,
-                $branchIds,
-                $categoryIds,
-                $forceRefresh
+                $branch,
+                $category,
+                $forceRefresh,
+                $buName
             );
 
             return response()->json([
@@ -75,10 +73,29 @@ class ExecutiveInventoryController extends Controller
     public function sync(Request $request): JsonResponse
     {
         try {
-            $source = $this->resolveSource($request);
-            $asOfDate = $request->input('as_of_date') ?: null;
+            $buName = 'Semua Unit Bisnis';
+            $source = 'second';
 
-            $data = $this->inventoryService->getInventoryValuation($source, $asOfDate, [], [], true);
+            if ($request->filled('business_unit_id')) {
+                $bu = BusinessUnit::find($request->input('business_unit_id'));
+                if ($bu) {
+                    $source = $bu->code ?: 'second';
+                    $buName = $bu->name;
+                }
+            }
+
+            $asOfDate = $request->input('as_of_date') ?: null;
+            $branch = $request->input('branch');
+            $category = $request->input('category');
+
+            $data = $this->inventoryService->getInventoryValuation(
+                $source,
+                $asOfDate,
+                $branch,
+                $category,
+                true,
+                $buName
+            );
 
             return response()->json([
                 'success' => true,
