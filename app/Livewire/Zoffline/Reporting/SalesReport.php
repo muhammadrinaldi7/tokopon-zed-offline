@@ -130,7 +130,7 @@ class SalesReport extends Component
         }
     }
 
-    public function getOrdersQueryProperty()
+    public function buildOrdersQuery()
     {
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
@@ -197,6 +197,11 @@ class SalesReport extends Component
         $query = $this->applyDynamicFilters($query);
 
         return $query->latest('orders.order_date');
+    }
+
+    public function getOrdersQueryProperty()
+    {
+        return $this->buildOrdersQuery();
     }
 
     /**
@@ -287,13 +292,24 @@ class SalesReport extends Component
                     $q->where(function ($sub) use ($ids) {
                         $sub->whereNull('orders.warehouse_id')->orWhereNotIn('orders.warehouse_id', $ids);
                     })->where(function ($sub) use ($allNames) {
-                        $sub->whereNull('orders.shipping_address_snapshot->store')->orWhereNotIn('orders.shipping_address_snapshot->store', $allNames);
+                        $sub->where(function ($inner) use ($allNames) {
+                            $inner->whereNotNull('orders.warehouse_id')
+                                  ->orWhereNull('orders.shipping_address_snapshot->store')
+                                  ->orWhereNotIn('orders.shipping_address_snapshot->store', $allNames);
+                        });
                     });
                 });
             } elseif ($operator === '=' || $operator === 'in') {
                 $query->where(function ($q) use ($ids, $allNames) {
-                    $q->whereIn('orders.warehouse_id', $ids)
-                      ->orWhereIn('orders.shipping_address_snapshot->store', $allNames);
+                    if (!empty($ids)) {
+                        $q->whereIn('orders.warehouse_id', $ids)
+                          ->orWhere(function ($sub) use ($allNames) {
+                              $sub->whereNull('orders.warehouse_id')
+                                  ->whereIn('orders.shipping_address_snapshot->store', $allNames);
+                          });
+                    } else {
+                        $q->whereIn('orders.shipping_address_snapshot->store', $allNames);
+                    }
                 });
             } elseif ($operator === 'empty') {
                 $query->whereNull('orders.warehouse_id')
@@ -520,9 +536,156 @@ class SalesReport extends Component
         ];
     }
 
+    /**
+     * Evaluasi apakah satu baris item order memenuhi filter pelaporan (dinamis & legacy).
+     */
+    private function itemMatchesReportingFilters(
+        $item,
+        $variant,
+        string $itemBrand,
+        string $itemCategory,
+        string $itemProyek,
+        array $itemVendors
+    ): bool {
+        // 1. Filter Legacy Proyek
+        if (!empty($this->proyekFilter)) {
+            if (!in_array($itemProyek, $this->proyekFilter, true)) {
+                return false;
+            }
+        }
+
+        // 2. Filter Legacy Vendor
+        if ($this->vendorFilter) {
+            $isUnknown = in_array('Tanpa Vendor / Unknown', $itemVendors) || empty($item->serial_number);
+            if ($this->vendorFilter === 'unknown') {
+                if (!$isUnknown) return false;
+            } else {
+                $vf = strtolower($this->vendorFilter);
+                $vendorString = strtolower(implode(', ', $itemVendors));
+                if (!str_contains($vendorString, $vf)) {
+                    return false;
+                }
+            }
+        }
+
+        // 3. Filter Dinamis Item-Level (brand, category, proyek, vendor)
+        foreach ($this->dynamicFilters as $filter) {
+            $field = $filter['field'] ?? '';
+            $op = $filter['operator'] ?? '=';
+            $val = $filter['value'] ?? null;
+
+            if ($field === 'brand') {
+                if (!$this->evalFieldFilter($itemBrand, $op, $val)) {
+                    return false;
+                }
+            } elseif ($field === 'category') {
+                if (!$this->evalFieldFilter($itemCategory, $op, $val)) {
+                    return false;
+                }
+            } elseif ($field === 'proyek') {
+                if (!$this->evalFieldFilter($itemProyek, $op, $val)) {
+                    return false;
+                }
+            } elseif ($field === 'vendor') {
+                if (!$this->evalVendorFilter($itemVendors, $item->serial_number, $op, $val)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private function evalFieldFilter(string $currentVal, string $op, mixed $filterVal): bool
+    {
+        $arr = is_array($filterVal) ? $filterVal : array_map('trim', explode(',', (string)$filterVal));
+        $arr = array_values(array_filter($arr, fn($v) => $v !== ''));
+        $arrLower = array_map('strtolower', $arr);
+        $currLower = strtolower(trim($currentVal));
+
+        switch ($op) {
+            case '=':
+            case 'in':
+                if (empty($arr)) return true;
+                return in_array($currLower, $arrLower, true);
+
+            case '!=':
+            case 'not_in':
+                if (empty($arr)) return true;
+                return !in_array($currLower, $arrLower, true);
+
+            case 'like':
+                $needle = strtolower(is_array($filterVal) ? ($filterVal[0] ?? '') : (string)$filterVal);
+                return str_contains($currLower, $needle);
+
+            case 'not_like':
+                $needle = strtolower(is_array($filterVal) ? ($filterVal[0] ?? '') : (string)$filterVal);
+                return !str_contains($currLower, $needle);
+
+            case 'empty':
+                return ($currLower === '' || $currLower === '-' || $currLower === 'unknown' || $currLower === 'non-proyek');
+
+            case 'not_empty':
+                return ($currLower !== '' && $currLower !== '-' && $currLower !== 'unknown' && $currLower !== 'non-proyek');
+
+            default:
+                return true;
+        }
+    }
+
+    private function evalVendorFilter(array $itemVendors, ?string $serialNumber, string $op, mixed $filterVal): bool
+    {
+        $arr = is_array($filterVal) ? $filterVal : array_map('trim', explode(',', (string)$filterVal));
+        $arr = array_values(array_filter($arr, fn($v) => $v !== ''));
+        $hasUnknown = in_array('unknown', $arr) || in_array('Tanpa Vendor / Unknown', $arr);
+        $namedVendors = array_values(array_diff($arr, ['unknown', 'Tanpa Vendor / Unknown']));
+        $namedVendorsLower = array_map('strtolower', $namedVendors);
+
+        $isItemUnknown = empty($serialNumber) || in_array('Tanpa Vendor / Unknown', $itemVendors);
+        $itemVendorsLower = array_map('strtolower', $itemVendors);
+
+        $matchesNamed = false;
+        foreach ($itemVendorsLower as $iv) {
+            if (in_array($iv, $namedVendorsLower, true)) {
+                $matchesNamed = true;
+                break;
+            }
+        }
+
+        switch ($op) {
+            case '=':
+            case 'in':
+                if ($hasUnknown && $isItemUnknown) return true;
+                if ($matchesNamed) return true;
+                return false;
+
+            case '!=':
+            case 'not_in':
+                if ($hasUnknown && $isItemUnknown) return false;
+                if ($matchesNamed) return false;
+                return true;
+
+            case 'like':
+                $needle = strtolower(is_array($filterVal) ? ($filterVal[0] ?? '') : (string)$filterVal);
+                foreach ($itemVendorsLower as $iv) {
+                    if (str_contains($iv, $needle)) return true;
+                }
+                return false;
+
+            case 'empty':
+                return $isItemUnknown;
+
+            case 'not_empty':
+                return !$isItemUnknown;
+
+            default:
+                return true;
+        }
+    }
+
     private function generateTransactionsData(): array
     {
-        $orders = $this->ordersQuery->with([
+        $orders = $this->buildOrdersQuery()->with([
             'payments.paymentMethod',
             'payments.paymentMethodRate',
             'handledBy',
@@ -664,11 +827,14 @@ class SalesReport extends Component
                     $vendor = '-';
                     $itemModal = 0;
 
+                    $itemVendors = [];
                     if (!empty($snList)) {
                         $vendorNames = [];
                         foreach ($snList as $sn) {
                             $snModel = $snVendors->get($sn);
-                            $vendorNames[] = $snModel?->vendor?->vendor_name ?? '-';
+                            $vn = $snModel?->vendor?->vendor_name ?? 'Tanpa Vendor / Unknown';
+                            $vendorNames[] = $vn;
+                            $itemVendors[] = $vn;
                             $snHpp = (float)($snModel?->hpp ?? 0);
                             $itemModal += ($item->qty < 0) ? -$snHpp : $snHpp;
                         }
@@ -678,12 +844,18 @@ class SalesReport extends Component
                         // Non-SN: ambil base_cost dari variant / ProductAccurate
                         $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
                         $itemModal = $baseCost * (float)$item->qty;
+                        $itemVendors = ['Tanpa Vendor / Unknown'];
                     }
+                    $itemVendors = array_unique($itemVendors);
 
                     $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
                     $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];
                     $penjualanBersih = round($actualItemSubtotal - $itemCouponDiscount - $itemLoyaltyDiscount);
                     $proyek = $variant?->proyek ?? '-';
+
+                    if (!$this->itemMatchesReportingFilters($item, $variant, $merk, $category, $proyek, $itemVendors)) {
+                        continue;
+                    }
 
                     $rowData = [
                         $order->order_date ? $order->order_date->format('d-m-Y') : $order->created_at->format('d-m-Y'),
@@ -1039,21 +1211,7 @@ class SalesReport extends Component
 
     private function generateVendorData(): array
     {
-        $start = Carbon::parse($this->startDate)->startOfDay();
-        $end = Carbon::parse($this->endDate)->endOfDay();
-
-        $ordersQuery = Order::with(['items.variant', 'items.promos', 'user', 'salesBy', 'handledBy', 'warehouse'])
-            ->whereBetween('orders.order_date', [$start, $end])
-            ->whereIn('orders.order_status', ['COMPLETED', 'piutang'])
-            ->when($this->businessUnitFilter && $this->businessUnitFilter !== 'all', function ($query) {
-                $query->where('orders.business_unit_id', $this->businessUnitFilter);
-            })
-            ->when($this->branchFilter, function ($query) {
-                $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
-            });
-
-        $ordersQuery = $this->applyDynamicFilters($ordersQuery);
-        $orders = $ordersQuery->latest('orders.order_date')->get();
+        $orders = $this->buildOrdersQuery()->with(['items.variant', 'items.promos', 'user', 'salesBy', 'handledBy', 'warehouse'])->get();
 
         $allSns = [];
         foreach ($orders as $order) {
@@ -1085,6 +1243,9 @@ class SalesReport extends Component
                 $variant = $item->variant;
                 $sku = $variant?->item_no ?? $variant?->sku ?? '-';
                 $productName = $variant?->name ?? $variant?->product?->name ?? $item->product_name ?? 'Unknown Product';
+                $merk = $variant?->brandName ?? $variant?->accurateData?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
+                $category = $variant?->categoryName ?? $variant?->accurateData?->categoryName ?? 'Unknown';
+                $proyek = $variant?->proyek ?? '-';
 
                 $itemPromosTotal = $item->promos->sum('pivot.discount_amount');
                 $actualItemSubtotal = $item->subtotal - ($item->discount_amount ?? 0) - $itemPromosTotal;
@@ -1106,8 +1267,9 @@ class SalesReport extends Component
                 }
 
                 $vendorDisplay = !empty($vendorNames) ? implode(', ', array_unique($vendorNames)) : 'Tanpa Vendor / Unknown';
+                $itemVendors = !empty($vendorNames) ? array_unique($vendorNames) : ['Tanpa Vendor / Unknown'];
 
-                if ($this->vendorFilter && !str_contains(strtolower($vendorDisplay), strtolower($this->vendorFilter))) {
+                if (!$this->itemMatchesReportingFilters($item, $variant, $merk, $category, $proyek, $itemVendors)) {
                     continue;
                 }
 
@@ -1191,21 +1353,10 @@ class SalesReport extends Component
 
     public function getVendorSummaryProperty()
     {
-        $start = Carbon::parse($this->startDate)->startOfDay();
-        $end = Carbon::parse($this->endDate)->endOfDay();
-
-        $ordersQuery = Order::with(['items.variant', 'items.promos', 'warehouse'])
-            ->whereBetween('orders.order_date', [$start, $end])
+        $orders = $this->buildOrdersQuery()
+            ->with(['items.variant', 'items.promos', 'warehouse'])
             ->whereIn('orders.order_status', ['COMPLETED'])
-            ->when($this->businessUnitFilter && $this->businessUnitFilter !== 'all', function ($query) {
-                $query->where('orders.business_unit_id', $this->businessUnitFilter);
-            })
-            ->when($this->branchFilter, function ($query) {
-                $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
-            });
-
-        $ordersQuery = $this->applyDynamicFilters($ordersQuery);
-        $orders = $ordersQuery->get();
+            ->get();
 
         // Kumpulkan semua serial number dari seluruh order items untuk query vendor sekaligus (bulk)
         $allSns = [];
@@ -1236,6 +1387,11 @@ class SalesReport extends Component
             $branch = $order->warehouse?->name ?? ($order->shipping_address_snapshot['store'] ?? 'Unknown Store');
 
             foreach ($order->items as $item) {
+                $variant = $item->variant;
+                $merk = $variant?->brandName ?? $variant?->accurateData?->brandName ?? $variant?->product?->brand?->name ?? 'Unknown';
+                $category = $variant?->categoryName ?? $variant?->accurateData?->categoryName ?? 'Unknown';
+                $proyek = $variant?->proyek ?? '-';
+
                 $itemVendors = [];
                 if ($item->serial_number) {
                     $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
@@ -1249,6 +1405,11 @@ class SalesReport extends Component
                 // Fallback jika tidak menggunakan SN atau data vendor kosong
                 if (empty($itemVendors)) {
                     $itemVendors = ['Tanpa Vendor / Unknown' => $item->qty];
+                }
+
+                $vendorNames = array_keys($itemVendors);
+                if (!$this->itemMatchesReportingFilters($item, $variant, $merk, $category, $proyek, $vendorNames)) {
+                    continue;
                 }
 
                 $totalSnCount = array_sum($itemVendors);
@@ -1342,7 +1503,7 @@ class SalesReport extends Component
 
     public function render()
     {
-        $orders = $this->ordersQuery->paginate(20);
+        $orders = (clone $this->ordersQuery)->paginate(20);
 
         $branchQuery = \App\Models\Branch::query();
         if ($this->businessUnitFilter && $this->businessUnitFilter !== 'all') {
@@ -1365,7 +1526,7 @@ class SalesReport extends Component
 
         $businessUnits = \App\Models\BusinessUnit::orderBy('name')->get();
 
-        $totalGross = $this->ordersQuery->sum('total_amount');
+        $totalGross = (clone $this->ordersQuery)->sum('total_amount');
         $netQuery = clone $this->ordersQuery;
         $totalNet = $netQuery->get()->sum(function ($order) {
             return $order->grand_total - $order->mdr_amount;

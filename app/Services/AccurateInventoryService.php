@@ -330,38 +330,106 @@ class AccurateInventoryService
         $dateKey = $asOfDate ?: now()->format('Y-m-d');
         $cacheKey = "accurate_inv_live_{$databaseSource}_{$dateKey}_{$filterHash}";
 
+        // 1. Tangani Cache & Refresh On-demand
         if ($forceRefresh) {
             Cache::forget($cacheKey);
-            try {
-                if ($databaseSource === 'all') {
-                    $this->syncProductsFromAccurate('second', 2);
-                    $this->syncProductsFromAccurate('syihab', 2);
-                    $this->syncWarehouseStocksFromAccurate('all', 3);
-                } else {
-                    $this->syncProductsFromAccurate($databaseSource, 3);
-                    $this->syncWarehouseStocksFromAccurate($databaseSource, 3);
-                }
-            } catch (\Exception $e) {
-                Log::warning("Background product sync on refresh failed: " . $e->getMessage());
-            }
+            $this->refreshAccurateSync($databaseSource);
         } elseif (Cache::has($cacheKey)) {
             return Cache::get($cacheKey);
         }
 
-        // Determine which BusinessUnits to query
-        $businessUnits = [];
-        if ($databaseSource === 'syihab') {
-            $bu = BusinessUnit::where('code', 'syihab')->first();
-            if ($bu) $businessUnits[] = $bu;
-        } elseif ($databaseSource === 'second') {
-            $bu = BusinessUnit::where('code', 'second')->first();
-            if ($bu) $businessUnits[] = $bu;
-        } else {
-            // All business units with active tokens
-            $businessUnits = BusinessUnit::whereNotNull('accurate_token')->get()->all();
+        // 2. Ambil Business Unit & Data Live (GL + Gudang)
+        $businessUnits = $this->resolveBusinessUnits($databaseSource);
+        [$totalValuation, $primaryAccount, $allWarehousesRaw] = $this->fetchGlAndLiveWarehouses($businessUnits, $asOfDate);
+
+        // 3. Kalkulasi Breakdown Cabang / Gudang
+        $branchBreakdown = $this->buildBranchBreakdown($allWarehousesRaw, $databaseSource, $totalValuation, $branch);
+
+        // 4. Resolusi Parameter Filter (Cabang & Kategori)
+        $matchedWhIds = $this->resolveMatchedWarehouseIds($branch);
+        $catTargets   = $this->resolveCategoryTargets($category);
+
+        // 5. Kalkulasi Breakdown Kategori & Brand
+        $categoryBreakdown = $this->buildCategoryBreakdown($matchedWhIds, $databaseSource, $totalValuation);
+        $brandBreakdown    = $this->buildBrandBreakdown($matchedWhIds, $catTargets, $databaseSource, $totalValuation);
+
+        // 6. Kalkulasi Top Valuasi Barang & Aging Risiko
+        $topValuationItems = $this->buildTopValuationItems($matchedWhIds, $catTargets, $databaseSource);
+
+        // 7. Kalkulasi Slow Moving & Total Unit
+        $slowMoving = $this->calculateSlowMoving($databaseSource, $totalValuation);
+        $totalWhUnits = !empty($branchBreakdown) ? array_sum(array_column($branchBreakdown, 'total_qty')) : 0;
+        if ($totalWhUnits <= 0) {
+            $totalWhUnits = (int)ProductAccurate::query()
+                ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
+                ->where('stock', '>', 0)
+                ->sum('stock');
         }
 
-        // 1. Fetch Real Accurate GL Balances & Live Warehouses
+        $result = [
+            'business_unit' => $resolvedBuName ?: ($databaseSource === 'syihab' ? 'Syihab Store' : ($databaseSource === 'second' ? 'GSK Second' : 'Semua Unit Bisnis')),
+            'database_source' => $databaseSource,
+            'as_of_date' => $asOfDate ?: now()->format('Y-m-d'),
+            'gl_account' => $primaryAccount ?: [
+                'account_no' => '10.06.001',
+                'account_name' => 'Persediaan',
+                'balance' => $totalValuation,
+            ],
+            'total_valuation' => round($totalValuation, 2),
+            'total_units' => (int)$totalWhUnits,
+            'average_unit_cost' => $totalWhUnits > 0 ? round($totalValuation / $totalWhUnits, 2) : 0,
+            'slow_moving' => $slowMoving,
+            'branch_breakdown' => $branchBreakdown,
+            'category_breakdown' => $categoryBreakdown,
+            'brand_breakdown' => $brandBreakdown,
+            'top_valuation_items' => $topValuationItems,
+            'last_synced_at' => now()->toIso8601String(),
+        ];
+
+        Cache::put($cacheKey, $result, now()->addMinutes(15));
+        return $result;
+    }
+
+    /**
+     * Jalankan sinkronisasi background saat user menekan force refresh.
+     */
+    protected function refreshAccurateSync(string $databaseSource): void
+    {
+        try {
+            if ($databaseSource === 'all') {
+                $this->syncProductsFromAccurate('second', 2);
+                $this->syncProductsFromAccurate('syihab', 2);
+                $this->syncWarehouseStocksFromAccurate('all', 3);
+            } else {
+                $this->syncProductsFromAccurate($databaseSource, 3);
+                $this->syncWarehouseStocksFromAccurate($databaseSource, 3);
+            }
+        } catch (\Exception $e) {
+            Log::warning("Background product sync on refresh failed: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Tentukan BusinessUnit target berdasarkan parameter source.
+     */
+    protected function resolveBusinessUnits(string $databaseSource): array
+    {
+        if ($databaseSource === 'syihab') {
+            $bu = BusinessUnit::where('code', 'syihab')->first();
+            return $bu ? [$bu] : [];
+        } elseif ($databaseSource === 'second') {
+            $bu = BusinessUnit::where('code', 'second')->first();
+            return $bu ? [$bu] : [];
+        }
+
+        return BusinessUnit::whereNotNull('accurate_token')->get()->all();
+    }
+
+    /**
+     * Ambil saldo GL live dan daftar gudang langsung dari Accurate Online API.
+     */
+    protected function fetchGlAndLiveWarehouses(array $businessUnits, ?string $asOfDate): array
+    {
         $totalValuation = 0;
         $primaryAccount = null;
         $allWarehousesRaw = [];
@@ -373,10 +441,8 @@ class AccurateInventoryService
                 $primaryAccount = $gl['account'];
             }
 
-            // Fetch live warehouses for this BU directly from Accurate API
             $whs = $this->fetchLiveWarehouses($bu);
             foreach ($whs as $w) {
-                // Ensure local warehouse record exists
                 $localWh = Warehouse::updateOrCreate(
                     ['name' => $w['name'], 'business_unit_id' => $bu->id],
                     ['warehouse_id' => $w['id']]
@@ -396,7 +462,18 @@ class AccurateInventoryService
             }
         }
 
-        // 2. Build Real Warehouse Breakdown using local WarehouseStock joined with ProductAccurate
+        return [$totalValuation, $primaryAccount, $allWarehousesRaw];
+    }
+
+    /**
+     * Bangun rincian per cabang/gudang dan lakukan rekonsiliasi proporsional terhadap GL.
+     */
+    protected function buildBranchBreakdown(
+        array $allWarehousesRaw,
+        string $databaseSource,
+        float $totalValuation,
+        $branch = null
+    ): array {
         $whStocksQuery = DB::table('warehouse_stocks')
             ->join('product_accurates', function ($join) {
                 $join->on('warehouse_stocks.variant_id', '=', 'product_accurates.id')
@@ -425,14 +502,13 @@ class AccurateInventoryService
         }
 
         $hasRealStockData = $whStockStats->isNotEmpty() && $whStockStats->sum('total_qty') > 0;
-
-        $branchBreakdown = [];
         $totalUnitsInDb = ProductAccurate::query()
             ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
             ->where('stock', '>', 0)
             ->sum('stock');
 
         $activeWarehousesCount = count($allWarehousesRaw);
+        $branchBreakdown = [];
 
         foreach ($allWarehousesRaw as $w) {
             $whCount = max(1, $w['bu_wh_count']);
@@ -447,36 +523,19 @@ class AccurateInventoryService
                 $buId = $w['bu_id'] ?? null;
                 $buRawVal = ($buId && isset($buRawValuations[$buId])) ? $buRawValuations[$buId] : 0;
 
-                // Scale proportionally to GL balance if GL balance > 0, otherwise use raw valuation
+                // Skala proporsional terhadap saldo GL jika tersedia
                 if ($w['bu_gl_balance'] > 0 && $buRawVal > 0) {
                     $whVal = round(($whRawVal / $buRawVal) * $w['bu_gl_balance'], 2);
                 } else {
                     $whVal = round($whRawVal, 2);
                 }
             } else {
-                // Fallback if WarehouseStock is not yet synced
                 $whVal = round($w['bu_gl_balance'] / $whCount, 2);
                 $whUnits = $totalUnitsInDb > 0 ? (int)round(($totalUnitsInDb / max(1, $activeWarehousesCount))) : 0;
             }
 
-            $status = 'NORMAL';
-            if ($w['suspended'] || str_contains($nameLower, 'rusak') || str_contains($nameLower, 'return') || str_contains($nameLower, 'retur')) {
-                $status = 'ALERT';
-            } elseif (str_contains($nameLower, 'head office') || str_contains($nameLower, 'kayutangi')) {
-                $status = 'OPTIMAL';
-            }
-
-            $type = 'Outlet Store';
-            if (str_contains($nameLower, 'head office') || str_contains($nameLower, 'pusat')) {
-                $type = 'Gudang Pusat';
-            } elseif (str_contains($nameLower, 'service')) {
-                $type = 'Pusat Service & Sparepart';
-            } elseif (str_contains($nameLower, 'rusak') || str_contains($nameLower, 'afkir')) {
-                $type = 'Barang Rusak / Afkir';
-            } elseif (str_contains($nameLower, 'return') || str_contains($nameLower, 'retur')) {
-                $type = 'Gudang Retur Supplier';
-            }
-
+            $status = $this->determineWarehouseStatus((bool)$w['suspended'], $nameLower);
+            $type = $this->determineWarehouseType($nameLower);
             $cleanBranchName = trim(str_ireplace(['gsk - ', 'gsk second - ', 'syihab - '], '', $w['name']));
 
             $branchBreakdown[] = [
@@ -492,33 +551,129 @@ class AccurateInventoryService
             ];
         }
 
-        // Apply Branch filter if specified
+        // Terapkan filter cabang jika dipilih
         if (!empty($branch)) {
             $targets = is_array($branch) ? array_map('strtolower', $branch) : [strtolower(trim($branch))];
             $branchBreakdown = array_values(array_filter($branchBreakdown, function ($b) use ($targets) {
                 $wh = strtolower($b['warehouse_name']);
                 $br = strtolower($b['branch_name']);
                 foreach ($targets as $t) {
-                    if (str_contains($wh, $t) || str_contains($br, $t)) return true;
+                    if (str_contains($wh, $t) || str_contains($br, $t) || str_contains($t, $br)) return true;
                 }
                 return false;
             }));
         }
 
-        // 3. Category Breakdown Directly from Local Database (product_accurates)
-        $catQuery = ProductAccurate::where('stock', '>', 0)
-            ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource));
+        return $branchBreakdown;
+    }
 
-        $dbCats = $catQuery->select(
-            'categoryName',
-            DB::raw('count(*) as count'),
-            DB::raw('sum(stock) as total_qty'),
-            DB::raw('sum(stock * base_cost) as total_val')
-        )->groupBy('categoryName')->orderByDesc('total_val')->get();
+    /**
+     * Tentukan status kesehatan operasional gudang.
+     */
+    protected function determineWarehouseStatus(bool $suspended, string $nameLower): string
+    {
+        if ($suspended || str_contains($nameLower, 'rusak') || str_contains($nameLower, 'return') || str_contains($nameLower, 'retur')) {
+            return 'ALERT';
+        }
+        if (str_contains($nameLower, 'head office') || str_contains($nameLower, 'kayutangi')) {
+            return 'OPTIMAL';
+        }
+        return 'NORMAL';
+    }
+
+    /**
+     * Tentukan tipe fungsi operasional gudang.
+     */
+    protected function determineWarehouseType(string $nameLower): string
+    {
+        if (str_contains($nameLower, 'head office') || str_contains($nameLower, 'pusat')) {
+            return 'Gudang Pusat';
+        }
+        if (str_contains($nameLower, 'service')) {
+            return 'Pusat Service & Sparepart';
+        }
+        if (str_contains($nameLower, 'rusak') || str_contains($nameLower, 'afkir')) {
+            return 'Barang Rusak / Afkir';
+        }
+        if (str_contains($nameLower, 'return') || str_contains($nameLower, 'retur')) {
+            return 'Gudang Retur Supplier';
+        }
+        return 'Outlet Store';
+    }
+
+    /**
+     * Resolusi ID gudang lokal berdasarkan nama filter cabang yang dipilih.
+     */
+    protected function resolveMatchedWarehouseIds($branch): array
+    {
+        if (empty($branch)) {
+            return [];
+        }
+
+        $targets = is_array($branch) ? array_map('strtolower', $branch) : [strtolower(trim($branch))];
+
+        return Warehouse::all()->filter(function ($w) use ($targets) {
+            $wName = strtolower($w->name);
+            $wClean = strtolower(trim(str_ireplace(['gsk - ', 'gsk second - ', 'syihab - '], '', $w->name)));
+            foreach ($targets as $t) {
+                if (str_contains($wName, $t) || str_contains($wClean, $t) || str_contains($t, $wClean)) {
+                    return true;
+                }
+            }
+            return false;
+        })->pluck('id')->toArray();
+    }
+
+    /**
+     * Normalisasi string/array kategori menjadi array target pencarian.
+     */
+    protected function resolveCategoryTargets($category): array
+    {
+        if (empty($category)) {
+            return [];
+        }
+
+        $catTargets = is_array($category) ? array_map('trim', $category) : [trim($category)];
+        return array_values(array_filter($catTargets, fn($c) => $c !== ''));
+    }
+
+    /**
+     * Bangun rincian valuasi per kategori produk.
+     */
+    protected function buildCategoryBreakdown(array $matchedWhIds, string $databaseSource, float $totalValuation): array
+    {
+        if (!empty($matchedWhIds)) {
+            $catQuery = DB::table('warehouse_stocks')
+                ->join('product_accurates', function ($join) {
+                    $join->on('warehouse_stocks.variant_id', '=', 'product_accurates.id')
+                         ->where('warehouse_stocks.variant_type', '=', ProductAccurate::class);
+                })
+                ->whereIn('warehouse_stocks.warehouse_id', $matchedWhIds)
+                ->where('warehouse_stocks.stock', '>', 0)
+                ->when($databaseSource !== 'all', fn($q) => $q->where('product_accurates.database_source', $databaseSource));
+
+            $dbCats = $catQuery->select(
+                'product_accurates.categoryName',
+                DB::raw('count(*) as count'),
+                DB::raw('sum(warehouse_stocks.stock) as total_qty'),
+                DB::raw('sum(warehouse_stocks.stock * product_accurates.base_cost) as total_val')
+            )->groupBy('product_accurates.categoryName')->orderByDesc('total_val')->get();
+        } else {
+            $catQuery = ProductAccurate::where('stock', '>', 0)
+                ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource));
+
+            $dbCats = $catQuery->select(
+                'categoryName',
+                DB::raw('count(*) as count'),
+                DB::raw('sum(stock) as total_qty'),
+                DB::raw('sum(stock * base_cost) as total_val')
+            )->groupBy('categoryName')->orderByDesc('total_val')->get();
+        }
 
         $categoryColors = ['#6366f1', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#14b8a6', '#64748b'];
         $categoryBreakdown = [];
         $totalCatVal = $dbCats->sum('total_val') ?: 1;
+        $buLabel = $databaseSource === 'syihab' ? 'Syihab' : ($databaseSource === 'second' ? 'GSK Second' : 'Semua BU');
 
         foreach ($dbCats as $idx => $c) {
             $catName = $c->categoryName ?: 'Umum';
@@ -527,7 +682,7 @@ class AccurateInventoryService
 
             $categoryBreakdown[] = [
                 'category_name' => $catName,
-                'business_unit' => $databaseSource === 'syihab' ? 'Syihab' : ($databaseSource === 'second' ? 'GSK Second' : 'Semua BU'),
+                'business_unit' => $buLabel,
                 'total_valuation' => $scaledVal,
                 'total_qty' => (int)$c->total_qty,
                 'average_unit_cost' => $c->total_qty > 0 ? round($scaledVal / $c->total_qty, 2) : 0,
@@ -536,16 +691,61 @@ class AccurateInventoryService
             ];
         }
 
-        // 4. Brand Breakdown Directly from Local Database
-        $brandQuery = ProductAccurate::where('stock', '>', 0)
-            ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource));
+        return $categoryBreakdown;
+    }
 
-        $dbBrands = $brandQuery->select(
-            'brandName',
-            DB::raw('count(*) as count'),
-            DB::raw('sum(stock) as total_qty'),
-            DB::raw('sum(stock * base_cost) as total_val')
-        )->groupBy('brandName')->orderByDesc('total_val')->get();
+    /**
+     * Bangun rincian valuasi per merek (Brand).
+     */
+    protected function buildBrandBreakdown(
+        array $matchedWhIds,
+        array $catTargets,
+        string $databaseSource,
+        float $totalValuation
+    ): array {
+        if (!empty($matchedWhIds)) {
+            $brandQuery = DB::table('warehouse_stocks')
+                ->join('product_accurates', function ($join) {
+                    $join->on('warehouse_stocks.variant_id', '=', 'product_accurates.id')
+                         ->where('warehouse_stocks.variant_type', '=', ProductAccurate::class);
+                })
+                ->whereIn('warehouse_stocks.warehouse_id', $matchedWhIds)
+                ->where('warehouse_stocks.stock', '>', 0)
+                ->when($databaseSource !== 'all', fn($q) => $q->where('product_accurates.database_source', $databaseSource));
+
+            if (!empty($catTargets)) {
+                $brandQuery->where(function ($q) use ($catTargets) {
+                    foreach ($catTargets as $cat) {
+                        $q->orWhere('product_accurates.categoryName', 'LIKE', '%' . $cat . '%');
+                    }
+                });
+            }
+
+            $dbBrands = $brandQuery->select(
+                'product_accurates.brandName',
+                DB::raw('count(*) as count'),
+                DB::raw('sum(warehouse_stocks.stock) as total_qty'),
+                DB::raw('sum(warehouse_stocks.stock * product_accurates.base_cost) as total_val')
+            )->groupBy('product_accurates.brandName')->orderByDesc('total_val')->get();
+        } else {
+            $brandQuery = ProductAccurate::where('stock', '>', 0)
+                ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource));
+
+            if (!empty($catTargets)) {
+                $brandQuery->where(function ($q) use ($catTargets) {
+                    foreach ($catTargets as $cat) {
+                        $q->orWhere('categoryName', 'LIKE', '%' . $cat . '%');
+                    }
+                });
+            }
+
+            $dbBrands = $brandQuery->select(
+                'brandName',
+                DB::raw('count(*) as count'),
+                DB::raw('sum(stock) as total_qty'),
+                DB::raw('sum(stock * base_cost) as total_val')
+            )->groupBy('brandName')->orderByDesc('total_val')->get();
+        }
 
         $totalBrandVal = $dbBrands->sum('total_val') ?: 1;
         $brandBreakdown = [];
@@ -563,25 +763,73 @@ class AccurateInventoryService
             ];
         }
 
-        // 5. REAL TOP VALUATION ITEMS DIRECTLY FROM product_accurates TABLE!
-        $topItemsQuery = ProductAccurate::where('stock', '>', 0)
-            ->where('base_cost', '>', 0)
-            ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource));
+        return $brandBreakdown;
+    }
 
-        $dbTopItems = $topItemsQuery->select([
-            'item_no',
-            'name',
-            'categoryName',
-            'brandName',
-            'stock',
-            'base_cost',
-            DB::raw('(stock * base_cost) as total_val'),
-            'updated_at',
-        ])->orderByDesc('total_val')->take(10)->get();
+    /**
+     * Ambil 10 item dengan valuasi tertinggi beserta estimasi aging dan risikonya.
+     */
+    protected function buildTopValuationItems(array $matchedWhIds, array $catTargets, string $databaseSource): array
+    {
+        if (!empty($matchedWhIds)) {
+            $topItemsQuery = DB::table('warehouse_stocks')
+                ->join('product_accurates', function ($join) {
+                    $join->on('warehouse_stocks.variant_id', '=', 'product_accurates.id')
+                         ->where('warehouse_stocks.variant_type', '=', ProductAccurate::class);
+                })
+                ->join('warehouses', 'warehouse_stocks.warehouse_id', '=', 'warehouses.id')
+                ->whereIn('warehouse_stocks.warehouse_id', $matchedWhIds)
+                ->where('warehouse_stocks.stock', '>', 0)
+                ->where('product_accurates.base_cost', '>', 0)
+                ->when($databaseSource !== 'all', fn($q) => $q->where('product_accurates.database_source', $databaseSource));
+
+            if (!empty($catTargets)) {
+                $topItemsQuery->where(function ($q) use ($catTargets) {
+                    foreach ($catTargets as $cat) {
+                        $q->orWhere('product_accurates.categoryName', 'LIKE', '%' . $cat . '%');
+                    }
+                });
+            }
+
+            $dbTopItems = $topItemsQuery->select([
+                'product_accurates.item_no',
+                'product_accurates.name',
+                'product_accurates.categoryName',
+                'product_accurates.brandName',
+                'warehouse_stocks.stock',
+                'product_accurates.base_cost',
+                DB::raw('(warehouse_stocks.stock * product_accurates.base_cost) as total_val'),
+                'warehouse_stocks.updated_at',
+                'warehouses.name as warehouse_name',
+            ])->orderByDesc('total_val')->take(10)->get();
+        } else {
+            $topItemsQuery = ProductAccurate::where('stock', '>', 0)
+                ->where('base_cost', '>', 0)
+                ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource));
+
+            if (!empty($catTargets)) {
+                $topItemsQuery->where(function ($q) use ($catTargets) {
+                    foreach ($catTargets as $cat) {
+                        $q->orWhere('categoryName', 'LIKE', '%' . $cat . '%');
+                    }
+                });
+            }
+
+            $dbTopItems = $topItemsQuery->select([
+                'item_no',
+                'name',
+                'categoryName',
+                'brandName',
+                'stock',
+                'base_cost',
+                DB::raw('(stock * base_cost) as total_val'),
+                'updated_at',
+            ])->orderByDesc('total_val')->take(10)->get();
+        }
 
         $topValuationItems = [];
         foreach ($dbTopItems as $idx => $it) {
-            $days = 20 + ($idx * 7); // Realistic ageing
+            $days = 20 + ($idx * 7); // Simulasi aging bertahap
             $risk = 'LOW';
             if ($days > 90) $risk = 'CRITICAL';
             elseif ($days > 60) $risk = 'HIGH';
@@ -597,10 +845,18 @@ class AccurateInventoryService
                 'total_valuation' => (float)$it->total_val,
                 'days_in_inventory' => $days,
                 'risk_status' => $risk,
+                'warehouse_name' => $it->warehouse_name ?? null,
             ];
         }
 
-        // 6. Slow Moving Items Calculation
+        return $topValuationItems;
+    }
+
+    /**
+     * Hitung metrik estimasi barang lambat bergerak (slow moving).
+     */
+    protected function calculateSlowMoving(string $databaseSource, float $totalValuation): array
+    {
         $slowMovingItems = ProductAccurate::where('stock', '>', 0)
             ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
             ->take(5)
@@ -609,34 +865,11 @@ class AccurateInventoryService
         $slowMovingQty = $slowMovingItems->sum('stock');
         $slowMovingValScaled = round($totalValuation * 0.082, 2);
 
-        $totalWhUnits = $hasRealStockData ? array_sum(array_column($branchBreakdown, 'total_qty')) : (int)max($totalUnitsInDb, 1);
-
-        $result = [
-            'business_unit' => $resolvedBuName ?: ($databaseSource === 'syihab' ? 'Syihab Store' : ($databaseSource === 'second' ? 'GSK Second' : 'Semua Unit Bisnis')),
-            'database_source' => $databaseSource,
-            'as_of_date' => $asOfDate ?: now()->format('Y-m-d'),
-            'gl_account' => $primaryAccount ?: [
-                'account_no' => '10.06.001',
-                'account_name' => 'Persediaan',
-                'balance' => $totalValuation,
-            ],
-            'total_valuation' => round($totalValuation, 2),
-            'total_units' => (int)$totalWhUnits,
-            'average_unit_cost' => $totalWhUnits > 0 ? round($totalValuation / $totalWhUnits, 2) : 0,
-            'slow_moving' => [
-                'threshold_days' => 60,
-                'total_valuation' => $slowMovingValScaled,
-                'total_qty' => (int)$slowMovingQty,
-                'percentage_of_inventory' => 8.2,
-            ],
-            'branch_breakdown' => $branchBreakdown,
-            'category_breakdown' => $categoryBreakdown,
-            'brand_breakdown' => $brandBreakdown,
-            'top_valuation_items' => $topValuationItems,
-            'last_synced_at' => now()->toIso8601String(),
+        return [
+            'threshold_days' => 60,
+            'total_valuation' => $slowMovingValScaled,
+            'total_qty' => (int)$slowMovingQty,
+            'percentage_of_inventory' => 8.2,
         ];
-
-        Cache::put($cacheKey, $result, now()->addMinutes(15));
-        return $result;
     }
 }
