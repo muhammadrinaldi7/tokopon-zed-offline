@@ -163,6 +163,10 @@ class PublicTradeInController extends Controller
         $query->when($brand, function ($q) use ($brand) {
             $q->where('brandName', $brand);
         })
+            ->where(function ($q) {
+                $q->whereNull('proyek')
+                    ->orWhere('proyek', '!=', 'BEACUKAI');
+            })
             ->when($proyek, function ($q) use ($proyek) {
                 $q->where('proyek', $proyek);
             });
