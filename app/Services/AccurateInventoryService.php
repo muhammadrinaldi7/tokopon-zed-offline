@@ -63,12 +63,20 @@ class AccurateInventoryService
     /**
      * Fetch Live GL Balance for Persediaan (Akun 10.06.001) from Accurate API.
      */
-    public function fetchLiveGlBalance(BusinessUnit $bu, ?string $asOfDate = null): array
+    public function fetchLiveGlBalance(BusinessUnit $bu, ?string $asOfDate = null, bool $forceRefresh = false): array
     {
-        $config = $this->getHeadersForBu($bu);
         $dt = new \DateTime('now', new \DateTimeZone('Asia/Jakarta'));
         $asOfFormat = $asOfDate ? Carbon::parse($asOfDate)->format('d/m/Y') : $dt->format('d/m/Y');
+        $cacheKey = "accurate_gl_bal_{$bu->id}_{$asOfFormat}";
 
+        if (!$forceRefresh && Cache::has($cacheKey)) {
+            $cached = Cache::get($cacheKey);
+            if (!empty($cached['balance']) && $cached['balance'] > 0) {
+                return $cached;
+            }
+        }
+
+        $config = $this->getHeadersForBu($bu);
         $glBalance = 0;
         $glAccountInfo = null;
 
@@ -116,7 +124,7 @@ class AccurateInventoryService
             Log::warning("Live GL fetch error for {$bu->name}: " . $e->getMessage());
         }
 
-        return [
+        $result = [
             'balance' => $glBalance,
             'account' => $glAccountInfo ?: [
                 'account_no' => '10.06.001',
@@ -124,6 +132,12 @@ class AccurateInventoryService
                 'balance' => $glBalance,
             ],
         ];
+
+        if ($glBalance > 0) {
+            Cache::put($cacheKey, $result, now()->addMinutes(30));
+        }
+
+        return $result;
     }
 
     /**
@@ -340,28 +354,66 @@ class AccurateInventoryService
 
         // 2. Ambil Business Unit & Data Live (GL + Gudang)
         $businessUnits = $this->resolveBusinessUnits($databaseSource);
-        [$totalValuation, $primaryAccount, $allWarehousesRaw] = $this->fetchGlAndLiveWarehouses($businessUnits, $asOfDate);
+        [$totalValuation, $primaryAccount, $allWarehousesRaw] = $this->fetchGlAndLiveWarehouses($businessUnits, $asOfDate, $forceRefresh, $databaseSource);
 
-        // 3. Kalkulasi Breakdown Cabang / Gudang
-        $branchBreakdown = $this->buildBranchBreakdown($allWarehousesRaw, $databaseSource, $totalValuation, $branch);
-
-        // 4. Resolusi Parameter Filter (Cabang & Kategori)
+        // 3. Resolusi Parameter Filter (Cabang & Kategori)
         $matchedWhIds = $this->resolveMatchedWarehouseIds($branch);
         $catTargets   = $this->resolveCategoryTargets($category);
 
-        // 5. Kalkulasi Breakdown Kategori & Brand
-        $categoryBreakdown = $this->buildCategoryBreakdown($matchedWhIds, $databaseSource, $totalValuation);
-        $brandBreakdown    = $this->buildBrandBreakdown($matchedWhIds, $catTargets, $databaseSource, $totalValuation);
+        // 4. Hitung Total Nilai Fisik Mentah di Database untuk Menghitung Proporsi
+        $buTotalRawVal = (float) DB::table('product_accurates')
+            ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
+            ->where('stock', '>', 0)
+            ->sum(DB::raw('stock * base_cost')) ?: 1.0;
 
-        // 6. Kalkulasi Top Valuasi Barang & Aging Risiko
+        // 5. Kalkulasi Breakdown Kategori (dan hitung nilai efektif jika kategori difilter)
+        $categoryBreakdown = $this->buildCategoryBreakdown($matchedWhIds, $catTargets, $databaseSource, $totalValuation, $buTotalRawVal);
+
+        // Jika user memfilter kategori, effectiveValuation adalah total dari kategori yang dipilih
+        if (!empty($catTargets)) {
+            $effectiveValuation = (float) array_sum(array_column($categoryBreakdown, 'total_valuation'));
+        } else {
+            $effectiveValuation = $totalValuation;
+        }
+
+        // 6. Kalkulasi Breakdown Cabang / Gudang (disaring berdasarkan kategori jika dipilih)
+        $branchBreakdown = $this->buildBranchBreakdown(
+            $allWarehousesRaw,
+            $databaseSource,
+            $effectiveValuation,
+            $buTotalRawVal,
+            $branch,
+            $catTargets
+        );
+
+        // Jika user memfilter cabang, sesuaikan effectiveValuation ke total cabang terpilih
+        if (!empty($branch)) {
+            $branchFilteredVal = (float) array_sum(array_column($branchBreakdown, 'total_valuation'));
+            if ($branchFilteredVal > 0 || !empty($branchBreakdown)) {
+                $effectiveValuation = $branchFilteredVal;
+            }
+        }
+
+        // 7. Kalkulasi Breakdown Brand (diskalakan terhadap effectiveValuation)
+        $brandBreakdown = $this->buildBrandBreakdown($matchedWhIds, $catTargets, $databaseSource, $effectiveValuation);
+
+        // 8. Kalkulasi Top Valuasi Barang (disaring berdasarkan cabang & kategori)
         $topValuationItems = $this->buildTopValuationItems($matchedWhIds, $catTargets, $databaseSource);
 
-        // 7. Kalkulasi Slow Moving & Total Unit
-        $slowMoving = $this->calculateSlowMoving($databaseSource, $totalValuation);
+        // 9. Kalkulasi Slow Moving & Total Unit Riil
+        $slowMoving = $this->calculateSlowMoving($databaseSource, $effectiveValuation, 60, $matchedWhIds, $catTargets);
+
         $totalWhUnits = !empty($branchBreakdown) ? array_sum(array_column($branchBreakdown, 'total_qty')) : 0;
-        if ($totalWhUnits <= 0) {
-            $totalWhUnits = (int)ProductAccurate::query()
+        if ($totalWhUnits <= 0 && empty($matchedWhIds)) {
+            $totalWhUnits = (int) ProductAccurate::query()
                 ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
+                ->when(!empty($catTargets), function ($q) use ($catTargets) {
+                    $q->where(function ($sub) use ($catTargets) {
+                        foreach ($catTargets as $cat) {
+                            $sub->orWhere('categoryName', 'LIKE', '%' . $cat . '%');
+                        }
+                    });
+                })
                 ->where('stock', '>', 0)
                 ->sum('stock');
         }
@@ -375,9 +427,9 @@ class AccurateInventoryService
                 'account_name' => 'Persediaan',
                 'balance' => $totalValuation,
             ],
-            'total_valuation' => round($totalValuation, 2),
+            'total_valuation' => round($effectiveValuation, 2),
             'total_units' => (int)$totalWhUnits,
-            'average_unit_cost' => $totalWhUnits > 0 ? round($totalValuation / $totalWhUnits, 2) : 0,
+            'average_unit_cost' => $totalWhUnits > 0 ? round($effectiveValuation / $totalWhUnits, 2) : 0,
             'slow_moving' => $slowMoving,
             'branch_breakdown' => $branchBreakdown,
             'category_breakdown' => $categoryBreakdown,
@@ -428,38 +480,69 @@ class AccurateInventoryService
     /**
      * Ambil saldo GL live dan daftar gudang langsung dari Accurate Online API.
      */
-    protected function fetchGlAndLiveWarehouses(array $businessUnits, ?string $asOfDate): array
+    protected function fetchGlAndLiveWarehouses(array $businessUnits, ?string $asOfDate, bool $forceRefresh = false, string $databaseSource = 'all'): array
     {
         $totalValuation = 0;
         $primaryAccount = null;
         $allWarehousesRaw = [];
 
         foreach ($businessUnits as $bu) {
-            $gl = $this->fetchLiveGlBalance($bu, $asOfDate);
+            $gl = $this->fetchLiveGlBalance($bu, $asOfDate, $forceRefresh);
             $totalValuation += $gl['balance'];
-            if (!$primaryAccount && !empty($gl['account'])) {
+            if (!$primaryAccount && $gl['account']) {
                 $primaryAccount = $gl['account'];
             }
 
             $whs = $this->fetchLiveWarehouses($bu);
+            if (empty($whs)) {
+                $localWhs = Warehouse::where('business_unit_id', $bu->id)->get();
+                foreach ($localWhs as $lw) {
+                    $whs[] = [
+                        'id' => $lw->warehouse_id ?: $lw->id,
+                        'local_id' => $lw->id,
+                        'name' => $lw->name,
+                        'suspended' => false,
+                    ];
+                }
+            }
+
             foreach ($whs as $w) {
-                $localWh = Warehouse::updateOrCreate(
-                    ['name' => $w['name'], 'business_unit_id' => $bu->id],
-                    ['warehouse_id' => $w['id']]
-                );
+                $localId = $w['local_id'] ?? null;
+                if (!$localId) {
+                    $localWh = Warehouse::updateOrCreate(
+                        ['name' => $w['name'], 'business_unit_id' => $bu->id],
+                        ['warehouse_id' => $w['id']]
+                    );
+                    $localId = $localWh->id;
+                }
 
                 $allWarehousesRaw[] = [
+                    'id' => $w['id'],
+                    'local_id' => $localId,
+                    'name' => $w['name'],
+                    'suspended' => $w['suspended'] ?? false,
                     'bu_id' => $bu->id,
                     'bu_name' => $bu->name,
                     'bu_code' => $bu->code,
-                    'id' => $w['id'],
-                    'local_id' => $localWh->id,
-                    'name' => $w['name'],
-                    'suspended' => $w['suspended'],
                     'bu_gl_balance' => $gl['balance'],
                     'bu_wh_count' => count($whs),
                 ];
             }
+        }
+
+        if ($totalValuation <= 0) {
+            $totalValuation = (float) DB::table('product_accurates')
+                ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
+                ->where('stock', '>', 0)
+                ->sum(DB::raw('stock * base_cost'));
+
+            // Also assign bu_gl_balance if 0
+            foreach ($allWarehousesRaw as &$aw) {
+                if ($aw['bu_gl_balance'] <= 0) {
+                    $aw['bu_gl_balance'] = $totalValuation;
+                }
+            }
+            unset($aw);
         }
 
         return [$totalValuation, $primaryAccount, $allWarehousesRaw];
@@ -471,18 +554,29 @@ class AccurateInventoryService
     protected function buildBranchBreakdown(
         array $allWarehousesRaw,
         string $databaseSource,
-        float $totalValuation,
-        $branch = null
+        float $effectiveValuation,
+        float $buTotalRawVal,
+        $branch = null,
+        array $catTargets = []
     ): array {
         $whStocksQuery = DB::table('warehouse_stocks')
             ->join('product_accurates', function ($join) {
                 $join->on('warehouse_stocks.variant_id', '=', 'product_accurates.id')
                      ->where('warehouse_stocks.variant_type', '=', ProductAccurate::class);
             })
-            ->join('warehouses', 'warehouse_stocks.warehouse_id', '=', 'warehouses.id');
+            ->join('warehouses', 'warehouse_stocks.warehouse_id', '=', 'warehouses.id')
+            ->where('warehouse_stocks.stock', '>', 0);
 
         if ($databaseSource !== 'all') {
             $whStocksQuery->where('product_accurates.database_source', $databaseSource);
+        }
+
+        if (!empty($catTargets)) {
+            $whStocksQuery->where(function ($q) use ($catTargets) {
+                foreach ($catTargets as $cat) {
+                    $q->orWhere('product_accurates.categoryName', 'LIKE', '%' . $cat . '%');
+                }
+            });
         }
 
         $whStockStats = $whStocksQuery->select(
@@ -495,20 +589,24 @@ class AccurateInventoryService
 
         $whStatsByLocalId = $whStockStats->keyBy('local_wh_id');
 
-        $buRawValuations = [];
-        foreach ($whStockStats as $st) {
-            $buId = $st->business_unit_id;
-            $buRawValuations[$buId] = ($buRawValuations[$buId] ?? 0) + (float)$st->total_val;
-        }
-
         $hasRealStockData = $whStockStats->isNotEmpty() && $whStockStats->sum('total_qty') > 0;
         $totalUnitsInDb = ProductAccurate::query()
             ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
+            ->when(!empty($catTargets), function ($q) use ($catTargets) {
+                $q->where(function ($sub) use ($catTargets) {
+                    foreach ($catTargets as $cat) {
+                        $sub->orWhere('categoryName', 'LIKE', '%' . $cat . '%');
+                    }
+                });
+            })
             ->where('stock', '>', 0)
             ->sum('stock');
 
         $activeWarehousesCount = count($allWarehousesRaw);
         $branchBreakdown = [];
+
+        // Hitung total raw valuation untuk subset filter ini agar penskalaan proporsional tepat
+        $subsetTotalRawVal = (float) $whStockStats->sum('total_val') ?: 1.0;
 
         foreach ($allWarehousesRaw as $w) {
             $whCount = max(1, $w['bu_wh_count']);
@@ -520,23 +618,23 @@ class AccurateInventoryService
             if ($hasRealStockData) {
                 $whUnits = $stat ? (int)$stat->total_qty : 0;
                 $whRawVal = $stat ? (float)$stat->total_val : 0;
-                $buId = $w['bu_id'] ?? null;
-                $buRawVal = ($buId && isset($buRawValuations[$buId])) ? $buRawValuations[$buId] : 0;
 
-                // Skala proporsional terhadap saldo GL jika tersedia
-                if ($w['bu_gl_balance'] > 0 && $buRawVal > 0) {
-                    $whVal = round(($whRawVal / $buRawVal) * $w['bu_gl_balance'], 2);
+                // Skala proporsional terhadap effectiveValuation untuk subset ini
+                if ($effectiveValuation > 0 && $subsetTotalRawVal > 0) {
+                    $whVal = round(($whRawVal / $subsetTotalRawVal) * $effectiveValuation, 2);
                 } else {
                     $whVal = round($whRawVal, 2);
                 }
             } else {
-                $whVal = round($w['bu_gl_balance'] / $whCount, 2);
+                $whVal = round($effectiveValuation / $whCount, 2);
                 $whUnits = $totalUnitsInDb > 0 ? (int)round(($totalUnitsInDb / max(1, $activeWarehousesCount))) : 0;
             }
 
             $status = $this->determineWarehouseStatus((bool)$w['suspended'], $nameLower);
             $type = $this->determineWarehouseType($nameLower);
             $cleanBranchName = trim(str_ireplace(['gsk - ', 'gsk second - ', 'syihab - '], '', $w['name']));
+
+            $pct = $effectiveValuation > 0 ? round(($whVal / $effectiveValuation) * 100, 1) : 0;
 
             $branchBreakdown[] = [
                 'warehouse_name' => $w['name'],
@@ -546,7 +644,7 @@ class AccurateInventoryService
                 'total_valuation' => $whVal,
                 'total_qty' => $whUnits,
                 'average_unit_cost' => $whUnits > 0 ? round($whVal / $whUnits, 2) : 0,
-                'percentage' => $totalValuation > 0 ? round(($whVal / $totalValuation) * 100, 1) : 0,
+                'percentage' => $pct,
                 'status' => $status,
             ];
         }
@@ -640,8 +738,13 @@ class AccurateInventoryService
     /**
      * Bangun rincian valuasi per kategori produk.
      */
-    protected function buildCategoryBreakdown(array $matchedWhIds, string $databaseSource, float $totalValuation): array
-    {
+    protected function buildCategoryBreakdown(
+        array $matchedWhIds,
+        array $catTargets,
+        string $databaseSource,
+        float $totalValuation,
+        float $buTotalRawVal = 1.0
+    ): array {
         if (!empty($matchedWhIds)) {
             $catQuery = DB::table('warehouse_stocks')
                 ->join('product_accurates', function ($join) {
@@ -651,6 +754,14 @@ class AccurateInventoryService
                 ->whereIn('warehouse_stocks.warehouse_id', $matchedWhIds)
                 ->where('warehouse_stocks.stock', '>', 0)
                 ->when($databaseSource !== 'all', fn($q) => $q->where('product_accurates.database_source', $databaseSource));
+
+            if (!empty($catTargets)) {
+                $catQuery->where(function ($q) use ($catTargets) {
+                    foreach ($catTargets as $cat) {
+                        $q->orWhere('product_accurates.categoryName', 'LIKE', '%' . $cat . '%');
+                    }
+                });
+            }
 
             $dbCats = $catQuery->select(
                 'product_accurates.categoryName',
@@ -662,6 +773,14 @@ class AccurateInventoryService
             $catQuery = ProductAccurate::where('stock', '>', 0)
                 ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource));
 
+            if (!empty($catTargets)) {
+                $catQuery->where(function ($q) use ($catTargets) {
+                    foreach ($catTargets as $cat) {
+                        $q->orWhere('categoryName', 'LIKE', '%' . $cat . '%');
+                    }
+                });
+            }
+
             $dbCats = $catQuery->select(
                 'categoryName',
                 DB::raw('count(*) as count'),
@@ -672,13 +791,20 @@ class AccurateInventoryService
 
         $categoryColors = ['#6366f1', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#14b8a6', '#64748b'];
         $categoryBreakdown = [];
-        $totalCatVal = $dbCats->sum('total_val') ?: 1;
+        $totalRawCatVal = (float) $dbCats->sum('total_val') ?: 1.0;
         $buLabel = $databaseSource === 'syihab' ? 'Syihab' : ($databaseSource === 'second' ? 'GSK Second' : 'Semua BU');
 
         foreach ($dbCats as $idx => $c) {
             $catName = $c->categoryName ?: 'Umum';
-            $pct = round(($c->total_val / $totalCatVal) * 100, 1);
-            $scaledVal = round(($c->total_val / $totalCatVal) * $totalValuation, 2);
+
+            // Skala proporsional terhadap totalValuation (saldo GL) berdasarkan porsinya di database
+            $scaledVal = round(($c->total_val / $buTotalRawVal) * $totalValuation, 2);
+            $pct = $totalValuation > 0 ? round(($scaledVal / $totalValuation) * 100, 1) : 0;
+
+            // Jika sedang difilter spesifik satu kategori, persentase dalam subset adalah proporsi terhadap totalRawCatVal
+            if (!empty($catTargets)) {
+                $pct = round(($c->total_val / $totalRawCatVal) * 100, 1);
+            }
 
             $categoryBreakdown[] = [
                 'category_name' => $catName,
@@ -701,7 +827,7 @@ class AccurateInventoryService
         array $matchedWhIds,
         array $catTargets,
         string $databaseSource,
-        float $totalValuation
+        float $effectiveValuation
     ): array {
         if (!empty($matchedWhIds)) {
             $brandQuery = DB::table('warehouse_stocks')
@@ -747,13 +873,13 @@ class AccurateInventoryService
             )->groupBy('brandName')->orderByDesc('total_val')->get();
         }
 
-        $totalBrandVal = $dbBrands->sum('total_val') ?: 1;
+        $totalBrandVal = (float) $dbBrands->sum('total_val') ?: 1.0;
         $brandBreakdown = [];
 
         foreach ($dbBrands as $b) {
             $bName = $b->brandName ?: 'Lainnya';
             $pct = round(($b->total_val / $totalBrandVal) * 100, 1);
-            $scaledVal = round(($b->total_val / $totalBrandVal) * $totalValuation, 2);
+            $scaledVal = round(($b->total_val / $totalBrandVal) * $effectiveValuation, 2);
 
             $brandBreakdown[] = [
                 'brand_name' => $bName,
@@ -767,20 +893,22 @@ class AccurateInventoryService
     }
 
     /**
-     * Ambil 10 item dengan valuasi tertinggi beserta estimasi aging dan risikonya.
+     * Ambil 10 item dengan valuasi tertinggi beserta perhitungan aging dan risiko RIIL.
      */
     protected function buildTopValuationItems(array $matchedWhIds, array $catTargets, string $databaseSource): array
     {
-        if (!empty($matchedWhIds)) {
+        $hasWhStocks = DB::table('warehouse_stocks')->where('stock', '>', 0)->exists();
+
+        if ($hasWhStocks) {
             $topItemsQuery = DB::table('warehouse_stocks')
                 ->join('product_accurates', function ($join) {
                     $join->on('warehouse_stocks.variant_id', '=', 'product_accurates.id')
                          ->where('warehouse_stocks.variant_type', '=', ProductAccurate::class);
                 })
                 ->join('warehouses', 'warehouse_stocks.warehouse_id', '=', 'warehouses.id')
-                ->whereIn('warehouse_stocks.warehouse_id', $matchedWhIds)
                 ->where('warehouse_stocks.stock', '>', 0)
                 ->where('product_accurates.base_cost', '>', 0)
+                ->when(!empty($matchedWhIds), fn($q) => $q->whereIn('warehouse_stocks.warehouse_id', $matchedWhIds))
                 ->when($databaseSource !== 'all', fn($q) => $q->where('product_accurates.database_source', $databaseSource));
 
             if (!empty($catTargets)) {
@@ -792,6 +920,7 @@ class AccurateInventoryService
             }
 
             $dbTopItems = $topItemsQuery->select([
+                'product_accurates.id as product_id',
                 'product_accurates.item_no',
                 'product_accurates.name',
                 'product_accurates.categoryName',
@@ -800,9 +929,11 @@ class AccurateInventoryService
                 'product_accurates.base_cost',
                 DB::raw('(warehouse_stocks.stock * product_accurates.base_cost) as total_val'),
                 'warehouse_stocks.updated_at',
+                'warehouses.id as warehouse_id',
                 'warehouses.name as warehouse_name',
             ])->orderByDesc('total_val')->take(10)->get();
         } else {
+            // Fallback jika data warehouse_stocks belum disinkronkan dari Accurate
             $topItemsQuery = ProductAccurate::where('stock', '>', 0)
                 ->where('base_cost', '>', 0)
                 ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource));
@@ -816,6 +947,7 @@ class AccurateInventoryService
             }
 
             $dbTopItems = $topItemsQuery->select([
+                'id as product_id',
                 'item_no',
                 'name',
                 'categoryName',
@@ -828,12 +960,41 @@ class AccurateInventoryService
         }
 
         $topValuationItems = [];
-        foreach ($dbTopItems as $idx => $it) {
-            $days = 20 + ($idx * 7); // Simulasi aging bertahap
+        foreach ($dbTopItems as $it) {
+            // Hitung umur fisik riil dari nomor seri / IMEI yang masih Available
+            $oldestSnQuery = DB::table('product_serial_numbers')
+                ->where('status', 'Available')
+                ->where(function ($q) use ($it) {
+                    $q->where('item_no', $it->item_no);
+                    if (!empty($it->product_id)) {
+                        $q->orWhere('product_accurate_id', $it->product_id);
+                    }
+                });
+
+            if (!empty($it->warehouse_id)) {
+                $oldestSnQuery->where('warehouse_id', $it->warehouse_id);
+            } elseif (!empty($matchedWhIds)) {
+                $oldestSnQuery->whereIn('warehouse_id', $matchedWhIds);
+            }
+
+            $oldestSn = $oldestSnQuery->selectRaw('MIN(COALESCE(receipt_date, created_at)) as oldest_in_date')->first();
+
+            if ($oldestSn && $oldestSn->oldest_in_date) {
+                $days = (int) round(Carbon::parse($oldestSn->oldest_in_date)->diffInDays(now()));
+            } else {
+                // Fallback riil dari tanggal barang masuk / update di database
+                $fallbackDate = $it->updated_at ?? now();
+                $days = (int) round(Carbon::parse($fallbackDate)->diffInDays(now()));
+            }
+
             $risk = 'LOW';
-            if ($days > 90) $risk = 'CRITICAL';
-            elseif ($days > 60) $risk = 'HIGH';
-            elseif ($days > 35) $risk = 'MEDIUM';
+            if ($days > 90) {
+                $risk = 'CRITICAL';
+            } elseif ($days > 60) {
+                $risk = 'HIGH';
+            } elseif ($days > 35) {
+                $risk = 'MEDIUM';
+            }
 
             $topValuationItems[] = [
                 'sku' => $it->item_no,
@@ -853,23 +1014,93 @@ class AccurateInventoryService
     }
 
     /**
-     * Hitung metrik estimasi barang lambat bergerak (slow moving).
+     * Hitung metrik RIIL barang lambat bergerak (slow moving > 60 hari) dari unit fisik dan stok.
      */
-    protected function calculateSlowMoving(string $databaseSource, float $totalValuation): array
-    {
-        $slowMovingItems = ProductAccurate::where('stock', '>', 0)
-            ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
-            ->take(5)
-            ->get();
+    protected function calculateSlowMoving(
+        string $databaseSource,
+        float $effectiveValuation,
+        int $thresholdDays = 60,
+        array $matchedWhIds = [],
+        array $catTargets = []
+    ): array {
+        $cutoffDate = now()->subDays($thresholdDays);
 
-        $slowMovingQty = $slowMovingItems->sum('stock');
-        $slowMovingValScaled = round($totalValuation * 0.082, 2);
+        // 1. Hitung unit ber-SN (IMEI/Serial) yang mengendap > threshold (60 hari) dengan status 'Available'
+        $slowSnQuery = DB::table('product_serial_numbers')
+            ->leftJoin('product_accurates', 'product_serial_numbers.product_accurate_id', '=', 'product_accurates.id')
+            ->where('product_serial_numbers.status', 'Available')
+            ->where(function ($q) use ($cutoffDate) {
+                $q->where('product_serial_numbers.receipt_date', '<=', $cutoffDate)
+                  ->orWhere(function ($q2) use ($cutoffDate) {
+                      $q2->whereNull('product_serial_numbers.receipt_date')
+                         ->where('product_serial_numbers.created_at', '<=', $cutoffDate);
+                  });
+            });
+
+        if ($databaseSource !== 'all') {
+            $slowSnQuery->where('product_accurates.database_source', $databaseSource);
+        }
+
+        if (!empty($matchedWhIds)) {
+            $slowSnQuery->whereIn('product_serial_numbers.warehouse_id', $matchedWhIds);
+        }
+
+        if (!empty($catTargets)) {
+            $slowSnQuery->where(function ($q) use ($catTargets) {
+                foreach ($catTargets as $cat) {
+                    $q->orWhere('product_accurates.categoryName', 'LIKE', '%' . $cat . '%');
+                }
+            });
+        }
+
+        $slowSns = $slowSnQuery->select([
+            'product_serial_numbers.serial_number',
+            'product_serial_numbers.hpp',
+            'product_accurates.base_cost',
+            'product_accurates.base_price',
+        ])->get();
+
+        $slowMovingSnQty = $slowSns->count();
+        $slowMovingSnVal = $slowSns->sum(function ($sn) {
+            if ($sn->hpp > 0) return (float) $sn->hpp;
+            if ($sn->base_cost > 0) return (float) $sn->base_cost;
+            return (float) round(($sn->base_price ?: 0) * 0.82);
+        });
+
+        // 2. Hitung item non-SN (aksesoris / stok umum) yang sudah > 60 hari tidak mengalami pergerakan
+        $snSkus = DB::table('product_serial_numbers')->distinct()->pluck('item_no')->toArray();
+
+        $slowNonSnQuery = ProductAccurate::where('stock', '>', 0)
+            ->where('created_at', '<=', $cutoffDate)
+            ->when(!empty($snSkus), fn($q) => $q->whereNotIn('item_no', $snSkus))
+            ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
+            ->when(!empty($catTargets), function ($q) use ($catTargets) {
+                $q->where(function ($sub) use ($catTargets) {
+                    foreach ($catTargets as $cat) {
+                        $sub->orWhere('categoryName', 'LIKE', '%' . $cat . '%');
+                    }
+                });
+            });
+
+        $slowNonSnItems = $slowNonSnQuery->get();
+        $slowNonSnQty = $slowNonSnItems->sum('stock');
+        $slowNonSnVal = $slowNonSnItems->sum(function ($p) {
+            $cost = $p->base_cost > 0 ? $p->base_cost : round($p->base_price * 0.82);
+            return (float) ($p->stock * $cost);
+        });
+
+        $totalSlowQty = (int) ($slowMovingSnQty + $slowNonSnQty);
+        $totalSlowVal = (float) ($slowMovingSnVal + $slowNonSnVal);
+
+        $percentage = $effectiveValuation > 0
+            ? round(($totalSlowVal / $effectiveValuation) * 100, 1)
+            : 0;
 
         return [
-            'threshold_days' => 60,
-            'total_valuation' => $slowMovingValScaled,
-            'total_qty' => (int)$slowMovingQty,
-            'percentage_of_inventory' => 8.2,
+            'threshold_days' => $thresholdDays,
+            'total_valuation' => round($totalSlowVal, 2),
+            'total_qty' => $totalSlowQty,
+            'percentage_of_inventory' => $percentage,
         ];
     }
 }
