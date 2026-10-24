@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\BusinessUnit;
 use App\Models\ProductAccurate;
+use App\Models\Warehouse;
+use App\Models\WarehouseStock;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -235,6 +237,85 @@ class AccurateInventoryService
     }
 
     /**
+     * Sync active warehouse stocks directly from Accurate Online into warehouse_stocks.
+     */
+    public function syncWarehouseStocksFromAccurate(string $databaseSource = 'all', int $maxPages = 5): int
+    {
+        $bus = [];
+        if ($databaseSource === 'syihab') {
+            $bu = BusinessUnit::where('code', 'syihab')->first();
+            if ($bu) $bus[] = $bu;
+        } elseif ($databaseSource === 'second') {
+            $bu = BusinessUnit::where('code', 'second')->first();
+            if ($bu) $bus[] = $bu;
+        } else {
+            $bus = BusinessUnit::whereNotNull('accurate_token')->get()->all();
+        }
+
+        $totalUpserted = 0;
+
+        foreach ($bus as $bu) {
+            $config = $this->getHeadersForBu($bu);
+            $warehouses = Warehouse::where('business_unit_id', $bu->id)
+                ->whereNotNull('warehouse_id')
+                ->get();
+            $products = ProductAccurate::where('business_unit_id', $bu->id)->pluck('id', 'item_no')->toArray();
+
+            foreach ($warehouses as $wh) {
+                for ($p = 1; $p <= $maxPages; $p++) {
+                    $dt = new \DateTime('now', new \DateTimeZone('Asia/Jakarta'));
+                    $timestamp = $dt->format('d/m/Y H:i:s');
+                    $signature = hash_hmac('sha256', $timestamp, $bu->accurate_secret_key);
+                    $headers = $config['headers'];
+                    $headers['X-Api-Timestamp'] = $timestamp;
+                    $headers['X-Api-Signature'] = $signature;
+
+                    $res = Http::timeout(15)->withHeaders($headers)->get($config['host'] . '/item/list-stock.do', [
+                        'sp.pageSize' => 100,
+                        'sp.page' => $p,
+                        'warehouseName' => $wh->name,
+                    ]);
+
+                    if (!$res->successful()) break;
+                    $items = $res->json()['d'] ?? [];
+                    if (empty($items)) break;
+
+                    $batch = [];
+                    foreach ($items as $it) {
+                        $qty = (int)round((float)($it['quantity'] ?? 0));
+                        if ($qty <= 0) continue;
+
+                        $itemNo = $it['no'] ?? null;
+                        if (!$itemNo || !isset($products[$itemNo])) continue;
+
+                        $batch[] = [
+                            'warehouse_id' => $wh->id,
+                            'variant_id'   => $products[$itemNo],
+                            'variant_type' => ProductAccurate::class,
+                            'stock'        => $qty,
+                            'created_at'   => now(),
+                            'updated_at'   => now(),
+                        ];
+                    }
+
+                    if (!empty($batch)) {
+                        WarehouseStock::upsert(
+                            $batch,
+                            ['warehouse_id', 'variant_id', 'variant_type'],
+                            ['stock', 'updated_at']
+                        );
+                        $totalUpserted += count($batch);
+                    }
+
+                    if (count($items) < 100) break;
+                }
+            }
+        }
+
+        return $totalUpserted;
+    }
+
+    /**
      * Get Complete Inventory Stock & Valuation 100% Live from Accurate Online & Database.
      */
     public function getInventoryValuation(
@@ -255,8 +336,10 @@ class AccurateInventoryService
                 if ($databaseSource === 'all') {
                     $this->syncProductsFromAccurate('second', 2);
                     $this->syncProductsFromAccurate('syihab', 2);
+                    $this->syncWarehouseStocksFromAccurate('all', 3);
                 } else {
                     $this->syncProductsFromAccurate($databaseSource, 3);
+                    $this->syncWarehouseStocksFromAccurate($databaseSource, 3);
                 }
             } catch (\Exception $e) {
                 Log::warning("Background product sync on refresh failed: " . $e->getMessage());
@@ -293,10 +376,18 @@ class AccurateInventoryService
             // Fetch live warehouses for this BU directly from Accurate API
             $whs = $this->fetchLiveWarehouses($bu);
             foreach ($whs as $w) {
+                // Ensure local warehouse record exists
+                $localWh = Warehouse::updateOrCreate(
+                    ['name' => $w['name'], 'business_unit_id' => $bu->id],
+                    ['warehouse_id' => $w['id']]
+                );
+
                 $allWarehousesRaw[] = [
+                    'bu_id' => $bu->id,
                     'bu_name' => $bu->name,
                     'bu_code' => $bu->code,
                     'id' => $w['id'],
+                    'local_id' => $localWh->id,
                     'name' => $w['name'],
                     'suspended' => $w['suspended'],
                     'bu_gl_balance' => $gl['balance'],
@@ -305,7 +396,36 @@ class AccurateInventoryService
             }
         }
 
-        // 2. Build Real Warehouse Breakdown
+        // 2. Build Real Warehouse Breakdown using local WarehouseStock joined with ProductAccurate
+        $whStocksQuery = DB::table('warehouse_stocks')
+            ->join('product_accurates', function ($join) {
+                $join->on('warehouse_stocks.variant_id', '=', 'product_accurates.id')
+                     ->where('warehouse_stocks.variant_type', '=', ProductAccurate::class);
+            })
+            ->join('warehouses', 'warehouse_stocks.warehouse_id', '=', 'warehouses.id');
+
+        if ($databaseSource !== 'all') {
+            $whStocksQuery->where('product_accurates.database_source', $databaseSource);
+        }
+
+        $whStockStats = $whStocksQuery->select(
+            'warehouses.id as local_wh_id',
+            'warehouses.name as warehouse_name',
+            'warehouses.business_unit_id',
+            DB::raw('SUM(warehouse_stocks.stock) as total_qty'),
+            DB::raw('SUM(warehouse_stocks.stock * product_accurates.base_cost) as total_val')
+        )->groupBy('warehouses.id', 'warehouses.name', 'warehouses.business_unit_id')->get();
+
+        $whStatsByLocalId = $whStockStats->keyBy('local_wh_id');
+
+        $buRawValuations = [];
+        foreach ($whStockStats as $st) {
+            $buId = $st->business_unit_id;
+            $buRawValuations[$buId] = ($buRawValuations[$buId] ?? 0) + (float)$st->total_val;
+        }
+
+        $hasRealStockData = $whStockStats->isNotEmpty() && $whStockStats->sum('total_qty') > 0;
+
         $branchBreakdown = [];
         $totalUnitsInDb = ProductAccurate::query()
             ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
@@ -316,11 +436,30 @@ class AccurateInventoryService
 
         foreach ($allWarehousesRaw as $w) {
             $whCount = max(1, $w['bu_wh_count']);
-            $whVal = round($w['bu_gl_balance'] / $whCount, 2);
-            $whUnits = $totalUnitsInDb > 0 ? (int)round(($totalUnitsInDb / max(1, $activeWarehousesCount))) : 0;
+            $localId = $w['local_id'] ?? null;
+            $nameLower = strtolower(trim($w['name']));
+
+            $stat = $localId ? $whStatsByLocalId->get($localId) : null;
+
+            if ($hasRealStockData) {
+                $whUnits = $stat ? (int)$stat->total_qty : 0;
+                $whRawVal = $stat ? (float)$stat->total_val : 0;
+                $buId = $w['bu_id'] ?? null;
+                $buRawVal = ($buId && isset($buRawValuations[$buId])) ? $buRawValuations[$buId] : 0;
+
+                // Scale proportionally to GL balance if GL balance > 0, otherwise use raw valuation
+                if ($w['bu_gl_balance'] > 0 && $buRawVal > 0) {
+                    $whVal = round(($whRawVal / $buRawVal) * $w['bu_gl_balance'], 2);
+                } else {
+                    $whVal = round($whRawVal, 2);
+                }
+            } else {
+                // Fallback if WarehouseStock is not yet synced
+                $whVal = round($w['bu_gl_balance'] / $whCount, 2);
+                $whUnits = $totalUnitsInDb > 0 ? (int)round(($totalUnitsInDb / max(1, $activeWarehousesCount))) : 0;
+            }
 
             $status = 'NORMAL';
-            $nameLower = strtolower($w['name']);
             if ($w['suspended'] || str_contains($nameLower, 'rusak') || str_contains($nameLower, 'return') || str_contains($nameLower, 'retur')) {
                 $status = 'ALERT';
             } elseif (str_contains($nameLower, 'head office') || str_contains($nameLower, 'kayutangi')) {
@@ -470,6 +609,8 @@ class AccurateInventoryService
         $slowMovingQty = $slowMovingItems->sum('stock');
         $slowMovingValScaled = round($totalValuation * 0.082, 2);
 
+        $totalWhUnits = $hasRealStockData ? array_sum(array_column($branchBreakdown, 'total_qty')) : (int)max($totalUnitsInDb, 1);
+
         $result = [
             'business_unit' => $resolvedBuName ?: ($databaseSource === 'syihab' ? 'Syihab Store' : ($databaseSource === 'second' ? 'GSK Second' : 'Semua Unit Bisnis')),
             'database_source' => $databaseSource,
@@ -480,8 +621,8 @@ class AccurateInventoryService
                 'balance' => $totalValuation,
             ],
             'total_valuation' => round($totalValuation, 2),
-            'total_units' => (int)max($totalUnitsInDb, 1),
-            'average_unit_cost' => $totalUnitsInDb > 0 ? round($totalValuation / $totalUnitsInDb, 2) : 0,
+            'total_units' => (int)$totalWhUnits,
+            'average_unit_cost' => $totalWhUnits > 0 ? round($totalValuation / $totalWhUnits, 2) : 0,
             'slow_moving' => [
                 'threshold_days' => 60,
                 'total_valuation' => $slowMovingValScaled,
