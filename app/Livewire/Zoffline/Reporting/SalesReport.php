@@ -16,6 +16,7 @@ use Maatwebsite\Excel\Facades\Excel;
 class SalesReport extends Component
 {
     use WithPagination;
+    use \App\Traits\WithDynamicReportingFilters;
 
     public $activeTab = 'transactions';
     public $dateRange = 'this_month';
@@ -47,6 +48,12 @@ class SalesReport extends Component
     public function updatedBusinessUnitFilter()
     {
         $this->branchFilter = '';
+        // Reset filter dinamis gudang/cabang jika ada, karena opsi gudang terikat pada unit bisnis yang dipilih
+        if (!empty($this->dynamicFilters)) {
+            $this->dynamicFilters = array_values(array_filter($this->dynamicFilters, function ($f) {
+                return !in_array($f['field'] ?? '', ['warehouse', 'branch']);
+            }));
+        }
         $this->resetPage();
     }
 
@@ -127,8 +134,7 @@ class SalesReport extends Component
     {
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
-
-        return Order::with(['user', 'salesBy', 'payments.paymentMethod', 'payments.paymentMethodRate', 'items.variant', 'promos'])
+        $query = Order::with(['user', 'salesBy', 'warehouse', 'payments.paymentMethod', 'payments.paymentMethodRate', 'items.variant', 'promos'])
             ->whereBetween('orders.order_date', [$start, $end])
             ->whereIn('orders.order_status', ['COMPLETED', 'piutang'])
             ->when($this->search, function ($query) {
@@ -185,8 +191,333 @@ class SalesReport extends Component
             })
             ->when($this->businessUnitFilter && $this->businessUnitFilter !== 'all', function ($query) {
                 $query->where('orders.business_unit_id', $this->businessUnitFilter);
-            })
-            ->latest('orders.order_date');
+            });
+
+        // Terapkan Filter Dinamis ERP
+        $query = $this->applyDynamicFilters($query);
+
+        return $query->latest('orders.order_date');
+    }
+
+    /**
+     * Definisi kamus filter dinamis ala ERP untuk Laporan Penjualan
+     */
+    public function getFilterableFields(): array
+    {
+        $buId = $this->businessUnitFilter;
+        $isBuFiltered = ($buId && $buId !== 'all');
+
+        // 1. Master Cabang & Gudang (dari tabel warehouses sesuai Business Unit yang dipilih)
+        $whQuery = \App\Models\Warehouse::query();
+        if ($isBuFiltered) {
+            $whQuery->where('business_unit_id', $buId);
+            $warehouses = $whQuery->orderBy('name')->pluck('name', 'name')->toArray();
+        } else {
+            $warehouses = $whQuery->with('businessUnit')->orderBy('name')->get()->mapWithKeys(function ($w) {
+                $buSuffix = $w->businessUnit?->name ? " ({$w->businessUnit->name})" : '';
+                return [$w->name => $w->name . $buSuffix];
+            })->toArray();
+        }
+
+        // 2. Kategori Proyek (dari ProductAccurate sesuai Business Unit)
+        $proyekQuery = \App\Models\ProductAccurate::whereNotNull('proyek')->where('proyek', '!=', '');
+        if ($isBuFiltered) {
+            $proyekQuery->where('business_unit_id', $buId);
+        }
+        $proyeks = $proyekQuery->orderBy('proyek')->pluck('proyek')->unique()->values()->toArray();
+        if (empty($proyeks)) {
+            $proyeks = \App\Models\ProductAccurate::whereNotNull('proyek')->where('proyek', '!=', '')->orderBy('proyek')->pluck('proyek')->unique()->values()->toArray();
+        }
+        if (empty($proyeks)) {
+            $proyeks = ['RESMI', 'INTER', 'BEACUKAI', 'NON-PROYEK'];
+        }
+
+        // 3. Vendor SN (dari master vendors)
+        $vendors = \App\Models\Vendor::orderBy('vendor_name')
+            ->pluck('vendor_name')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        // 4. Merek / Brand (dari ProductAccurate sesuai Business Unit)
+        $brandQuery = \App\Models\ProductAccurate::whereNotNull('brandName')->where('brandName', '!=', '');
+        if ($isBuFiltered) {
+            $brandQuery->where('business_unit_id', $buId);
+        }
+        $brands = $brandQuery->orderBy('brandName')->pluck('brandName')->unique()->values()->toArray();
+        if (empty($brands)) {
+            $brands = \App\Models\ProductAccurate::whereNotNull('brandName')->where('brandName', '!=', '')->orderBy('brandName')->pluck('brandName')->unique()->values()->toArray();
+        }
+
+        // 5. Kategori Produk (dari ProductAccurate sesuai Business Unit)
+        $categoryQuery = \App\Models\ProductAccurate::whereNotNull('categoryName')->where('categoryName', '!=', '');
+        if ($isBuFiltered) {
+            $categoryQuery->where('business_unit_id', $buId);
+        }
+        $categories = $categoryQuery->orderBy('categoryName')->pluck('categoryName')->unique()->values()->toArray();
+        if (empty($categories)) {
+            $categories = \App\Models\ProductAccurate::whereNotNull('categoryName')->where('categoryName', '!=', '')->orderBy('categoryName')->pluck('categoryName')->unique()->values()->toArray();
+        }
+
+        // 6. Metode Pembayaran (dari master payment_methods)
+        $paymentMethods = \App\Models\PaymentMethod::orderBy('name')
+            ->pluck('name')
+            ->unique()
+            ->values()
+            ->toArray();
+
+        // 7. Unit Bisnis
+        $businessUnits = \App\Models\BusinessUnit::orderBy('name')->pluck('name', 'id')->toArray();
+
+        $warehouseHandler = function ($query, $operator, $value) {
+            $arr = is_array($value) ? $value : array_map('trim', explode(',', (string)$value));
+            $arr = array_values(array_filter($arr, fn($v) => $v !== ''));
+
+            $whList = \App\Models\Warehouse::where(function($q) use ($arr) {
+                $q->whereIn('id', $arr)->orWhereIn('name', $arr);
+            })->get();
+
+            $ids = $whList->pluck('id')->toArray();
+            $names = $whList->pluck('name')->toArray();
+            $allNames = array_unique(array_merge($names, $arr));
+
+            if ($operator === '!=' || $operator === 'not_in') {
+                $query->where(function ($q) use ($ids, $allNames) {
+                    $q->where(function ($sub) use ($ids) {
+                        $sub->whereNull('orders.warehouse_id')->orWhereNotIn('orders.warehouse_id', $ids);
+                    })->where(function ($sub) use ($allNames) {
+                        $sub->whereNull('orders.shipping_address_snapshot->store')->orWhereNotIn('orders.shipping_address_snapshot->store', $allNames);
+                    });
+                });
+            } elseif ($operator === '=' || $operator === 'in') {
+                $query->where(function ($q) use ($ids, $allNames) {
+                    $q->whereIn('orders.warehouse_id', $ids)
+                      ->orWhereIn('orders.shipping_address_snapshot->store', $allNames);
+                });
+            } elseif ($operator === 'empty') {
+                $query->whereNull('orders.warehouse_id')
+                      ->where(function($q) {
+                          $q->whereNull('orders.shipping_address_snapshot->store')
+                            ->orWhere('orders.shipping_address_snapshot->store', '');
+                      });
+            } elseif ($operator === 'not_empty') {
+                $query->where(function($q) {
+                    $q->whereNotNull('orders.warehouse_id')
+                      ->orWhere(function($sub) {
+                          $sub->whereNotNull('orders.shipping_address_snapshot->store')
+                              ->where('orders.shipping_address_snapshot->store', '!=', '');
+                      });
+                });
+            } else {
+                $val = is_array($value) ? ($value[0] ?? '') : $value;
+                $query->where('orders.shipping_address_snapshot->store', 'like', "%{$val}%");
+            }
+        };
+
+        return [
+            'warehouse' => [
+                'label' => 'Cabang / Gudang',
+                'type' => 'select',
+                'description' => 'Master Cabang & Gudang Toko POS Sesuai Unit Bisnis',
+                'options' => $warehouses,
+                'handler' => $warehouseHandler,
+            ],
+            'proyek' => [
+                'label' => 'Kategori Proyek',
+                'type' => 'select',
+                'description' => 'Proyek Barang Accurate (RESMI, INTER, BEACUKAI)',
+                'options' => $proyeks,
+                'handler' => function ($query, $operator, $value) {
+                    $arr = is_array($value) ? $value : array_map('trim', explode(',', (string)$value));
+                    $arr = array_values(array_filter($arr, fn($v) => $v !== ''));
+
+                    if ($operator === '!=' || $operator === 'not_in') {
+                        $query->whereDoesntHave('items', function ($iq) use ($arr) {
+                            $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) use ($arr) {
+                                $vq->whereIn('proyek', $arr);
+                            });
+                        });
+                    } elseif ($operator === '=' || $operator === 'in') {
+                        $query->whereHas('items', function ($iq) use ($arr) {
+                            $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) use ($arr) {
+                                $vq->whereIn('proyek', $arr);
+                            });
+                        });
+                    } elseif ($operator === 'empty') {
+                        $query->whereHas('items', function ($iq) {
+                            $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) {
+                                $vq->whereNull('proyek')->orWhere('proyek', '');
+                            });
+                        });
+                    } elseif ($operator === 'not_empty') {
+                        $query->whereHas('items', function ($iq) {
+                            $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) {
+                                $vq->whereNotNull('proyek')->where('proyek', '!=', '');
+                            });
+                        });
+                    } else { // like
+                        $val = is_array($value) ? ($value[0] ?? '') : $value;
+                        $query->whereHas('items', function ($iq) use ($val) {
+                            $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) use ($val) {
+                                $vq->where('proyek', 'like', "%{$val}%");
+                            });
+                        });
+                    }
+                },
+            ],
+            'vendor' => [
+                'label' => 'Vendor SN',
+                'type' => 'select',
+                'description' => 'Supplier / Vendor Serial Number Unit',
+                'options' => array_merge(['unknown' => 'Tanpa Vendor / Unknown'], $vendors),
+                'handler' => function ($query, $operator, $value) {
+                    $arr = is_array($value) ? $value : array_map('trim', explode(',', (string)$value));
+                    $arr = array_values(array_filter($arr, fn($v) => $v !== ''));
+                    $hasUnknown = in_array('unknown', $arr);
+                    $namedVendors = array_values(array_diff($arr, ['unknown']));
+
+                    $snList = [];
+                    if (!empty($namedVendors)) {
+                        $snList = \App\Models\ProductSerialNumber::whereHas('vendor', function ($qv) use ($namedVendors) {
+                            $qv->whereIn('vendor_name', $namedVendors);
+                        })->pluck('serial_number')->toArray();
+                    }
+
+                    if ($operator === '!=' || $operator === 'not_in') {
+                        if ($hasUnknown && empty($namedVendors)) {
+                            $query->whereHas('items', function ($qi) {
+                                $qi->whereNotNull('serial_number')->where('serial_number', '!=', '');
+                            });
+                        } elseif (!empty($snList)) {
+                            $query->whereDoesntHave('items.serialNumbers', function ($qsn) use ($snList) {
+                                $qsn->whereIn('serial_number', $snList);
+                            });
+                        }
+                    } else {
+                        $query->where(function ($sub) use ($hasUnknown, $snList) {
+                            if ($hasUnknown) {
+                                $sub->whereHas('items', function ($qi) {
+                                    $qi->whereNull('serial_number')->orWhere('serial_number', '');
+                                });
+                            }
+                            if (!empty($snList)) {
+                                $sub->orWhereHas('items.serialNumbers', function ($qsn) use ($snList) {
+                                    $qsn->whereIn('serial_number', $snList);
+                                });
+                            }
+                        });
+                    }
+                },
+            ],
+            'brand' => [
+                'label' => 'Merek / Brand',
+                'type' => 'select',
+                'description' => 'Merek Produk (Apple, Samsung, Xiaomi, dll)',
+                'options' => $brands,
+                'handler' => function ($query, $operator, $value) {
+                    $arr = is_array($value) ? $value : array_map('trim', explode(',', (string)$value));
+                    $arr = array_values(array_filter($arr, fn($v) => $v !== ''));
+
+                    if ($operator === '!=' || $operator === 'not_in') {
+                        $query->whereDoesntHave('items', function ($iq) use ($arr) {
+                            $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) use ($arr) {
+                                $vq->whereIn('brandName', $arr);
+                            });
+                        });
+                    } elseif ($operator === '=' || $operator === 'in') {
+                        $query->whereHas('items', function ($iq) use ($arr) {
+                            $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) use ($arr) {
+                                $vq->whereIn('brandName', $arr);
+                            });
+                        });
+                    } else {
+                        $val = is_array($value) ? ($value[0] ?? '') : $value;
+                        $query->whereHas('items', function ($iq) use ($val) {
+                            $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) use ($val) {
+                                $vq->where('brandName', 'like', "%{$val}%");
+                            });
+                        });
+                    }
+                },
+            ],
+            'category' => [
+                'label' => 'Kategori Produk',
+                'type' => 'select',
+                'description' => 'Kategori Produk Accurate',
+                'options' => $categories,
+                'handler' => function ($query, $operator, $value) {
+                    $arr = is_array($value) ? $value : array_map('trim', explode(',', (string)$value));
+                    $arr = array_values(array_filter($arr, fn($v) => $v !== ''));
+
+                    if ($operator === '!=' || $operator === 'not_in') {
+                        $query->whereDoesntHave('items', function ($iq) use ($arr) {
+                            $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) use ($arr) {
+                                $vq->whereIn('categoryName', $arr);
+                            });
+                        });
+                    } elseif ($operator === '=' || $operator === 'in') {
+                        $query->whereHas('items', function ($iq) use ($arr) {
+                            $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) use ($arr) {
+                                $vq->whereIn('categoryName', $arr);
+                            });
+                        });
+                    } else {
+                        $val = is_array($value) ? ($value[0] ?? '') : $value;
+                        $query->whereHas('items', function ($iq) use ($val) {
+                            $iq->whereHasMorph('variant', [\App\Models\ProductAccurate::class], function ($vq) use ($val) {
+                                $vq->where('categoryName', 'like', "%{$val}%");
+                            });
+                        });
+                    }
+                },
+            ],
+            'payment_method' => [
+                'label' => 'Metode Pembayaran',
+                'type' => 'select',
+                'description' => 'Metode Bayar (BCA, Mandiri, Cash, EDC, dll)',
+                'options' => $paymentMethods,
+                'handler' => function ($query, $operator, $value) {
+                    $arr = is_array($value) ? $value : array_map('trim', explode(',', (string)$value));
+                    $arr = array_values(array_filter($arr, fn($v) => $v !== ''));
+
+                    if ($operator === '!=' || $operator === 'not_in') {
+                        $query->whereDoesntHave('payments.paymentMethod', function ($pq) use ($arr) {
+                            $pq->whereIn('name', $arr);
+                        });
+                    } elseif ($operator === '=' || $operator === 'in') {
+                        $query->whereHas('payments.paymentMethod', function ($pq) use ($arr) {
+                            $pq->whereIn('name', $arr);
+                        });
+                    } else {
+                        $val = is_array($value) ? ($value[0] ?? '') : $value;
+                        $query->whereHas('payments.paymentMethod', function ($pq) use ($val) {
+                            $pq->where('name', 'like', "%{$val}%");
+                        });
+                    }
+                },
+            ],
+            'order_status' => [
+                'label' => 'Status Order',
+                'type' => 'select',
+                'description' => 'Status Transaksi (COMPLETED, piutang, DRAFT, CANCELLED)',
+                'options' => ['COMPLETED', 'piutang', 'DRAFT', 'CANCELLED'],
+                'column' => 'orders.order_status',
+            ],
+            'grand_total' => [
+                'label' => 'Total Nilai Belanja (Rp)',
+                'type' => 'number',
+                'description' => 'Nominal Total Belanja Order',
+                'column' => 'orders.grand_total',
+            ],
+            'business_unit' => [
+                'label' => 'Unit Bisnis',
+                'type' => 'select',
+                'description' => 'Unit Bisnis (Syihab / GSK Second)',
+                'options' => $businessUnits,
+                'column' => 'orders.business_unit_id',
+            ],
+        ];
     }
 
     private function generateTransactionsData(): array
@@ -225,7 +556,7 @@ class SalesReport extends Component
         $rows = [];
 
         foreach ($orders as $order) {
-            $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
+            $branch = $order->warehouse?->name ?? ($order->shipping_address_snapshot['store'] ?? 'Unknown');
 
             // Rekap Pembayaran dan MDR secara granular untuk Order ini
             $orderPayments = [];
@@ -711,7 +1042,7 @@ class SalesReport extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        $orders = Order::with(['items.variant', 'items.promos', 'user', 'salesBy', 'handledBy'])
+        $ordersQuery = Order::with(['items.variant', 'items.promos', 'user', 'salesBy', 'handledBy', 'warehouse'])
             ->whereBetween('orders.order_date', [$start, $end])
             ->whereIn('orders.order_status', ['COMPLETED', 'piutang'])
             ->when($this->businessUnitFilter && $this->businessUnitFilter !== 'all', function ($query) {
@@ -719,9 +1050,10 @@ class SalesReport extends Component
             })
             ->when($this->branchFilter, function ($query) {
                 $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
-            })
-            ->latest('orders.order_date')
-            ->get();
+            });
+
+        $ordersQuery = $this->applyDynamicFilters($ordersQuery);
+        $orders = $ordersQuery->latest('orders.order_date')->get();
 
         $allSns = [];
         foreach ($orders as $order) {
@@ -747,7 +1079,7 @@ class SalesReport extends Component
         $rows = [];
 
         foreach ($orders as $order) {
-            $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
+            $branch = $order->warehouse?->name ?? ($order->shipping_address_snapshot['store'] ?? 'Unknown');
 
             foreach ($order->items as $item) {
                 $variant = $item->variant;
@@ -862,8 +1194,7 @@ class SalesReport extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        // Ambil order COMPLETED bulan ini untuk semua cabang (atau cabang terfilter)
-        $orders = Order::with(['items.variant', 'items.promos'])
+        $ordersQuery = Order::with(['items.variant', 'items.promos', 'warehouse'])
             ->whereBetween('orders.order_date', [$start, $end])
             ->whereIn('orders.order_status', ['COMPLETED'])
             ->when($this->businessUnitFilter && $this->businessUnitFilter !== 'all', function ($query) {
@@ -871,8 +1202,10 @@ class SalesReport extends Component
             })
             ->when($this->branchFilter, function ($query) {
                 $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
-            })
-            ->get();
+            });
+
+        $ordersQuery = $this->applyDynamicFilters($ordersQuery);
+        $orders = $ordersQuery->get();
 
         // Kumpulkan semua serial number dari seluruh order items untuk query vendor sekaligus (bulk)
         $allSns = [];
@@ -900,7 +1233,7 @@ class SalesReport extends Component
         $vendorData = [];
 
         foreach ($orders as $order) {
-            $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown Store';
+            $branch = $order->warehouse?->name ?? ($order->shipping_address_snapshot['store'] ?? 'Unknown Store');
 
             foreach ($order->items as $item) {
                 $itemVendors = [];

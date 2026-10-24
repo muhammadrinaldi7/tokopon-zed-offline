@@ -25,353 +25,155 @@
         </div>
     </div>
 
-    <div class="flex flex-col items-start mb-6 gap-4">
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3 w-full">
-            {{-- Separator CSV --}}
-            <div
-                class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center justify-between">
-                <span class="text-xs text-gray-500 mr-2 font-medium">Separator:</span>
-                <select wire:model="csvSeparator"
-                    class="text-sm border-none bg-transparent focus:ring-0 text-gray-700 p-0 font-medium cursor-pointer w-full text-right truncate">
-                    <option value=";">Semicolon (;)</option>
-                    <option value=",">Comma (,)</option>
-                </select>
-            </div>
-
-            {{-- Filter Unit Bisnis --}}
-            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
-                <select wire:model.live="businessUnitFilter"
-                    class="border-none text-sm font-bold text-gray-800 focus:ring-0 bg-transparent p-0 cursor-pointer w-full truncate">
-                    <option value="all">Semua Bisnis Unit</option>
-                    @foreach ($businessUnits as $bu)
-                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            {{-- Filter Cabang --}}
-            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
-                <select wire:model.live="branchFilter"
-                    class="border-none text-sm font-medium focus:ring-0 text-gray-700 bg-transparent p-0 cursor-pointer w-full truncate">
-                    <option value="">Semua Cabang</option>
-                    @foreach ($availableBranches as $branch)
-                        <option value="{{ $branch }}">{{ $branch }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            {{-- Filter Vendor (Searchable Dropdown) --}}
-            <div x-data="{
-                open: false,
-                search: '',
-                selected: @entangle('vendorFilter').live,
-                vendors: {{ json_encode($availableVendors) }},
-                get filteredVendors() {
-                    if (!this.search) return this.vendors;
-                    return this.vendors.filter(v => v.toLowerCase().includes(this.search.toLowerCase()));
-                },
-                get displayLabel() {
-                    if (!this.selected) return 'Semua Vendor';
-                    if (this.selected === 'unknown') return 'Tanpa Vendor / Unknown';
-                    return this.selected;
-                },
-                selectVendor(val) {
-                    this.selected = val;
-                    this.open = false;
-                    this.search = '';
-                }
-            }" @click.outside="open = false"
-                class="relative bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
-                <!-- Trigger Button -->
-                <div @click="open = !open" class="w-full flex items-center justify-between cursor-pointer select-none">
-                    <span class="text-sm font-medium text-gray-700 truncate" x-text="displayLabel">Semua Vendor</span>
-                    <div class="flex items-center gap-1 shrink-0 ml-1">
-                        <button type="button" x-show="selected" @click.stop="selectVendor('')"
-                            class="text-gray-400 hover:text-gray-600 p-0.5" title="Reset filter vendor">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200"
-                            :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
-                            </path>
-                        </svg>
-                    </div>
-                </div>
-
-                <!-- Dropdown Search Panel -->
-                <div x-show="open" x-transition:enter="transition ease-out duration-100"
-                    x-transition:enter-start="transform opacity-0 scale-95"
-                    x-transition:enter-end="transform opacity-100 scale-100"
-                    x-transition:leave="transition ease-in duration-75"
-                    x-transition:leave-start="transform opacity-100 scale-100"
-                    x-transition:leave-end="transform opacity-0 scale-95"
-                    class="absolute left-0 top-full mt-1.5 w-64 max-h-72 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50 flex flex-col"
-                    style="display: none;">
-
-                    <!-- Search Input -->
-                    <div class="px-2 pb-2 border-b border-gray-100">
-                        <div class="relative">
-                            <input x-model="search" x-ref="vendorSearchInput" @keydown.escape="open = false"
-                                type="text" placeholder="Ketik cari vendor..."
-                                class="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1c69d4] focus:border-[#1c69d4]"
-                                x-init="$watch('open', value => { if (value) setTimeout(() => $refs.vendorSearchInput.focus(), 50) })">
-                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" fill="none"
-                                stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
-                        </div>
-                    </div>
-
-                    <!-- Vendor List -->
-                    <div class="overflow-y-auto flex-1 max-h-56 divide-y divide-gray-50 text-xs">
-                        <div @click="selectVendor('')"
-                            class="px-3 py-2 cursor-pointer hover:bg-blue-50 hover:text-[#1c69d4] flex items-center justify-between transition-colors"
-                            :class="{ 'font-bold text-[#1c69d4] bg-blue-50/60': !selected }">
-                            <span>Semua Vendor</span>
-                            <span x-show="!selected" class="text-[#1c69d4] font-bold">✓</span>
-                        </div>
-
-                        <div @click="selectVendor('unknown')"
-                            class="px-3 py-2 cursor-pointer hover:bg-blue-50 hover:text-[#1c69d4] flex items-center justify-between transition-colors"
-                            :class="{ 'font-bold text-[#1c69d4] bg-blue-50/60': selected === 'unknown' }">
-                            <span>Tanpa Vendor / Unknown</span>
-                            <span x-show="selected === 'unknown'" class="text-[#1c69d4] font-bold">✓</span>
-                        </div>
-
-                        <template x-for="v in filteredVendors" :key="v">
-                            <div @click="selectVendor(v)"
-                                class="px-3 py-2 cursor-pointer hover:bg-blue-50 hover:text-[#1c69d4] flex items-center justify-between transition-colors"
-                                :class="{ 'font-bold text-[#1c69d4] bg-blue-50/60': selected === v }">
-                                <span x-text="v" class="truncate pr-2"></span>
-                                <span x-show="selected === v" class="text-[#1c69d4] font-bold">✓</span>
-                            </div>
-                        </template>
-
-                        <div x-show="filteredVendors.length === 0 && search"
-                            class="px-3 py-4 text-center text-gray-400 italic">
-                            Vendor tidak ditemukan
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Filter Proyek (Multi Select) --}}
-            <div x-data="{
-                open: false,
-                search: '',
-                selected: @entangle('proyekFilter').live,
-                projects: {{ json_encode($availableProjects) }},
-                get filteredProjects() {
-                    if (!this.search) return this.projects;
-                    return this.projects.filter(p => p.toLowerCase().includes(this.search.toLowerCase()));
-                },
-                get displayLabel() {
-                    if (!this.selected || this.selected.length === 0) return 'Semua Proyek';
-                    if (this.selected.length === 1) return this.selected[0];
-                    return this.selected.length + ' Proyek Terpilih';
-                },
-                clearSelection() {
-                    this.selected = [];
-                }
-            }" @click.outside="open = false"
-                class="relative bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
-                <!-- Trigger Button -->
-                <div @click="open = !open"
-                    class="w-full flex items-center justify-between cursor-pointer select-none">
-                    <span class="text-sm font-medium text-gray-700 truncate" x-text="displayLabel">Semua Proyek</span>
-                    <div class="flex items-center gap-1 shrink-0 ml-1">
-                        <button type="button" x-show="selected && selected.length > 0"
-                            @click.stop="clearSelection()" class="text-gray-400 hover:text-gray-600 p-0.5"
-                            title="Reset filter proyek">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                        <svg class="w-4 h-4 text-gray-400 transition-transform duration-200"
-                            :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
-                            </path>
-                        </svg>
-                    </div>
-                </div>
-
-                <!-- Dropdown Search Panel -->
-                <div x-show="open" x-transition:enter="transition ease-out duration-100"
-                    x-transition:enter-start="transform opacity-0 scale-95"
-                    x-transition:enter-end="transform opacity-100 scale-100"
-                    x-transition:leave="transition ease-in duration-75"
-                    x-transition:leave-start="transform opacity-100 scale-100"
-                    x-transition:leave-end="transform opacity-0 scale-95"
-                    class="absolute left-0 top-full mt-1.5 w-64 max-h-72 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50 flex flex-col"
-                    style="display: none;">
-
-                    <!-- Search Input -->
-                    <div class="px-2 pb-2 border-b border-gray-100">
-                        <div class="relative">
-                            <input x-model="search" x-ref="projectSearchInput" @keydown.escape="open = false"
-                                type="text" placeholder="Ketik cari proyek..."
-                                class="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1c69d4] focus:border-[#1c69d4]"
-                                x-init="$watch('open', value => { if (value) setTimeout(() => $refs.projectSearchInput.focus(), 50) })">
-                            <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" fill="none"
-                                stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
-                        </div>
-                    </div>
-
-                    <!-- Project List -->
-                    <div class="overflow-y-auto flex-1 max-h-56 divide-y divide-gray-50 text-xs">
-                        <template x-for="p in filteredProjects" :key="p">
-                            <label
-                                class="px-3 py-2 cursor-pointer hover:bg-blue-50 flex items-center gap-2 transition-colors">
-                                <input type="checkbox" :value="p" x-model="selected"
-                                    class="rounded text-[#1c69d4] focus:ring-[#1c69d4] w-3.5 h-3.5 border-gray-300">
-                                <span x-text="p" class="truncate pr-2"
-                                    :class="{
-                                        'font-bold text-[#1c69d4]': selected && selected.includes(p),
-                                        'text-gray-700': !(
-                                            selected && selected.includes(p))
-                                    }"></span>
-                            </label>
-                        </template>
-
-                        <div x-show="filteredProjects.length === 0 && search"
-                            class="px-3 py-4 text-center text-gray-400 italic">
-                            Proyek tidak ditemukan
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Filter Rentang Tanggal (Default: Bulan Ini) --}}
-            <div class="bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm col-span-1 flex items-center">
+    {{-- Sleek Top Controls Toolbar (Date Range, BU, Separator & Export) --}}
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-4 gap-3 bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-xs">
+        {{-- Sisi Kiri: Rentang Tanggal & Unit Bisnis --}}
+        <div class="flex flex-wrap items-center gap-2.5">
+            {{-- Rentang Tanggal --}}
+            <div class="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200 shadow-xs">
+                <span class="text-xs text-gray-500 font-medium shrink-0">Periode:</span>
                 <select wire:model.live="dateRange"
-                    class="border-none text-sm font-bold text-blue-600 focus:ring-0 bg-transparent p-0 cursor-pointer w-full truncate">
+                    class="border-none text-xs font-bold text-blue-600 focus:ring-0 bg-transparent p-0 cursor-pointer">
                     <option value="today">Hari Ini</option>
                     <option value="yesterday">Kemarin</option>
                     <option value="this_week">Minggu Ini</option>
                     <option value="this_month">Bulan Ini</option>
                     <option value="last_month">Bulan Lalu</option>
                     <option value="this_year">Tahun Ini</option>
-                    <option value="custom">Kustom</option>
+                    <option value="custom">Kustom Tanggal</option>
                 </select>
             </div>
 
             @if ($dateRange === 'custom')
-                <div
-                    class="md:col-span-2 lg:col-span-2 flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm">
+                <div class="flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200 shadow-xs">
                     <input type="date" wire:model.live="startDate"
-                        class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700 w-full text-center">
-                    <span class="text-gray-400 text-sm font-bold">-</span>
+                        class="border-none bg-transparent p-0 text-xs focus:ring-0 text-gray-700">
+                    <span class="text-gray-400 text-xs font-bold">-</span>
                     <input type="date" wire:model.live="endDate"
-                        class="border-none bg-transparent p-0 text-sm focus:ring-0 text-gray-700 w-full text-center">
+                        class="border-none bg-transparent p-0 text-xs focus:ring-0 text-gray-700">
                 </div>
             @endif
 
-            {{-- Export Buttons (CSV & Excel) --}}
-            <div
-                class="flex items-center gap-2 col-span-1 {{ $dateRange === 'custom' ? 'lg:col-span-6' : 'lg:col-span-2' }}">
-                @if ($activeTab === 'transactions')
-                    {{-- Tombol CSV Transaksi --}}
-                    <button wire:click="exportCsvOpsi3" wire:loading.attr="disabled"
-                        class="flex-1 flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-800 disabled:opacity-75 disabled:cursor-wait text-white text-xs font-bold py-2 px-3 rounded-xl shadow-sm transition-colors h-full min-h-10.5">
-                        <svg wire:loading.remove wire:target="exportCsvOpsi3" class="w-4 h-4 shrink-0 text-slate-300"
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                            </path>
-                        </svg>
-                        <svg wire:loading wire:target="exportCsvOpsi3"
-                            class="animate-spin w-4 h-4 text-white shrink-0" xmlns="http://www.w3.org/2000/svg"
-                            fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                            </path>
-                        </svg>
-                        <span wire:loading.remove wire:target="exportCsvOpsi3">Export CSV</span>
-                        <span wire:loading wire:target="exportCsvOpsi3">Memproses...</span>
-                    </button>
-
-                    {{-- Tombol Excel Transaksi --}}
-                    <button wire:click="exportExcelOpsi3" wire:loading.attr="disabled"
-                        class="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-75 disabled:cursor-wait text-white text-xs font-bold py-2 px-3 rounded-xl shadow-sm transition-colors h-full min-h-10.5">
-                        <svg wire:loading.remove wire:target="exportExcelOpsi3"
-                            class="w-4 h-4 shrink-0 text-emerald-200" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                            </path>
-                        </svg>
-                        <svg wire:loading wire:target="exportExcelOpsi3"
-                            class="animate-spin w-4 h-4 text-white shrink-0" xmlns="http://www.w3.org/2000/svg"
-                            fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                            </path>
-                        </svg>
-                        <span wire:loading.remove wire:target="exportExcelOpsi3">Export Excel</span>
-                        <span wire:loading wire:target="exportExcelOpsi3">Memproses...</span>
-                    </button>
-                @else
-                    {{-- Tombol CSV Vendor --}}
-                    <button wire:click="exportVendorCsv" wire:loading.attr="disabled"
-                        class="flex-1 flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-800 disabled:opacity-75 disabled:cursor-wait text-white text-xs font-bold py-2 px-3 rounded-xl shadow-sm transition-colors h-full min-h-10.5">
-                        <svg wire:loading.remove wire:target="exportVendorCsv" class="w-4 h-4 shrink-0 text-slate-300"
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                            </path>
-                        </svg>
-                        <svg wire:loading wire:target="exportVendorCsv"
-                            class="animate-spin w-4 h-4 text-white shrink-0" xmlns="http://www.w3.org/2000/svg"
-                            fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                            </path>
-                        </svg>
-                        <span wire:loading.remove wire:target="exportVendorCsv">CSV Vendor</span>
-                        <span wire:loading wire:target="exportVendorCsv">Memproses...</span>
-                    </button>
-
-                    {{-- Tombol Excel Vendor --}}
-                    <button wire:click="exportVendorExcel" wire:loading.attr="disabled"
-                        class="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-75 disabled:cursor-wait text-white text-xs font-bold py-2 px-3 rounded-xl shadow-sm transition-colors h-full min-h-10.5">
-                        <svg wire:loading.remove wire:target="exportVendorExcel"
-                            class="w-4 h-4 shrink-0 text-emerald-200" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                            </path>
-                        </svg>
-                        <svg wire:loading wire:target="exportVendorExcel"
-                            class="animate-spin w-4 h-4 text-white shrink-0" xmlns="http://www.w3.org/2000/svg"
-                            fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                            </path>
-                        </svg>
-                        <span wire:loading.remove wire:target="exportVendorExcel">Excel Vendor</span>
-                        <span wire:loading wire:target="exportVendorExcel">Memproses...</span>
-                    </button>
-                @endif
+            {{-- Filter Unit Bisnis --}}
+            <div class="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200 shadow-xs">
+                <span class="text-xs text-gray-500 font-medium shrink-0">Unit Bisnis:</span>
+                <select wire:model.live="businessUnitFilter"
+                    class="border-none text-xs font-bold text-gray-800 focus:ring-0 bg-transparent p-0 cursor-pointer">
+                    <option value="all">Semua Bisnis Unit</option>
+                    @foreach ($businessUnits as $bu)
+                        <option value="{{ $bu->id }}">{{ $bu->name }}</option>
+                    @endforeach
+                </select>
             </div>
         </div>
+
+        {{-- Sisi Kanan: Separator CSV & Export Actions --}}
+        <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1.5 rounded-xl border border-gray-200">
+                <span class="text-[11px] text-gray-500 font-medium">CSV:</span>
+                <select wire:model="csvSeparator"
+                    class="text-xs border-none bg-transparent focus:ring-0 text-gray-700 p-0 font-medium cursor-pointer">
+                    <option value=";">Semicolon (;)</option>
+                    <option value=",">Comma (,)</option>
+                </select>
+            </div>
+
+            @if ($activeTab === 'transactions')
+                {{-- Tombol CSV Transaksi --}}
+                <button wire:click="exportCsvOpsi3" wire:loading.attr="disabled"
+                    class="flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-800 disabled:opacity-75 disabled:cursor-wait text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-xs transition-colors">
+                    <svg wire:loading.remove wire:target="exportCsvOpsi3" class="w-3.5 h-3.5 shrink-0 text-slate-300"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                        </path>
+                    </svg>
+                    <svg wire:loading wire:target="exportCsvOpsi3"
+                        class="animate-spin w-3.5 h-3.5 text-white shrink-0" xmlns="http://www.w3.org/2000/svg"
+                        fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                            stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                    <span wire:loading.remove wire:target="exportCsvOpsi3">Export CSV</span>
+                    <span wire:loading wire:target="exportCsvOpsi3">Memproses...</span>
+                </button>
+
+                {{-- Tombol Excel Transaksi --}}
+                <button wire:click="exportExcelOpsi3" wire:loading.attr="disabled"
+                    class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-75 disabled:cursor-wait text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-xs transition-colors">
+                    <svg wire:loading.remove wire:target="exportExcelOpsi3"
+                        class="w-3.5 h-3.5 shrink-0 text-emerald-200" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                        </path>
+                    </svg>
+                    <svg wire:loading wire:target="exportExcelOpsi3"
+                        class="animate-spin w-3.5 h-3.5 text-white shrink-0" xmlns="http://www.w3.org/2000/svg"
+                        fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                            stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                    <span wire:loading.remove wire:target="exportExcelOpsi3">Export Excel</span>
+                    <span wire:loading wire:target="exportExcelOpsi3">Memproses...</span>
+                </button>
+            @else
+                {{-- Tombol CSV Vendor --}}
+                <button wire:click="exportVendorCsv" wire:loading.attr="disabled"
+                    class="flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-800 disabled:opacity-75 disabled:cursor-wait text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-xs transition-colors">
+                    <svg wire:loading.remove wire:target="exportVendorCsv" class="w-3.5 h-3.5 shrink-0 text-slate-300"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                        </path>
+                    </svg>
+                    <svg wire:loading wire:target="exportVendorCsv"
+                        class="animate-spin w-3.5 h-3.5 text-white shrink-0" xmlns="http://www.w3.org/2000/svg"
+                        fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                            stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                    <span wire:loading.remove wire:target="exportVendorCsv">CSV Vendor</span>
+                    <span wire:loading wire:target="exportVendorCsv">Memproses...</span>
+                </button>
+
+                {{-- Tombol Excel Vendor --}}
+                <button wire:click="exportVendorExcel" wire:loading.attr="disabled"
+                    class="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-75 disabled:cursor-wait text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-xs transition-colors">
+                    <svg wire:loading.remove wire:target="exportVendorExcel"
+                        class="w-3.5 h-3.5 shrink-0 text-emerald-200" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                        </path>
+                    </svg>
+                    <svg wire:loading wire:target="exportVendorExcel"
+                        class="animate-spin w-3.5 h-3.5 text-white shrink-0" xmlns="http://www.w3.org/2000/svg"
+                        fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                            stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                    <span wire:loading.remove wire:target="exportVendorExcel">Excel Vendor</span>
+                    <span wire:loading wire:target="exportVendorExcel">Memproses...</span>
+                </button>
+            @endif
+        </div>
     </div>
+
+    {{-- ERP-Style Dynamic Filter Bar --}}
+    @include('livewire.zoffline.reporting.partials.dynamic-filter-bar')
 
     {{-- Tabs --}}
     <div class="flex gap-2 mb-6 border-b border-gray-200 pb-px">
@@ -523,7 +325,7 @@
                                 <td class="px-5 py-3">
                                     <span
                                         class="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-[11px] font-medium">
-                                        {{ $order->shipping_address_snapshot['store'] ?? 'Unknown' }}
+                                        {{ $order->warehouse?->name ?? ($order->shipping_address_snapshot['store'] ?? 'Unknown') }}
                                     </span>
                                 </td>
                                 <td class="px-5 py-3">
