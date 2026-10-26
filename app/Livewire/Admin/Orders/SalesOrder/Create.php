@@ -54,16 +54,156 @@ class Create extends Component
     public $discount_amount = 0;
     public $grand_total = 0;
 
+    // Direct DP Form in Step 3
+    public bool $has_dp = false;
+    public $dp_mode = 'tunai'; // 'tunai' or 'non-tunai'
+    public $dp_bank_group = null; // 'BCA', 'MANDIRI', 'QRIS', etc.
+    public $dp_amount = 0;
+    public $dp_payment_method_id = null;
+    public $dp_payment_method_rate_id = null;
+    public $dp_date = null;
+    public $dp_notes = '';
+    public $dp_contract_number = '';
+
+    // Customer Deposit (Store Credit) Support
+    public bool $use_customer_deposit = false;
+    public $custom_deposit_amount = 0;
+    public $available_customer_deposits = [];
+    public $available_customer_deposit_total = 0;
+
     // Wizard
     public int $wizardStep = 1;
 
     public function mount()
     {
         $this->order_date = Carbon::now()->format('Y-m-d');
+        $this->dp_date = Carbon::now()->format('Y-m-d');
         $this->business_unit_id = Auth::user()->getActiveBusinessUnitId();
         $this->warehouse_id = Auth::user()->warehouse_id;
+        $this->setDpMode('tunai');
         // Initial empty row
         $this->addItem();
+    }
+
+    public function setDpMode($mode)
+    {
+        $this->dp_mode = $mode;
+        $user = Auth::user();
+        $businessUnitId = $this->business_unit_id ?? $user->getActiveBusinessUnitId();
+        $warehouseName = $user->warehouse ? trim(strtolower($user->warehouse->name)) : null;
+
+        if ($mode === 'tunai') {
+            $this->dp_bank_group = null;
+            $cashMethods = \App\Models\PaymentMethod::where('is_active', true)
+                ->where('category', 'TUNAI')
+                ->where(function ($q) use ($businessUnitId) {
+                    $q->where('business_unit_id', $businessUnitId)->orWhereNull('business_unit_id');
+                })
+                ->get();
+
+            $matched = null;
+            if ($warehouseName) {
+                $matched = $cashMethods->first(function ($m) use ($warehouseName) {
+                    $mLoc = trim(str_replace('tunai', '', strtolower($m->name)));
+                    return !empty($mLoc) && str_contains($warehouseName, $mLoc);
+                });
+            }
+            $selected = $matched ?? $cashMethods->first();
+            if ($selected) {
+                $this->dp_payment_method_id = $selected->id;
+                $this->dp_payment_method_rate_id = null;
+            }
+        } else {
+            // Non-tunai: reset pilihan metode & grup bank jika beralih dari tunai agar user memilih grup bank terlebih dahulu
+            $current = \App\Models\PaymentMethod::find($this->dp_payment_method_id);
+            if (!$current || $current->category === 'TUNAI') {
+                $this->dp_bank_group = null;
+                $this->dp_payment_method_id = null;
+                $this->dp_payment_method_rate_id = null;
+            }
+        }
+    }
+
+    public function selectDpBankGroup($group)
+    {
+        $this->dp_bank_group = $group;
+        $user = Auth::user();
+        $businessUnitId = $this->business_unit_id ?? $user->getActiveBusinessUnitId();
+
+        $methods = \App\Models\PaymentMethod::where('is_active', true)
+            ->where('category', 'NON-TUNAI')
+            ->where(function ($q) use ($businessUnitId) {
+                $q->where('business_unit_id', $businessUnitId)->orWhereNull('business_unit_id');
+            })
+            ->where(function ($q) use ($group) {
+                $q->where('bank_name', $group)
+                  ->orWhere(function($sub) use ($group) {
+                      $sub->whereNull('bank_name')->where('name', $group);
+                  });
+            })
+            ->get();
+
+        if ($methods->count() === 1) {
+            $this->selectDpPaymentMethod($methods->first()->id);
+        } else {
+            $this->dp_payment_method_id = null;
+            $this->dp_payment_method_rate_id = null;
+        }
+    }
+
+    public function resetDpBankGroup()
+    {
+        $this->dp_bank_group = null;
+        $this->dp_payment_method_id = null;
+        $this->dp_payment_method_rate_id = null;
+    }
+
+    public function selectDpPaymentMethod($id, $rateId = null)
+    {
+        $this->dp_payment_method_id = $id;
+        $pm = \App\Models\PaymentMethod::find($id);
+        if ($pm) {
+            if ($pm->category === 'NON-TUNAI') {
+                $this->dp_bank_group = $pm->bank_name ?: $pm->name;
+            }
+            if ($rateId) {
+                $this->dp_payment_method_rate_id = $rateId;
+            } elseif ($pm->rates()->where('is_active', true)->exists()) {
+                $this->dp_payment_method_rate_id = $pm->rates()->where('is_active', true)->first()->id;
+            } else {
+                $this->dp_payment_method_rate_id = null;
+            }
+        }
+    }
+
+    public function loadCustomerDeposits()
+    {
+        if ($this->user_id) {
+            $buId = $this->business_unit_id;
+            $this->available_customer_deposits = \App\Models\CustomerDeposit::where('user_id', $this->user_id)
+                ->where('status', 'AVAILABLE')
+                ->where('balance', '>', 0)
+                ->where(function($q) use ($buId) {
+                    if ($buId) {
+                        $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+                    }
+                })
+                ->get()
+                ->toArray();
+            $this->available_customer_deposit_total = collect($this->available_customer_deposits)->sum('balance');
+        } else {
+            $this->available_customer_deposits = [];
+            $this->available_customer_deposit_total = 0;
+        }
+    }
+
+    public function updatedUseCustomerDeposit($value)
+    {
+        if ($value) {
+            $this->custom_deposit_amount = min($this->available_customer_deposit_total, $this->grand_total);
+        } else {
+            $this->custom_deposit_amount = 0;
+        }
     }
 
     public function nextStep()
@@ -72,8 +212,11 @@ class Create extends Component
             $this->validate([
                 'user_id' => 'required',
                 'order_date' => 'required|date',
+                'business_unit_id' => 'required',
             ], [
                 'user_id.required' => 'Silakan pilih pelanggan terlebih dahulu.',
+                'order_date.required' => 'Tanggal SO harus diisi.',
+                'business_unit_id.required' => 'Unit Usaha harus dipilih.',
             ]);
         } elseif ($this->wizardStep == 2) {
             if (empty($this->items)) {
@@ -88,11 +231,14 @@ class Create extends Component
                 'items.*.qty.min' => 'Kuantitas minimal 1.',
             ]);
 
-            // Validasi SN jika ada yang lupa menekan enter
+            // Auto-commit SN jika pengguna mengetik/scan IMEI tapi belum sempat menekan tombol tambah/Enter
             foreach ($this->items as $idx => $item) {
                 if (!empty(trim($item['scanned_sn'] ?? ''))) {
-                    $this->addError('items', 'Ada input IMEI yang belum ditekan Enter pada baris ke-' . ($idx + 1));
-                    return;
+                    $this->addSn($idx);
+                    if (!empty(trim($this->items[$idx]['scanned_sn'] ?? ''))) {
+                        $this->addError('items', 'IMEI pada baris ke-' . ($idx + 1) . ' belum valid: ' . $this->items[$idx]['scanned_sn']);
+                        return;
+                    }
                 }
             }
         }
@@ -109,6 +255,35 @@ class Create extends Component
         }
     }
 
+    public function setDpPercentage($percent)
+    {
+        $this->has_dp = true;
+        $this->dp_amount = round(($this->grand_total * (float)$percent) / 100);
+    }
+
+    public function setDpNominal($amount)
+    {
+        $this->has_dp = true;
+        $this->dp_amount = min($this->grand_total, (float)$amount);
+    }
+
+    public function updatedHasDp($value)
+    {
+        if ($value && empty($this->dp_amount)) {
+            $this->dp_amount = 0;
+        }
+    }
+
+    public function updatedDpPaymentMethodId($val)
+    {
+        $pm = \App\Models\PaymentMethod::find($val);
+        if ($pm && $pm->rates()->where('is_active', true)->exists()) {
+            $this->dp_payment_method_rate_id = $pm->rates()->where('is_active', true)->first()->id;
+        } else {
+            $this->dp_payment_method_rate_id = null;
+        }
+    }
+
     public function addItem()
     {
         $this->items[] = [
@@ -120,6 +295,8 @@ class Create extends Component
             'discount' => 0,
             'total' => 0,
             'product_name' => '',
+            'item_no' => '',
+            'available_stock' => 0,
             'serial_numbers' => [], // Validated SNs as badges
             'scanned_sn' => '', // Current input string
         ];
@@ -144,6 +321,7 @@ class Create extends Component
             if ($field === 'searchProduct') {
                 $term = $value;
                 if (strlen($term) >= 2) {
+                    $warehouseId = Auth::user()->warehouse_id;
                     $this->items[$index]['searchResults'] = \App\Models\ProductAccurate::where(function ($q) use ($term) {
                         $q->where('name', 'like', '%' . $term . '%')
                             ->orWhere('item_no', 'like', '%' . $term . '%');
@@ -151,11 +329,21 @@ class Create extends Component
                         ->where('business_unit_id', $this->business_unit_id)
                         ->take(10)
                         ->get()
-                        ->map(function ($v) {
+                        ->map(function ($v) use ($warehouseId) {
+                            $stock = 0;
+                            if ($warehouseId) {
+                                $stock = \App\Models\WarehouseStock::where([
+                                    'warehouse_id' => $warehouseId,
+                                    'variant_id'   => $v->id,
+                                    'variant_type' => \App\Models\ProductAccurate::class,
+                                ])->value('stock') ?? 0;
+                            }
                             return [
                                 'id' => $v->id,
                                 'name' => $v->name,
-                                'price' => $v->base_price
+                                'item_no' => $v->item_no ?? '',
+                                'price' => $v->base_price,
+                                'stock' => (int)$stock
                             ];
                         })->toArray();
                 } else {
@@ -319,6 +507,7 @@ class Create extends Component
         $this->selectedCustomerName = $name;
         $this->selectedCustomerEmail = $email;
         $this->selectedCustomerPhone = $phone;
+        $this->loadCustomerDeposits();
     }
 
     public function clearCustomer()
@@ -328,6 +517,10 @@ class Create extends Component
         $this->selectedCustomerName = null;
         $this->selectedCustomerEmail = null;
         $this->selectedCustomerPhone = null;
+        $this->available_customer_deposits = [];
+        $this->available_customer_deposit_total = 0;
+        $this->use_customer_deposit = false;
+        $this->custom_deposit_amount = 0;
     }
 
     public function updatedSearchSales($value)
@@ -456,8 +649,21 @@ class Create extends Component
 
     public function selectProduct($index, $id, $name, $price)
     {
+        $warehouseId = Auth::user()->warehouse_id;
+        $variant = \App\Models\ProductAccurate::find($id);
+        $stock = 0;
+        if ($warehouseId && $variant) {
+            $stock = \App\Models\WarehouseStock::where([
+                'warehouse_id' => $warehouseId,
+                'variant_id'   => $variant->id,
+                'variant_type' => \App\Models\ProductAccurate::class,
+            ])->value('stock') ?? 0;
+        }
+
         $this->items[$index]['variant_id'] = $id;
         $this->items[$index]['product_name'] = $name;
+        $this->items[$index]['item_no'] = $variant ? $variant->item_no : '';
+        $this->items[$index]['available_stock'] = (int)$stock;
         $this->items[$index]['searchProduct'] = $name;
         $this->items[$index]['unit_price'] = $price;
         $this->items[$index]['searchResults'] = [];
@@ -472,6 +678,8 @@ class Create extends Component
             $this->items[$index]['searchProduct'] = '';
             $this->items[$index]['variant_id'] = '';
             $this->items[$index]['product_name'] = '';
+            $this->items[$index]['item_no'] = '';
+            $this->items[$index]['available_stock'] = 0;
             $this->items[$index]['unit_price'] = 0;
             $this->items[$index]['total'] = 0;
         }
@@ -496,6 +704,10 @@ class Create extends Component
         }
 
         $this->grand_total = max(0, $this->subtotal - $this->discount_amount);
+
+        if ($this->has_dp && (float)$this->dp_amount > $this->grand_total) {
+            $this->dp_amount = $this->grand_total;
+        }
     }
 
     public function save()
@@ -507,18 +719,47 @@ class Create extends Component
         }
 
         try {
-            $this->validate([
+            $rules = [
                 'user_id' => 'required',
                 'business_unit_id' => 'required',
                 'order_date' => 'required|date',
                 'items' => 'required|array|min:1',
                 'items.*.variant_id' => 'required',
                 'items.*.qty' => 'required|numeric|min:1',
-            ], [
+            ];
+
+            $messages = [
                 'user_id.required' => 'Pelanggan harus dipilih.',
                 'business_unit_id.required' => 'Unit Usaha harus dipilih.',
                 'items.*.variant_id.required' => 'Produk belum dipilih.',
-            ]);
+                'items.*.qty.min' => 'Kuantitas minimal 1.',
+            ];
+
+            if ($this->has_dp) {
+                $actualAmount = (float) $this->dp_amount;
+                $depositToUse = ($this->use_customer_deposit && $this->custom_deposit_amount > 0) ? (float) $this->custom_deposit_amount : 0;
+                $totalPaid = $actualAmount + $depositToUse;
+
+                if ($totalPaid <= 0) {
+                    $this->addError('dp_amount', 'Masukkan nominal DP yang dibayarkan atau gunakan saldo deposit.');
+                    return;
+                }
+
+                if ($totalPaid > $this->grand_total) {
+                    $this->addError('dp_amount', 'Total pembayaran DP tidak boleh melebihi Grand Total pesanan.');
+                    return;
+                }
+
+                if ($actualAmount > 0) {
+                    $rules['dp_payment_method_id'] = 'required';
+                    $messages['dp_payment_method_id.required'] = 'Metode pembayaran DP harus dipilih.';
+                }
+
+                $rules['dp_date'] = 'required|date';
+                $messages['dp_date.required'] = 'Tanggal pembayaran DP harus diisi.';
+            }
+
+            $this->validate($rules, $messages);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::warning('Validation Error di Create SO: ' . $e->getMessage());
             $this->dispatch('toast', title: 'Validasi Gagal', message: 'Harap periksa kembali isian form Anda.', type: 'warning');
@@ -530,19 +771,25 @@ class Create extends Component
             'business_unit_id' => $this->business_unit_id,
             'subtotal' => $this->subtotal,
             'grand_total' => $this->grand_total,
+            'has_dp' => $this->has_dp,
+            'dp_amount' => $this->dp_amount,
+            'custom_deposit_amount' => $this->custom_deposit_amount,
         ]);
 
         $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
         $businessUnit = BusinessUnit::find($this->business_unit_id);
-        $completePrefix = 'SO-' . $businessUnit->prefix . '-';
+        $completePrefix = 'SO-' . ($businessUnit ? $businessUnit->prefix : 'GEN') . '-';
         $orderNumber = $completePrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
-            Order::whereDate('order_date', $dateToUse->format('Y-m-d')) // <- Menggunakan order_date
+            Order::whereDate('order_date', $dateToUse->format('Y-m-d'))
                 ->where('order_channel', 'SO')
                 ->count() + 1,
             4,
             '0',
             STR_PAD_LEFT
         );
+
+        $deposit = null;
+        $orderPayment = null;
 
         try {
             DB::beginTransaction();
@@ -594,11 +841,11 @@ class Create extends Component
                     'total_hpp' => $hppData['total_hpp'],
                     'discount_amount' => $item['discount'],
                     'subtotal' => $item['total'],
-                    'serial_number' => !empty($itemSns) ? implode(',', $itemSns) : null, // Simpan IMEI gabungan
+                    'serial_number' => !empty($itemSns) ? implode(',', $itemSns) : null,
                     'sales_ids' => !empty($item['sales_ids']) ? json_encode($item['sales_ids']) : ($this->sales_id ? json_encode([$this->sales_id]) : null),
                 ]);
 
-                // Kunci IMEI di lokal dengan status Unavailable (mirip case draft) & potong stok gudang lokal
+                // Kunci IMEI di lokal dengan status Unavailable & potong stok gudang lokal
                 if (!empty($itemSns)) {
                     \App\Models\ProductSerialNumber::whereIn('serial_number', $itemSns)
                         ->update(['status' => 'Unavailable']);
@@ -617,23 +864,119 @@ class Create extends Component
                 }
             }
 
+            // Proses Pembayaran DP Langsung (Jika diaktifkan)
+            if ($this->has_dp) {
+                $actualAmount = (float)$this->dp_amount;
+                $depositToUse = ($this->use_customer_deposit && $this->custom_deposit_amount > 0) ? (float)$this->custom_deposit_amount : 0;
+                $totalDpPaid = $actualAmount + $depositToUse;
+
+                // 1. Potong Saldo Deposit Pelanggan lama (jika digunakan)
+                if ($depositToUse > 0 && !empty($this->available_customer_deposits)) {
+                    $depositIds = collect($this->available_customer_deposits)->pluck('id')->toArray();
+                    $lockedDeposits = \App\Models\CustomerDeposit::whereIn('id', $depositIds)
+                        ->where('status', 'AVAILABLE')
+                        ->lockForUpdate()
+                        ->get();
+
+                    $remainingDpNeeded = $depositToUse;
+                    foreach ($lockedDeposits as $existingDeposit) {
+                        if ($remainingDpNeeded > 0) {
+                            $useAmount = min((float)$existingDeposit->balance, $remainingDpNeeded);
+
+                            \App\Models\CustomerDepositUsage::create([
+                                'customer_deposit_id' => $existingDeposit->id,
+                                'order_id' => $order->id,
+                                'amount_used' => $useAmount,
+                            ]);
+
+                            $existingDeposit->balance -= $useAmount;
+                            if ($existingDeposit->balance <= 0) {
+                                $existingDeposit->status = 'USED';
+                            }
+                            $existingDeposit->save();
+
+                            \App\Models\OrderPayment::create([
+                                'order_id' => $order->id,
+                                'xendit_external_id' => 'DP-USE-' . date('YmdHis') . rand(1000, 9999),
+                                'amount' => $useAmount,
+                                'status' => 'PAID',
+                                'no_kontrak' => $this->dp_contract_number,
+                                'paid_at' => Carbon::parse($this->dp_date),
+                            ]);
+
+                            if ($existingDeposit->accurate_invoice_no) {
+                                $doc = \App\Models\OrderAccurateDoc::firstOrNew([
+                                    'order_id' => $order->id,
+                                    'doc_type' => 'DP_INVOICE',
+                                    'doc_number' => $existingDeposit->accurate_invoice_no,
+                                ]);
+                                $doc->amount = ($doc->amount ?? 0) + $useAmount;
+                                $doc->status = 'SUCCESS';
+                                $doc->save();
+                            }
+                            if ($existingDeposit->accurate_receipt_no) {
+                                $doc = \App\Models\OrderAccurateDoc::firstOrNew([
+                                    'order_id' => $order->id,
+                                    'doc_type' => 'DP_RECEIPT',
+                                    'doc_number' => $existingDeposit->accurate_receipt_no,
+                                ]);
+                                $doc->amount = ($doc->amount ?? 0) + $useAmount;
+                                $doc->status = 'SUCCESS';
+                                $doc->save();
+                            }
+
+                            $remainingDpNeeded -= $useAmount;
+                        }
+                    }
+                }
+
+                // 2. Buat Uang Muka baru dari Cash / Transfer
+                if ($actualAmount > 0) {
+                    $deposit = \App\Models\CustomerDeposit::create([
+                        'user_id' => $order->user_id,
+                        'origin_order_id' => $order->id,
+                        'business_unit_id' => $order->business_unit_id,
+                        'amount' => $actualAmount,
+                        'balance' => $actualAmount,
+                        'payment_method_id' => $this->dp_payment_method_id,
+                        'status' => 'AVAILABLE',
+                        'notes' => 'DP langsung dari SO ' . $order->order_number . ($this->dp_notes ? ' - ' . $this->dp_notes : ''),
+                        'created_by' => Auth::id(),
+                    ]);
+
+                    $orderPayment = \App\Models\OrderPayment::create([
+                        'order_id' => $order->id,
+                        'xendit_external_id' => 'DP-SO-' . date('YmdHis') . rand(1000, 9999),
+                        'amount' => $actualAmount,
+                        'status' => 'PAID',
+                        'payment_method_id' => $this->dp_payment_method_id,
+                        'payment_method_rate_id' => $this->dp_payment_method_rate_id,
+                        'no_kontrak' => $this->dp_contract_number,
+                        'paid_at' => Carbon::parse($this->dp_date),
+                    ]);
+                }
+
+                if ($totalDpPaid >= $order->grand_total) {
+                    $order->update(['order_status' => 'paid']);
+                } elseif ($totalDpPaid > 0) {
+                    $order->update(['order_status' => 'down_payment']);
+                }
+            }
+
             DB::commit();
 
-            // Trigger Sync to Accurate
+            // Trigger Sync SO to Accurate
             try {
                 $accurateService = app(AccurateService::class);
                 $customerUser = User::find($this->user_id);
                 $businessUnit = BusinessUnit::find($this->business_unit_id);
                 $dbSource = $businessUnit ? $businessUnit->code : 'syihab';
 
-                // Check if we need to append GSK prefix for Accurate Second branch
-                // Accurate Second usually prefixes branch with "GSK " if it's not already there
                 $accurateBranchName = $branchName;
                 if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
                     $accurateBranchName = 'GSK ' . $accurateBranchName;
                 }
 
-                // Sync Customer to Accurate
                 $accurateService->syncCustomer($customerUser, $dbSource);
                 $customerUser->refresh();
 
@@ -655,7 +998,6 @@ class Create extends Component
                         'projectNo' => $projectNo
                     ];
 
-                    // Map sales_ids to Accurate employee numbers
                     if (!empty($item['sales_ids'])) {
                         $employeeNos = \App\Models\Employe::whereIn('id', $item['sales_ids'])
                             ->pluck('employee_no')
@@ -673,7 +1015,6 @@ class Create extends Component
                         }
                     }
 
-                    // Jika user mengisi SN / IMEI, kirim ke Accurate untuk mencadangkan SN
                     $joinedSn = isset($item['serial_numbers']) ? implode(',', array_filter(array_map('trim', $item['serial_numbers']))) : '';
                     if (!empty($joinedSn)) {
                         $sns = explode(',', $joinedSn);
@@ -713,7 +1054,99 @@ class Create extends Component
                         'status' => 'SUCCESS',
                     ]);
                     Log::info('Berhasil Sync SO ke Accurate dengan Nomor: ' . $soResult['r']['number']);
-                    Log::info("IMEI dikunci di ZedPOS lokal (Unavailable). DO Accurate tidak dibuat di awal, stok Accurate tetap aman hingga pelunasan.");
+                }
+
+                // Sinkronisasi Faktur DP ke Accurate jika ada pembayaran DP baru
+                if ($deposit && $orderPayment && (float)$this->dp_amount > 0) {
+                    try {
+                        $dpAmount = (float)$this->dp_amount;
+                        $pm = \App\Models\PaymentMethod::find($this->dp_payment_method_id);
+                        $rate = null;
+                        if ($this->dp_payment_method_rate_id) {
+                            $rate = \App\Models\PaymentMethodRate::find($this->dp_payment_method_rate_id);
+                        } elseif ($pm && $pm->rates()->where('is_active', true)->exists()) {
+                            $rate = $pm->rates()->where('is_active', true)->first();
+                        }
+
+                        $pct = $rate ? (float) ($rate->percentage ?? $rate->mdr_percentage ?? 0) : 0;
+                        $rowMdr = $pct > 0 ? round($dpAmount * $pct / 100, 0) : 0;
+                        $netReceiptAmount = $dpAmount - $rowMdr;
+
+                        $detailDiscounts = [];
+                        if ($rowMdr > 0 && $rate && $rate->accurate_account_no) {
+                            $detailDiscounts[] = [
+                                'accountNo' => $rate->accurate_account_no,
+                                'amount' => (float) $rowMdr,
+                                'departmentName' => $accurateBranchName,
+                                'discountNotes' => 'MDR DP'
+                            ];
+                        }
+
+                        $dpInvData = [
+                            'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
+                            'branchName' => $accurateBranchName,
+                            'dpAmount'   => (float)$dpAmount,
+                            'transDate'  => Carbon::parse($this->dp_date)->format('d/m/Y'),
+                            'inclusiveTax' => false,
+                            'isTaxable' => false,
+                            'description' => 'Uang Muka (DP) dari SO: ' . ($order->accurate_so_number ?? $order->order_number) . ($this->dp_contract_number ? '. No Kontrak: ' . $this->dp_contract_number : '') . ($this->dp_notes ? '. ' . $this->dp_notes : ''),
+                        ];
+
+                        if ($this->dp_contract_number) {
+                            $dpInvData['poNumber'] = $this->dp_contract_number;
+                        }
+
+                        $dpInvResult = $accurateService->postDownPaymentInvoice($dpInvData, $dbSource);
+                        if (isset($dpInvResult['r']['number'])) {
+                            $dpInvoiceNo = $dpInvResult['r']['number'];
+                            $deposit->update(['accurate_invoice_no' => $dpInvoiceNo]);
+
+                            \App\Models\OrderAccurateDoc::create([
+                                'order_id' => $order->id,
+                                'doc_type' => 'DP_INVOICE',
+                                'doc_number' => $dpInvoiceNo,
+                                'accurate_id' => $dpInvResult['r']['id'] ?? null,
+                                'amount' => (float)$dpAmount,
+                                'status' => 'SUCCESS',
+                            ]);
+
+                            $srData = [
+                                'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
+                                'branchName' => $accurateBranchName,
+                                'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
+                                'transDate' => Carbon::parse($this->dp_date)->format('d/m/Y'),
+                                'receiptAmount' => (float)$netReceiptAmount,
+                                'chequeAmount' => (float)$netReceiptAmount,
+                                'description' => 'Penerimaan DP dari SO: ' . ($order->accurate_so_number ?? $order->order_number) . ($this->dp_contract_number ? '. No Kontrak: ' . $this->dp_contract_number : '') . ($this->dp_notes ? '. ' . $this->dp_notes : ''),
+                                'detailInvoice' => [
+                                    [
+                                        'invoiceNo' => $dpInvoiceNo,
+                                        'paymentAmount' => (float)$dpAmount,
+                                    ]
+                                ]
+                            ];
+
+                            if (!empty($detailDiscounts)) {
+                                $srData['detailInvoice'][0]['detailDiscount'] = $detailDiscounts;
+                            }
+
+                            $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+                            if (isset($srResult['r']['number'])) {
+                                $deposit->update(['accurate_receipt_no' => $srResult['r']['number']]);
+                                \App\Models\OrderAccurateDoc::create([
+                                    'order_id' => $order->id,
+                                    'doc_type' => 'DP_RECEIPT',
+                                    'doc_number' => $srResult['r']['number'],
+                                    'accurate_id' => $srResult['r']['id'] ?? null,
+                                    'amount' => (float)$dpAmount,
+                                    'status' => 'SUCCESS',
+                                ]);
+                            }
+                        }
+                    } catch (\Exception $eDp) {
+                        Log::error('Accurate DP Sync Error: ' . $eDp->getMessage());
+                        $this->dispatch('toast', title: 'DP Tersimpan di Tokopon', message: 'DP tercatat di sistem toko, namun gagal sync faktur DP ke Accurate: ' . $eDp->getMessage(), type: 'warning');
+                    }
                 }
             } catch (\Exception $e) {
                 Log::error('Accurate SO Sync Error: ' . $e->getMessage());
@@ -744,10 +1177,78 @@ class Create extends Component
             $warehouses = Warehouse::where('business_unit_id', $this->business_unit_id)->get();
         }
 
+        $user = Auth::user();
+        $businessUnitId = $this->business_unit_id ?? $user->getActiveBusinessUnitId();
+        $warehouseName = $user->warehouse ? trim(strtolower($user->warehouse->name)) : null;
+
+        $cashPaymentMethods = \App\Models\PaymentMethod::where('is_active', true)
+            ->where('category', 'TUNAI')
+            ->where(function ($query) use ($businessUnitId) {
+                $query->where('business_unit_id', $businessUnitId)
+                    ->orWhereNull('business_unit_id');
+            })
+            ->get();
+
+        if ($warehouseName) {
+            $filteredCash = $cashPaymentMethods->filter(function ($method) use ($warehouseName) {
+                $methodNameLower = strtolower(trim($method->name));
+                if (str_contains($methodNameLower, 'tukar tambah')) {
+                    return true;
+                }
+                $methodLocation = trim(str_replace('tunai', '', $methodNameLower));
+                if (empty($methodLocation)) return false;
+                return str_contains($warehouseName, $methodLocation);
+            })->values();
+            if ($filteredCash->isNotEmpty()) {
+                $cashPaymentMethods = $filteredCash;
+            }
+        }
+
+        $nonCashPaymentMethods = \App\Models\PaymentMethod::where('is_active', true)
+            ->where('category', 'NON-TUNAI')
+            ->where(function ($query) use ($businessUnitId) {
+                $query->where('business_unit_id', $businessUnitId)
+                    ->orWhereNull('business_unit_id');
+            })
+            ->with('rates')
+            ->orderBy('name')
+            ->get();
+
+        // Auto-assign default payment method hanya jika tunai
+        if (empty($this->dp_payment_method_id) && $this->dp_mode === 'tunai' && $cashPaymentMethods->isNotEmpty()) {
+            $this->dp_payment_method_id = $cashPaymentMethods->first()->id;
+        }
+
+        // Kumpulan grup bank non-tunai (seperti pada POS)
+        $nonCashBankGroups = $nonCashPaymentMethods
+            ->map(function ($m) {
+                return trim($m->bank_name ?: $m->name);
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        // Filter metode untuk grup bank yang sedang dipilih
+        $methodsInSelectedGroup = collect();
+        if ($this->dp_mode === 'non-tunai' && !empty($this->dp_bank_group)) {
+            $methodsInSelectedGroup = $nonCashPaymentMethods->filter(function ($m) {
+                $grp = trim($m->bank_name ?: $m->name);
+                return strcasecmp($grp, $this->dp_bank_group) === 0;
+            })->values();
+        }
+
         return view('livewire.admin.orders.sales-order.create', [
             'businessUnits' => BusinessUnit::all(),
             'warehouses' => $warehouses,
             'isGsk' => $isGsk,
+            'cashPaymentMethods' => $cashPaymentMethods,
+            'nonCashPaymentMethods' => $nonCashPaymentMethods,
+            'nonCashBankGroups' => $nonCashBankGroups,
+            'methodsInSelectedGroup' => $methodsInSelectedGroup,
+            'paymentMethods' => \App\Models\PaymentMethod::where('is_active', true)->where(function($q) use ($businessUnitId) {
+                if ($businessUnitId) $q->where('business_unit_id', $businessUnitId)->orWhereNull('business_unit_id');
+            })->get(),
         ])->layout('layouts.z');
     }
 }
