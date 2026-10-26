@@ -105,7 +105,7 @@
                 </svg>
                 Informasi Tambahan
             </h3>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-6">
                 <div>
                     <span class="block text-xs font-bold text-gray-400 uppercase">Pelanggan</span>
                     <span class="font-semibold text-gray-800">{{ $order->user->name ?? '-' }}</span>
@@ -121,6 +121,21 @@
                 <div>
                     <span class="block text-xs font-bold text-gray-400 uppercase">Sales / Pramuniaga</span>
                     <span class="font-semibold text-gray-800">{{ $order->salesBy->name ?? '-' }}</span>
+                </div>
+                <div>
+                    <span class="block text-xs font-bold text-gray-400 uppercase">Alokasi Unit</span>
+                    @if (count($this->lockedSerialNumbers) > 0)
+                        <span class="inline-flex items-center gap-1 font-bold text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 mt-0.5">
+                            <svg class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            {{ count($this->lockedSerialNumbers) }} Unit Terkunci
+                        </span>
+                    @else
+                        <span class="text-xs font-semibold text-gray-500 block mt-0.5">
+                            Indent (Non-Keep)
+                        </span>
+                    @endif
                 </div>
                 @if ($order->accurate_so_number)
                     <div>
@@ -170,6 +185,22 @@
                                                 {{ $item->variant->color ?? '' }}</div>
                                         @else
                                             Unknown Product
+                                        @endif
+
+                                        @if (!empty(trim((string)$item->serial_number)))
+                                            @php
+                                                $itemSns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                                            @endphp
+                                            <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                                @foreach ($itemSns as $sn)
+                                                    <span class="inline-flex items-center gap-1 text-[11px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-md shadow-2xs">
+                                                        <svg class="w-3 h-3 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                        </svg>
+                                                        IMEI: {{ $sn }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
                                         @endif
                                     </td>
                                     <td class="p-3 text-sm text-center">{{ $item->qty }}</td>
@@ -288,18 +319,18 @@
                 @endphp
 
                 @if ($hasAccurateDocs)
-                    {{-- Node 1: Sales Order --}}
+                    {{-- Node 1: Sales Order & Unit Terkunci (Keep IMEI) --}}
                     @php
                         $soDoc = $order->accurateDocs->where('doc_type', 'SALES_ORDER')->first();
                         $doDoc = $order->accurateDocs->where('doc_type', 'DELIVERY_ORDER')->first();
+                        $lockedSns = $this->lockedSerialNumbers;
                     @endphp
-                    <div class="flex flex-col md:flex-row items-start md:items-center gap-16">
+                    <div class="flex flex-col md:flex-row items-start md:items-center gap-6">
+                        {{-- SO Box --}}
                         <div id="node-so" style="z-index: 10;">
                             <div
-                                class="w-48 bg-[#eff6ff] border-2 border-[#1c69d4] rounded-xl p-4 text-center shadow-sm cursor-move hover:shadow-md transition-all">
-                                <div class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider mb-1">Sales
-                                    Order
-                                </div>
+                                class="w-48 bg-[#eff6ff] border-2 border-[#1c69d4] rounded-xl p-4 text-center shadow-sm hover:shadow-md transition-all">
+                                <div class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider mb-1">Sales Order</div>
                                 <div class="text-xs font-bold text-gray-800 mb-1">
                                     {{ $soDoc ? $soDoc->doc_number : $order->accurate_so_number }}</div>
                                 <div class="text-[10px] text-gray-500">
@@ -308,12 +339,16 @@
                             </div>
                         </div>
 
+                        {{-- Legacy DO Node (Jika order pernah dibuatkan DO di Accurate) --}}
                         @if ($doDoc)
+                            <div class="w-8 h-0.5 bg-gray-300 relative shrink-0 hidden md:block">
+                                <div class="absolute right-0 -top-1 w-2.5 h-2.5 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
+                            </div>
                             <div id="node-do" style="z-index: 10;">
                                 <div
-                                    class="w-48 bg-orange-50 border-2 border-orange-500 rounded-xl p-4 text-center shadow-sm cursor-move hover:shadow-md transition-shadow">
+                                    class="w-48 bg-orange-50 border-2 border-orange-500 rounded-xl p-4 text-center shadow-sm hover:shadow-md transition-shadow">
                                     <div class="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">
-                                        Delivery Order</div>
+                                        Delivery Order (Legacy)</div>
                                     <div class="text-[10px] font-semibold text-orange-800 mb-1">
                                         {{ $doDoc->doc_number }}</div>
                                     <div class="text-[10px] text-gray-500">
@@ -321,6 +356,74 @@
                                 </div>
                             </div>
                         @endif
+
+                        {{-- Node Keep IMEI (Unit Terkunci di Tokopon Zed) --}}
+                        @if (count($lockedSns) > 0)
+                            <div class="w-8 h-0.5 bg-amber-400 relative shrink-0 hidden md:block">
+                                <div class="absolute right-0 -top-1 w-2.5 h-2.5 border-t-2 border-r-2 border-amber-400 transform rotate-45"></div>
+                            </div>
+                            <div id="node-locked-imei" style="z-index: 10;">
+                                <div
+                                    class="w-60 bg-gradient-to-b from-amber-50 to-amber-50/40 border-2 border-amber-400 rounded-xl p-3.5 text-left shadow-sm hover:shadow-md transition-all">
+                                    <div class="flex items-center justify-between gap-1 mb-2">
+                                        <span class="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-md">
+                                            <svg class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                            </svg>
+                                            Keep IMEI
+                                        </span>
+                                        <span class="text-[10px] font-bold text-amber-700 bg-white px-2 py-0.5 rounded-full border border-amber-200 shadow-2xs">
+                                            {{ count($lockedSns) }} Unit
+                                        </span>
+                                    </div>
+
+                                    <div class="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                                        @foreach ($lockedSns as $locked)
+                                            <div class="bg-white p-2 rounded-lg border border-amber-200 shadow-2xs">
+                                                <div class="text-xs font-bold text-gray-800 leading-tight truncate" title="{{ $locked['item_name'] }}">
+                                                    {{ $locked['item_name'] }}
+                                                </div>
+                                                <div class="flex items-center justify-between gap-1 mt-1">
+                                                    <span class="text-[11px] font-mono font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 select-all">
+                                                        {{ $locked['sn'] }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    <div class="mt-2.5 pt-2 border-t border-amber-200 flex items-center justify-between text-[11px]">
+                                        <span class="text-emerald-700 font-bold flex items-center gap-1.5">
+                                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                            Kunci Tokopon
+                                        </span>
+                                        @if ($order->order_status !== 'COMPLETED' && $order->order_status !== 'CANCELLED' && $order->order_status !== 'cancelled')
+                                            <button type="button" @click="$dispatch('openSwapModal', { orderId: {{ $order->id }} })"
+                                                class="text-indigo-600 hover:text-indigo-800 font-bold hover:underline inline-flex items-center gap-0.5"
+                                                title="Tukar atau ganti unit IMEI">
+                                                Swap &rarr;
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @elseif (!$doDoc && $order->order_status !== 'COMPLETED' && $order->order_status !== 'CANCELLED' && $order->order_status !== 'cancelled')
+                            <div class="w-8 h-0.5 bg-gray-300 relative shrink-0 hidden md:block">
+                                <div class="absolute right-0 -top-1 w-2.5 h-2.5 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
+                            </div>
+                            <div id="node-indent-info" style="z-index: 10;">
+                                <div class="w-48 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-4 text-center">
+                                    <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Alokasi Unit</div>
+                                    <div class="text-xs font-semibold text-gray-600 mb-0.5">Indent / Non-Keep</div>
+                                    <div class="text-[10px] text-gray-400">Unit belum dikunci</div>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Line penghubung ke DP / Pelunasan --}}
+                    <div class="w-10 h-0.5 bg-gray-300 relative shrink-0 hidden md:block">
+                        <div class="absolute right-0 -top-1 w-2.5 h-2.5 border-t-2 border-r-2 border-gray-300 transform rotate-45"></div>
                     </div>
 
                     {{-- DPs --}}
@@ -475,21 +578,75 @@
                     @endif
                 @else
                     {{-- Fallback for Old Orders without accurateDocs --}}
-                    <div class="relative group">
-                        <div
-                            class="w-48 bg-[#eff6ff] border-2 border-[#1c69d4] rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
-                            <div class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider mb-1">Sales Order
+                    @php $lockedSns = $this->lockedSerialNumbers; @endphp
+                    <div class="flex flex-col md:flex-row items-start md:items-center gap-6">
+                        <div class="relative group">
+                            <div
+                                class="w-48 bg-[#eff6ff] border-2 border-[#1c69d4] rounded-xl p-4 text-center shadow-sm cursor-pointer hover:shadow-md transition-all">
+                                <div class="text-[10px] font-bold text-[#1c69d4] uppercase tracking-wider mb-1">Sales Order
+                                </div>
+                                <div class="text-xs font-bold text-gray-800 mb-1">{{ $order->order_number }}</div>
+                                <div class="text-[10px] text-gray-500">
+                                    {{ $order->order_date ? $order->order_date->format('d/m/Y') : '-' }}</div>
                             </div>
-                            <div class="text-xs font-bold text-gray-800 mb-1">{{ $order->order_number }}</div>
-                            <div class="text-[10px] text-gray-500">
-                                {{ $order->order_date ? $order->order_date->format('d/m/Y') : '-' }}</div>
                         </div>
+
+                        @if (count($lockedSns) > 0)
+                            <div class="w-8 h-0.5 bg-amber-400 relative shrink-0 hidden md:block">
+                                <div class="absolute right-0 -top-1 w-2.5 h-2.5 border-t-2 border-r-2 border-amber-400 transform rotate-45"></div>
+                            </div>
+                            <div id="node-locked-imei-fb" style="z-index: 10;">
+                                <div
+                                    class="w-60 bg-gradient-to-b from-amber-50 to-amber-50/40 border-2 border-amber-400 rounded-xl p-3.5 text-left shadow-sm hover:shadow-md transition-all">
+                                    <div class="flex items-center justify-between gap-1 mb-2">
+                                        <span class="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-md">
+                                            <svg class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                            </svg>
+                                            Keep IMEI
+                                        </span>
+                                        <span class="text-[10px] font-bold text-amber-700 bg-white px-2 py-0.5 rounded-full border border-amber-200 shadow-2xs">
+                                            {{ count($lockedSns) }} Unit
+                                        </span>
+                                    </div>
+
+                                    <div class="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                                        @foreach ($lockedSns as $locked)
+                                            <div class="bg-white p-2.5 rounded-lg border border-amber-200 shadow-2xs">
+                                                <div class="text-xs font-bold text-gray-800 leading-tight truncate" title="{{ $locked['item_name'] }}">
+                                                    {{ $locked['item_name'] }}
+                                                </div>
+                                                <div class="flex items-center justify-between gap-1 mt-1.5">
+                                                    <span class="text-[11px] font-mono font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 select-all">
+                                                        {{ $locked['sn'] }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    <div class="mt-3 pt-2.5 border-t border-amber-200 flex items-center justify-between text-[11px]">
+                                        <span class="text-emerald-700 font-bold flex items-center gap-1.5">
+                                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                            Kunci Tokopon
+                                        </span>
+                                        @if ($order->order_status !== 'COMPLETED' && $order->order_status !== 'CANCELLED' && $order->order_status !== 'cancelled')
+                                            <button type="button" @click="$dispatch('openSwapModal', { orderId: {{ $order->id }} })"
+                                                class="text-indigo-600 hover:text-indigo-800 font-bold hover:underline inline-flex items-center gap-0.5"
+                                                title="Tukar atau ganti unit IMEI">
+                                                Swap &rarr;
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                     {{-- Line --}}
-                    <div class="w-16 h-0.5 bg-gray-300 relative">
+                    <div class="w-10 h-0.5 bg-gray-300 relative shrink-0 hidden md:block">
                         <div
-                            class="absolute right-0 -top-1.5 w-3 h-3 border-t-2 border-r-2 border-gray-300 transform rotate-45">
+                            class="absolute right-0 -top-1 w-2.5 h-2.5 border-t-2 border-r-2 border-gray-300 transform rotate-45">
                         </div>
                     </div>
 

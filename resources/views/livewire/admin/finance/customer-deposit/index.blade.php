@@ -84,7 +84,7 @@
                                     <div class="text-xs text-gray-500">{{ $dep->user->profile->phone_number ?? ($dep->user->phone ?? '-') }}</div>
                                     <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
                                         @if ($dep->originOrder)
-                                            <a href="{{ route('admin.orders.sales-orders.show', $dep->originOrder->id) }}" target="_blank"
+                                            <a href="{{ route('admin.sales-orders.show', $dep->originOrder->id) }}" target="_blank"
                                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold border border-blue-200 transition"
                                                title="Buka detail Sales Order">
                                                 <svg class="w-3 h-3 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -614,7 +614,7 @@
                         <div class="font-bold text-blue-900 flex items-center justify-between">
                             <span>Sinkronisasi Accurate:</span>
                             @if ($selDep->originOrder)
-                                <a href="{{ route('admin.orders.sales-orders.show', $selDep->originOrder->id) }}" target="_blank" class="text-blue-700 underline font-semibold">
+                                <a href="{{ route('admin.sales-orders.show', $selDep->originOrder->id) }}" target="_blank" class="text-blue-700 underline font-semibold">
                                     Sumber: SO #{{ $selDep->originOrder->order_number }}
                                 </a>
                             @else

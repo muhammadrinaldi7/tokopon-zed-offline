@@ -17,6 +17,7 @@ class Index extends Component
     public $search = '';
     public $filterBusinessUnitId = '';
     public $filterBranchId = '';
+    public $filterImeiStatus = '';
 
     public function mount()
     {
@@ -77,6 +78,11 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function updatedFilterImeiStatus()
+    {
+        $this->resetPage();
+    }
+
     public function resetFilters()
     {
         $user = Auth::user();
@@ -84,6 +90,7 @@ class Index extends Component
         $isMo = $user && !$isAdmin && $user->hasAnyRole(['manager_operasional', 'manager_operasional_gsk']);
 
         $this->search = '';
+        $this->filterImeiStatus = '';
 
         if ($isAdmin) {
             $activeBu = $user->getActiveBusinessUnitId();
@@ -131,8 +138,19 @@ class Index extends Component
 
         // Query utama Order
         $ordersQuery = Order::query()
-            ->with(['user', 'accurateDocs', 'approvalRequests', 'salesBy', 'branch', 'businessUnit'])
+            ->with(['user', 'accurateDocs', 'approvalRequests', 'salesBy', 'branch', 'businessUnit', 'items:id,order_id,serial_number'])
             ->where('order_channel', 'SO');
+
+        // Filter Alokasi IMEI / Indent
+        if ($this->filterImeiStatus === 'keep_imei') {
+            $ordersQuery->whereHas('items', function ($q) {
+                $q->whereNotNull('serial_number')->where('serial_number', '!=', '');
+            });
+        } elseif ($this->filterImeiStatus === 'indent') {
+            $ordersQuery->whereDoesntHave('items', function ($q) {
+                $q->whereNotNull('serial_number')->where('serial_number', '!=', '');
+            });
+        }
 
         // Scoping keamanan berdasarkan role
         if ($isBranchLocked) {
