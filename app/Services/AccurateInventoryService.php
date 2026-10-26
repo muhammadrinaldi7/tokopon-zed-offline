@@ -167,6 +167,7 @@ class AccurateInventoryService
 
     /**
      * Sync active items directly from Accurate Online into product_accurates.
+     * Menggunakan format dan pemetaan standar yang sama persis dengan ProductAccurateManagement.
      */
     public function syncProductsFromAccurate(string $databaseSource = 'second', int $maxPages = 5): int
     {
@@ -174,31 +175,18 @@ class AccurateInventoryService
         $bu = BusinessUnit::where('code', $code)->first();
         if (!$bu) return 0;
 
-        $config = $this->getHeadersForBu($bu);
-        $host = $config['host'];
-        $secretKey = $bu->accurate_secret_key;
-        $token = $bu->accurate_token;
         $buId = $bu->id;
-
+        $service = app(AccurateService::class);
         $imported = 0;
+
         for ($p = 1; $p <= $maxPages; $p++) {
-            $dt = new \DateTime('now', new \DateTimeZone('Asia/Jakarta'));
-            $timestamp = $dt->format('d/m/Y H:i:s');
-            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+            try {
+                $items = $service->getItemList($p, 100, $code);
+            } catch (\Exception $e) {
+                Log::warning("Accurate getItemList failed on page {$p} for {$code}: " . $e->getMessage());
+                break;
+            }
 
-            $res = Http::timeout(25)->withHeaders([
-                'Authorization'   => 'Bearer ' . $token,
-                'X-Api-Timestamp' => $timestamp,
-                'X-Api-Signature' => $signature,
-                'Content-Type'    => 'application/json',
-            ])->get($host . '/item/list.do', [
-                'fields' => 'id,no,name,unitPrice,availableToSell,balanceUnitCost,totalCost,itemBrand,itemCategory,manageSN',
-                'sp.pageSize' => 100,
-                'sp.page' => $p,
-            ]);
-
-            if (!$res->successful()) break;
-            $items = $res->json()['d'] ?? [];
             if (empty($items)) break;
 
             $batch = [];
@@ -209,27 +197,24 @@ class AccurateInventoryService
                 $cost = (float)($item['balanceUnitCost'] ?? 0);
                 $price = (float)($item['unitPrice'] ?? 0);
 
-                if ($cost <= 0 && $price > 0) {
-                    $cost = round($price * 0.82);
-                }
-
                 $batch[] = [
                     'accurate_id'          => $item['no'],
                     'database_source'      => $code,
                     'business_unit_id'     => $buId,
                     'item_no'              => $item['no'],
                     'name'                 => $item['name'] ?? 'Unknown Item',
-                    'base_price'           => (int)round($price),
-                    'stock'                => (int)round($stock),
-                    'base_cost'            => (int)round($cost),
-                    'has_sn'               => (isset($item['serialNumberType']) && $item['serialNumberType'] === 'UNIQUE'),
+                    'base_price'           => (int) round($price),
+                    'stock'                => (int) round($stock),
+                    'base_cost'            => (int) round($cost),
+                    'has_sn'               => (isset($item['serialNumberType']) && $item['serialNumberType'] === 'UNIQUE') || (!empty($item['manageSN'])),
                     'id_brand_accurate'    => $item['itemBrand']['id'] ?? null,
-                    'brandName'            => $item['itemBrand']['name'] ?? 'Apple',
+                    'brandName'            => $item['itemBrand']['name'] ?? null,
                     'id_category_accurate' => $item['itemCategory']['id'] ?? null,
-                    'categoryName'         => $item['itemCategory']['name'] ?? 'Gadget',
-                    'is_addon'             => false,
-                    'proyek'               => null,
-                    'os'                   => null,
+                    'categoryName'         => $item['itemCategory']['name'] ?? null,
+                    'itemType'             => $item['itemType'] ?? null,
+                    'is_addon'             => isset($item['charField1']) && strtolower(trim($item['charField1'])) === 'ya',
+                    'proyek'               => $item['charField2'] ?? null,
+                    'os'                   => $item['charField3'] ?? null,
                     'raw_data'             => json_encode($item),
                     'created_at'           => now(),
                     'updated_at'           => now(),
@@ -240,10 +225,30 @@ class AccurateInventoryService
                 ProductAccurate::upsert(
                     $batch,
                     ['accurate_id', 'database_source'],
-                    ['item_no', 'name', 'base_price', 'stock', 'base_cost', 'has_sn', 'brandName', 'categoryName', 'updated_at']
+                    [
+                        'item_no',
+                        'name',
+                        'base_price',
+                        'stock',
+                        'base_cost',
+                        'has_sn',
+                        'business_unit_id',
+                        'id_brand_accurate',
+                        'brandName',
+                        'id_category_accurate',
+                        'categoryName',
+                        'itemType',
+                        'is_addon',
+                        'proyek',
+                        'os',
+                        'raw_data',
+                        'updated_at'
+                    ]
                 );
                 $imported += count($batch);
             }
+
+            if (count($items) < 100) break;
             usleep(100000);
         }
 
