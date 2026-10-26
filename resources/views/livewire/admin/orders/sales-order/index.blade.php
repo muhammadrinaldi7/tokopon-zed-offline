@@ -51,7 +51,7 @@
         {{-- Filter & Search Bar --}}
         <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-6">
             {{-- Search Bar --}}
-            <div class="md:col-span-5 relative">
+            <div class="md:col-span-4 relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -64,11 +64,11 @@
             </div>
 
             {{-- Filter Unit Bisnis --}}
-            <div class="md:col-span-3">
+            <div class="md:col-span-2">
                 @if ($isAdmin)
                     <select wire:model.live="filterBusinessUnitId"
                         class="p-2.5 w-full rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white">
-                        <option value="">Semua Unit Bisnis</option>
+                        <option value="">Semua Bisnis</option>
                         @foreach ($businessUnits as $bu)
                             <option value="{{ $bu->id }}">{{ $bu->name }}</option>
                         @endforeach
@@ -113,6 +113,16 @@
                 @endif
             </div>
 
+            {{-- Filter Alokasi IMEI --}}
+            <div class="md:col-span-2">
+                <select wire:model.live="filterImeiStatus"
+                    class="p-2.5 w-full rounded-xl border-gray-200 text-sm focus:ring-[#1c69d4] focus:border-[#1c69d4] shadow-sm bg-white">
+                    <option value="">Semua Alokasi</option>
+                    <option value="keep_imei">🔒 Keep IMEI</option>
+                    <option value="indent">Indent (Non-Keep)</option>
+                </select>
+            </div>
+
             {{-- Tombol Reset --}}
             <div class="md:col-span-1 flex items-center">
                 <button wire:click="resetFilters" type="button"
@@ -143,7 +153,23 @@
                     @forelse($orders as $order)
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="p-4">
-                                <div class="font-bold text-[#1c69d4]">{{ $order->order_number }}</div>
+                                @php
+                                    $lockedCount = $order->items ? $order->items->sum(function($item) {
+                                        return !empty(trim((string)$item->serial_number)) ? count(array_filter(array_map('trim', explode(',', $item->serial_number)))) : 0;
+                                    }) : 0;
+                                @endphp
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="font-bold text-[#1c69d4]">{{ $order->order_number }}</span>
+                                    @if ($lockedCount > 0)
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-extrabold rounded-md border border-amber-300 shadow-2xs"
+                                            title="Keep IMEI: {{ $lockedCount }} Unit Terkunci">
+                                            <svg class="w-3 h-3 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                            </svg>
+                                            Keep IMEI ({{ $lockedCount }})
+                                        </span>
+                                    @endif
+                                </div>
                                 @if ($order->accurate_so_number)
                                     <div class="text-[10px] text-gray-400 font-medium">Accurate:
                                         {{ $order->accurate_so_number }}</div>
@@ -188,13 +214,31 @@
 
                                     @if ($order->accurateDocs->where('doc_type', 'DELIVERY_ORDER')->isNotEmpty())
                                         <span
-                                            class="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 text-orange-600 text-[9px] font-bold uppercase rounded border border-orange-200">
+                                            class="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 text-orange-600 text-[9px] font-bold uppercase rounded border border-orange-200"
+                                            title="Delivery Order (Accurate) Tercetak">
                                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24"
                                                 stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                     d="M5 13l4 4L19 7" />
                                             </svg>
                                             DO TERCETAK
+                                        </span>
+                                    @elseif ($lockedCount > 0)
+                                        <span
+                                            class="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 text-[9px] font-bold uppercase rounded border border-amber-300 shadow-2xs"
+                                            title="Unit Terkunci di Tokopon Zed">
+                                            <svg class="w-3 h-3 text-amber-600" fill="none" viewBox="0 0 24 24"
+                                                stroke="currentColor" stroke-width="2.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round"
+                                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                            </svg>
+                                            KUNCI IMEI
+                                        </span>
+                                    @else
+                                        <span
+                                            class="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-50 text-gray-500 text-[9px] font-semibold uppercase rounded border border-gray-200"
+                                            title="Indent / Pre-Order">
+                                            INDENT
                                         </span>
                                     @endif
                                 </div>

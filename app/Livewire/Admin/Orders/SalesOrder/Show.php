@@ -679,6 +679,42 @@ class Show extends Component
     }
 
     #[Computed]
+    public function lockedSerialNumbers()
+    {
+        $all = [];
+        if (!$this->order || !$this->order->relationLoaded('items')) {
+            $items = $this->order ? $this->order->items : collect();
+        } else {
+            $items = $this->order->items;
+        }
+
+        foreach ($items as $item) {
+            if (!empty(trim((string)$item->serial_number))) {
+                $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                $variantName = 'Unit';
+                if ($item->variant && get_class($item->variant) === \App\Models\ProductAccurate::class) {
+                    $variantName = $item->variant->name;
+                } elseif ($item->variant) {
+                    $prodName = $item->variant->product->name ?? ($item->variant->secondProduct->name ?? 'Unit');
+                    $specs = array_filter([$item->variant->storage ?? null, $item->variant->color ?? null]);
+                    $variantName = $prodName . (!empty($specs) ? ' (' . implode(' ', $specs) . ')' : '');
+                }
+                foreach ($sns as $sn) {
+                    $psn = \App\Models\ProductSerialNumber::where('serial_number', $sn)->first();
+                    $all[] = [
+                        'sn' => $sn,
+                        'item_id' => $item->id,
+                        'item_name' => $variantName !== 'Unit' ? $variantName : ($psn->product_name ?? 'Unit'),
+                        'item_no' => $item->variant->item_no ?? ($item->variant->sku ?? ($psn->item_no ?? '')),
+                        'status' => $psn->status ?? 'Unavailable',
+                    ];
+                }
+            }
+        }
+        return $all;
+    }
+
+    #[Computed]
     public function availableDeposits()
     {
         return \App\Models\CustomerDeposit::where('origin_order_id', $this->order->id)
