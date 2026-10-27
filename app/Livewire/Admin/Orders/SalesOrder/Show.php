@@ -15,11 +15,12 @@ use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use App\Livewire\Zoffline\Pos\Traits\WithPaymentAndPromo;
 
 class Show extends Component
 {
-    use WithPaymentAndPromo;
+    use WithPaymentAndPromo, WithFileUploads;
     public Order $order;
 
     // DP Form
@@ -31,6 +32,17 @@ class Show extends Component
     public $dp_date;
     public $dp_notes;
     public $dp_contract_number;
+
+    // Refund DP Form
+    public $showRefundDpModal = false;
+    public $refundDepositId = null;
+    public $refundAmount = 0;
+    public $refundBankNo = '';
+    public $refundCustomerBankName = '';
+    public $refundCustomerAccountNo = '';
+    public $refundCustomerAccountName = '';
+    public $refundNotes = '';
+    public $refundReceipt = null;
 
     // Edit Item Price Modal
     public $showEditPriceModal = false;
@@ -211,10 +223,15 @@ class Show extends Component
         $this->dp_notes = '';
         $this->dp_contract_number = '';
         
+        $soBuId = $this->order->business_unit_id;
         $this->availableCustomerDeposits = \App\Models\CustomerDeposit::where('user_id', $this->order->user_id)
             ->where('status', 'AVAILABLE')
             ->where('balance', '>', 0)
-            ->where('business_unit_id', $this->order->business_unit_id)
+            ->where(function($q) use ($soBuId) {
+                if ($soBuId) {
+                    $q->where('business_unit_id', $soBuId)->orWhereNull('business_unit_id');
+                }
+            })
             ->where(function($q) {
                 $q->whereNull('origin_order_id')
                   ->orWhere('origin_order_id', '!=', $this->order->id);
@@ -707,6 +724,20 @@ class Show extends Component
             ->get();
     }
 
+    #[Computed]
+    public function refundedDeposits()
+    {
+        return \App\Models\CustomerDeposit::where('origin_order_id', $this->order->id)
+            ->where(function ($q) {
+                $q->where('status', 'REFUNDED')
+                    ->orWhereNotNull('refund_bank_no')
+                    ->orWhereNotNull('refunded_at');
+            })
+            ->with(['refundGlAccount', 'paymentMethod'])
+            ->latest('updated_at')
+            ->get();
+    }
+
     public function openRefundDpModal($depositId = null)
     {
         $deposit = null;
@@ -793,9 +824,11 @@ class Show extends Component
                     $this->refundBankNo,
                     $this->refundAmount
                 );
+            } else {
+                Log::info("Refund DP SO {$this->order->order_number}: Deposit tidak memiliki accurate_invoice_no, sinkronisasi refund Accurate dilewati.");
             }
 
-            // 3. Update status deposit lokal
+            // 3. Update status deposit lokal beserta data kas/bank pengeluaran
             $newBalance = max(0, (float)$deposit->balance - (float)$this->refundAmount);
             $newStatus = ($newBalance <= 0) ? 'REFUNDED' : 'AVAILABLE';
 
@@ -807,6 +840,12 @@ class Show extends Component
             $deposit->update([
                 'balance' => $newBalance,
                 'status' => $newStatus,
+                'refund_bank_no' => $this->refundBankNo,
+                'refund_customer_bank_name' => $this->refundCustomerBankName,
+                'refund_customer_account_no' => $this->refundCustomerAccountNo,
+                'refund_customer_account_name' => $this->refundCustomerAccountName,
+                'refund_receipt_path' => $receiptPath,
+                'refunded_at' => now(),
                 'notes' => ($deposit->notes ?? '') . $noteDetails,
             ]);
 
