@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Orders\SalesOrder;
 
+use App\Models\AccurateGlAccount;
 use App\Models\BusinessUnitProject;
 use App\Models\Order;
 use App\Models\OrderPayment;
@@ -757,6 +758,12 @@ class Show extends Component
         $this->refundReceipt = null;
     }
 
+    public function selectRefundBank($bankNo)
+    {
+        $this->refundBankNo = $bankNo;
+        $this->resetValidation('refundBankNo');
+    }
+
     public function processRefundDp()
     {
         $this->validate([
@@ -835,10 +842,38 @@ class Show extends Component
 
     public function render()
     {
+        $businessUnit = $this->order->businessUnit;
+        $dbSource = strtolower($businessUnit ? $businessUnit->code : 'syihab');
+
+        $accurateGlAccounts = AccurateGlAccount::where('account_type', 'CASH_BANK')
+            ->where(function ($q) use ($dbSource) {
+                if ($dbSource) {
+                    $q->where('database_source', $dbSource)->orWhereNull('database_source');
+                }
+            })
+            ->orderBy('name')
+            ->get();
+
+        if ($accurateGlAccounts->isEmpty()) {
+            $accurateGlAccounts = AccurateGlAccount::where('account_type', 'CASH_BANK')
+                ->orderBy('name')
+                ->get();
+        }
+
+        $buId = $this->order->business_unit_id;
+        $paymentMethods = PaymentMethod::where('is_active', true)
+            ->where(function ($q) use ($buId) {
+                if ($buId) {
+                    $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+                }
+            })
+            ->orderBy('category', 'desc')
+            ->orderBy('bank_name')
+            ->get();
+
         return view('livewire.admin.orders.sales-order.show', [
-            'paymentMethods' => PaymentMethod::where('is_active', true)
-                ->where('business_unit_id', $this->order->business_unit_id)
-                ->get()
+            'accurateGlAccounts' => $accurateGlAccounts,
+            'paymentMethods' => $paymentMethods
         ])->layout('layouts.z');
     }
 }
