@@ -35,6 +35,10 @@ class User extends Authenticatable implements HasMedia
         'branch_id',
         'telegram_chat_id',
         'push_token',
+        'referral_code',
+        'referred_by_id',
+        'registration_channel',
+        'mobile_activated_at',
     ];
 
     public function businessUnit()
@@ -132,6 +136,7 @@ class User extends Authenticatable implements HasMedia
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'mobile_activated_at' => 'datetime',
         ];
     }
 
@@ -262,5 +267,30 @@ class User extends Authenticatable implements HasMedia
         }
 
         return '';
+    }
+
+    public function referrer()
+    {
+        return $this->belongsTo(User::class, 'referred_by_id');
+    }
+
+    public function referrals()
+    {
+        return $this->hasMany(User::class, 'referred_by_id');
+    }
+
+    public function referralCodeRecord()
+    {
+        return $this->hasOne(UserReferralCode::class);
+    }
+
+    public function referralCommissions()
+    {
+        return $this->hasMany(ReferralCommission::class, 'referrer_id');
+    }
+
+    public function commissionWithdrawals()
+    {
+        return $this->hasMany(CommissionWithdrawal::class);
     }
 }

@@ -295,6 +295,13 @@ class MobileOrderService
                 'payment_method_id' => $data['payment_method_id'] ?? null,
             ]);
 
+            // 7. Catat komisi referral jika ada
+            try {
+                app(\App\Services\ReferralService::class)->recordOrderCommission($order);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Gagal mencatat komisi referral untuk pesanan #{{$order->order_number}}: " . $e->getMessage());
+            }
+
             return $order->load(['items', 'payments', 'warehouse']);
         });
     }

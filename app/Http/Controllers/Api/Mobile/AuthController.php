@@ -107,69 +107,55 @@ class AuthController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email',
+            'email' => 'required|string|email|max:255',
             'password' => 'required|string|min:6',
-            'phone' => 'nullable|string|max:30',
+            'phone' => 'required|string|min:9|max:30',
             'address' => 'nullable|string',
+            'referral_code' => 'nullable|string|max:30',
             'device_name' => 'nullable|string',
+        ], [
+            'name.required' => 'Nama lengkap wajib diisi.',
+            'phone.required' => 'Nomor WhatsApp wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'email.email' => 'Format email tidak valid.',
+            'password.min' => 'Kata sandi minimal 6 karakter.',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Data pendaftaran tidak valid: ' . $validator->errors()->first(),
+                'message' => $validator->errors()->first(),
                 'errors' => $validator->errors(),
             ], 422);
         }
 
         try {
-            return DB::transaction(function () use ($request) {
-                $user = User::create([
-                    'name' => trim($request->input('name')),
-                    'email' => strtolower(trim($request->input('email'))),
-                    'password' => Hash::make($request->input('password')),
-                ]);
+            $referralService = app(\App\Services\ReferralService::class);
+            $user = $referralService->registerOrClaimMember($request->all());
 
-                $cleanPhone = preg_replace('/[^0-9]/', '', (string) $request->input('phone', ''));
+            $deviceName = $request->input('device_name') ?: 'TokoponMobileApp';
+            $token = $user->createToken($deviceName, ['mobile:customer'])->plainTextToken;
 
-                UserProfile::create([
-                    'user_id' => $user->id,
-                    'full_name' => $user->name,
-                    'phone_number' => $cleanPhone ?: null,
-                    'domisili' => $request->input('address'),
-                ]);
+            $isClaimed = $user->registration_channel === 'MOBILE_CLAIM';
+            $message = $isClaimed
+                ? 'Selamat datang di Tokopon Mobile! Akun member toko offline Anda telah berhasil diaktivasi.'
+                : 'Pendaftaran akun berhasil. Selamat datang di Tokopon!';
 
-                if (!empty($cleanPhone)) {
-                    try {
-                        $loyaltyService = app(\App\Services\LoyaltyService::class);
-                        $loyaltyService->getOrCreateAccount($cleanPhone, $user->id, $user->name);
-                    } catch (\Throwable $e) {
-                        Log::warning('Gagal membuat loyalty account saat registrasi: ' . $e->getMessage());
-                    }
-                }
-
-                if (Role::where('name', 'customer')->exists()) {
-                    $user->assignRole('customer');
-                }
-
-                $deviceName = $request->input('device_name') ?: 'TokoponMobileApp';
-                $token = $user->createToken($deviceName, ['mobile:customer'])->plainTextToken;
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Pendaftaran akun berhasil.',
-                    'data' => [
-                        'token' => $token,
-                        'token_type' => 'Bearer',
-                        'user' => $this->formatUserData($user),
-                    ],
-                ], 201);
-            });
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'data' => [
+                    'token' => $token,
+                    'token_type' => 'Bearer',
+                    'user' => $this->formatUserData($user),
+                    'is_pos_claimed' => $isClaimed,
+                ],
+            ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mendaftarkan akun: ' . $e->getMessage(),
-            ], 500);
+                'message' => $e->getMessage(),
+            ], 422);
         }
     }
 
@@ -288,6 +274,7 @@ class AuthController extends Controller
             'email' => $user->email,
             'phone' => $user->customer_phone,
             'address' => $user->customer_address,
+            'referral_code' => $user->referral_code,
             'roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames() : [],
         ];
     }

@@ -238,4 +238,17 @@ Route::prefix('v1/mobile')->middleware('throttle:120,1')->group(function () {
         Route::post('/validate', [\App\Http\Controllers\Api\Mobile\CouponController::class, 'validateCoupon'])
             ->name('validate');
     });
+
+    // 8. Program Referral & Komisi
+    Route::get('/referral/validate', [\App\Http\Controllers\Api\Mobile\ReferralController::class, 'validateCode'])
+        ->name('api.mobile.referral.validate');
+
+    Route::middleware('auth:sanctum')->prefix('referral')->name('api.mobile.referral.')->group(function () {
+        Route::get('/summary', [\App\Http\Controllers\Api\Mobile\ReferralController::class, 'summary'])
+            ->name('summary');
+        Route::get('/history', [\App\Http\Controllers\Api\Mobile\ReferralController::class, 'history'])
+            ->name('history');
+        Route::post('/withdraw', [\App\Http\Controllers\Api\Mobile\ReferralController::class, 'withdraw'])
+            ->name('withdraw');
+    });
 });

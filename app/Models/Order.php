@@ -20,6 +20,11 @@ class Order extends Model
     {
         static::updated(function (Order $order) {
             if ($order->wasChanged('order_status')) {
+                try {
+                    app(\App\Services\ReferralService::class)->handleOrderStatusChanged($order);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("Referral listener error on Order #{{$order->order_number}}: " . $e->getMessage());
+                }
                 $status = strtoupper((string) $order->order_status);
 
                 if ($status === 'CANCELLED') {
@@ -237,5 +242,10 @@ class Order extends Model
     public function customerDeposits()
     {
         return $this->hasMany(CustomerDeposit::class, 'origin_order_id');
+    }
+
+    public function referralCommissions()
+    {
+        return $this->hasMany(\App\Models\ReferralCommission::class);
     }
 }
