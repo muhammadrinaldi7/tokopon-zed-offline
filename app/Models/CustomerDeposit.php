@@ -37,8 +37,37 @@ class CustomerDeposit extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    protected $casts = [
+        'refunded_at' => 'datetime',
+        'amount' => 'decimal:2',
+        'balance' => 'decimal:2',
+    ];
+
     public function usages()
     {
         return $this->hasMany(CustomerDepositUsage::class, 'customer_deposit_id');
+    }
+
+    public function refundGlAccount(): BelongsTo
+    {
+        return $this->belongsTo(AccurateGlAccount::class, 'refund_bank_no', 'account_no');
+    }
+
+    public function getRefundBankLabelAttribute(): string
+    {
+        if (empty($this->refund_bank_no)) {
+            return '-';
+        }
+
+        if ($this->refund_bank_no === 'KAS-CASH') {
+            return 'Kas Tunai Kasir (KAS-CASH)';
+        }
+
+        $gl = $this->refundGlAccount;
+        if ($gl) {
+            return "{$gl->name} ({$this->refund_bank_no})";
+        }
+
+        return $this->refund_bank_no;
     }
 }

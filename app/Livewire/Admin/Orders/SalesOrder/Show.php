@@ -724,6 +724,20 @@ class Show extends Component
             ->get();
     }
 
+    #[Computed]
+    public function refundedDeposits()
+    {
+        return \App\Models\CustomerDeposit::where('origin_order_id', $this->order->id)
+            ->where(function ($q) {
+                $q->where('status', 'REFUNDED')
+                    ->orWhereNotNull('refund_bank_no')
+                    ->orWhereNotNull('refunded_at');
+            })
+            ->with(['refundGlAccount', 'paymentMethod'])
+            ->latest('updated_at')
+            ->get();
+    }
+
     public function openRefundDpModal($depositId = null)
     {
         $deposit = null;
@@ -810,9 +824,11 @@ class Show extends Component
                     $this->refundBankNo,
                     $this->refundAmount
                 );
+            } else {
+                Log::info("Refund DP SO {$this->order->order_number}: Deposit tidak memiliki accurate_invoice_no, sinkronisasi refund Accurate dilewati.");
             }
 
-            // 3. Update status deposit lokal
+            // 3. Update status deposit lokal beserta data kas/bank pengeluaran
             $newBalance = max(0, (float)$deposit->balance - (float)$this->refundAmount);
             $newStatus = ($newBalance <= 0) ? 'REFUNDED' : 'AVAILABLE';
 
@@ -824,6 +840,12 @@ class Show extends Component
             $deposit->update([
                 'balance' => $newBalance,
                 'status' => $newStatus,
+                'refund_bank_no' => $this->refundBankNo,
+                'refund_customer_bank_name' => $this->refundCustomerBankName,
+                'refund_customer_account_no' => $this->refundCustomerAccountNo,
+                'refund_customer_account_name' => $this->refundCustomerAccountName,
+                'refund_receipt_path' => $receiptPath,
+                'refunded_at' => now(),
                 'notes' => ($deposit->notes ?? '') . $noteDetails,
             ]);
 

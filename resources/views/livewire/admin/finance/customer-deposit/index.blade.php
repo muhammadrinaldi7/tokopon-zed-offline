@@ -115,7 +115,32 @@
                                     </div>
                                 </td>
                                 <td class="px-5 py-4 whitespace-nowrap text-sm text-gray-700">
-                                    <div class="font-medium">{{ $dep->paymentMethod->name ?? 'Kas / Lainnya' }}</div>
+                                    @if ($dep->status === 'REFUNDED')
+                                        <div class="space-y-1">
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                                    Refund via
+                                                </span>
+                                                <span class="font-bold text-xs text-rose-900">{{ $dep->refund_bank_label }}</span>
+                                            </div>
+                                            <div class="text-[11px] text-gray-500">
+                                                <span class="text-gray-400">Asal DP:</span> {{ $dep->paymentMethod->name ?? 'Kas / Lainnya' }}
+                                            </div>
+                                            @if ($dep->refund_customer_bank_name)
+                                                <div class="text-[10px] text-gray-500">
+                                                    Ke: <span class="font-medium text-gray-700">{{ $dep->refund_customer_bank_name }}</span> ({{ $dep->refund_customer_account_no }})
+                                                </div>
+                                            @endif
+                                            @if ($dep->refund_receipt_path)
+                                                <a href="{{ asset('storage/' . $dep->refund_receipt_path) }}" target="_blank" class="inline-flex items-center gap-1 text-[10px] text-rose-600 hover:text-rose-800 font-bold hover:underline mt-0.5">
+                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                    Lihat Bukti Transfer
+                                                </a>
+                                            @endif
+                                        </div>
+                                    @else
+                                        <div class="font-medium">{{ $dep->paymentMethod->name ?? 'Kas / Lainnya' }}</div>
+                                    @endif
                                     @if ($dep->usages && $dep->usages->count() > 0)
                                         <div class="text-xs text-blue-600 mt-0.5 font-medium flex items-center gap-1">
                                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>

@@ -473,6 +473,26 @@
                                         </div>
                                     @endif
 
+                                    @php $dpRefundDoc = $order->accurateDocs->where('doc_type', 'DP_REFUND')->where('status', 'SUCCESS')->first(); @endphp
+                                    @if ($dpRefundDoc)
+                                        {{-- Node: DP Refund --}}
+                                        <div id="node-dp-refund-{{ $idx }}"
+                                            data-parent="node-dp-inv-{{ $idx }}"
+                                            class="node-dp-refund w-48 bg-rose-50 border-2 border-rose-500 rounded-xl p-4 text-center shadow-sm cursor-move hover:shadow-md transition-shadow"
+                                            style="z-index: 10;">
+                                            <div class="text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1">
+                                                Refund UM (Accurate)</div>
+                                            <div class="text-[10px] font-semibold text-rose-800 mb-1">
+                                                {{ $dpRefundDoc->doc_number }}
+                                            </div>
+                                            <div class="text-xs font-bold text-rose-700 mb-1">
+                                                - Rp {{ number_format(abs($dpRefundDoc->amount), 0, ',', '.') }}</div>
+                                            <div class="text-[10px] text-gray-500">
+                                                {{ $dpRefundDoc->created_at->format('d/m/Y H:i') }}
+                                            </div>
+                                        </div>
+                                    @endif
+
                                     @if ($loop->first)
                                         @php $siDoc = $order->accurateDocs->where('doc_type', 'SALES_INVOICE')->first(); @endphp
 
@@ -697,6 +717,54 @@
                                     <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Uang
                                         Muka (DP)</div>
                                     <div class="text-xs font-bold text-gray-400 mb-1">Belum Ada Pembayaran</div>
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Kartu Riwayat Pengembalian Dana (Refund DP) --}}
+                        @if ($this->refundedDeposits->count() > 0)
+                            <div class="mt-4 pt-4 border-t border-dashed border-gray-200">
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-rose-600 block mb-2.5 flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" /></svg>
+                                    Pengembalian Dana (Refund DP)
+                                </span>
+                                <div class="flex flex-wrap gap-4">
+                                    @foreach ($this->refundedDeposits as $refDep)
+                                        <div class="bg-rose-50/70 border-2 border-rose-300 rounded-2xl p-4 text-xs shadow-sm max-w-sm space-y-2.5">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-200">
+                                                    Uang Keluar
+                                                </span>
+                                                <span class="text-[10px] text-gray-500 font-medium">
+                                                    {{ $refDep->refunded_at ? $refDep->refunded_at->format('d/m/Y H:i') : $refDep->updated_at->format('d/m/Y H:i') }}
+                                                </span>
+                                            </div>
+                                            <div class="text-base font-black text-rose-700">
+                                                - Rp {{ number_format($refDep->amount, 0, ',', '.') }}
+                                            </div>
+                                            <div class="p-2.5 bg-white/90 rounded-xl border border-rose-100 space-y-1">
+                                                <div class="text-[11px] text-gray-700">
+                                                    <span class="font-bold text-gray-800">Kas/Bank Toko:</span>
+                                                    <span class="font-mono font-bold text-rose-700">{{ $refDep->refund_bank_label }}</span>
+                                                </div>
+                                                @if ($refDep->refund_customer_bank_name)
+                                                    <div class="text-[11px] text-gray-600">
+                                                        <span class="font-bold text-gray-800">Tujuan:</span>
+                                                        {{ $refDep->refund_customer_bank_name }} ({{ $refDep->refund_customer_account_no }}) a/n {{ $refDep->refund_customer_account_name }}
+                                                    </div>
+                                                @endif
+                                                <div class="text-[10px] text-gray-400">
+                                                    <span class="font-semibold text-gray-500">Asal Masuk DP:</span> {{ $refDep->paymentMethod->name ?? 'Kas / Lainnya' }}
+                                                </div>
+                                            </div>
+                                            @if ($refDep->refund_receipt_path)
+                                                <a href="{{ asset('storage/' . $refDep->refund_receipt_path) }}" target="_blank" class="inline-flex items-center gap-1.5 text-xs text-rose-600 hover:text-rose-800 font-bold hover:underline">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                    Lihat Bukti Transfer
+                                                </a>
+                                            @endif
+                                        </div>
+                                    @endforeach
                                 </div>
                             </div>
                         @endif

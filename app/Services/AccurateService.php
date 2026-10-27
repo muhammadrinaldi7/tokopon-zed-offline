@@ -2548,7 +2548,7 @@ class AccurateService
         $customerNo = $order->user ? $order->user->getAccurateCustomerNo($dbSource) : 'UMUM';
 
         // 1. Jika dipanggil dari Form Refund Manual dengan akun Bank & Nominal spesifik
-        if ($customBankNo && $customAmount !== null) {
+        if (!empty($customBankNo) && $customAmount !== null) {
             $refundAmount = (float)$customAmount;
             if ($refundAmount <= 0) {
                 throw new \Exception('Nominal refund harus lebih dari 0.');
@@ -2570,7 +2570,7 @@ class AccurateService
                 ]
             ];
 
-            Log::info("Payload Manual Refund DP (Uang Keluar) SO {$order->order_number}:", $receiptPayload);
+            Log::info("Payload Manual Refund DP SO {$order->order_number} via Kas/Bank Pilihan: {$customBankNo}:", $receiptPayload);
 
             $result = $this->postSalesReceipt($receiptPayload, $dbSource);
             if (isset($result['r']['number'])) {
@@ -2588,7 +2588,8 @@ class AccurateService
             }
         }
 
-        // 2. Fallback otomatis berdasarkan metode pembayaran historis
+        // 2. Fallback otomatis berdasarkan metode pembayaran historis (Hanya jika customBankNo tidak disediakan)
+        Log::warning("refundDownPayment SO {$order->order_number}: customBankNo kosong, beralih ke fallback akun kas/bank pembayaran historis.");
         $payments = $order->payments()->where('status', 'PAID')->get();
         if ($payments->isEmpty()) {
             return;

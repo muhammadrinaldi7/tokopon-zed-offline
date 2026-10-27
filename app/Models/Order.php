@@ -233,4 +233,9 @@ class Order extends Model
     {
         return $this->morphMany(MessageLog::class, 'source')->latest();
     }
+
+    public function customerDeposits()
+    {
+        return $this->hasMany(CustomerDeposit::class, 'origin_order_id');
+    }
 }
