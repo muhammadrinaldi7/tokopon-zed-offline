@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Orders\SalesOrder;
 
+use App\Models\AccurateGlAccount;
 use App\Models\BusinessUnitProject;
 use App\Models\Order;
 use App\Models\OrderPayment;
@@ -661,12 +662,201 @@ class Show extends Component
         $soDoc->update(['amount' => $this->order->grand_total]);
     }
 
+    #[Computed]
+    public function lockedSerialNumbers()
+    {
+        $all = [];
+        if (!$this->order || !$this->order->relationLoaded('items')) {
+            $items = $this->order ? $this->order->items : collect();
+        } else {
+            $items = $this->order->items;
+        }
+
+        foreach ($items as $item) {
+            if (!empty(trim((string)$item->serial_number))) {
+                $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                $variantName = 'Unit';
+                if ($item->variant && get_class($item->variant) === \App\Models\ProductAccurate::class) {
+                    $variantName = $item->variant->name;
+                } elseif ($item->variant) {
+                    $prodName = $item->variant->product->name ?? ($item->variant->secondProduct->name ?? 'Unit');
+                    $specs = array_filter([$item->variant->storage ?? null, $item->variant->color ?? null]);
+                    $variantName = $prodName . (!empty($specs) ? ' (' . implode(' ', $specs) . ')' : '');
+                }
+                foreach ($sns as $sn) {
+                    $psn = \App\Models\ProductSerialNumber::where('serial_number', $sn)->first();
+                    $all[] = [
+                        'sn' => $sn,
+                        'item_id' => $item->id,
+                        'item_name' => $variantName !== 'Unit' ? $variantName : ($psn->product_name ?? 'Unit'),
+                        'item_no' => $item->variant->item_no ?? ($item->variant->sku ?? ($psn->item_no ?? '')),
+                        'status' => $psn->status ?? 'Unavailable',
+                    ];
+                }
+            }
+        }
+        return $all;
+    }
+
+    #[Computed]
+    public function availableDeposits()
+    {
+        return \App\Models\CustomerDeposit::where('origin_order_id', $this->order->id)
+            ->where('status', 'AVAILABLE')
+            ->where('balance', '>', 0)
+            ->get();
+    }
+
+    public function openRefundDpModal($depositId = null)
+    {
+        $deposit = null;
+        if ($depositId) {
+            $deposit = \App\Models\CustomerDeposit::find($depositId);
+        } else {
+            $deposit = $this->availableDeposits->first();
+        }
+
+        if (!$deposit || $deposit->status !== 'AVAILABLE' || $deposit->balance <= 0) {
+            $this->dispatch('toast', title: 'Gagal', message: 'Tidak ditemukan saldo DP yang tersedia untuk direfund.', type: 'error');
+            return;
+        }
+
+        $this->refundDepositId = $deposit->id;
+        $this->refundAmount = (float)$deposit->balance;
+        $this->refundBankNo = '';
+        $this->refundCustomerBankName = '';
+        $this->refundCustomerAccountNo = '';
+        $this->refundCustomerAccountName = $this->order->user->name ?? '';
+        $this->refundNotes = 'Refund DP Pembatalan SO ' . $this->order->order_number;
+        $this->refundReceipt = null;
+        $this->showRefundDpModal = true;
+    }
+
+    public function closeRefundDpModal()
+    {
+        $this->showRefundDpModal = false;
+        $this->refundDepositId = null;
+        $this->refundAmount = 0;
+        $this->refundBankNo = '';
+        $this->refundReceipt = null;
+    }
+
+    public function selectRefundBank($bankNo)
+    {
+        $this->refundBankNo = $bankNo;
+        $this->resetValidation('refundBankNo');
+    }
+
+    public function processRefundDp()
+    {
+        $this->validate([
+            'refundBankNo' => 'required',
+            'refundAmount' => 'required|numeric|min:1',
+            'refundReceipt' => 'required|image|max:5120',
+        ], [
+            'refundBankNo.required' => 'Pilih akun Kas/Bank toko terlebih dahulu.',
+            'refundAmount.required' => 'Nominal refund wajib diisi.',
+            'refundReceipt.required' => 'Bukti transfer / kwitansi pengembalian dana wajib diunggah.',
+            'refundReceipt.image' => 'File bukti harus berupa gambar (JPG, PNG, dll).',
+            'refundReceipt.max' => 'Ukuran gambar maksimal 5MB.',
+        ]);
+
+        $deposit = \App\Models\CustomerDeposit::find($this->refundDepositId);
+        if (!$deposit || $deposit->status !== 'AVAILABLE' || $deposit->balance <= 0) {
+            $this->dispatch('toast', title: 'Error', message: 'Data deposit tidak valid atau sudah direfund.', type: 'error');
+            return;
+        }
+
+        if ($this->refundAmount > $deposit->balance) {
+            $this->dispatch('toast', title: 'Error', message: 'Nominal refund melebihi saldo deposit yang tersedia.', type: 'error');
+            return;
+        }
+
+        $accurateService = app(AccurateService::class);
+        $businessUnit = $this->order->businessUnit;
+        $dbSource = strtolower($businessUnit ? $businessUnit->code : 'syihab');
+
+        DB::beginTransaction();
+        try {
+            // 1. Simpan bukti transfer
+            $receiptPath = null;
+            if ($this->refundReceipt) {
+                $receiptPath = $this->refundReceipt->store('finance/dp_refunds', 'public');
+            }
+
+            // 2. Sinkronkan ke Accurate jika deposit memiliki invoice DP Accurate
+            if (!empty($deposit->accurate_invoice_no)) {
+                $accurateService->refundDownPayment(
+                    $this->order,
+                    $deposit->accurate_invoice_no,
+                    $dbSource,
+                    $this->refundBankNo,
+                    $this->refundAmount
+                );
+            }
+
+            // 3. Update status deposit lokal
+            $newBalance = max(0, (float)$deposit->balance - (float)$this->refundAmount);
+            $newStatus = ($newBalance <= 0) ? 'REFUNDED' : 'AVAILABLE';
+
+            $noteDetails = "\n[" . now()->format('Y-m-d H:i') . "] REFUND DANA: Rp " . number_format($this->refundAmount, 0, ',', '.') .
+                " via Kas/Bank: " . $this->refundBankNo .
+                ($this->refundCustomerBankName ? " ke " . $this->refundCustomerBankName . " No: " . $this->refundCustomerAccountNo . " a/n " . $this->refundCustomerAccountName : '') .
+                ($this->refundNotes ? " (" . $this->refundNotes . ")" : "");
+
+            $deposit->update([
+                'balance' => $newBalance,
+                'status' => $newStatus,
+                'notes' => ($deposit->notes ?? '') . $noteDetails,
+            ]);
+
+            DB::commit();
+
+            $this->showRefundDpModal = false;
+            $this->order->refresh();
+            $this->dispatch('toast', title: 'Berhasil', message: 'Refund DP berhasil diproses dan disinkronkan ke Accurate.', type: 'success');
+            $this->dispatch('refreshOrderDetails');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Gagal proses refund DP SO {$this->order->order_number}: " . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal Refund', message: 'Gagal memproses refund: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
     public function render()
     {
+        $businessUnit = $this->order->businessUnit;
+        $dbSource = strtolower($businessUnit ? $businessUnit->code : 'syihab');
+
+        $accurateGlAccounts = AccurateGlAccount::where('account_type', 'CASH_BANK')
+            ->where(function ($q) use ($dbSource) {
+                if ($dbSource) {
+                    $q->where('database_source', $dbSource)->orWhereNull('database_source');
+                }
+            })
+            ->orderBy('name')
+            ->get();
+
+        if ($accurateGlAccounts->isEmpty()) {
+            $accurateGlAccounts = AccurateGlAccount::where('account_type', 'CASH_BANK')
+                ->orderBy('name')
+                ->get();
+        }
+
+        $buId = $this->order->business_unit_id;
+        $paymentMethods = PaymentMethod::where('is_active', true)
+            ->where(function ($q) use ($buId) {
+                if ($buId) {
+                    $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+                }
+            })
+            ->orderBy('category', 'desc')
+            ->orderBy('bank_name')
+            ->get();
+
         return view('livewire.admin.orders.sales-order.show', [
-            'paymentMethods' => PaymentMethod::where('is_active', true)
-                ->where('business_unit_id', $this->order->business_unit_id)
-                ->get()
+            'accurateGlAccounts' => $accurateGlAccounts,
+            'paymentMethods' => $paymentMethods
         ])->layout('layouts.z');
     }
 }
