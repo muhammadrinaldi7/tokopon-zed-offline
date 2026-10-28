@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Orders\SalesOrder;
 
+use App\Models\AccurateGlAccount;
 use App\Models\BusinessUnitProject;
 use App\Models\Order;
 use App\Models\OrderPayment;
@@ -723,6 +724,20 @@ class Show extends Component
             ->get();
     }
 
+    #[Computed]
+    public function refundedDeposits()
+    {
+        return \App\Models\CustomerDeposit::where('origin_order_id', $this->order->id)
+            ->where(function ($q) {
+                $q->where('status', 'REFUNDED')
+                    ->orWhereNotNull('refund_bank_no')
+                    ->orWhereNotNull('refunded_at');
+            })
+            ->with(['refundGlAccount', 'paymentMethod'])
+            ->latest('updated_at')
+            ->get();
+    }
+
     public function openRefundDpModal($depositId = null)
     {
         $deposit = null;
@@ -755,6 +770,12 @@ class Show extends Component
         $this->refundAmount = 0;
         $this->refundBankNo = '';
         $this->refundReceipt = null;
+    }
+
+    public function selectRefundBank($bankNo)
+    {
+        $this->refundBankNo = $bankNo;
+        $this->resetValidation('refundBankNo');
     }
 
     public function processRefundDp()
@@ -803,9 +824,11 @@ class Show extends Component
                     $this->refundBankNo,
                     $this->refundAmount
                 );
+            } else {
+                Log::info("Refund DP SO {$this->order->order_number}: Deposit tidak memiliki accurate_invoice_no, sinkronisasi refund Accurate dilewati.");
             }
 
-            // 3. Update status deposit lokal
+            // 3. Update status deposit lokal beserta data kas/bank pengeluaran
             $newBalance = max(0, (float)$deposit->balance - (float)$this->refundAmount);
             $newStatus = ($newBalance <= 0) ? 'REFUNDED' : 'AVAILABLE';
 
@@ -817,6 +840,12 @@ class Show extends Component
             $deposit->update([
                 'balance' => $newBalance,
                 'status' => $newStatus,
+                'refund_bank_no' => $this->refundBankNo,
+                'refund_customer_bank_name' => $this->refundCustomerBankName,
+                'refund_customer_account_no' => $this->refundCustomerAccountNo,
+                'refund_customer_account_name' => $this->refundCustomerAccountName,
+                'refund_receipt_path' => $receiptPath,
+                'refunded_at' => now(),
                 'notes' => ($deposit->notes ?? '') . $noteDetails,
             ]);
 
@@ -835,10 +864,38 @@ class Show extends Component
 
     public function render()
     {
+        $businessUnit = $this->order->businessUnit;
+        $dbSource = strtolower($businessUnit ? $businessUnit->code : 'syihab');
+
+        $accurateGlAccounts = AccurateGlAccount::where('account_type', 'CASH_BANK')
+            ->where(function ($q) use ($dbSource) {
+                if ($dbSource) {
+                    $q->where('database_source', $dbSource)->orWhereNull('database_source');
+                }
+            })
+            ->orderBy('name')
+            ->get();
+
+        if ($accurateGlAccounts->isEmpty()) {
+            $accurateGlAccounts = AccurateGlAccount::where('account_type', 'CASH_BANK')
+                ->orderBy('name')
+                ->get();
+        }
+
+        $buId = $this->order->business_unit_id;
+        $paymentMethods = PaymentMethod::where('is_active', true)
+            ->where(function ($q) use ($buId) {
+                if ($buId) {
+                    $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+                }
+            })
+            ->orderBy('category', 'desc')
+            ->orderBy('bank_name')
+            ->get();
+
         return view('livewire.admin.orders.sales-order.show', [
-            'paymentMethods' => PaymentMethod::where('is_active', true)
-                ->where('business_unit_id', $this->order->business_unit_id)
-                ->get()
+            'accurateGlAccounts' => $accurateGlAccounts,
+            'paymentMethods' => $paymentMethods
         ])->layout('layouts.z');
     }
 }

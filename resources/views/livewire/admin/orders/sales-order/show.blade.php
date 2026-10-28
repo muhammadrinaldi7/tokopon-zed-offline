@@ -473,6 +473,26 @@
                                         </div>
                                     @endif
 
+                                    @php $dpRefundDoc = $order->accurateDocs->where('doc_type', 'DP_REFUND')->where('status', 'SUCCESS')->first(); @endphp
+                                    @if ($dpRefundDoc)
+                                        {{-- Node: DP Refund --}}
+                                        <div id="node-dp-refund-{{ $idx }}"
+                                            data-parent="node-dp-inv-{{ $idx }}"
+                                            class="node-dp-refund w-48 bg-rose-50 border-2 border-rose-500 rounded-xl p-4 text-center shadow-sm cursor-move hover:shadow-md transition-shadow"
+                                            style="z-index: 10;">
+                                            <div class="text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1">
+                                                Refund UM (Accurate)</div>
+                                            <div class="text-[10px] font-semibold text-rose-800 mb-1">
+                                                {{ $dpRefundDoc->doc_number }}
+                                            </div>
+                                            <div class="text-xs font-bold text-rose-700 mb-1">
+                                                - Rp {{ number_format(abs($dpRefundDoc->amount), 0, ',', '.') }}</div>
+                                            <div class="text-[10px] text-gray-500">
+                                                {{ $dpRefundDoc->created_at->format('d/m/Y H:i') }}
+                                            </div>
+                                        </div>
+                                    @endif
+
                                     @if ($loop->first)
                                         @php $siDoc = $order->accurateDocs->where('doc_type', 'SALES_INVOICE')->first(); @endphp
 
@@ -700,6 +720,54 @@
                                 </div>
                             </div>
                         @endif
+
+                        {{-- Kartu Riwayat Pengembalian Dana (Refund DP) --}}
+                        @if ($this->refundedDeposits->count() > 0)
+                            <div class="mt-4 pt-4 border-t border-dashed border-gray-200">
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-rose-600 block mb-2.5 flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" /></svg>
+                                    Pengembalian Dana (Refund DP)
+                                </span>
+                                <div class="flex flex-wrap gap-4">
+                                    @foreach ($this->refundedDeposits as $refDep)
+                                        <div class="bg-rose-50/70 border-2 border-rose-300 rounded-2xl p-4 text-xs shadow-sm max-w-sm space-y-2.5">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-200">
+                                                    Uang Keluar
+                                                </span>
+                                                <span class="text-[10px] text-gray-500 font-medium">
+                                                    {{ $refDep->refunded_at ? $refDep->refunded_at->format('d/m/Y H:i') : $refDep->updated_at->format('d/m/Y H:i') }}
+                                                </span>
+                                            </div>
+                                            <div class="text-base font-black text-rose-700">
+                                                - Rp {{ number_format($refDep->amount, 0, ',', '.') }}
+                                            </div>
+                                            <div class="p-2.5 bg-white/90 rounded-xl border border-rose-100 space-y-1">
+                                                <div class="text-[11px] text-gray-700">
+                                                    <span class="font-bold text-gray-800">Kas/Bank Toko:</span>
+                                                    <span class="font-mono font-bold text-rose-700">{{ $refDep->refund_bank_label }}</span>
+                                                </div>
+                                                @if ($refDep->refund_customer_bank_name)
+                                                    <div class="text-[11px] text-gray-600">
+                                                        <span class="font-bold text-gray-800">Tujuan:</span>
+                                                        {{ $refDep->refund_customer_bank_name }} ({{ $refDep->refund_customer_account_no }}) a/n {{ $refDep->refund_customer_account_name }}
+                                                    </div>
+                                                @endif
+                                                <div class="text-[10px] text-gray-400">
+                                                    <span class="font-semibold text-gray-500">Asal Masuk DP:</span> {{ $refDep->paymentMethod->name ?? 'Kas / Lainnya' }}
+                                                </div>
+                                            </div>
+                                            @if ($refDep->refund_receipt_path)
+                                                <a href="{{ asset('storage/' . $refDep->refund_receipt_path) }}" target="_blank" class="inline-flex items-center gap-1.5 text-xs text-rose-600 hover:text-rose-800 font-bold hover:underline">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                    Lihat Bukti Transfer
+                                                </a>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 @endif
             </div>
@@ -858,79 +926,292 @@
     {{-- Modal Refund DP --}}
     @if ($showRefundDpModal)
         <div class="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-            <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
-                <div class="p-6 bg-gradient-to-r from-rose-600 to-rose-700 text-white flex justify-between items-center">
+            <div class="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+                <div class="p-6 bg-gradient-to-r from-rose-600 via-rose-700 to-rose-800 text-white flex justify-between items-center shadow-md">
                     <div>
-                        <h3 class="text-lg font-black tracking-tight flex items-center gap-2">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-[11px] font-bold tracking-wide uppercase mb-1 backdrop-blur-xs">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
                             </svg>
-                            Pencairan Refund Uang Muka (DP)
-                        </h3>
-                        <p class="text-xs text-rose-100 mt-1">Pengembalian dana DP untuk SO dibatalkan: {{ $order->order_number }}</p>
+                            Pengembalian Dana Kas / Bank
+                        </div>
+                        <h3 class="text-lg font-black tracking-tight">Pencairan Refund Uang Muka (DP)</h3>
+                        <p class="text-xs text-rose-100 mt-0.5">SO Dibatalkan: <span class="font-mono font-bold text-white">{{ $order->order_number }}</span></p>
                     </div>
-                    <button type="button" wire:click="closeRefundDpModal" class="p-1 rounded-full hover:bg-white/20 transition">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <button type="button" wire:click="closeRefundDpModal" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
 
-                <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-                    {{-- Info Saldo --}}
-                    <div class="p-4 bg-rose-50 rounded-2xl border border-rose-100 text-sm">
-                        <div class="flex justify-between items-center">
-                            <span class="text-rose-700 font-medium">Saldo DP Tersedia:</span>
-                            <span class="text-lg font-black text-rose-700">Rp {{ number_format($refundAmount, 0, ',', '.') }}</span>
+                <div class="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+                    {{-- Info Saldo DP --}}
+                    <div class="p-4 bg-gradient-to-br from-rose-50 to-pink-50/50 rounded-2xl border border-rose-100 text-sm flex items-center justify-between">
+                        <div>
+                            <span class="text-xs font-semibold text-rose-600 uppercase tracking-wider block">Saldo DP Tersedia</span>
+                            <span class="text-2xl font-black text-rose-800 tracking-tight">Rp {{ number_format($refundAmount, 0, ',', '.') }}</span>
+                            <div class="text-xs text-rose-600/80 mt-0.5">
+                                Pelanggan: <strong class="text-rose-900 font-bold">{{ $order->user->name ?? 'Pelanggan Umum' }}</strong>
+                            </div>
                         </div>
-                        <p class="text-xs text-rose-500 mt-1">Pelanggan: <strong class="text-rose-800">{{ $order->user->name ?? 'Pelanggan Umum' }}</strong></p>
+                        <div class="w-12 h-12 rounded-2xl bg-rose-100/80 border border-rose-200/60 flex items-center justify-center text-rose-600 shadow-inner">
+                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
                     </div>
 
                     {{-- Form Nominal --}}
                     <div>
-                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nominal Refund (Rp) <span class="text-rose-500">*</span></label>
-                        <input type="number" wire:model="refundAmount" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-base font-bold text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none" min="1" max="{{ $refundAmount }}">
-                        @error('refundAmount') <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span> @enderror
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                Nominal Refund Dicairkan (Rp) <span class="text-rose-500">*</span>
+                            </label>
+                            <span class="text-[11px] text-gray-400">Maks. Rp {{ number_format($refundAmount, 0, ',', '.') }}</span>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute left-4 top-2.5 text-sm font-bold text-gray-400">Rp</span>
+                            <input type="number" wire:model="refundAmount" class="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-base font-black text-gray-900 focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition" min="1" max="{{ $refundAmount }}">
+                        </div>
+                        @error('refundAmount') <span class="text-xs text-rose-500 mt-1 block font-semibold">{{ $message }}</span> @enderror
                     </div>
 
-                    {{-- Akun Kas/Bank Toko --}}
-                    <div>
-                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Akun Kas / Bank Pengeluaran Toko <span class="text-rose-500">*</span></label>
-                        <select wire:model="refundBankNo" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none">
-                            <option value="">-- Pilih Akun Bank Toko --</option>
-                            @foreach ($paymentMethods->whereNotNull('accurate_bank_no') as $pm)
-                                <option value="{{ $pm->accurate_bank_no }}">{{ $pm->name }} (Accurate: {{ $pm->accurate_bank_no }})</option>
-                            @endforeach
-                            <option value="KAS-CASH">Kas Tunai Kasir (KAS-CASH)</option>
-                        </select>
-                        @error('refundBankNo') <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span> @enderror
+                    {{-- AKUN KAS / BANK PENGELUARAN TOKO (Interactive Cards with Bank Identity) --}}
+                    <div x-data="{ search: '' }">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                Akun Kas / Bank Pengeluaran Toko <span class="text-rose-500">*</span>
+                            </label>
+                            <span class="text-[11px] font-semibold text-gray-400">Pilih sumber dana refund</span>
+                        </div>
+
+                        {{-- Search Input Filter --}}
+                        <div class="relative mb-2.5">
+                            <input type="text"
+                                   x-model="search"
+                                   placeholder="Cari nama bank, no rekening, atau kas..."
+                                   class="w-full pl-9 pr-8 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 outline-none transition">
+                            <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <button type="button" x-show="search" @click="search = ''" class="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </div>
+
+                        {{-- List Akun Kas / Bank (Sumber data: accurate_gl_accounts) --}}
+                        <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                            @php
+                                $hasKasCashInGl = $accurateGlAccounts->contains(function ($item) {
+                                    return $item->account_no === 'KAS-CASH' || str_contains(strtolower($item->name), 'kasir') || str_contains(strtolower($item->name), 'laci');
+                                });
+                            @endphp
+
+                            {{-- Option 1: Kas Tunai Kasir Standalone (jika belum ada akun laci kasir spesifik di GL) --}}
+                            @if (!$hasKasCashInGl)
+                                @php
+                                    $isCashSelected = ($refundBankNo === 'KAS-CASH');
+                                @endphp
+                                <div wire:click="selectRefundBank('KAS-CASH')"
+                                     x-show="!search || 'kas tunai cash kasir laci kascash outlet'.includes(search.toLowerCase())"
+                                     class="group cursor-pointer p-3 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 {{ $isCashSelected ? 'border-rose-500 bg-rose-50/70 shadow-sm ring-1 ring-rose-500/30' : 'border-gray-200 hover:border-rose-300 hover:bg-gray-50/80 bg-white' }}">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                                            <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                            </svg>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 tracking-wider">
+                                                    KAS TUNAI
+                                                </span>
+                                                <span class="font-bold text-sm text-gray-900">Kas Tunai Kasir</span>
+                                                <span class="text-[10px] font-mono px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded border border-gray-200">
+                                                    KAS-CASH
+                                                </span>
+                                            </div>
+                                            <p class="text-xs text-gray-500 mt-0.5 truncate">Pengeluaran uang tunai langsung dari laci kasir outlet</p>
+                                        </div>
+                                    </div>
+                                    <div class="shrink-0">
+                                        @if ($isCashSelected)
+                                            <div class="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-sm">
+                                                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                                </svg>
+                                            </div>
+                                        @else
+                                            <div class="w-6 h-6 rounded-full border-2 border-gray-300 group-hover:border-rose-400 transition-colors"></div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
+
+                            {{-- Option 2+: Akun GL Kas & Bank dari accurate_gl_accounts --}}
+                            @forelse ($accurateGlAccounts as $gl)
+                                @php
+                                    $accNo = $gl->account_no;
+                                    $accName = $gl->name;
+                                    $isSelected = ($refundBankNo === $accNo);
+
+                                    $nameLower = strtolower($accName . ' ' . $accNo);
+                                    $isCash = str_contains($nameLower, 'kas') || str_contains($nameLower, 'cash') || $accNo === 'KAS-CASH';
+
+                                    // Deteksi nama Bank dari nama GL account
+                                    $detectedBank = null;
+                                    $bankKeywords = ['bca', 'mandiri', 'bri', 'bni', 'bsi', 'qris', 'cimb', 'permata', 'danamon', 'panin'];
+                                    foreach ($bankKeywords as $kw) {
+                                        if (str_contains($nameLower, $kw)) {
+                                            $detectedBank = strtoupper($kw);
+                                            break;
+                                        }
+                                    }
+
+                                    $logoFile = $detectedBank ? strtolower($detectedBank) . '.png' : null;
+                                    $hasLogo = $logoFile && file_exists(public_path('assets/png/paymentmethod/' . $logoFile));
+
+                                    $searchString = strtolower($accNo . ' ' . $accName . ' ' . ($detectedBank ?? '') . ' ' . ($isCash ? 'kas tunai cash' : 'bank'));
+                                @endphp
+                                <div wire:click="selectRefundBank('{{ addslashes($accNo) }}')"
+                                     x-show="!search || '{{ addslashes($searchString) }}'.includes(search.toLowerCase())"
+                                     class="group cursor-pointer p-3 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 {{ $isSelected ? 'border-rose-500 bg-rose-50/70 shadow-sm ring-1 ring-rose-500/30' : 'border-gray-200 hover:border-rose-300 hover:bg-gray-50/80 bg-white' }}">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="w-12 h-12 rounded-xl {{ $isCash ? 'bg-emerald-50 border border-emerald-200 text-emerald-600' : 'bg-white border border-gray-200' }} flex items-center justify-center shrink-0 p-1.5 shadow-xs group-hover:scale-105 transition-transform">
+                                            @if ($isCash)
+                                                <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                                </svg>
+                                            @elseif ($hasLogo)
+                                                <img src="{{ asset('assets/png/paymentmethod/' . $logoFile) }}"
+                                                     alt="{{ $detectedBank ?? $accName }}"
+                                                     class="max-h-7 max-w-full object-contain">
+                                            @elseif ($detectedBank)
+                                                <span class="font-black text-xs text-blue-700 tracking-wider">
+                                                    {{ $detectedBank }}
+                                                </span>
+                                            @else
+                                                <svg class="w-6 h-6 text-gray-400 group-hover:text-rose-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+                                                </svg>
+                                            @endif
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                @if ($isCash)
+                                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 tracking-wider">
+                                                        KAS TUNAI
+                                                    </span>
+                                                @elseif ($detectedBank)
+                                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-blue-50 text-blue-700 border border-blue-200/60 tracking-wider">
+                                                        {{ $detectedBank }}
+                                                    </span>
+                                                @else
+                                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-gray-100 text-gray-700 tracking-wider">
+                                                        KAS / BANK
+                                                    </span>
+                                                @endif
+
+                                                <span class="font-bold text-sm text-gray-900 truncate">{{ $accName }}</span>
+
+                                                <span class="text-[10px] font-mono px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded border border-gray-200 font-semibold" title="Accurate Account No">
+                                                    COA: {{ $accNo }}
+                                                </span>
+
+                                                @if ($gl->database_source)
+                                                    <span class="text-[9px] uppercase px-1.5 py-0.5 bg-gray-50 text-gray-400 rounded border border-gray-200 font-mono">
+                                                        {{ $gl->database_source }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            <div class="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                                                <span class="text-gray-400 text-[11px]">Akun GL Accurate Kas & Bank • Nomor COA: <strong class="font-mono text-gray-700 font-semibold">{{ $accNo }}</strong></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="shrink-0">
+                                        @if ($isSelected)
+                                            <div class="w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-sm">
+                                                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                                </svg>
+                                            </div>
+                                        @else
+                                            <div class="w-6 h-6 rounded-full border-2 border-gray-300 group-hover:border-rose-400 transition-colors"></div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="p-4 text-center text-xs text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                    Belum ada data akun kas/bank di accurate_gl_accounts. Silakan sinkronkan akun GL dari menu Pengaturan Metode Pembayaran.
+                                </div>
+                            @endforelse
+                        </div>
+
+                        {{-- Active Account Info Banner --}}
+                        <div class="mt-2.5">
+                            @if ($refundBankNo)
+                                @php
+                                    $selectedAcc = $accurateGlAccounts->firstWhere('account_no', $refundBankNo);
+                                    $selectedName = $selectedAcc ? $selectedAcc->name : ($refundBankNo === 'KAS-CASH' ? 'Kas Tunai Kasir Outlet' : $refundBankNo);
+                                @endphp
+                                <div class="px-3 py-2 bg-emerald-50 border border-emerald-200/80 rounded-xl flex items-center justify-between text-xs text-emerald-800 shadow-xs">
+                                    <div class="flex items-center gap-2 truncate">
+                                        <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span class="truncate">Akun Terpilih: <strong class="text-gray-900 font-bold font-mono">{{ $refundBankNo }}</strong> ({{ $selectedName }})</span>
+                                    </div>
+                                    <button type="button" wire:click="selectRefundBank('')" class="text-rose-600 hover:text-rose-800 text-[11px] font-bold hover:underline shrink-0 ml-2">
+                                        Batal Pilih
+                                    </button>
+                                </div>
+                            @else
+                                <div class="px-3 py-2 bg-rose-50/60 border border-rose-200/60 rounded-xl flex items-center gap-2 text-xs text-rose-600">
+                                    <svg class="w-4 h-4 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <span>Klik salah satu akun kas/bank toko di atas untuk memilih sumber dana refund.</span>
+                                </div>
+                            @endif
+                        </div>
+                        @error('refundBankNo') <span class="text-xs text-rose-500 mt-1.5 block font-bold">{{ $message }}</span> @enderror
                     </div>
 
                     {{-- Data Rekening Tujuan Customer --}}
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Bank Customer</label>
-                            <input type="text" wire:model="refundCustomerBankName" placeholder="Contoh: BCA / Mandiri / Tunai" class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none">
+                    <div class="p-4 bg-gray-50 rounded-2xl border border-gray-200/80 space-y-3">
+                        <div class="text-xs font-bold text-gray-700 flex items-center gap-1.5 uppercase tracking-wider">
+                            <svg class="w-4 h-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            Rekening Tujuan Pengembalian (Customer)
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">No. Rekening / No. HP</label>
-                            <input type="text" wire:model="refundCustomerAccountNo" placeholder="Nomor rekening" class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nama Pemilik Rekening</label>
-                            <input type="text" wire:model="refundCustomerAccountName" placeholder="Nama pemilik rekening" class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-600 mb-1">Bank Customer</label>
+                                <input type="text" wire:model="refundCustomerBankName" placeholder="Contoh: BCA / Mandiri / Tunai" class="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-600 mb-1">No. Rekening / No. HP</label>
+                                <input type="text" wire:model="refundCustomerAccountNo" placeholder="Nomor rekening customer" class="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none transition">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-gray-600 mb-1">Nama Pemilik Rekening</label>
+                                <input type="text" wire:model="refundCustomerAccountName" placeholder="Nama lengkap pemilik rekening" class="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none transition">
+                            </div>
                         </div>
                     </div>
 
                     {{-- Bukti Transfer --}}
                     <div>
                         <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Unggah Bukti Transfer / Kwitansi <span class="text-rose-500">*</span></label>
-                        <input type="file" wire:model="refundReceipt" accept="image/*" class="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100 transition">
-                        @error('refundReceipt') <span class="text-xs text-rose-500 mt-1 block">{{ $message }}</span> @enderror
+                        <input type="file" wire:model="refundReceipt" accept="image/*" class="w-full text-xs text-gray-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100 transition cursor-pointer">
+                        @error('refundReceipt') <span class="text-xs text-rose-500 mt-1 block font-semibold">{{ $message }}</span> @enderror
                         @if ($refundReceipt)
-                            <div class="mt-2 text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                            <div class="mt-2 text-xs text-emerald-600 font-semibold flex items-center gap-1.5 p-2 bg-emerald-50 rounded-xl border border-emerald-100">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                                File terpilih: {{ $refundReceipt->getClientOriginalName() }}
+                                File terpilih: <span class="font-bold">{{ $refundReceipt->getClientOriginalName() }}</span>
                             </div>
                         @endif
                     </div>
@@ -938,7 +1219,7 @@
                     {{-- Catatan --}}
                     <div>
                         <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Catatan Tambahan</label>
-                        <textarea wire:model="refundNotes" rows="2" class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:ring-2 focus:ring-rose-500 outline-none"></textarea>
+                        <textarea wire:model="refundNotes" rows="2" placeholder="Catatan atau keterangan refund..." class="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:ring-2 focus:ring-rose-500 outline-none transition"></textarea>
                     </div>
                 </div>
 
@@ -948,7 +1229,10 @@
                     </button>
                     <button type="button" wire:click="processRefundDp" wire:loading.attr="disabled" class="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition flex items-center gap-2 shadow-sm shadow-rose-600/20 text-sm">
                         <span wire:loading.remove wire:target="processRefundDp">Konfirmasi & Cairkan Refund</span>
-                        <span wire:loading wire:target="processRefundDp">Memproses...</span>
+                        <span wire:loading wire:target="processRefundDp" class="flex items-center gap-2">
+                            <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Memproses...
+                        </span>
                     </button>
                 </div>
             </div>

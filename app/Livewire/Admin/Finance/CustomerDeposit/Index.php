@@ -400,6 +400,12 @@ class Index extends Component
             $deposit->update([
                 'balance' => $newBalance,
                 'status' => $newStatus,
+                'refund_bank_no' => $this->refundBankNo,
+                'refund_customer_bank_name' => $this->refundCustomerBankName,
+                'refund_customer_account_no' => $this->refundCustomerAccountNo,
+                'refund_customer_account_name' => $this->refundCustomerAccountName,
+                'refund_receipt_path' => $receiptPath,
+                'refunded_at' => now(),
                 'notes' => ($deposit->notes ?? '') . $noteDetails,
             ]);
 
