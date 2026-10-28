@@ -87,6 +87,7 @@ class PermissionSeeder extends Seeder
 
         // Admin gets most operational tasks but not users/settings
         $admin->syncPermissions([
+            'access-cs-chat',
             'view-pos',
             'view-riwayat-kasir',
             'sell-phone',

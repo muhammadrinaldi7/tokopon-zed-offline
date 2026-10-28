@@ -37,5 +37,13 @@ class AppServiceProvider extends ServiceProvider
             \Illuminate\Auth\Events\Login::class,
             \App\Listeners\MergeGuestCartOnLogin::class
         );
+
+        // Implicitly grant 'admin' and 'superadmin' roles all permissions
+        \Illuminate\Support\Facades\Gate::before(function ($user, $ability) {
+            if (method_exists($user, 'hasRole')) {
+                return ($user->hasRole('superadmin') || $user->hasRole('admin')) ? true : null;
+            }
+            return null;
+        });
     }
 }
