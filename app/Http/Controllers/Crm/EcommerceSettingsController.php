@@ -78,6 +78,12 @@ class EcommerceSettingsController extends Controller
                 ];
             }
 
+            // Sanitizer closure untuk memastikan tidak ada malformed UTF-8 yang merusak json_encode
+            $cleanUtf8 = function ($val) {
+                if ($val === null) return '';
+                return mb_convert_encoding((string) $val, 'UTF-8', 'UTF-8');
+            };
+
             // 2. Data Gudang & Master Cabang BU
             $hasOnlineStoreCol = Schema::hasTable('warehouses') && Schema::hasColumn('warehouses', 'is_online_store');
             $hasBuCol = Schema::hasTable('warehouses') && Schema::hasColumn('warehouses', 'business_unit_id');
@@ -88,27 +94,37 @@ class EcommerceSettingsController extends Controller
             }
 
             $warehouses = collect();
+            $onlineWarehouseId = null;
             try {
                 if (Schema::hasTable('warehouses')) {
+                    $whQuery = Warehouse::query();
                     if ($selectedBuId && $hasBuCol) {
-                        $warehouses = Warehouse::where('business_unit_id', $selectedBuId)->get($whCols);
-                    } else {
-                        $warehouses = Warehouse::limit(50)->get($whCols);
+                        $whQuery->where(function ($q) use ($selectedBuId) {
+                            $q->where('business_unit_id', $selectedBuId)->orWhereNull('business_unit_id');
+                        });
+                    }
+                    $whRecords = $whQuery->limit(100)->get($whCols);
+                    $warehouses = $whRecords->map(function ($wh) use ($hasOnlineStoreCol, $cleanUtf8) {
+                        return [
+                            'id' => (int) $wh->id,
+                            'name' => $cleanUtf8($wh->name ?? ('Gudang #' . $wh->id)),
+                            'is_online_store' => $hasOnlineStoreCol ? (bool) ($wh->is_online_store ?? false) : false,
+                        ];
+                    });
+
+                    if ($hasOnlineStoreCol) {
+                        $onlineWarehouseId = $whRecords->firstWhere('is_online_store', true)?->id;
                     }
                 }
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Settings: Failed to load warehouses: ' . $e->getMessage());
             }
 
-            $onlineWarehouseId = $hasOnlineStoreCol
-                ? $warehouses->firstWhere('is_online_store', true)?->id
-                : null;
-
             try {
-                $defaultBranchName = (string) $settingService->get(
+                $defaultBranchName = $cleanUtf8($settingService->get(
                     "ecommerce_branch_{$selectedBuId}",
                     $settingService->get('ecommerce_default_branch_name', 'Banjarbaru')
-                );
+                ));
                 $defaultSalesId = $selectedBuId ? $settingService->get("ecommerce_sales_{$selectedBuId}", $settingService->get('ecommerce_default_sales_id')) : null;
                 $defaultHandledById = $selectedBuId ? $settingService->get("ecommerce_handled_by_{$selectedBuId}", $settingService->get('ecommerce_default_handled_by_id')) : null;
             } catch (\Throwable $e) {
@@ -117,7 +133,7 @@ class EcommerceSettingsController extends Controller
                 $defaultHandledById = null;
             }
 
-            // 3. Kategori Produk BU
+            // 3. Kategori & Merek Produk BU
             $allCategories = collect();
             $activeCategories = [];
             $allBrands = collect();
@@ -135,9 +151,9 @@ class EcommerceSettingsController extends Controller
                             ->groupBy($catCol)
                             ->orderBy($catCol)
                             ->get()
-                            ->map(function ($row) use ($catCol) {
+                            ->map(function ($row) use ($catCol, $cleanUtf8) {
                                 return [
-                                    'name' => (string) $row->{$catCol},
+                                    'name' => $cleanUtf8($row->{$catCol}),
                                     'count' => (int) $row->count,
                                 ];
                             });
@@ -167,9 +183,9 @@ class EcommerceSettingsController extends Controller
                             ->groupBy($brandCol)
                             ->orderBy($brandCol)
                             ->get()
-                            ->map(function ($row) use ($brandCol) {
+                            ->map(function ($row) use ($brandCol, $cleanUtf8) {
                                 return [
-                                    'name' => (string) $row->{$brandCol},
+                                    'name' => $cleanUtf8($row->{$brandCol}),
                                     'count' => (int) $row->count,
                                 ];
                             });
@@ -189,29 +205,59 @@ class EcommerceSettingsController extends Controller
                 }
             }
 
-            // Pastikan array selalu indexed dan bersih
-            $activeCategories = array_values(array_filter((array) $activeCategories, fn($v) => is_string($v) && $v !== ''));
-            $activeBrands = array_values(array_filter((array) $activeBrands, fn($v) => is_string($v) && $v !== ''));
+            // Pastikan array selalu indexed dan bersih dari non-string / malformed UTF-8
+            $activeCategories = array_values(array_map(
+                $cleanUtf8,
+                array_filter((array) $activeCategories, fn($v) => is_string($v) && $v !== '')
+            ));
+            $activeBrands = array_values(array_map(
+                $cleanUtf8,
+                array_filter((array) $activeBrands, fn($v) => is_string($v) && $v !== '')
+            ));
 
-            // Karyawan & User untuk sales / kasir default
+            // 4. Karyawan untuk Sales Default (Batas aman 100 staf)
             $employees = collect();
             try {
                 if (Schema::hasTable('employes')) {
-                    $empCols = ['id'];
-                    if (Schema::hasColumn('employes', 'name')) $empCols[] = 'name';
-                    $employees = Employe::get($empCols);
+                    $empQuery = Employe::query();
+                    if ($selectedBuId && Schema::hasColumn('employes', 'business_unit_id')) {
+                        $empQuery->where(function ($q) use ($selectedBuId) {
+                            $q->where('business_unit_id', $selectedBuId)->orWhereNull('business_unit_id');
+                        });
+                    }
+                    $employees = $empQuery->limit(100)->get(['id', 'name'])->map(function ($emp) use ($cleanUtf8) {
+                        return [
+                            'id' => (int) $emp->id,
+                            'name' => $cleanUtf8($emp->name ?? ('Karyawan #' . $emp->id)),
+                        ];
+                    });
                 }
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Settings: Failed to load employes: ' . $e->getMessage());
             }
 
+            // 5. User Kasir Default (Hanya staf / admin, batas 100 agar hemat RAM)
             $users = collect();
             try {
                 if (Schema::hasTable('users')) {
-                    $userCols = ['id'];
-                    if (Schema::hasColumn('users', 'name')) $userCols[] = 'name';
-                    if (Schema::hasColumn('users', 'email')) $userCols[] = 'email';
-                    $users = User::get($userCols);
+                    $userQuery = User::query();
+                    if (method_exists(User::class, 'role')) {
+                        try {
+                            $userQuery->role(['superadmin', 'admin', 'kasir', 'cashier', 'cs', 'staff', 'finance']);
+                        } catch (\Throwable $re) {
+                            // Fallback jika role belum di-seed
+                        }
+                    }
+                    $foundUsers = $userQuery->limit(100)->get(['id', 'name']);
+                    if ($foundUsers->isEmpty()) {
+                        $foundUsers = User::limit(50)->get(['id', 'name']);
+                    }
+                    $users = $foundUsers->map(function ($u) use ($cleanUtf8) {
+                        return [
+                            'id' => (int) $u->id,
+                            'name' => $cleanUtf8($u->name ?? ('User #' . $u->id)),
+                        ];
+                    });
                 }
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Settings: Failed to load users: ' . $e->getMessage());
@@ -222,7 +268,7 @@ class EcommerceSettingsController extends Controller
                 'referralSettings' => $referralSettings,
                 'selectedBuId' => $selectedBuId ? (int) $selectedBuId : null,
                 'buSettings' => [
-                    'online_warehouse_id' => $onlineWarehouseId,
+                    'online_warehouse_id' => $onlineWarehouseId ? (int) $onlineWarehouseId : null,
                     'default_branch_name' => $defaultBranchName,
                     'default_sales_id' => $defaultSalesId ? (int) $defaultSalesId : null,
                     'default_handled_by_id' => $defaultHandledById ? (int) $defaultHandledById : null,

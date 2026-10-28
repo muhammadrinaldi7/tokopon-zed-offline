@@ -50,19 +50,23 @@ class HandleInertiaRequests extends Middleware
                     'roles' => method_exists($user, 'getRoleNames') ? $user->getRoleNames() : [],
                 ] : null,
             ],
-            'businessUnits' => fn () => \App\Models\BusinessUnit::orderBy('name')
-                ->get(['id', 'name', 'code', 'mobile_category', 'is_active'])
-                ->map(function ($bu) {
-                    $isSecond = ($bu->mobile_category === 'SECOND') || str_contains(strtoupper($bu->name ?? ''), 'SECOND');
-                    return [
-                        'id' => $bu->id,
-                        'name' => $bu->name,
-                        'code' => $bu->code,
-                        'category' => $bu->mobile_category ?: 'GENERAL',
-                        'is_second' => $isSecond,
-                        'is_active' => (bool) $bu->is_active,
-                    ];
-                }),
+            'businessUnits' => fn () => \Illuminate\Support\Facades\Schema::hasTable('business_units')
+                ? \App\Models\BusinessUnit::orderBy('name')
+                    ->get()
+                    ->map(function ($bu) {
+                        $name = (string) ($bu->name ?? '');
+                        $category = (string) ($bu->mobile_category ?? 'GENERAL');
+                        $isSecond = ($category === 'SECOND') || str_contains(strtoupper($name), 'SECOND');
+                        return [
+                            'id' => (int) $bu->id,
+                            'name' => mb_convert_encoding($name, 'UTF-8', 'UTF-8'),
+                            'code' => mb_convert_encoding((string) ($bu->code ?? ''), 'UTF-8', 'UTF-8'),
+                            'category' => mb_convert_encoding($category ?: 'GENERAL', 'UTF-8', 'UTF-8'),
+                            'is_second' => $isSecond,
+                            'is_active' => (bool) ($bu->is_active ?? true),
+                        ];
+                    })->values()->all()
+                : [],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

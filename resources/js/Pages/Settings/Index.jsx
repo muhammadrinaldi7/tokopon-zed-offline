@@ -23,7 +23,8 @@ import {
     Percent,
     Sliders,
     Sparkles,
-    ShieldCheck
+    ShieldCheck,
+    ArrowUpRight
 } from 'lucide-react';
 
 export default function EcommerceSettingsIndex({
