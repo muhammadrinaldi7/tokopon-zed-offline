@@ -1,0 +1,2820 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Employe;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
+class AccurateService
+{
+
+    public function getCredentials($databaseSource)
+    {
+        // Bersihkan spasi, jadikan huruf kecil, dan berikan default 'syihab' jika kosong
+        $code = trim(strtolower($databaseSource)) ?: 'syihab';
+
+        $businessUnit = \App\Models\BusinessUnit::where("code", $code)->first();
+
+        if (!$businessUnit) {
+            throw new \Exception("Kredensial Accurate untuk unit usaha '{$databaseSource}' tidak ditemukan di database.");
+        }
+
+        return [
+            $businessUnit->accurate_host,
+            $businessUnit->accurate_token,
+            $businessUnit->accurate_secret_key
+        ];
+    }
+
+    /**
+     * Fetch Project List from Accurate
+     * 
+     * @param string $databaseSource
+     * @return array
+     * @throws \Exception
+     */
+    public function projectListDo($databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->get($config['host'] . '/project/list.do');
+
+        Log::info("API Accurate Project List ({$databaseSource}): " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                $result = $data['d'];
+                return $result;
+            }
+            return [];
+        } else {
+            Log::error("API Accurate Project List Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
+     * Fetch Item Detail from Accurate
+     * 
+     * @param string $itemNo
+     * @return array
+     * @throws \Exception
+     */
+    public function itemDetailDo($itemNo, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $param = [
+            "no" => $itemNo
+        ];
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->get($config['host'] . '/item/detail.do', $param);
+
+        Log::info("API Accurate Item Detail ({$databaseSource}): " . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                $result = $data['d'];
+                return $result;
+            }
+            return [];
+        } else {
+            Log::info("API Accurate Item Detail Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+
+    /**
+     * Save Purchase Invoice to Accurate
+     * * @param array $payload
+     * @param string $databaseSource
+     * @return array|bool
+     * @throws \Exception
+     */
+    public function savePurchaseInvoiceDo(array $payload, $databaseSource = 'syihab')
+    {
+        // Memanfaatkan fungsi getHeaders() yang sudah Anda miliki
+        $config = $this->getHeaders($databaseSource);
+
+        // API tujuan adalah purchase-invoice/save.do dengan method POST
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->post($config['host'] . '/purchase-invoice/save.do', $payload);
+
+        Log::info("API Accurate Save PI ({$databaseSource}) Payload: " . json_encode($payload));
+        Log::info("API Accurate Save PI ({$databaseSource}) Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+
+            // Validasi sukses/gagal dari struktur JSON Accurate
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+
+            // Mengembalikan data hasil save (biasanya berisi id dan number faktur baru)
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Save PI Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
+     * Hit Accurate Online API to save User as Vendor
+     * 
+     * @param User $user
+     * @param string $databaseSource
+     * @return void
+     * @throws \Exception
+     */
+    public function syncVendor(User $user, $databaseSource = 'syihab')
+    {
+        $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+        if (!$bu) return;
+
+        // Jika sudah punya vendor ID, tidak perlu hit API lagi
+        $existingVendor = $user->accurateVendors()->where('business_unit_id', $bu->id)->first();
+        if ($existingVendor && ($existingVendor->accurate_vendor_id || $existingVendor->accurate_vendor_no)) {
+            return;
+        }
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        // Ambil alamat primary
+        $address = $user->addresses()->where('is_primary', true)->first();
+
+        // Generate prefix dynamically for any new business unit, preserving legacy ones
+        $prefix = strtoupper(trim($databaseSource)) . '_';
+        if (trim(strtolower($databaseSource)) === 'second') $prefix = 'GSK_';
+        if (trim(strtolower($databaseSource)) === 'syihab') $prefix = 'SYB_';
+
+        // Data yang akan dikirim ke Accurate
+        $vendorData = [
+            'name' => $prefix . 'VENDOR_' . ($user->profile ? $user->profile->full_name : $user->name),
+            'vendorNo' => $prefix . 'VENDOR_' . str_pad($user->id, 5, '0', STR_PAD_LEFT),
+            // 'transDate' => date('d/m/Y'),
+            'currencyCode' => 'IDR',
+            'mobilePhone' => $user->profile ? $user->profile->phone_number : null,
+            'email' => $user->email,
+            'npwpNo' => $user->npwp,
+            'notes' => 'VENDOR ' . rtrim($prefix, '_') . ' - NIK:' . $user->identity,
+        ];
+
+        // Opsional: Jika ada alamat, kirimkan juga
+        if ($address) {
+            $vendorData['billStreet'] = $address->full_address;
+            $vendorData['billZipCode'] = $address->postal_code;
+        }
+
+        // 1. Siapkan Timestamp (Format ISO 8601 sangat disarankan)
+        $timestamp = now()->toIso8601String();
+
+        // 2. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        // CONTOH HIT API MENGGUNAKAN LARAVEL HTTP CLIENT:
+        // Pastikan Anda sudah mengatur ACCURATE_HOST dan ACCURATE_TOKEN di .env Anda
+        // dd($vendorData);
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/vendor/save.do', $vendorData);
+
+        Log::info('API Accurate Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            // Simpan ID dari Accurate ke Database kita
+            if (isset($data['r'])) {
+
+                $result = $data['r']; // Ambil objek 'r'
+                Log::info('data accurate : ' . json_encode($result));
+                // Log::info('data tunggal : ' . json_encode($result['vendorNo']));
+                $idAccurate = $result['id'];        // Hasilnya: 601
+                $noVendor   = $result['vendorNo'];  // Hasilnya: "GSK_VENDOR_00002"
+                // 2. Update database user
+                $user->accurateVendors()->updateOrCreate(
+                    ['business_unit_id' => $bu->id],
+                    [
+                        'accurate_vendor_id' => $idAccurate,
+                        'accurate_vendor_no' => $noVendor,
+                    ]
+                );
+            }
+        } else {
+            Log::info('API Accurate Error: ' . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+
+        // MOCKUP SEMENTARA KARENA KITA BELUM PUNYA TOKEN ACCURATE:
+        // Menyimulasikan response berhasil dari Accurate
+        // $simulatedVendorId = rand(1000, 9999);
+        // $simulatedVendorNo = 'V-' . str_pad($simulatedVendorId, 5, '0', STR_PAD_LEFT);
+
+        // $user->update([
+        //     'accurate_vendor_id' => $simulatedVendorId,
+        //     'accurate_vendor_no' => $simulatedVendorNo,
+        // ]);
+    }
+    public function getWarehouseList($databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->get($config['host'] . '/warehouse/list.do');
+
+        Log::info('API Accurate Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            // Simpan ID dari Accurate ke Database kita
+            if (isset($data)) {
+                // dd($data[]);
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Error: ' . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+    public function getBranchList($databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->get($config['host'] . '/branch/list.do');
+
+        Log::info('API Accurate Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            // Simpan ID dari Accurate ke Database kita
+            if (isset($data)) {
+                // dd($data[]);
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Error: ' . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+
+    public function postPurchaseInvoice($purchaseInvoiceData, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        // 1. Siapkan Timestamp (Format ISO 8601 sangat disarankan)
+        $timestamp = now()->toIso8601String();
+
+        // 3. Generate Signature: HMAC-SHA256 dari Timestamp menggunakan Secret Key
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature, // Jika menggunakan OAuth Accurate
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/purchase-invoice/save.do', $purchaseInvoiceData);
+
+        Log::info('API Accurate Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            // Simpan ID dari Accurate ke Database kita
+            if (isset($data)) {
+                // dd($data[]);
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Error: ' . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+
+    public function postPurchasePayment($purchasePaymentData, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/purchase-payment/save.do', $purchasePaymentData);
+
+        Log::info('API Accurate Purchase Payment Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Purchase Payment Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Purchase Payment Error: ' . $response->body());
+            throw new \Exception('API Accurate Purchase Payment Error: ' . $response->body());
+        }
+    }
+
+    public function getItemList($page = 1, $pageSize = 100, $databaseSource = 'syihab')
+    {
+        // Tentukan kredensial berdasarkan sumber database
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        // PERUBAHAN: Gunakan variabel dinamis untuk parameter halaman
+        $param = [
+            "sp.page"     => $page,
+            "sp.pageSize" => $pageSize,
+            "fields"      => "no,name,unitPrice,availableToSell,itemBranchName,balanceUnitCost,itemBrand,itemCategory,manageSN,itemType,charField1,charField2,charField3",
+        ];
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/item/list.do', $param);
+
+        if ($response->successful()) {
+            $data = $response->json();
+
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+
+            // PERUBAHAN: Langsung kembalikan array datanya (bagian 'd')
+            Log::info('data accurate products ' . json_encode($data['d']));
+            return $data['d'] ?? [];
+        } else {
+            \Illuminate\Support\Facades\Log::error("API Accurate Get Item List ({$databaseSource}) Error: " . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+    public function getItemListForBuyback($databaseSource = 'syihab')
+    {
+        // Tentukan kredensial berdasarkan sumber database
+        // Default (syihab) mengambil dari ACCURATE_TOKEN, sedangkan 'second' dari ACCURATE_TOKEN_SECOND
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+        $param = [
+            "fields" => "no,availableToSell,itemBranchName",
+            "filter.keywords.op" => "CONTAIN",
+            "filter.keywords.val" => "hp",
+        ];
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/item/list.do', $param);
+
+        Log::info("API Accurate Get Item List ({$databaseSource}) Success: " . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info("API Accurate Get Item List ({$databaseSource}) Error: " . $response->body());
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+
+    public function getNearestCost($itemNo, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $param = [
+            "itemNo" => $itemNo
+        ];
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/item/get-nearest-cost.do', $param);
+
+        Log::info("API Accurate Get Nearest Cost ({$itemNo}) Success: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data['d'])) {
+                return $data['d'];
+            }
+            return null;
+        } else {
+            Log::error("API Accurate Get Nearest Cost Error: " . $response->body());
+            throw new \Exception('API Accurate Get Nearest Cost Error: ' . $response->body());
+        }
+    }
+
+    public function fetchCustomers($page = 1, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $param = [
+            'fields' => 'id,name,customerNo,email,mobilePhone',
+            'sp.sort' => 'id|asc',
+            'sp.page' => $page,
+            'sp.pageSize' => 100
+        ];
+
+        $response = \Illuminate\Support\Facades\Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature
+        ])->get($host . '/customer/list.do', $param);
+
+        if ($response->successful()) {
+            return $response->json();
+        }
+
+        \Illuminate\Support\Facades\Log::error('API Accurate Fetch Customers Error: ' . $response->body());
+        throw new \Exception('API Accurate Fetch Customers Error: ' . $response->body());
+    }
+
+    public function syncCustomer(User $user, $databaseSource = 'syihab')
+    {
+        $businessUnit = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+        if (!$businessUnit) {
+            return;
+        }
+
+        $existingPivot = $user->accurateCustomers()->where('business_unit_id', $businessUnit->id)->first();
+        if ($existingPivot) {
+            return; // Customer is already synced to this business unit
+        }
+
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $address = $user->addresses()->where('is_primary', true)->first();
+
+        // Ambil prefix dinamis dari database, default ke KODE unit jika kosong
+        $prefix = $businessUnit->customer_prefix
+            ? strtoupper($businessUnit->customer_prefix)
+            : strtoupper(trim($businessUnit->code)) . '_';
+
+        $customerData = [
+            'name' => $user->profile ? $user->profile->full_name : $user->name,
+            'customerNo' => $prefix . 'CUSTOMER_' . str_pad($user->id, 5, '0', STR_PAD_LEFT),
+            'currencyCode' => 'IDR',
+            'mobilePhone' => $user->profile ? $user->profile->phone_number : null,
+            'email' => $user->email,
+            'npwpNo' => $user->npwp,
+            'notes' => 'CUSTOMER ' . $prefix . ' - NIK:' . $user->identity,
+        ];
+
+        if ($address) {
+            $customerData['billStreet'] = $address->full_address;
+            $customerData['billZipCode'] = $address->postal_code;
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/customer/save.do', $customerData);
+
+        Log::info('API Accurate Customer Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                // If it already exists, Accurate usually returns an error. 
+                // We should handle if the error is "Customer No. already exists"
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data['r'])) {
+                $result = $data['r'];
+
+                \App\Models\UserAccurateCustomer::updateOrCreate(
+                    [
+                        'user_id' => $user->id,
+                        'business_unit_id' => $businessUnit->id,
+                    ],
+                    [
+                        'accurate_customer_id' => $result['id'],
+                        'accurate_customer_no' => $result['customerNo'],
+                    ]
+                );
+            }
+        } else {
+            Log::info('API Accurate Customer Error: ' . $response->body());
+            throw new \Exception('API Accurate Customer Error: ' . $response->body());
+        }
+    }
+
+    public function updateCustomer(User $user, $databaseSource = 'syihab')
+    {
+        $businessUnit = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+        if (!$businessUnit) return;
+
+        $existingPivot = $user->accurateCustomers()->where('business_unit_id', $businessUnit->id)->first();
+        if (!$existingPivot) {
+            // Jika belum ada di Accurate, panggil syncCustomer
+            return $this->syncCustomer($user, $databaseSource);
+        }
+
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        // Ambil prefix dinamis dari database, default ke KODE unit jika kosong
+        $prefix = $businessUnit->customer_prefix
+            ? strtoupper($businessUnit->customer_prefix)
+            : strtoupper(trim($businessUnit->code)) . '_';
+
+        $customerData = [
+            'id' => $existingPivot->accurate_customer_id, // Sertakan ID untuk UPDATE
+            'name' => $user->profile ? $user->profile->full_name : $user->name,
+            'mobilePhone' => $user->profile ? $user->profile->phone_number : null,
+            'email' => $user->email,
+        ];
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/customer/save.do', $customerData);
+
+        if (!$response->successful()) {
+            Log::error('API Accurate Customer Update Error: ' . $response->body());
+            throw new \Exception('API Accurate Customer Update Error: ' . $response->body());
+        }
+    }
+
+    public function postSalesOrder($salesOrderData, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-order/save.do', $salesOrderData);
+
+        Log::info('API Accurate Sales Order Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Sales Order Error: ' . $response->body());
+            throw new \Exception('API Accurate Sales Order Error: ' . $response->body());
+        }
+    }
+
+    public function getSalesOrderDetail($id, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/sales-order/detail.do', [
+            'id' => $id,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? null;
+            }
+        }
+
+        Log::error("Accurate API Get Sales Order Detail Failed ({$databaseSource}): " . $response->body());
+        return null;
+    }
+
+    public function closeSalesOrder($soNumber, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $payload = [
+            'number' => $soNumber,
+            'orderClosed' => true
+        ];
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-order/manual-close-order.do', $payload);
+
+        Log::info('API Accurate Close SO Success: ' . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            return $data ?? [];
+        } else {
+            Log::info('API Accurate Close SO Error: ' . $response->body());
+            throw new \Exception('API Accurate Close SO Error: ' . $response->body());
+        }
+    }
+
+
+    public function postDeliveryOrder($deliveryOrderData, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/delivery-order/save.do', $deliveryOrderData);
+
+        Log::info('API Accurate Delivery Order Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Delivery Order Error: ' . $response->body());
+            throw new \Exception('API Accurate Delivery Order Error: ' . $response->body());
+        }
+    }
+
+    public function postSalesInvoice($salesInvoiceData, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-invoice/save.do', $salesInvoiceData);
+
+        Log::info('API Accurate Sales Invoice Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Sales Invoice Error: ' . $response->body());
+            throw new \Exception('API Accurate Sales Invoice Error: ' . $response->body());
+        }
+    }
+
+    public function getSalesInvoiceDetail($id, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/sales-invoice/detail.do', [
+            'id' => $id,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? null;
+            }
+        }
+
+        Log::error("Accurate API Get Sales Invoice Detail Failed ({$databaseSource}): " . $response->body());
+        return null;
+    }
+
+    public function postSalesReturn($salesReturnData, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-return/save.do', $salesReturnData);
+
+        Log::info('API Accurate Sales Return Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate Sales Return Error: ' . $response->body());
+            throw new \Exception('API Accurate Sales Return Error: ' . $response->body());
+        }
+    }
+
+    public function getSalesReturns($startDate = null, $endDate = null, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $allReturns = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $timestamp = now()->toIso8601String();
+            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+            $params = [
+                'sp.pageSize' => 100,
+                'sp.page' => $page,
+                'sp.sort' => 'id|desc',
+                'fields' => 'id,number,transDate,customer,totalAmount,description,branch,detailItem'
+            ];
+
+            if ($startDate && $endDate) {
+                $startFormatted = \Carbon\Carbon::parse($startDate)->format('d/m/Y');
+                $endFormatted = \Carbon\Carbon::parse($endDate)->format('d/m/Y');
+                $params['filter.transDate.op'] = 'BETWEEN';
+                $params['filter.transDate.val'] = [$startFormatted, $endFormatted];
+            } elseif ($startDate) {
+                $startFormatted = \Carbon\Carbon::parse($startDate)->format('d/m/Y');
+                $params['filter.transDate.op'] = 'GREATER_EQUAL_THAN';
+                $params['filter.transDate.val'] = $startFormatted;
+            }
+
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ])->get($host . '/sales-return/list.do', $params);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data['s']) && $data['s'] === true) {
+                    $chunk = $data['d'] ?? [];
+                    $allReturns = array_merge($allReturns, $chunk);
+
+                    $pageCount = $data['sp']['pageCount'] ?? 1;
+                    if ($page >= $pageCount || count($chunk) < 100) {
+                        $hasMore = false;
+                    } else {
+                        $page++;
+                    }
+                } else {
+                    Log::error("Accurate API Get Sales Return List Error ({$databaseSource}): " . json_encode($data));
+                    break;
+                }
+            } else {
+                Log::error("Accurate API Get Sales Return List Failed ({$databaseSource}): " . $response->body());
+                $hasMore = false;
+            }
+        }
+
+        return $allReturns;
+    }
+
+    public function getSalesReturnDetail($id, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/sales-return/detail.do', [
+            'id' => $id,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? null;
+            }
+        }
+
+        Log::error("Accurate API Get Sales Return Detail Failed ({$databaseSource}): " . $response->body());
+        return null;
+    }
+
+    public function getEmployees($databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $allEmployees = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            // Pembuatan Signature Oauth / API Timestamp jika menggunakan metode signature custom
+            $timestamp = now()->toIso8601String();
+            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+            $paramBody = [
+                "sp.pageSize" => 100,
+                "sp.page" => $page,
+                "fields" => "id,number,name,email,mobilePhone,workPositionName,suspended,branchId"
+            ];
+
+            // Hit ke endpoint karyawan milik Accurate Online
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ])->get($host . '/employee/list.do', $paramBody);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['s']) && $data['s'] === false) {
+                    \Illuminate\Support\Facades\Log::error("Accurate API Get Employees Error ({$databaseSource}): " . json_encode($data));
+                    break;
+                }
+
+                $chunk = $data['d'] ?? [];
+                $allEmployees = array_merge($allEmployees, $chunk);
+
+                $pageCount = $data['sp']['pageCount'] ?? 1;
+
+                if ($page >= $pageCount || count($chunk) < 100) {
+                    $hasMore = false;
+                } else {
+                    $page++;
+                }
+            } else {
+                // Catat log jika terjadi kendala pada server Accurate
+                \Illuminate\Support\Facades\Log::error("Accurate API Get Employees Failed ({$databaseSource}): " . $response->body());
+                $hasMore = false;
+            }
+        }
+
+        return $allEmployees;
+    }
+
+    public function getVendors($databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $allVendors = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $timestamp = now()->toIso8601String();
+            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+            $paramBody = [
+                "sp.pageSize" => 100,
+                "sp.page" => $page,
+                "fields" => "id,vendorNo,name,email,mobilePhone,suspended"
+            ];
+
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ])->get($host . '/vendor/list.do', $paramBody);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['s']) && $data['s'] === false) {
+                    \Illuminate\Support\Facades\Log::error("Accurate API Get Vendors Error ({$databaseSource}): " . json_encode($data));
+                    break;
+                }
+
+                $chunk = $data['d'] ?? [];
+                $allVendors = array_merge($allVendors, $chunk);
+
+                $pageCount = $data['sp']['pageCount'] ?? 1;
+
+                if ($page >= $pageCount || count($chunk) < 100) {
+                    $hasMore = false;
+                } else {
+                    $page++;
+                }
+            } else {
+                \Illuminate\Support\Facades\Log::error("Accurate API Get Vendors Failed ({$databaseSource}): " . $response->body());
+                $hasMore = false;
+            }
+        }
+
+        return $allVendors;
+    }
+
+    /**
+     * Fetch Vendor Detail from Accurate
+     * 
+     * @param string $vendorNo
+     * @param string $databaseSource
+     * @return array
+     * @throws \Exception
+     */
+    public function getVendorDetail($vendorNo, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $param = [
+            "vendorNo" => $vendorNo
+        ];
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/vendor/detail.do', $param);
+
+        Log::info("API Accurate Get Vendor Detail ({$vendorNo}) Success: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data['d'])) {
+                return $data['d'];
+            }
+            return [];
+        } else {
+            Log::info("API Accurate Get Vendor Detail Error: " . $response->body());
+            throw new \Exception('API Accurate Get Vendor Detail Error: ' . $response->body());
+        }
+    }
+    public function getCustomerDetail($customerNo, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $param = [
+            "customerNo" => $customerNo
+        ];
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/customer/detail.do', $param);
+
+        Log::info("API Accurate Get Customer Detail ({$customerNo}) Success: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data['d'])) {
+                return $data['d'];
+            }
+            return [];
+        } else {
+            Log::info("API Accurate Get Vendor Detail Error: " . $response->body());
+            throw new \Exception('API Accurate Get Vendor Detail Error: ' . $response->body());
+        }
+    }
+    public function postDownPaymentInvoice($data, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-invoice/create-down-payment.do', $data);
+
+        Log::info('API Accurate DP Invoice Success: ' . $response->body());
+        if ($response->successful()) {
+            $responseData = $response->json();
+            if (isset($responseData['s']) && $responseData['s'] === false) {
+                $errorMsg = isset($responseData['d']) && is_array($responseData['d']) ? implode(', ', $responseData['d']) : json_encode($responseData);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($responseData)) {
+                return $responseData;
+            }
+            return [];
+        } else {
+            Log::info('API Accurate DP Invoice Error: ' . $response->body());
+            throw new \Exception('API Accurate DP Invoice Error: ' . $response->body());
+        }
+    }
+
+
+    public function postSalesReceipt($salesReceiptData, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->post($host . '/sales-receipt/save.do', $salesReceiptData);
+
+        Log::info('API Accurate Sales Receipt Success: ' . $response->body());
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data)) {
+                return $data;
+            }
+            return [];
+        } else {
+            throw new \Exception('API Accurate Sales Receipt Error: ' . $response->body());
+        }
+    }
+
+    public function getDetailSalesReceipt($id, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/sales-receipt/detail.do', [
+            'id' => $id
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            if (isset($data['d'])) {
+                return $data['d'];
+            }
+            return null;
+        } else {
+            Log::error('API Accurate Get Detail Sales Receipt Error: ' . $response->body());
+            throw new \Exception('API Accurate Get Detail Sales Receipt Error: ' . $response->body());
+        }
+    }
+
+    // public function getStockPerWarehouse($warehouseName, $databaseSource = 'syihab')
+    // {
+    //     list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+    //     $allData = [];
+    //     $page = 1;
+    //     $hasMore = true;
+
+    //     while ($hasMore) {
+    //         $timestamp = now()->toIso8601String();
+    //         $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+    //         $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+    //             'Authorization' => 'Bearer ' . $token,
+    //             'X-Api-Timestamp' => $timestamp,
+    //             'X-Api-Signature'  => $signature,
+    //             'Content-Type'  => 'application/json',
+    //         ])->get($host . '/item/list-stock.do', [
+    //             'sp.pageSize' => 100,
+    //             'sp.page' => $page,
+    //             'warehouseName' => $warehouseName
+    //         ]);
+
+    //         if ($response->successful()) {
+    //             $data = $response->json();
+    //             if (isset($data['s']) && $data['s'] === false) {
+    //                 throw new \Exception('API Accurate Error: ' . json_encode($data['d']));
+    //             }
+
+    //             $chunk = $data['d'] ?? [];
+    //             $allData = array_merge($allData, $chunk);
+
+    //             // Jika jumlah data di halaman ini kurang dari limit (100), berarti sudah mentok di halaman terakhir
+    //             if (count($chunk) < 100) {
+    //                 $hasMore = false;
+    //             } else {
+    //                 $page++;
+    //             }
+    //         } else {
+    //             throw new \Exception('API Accurate Error: ' . $response->body());
+    //         }
+    //     }
+
+    //     return $allData;
+    // }
+
+    public function getGlAccounts($databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/glaccount/list.do', [
+            'fields' => 'id,no,name,accountType',
+            'filter.accountType.op' => 'EQUAL',
+            'filter.accountType.val' => ['CASH_BANK'],
+            'filter.leafOnly' => true,
+            'filter.suspended' => false,
+            'sp.pageSize' => 100
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                throw new \Exception('API Accurate Error: ' . json_encode($data['d']));
+            }
+            return $data['d'] ?? [];
+        } else {
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+
+    /**
+     * Get serial number per warehouse from Accurate report
+     */
+    public function getSerialNumberPerWarehouse($sku, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/report/serial-number-per-warehouse.do', [
+            'itemNo' => $sku,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? [];
+            }
+        }
+        Log::info('data proses serial number 2: ' . json_encode($data));
+        return [];
+    }
+
+    public function getItemStockPerWarehousePage($warehouseName, $page = 1, $pageSize = 100, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/item/list-stock.do', [
+            'sp.pageSize'   => $pageSize,
+            'sp.page'       => $page,
+            'warehouseName' => $warehouseName
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data['d']);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+
+            return $data['d'] ?? [];
+        } else {
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+
+    public function getItemStockPerWarehouse($warehouseName, $databaseSource = 'syihab')
+    {
+        $allData = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $chunk = $this->getItemStockPerWarehousePage($warehouseName, $page, 100, $databaseSource);
+            $allData = array_merge($allData, $chunk);
+
+            if (count($chunk) < 100) {
+                $hasMore = false;
+            } else {
+                $page++;
+            }
+        }
+
+        return $allData;
+    }
+    public function getStockPerItem($itemNo, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/item/list-stock.do', [
+            'pageSize' => 100,
+            'itemNo' => $itemNo
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                throw new \Exception('API Accurate Error: ' . json_encode($data['d']));
+            }
+            return $data['d'] ?? [];
+        } else {
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+
+    public function getStockPerItemWarehouse($itemNo, $warehouseName, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature'  => $signature,
+            'Content-Type'  => 'application/json',
+        ])->get($host . '/item/get-stock.do', [
+            'no' => $itemNo,
+            'warehouseName' => $warehouseName
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                throw new \Exception('API Accurate Error: ' . json_encode($data['d']));
+            }
+            return $data['d'] ?? [];
+        } else {
+            throw new \Exception('API Accurate Error: ' . $response->body());
+        }
+    }
+    /**
+     * FUNGSI BARU: Memeriksa keberadaan Serial Number (SN) di database Accurate Online
+     */
+    // public function checkSerialNumberExistance($sn, $databaseSource = 'syihab')
+    // {
+    //     list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+    //     $timestamp = now()->toIso8601String();
+    //     $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+    //     try {
+    //         $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+    //             'Authorization'   => 'Bearer ' . $token,
+    //             'X-Api-Timestamp' => $timestamp,
+    //             'X-Api-Signature' => $signature,
+    //             'Content-Type'    => 'application/json',
+    //         ])->get($host . '/item/search-by-item-or-sn.do', [
+    //             'keywords' => $sn
+    //         ]);
+
+    //         Log::info("API Accurate Check SN ({$databaseSource}) Success: " . $response->body());
+
+    //         if ($response->successful()) {
+    //             $data = $response->json();
+    //             // Jika Accurate mengembalikan status sukses (s = true) dan isi datanya (d) tidak kosong, berati SN ada
+    //             if (isset($data['s']) && $data['s'] === true && !empty($data['d'])) {
+    //                 return true;
+    //             }
+    //         }
+    //         return false;
+    //     } catch (\Exception $e) {
+    //         Log::error("API Accurate Check SN ({$databaseSource}) Error: " . $e->getMessage());
+    //         return false;
+    //     }
+    // }
+    public function checkSerialNumberExistance($sn, $expectedSku, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        try {
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ])->get($host . '/item/search-by-item-or-sn.do', [
+                'keywords' => $sn
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['s']) && $data['s'] === true) {
+                    // KONDISI 1: Jika Accurate sukses merespons tapi array 'd' kosong (SN memang tidak ada)
+                    if (empty($data['d'])) {
+                        return 'not_found';
+                    }
+
+                    // FILTER BARU: Cek apakah hasil yang ditemukan benar-benar Serial Number
+                    $firstHit = $data['d'][0];
+                    if (isset($firstHit['searchHitType']) && $firstHit['searchHitType'] !== 'serialNumber') {
+                        return 'invalid_type'; // Jika bukan SN (misal: barcode barang), tolak!
+                    }
+
+                    // Jika array 'd' ada isinya, kita cek kecocokan SKU
+                    foreach ($data['d'] as $accurateItem) {
+                        if (isset($accurateItem['no']) && $accurateItem['no'] === $expectedSku) {
+                            return 'valid'; // SN ada DAN cocok dengan SKU
+                        }
+                    }
+
+                    // KONDISI 2: Loop selesai tapi tidak ada SKU yang cocok (SN ada, tapi beda barang)
+                    return 'mismatch';
+                }
+            }
+
+            return 'not_found';
+        } catch (\Exception $e) {
+            Log::error("API Accurate Check SN ({$databaseSource}) Error: " . $e->getMessage());
+            return 'error'; // Jika terjadi gangguan server / API timeout
+        }
+    }
+    private function getHeaders($databaseSource)
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        return [
+            'host' => $host,
+            'headers' => [
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ]
+        ];
+    }
+    /**
+     * FUNGSI BARU: Mencari SKU (item no) berdasarkan SN saat scanning di POS
+     */
+    public function findSkuBySerialNumber($sn, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        try {
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+                ->get($config['host'] . '/item/search-by-item-or-sn.do', [
+                    // Tetap pertahankan strtoupper + trim agar aman dari masalah case-sensitive kemarin
+                    'keywords' => trim($sn)
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                if (isset($data['s']) && $data['s'] === true && !empty($data['d'])) {
+                    // 1. Ambil data hit pertama dari Accurate
+                    $firstHit = $data['d'][0];
+
+                    // 2. FILTER BARU: Validasi apakah searchHitType benar-benar 'serialNumber'
+                    if (isset($firstHit['searchHitType']) && $firstHit['searchHitType'] === 'serialNumber') {
+                        return $firstHit['no'] ?? null; // Kembalikan SKU jika valid
+                    }
+
+                    // BARU: Jika ketemu tapi BUKAN serialNumber, kembalikan penanda khusus
+                    return 'invalid_type';
+                    // Jika tipenya bukan serialNumber (misal: 'item'), catat log dan otomatis return null (tolak)
+                    \Illuminate\Support\Facades\Log::warning("Scan SN diabaikan karena searchHitType berjenis '" . ($firstHit['searchHitType'] ?? 'unknown') . "' untuk input: {$sn}");
+                }
+            }
+            return null;
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("API Accurate Find SKU by SN ({$databaseSource}) Error: " . $e->getMessage());
+            return 'error';
+        }
+    }
+    /**
+     * Hit API Accurate Penyesuaian Persediaan (Single)
+     * @param array $payload
+     * @param string $databaseSource
+     * @return array
+     * @throws \Exception
+     */
+    public function postItemAdjustment(array $payload, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->post($config['host'] . '/item-adjustment/save.do', $payload);
+
+        Log::info("API Accurate Item Adjustment ({$databaseSource}) Payload: " . json_encode($payload));
+        Log::info("API Accurate Item Adjustment ({$databaseSource}) Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Item Adjustment Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
+     * Hit API Bulk Save Penyesuaian Persediaan (Max 100 data)
+     * * @param array $chunkData
+     * @return array
+     * @throws \Exception
+     */
+    public function bulkSaveItemAdjustment(array $chunkData)
+    {
+        // 1. Siapkan Timestamp & Signature khas Accurate
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, env('ACCURATE_SECRET_KEY'));
+
+        // 2. Susun parameter bungkus "data"
+        $payload = [
+            "data" => $chunkData
+        ];
+
+        // 3. Eksekusi POST ke endpoint bulk-save
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . env('ACCURATE_TOKEN'),
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->post(env('ACCURATE_HOST') . '/item-adjustment/bulk-save.do', $payload);
+
+        // 4. Catat Log & Validasi Response internal Accurate
+        Log::info('API Accurate Bulk Adjustment Response: ' . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+
+            // Cek jika status 's' bernilai false (error bawaan Accurate)
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+
+            return $data;
+        } else {
+            throw new \Exception('API Accurate Connection Error: ' . $response->body());
+        }
+    }
+
+    public function getReceiveItemList($databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $allIds = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $timestamp = now()->toIso8601String();
+            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ])->get($host . '/receive-item/list.do', [
+                'sp.pageSize' => 100,
+                'sp.page' => $page,
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data['s']) && $data['s'] === true) {
+                    $chunk = $data['d'] ?? [];
+                    foreach ($chunk as $item) {
+                        if (isset($item['id'])) {
+                            $allIds[] = $item['id'];
+                        }
+                    }
+
+                    $pageCount = $data['sp']['pageCount'] ?? 1;
+                    if ($page >= $pageCount || count($chunk) < 100) {
+                        $hasMore = false;
+                    } else {
+                        $page++;
+                    }
+                } else {
+                    Log::error("Accurate API Get Receive Item List Error ({$databaseSource}): " . json_encode($data));
+                    break;
+                }
+            } else {
+                Log::error("Accurate API Get Receive Item List Failed ({$databaseSource}): " . $response->body());
+                $hasMore = false;
+            }
+        }
+
+        return $allIds;
+    }
+
+    /**
+     * Ambil daftar Receive Item terbaru dari Accurate dengan sorting id|desc
+     */
+    public function getRecentReceiveItemList($databaseSource = 'syihab', $limit = 25, $keyword = null)
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $params = [
+            'sp.pageSize' => $limit,
+            'sp.page' => 1,
+            'sp.sort' => 'id|desc',
+        ];
+
+        if (!empty($keyword)) {
+            $params['filter.keywords.val'] = trim($keyword);
+        }
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/receive-item/list.do', $params);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                $items = $data['d'] ?? [];
+                $result = [];
+                foreach ($items as $item) {
+                    if (isset($item['id'])) {
+                        $result[] = [
+                            'id' => $item['id'],
+                            'number' => $item['number'] ?? ($item['no'] ?? 'RI-' . $item['id']),
+                            'transDate' => $item['transDate'] ?? null,
+                            'vendor' => $item['vendor']['name'] ?? ($item['vendorName'] ?? null),
+                        ];
+                    }
+                }
+                return $result;
+            } else {
+                Log::error("Accurate API Get Recent Receive Items Error ({$databaseSource}): " . json_encode($data));
+            }
+        } else {
+            Log::error("Accurate API Get Recent Receive Items Failed ({$databaseSource}): " . $response->body());
+        }
+
+        return [];
+    }
+
+    /**
+     * Cari ID Dokumen Receive Item berdasarkan Nomor Dokumen
+     */
+    public function findReceiveItemIdByNumber($docNumber, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/receive-item/list.do', [
+            'filter.keywords.val' => trim($docNumber),
+            'sp.pageSize' => 10,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true && !empty($data['d'])) {
+                foreach ($data['d'] as $item) {
+                    $itemNum = $item['number'] ?? ($item['no'] ?? '');
+                    if (strcasecmp(trim($itemNum), trim($docNumber)) === 0 || $item['id'] == $docNumber) {
+                        return $item['id'];
+                    }
+                }
+                // Fallback to first item if keyword matched closely
+                return $data['d'][0]['id'] ?? null;
+            }
+        }
+
+        return null;
+    }
+
+    public function getReceiveItemDetail($id, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/receive-item/detail.do', [
+            'id' => $id,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? null;
+            }
+        }
+
+        return null;
+    }
+
+    public function getPurchaseInvoiceDetail($idOrNumber, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $param = is_numeric($idOrNumber) ? ['id' => $idOrNumber] : ['number' => $idOrNumber];
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->get($config['host'] . '/purchase-invoice/detail.do', $param);
+
+        Log::info("API Accurate Get Purchase Invoice Detail ({$databaseSource}): " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? null;
+            }
+        }
+
+        Log::error("Accurate API Get Purchase Invoice Detail Failed ({$databaseSource}): " . $response->body());
+        return null;
+    }
+
+    public function getPurchaseOrders($databaseSource = 'syihab', $status = null)
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $allOrders = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $timestamp = now()->toIso8601String();
+            $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+            $params = [
+                'sp.pageSize' => 100,
+                'sp.page' => $page,
+                'sp.sort' => 'id|desc'
+            ];
+
+            // Filter for unreceived POs typically status is OPEN or PARTIAL, wait we will just pull list and filter if needed
+            // Accurate PO statuses: UNAPPROVED, APPROVED, CLOSED, REJECTED, WAITING_RECEIPT
+
+            $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+                'Authorization'   => 'Bearer ' . $token,
+                'X-Api-Timestamp' => $timestamp,
+                'X-Api-Signature' => $signature,
+                'Content-Type'    => 'application/json',
+            ])->get($host . '/purchase-order/list.do', $params);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data['s']) && $data['s'] === true) {
+                    $chunk = $data['d'] ?? [];
+                    $allOrders = array_merge($allOrders, $chunk);
+
+                    $pageCount = $data['sp']['pageCount'] ?? 1;
+                    if ($page >= $pageCount || count($chunk) < 100) {
+                        $hasMore = false;
+                    } else {
+                        $page++;
+                    }
+                } else {
+                    Log::error("Accurate API Get Purchase Order List Error ({$databaseSource}): " . json_encode($data));
+                    break;
+                }
+            } else {
+                Log::error("Accurate API Get Purchase Order List Failed ({$databaseSource}): " . $response->body());
+                $hasMore = false;
+            }
+        }
+
+        return $allOrders;
+    }
+
+    public function getPurchaseOrderDetail($id, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/purchase-order/detail.do', [
+            'id' => $id,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? null;
+            }
+        }
+
+        Log::error("Accurate API Get Purchase Order Detail Failed ({$databaseSource}): " . $response->body());
+        return null;
+    }
+
+    /**
+     * Proses penggantian unit garansi (Retur).
+     * Memanggil API Accurate untuk Sales Return (menarik stok rusak) 
+     * dan Sales Invoice (mengeluarkan stok baru).
+     */
+    public function processWarrantyReplacement(\App\Models\WarrantyClaim $claim, $newImei, $newItemNo = null, $newPrice = 0, $priceDifference = 0, $replacementType = 'same', $bankNo = null, $originalPriceFromUI = null, $salesmanNo = null, $branchName = null)
+    {
+        $businessUnitCode = $claim->warranty->policy?->businessUnit?->code ?? 'syihab';
+        // dd($claim->customer, $claim->customer->getAccurateCustomerNo($businessUnitCode));
+
+        // Simulasi mendapatkan nomor invoice lama dan item lama dari order system
+        $order = $claim->warranty->orderItem->order ?? null;
+
+        // 1. Ambil Data Referensi dari Database
+        // Cek apakah invoice asli menggunakan pembayaran Finance
+        $financePayment = null;
+        if ($order) {
+            $financePayment = $order->payments()->with('paymentMethod')->get()->first(function ($payment) {
+                return $payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no);
+            });
+        }
+
+        // Jika ada finance payment, pakai customer no dari finance. Jika tidak, pakai milik customer
+        if ($financePayment) {
+            $customerNo = $financePayment->paymentMethod->accurate_customer_no;
+            $customerName = $financePayment->paymentMethod->name ?? 'Finance Customer';
+        } else {
+            // Ambil No Pelanggan yang TEPAT sesuai dengan Business Unit tempat garansi ini diterbitkan
+            $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
+            $customerName = $claim->customer->name ?? 'Pelanggan Garansi';
+        }
+        $originalInvoiceNo = null;
+
+        // Periksa apakah unit ini pernah diganti sebelumnya (Replacement beruntun)
+        // Jika ya, gunakan invoice dari penggantian terakhir (Order: WR-xxx)
+        $previousClaims = $claim->warranty->claims()
+            ->where('id', '!=', $claim->id)
+            ->where('status', 'resolved')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        foreach ($previousClaims as $prevClaim) {
+            $wrOrder = \App\Models\Order::where('order_number', 'WR-' . $prevClaim->claim_number)->first();
+            if ($wrOrder && $wrOrder->accurate_invoice_no) {
+                $originalInvoiceNo = $wrOrder->accurate_invoice_no;
+                break;
+            }
+        }
+
+        // Jika tidak ada penggantian sebelumnya, gunakan invoice dari pesanan pertama kali
+        if (!$originalInvoiceNo && $order) {
+            $originalInvoiceNo = $order->accurate_invoice_no ?? null;
+            if (!$originalInvoiceNo) {
+                $siDoc = $order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->first();
+                if ($siDoc) {
+                    $originalInvoiceNo = $siDoc->doc_number;
+                }
+            }
+        }
+
+        // Validasi: Accurate mewajibkan nomor Faktur Penjualan (Sales Invoice) untuk Retur.
+        // Jika tidak ada, jangan paksakan hit API agar tidak error berantakan.
+        if (!$originalInvoiceNo) {
+            throw new \Exception("Faktur Penjualan (Sales Invoice) Accurate untuk pesanan/unit ini tidak ditemukan di sistem. Pastikan pesanan asli sudah dibuatkan invoice-nya di Accurate.");
+        }
+
+        // Ambil Item No (SKU) dari relasi Variant
+        $variant = $claim->warranty->orderItem->variant ?? null;
+        $originalItemNo = 'UNKNOWN-SKU';
+
+        if ($variant) {
+            // Jika variant langsung dari ProductAccurate
+            if (isset($variant->item_no)) {
+                $originalItemNo = $variant->item_no;
+            }
+            // Jika dari SecondProductVariant atau ProductVariant (punya relasi ke accurateData)
+            elseif ($variant->accurateData) {
+                $originalItemNo = $variant->accurateData->item_no;
+            }
+            // Fallback: coba panggil accurateData() sebagai method
+            elseif (method_exists($variant, 'accurateData') && $variant->accurateData()->first()) {
+                $originalItemNo = $variant->accurateData()->first()->item_no;
+            }
+        }
+
+        // Ambil Project No
+        $businessUnitId = $claim->warranty->policy?->business_unit_id ?? (Auth::user()->getActiveBusinessUnitId() ?? 1);
+        $projectName = '';
+        if ($variant) {
+            if (isset($variant->proyek)) {
+                $projectName = trim(strtoupper($variant->proyek));
+            } elseif (isset($variant->accurateData->proyek)) {
+                $projectName = trim(strtoupper($variant->accurateData->proyek));
+            } elseif (method_exists($variant, 'accurateData') && $variant->accurateData()->first()) {
+                $projectName = trim(strtoupper($variant->accurateData()->first()->proyek ?? ''));
+            }
+        }
+        $projectNo = \App\Models\BusinessUnitProject::getProjectNoByBusinessUnit($businessUnitId, $projectName, $projectName ?: null);
+
+        $targetItemNo = $newItemNo ?? $originalItemNo;
+        $originalPrice = $originalPriceFromUI ?? ($claim->warranty->orderItem->price_at_checkout ?? 0);
+        $targetPrice = $newPrice > 0 ? $newPrice : $originalPrice;
+        $chequeAmount = $priceDifference;
+
+        // Gunakan user pembuat klaim (CS/Kasir) sebagai acuan cabang & gudang,
+        // KARENA transaksi fisik terjadi di cabang mereka, bukan di cabang Manager/Approver.
+        $actionUser = $claim->claimedBy ?? Auth::user();
+
+        // Ambil Nama Cabang berdasarkan parameter, atau fallback ke actionUser
+        $branchName = $branchName ?? $actionUser?->branch?->name ?? 'Cabang Utama';
+
+        // Ambil konfigurasi pajak dari Business Unit
+        $businessUnit = $claim->warranty->policy->businessUnit ?? null;
+        $isTaxable = $businessUnit?->is_taxable ?? false;
+
+        $warehouseMainName = $actionUser?->warehouse?->name ?? 'Gudang Utama';
+
+        // Gudang Retur diambil dari settingan Business Unit. Jika kosong, fallback ke gudang pemroses (User).
+        $warehouseReturnName = $claim->warranty->policy?->businessUnit?->accurate_return_warehouse_name;
+        if (empty(trim($warehouseReturnName))) {
+            $warehouseReturnName = $warehouseMainName;
+        }
+
+        // --- PROSES 1: SALES RETURN (MENARIK IMEI LAMA) ---
+        Log::info("Mempersiapkan Sales Return ke Accurate untuk IMEI Lama: " . $claim->serial_number);
+
+        $itemDetailSR = [
+            'itemNo' => $originalItemNo,
+            'quantity' => 1,
+            'unitPrice' => $originalPrice, // WAJIB ADA agar menjadi deposit walau invoice tak ketemu
+            'itemDiscount' => 0, // Hindari diskon bawaan
+            'warehouseName' => $warehouseReturnName,
+            'detailSerialNumber' => [
+                ['serialNumberNo' => $claim->serial_number, 'quantity' => 1]
+            ]
+        ];
+        if ($projectNo) {
+            $itemDetailSR['projectNo'] = $projectNo;
+        }
+
+        // Payload standar retur industri (Terhubung ke faktur lama agar memotong piutang/jadi overpayment)
+        $returnPayload = [
+            'customerNo' => $customerNo,
+            'invoiceNumber' => $originalInvoiceNo, // <--- Relasi ke faktur lama dihidupkan kembali
+            'returnDate' => now()->format('d/m/Y'),
+            'branchName' => $branchName,
+            'taxable' => $isTaxable,
+            'inclusiveTax' => $isTaxable,
+            'description' => "Retur Klaim Garansi Ganti Unit. Referensi Faktur: {$originalInvoiceNo}. SN Rusak: {$claim->serial_number}",
+            'detailItem' => [$itemDetailSR]
+        ];
+
+        Log::info("Payload Sales Return:", $returnPayload);
+        $returnResponse = $this->postSalesReturn($returnPayload, $businessUnitCode);
+        $newReturnNo = $returnResponse['r']['number'] ?? null;
+
+        if (!$newReturnNo) {
+            throw new \Exception("Gagal mendapatkan nomor Sales Return dari respon Accurate.");
+        }
+
+        // --- PROSES 2: SALES INVOICE (MENGELUARKAN IMEI BARU) ---
+        Log::info("Mempersiapkan Sales Invoice ke Accurate untuk IMEI Baru: " . $newImei);
+
+        $itemDetailSI = [
+            'itemNo' => $targetItemNo,
+            'quantity' => 1,
+            'unitPrice' => $targetPrice, // Harga menggunakan harga asli/baru
+            'itemDiscount' => 0, // Hindari diskon bawaan
+            'warehouseName' => $warehouseMainName,
+            'detailSerialNumber' => [
+                ['serialNumberNo' => $newImei, 'quantity' => 1]
+            ]
+        ];
+        if ($projectNo) {
+            $itemDetailSI['projectNo'] = $projectNo;
+        }
+        if ($salesmanNo) {
+            $itemDetailSI['salesmanListNumber'] = [(string) $salesmanNo];
+        }
+
+        // Payload standar pengeluaran barang pengganti
+        $invoicePayload = [
+            'customerNo' => $customerNo,
+            'transDate' => now()->format('d/m/Y'),
+            'branchName' => $branchName,
+            'taxable' => $isTaxable,
+            'inclusiveTax' => $isTaxable,
+            'description' => "Penggantian Unit Klaim Garansi untuk Faktur: {$originalInvoiceNo}. SN Pengganti: {$newImei}",
+            'detailItem' => [$itemDetailSI]
+        ];
+
+        Log::info("Payload Sales Invoice:", $invoicePayload);
+        $invoiceResponse = $this->postSalesInvoice($invoicePayload, $businessUnitCode);
+        $newInvoiceNo = $invoiceResponse['r']['number'] ?? null;
+
+        if (!$newInvoiceNo) {
+            throw new \Exception("Gagal mendapatkan nomor Sales Invoice dari respon Accurate.");
+        }
+
+        // --- PROSES 3: SALES RECEIPT (SETTLEMENT / REFUND) ---
+        Log::info("Mempersiapkan Sales Receipt untuk pelunasan Invoice Baru: {$newInvoiceNo} menggunakan overpayment Invoice Lama: {$originalInvoiceNo}");
+
+        if (!$bankNo) {
+            // Karena Sales Receipt membutuhkan bankNo meskipun saldonya 0 (offsetting), 
+            // kita ambil salah satu akun kas/bank yang valid dari business unit ini.
+            $defaultBank = \App\Models\AccurateGlAccount::where('account_type', 'CASH_BANK')
+                ->where('database_source', $businessUnitCode)
+                ->first();
+            $finalBankNo = $defaultBank ? $defaultBank->account_no : '110101';
+        } else {
+            $finalBankNo = $bankNo;
+        }
+
+        // Logika Offsetting Piutang (Kelebihan bayar vs Tagihan baru)
+        if ($chequeAmount < 0) {
+            // Downgrade: Kita hanya menarik saldo dari faktur lama SEBESAR harga faktur baru
+            // Sisa overpayment akan tetap tertinggal di faktur lama
+            $oldInvoiceDeduction = -$targetPrice;
+            $actualCheque = 0;
+            $descSuffix = " (Sisa overpayment Rp " . number_format(abs($chequeAmount), 0, ',', '.') . " tertinggal di faktur lama)";
+        } else {
+            // Upgrade atau 1:1: Kita menarik SELURUH saldo faktur lama (originalPrice)
+            $oldInvoiceDeduction = -$originalPrice;
+            $actualCheque = $chequeAmount; // >0 jika upgrade, 0 jika 1:1
+            $descSuffix = "";
+        }
+
+        $receiptPayload = [
+            'customerNo' => $customerNo,
+            'bankNo' => $finalBankNo,
+            'transDate' => now()->format('d/m/Y'),
+            'branchName' => $branchName,
+            'chequeAmount' => $actualCheque,
+            'useCredit' => false, // Kita tidak pakai deposit terpisah, kita pakai sistem offset invoice
+            'description' => "Pelunasan Ganti Unit. Faktur Baru: {$newInvoiceNo}. Potong Faktur Lama: {$originalInvoiceNo}{$descSuffix}",
+            'detailInvoice' => [
+                [
+                    'invoiceNo' => $originalInvoiceNo,
+                    'paymentAmount' => $oldInvoiceDeduction // Tarik saldo minus dari faktur lama
+                ],
+                [
+                    'invoiceNo' => $newInvoiceNo,
+                    'paymentAmount' => $targetPrice // Bayar faktur baru
+                ]
+            ]
+        ];
+
+        Log::info("Payload Sales Receipt (Offsetting):", $receiptPayload);
+
+        $receiptResponse = null;
+        try {
+            $receiptResponse = $this->postSalesReceipt($receiptPayload, $businessUnitCode);
+        } catch (\Exception $e) {
+            Log::error("Sales Receipt Gagal: " . $e->getMessage());
+            throw $e;
+        }
+
+        return [
+            'success' => true,
+            'sales_return' => [
+                'id' => $returnResponse['r']['id'] ?? null,
+                'number' => $newReturnNo,
+            ],
+            'sales_invoice' => [
+                'id' => $invoiceResponse['r']['id'] ?? null,
+                'number' => $newInvoiceNo,
+            ],
+            'sales_receipt' => [
+                'id' => $receiptResponse['r']['id'] ?? null,
+                'number' => $receiptResponse['r']['number'] ?? null,
+            ],
+        ];
+    }
+
+
+    /**
+     * Delete Sales Receipt in Accurate
+     * 
+     * @param int|string $id
+     * @param string $databaseSource
+     * @return array|bool
+     * @throws \Exception
+     */
+    public function deleteSalesReceipt($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $payload = is_numeric($id) ? ['id' => (int)$id] : ['number' => $id];
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->post($config['host'] . '/sales-receipt/delete.do', $payload);
+
+        Log::info("API Accurate Delete Sales Receipt ({$databaseSource}) ID/No: {$id} Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete SR: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete SR Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
+     * Delete Sales Invoice in Accurate
+     * 
+     * @param int|string $id
+     * @param string $databaseSource
+     * @return array|bool
+     * @throws \Exception
+     */
+    public function deleteSalesInvoice($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $payload = is_numeric($id) ? ['id' => (int)$id] : ['number' => $id];
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->post($config['host'] . '/sales-invoice/delete.do', $payload);
+
+        Log::info("API Accurate Delete Sales Invoice ({$databaseSource}) ID/No: {$id} Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete SI: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete SI Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+    public function deleteDeliveryOrder($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $payload = is_numeric($id) ? ['id' => (int)$id] : ['number' => $id];
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->post($config['host'] . '/delivery-order/delete.do', $payload);
+
+        Log::info("API Accurate Delete Delivery Order ({$databaseSource}) ID/No: {$id} Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete DO: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete DO Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    public function deleteSalesOrder($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $payload = is_numeric($id) ? ['id' => (int)$id] : ['number' => $id];
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->post($config['host'] . '/sales-order/delete.do', $payload);
+
+        Log::info("API Accurate Delete Sales Order ({$databaseSource}) ID/No: {$id} Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete SO: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete SO Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
+     * Delete Purchase Payment in Accurate
+     * 
+     * @param int|string $id
+     * @param string $databaseSource
+     * @return array|bool
+     * @throws \Exception
+     */
+    public function deletePurchasePayment($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $payload = is_numeric($id) ? ['id' => $id] : ['number' => $id];
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->post($config['host'] . '/purchase-payment/delete.do', $payload);
+
+        Log::info("API Accurate Delete Purchase Payment ({$databaseSource}) Payload: " . json_encode($payload) . " Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete PP: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete PP Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
+     * Delete Purchase Invoice in Accurate
+     * 
+     * @param int|string $id
+     * @param string $databaseSource
+     * @return array|bool
+     * @throws \Exception
+     */
+    public function deletePurchaseInvoice($id, $databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+
+        $payload = is_numeric($id) ? ['id' => $id] : ['number' => $id];
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders($config['headers'])
+            ->post($config['host'] . '/purchase-invoice/delete.do', $payload);
+
+        Log::info("API Accurate Delete Purchase Invoice ({$databaseSource}) Payload: " . json_encode($payload) . " Response: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : json_encode($data);
+                throw new \Exception('API Accurate Error Delete PI: ' . $errorMsg);
+            }
+            return $data['d'] ?? true;
+        } else {
+            Log::error("API Accurate Delete PI Error ({$databaseSource}): " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+
+    /**
+     * Rollback Purchase documents in Accurate (Delete Purchase Payment, then Delete Purchase Invoice).
+     * 
+     * @param \App\Models\SellPhone $sellPhone
+     * @return array
+     */
+    public function rollbackPurchaseDocuments(\App\Models\SellPhone $sellPhone)
+    {
+        $dbSource = $sellPhone->businessUnit ? strtolower($sellPhone->businessUnit->code) : 'gsk';
+        $invoiceNumber = $sellPhone->invoice_number;
+
+        if (!$invoiceNumber) {
+            return [
+                'success' => true,
+                'message' => 'Tidak ada nomor faktur Accurate yang terhubung.',
+                'deleted_docs' => [],
+            ];
+        }
+
+        $detail = $this->getPurchaseInvoiceDetail($invoiceNumber, $dbSource);
+        if (!$detail) {
+            Log::warning("Rollback Purchase: Faktur {$invoiceNumber} tidak ditemukan di Accurate atau sudah dihapus.");
+            return [
+                'success' => true,
+                'message' => "Faktur {$invoiceNumber} tidak ditemukan di Accurate.",
+                'deleted_docs' => [],
+            ];
+        }
+
+        $invoiceId = $detail['id'] ?? null;
+        $deletedDocs = [];
+
+        // 1. Hapus Purchase Payment yang terhubung jika ada
+        $paymentList = $detail['purchasePaymentList'] ?? ($detail['paymentList'] ?? ($detail['detailPayment'] ?? []));
+        if (!empty($paymentList)) {
+            foreach ($paymentList as $pmt) {
+                $paymentId = $pmt['id'] ?? ($pmt['purchasePaymentId'] ?? null);
+                $paymentNo = $pmt['number'] ?? ($pmt['purchasePaymentNo'] ?? null);
+                if ($paymentId || $paymentNo) {
+                    try {
+                        $this->deletePurchasePayment($paymentId ?: $paymentNo, $dbSource);
+                        $deletedDocs[] = ['type' => 'PURCHASE_PAYMENT', 'id' => $paymentId, 'number' => $paymentNo];
+                    } catch (\Exception $e) {
+                        Log::warning("Gagal hapus Purchase Payment ({$paymentNo}/{$paymentId}): " . $e->getMessage());
+                        if (!str_contains($e->getMessage(), 'tidak ditemukan atau sudah dihapus')) {
+                            throw $e;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Hapus Purchase Invoice
+        if ($invoiceId || $invoiceNumber) {
+            try {
+                $this->deletePurchaseInvoice($invoiceId ?: $invoiceNumber, $dbSource);
+                $deletedDocs[] = ['type' => 'PURCHASE_INVOICE', 'id' => $invoiceId, 'number' => $invoiceNumber];
+            } catch (\Exception $e) {
+                Log::warning("Gagal hapus Purchase Invoice ({$invoiceNumber}/{$invoiceId}): " . $e->getMessage());
+                if (!str_contains($e->getMessage(), 'tidak ditemukan atau sudah dihapus')) {
+                    throw $e;
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'deleted_docs' => $deletedDocs,
+        ];
+    }
+
+    /**
+     * Rollback order documents in Accurate with correct Bottom-Up order.
+     */
+    public function rollbackOrderDocuments(\App\Models\Order $order)
+    {
+        $dbSource = strtolower($order->businessUnit->code ?? 'syihab');
+        $docs = $order->accurateDocs;
+
+        // 1. CEK DOWN PAYMENT (DP)
+        $dpReceiptDocs = $docs->where('doc_type', 'DP_RECEIPT')->where('status', 'SUCCESS');
+        $dpInvoiceDocs = $docs->where('doc_type', 'DP_INVOICE')->where('status', 'SUCCESS');
+        $hasDP = $dpReceiptDocs->isNotEmpty() && $dpInvoiceDocs->isNotEmpty();
+
+        if ($hasDP) {
+            // Sesuai request Akuntansi: Jangan lakukan refund otomatis via Sales Receipt minus.
+            // Biarkan DP Invoice menggantung sebagai "Uang Muka Belum Terpakai" (Unapplied DP) di Accurate.
+            // Tim Akuntansi akan mengurus pengembalian atau pengalihannya secara manual.
+            Log::info("Pembatalan SO: {$order->order_number} memiliki DP. Melewati proses Refund Otomatis.");
+        }
+
+        // 2. DELETE DOCUMENTS (Kecuali DP)
+        $orderedTypes = ['SALES_RECEIPT', 'receipt', 'SALES_INVOICE', 'invoice', 'DELIVERY_ORDER'];
+
+        // Accurate tidak mengizinkan penghapusan SALES_ORDER jika ada DP_INVOICE yang terikat.
+        // Jika tidak ada DP, kita hapus SO nya sekalian.
+        if (!$hasDP) {
+            $orderedTypes[] = 'SALES_ORDER';
+        } else {
+            // Jika ada DP (SO tidak dihapus), kita kirim request CLOSE ke SO tersebut agar tidak menggantung
+            $soDoc = $docs->where('doc_type', 'SALES_ORDER')->where('status', 'SUCCESS')->first();
+            if ($soDoc && $soDoc->doc_number) {
+                try {
+                    $this->closeSalesOrder($soDoc->doc_number, $dbSource);
+                } catch (\Exception $e) {
+                    Log::warning("Gagal menutup (Close) SO {$order->order_number} di Accurate: " . $e->getMessage());
+                }
+            }
+        }
+
+        foreach ($orderedTypes as $type) {
+            $matchedDocs = $docs->where('doc_type', $type)->where('status', 'SUCCESS');
+            foreach ($matchedDocs as $doc) {
+                if ($doc->accurate_id) {
+                    try {
+                        if (in_array($type, ['SALES_RECEIPT', 'receipt'])) {
+                            $this->deleteSalesReceipt($doc->accurate_id, $dbSource);
+                        } elseif (in_array($type, ['SALES_INVOICE', 'invoice'])) {
+                            $this->deleteSalesInvoice($doc->accurate_id, $dbSource);
+                        } elseif ($type === 'DELIVERY_ORDER') {
+                            $this->deleteDeliveryOrder($doc->accurate_id, $dbSource);
+                        } elseif ($type === 'SALES_ORDER') {
+                            $this->deleteSalesOrder($doc->accurate_id, $dbSource);
+                        }
+                    } catch (\Exception $e) {
+                        // Jika dokumen sudah dihapus di Accurate, lanjut saja
+                        if (str_contains($e->getMessage(), 'tidak ditemukan atau sudah dihapus')) {
+                            Log::warning("Rollback: Dokumen {$type} ID {$doc->accurate_id} sudah tidak ada di Accurate, skip. ({$e->getMessage()})");
+                        } else {
+                            // Error lain selain "sudah dihapus", tetap throw
+                            throw $e;
+                        }
+                    }
+                    $doc->update(['status' => 'CANCELLED']);
+                }
+            }
+        }
+    }
+
+    /**
+     * Memproses pengembalian uang muka (Refund DP) ke customer akibat pembatalan SO
+     */
+    public function refundDownPayment(\App\Models\Order $order, $dpInvoiceNo, $dbSource, $customBankNo = null, $customAmount = null)
+    {
+        $branchName = \Illuminate\Support\Facades\Auth::user()->branch->name ?? 'Cabang Utama';
+        if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
+            $branchName = 'GSK ' . $branchName;
+        }
+        $customerNo = $order->user ? $order->user->getAccurateCustomerNo($dbSource) : 'UMUM';
+
+        // 1. Jika dipanggil dari Form Refund Manual dengan akun Bank & Nominal spesifik
+        if (!empty($customBankNo) && $customAmount !== null) {
+            $refundAmount = (float)$customAmount;
+            if ($refundAmount <= 0) {
+                throw new \Exception('Nominal refund harus lebih dari 0.');
+            }
+
+            $receiptPayload = [
+                'customerNo' => $customerNo,
+                'bankNo' => $customBankNo,
+                'transDate' => now()->format('d/m/Y'),
+                'branchName' => $branchName,
+                'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
+                'useCredit' => false,
+                'description' => "Pengembalian Dana (Refund DP) Pembatalan SO: {$order->order_number}",
+                'detailInvoice' => [
+                    [
+                        'invoiceNo' => $dpInvoiceNo,
+                        'paymentAmount' => -$refundAmount
+                    ]
+                ]
+            ];
+
+            Log::info("Payload Manual Refund DP SO {$order->order_number} via Kas/Bank Pilihan: {$customBankNo}:", $receiptPayload);
+
+            $result = $this->postSalesReceipt($receiptPayload, $dbSource);
+            if (isset($result['r']['number'])) {
+                return \App\Models\OrderAccurateDoc::create([
+                    'order_id' => $order->id,
+                    'doc_type' => 'DP_REFUND',
+                    'doc_number' => $result['r']['number'],
+                    'accurate_id' => $result['r']['id'] ?? null,
+                    'amount' => -$refundAmount,
+                    'status' => 'SUCCESS',
+                ]);
+            } else {
+                $err = $result['d'][0] ?? json_encode($result);
+                throw new \Exception("Gagal mencatat Refund DP di Accurate: {$err}");
+            }
+        }
+
+        // 2. Fallback otomatis berdasarkan metode pembayaran historis (Hanya jika customBankNo tidak disediakan)
+        Log::warning("refundDownPayment SO {$order->order_number}: customBankNo kosong, beralih ke fallback akun kas/bank pembayaran historis.");
+        $payments = $order->payments()->where('status', 'PAID')->get();
+        if ($payments->isEmpty()) {
+            return;
+        }
+
+        foreach ($payments as $payment) {
+            $refundAmount = (float)$payment->amount;
+            if ($refundAmount <= 0) continue;
+
+            $pm = $payment->paymentMethod;
+            // Gunakan bank asal uang tersebut masuk (sesuai pilihan User: "Gunakan otomatis akun Bank/Kas asal pada saat DP tersebut dibayarkan")
+            $bankNo = $pm->accurate_bank_no ?? 'KAS-CASH';
+
+            $receiptPayload = [
+                'customerNo' => $customerNo,
+                'bankNo' => $bankNo,
+                'transDate' => now()->format('d/m/Y'),
+                'branchName' => $branchName,
+                'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
+                'useCredit' => false,
+                'description' => "Pengembalian Dana (Refund DP) Pembatalan SO: {$order->order_number}",
+                'detailInvoice' => [
+                    [
+                        'invoiceNo' => $dpInvoiceNo,
+                        'paymentAmount' => -$refundAmount
+                    ]
+                ]
+            ];
+
+            Log::info("Payload Refund DP (Uang Keluar) SO {$order->order_number}:", $receiptPayload);
+
+            try {
+                $result = $this->postSalesReceipt($receiptPayload, $dbSource);
+                if (isset($result['r']['number'])) {
+                    \App\Models\OrderAccurateDoc::create([
+                        'order_id' => $order->id,
+                        'doc_type' => 'DP_REFUND',
+                        'doc_number' => $result['r']['number'],
+                        'accurate_id' => $result['r']['id'] ?? null,
+                        'amount' => -$refundAmount,
+                        'status' => 'SUCCESS',
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error("Refund DP Gagal untuk SO {$order->order_number}: " . $e->getMessage());
+                // Jangan me-lempar error agar proses rollback (penghapusan DO/SI) tetap bisa berjalan
+            }
+        }
+    }
+
+    /**
+     * Memproses pengembalian uang muka (Refund DP) langsung dari model CustomerDeposit
+     */
+    public function refundCustomerDeposit(\App\Models\CustomerDeposit $deposit, $customBankNo, $customAmount, $customNotes = null)
+    {
+        $businessUnit = $deposit->businessUnit;
+        $dbSource = strtolower($businessUnit ? $businessUnit->code : 'syihab');
+
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $branchName = $user->branch->name ?? 'Cabang Utama';
+        if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
+            $branchName = 'GSK ' . $branchName;
+        }
+
+        $customerUser = $deposit->user;
+        $customerNo = $customerUser ? $customerUser->getAccurateCustomerNo($dbSource) : 'UMUM';
+
+        $refundAmount = (float)$customAmount;
+        if ($refundAmount <= 0) {
+            throw new \Exception('Nominal refund harus lebih dari 0.');
+        }
+
+        if (empty($deposit->accurate_invoice_no)) {
+            throw new \Exception('Deposit tidak memiliki nomor Faktur DP Accurate.');
+        }
+
+        $description = $customNotes ?: ("Pengembalian Dana (Refund DP) Pelanggan: " . ($customerUser->name ?? 'Umum'));
+        if ($deposit->originOrder) {
+            $description .= " (SO: {$deposit->originOrder->order_number})";
+        }
+
+        $receiptPayload = [
+            'customerNo' => $customerNo,
+            'bankNo' => $customBankNo,
+            'transDate' => now()->format('d/m/Y'),
+            'branchName' => $branchName,
+            'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
+            'useCredit' => false,
+            'description' => $description,
+            'detailInvoice' => [
+                [
+                    'invoiceNo' => $deposit->accurate_invoice_no,
+                    'paymentAmount' => -$refundAmount
+                ]
+            ]
+        ];
+
+        Log::info("Payload Refund Customer Deposit ({$dbSource}) Deposit #{$deposit->id}:", $receiptPayload);
+
+        $result = $this->postSalesReceipt($receiptPayload, $dbSource);
+        if (isset($result['r']['number'])) {
+            if ($deposit->origin_order_id) {
+                \App\Models\OrderAccurateDoc::create([
+                    'order_id' => $deposit->origin_order_id,
+                    'doc_type' => 'DP_REFUND',
+                    'doc_number' => $result['r']['number'],
+                    'accurate_id' => $result['r']['id'] ?? null,
+                    'amount' => -$refundAmount,
+                    'status' => 'SUCCESS',
+                ]);
+            }
+            return $result['r'];
+        } else {
+            $err = $result['d'][0] ?? json_encode($result);
+            throw new \Exception("Gagal mencatat Refund DP di Accurate: {$err}");
+        }
+    }
+
+    /**
+     * Memproses pencairan refund (uang keluar) untuk kasus Downgrade.
+     * Menggunakan Sales Receipt dengan nilai chequeAmount minus.
+     */
+    public function processDowngradeRefund(\App\Models\WarrantyClaim $claim, $bankNo, $refundAmount)
+    {
+        $businessUnitCode = $claim->warranty->policy?->businessUnit?->code ?? 'syihab';
+
+        // Karena warranty->orderItem sudah menunjuk ke barang pengganti (faktur baru),
+        // kita harus mencari faktur lama berdasarkan IMEI yang diretur pada klaim ini.
+        // Abaikan order retur (yang totalnya minus atau diawali RET) agar mendapatkan faktur penjualan aslinya.
+        $oldOrderItem = \App\Models\OrderItem::with(['order.payments.paymentMethod'])
+            ->where('serial_number', $claim->serial_number)
+            ->whereHas('order', function ($query) {
+                $query->where('total_amount', '>', 0);
+            })
+            ->latest()
+            ->first();
+
+        $order = $oldOrderItem ? $oldOrderItem->order : null;
+
+        $financePayment = null;
+        if ($order) {
+            $financePayment = $order->payments->first(function ($payment) {
+                return $payment->paymentMethod && !empty($payment->paymentMethod->accurate_customer_no);
+            });
+        }
+
+        // Jika ada finance payment, pakai customer no dari finance. Jika tidak, pakai milik customer
+        if ($financePayment) {
+            $customerNo = $financePayment->paymentMethod->accurate_customer_no;
+        } else {
+            $customerNo = $claim->customer ? $claim->customer->getAccurateCustomerNo($businessUnitCode) : 'UMUM';
+        }
+
+        if ($oldOrderItem && $oldOrderItem->order) {
+            $originalInvoiceNo = $oldOrderItem->order->accurate_invoice_no ?? $oldOrderItem->order->order_number ?? 'INV-UNKNOWN';
+        } else {
+            // Fallback (seharusnya tidak pernah terjadi jika data valid)
+            $fallbackOrder = $claim->warranty->orderItem->order ?? null;
+            $originalInvoiceNo = $fallbackOrder->accurate_invoice_no ?? $fallbackOrder->order_number ?? 'INV-UNKNOWN';
+        }
+
+        // Gunakan user pembuat klaim (CS/Kasir) sebagai acuan cabang
+        $actionUser = $claim->claimedBy ?? Auth::user();
+        $branchName = $actionUser?->branch?->name ?? 'Cabang Utama';
+
+        // Payload Penerimaan Penjualan (Uang Keluar)
+        $receiptPayload = [
+            'customerNo' => $customerNo,
+            'bankNo' => $bankNo,
+            'transDate' => now()->format('d/m/Y'),
+            'branchName' => $branchName,
+            'chequeAmount' => -$refundAmount, // Minus = Uang Keluar
+            'useCredit' => false,
+            'description' => "Pencairan Tunai / Refund Sisa Kelebihan Bayar atas Downgrade Klaim Garansi untuk Faktur Lama: {$originalInvoiceNo}",
+            'detailInvoice' => [
+                [
+                    'invoiceNo' => $originalInvoiceNo,
+                    'paymentAmount' => -$refundAmount // Tarik dari sisa saldo faktur
+                ]
+            ]
+        ];
+
+        Log::info("Payload Pencairan Refund (Uang Keluar):", $receiptPayload);
+
+        try {
+            $this->postSalesReceipt($receiptPayload, $businessUnitCode);
+        } catch (\Exception $e) {
+            Log::error("Pencairan Refund Gagal: " . $e->getMessage());
+            throw $e;
+        }
+
+        return true;
+    }
+
+    /**
+     * Renew Webhook Accurate Online
+     * 
+     * Endpoint: GET https://account.accurate.id/api/webhook-renew.do
+     * Memperpanjang masa aktif webhook di Accurate Online agar tidak kedaluwarsa.
+     * 
+     * @param string $databaseSource
+     * @return array
+     * @throws \Exception
+     */
+    public function renewWebhookDo($databaseSource = 'syihab')
+    {
+        $config = $this->getHeaders($databaseSource);
+        $url = 'https://account.accurate.id/api/webhook-renew.do';
+
+        $response = Http::timeout(30)->retry(2, 500)
+            ->withHeaders($config['headers'])
+            ->get($url);
+
+        Log::info("API Accurate Renew Webhook ({$databaseSource}) [{$url}]: " . $response->body());
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === false) {
+                $errorMsg = isset($data['d']) && is_array($data['d']) ? implode(', ', $data['d']) : (is_string($data['d'] ?? null) ? $data['d'] : json_encode($data));
+                throw new \Exception('API Accurate Error: ' . $errorMsg);
+            }
+            return $data ?? [];
+        } else {
+            Log::error("API Accurate Renew Webhook Error ({$databaseSource}) [{$url}]: " . $response->body());
+            throw new \Exception('API Accurate HTTP Error: ' . $response->status() . ' - ' . $response->body());
+        }
+    }
+}

@@ -193,7 +193,7 @@ class AccurateInventoryService
             foreach ($items as $item) {
                 if (!isset($item['no'])) continue;
 
-                $stock = (float)($item['availableToSell'] ?? 0);
+                $stock = (float)($item['quantity'] ?? ($item['availableToSell'] ?? 0));
                 $cost = (float)($item['balanceUnitCost'] ?? 0);
                 $price = (float)($item['unitPrice'] ?? 0);
 
@@ -302,7 +302,7 @@ class AccurateInventoryService
                     $batch = [];
                     foreach ($items as $it) {
                         $qty = (int)round((float)($it['quantity'] ?? 0));
-                        if ($qty <= 0) continue;
+                        if ($qty < 0) continue;
 
                         $itemNo = $it['no'] ?? null;
                         if (!$itemNo || !isset($products[$itemNo])) continue;
@@ -365,42 +365,36 @@ class AccurateInventoryService
         $matchedWhIds = $this->resolveMatchedWarehouseIds($branch);
         $catTargets   = $this->resolveCategoryTargets($category);
 
-        // 4. Hitung Total Nilai Fisik Mentah di Database untuk Menghitung Proporsi
+        // 4. Hitung Total Nilai Fisik Mentah di Database (Stok Fisik x HPP Accurate)
         $buTotalRawVal = (float) DB::table('product_accurates')
             ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
             ->where('stock', '>', 0)
-            ->sum(DB::raw('stock * base_cost')) ?: 1.0;
+            ->sum(DB::raw('stock * base_cost'));
 
-        // 5. Kalkulasi Breakdown Kategori (dan hitung nilai efektif jika kategori difilter)
-        $categoryBreakdown = $this->buildCategoryBreakdown($matchedWhIds, $catTargets, $databaseSource, $totalValuation, $buTotalRawVal);
+        // 5. Kalkulasi Breakdown Kategori (Murni Nilai Stok Fisik x HPP Accurate tanpa proporsional)
+        $categoryBreakdown = $this->buildCategoryBreakdown($matchedWhIds, $catTargets, $databaseSource);
 
-        // Jika user memfilter kategori, effectiveValuation adalah total dari kategori yang dipilih
-        if (!empty($catTargets)) {
-            $effectiveValuation = (float) array_sum(array_column($categoryBreakdown, 'total_valuation'));
-        } else {
-            $effectiveValuation = $totalValuation;
-        }
-
-        // 6. Kalkulasi Breakdown Cabang / Gudang (disaring berdasarkan kategori jika dipilih)
+        // 6. Kalkulasi Breakdown Cabang / Gudang (Murni Nilai Stok Fisik Gudang x HPP Accurate)
         $branchBreakdown = $this->buildBranchBreakdown(
             $allWarehousesRaw,
             $databaseSource,
-            $effectiveValuation,
             $buTotalRawVal,
             $branch,
             $catTargets
         );
 
-        // Jika user memfilter cabang, sesuaikan effectiveValuation ke total cabang terpilih
+        // Tentukan nilai total valuasi efektif berdasarkan filter aktif
         if (!empty($branch)) {
-            $branchFilteredVal = (float) array_sum(array_column($branchBreakdown, 'total_valuation'));
-            if ($branchFilteredVal > 0 || !empty($branchBreakdown)) {
-                $effectiveValuation = $branchFilteredVal;
-            }
+            $effectiveValuation = (float) array_sum(array_column($branchBreakdown, 'total_valuation'));
+        } elseif (!empty($catTargets)) {
+            $effectiveValuation = (float) array_sum(array_column($categoryBreakdown, 'total_valuation'));
+        } else {
+            $branchSum = (float) array_sum(array_column($branchBreakdown, 'total_valuation'));
+            $effectiveValuation = $branchSum > 0 ? $branchSum : $buTotalRawVal;
         }
 
-        // 7. Kalkulasi Breakdown Brand (diskalakan terhadap effectiveValuation)
-        $brandBreakdown = $this->buildBrandBreakdown($matchedWhIds, $catTargets, $databaseSource, $effectiveValuation);
+        // 7. Kalkulasi Breakdown Brand (Murni Nilai Stok x HPP Accurate)
+        $brandBreakdown = $this->buildBrandBreakdown($matchedWhIds, $catTargets, $databaseSource);
 
         // 8. Kalkulasi Top Valuasi Barang (disaring berdasarkan cabang & kategori)
         $topValuationItems = $this->buildTopValuationItems($matchedWhIds, $catTargets, $databaseSource);
@@ -554,12 +548,11 @@ class AccurateInventoryService
     }
 
     /**
-     * Bangun rincian per cabang/gudang dan lakukan rekonsiliasi proporsional terhadap GL.
+     * Bangun rincian per cabang/gudang langsung dari nilai riil stok fisik x HPP Accurate.
      */
     protected function buildBranchBreakdown(
         array $allWarehousesRaw,
         string $databaseSource,
-        float $effectiveValuation,
         float $buTotalRawVal,
         $branch = null,
         array $catTargets = []
@@ -610,9 +603,6 @@ class AccurateInventoryService
         $activeWarehousesCount = count($allWarehousesRaw);
         $branchBreakdown = [];
 
-        // Hitung total raw valuation untuk subset filter ini agar penskalaan proporsional tepat
-        $subsetTotalRawVal = (float) $whStockStats->sum('total_val') ?: 1.0;
-
         foreach ($allWarehousesRaw as $w) {
             $whCount = max(1, $w['bu_wh_count']);
             $localId = $w['local_id'] ?? null;
@@ -623,23 +613,15 @@ class AccurateInventoryService
             if ($hasRealStockData) {
                 $whUnits = $stat ? (int)$stat->total_qty : 0;
                 $whRawVal = $stat ? (float)$stat->total_val : 0;
-
-                // Skala proporsional terhadap effectiveValuation untuk subset ini
-                if ($effectiveValuation > 0 && $subsetTotalRawVal > 0) {
-                    $whVal = round(($whRawVal / $subsetTotalRawVal) * $effectiveValuation, 2);
-                } else {
-                    $whVal = round($whRawVal, 2);
-                }
+                $whVal = round($whRawVal, 2);
             } else {
-                $whVal = round($effectiveValuation / $whCount, 2);
+                $whVal = round($buTotalRawVal / $whCount, 2);
                 $whUnits = $totalUnitsInDb > 0 ? (int)round(($totalUnitsInDb / max(1, $activeWarehousesCount))) : 0;
             }
 
             $status = $this->determineWarehouseStatus((bool)$w['suspended'], $nameLower);
             $type = $this->determineWarehouseType($nameLower);
             $cleanBranchName = trim(str_ireplace(['gsk - ', 'gsk second - ', 'syihab - '], '', $w['name']));
-
-            $pct = $effectiveValuation > 0 ? round(($whVal / $effectiveValuation) * 100, 1) : 0;
 
             $branchBreakdown[] = [
                 'warehouse_name' => $w['name'],
@@ -649,7 +631,7 @@ class AccurateInventoryService
                 'total_valuation' => $whVal,
                 'total_qty' => $whUnits,
                 'average_unit_cost' => $whUnits > 0 ? round($whVal / $whUnits, 2) : 0,
-                'percentage' => $pct,
+                'percentage' => 0,
                 'status' => $status,
             ];
         }
@@ -666,6 +648,13 @@ class AccurateInventoryService
                 return false;
             }));
         }
+
+        // Hitung persentase terhadap total valuasi cabang yang tampil
+        $totalDisplayVal = (float) array_sum(array_column($branchBreakdown, 'total_valuation'));
+        foreach ($branchBreakdown as &$b) {
+            $b['percentage'] = $totalDisplayVal > 0 ? round(($b['total_valuation'] / $totalDisplayVal) * 100, 1) : 0;
+        }
+        unset($b);
 
         return $branchBreakdown;
     }
@@ -741,14 +730,12 @@ class AccurateInventoryService
     }
 
     /**
-     * Bangun rincian valuasi per kategori produk.
+     * Bangun rincian valuasi per kategori produk murni dari stok x HPP Accurate.
      */
     protected function buildCategoryBreakdown(
         array $matchedWhIds,
         array $catTargets,
-        string $databaseSource,
-        float $totalValuation,
-        float $buTotalRawVal = 1.0
+        string $databaseSource
     ): array {
         if (!empty($matchedWhIds)) {
             $catQuery = DB::table('warehouse_stocks')
@@ -802,21 +789,16 @@ class AccurateInventoryService
         foreach ($dbCats as $idx => $c) {
             $catName = $c->categoryName ?: 'Umum';
 
-            // Skala proporsional terhadap totalValuation (saldo GL) berdasarkan porsinya di database
-            $scaledVal = round(($c->total_val / $buTotalRawVal) * $totalValuation, 2);
-            $pct = $totalValuation > 0 ? round(($scaledVal / $totalValuation) * 100, 1) : 0;
-
-            // Jika sedang difilter spesifik satu kategori, persentase dalam subset adalah proporsi terhadap totalRawCatVal
-            if (!empty($catTargets)) {
-                $pct = round(($c->total_val / $totalRawCatVal) * 100, 1);
-            }
+            // Nilai mentah murni tanpa skala proporsional (Stok x HPP Accurate)
+            $catVal = round((float)$c->total_val, 2);
+            $pct = $totalRawCatVal > 0 ? round(($catVal / $totalRawCatVal) * 100, 1) : 0;
 
             $categoryBreakdown[] = [
                 'category_name' => $catName,
                 'business_unit' => $buLabel,
-                'total_valuation' => $scaledVal,
+                'total_valuation' => $catVal,
                 'total_qty' => (int)$c->total_qty,
-                'average_unit_cost' => $c->total_qty > 0 ? round($scaledVal / $c->total_qty, 2) : 0,
+                'average_unit_cost' => $c->total_qty > 0 ? round($catVal / $c->total_qty, 2) : 0,
                 'percentage' => $pct,
                 'color' => $categoryColors[$idx % count($categoryColors)],
             ];
@@ -826,13 +808,12 @@ class AccurateInventoryService
     }
 
     /**
-     * Bangun rincian valuasi per merek (Brand).
+     * Bangun rincian valuasi per merek (Brand) murni dari stok x HPP Accurate.
      */
     protected function buildBrandBreakdown(
         array $matchedWhIds,
         array $catTargets,
-        string $databaseSource,
-        float $effectiveValuation
+        string $databaseSource
     ): array {
         if (!empty($matchedWhIds)) {
             $brandQuery = DB::table('warehouse_stocks')
@@ -883,12 +864,12 @@ class AccurateInventoryService
 
         foreach ($dbBrands as $b) {
             $bName = $b->brandName ?: 'Lainnya';
-            $pct = round(($b->total_val / $totalBrandVal) * 100, 1);
-            $scaledVal = round(($b->total_val / $totalBrandVal) * $effectiveValuation, 2);
+            $brandVal = round((float)$b->total_val, 2);
+            $pct = $totalBrandVal > 0 ? round(($brandVal / $totalBrandVal) * 100, 1) : 0;
 
             $brandBreakdown[] = [
                 'brand_name' => $bName,
-                'total_valuation' => $scaledVal,
+                'total_valuation' => $brandVal,
                 'total_qty' => (int)$b->total_qty,
                 'percentage' => $pct,
             ];
