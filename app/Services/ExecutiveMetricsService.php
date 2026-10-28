@@ -1096,11 +1096,66 @@ class ExecutiveMetricsService
             ]);
         }
 
+        $accurateProjects = ProductAccurate::whereNotNull('proyek')
+            ->where('proyek', '!=', '')
+            ->select('proyek as name', 'business_unit_id')
+            ->distinct()
+            ->get();
+
+        $projectMap = [];
+        foreach ($accurateProjects as $item) {
+            $pName = strtoupper(trim($item->name));
+            if ($pName === '' || $pName === 'NON-PROYEK') {
+                continue;
+            }
+            $buId = $item->business_unit_id ? (int)$item->business_unit_id : null;
+
+            if (!isset($projectMap[$pName])) {
+                $projectMap[$pName] = [
+                    'name' => $pName,
+                    'business_unit_ids' => [],
+                    'is_global' => false,
+                ];
+            }
+
+            if ($buId === null) {
+                $projectMap[$pName]['is_global'] = true;
+            } else {
+                if (!in_array($buId, $projectMap[$pName]['business_unit_ids'], true)) {
+                    $projectMap[$pName]['business_unit_ids'][] = $buId;
+                }
+            }
+        }
+
+        $projectMap['NON-PROYEK'] = [
+            'name' => 'NON-PROYEK',
+            'business_unit_ids' => $allBuList,
+            'is_global' => true,
+        ];
+
+        $projects = collect($projectMap)->map(function ($proj) use ($allBuList) {
+            $buIds = $proj['business_unit_ids'];
+            if ($proj['is_global'] || empty($buIds)) {
+                $buIds = $allBuList;
+            }
+            sort($buIds);
+            $isAllBu = count($buIds) >= count($allBuList);
+
+            return [
+                'name' => $proj['name'],
+                'business_unit_id' => count($buIds) === 1 ? $buIds[0] : null,
+                'business_unit_ids' => $buIds,
+                'is_all_bu' => $isAllBu,
+                'bu_count' => count($buIds),
+            ];
+        })->sortBy('name')->values();
+
         return [
             'business_units' => $businessUnits,
             'branches' => $branches,
             'order_stores' => $orderStores,
             'categories' => $categories,
+            'projects' => $projects,
             'date_presets' => [
                 ['value' => 'today', 'label' => 'Hari Ini'],
                 ['value' => 'yesterday', 'label' => 'Kemarin'],

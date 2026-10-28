@@ -343,9 +343,10 @@ class AccurateInventoryService
         $branch = null,
         $category = null,
         bool $forceRefresh = false,
-        ?string $resolvedBuName = null
+        ?string $resolvedBuName = null,
+        $project = null
     ): array {
-        $filterHash = md5(json_encode([$databaseSource, $branch, $category]));
+        $filterHash = md5(json_encode([$databaseSource, $branch, $category, $project]));
         $dateKey = $asOfDate ?: now()->format('Y-m-d');
         $cacheKey = "accurate_inv_live_{$databaseSource}_{$dateKey}_{$filterHash}";
 
@@ -361,18 +362,20 @@ class AccurateInventoryService
         $businessUnits = $this->resolveBusinessUnits($databaseSource);
         [$totalValuation, $primaryAccount, $allWarehousesRaw] = $this->fetchGlAndLiveWarehouses($businessUnits, $asOfDate, $forceRefresh, $databaseSource);
 
-        // 3. Resolusi Parameter Filter (Cabang & Kategori)
+        // 3. Resolusi Parameter Filter (Cabang, Kategori & Proyek)
         $matchedWhIds = $this->resolveMatchedWarehouseIds($branch);
         $catTargets   = $this->resolveCategoryTargets($category);
+        $projTargets  = $this->resolveProjectTargets($project);
 
         // 4. Hitung Total Nilai Fisik Mentah di Database (Stok Fisik x HPP Accurate)
-        $buTotalRawVal = (float) DB::table('product_accurates')
+        $rawValQuery = DB::table('product_accurates')
             ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
-            ->where('stock', '>', 0)
-            ->sum(DB::raw('stock * base_cost'));
+            ->where('stock', '>', 0);
+        $this->applyProjectFilter($rawValQuery, $projTargets, 'proyek');
+        $buTotalRawVal = (float) $rawValQuery->sum(DB::raw('stock * base_cost'));
 
         // 5. Kalkulasi Breakdown Kategori (Murni Nilai Stok Fisik x HPP Accurate tanpa proporsional)
-        $categoryBreakdown = $this->buildCategoryBreakdown($matchedWhIds, $catTargets, $databaseSource);
+        $categoryBreakdown = $this->buildCategoryBreakdown($matchedWhIds, $catTargets, $databaseSource, $projTargets);
 
         // 6. Kalkulasi Breakdown Cabang / Gudang (Murni Nilai Stok Fisik Gudang x HPP Accurate)
         $branchBreakdown = $this->buildBranchBreakdown(
@@ -380,13 +383,14 @@ class AccurateInventoryService
             $databaseSource,
             $buTotalRawVal,
             $branch,
-            $catTargets
+            $catTargets,
+            $projTargets
         );
 
         // Tentukan nilai total valuasi efektif berdasarkan filter aktif
         if (!empty($branch)) {
             $effectiveValuation = (float) array_sum(array_column($branchBreakdown, 'total_valuation'));
-        } elseif (!empty($catTargets)) {
+        } elseif (!empty($catTargets) || !empty($projTargets)) {
             $effectiveValuation = (float) array_sum(array_column($categoryBreakdown, 'total_valuation'));
         } else {
             $branchSum = (float) array_sum(array_column($branchBreakdown, 'total_valuation'));
@@ -394,17 +398,24 @@ class AccurateInventoryService
         }
 
         // 7. Kalkulasi Breakdown Brand (Murni Nilai Stok x HPP Accurate)
-        $brandBreakdown = $this->buildBrandBreakdown($matchedWhIds, $catTargets, $databaseSource);
+        $brandBreakdown = $this->buildBrandBreakdown($matchedWhIds, $catTargets, $databaseSource, $projTargets);
 
-        // 8. Kalkulasi Top Valuasi Barang (disaring berdasarkan cabang & kategori)
-        $topValuationItems = $this->buildTopValuationItems($matchedWhIds, $catTargets, $databaseSource);
+        // 8. Kalkulasi Top Valuasi Barang (disaring berdasarkan cabang, kategori & proyek)
+        $topValuationItems = $this->buildTopValuationItems($matchedWhIds, $catTargets, $databaseSource, $projTargets);
 
         // 9. Kalkulasi Slow Moving & Total Unit Riil
-        $slowMoving = $this->calculateSlowMoving($databaseSource, $effectiveValuation, 60, $matchedWhIds, $catTargets);
+        $slowMoving = $this->calculateSlowMoving($databaseSource, $effectiveValuation, 60, $matchedWhIds, $catTargets, $projTargets);
 
-        $totalWhUnits = !empty($branchBreakdown) ? array_sum(array_column($branchBreakdown, 'total_qty')) : 0;
+        if (!empty($branch)) {
+            $totalWhUnits = !empty($branchBreakdown) ? array_sum(array_column($branchBreakdown, 'total_qty')) : 0;
+        } elseif (!empty($catTargets) || !empty($projTargets)) {
+            $totalWhUnits = !empty($categoryBreakdown) ? array_sum(array_column($categoryBreakdown, 'total_qty')) : 0;
+        } else {
+            $totalWhUnits = !empty($branchBreakdown) ? array_sum(array_column($branchBreakdown, 'total_qty')) : 0;
+        }
+
         if ($totalWhUnits <= 0 && empty($matchedWhIds)) {
-            $totalWhUnits = (int) ProductAccurate::query()
+            $unitFallbackQuery = ProductAccurate::query()
                 ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
                 ->when(!empty($catTargets), function ($q) use ($catTargets) {
                     $q->where(function ($sub) use ($catTargets) {
@@ -413,8 +424,9 @@ class AccurateInventoryService
                         }
                     });
                 })
-                ->where('stock', '>', 0)
-                ->sum('stock');
+                ->where('stock', '>', 0);
+            $this->applyProjectFilter($unitFallbackQuery, $projTargets, 'proyek');
+            $totalWhUnits = (int) $unitFallbackQuery->sum('stock');
         }
 
         $result = [
@@ -555,7 +567,8 @@ class AccurateInventoryService
         string $databaseSource,
         float $buTotalRawVal,
         $branch = null,
-        array $catTargets = []
+        array $catTargets = [],
+        array $projTargets = []
     ): array {
         $whStocksQuery = DB::table('warehouse_stocks')
             ->join('product_accurates', function ($join) {
@@ -577,6 +590,8 @@ class AccurateInventoryService
             });
         }
 
+        $this->applyProjectFilter($whStocksQuery, $projTargets, 'product_accurates.proyek');
+
         $whStockStats = $whStocksQuery->select(
             'warehouses.id as local_wh_id',
             'warehouses.name as warehouse_name',
@@ -588,7 +603,7 @@ class AccurateInventoryService
         $whStatsByLocalId = $whStockStats->keyBy('local_wh_id');
 
         $hasRealStockData = $whStockStats->isNotEmpty() && $whStockStats->sum('total_qty') > 0;
-        $totalUnitsInDb = ProductAccurate::query()
+        $totalUnitsInDbQuery = ProductAccurate::query()
             ->when($databaseSource !== 'all', fn($q) => $q->where('database_source', $databaseSource))
             ->when(!empty($catTargets), function ($q) use ($catTargets) {
                 $q->where(function ($sub) use ($catTargets) {
@@ -597,8 +612,9 @@ class AccurateInventoryService
                     }
                 });
             })
-            ->where('stock', '>', 0)
-            ->sum('stock');
+            ->where('stock', '>', 0);
+        $this->applyProjectFilter($totalUnitsInDbQuery, $projTargets, 'proyek');
+        $totalUnitsInDb = $totalUnitsInDbQuery->sum('stock');
 
         $activeWarehousesCount = count($allWarehousesRaw);
         $branchBreakdown = [];
@@ -778,12 +794,64 @@ class AccurateInventoryService
     }
 
     /**
+     * Normalisasi string/array proyek menjadi array target pencarian.
+     */
+    protected function resolveProjectTargets($project): array
+    {
+        if (empty($project)) {
+            return [];
+        }
+
+        if (is_string($project)) {
+            $projTargets = explode(',', $project);
+        } elseif (is_array($project)) {
+            $projTargets = [];
+            foreach ($project as $p) {
+                if (is_string($p) && str_contains($p, ',')) {
+                    $projTargets = array_merge($projTargets, explode(',', $p));
+                } else {
+                    $projTargets[] = (string) $p;
+                }
+            }
+        } else {
+            $projTargets = [(string) $project];
+        }
+
+        $projTargets = array_map('trim', $projTargets);
+        return array_values(array_filter($projTargets, fn($p) => $p !== '' && strtolower($p) !== 'all'));
+    }
+
+    /**
+     * Terapkan klausa filter proyek pada query builder.
+     */
+    protected function applyProjectFilter($query, array $projTargets, string $column = 'product_accurates.proyek'): void
+    {
+        if (empty($projTargets)) {
+            return;
+        }
+
+        $query->where(function ($q) use ($projTargets, $column) {
+            foreach ($projTargets as $proj) {
+                $upper = strtoupper(trim($proj));
+                if ($upper === 'NON-PROYEK' || $upper === 'TANPA PROYEK' || $upper === 'KOSONG') {
+                    $q->orWhereNull($column)
+                      ->orWhere($column, '=', '')
+                      ->orWhereRaw("LOWER({$column}) = 'non-proyek'");
+                } else {
+                    $q->orWhere($column, 'LIKE', '%' . $proj . '%');
+                }
+            }
+        });
+    }
+
+    /**
      * Bangun rincian valuasi per kategori produk murni dari stok x HPP Accurate.
      */
     protected function buildCategoryBreakdown(
         array $matchedWhIds,
         array $catTargets,
-        string $databaseSource
+        string $databaseSource,
+        array $projTargets = []
     ): array {
         if (!empty($matchedWhIds)) {
             $catQuery = DB::table('warehouse_stocks')
@@ -803,6 +871,8 @@ class AccurateInventoryService
                 });
             }
 
+            $this->applyProjectFilter($catQuery, $projTargets, 'product_accurates.proyek');
+
             $dbCats = $catQuery->select(
                 'product_accurates.categoryName',
                 DB::raw('count(*) as count'),
@@ -820,6 +890,8 @@ class AccurateInventoryService
                     }
                 });
             }
+
+            $this->applyProjectFilter($catQuery, $projTargets, 'proyek');
 
             $dbCats = $catQuery->select(
                 'categoryName',
@@ -861,7 +933,8 @@ class AccurateInventoryService
     protected function buildBrandBreakdown(
         array $matchedWhIds,
         array $catTargets,
-        string $databaseSource
+        string $databaseSource,
+        array $projTargets = []
     ): array {
         if (!empty($matchedWhIds)) {
             $brandQuery = DB::table('warehouse_stocks')
@@ -881,6 +954,8 @@ class AccurateInventoryService
                 });
             }
 
+            $this->applyProjectFilter($brandQuery, $projTargets, 'product_accurates.proyek');
+
             $dbBrands = $brandQuery->select(
                 'product_accurates.brandName',
                 DB::raw('count(*) as count'),
@@ -898,6 +973,8 @@ class AccurateInventoryService
                     }
                 });
             }
+
+            $this->applyProjectFilter($brandQuery, $projTargets, 'proyek');
 
             $dbBrands = $brandQuery->select(
                 'brandName',
@@ -929,7 +1006,7 @@ class AccurateInventoryService
     /**
      * Ambil 10 item dengan valuasi tertinggi beserta perhitungan aging dan risiko RIIL.
      */
-    protected function buildTopValuationItems(array $matchedWhIds, array $catTargets, string $databaseSource): array
+    protected function buildTopValuationItems(array $matchedWhIds, array $catTargets, string $databaseSource, array $projTargets = []): array
     {
         $hasWhStocks = DB::table('warehouse_stocks')->where('stock', '>', 0)->exists();
 
@@ -952,6 +1029,8 @@ class AccurateInventoryService
                     }
                 });
             }
+
+            $this->applyProjectFilter($topItemsQuery, $projTargets, 'product_accurates.proyek');
 
             $dbTopItems = $topItemsQuery->select([
                 'product_accurates.id as product_id',
@@ -979,6 +1058,8 @@ class AccurateInventoryService
                     }
                 });
             }
+
+            $this->applyProjectFilter($topItemsQuery, $projTargets, 'proyek');
 
             $dbTopItems = $topItemsQuery->select([
                 'id as product_id',
@@ -1055,7 +1136,8 @@ class AccurateInventoryService
         float $effectiveValuation,
         int $thresholdDays = 60,
         array $matchedWhIds = [],
-        array $catTargets = []
+        array $catTargets = [],
+        array $projTargets = []
     ): array {
         $cutoffDate = now()->subDays($thresholdDays);
 
@@ -1087,6 +1169,8 @@ class AccurateInventoryService
             });
         }
 
+        $this->applyProjectFilter($slowSnQuery, $projTargets, 'product_accurates.proyek');
+
         $slowSns = $slowSnQuery->select([
             'product_serial_numbers.serial_number',
             'product_serial_numbers.hpp',
@@ -1115,6 +1199,7 @@ class AccurateInventoryService
                     }
                 });
             });
+        $this->applyProjectFilter($slowNonSnQuery, $projTargets, 'proyek');
 
         $slowNonSnItems = $slowNonSnQuery->get();
         $slowNonSnQty = $slowNonSnItems->sum('stock');

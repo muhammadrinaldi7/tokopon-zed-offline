@@ -45,6 +45,7 @@ class ExecutiveInventoryController extends Controller
 
             $branch = $request->input('branch');
             $category = $request->input('category');
+            $project = $request->input('project', $request->input('projects'));
 
             $data = $this->inventoryService->getInventoryValuation(
                 $source,
@@ -52,7 +53,8 @@ class ExecutiveInventoryController extends Controller
                 $branch,
                 $category,
                 $forceRefresh,
-                $buName
+                $buName,
+                $project
             );
 
             return response()->json([
@@ -87,6 +89,7 @@ class ExecutiveInventoryController extends Controller
             $asOfDate = $request->input('as_of_date') ?: null;
             $branch = $request->input('branch');
             $category = $request->input('category');
+            $project = $request->input('project', $request->input('projects'));
 
             $data = $this->inventoryService->getInventoryValuation(
                 $source,
@@ -94,7 +97,8 @@ class ExecutiveInventoryController extends Controller
                 $branch,
                 $category,
                 true,
-                $buName
+                $buName,
+                $project
             );
 
             return response()->json([
