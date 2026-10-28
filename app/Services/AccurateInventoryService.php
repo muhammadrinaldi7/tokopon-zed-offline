@@ -638,7 +638,22 @@ class AccurateInventoryService
 
         // Terapkan filter cabang jika dipilih
         if (!empty($branch)) {
-            $targets = is_array($branch) ? array_map('strtolower', $branch) : [strtolower(trim($branch))];
+            if (is_string($branch)) {
+                $targets = explode(',', $branch);
+            } elseif (is_array($branch)) {
+                $targets = [];
+                foreach ($branch as $b) {
+                    if (is_string($b) && str_contains($b, ',')) {
+                        $targets = array_merge($targets, explode(',', $b));
+                    } else {
+                        $targets[] = (string) $b;
+                    }
+                }
+            } else {
+                $targets = [(string) $branch];
+            }
+            $targets = array_values(array_filter(array_map('strtolower', array_map('trim', $targets)), fn($t) => $t !== '' && $t !== 'all'));
+
             $branchBreakdown = array_values(array_filter($branchBreakdown, function ($b) use ($targets) {
                 $wh = strtolower($b['warehouse_name']);
                 $br = strtolower($b['branch_name']);
@@ -702,7 +717,25 @@ class AccurateInventoryService
             return [];
         }
 
-        $targets = is_array($branch) ? array_map('strtolower', $branch) : [strtolower(trim($branch))];
+        if (is_string($branch)) {
+            $targets = explode(',', $branch);
+        } elseif (is_array($branch)) {
+            $targets = [];
+            foreach ($branch as $b) {
+                if (is_string($b) && str_contains($b, ',')) {
+                    $targets = array_merge($targets, explode(',', $b));
+                } else {
+                    $targets[] = (string) $b;
+                }
+            }
+        } else {
+            $targets = [(string) $branch];
+        }
+
+        $targets = array_values(array_filter(array_map('strtolower', array_map('trim', $targets)), fn($t) => $t !== '' && $t !== 'all'));
+        if (empty($targets)) {
+            return [];
+        }
 
         return Warehouse::all()->filter(function ($w) use ($targets) {
             $wName = strtolower($w->name);
@@ -725,8 +758,23 @@ class AccurateInventoryService
             return [];
         }
 
-        $catTargets = is_array($category) ? array_map('trim', $category) : [trim($category)];
-        return array_values(array_filter($catTargets, fn($c) => $c !== ''));
+        if (is_string($category)) {
+            $catTargets = explode(',', $category);
+        } elseif (is_array($category)) {
+            $catTargets = [];
+            foreach ($category as $c) {
+                if (is_string($c) && str_contains($c, ',')) {
+                    $catTargets = array_merge($catTargets, explode(',', $c));
+                } else {
+                    $catTargets[] = (string) $c;
+                }
+            }
+        } else {
+            $catTargets = [(string) $category];
+        }
+
+        $catTargets = array_map('trim', $catTargets);
+        return array_values(array_filter($catTargets, fn($c) => $c !== '' && strtolower($c) !== 'all'));
     }
 
     /**
