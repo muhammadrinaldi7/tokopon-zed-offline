@@ -114,6 +114,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
     const titleFlashingTimerRef = useRef(null);
     const seenMessageIdsRef = useRef(new Set());
     const lastPolledIdRef = useRef(0);
+    const lastChimeTimeRef = useRef(0);
 
     const initAudioContext = () => {
         try {
@@ -165,9 +166,15 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
         }
     };
 
-    // Mainkan audio lonceng saat ada pesan baru
+    // Mainkan audio lonceng saat ada pesan baru (dengan proteksi debounce 600ms)
     const playChime = () => {
         if (!soundEnabled) return;
+        const now = Date.now();
+        if (now - lastChimeTimeRef.current < 600) {
+            return;
+        }
+        lastChimeTimeRef.current = now;
+
         try {
             const audio = document.getElementById('global-chat-chime');
             if (audio) {
@@ -309,25 +316,42 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
     // Eksekusi notifikasi gabungan (Sound + Desktop Popup Windows + In-App Toast + Title Flash)
     const handleIncomingCustomerMessage = (payload) => {
         if (!payload) return;
-        const msgId = payload.id;
-        if (msgId && seenMessageIdsRef.current.has(msgId)) {
-            return;
-        }
-        if (msgId) {
-            seenMessageIdsRef.current.add(msgId);
-        }
 
+        const msgId = payload.id;
+        const convId = payload.conversationId || 0;
         const senderName = typeof payload.user === 'object' && payload.user !== null
             ? (payload.user.name || 'Pelanggan')
             : (payload.user || payload.sender || 'Pelanggan');
+        const messageText = (payload.message || payload.text || 'Mengirim pesan baru...').trim();
 
-        const messageText = payload.message || payload.text || 'Mengirim pesan baru...';
+        // 1. Kunci deduplikasi ganda: ID numerik database DAN signature isi pesan
+        const dedupKeys = [];
+        if (msgId) {
+            dedupKeys.push(`id-${msgId}`);
+        }
+        if (convId && messageText) {
+            dedupKeys.push(`sig-${convId}-${messageText}`);
+        }
 
-        // 1. Putar suara lonceng
+        // Jika salah satu kunci sudah pernah dibunyikan/ditampilkan, abaikan duplikat
+        const isDuplicate = dedupKeys.some((k) => seenMessageIdsRef.current.has(k));
+        if (isDuplicate) {
+            return;
+        }
+
+        // Tandai kunci-kunci pesan ini sudah terlihat
+        dedupKeys.forEach((k) => seenMessageIdsRef.current.add(k));
+
+        // Naikkan watermark ID agar background polling tidak memproses ulang pesan ini
+        if (msgId && msgId > lastPolledIdRef.current) {
+            lastPolledIdRef.current = msgId;
+        }
+
+        // 1. Putar suara lonceng (terlindung debounce 600ms)
         playChime();
 
         // 2. Munculkan popup Windows native (seperti WA Web)
-        triggerDesktopNotification(senderName, messageText, payload.conversationId);
+        triggerDesktopNotification(senderName, messageText, convId);
 
         // 3. Kedipkan tab browser jika sedang di background
         startFlashingTitle(senderName);
@@ -345,6 +369,8 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                 new CustomEvent('tokopon:incoming-message', {
                     detail: {
                         ...payload,
+                        id: msgId,
+                        conversationId: convId,
                         sender: senderName,
                         user: senderName,
                         message: messageText,
@@ -366,12 +392,11 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
             }
         };
 
+        // MessageSent disiarkan dengan alias 'message.sent'
         channel.listen('.message.sent', handleMessage);
-        channel.listen('MessageSent', handleMessage);
 
         return () => {
             channel.stopListening('.message.sent', handleMessage);
-            channel.stopListening('MessageSent', handleMessage);
         };
     }, [soundEnabled, desktopNotifStatus]);
 

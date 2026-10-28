@@ -352,7 +352,8 @@ class ChatController extends Controller
                 time: now()->format('H:i'),
                 userId: $user?->id ?: 0,
                 conversationId: $conversation->id,
-                senderType: $senderType
+                senderType: $senderType,
+                id: (int) $message->id
             ))->toOthers();
         } catch (\Throwable $e) {
             // broadcast fallback silently

@@ -144,15 +144,11 @@ export default function CsChatIndex({
         };
 
         channel.listen('.message.sent', handleNewMessage);
-        channel.listen('MessageSent', handleNewMessage);
         channel.listen('.message.read', handleReadReceipt);
-        channel.listen('MessageRead', handleReadReceipt);
 
         return () => {
             channel.stopListening('.message.sent', handleNewMessage);
-            channel.stopListening('MessageSent', handleNewMessage);
             channel.stopListening('.message.read', handleReadReceipt);
-            channel.stopListening('MessageRead', handleReadReceipt);
             window.Echo.leave(`conversation.${activeConv.id}`);
         };
     }, [activeConv?.id]);

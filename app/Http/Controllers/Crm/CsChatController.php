@@ -504,7 +504,8 @@ class CsChatController extends Controller
                 time: now()->format('H:i'),
                 userId: $user->id,
                 conversationId: $conversationId,
-                senderType: 'cs'
+                senderType: 'cs',
+                id: (int) $message->id
             ))->toOthers();
         } catch (\Throwable $e) {}
 

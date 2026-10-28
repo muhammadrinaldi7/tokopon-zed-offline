@@ -512,7 +512,8 @@ class CsChat extends Component
                 time: now()->format('H:i'),
                 userId: $user->id,
                 conversationId: $this->activeConversationId,
-                senderType: 'cs'
+                senderType: 'cs',
+                id: (int) $createdMsg->id
             ))->toOthers();
         } catch (\Throwable $e) {
             // broadcast fallback silently

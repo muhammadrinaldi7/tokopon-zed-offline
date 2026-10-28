@@ -19,15 +19,24 @@ class MessageSent implements ShouldBroadcastNow
     public int $userId;
     public int $conversationId;
     public string $senderType;
+    public ?int $id;
 
-    public function __construct(string $user, string $message, string $time, int $userId, int $conversationId, string $senderType = 'customer')
-    {
+    public function __construct(
+        string $user,
+        string $message,
+        string $time,
+        int $userId,
+        int $conversationId,
+        string $senderType = 'customer',
+        ?int $id = null
+    ) {
         $this->user = $user;
         $this->message = $message;
         $this->time = $time;
         $this->userId = $userId;
         $this->conversationId = $conversationId;
         $this->senderType = $senderType;
+        $this->id = $id;
     }
 
     public function broadcastOn(): array
@@ -46,6 +55,7 @@ class MessageSent implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
+            'id' => $this->id,
             'user' => $this->user,
             'message' => $this->message,
             'time' => $this->time,
