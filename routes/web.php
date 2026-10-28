@@ -155,6 +155,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/loyalty/settings', [\App\Http\Controllers\Crm\LoyaltyController::class, 'saveSettings'])->name('loyalty.settings');
         Route::post('/loyalty/sync', [\App\Http\Controllers\Crm\LoyaltyController::class, 'syncUsers'])->name('loyalty.sync');
 
+        // ─── Sub-Modul: Referral & Komisi Afiliasi ───
+        Route::get('/referral', [\App\Http\Controllers\Crm\ReferralController::class, 'index'])->name('referral');
+        Route::post('/referral/settings', [\App\Http\Controllers\Crm\ReferralController::class, 'saveSettings'])->name('referral.settings');
+        Route::post('/referral/withdrawals/{withdrawal}/approve', [\App\Http\Controllers\Crm\ReferralController::class, 'approveWithdrawal'])->name('referral.withdrawals.approve');
+        Route::post('/referral/withdrawals/{withdrawal}/reject', [\App\Http\Controllers\Crm\ReferralController::class, 'rejectWithdrawal'])->name('referral.withdrawals.reject');
+        Route::post('/referral/release-holds', [\App\Http\Controllers\Crm\ReferralController::class, 'releaseHolds'])->name('referral.release-holds');
+
         // ─── Sub-Modul: Rekening Bank Toko ───
         Route::get('/payments', [\App\Http\Controllers\Crm\PaymentMethodController::class, 'index'])->name('payments');
         Route::post('/payments', [\App\Http\Controllers\Crm\PaymentMethodController::class, 'store'])->name('payments.store');
@@ -167,6 +174,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/settings', [\App\Http\Controllers\Crm\EcommerceSettingsController::class, 'index'])->name('settings');
         Route::post('/settings/global', [\App\Http\Controllers\Crm\EcommerceSettingsController::class, 'saveGlobalSettings'])->name('settings.global');
         Route::post('/settings/business-unit', [\App\Http\Controllers\Crm\EcommerceSettingsController::class, 'saveBusinessUnitSettings'])->name('settings.business-unit');
+        Route::post('/settings/referral', [\App\Http\Controllers\Crm\EcommerceSettingsController::class, 'saveReferralSettings'])->name('settings.referral');
     });
 
     // Reporting

@@ -50,12 +50,31 @@ class EcommerceSettingsController extends Controller
                     'instant_payment' => filter_var($settingService->get('ecommerce_instant_payment', false), FILTER_VALIDATE_BOOLEAN),
                     'cs_phone' => (string) $settingService->get('ecommerce_cs_phone', '081298765432'),
                 ];
+
+                $referralSettings = [
+                    'referral_is_active' => filter_var($settingService->get('referral_is_active', true), FILTER_VALIDATE_BOOLEAN),
+                    'referral_commission_type' => strtoupper((string) $settingService->get('referral_commission_type', 'PERCENTAGE')),
+                    'referral_commission_rate' => (float) $settingService->get('referral_commission_rate', 1.0),
+                    'referral_reward_scope' => strtoupper((string) $settingService->get('referral_reward_scope', 'FIRST_ORDER_ONLY')),
+                    'referral_max_commission_cap' => (float) $settingService->get('referral_max_commission_cap', 100000),
+                    'referral_hold_days' => (int) $settingService->get('referral_hold_days', 7),
+                    'referral_min_withdrawal' => (float) $settingService->get('referral_min_withdrawal', 50000),
+                ];
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Settings: Failed to load global settings: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Log::warning('Settings: Failed to load global/referral settings: ' . $e->getMessage());
                 $globalSettings = [
                     'dynamic_shipping' => false,
                     'instant_payment' => false,
                     'cs_phone' => '081298765432',
+                ];
+                $referralSettings = [
+                    'referral_is_active' => true,
+                    'referral_commission_type' => 'PERCENTAGE',
+                    'referral_commission_rate' => 1.0,
+                    'referral_reward_scope' => 'FIRST_ORDER_ONLY',
+                    'referral_max_commission_cap' => 100000,
+                    'referral_hold_days' => 7,
+                    'referral_min_withdrawal' => 50000,
                 ];
             }
 
@@ -200,6 +219,7 @@ class EcommerceSettingsController extends Controller
 
             return Inertia::render('Settings/Index', [
                 'globalSettings' => $globalSettings,
+                'referralSettings' => $referralSettings,
                 'selectedBuId' => $selectedBuId ? (int) $selectedBuId : null,
                 'buSettings' => [
                     'online_warehouse_id' => $onlineWarehouseId,
@@ -222,6 +242,15 @@ class EcommerceSettingsController extends Controller
                     'dynamic_shipping' => false,
                     'instant_payment' => false,
                     'cs_phone' => '081298765432',
+                ],
+                'referralSettings' => [
+                    'referral_is_active' => true,
+                    'referral_commission_type' => 'PERCENTAGE',
+                    'referral_commission_rate' => 1.0,
+                    'referral_reward_scope' => 'FIRST_ORDER_ONLY',
+                    'referral_max_commission_cap' => 100000,
+                    'referral_hold_days' => 7,
+                    'referral_min_withdrawal' => 50000,
                 ],
                 'selectedBuId' => null,
                 'buSettings' => [
@@ -289,5 +318,31 @@ class EcommerceSettingsController extends Controller
         $settingService->set("ecommerce_brands_{$buId}", json_encode($validated['active_brands'] ?? []));
 
         return redirect()->back()->with('success', 'Pengaturan unit bisnis toko berhasil disimpan.');
+    }
+
+    /**
+     * Simpan pengaturan Program Referral & Komisi dari halaman Pengaturan App
+     */
+    public function saveReferralSettings(Request $request, SettingService $settingService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'referral_is_active' => 'boolean',
+            'referral_commission_type' => 'required|in:PERCENTAGE,FIXED',
+            'referral_commission_rate' => 'required|numeric|min:0.01',
+            'referral_reward_scope' => 'required|in:FIRST_ORDER_ONLY,ALL_ORDERS',
+            'referral_max_commission_cap' => 'required|numeric|min:0',
+            'referral_hold_days' => 'required|integer|min:0|max:90',
+            'referral_min_withdrawal' => 'required|numeric|min:10000',
+        ]);
+
+        $settingService->set('referral_is_active', $validated['referral_is_active'] ? '1' : '0');
+        $settingService->set('referral_commission_type', $validated['referral_commission_type']);
+        $settingService->set('referral_commission_rate', (string) $validated['referral_commission_rate']);
+        $settingService->set('referral_reward_scope', $validated['referral_reward_scope']);
+        $settingService->set('referral_max_commission_cap', (string) $validated['referral_max_commission_cap']);
+        $settingService->set('referral_hold_days', (string) $validated['referral_hold_days']);
+        $settingService->set('referral_min_withdrawal', (string) $validated['referral_min_withdrawal']);
+
+        return redirect()->back()->with('success', 'Pengaturan program referral & komisi berhasil disimpan.');
     }
 }

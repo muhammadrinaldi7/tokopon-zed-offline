@@ -19,7 +19,9 @@ import {
     Info,
     Store,
     Wifi,
-    UserCheck
+    UserCheck,
+    Users,
+    Share2
 } from 'lucide-react';
 
 export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Suite' }) {
@@ -32,7 +34,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
     const [toast, setToast] = useState(null);
     const audioRef = useRef(null);
 
-    // Navigasi Terpadu 9 Sub-Modul
+    // Navigasi Terpadu 10 Sub-Modul
     const navItems = [
         {
             label: 'Live Chat CS',
@@ -82,6 +84,13 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
             icon: Crown,
             badge: null,
             color: 'yellow'
+        },
+        {
+            label: 'Referral & Komisi',
+            href: '/crm/referral',
+            icon: Users,
+            badge: null,
+            color: 'emerald'
         },
         {
             label: 'Rekening Bank',
@@ -474,7 +483,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                         <button
                             type="button"
                             onClick={requestDesktopNotificationPermission}
-                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs ${
+                            className={`px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs shrink-0 ${
                                 desktopNotifStatus === 'granted'
                                     ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
                                     : desktopNotifStatus === 'denied'
@@ -490,12 +499,12 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                             }
                         >
                             <Bell className={`w-3.5 h-3.5 ${desktopNotifStatus === 'granted' ? 'text-emerald-600' : ''}`} />
-                            <span className="text-[11px]">
+                            <span className="text-[11px] hidden sm:inline">
                                 {desktopNotifStatus === 'granted'
                                     ? 'Notif Desktop: Aktif'
                                     : desktopNotifStatus === 'denied'
                                     ? 'Notif Diblokir'
-                                    : 'Izinkan Notif Desktop'}
+                                    : 'Izinkan Notif'}
                             </span>
                         </button>
 
@@ -506,7 +515,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                                 setSoundEnabled(!soundEnabled);
                                 if (!soundEnabled) playChime();
                             }}
-                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs ${
+                            className={`px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs shrink-0 ${
                                 soundEnabled
                                     ? 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                                     : 'bg-rose-50 border-rose-200 text-rose-600'
@@ -516,12 +525,12 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                             {soundEnabled ? (
                                 <>
                                     <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
-                                    <span className="text-[11px]">Suara: Aktif</span>
+                                    <span className="text-[11px] hidden sm:inline">Suara: Aktif</span>
                                 </>
                             ) : (
                                 <>
                                     <VolumeX className="w-3.5 h-3.5 text-rose-500" />
-                                    <span className="text-[11px]">Mute</span>
+                                    <span className="text-[11px] hidden sm:inline">Mute</span>
                                 </>
                             )}
                         </button>
