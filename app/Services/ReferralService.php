@@ -208,15 +208,31 @@ class ReferralService
                     'domisili' => $payload['address'] ?? $existingProfile->domisili,
                 ]);
 
-                // Pastikan role customer aktif
-                if (method_exists($existingUser, 'hasRole') && !$existingUser->hasRole('customer')) {
-                    $existingUser->assignRole('customer');
+                // Pastikan role user aktif jika tabel roles tersedia
+                try {
+                    $defaultRole = \Spatie\Permission\Models\Role::where('name', 'user')->exists() ? 'user' : (\Spatie\Permission\Models\Role::where('name', 'customer')->exists() ? 'customer' : null);
+                    if ($defaultRole && method_exists($existingUser, 'assignRole') && !$existingUser->hasRole($defaultRole)) {
+                        $existingUser->assignRole($defaultRole);
+                    }
+                } catch (\Throwable $e) {
+                    // Abaikan jika Spatie roles belum disinkronkan
                 }
 
                 // Terbitkan kode referral untuk akun ini
                 $this->getOrCreateReferralCode($existingUser);
 
                 Log::info("Akun member POS #{$existingUser->id} ({$cleanPhone}) berhasil diklaim & diaktivasi di Tokopon Mobile.");
+
+                if (!empty($updateData['referred_by_id'])) {
+                    $refUser = User::find($updateData['referred_by_id']);
+                    if ($refUser) {
+                        try {
+                            app(ReferralNotificationService::class)->notifyFriendJoined($refUser, $existingUser);
+                        } catch (\Throwable $e) {
+                            Log::warning("Gagal kirim notifikasi teman bergabung: " . $e->getMessage());
+                        }
+                    }
+                }
 
                 return $existingUser;
             }
@@ -260,12 +276,28 @@ class ReferralService
                 Log::warning("Gagal membuat loyalty account saat registrasi: " . $e->getMessage());
             }
 
-            if (method_exists($newUser, 'assignRole')) {
-                $newUser->assignRole('customer');
+            try {
+                $defaultRole = \Spatie\Permission\Models\Role::where('name', 'user')->exists() ? 'user' : (\Spatie\Permission\Models\Role::where('name', 'customer')->exists() ? 'customer' : null);
+                if ($defaultRole && method_exists($newUser, 'assignRole')) {
+                    $newUser->assignRole($defaultRole);
+                }
+            } catch (\Throwable $e) {
+                // Abaikan jika Spatie roles belum disinkronkan
             }
 
             // Terbitkan kode referral untuk akun baru
             $this->getOrCreateReferralCode($newUser);
+
+            if (!empty($newUser->referred_by_id)) {
+                $refUser = User::find($newUser->referred_by_id);
+                if ($refUser) {
+                    try {
+                        app(ReferralNotificationService::class)->notifyFriendJoined($refUser, $newUser);
+                    } catch (\Throwable $e) {
+                        Log::warning("Gagal kirim notifikasi teman bergabung: " . $e->getMessage());
+                    }
+                }
+            }
 
             return $newUser;
         });
@@ -345,6 +377,14 @@ class ReferralService
             UserReferralCode::where('code', $referrerUser->referral_code)->increment('total_converted_orders');
         }
 
+        if ($referrerUser) {
+            try {
+                app(ReferralNotificationService::class)->notifyCommissionEarned($referrerUser, $commission);
+            } catch (\Throwable $e) {
+                Log::warning("Gagal kirim notifikasi komisi referral: " . $e->getMessage());
+            }
+        }
+
         return $commission;
     }
 
@@ -356,12 +396,16 @@ class ReferralService
         $status = strtoupper((string) $order->order_status);
 
         if ($status === 'CANCELLED') {
-            ReferralCommission::where('order_id', $order->id)
+            $commissions = ReferralCommission::where('order_id', $order->id)
                 ->where('status', '!=', 'PAID')
-                ->update([
+                ->get();
+
+            foreach ($commissions as $comm) {
+                $comm->update([
                     'status' => 'VOID',
-                    'notes' => DB::raw("CONCAT(COALESCE(notes, ''), ' [Dibatalkan karena pesanan dibatalkan]')"),
+                    'notes' => trim(($comm->notes ?? '') . ' [Dibatalkan karena pesanan dibatalkan]'),
                 ]);
+            }
         } elseif (in_array($status, ['COMPLETED', 'PAID'], true)) {
             // Pastikan hold_until terisi
             $holdDays = (int) $this->settingService->get('referral_hold_days', 7);
@@ -474,6 +518,98 @@ class ReferralService
                 'status' => 'PENDING',
                 'notes' => "Permohonan penarikan komisi ke {$bankAccount->bank_name} - {$bankAccount->account_number}",
             ]);
+        });
+    }
+
+    /**
+     * Lepaskan komisi yang telah melewati batas hold_until H+7 menjadi APPROVED.
+     */
+    public function releaseMaturedCommissions(): int
+    {
+        $matured = ReferralCommission::where('status', 'PENDING')
+            ->whereNotNull('hold_until')
+            ->where('hold_until', '<=', now())
+            ->whereHas('order', function ($q) {
+                $q->whereNotIn('order_status', ['CANCELLED', 'REFUNDED']);
+            })
+            ->get();
+
+        if ($matured->isEmpty()) {
+            return 0;
+        }
+
+        $count = ReferralCommission::whereIn('id', $matured->pluck('id'))
+            ->update([
+                'status' => 'APPROVED',
+            ]);
+
+        // Kirim notifikasi ke masing-masing pengundang
+        $grouped = $matured->groupBy('referrer_id');
+        foreach ($grouped as $referrerId => $items) {
+            $referrer = User::find($referrerId);
+            if ($referrer) {
+                try {
+                    $totalAmount = (float) $items->sum('commission_amount');
+                    app(ReferralNotificationService::class)->notifyCommissionMatured($referrer, $totalAmount);
+                } catch (\Throwable $e) {
+                    Log::warning("Gagal kirim notifikasi komisi matured: " . $e->getMessage());
+                }
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * Setujui pengajuan penarikan dana komisi oleh tim finance.
+     */
+    public function approveWithdrawal(CommissionWithdrawal $withdrawal, ?string $proofAttachmentUrl = null, ?string $notes = null, ?int $handledByUserId = null): CommissionWithdrawal
+    {
+        if ($withdrawal->status !== 'PENDING') {
+            throw new Exception("Hanya pengajuan dengan status PENDING yang dapat disetujui.");
+        }
+
+        return DB::transaction(function () use ($withdrawal, $proofAttachmentUrl, $notes, $handledByUserId) {
+            $withdrawal->update([
+                'status' => 'TRANSFERRED',
+                'proof_attachment_url' => $proofAttachmentUrl ?? $withdrawal->proof_attachment_url,
+                'notes' => $notes ? ($withdrawal->notes . ' | ' . $notes) : $withdrawal->notes,
+                'handled_by' => $handledByUserId,
+            ]);
+
+            try {
+                app(ReferralNotificationService::class)->notifyWithdrawalTransferred($withdrawal);
+            } catch (\Throwable $e) {
+                Log::warning("Gagal kirim notifikasi penarikan disetujui: " . $e->getMessage());
+            }
+
+            return $withdrawal;
+        });
+    }
+
+    /**
+     * Tolak pengajuan penarikan dana komisi oleh tim finance.
+     */
+    public function rejectWithdrawal(CommissionWithdrawal $withdrawal, string $reason, ?int $handledByUserId = null): CommissionWithdrawal
+    {
+        if ($withdrawal->status !== 'PENDING') {
+            throw new Exception("Hanya pengajuan dengan status PENDING yang dapat ditolak.");
+        }
+
+        return DB::transaction(function () use ($withdrawal, $reason, $handledByUserId) {
+            $withdrawal->update([
+                'status' => 'REJECTED',
+                'notes' => $withdrawal->notes . " | Ditolak: {$reason}",
+                'handled_by' => $handledByUserId,
+            ]);
+
+            try {
+                app(ReferralNotificationService::class)->notifyWithdrawalRejected($withdrawal, $reason);
+            } catch (\Throwable $e) {
+                Log::warning("Gagal kirim notifikasi penarikan ditolak: " . $e->getMessage());
+            }
+
+            return $withdrawal;
         });
     }
 }

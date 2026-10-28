@@ -99,6 +99,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/closing-analytics', \App\Livewire\Zoffline\Ecommerce\ClosingAnalytics::class)->name('closing-analytics');
         Route::get('/payment-methods', \App\Livewire\Zoffline\Ecommerce\PaymentMethodManager::class)->name('payment-methods');
         Route::get('/loyalty', \App\Livewire\Zoffline\Ecommerce\LoyaltyManager::class)->name('loyalty');
+        Route::get('/referral', \App\Livewire\Zoffline\Ecommerce\ReferralManager::class)->name('referral');
         Route::get('/vouchers', \App\Livewire\Zoffline\Ecommerce\VoucherManager::class)->name('vouchers');
         Route::get('/settings', \App\Livewire\Zoffline\Ecommerce\EcommerceSettings::class)->name('settings');
     });
