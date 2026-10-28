@@ -41,7 +41,7 @@ class ProductAccurate extends Model implements HasMedia
 
     public function product()
     {
-        return $this->belongsTo(Product::class, 'product_id', 'id');
+        return $this->hasOneThrough(Product::class, ProductVariant::class, 'product_accurate_id', 'id', 'id', 'product_id');
     }
 
     public function productVariants()

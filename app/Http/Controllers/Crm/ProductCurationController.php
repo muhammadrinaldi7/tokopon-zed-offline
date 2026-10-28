@@ -116,6 +116,12 @@ class ProductCurationController extends Controller
                     $imageUrl = $first->getFirstMediaUrl('variant_image');
                     $hasCover = true;
                 }
+            } elseif ($prod->secondProductVariants && $prod->secondProductVariants->isNotEmpty()) {
+                $firstSec = $prod->secondProductVariants->first();
+                if ($firstSec && $firstSec->hasMedia('variant_image')) {
+                    $imageUrl = $firstSec->getFirstMediaUrl('variant_image');
+                    $hasCover = true;
+                }
             }
 
             $gallery = [];
