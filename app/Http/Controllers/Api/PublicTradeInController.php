@@ -34,6 +34,8 @@ class PublicTradeInController extends Controller
             $query->where('business_unit_id', 1)
                 ->where('categoryName', 'like', '%Handphone%')
                 ->where('base_price', '>', 0);
+
+            $this->applyAllowedProyeksFilter($query, $this->resolveAllowedProyeks('tradein_target_new_allowed_proyeks'));
         } elseif ($type === 'second') {
             // HP Second: BU 2 (GSK Second) & Kategori HP SECOND & Khusus APPLE
             $query->where('business_unit_id', 2)
@@ -41,12 +43,14 @@ class PublicTradeInController extends Controller
                 ->whereRaw('UPPER(brandName) = ?', ['APPLE']);
 
             $this->applySecondSellPriceFilter($query, $secondPriceSource);
+            $this->applyAllowedProyeksFilter($query, $this->resolveAllowedProyeks('tradein_target_second_allowed_proyeks'));
         } elseif ($type === 'old') {
             $oldBuIds = $this->resolveOldBusinessUnitIds($request);
             $oldPriceSource = (string) $this->settingService->get('tradein_old_price_source', 'buy_fallback');
 
             $query->whereIn('business_unit_id', $oldBuIds);
             $this->applyOldBuyPriceFilter($query, $oldPriceSource);
+            $this->applyAllowedProyeksFilter($query, $this->resolveAllowedProyeks('tradein_old_allowed_proyeks'));
 
             $query->where(function ($q) {
                 $q->where('categoryName', 'like', '%Handphone%')
@@ -94,6 +98,7 @@ class PublicTradeInController extends Controller
 
         $oldBuIds = $this->resolveOldBusinessUnitIds($request);
         $oldPriceSource = (string) $this->settingService->get('tradein_old_price_source', 'buy_fallback');
+        $allowedProyeks = $this->resolveAllowedProyeks('tradein_old_allowed_proyeks');
         $priceStrategy = (string) $this->settingService->get('tradein_old_price_strategy', 'min');
         $excludeAccessories = (bool) $this->settingService->get('tradein_exclude_accessories', true);
 
@@ -106,11 +111,10 @@ class PublicTradeInController extends Controller
             })
             ->when($brand, function ($q) use ($brand) {
                 $q->where('brandName', $brand);
-            })
-            ->when($proyek, function ($q) use ($proyek) {
-                $q->where('proyek', $proyek);
             });
 
+        $this->applyAllowedProyeksFilter($query, $allowedProyeks);
+        $this->applySingleProyekQueryFilter($query, $proyek);
         $this->applyOldBuyPriceFilter($query, $oldPriceSource);
         $this->applyExcludeAccessories($query, $excludeAccessories);
         $query = $this->applySmartSearch($query, $search);
@@ -181,7 +185,7 @@ class PublicTradeInController extends Controller
                         'storage' => $attrs['storage'],
                         'brand' => $rep->brandName,
                         'category' => $rep->categoryName,
-                        'proyek' => $rep->proyek ?? 'NON-PROYEK',
+                        'proyek' => $attrs['proyek'],
                         'is_second' => $isSecond,
                         'condition_label' => $isSecond ? 'HP Second (2ND)' : 'Reguler',
                         'variant_count' => $group->count(),
@@ -212,7 +216,7 @@ class PublicTradeInController extends Controller
                     'storage' => $attrs['storage'],
                     'brand' => $device->brandName,
                     'category' => $device->categoryName,
-                    'proyek' => $device->proyek ?? 'NON-PROYEK',
+                    'proyek' => $attrs['proyek'],
                     'is_second' => $isSecond,
                     'condition_label' => $isSecond ? 'HP Second (2ND)' : 'Reguler',
                     'variant_count' => 1,
@@ -227,6 +231,7 @@ class PublicTradeInController extends Controller
             'status' => 'success',
             'grouped' => $isGrouped,
             'business_unit_ids' => $oldBuIds,
+            'allowed_proyeks' => $allowedProyeks,
             'price_source_mode' => $oldPriceSource,
             'total' => $devices->count(),
             'data' => $devices,
@@ -251,6 +256,11 @@ class PublicTradeInController extends Controller
             : (bool) $this->settingService->get('tradein_group_target_devices', true);
 
         $secondPriceSource = (string) $this->settingService->get('tradein_second_price_source', 'custom_fallback');
+        $allowedProyeks = $this->resolveAllowedProyeks(
+            $targetType === 'second'
+                ? 'tradein_target_second_allowed_proyeks'
+                : 'tradein_target_new_allowed_proyeks'
+        );
         $priceStrategy = (string) $this->settingService->get('tradein_target_price_strategy', 'min');
         $excludeAccessories = (bool) $this->settingService->get('tradein_exclude_accessories', true);
 
@@ -274,14 +284,18 @@ class PublicTradeInController extends Controller
 
         $query->when($brand, function ($q) use ($brand) {
             $q->where('brandName', $brand);
-        })
-            ->where(function ($q) {
+        });
+
+        if (!empty($allowedProyeks)) {
+            $this->applyAllowedProyeksFilter($query, $allowedProyeks);
+        } else {
+            $query->where(function ($q) {
                 $q->whereNull('proyek')
-                    ->orWhere('proyek', '!=', 'BEACUKAI');
-            })
-            ->when($proyek, function ($q) use ($proyek) {
-                $q->where('proyek', $proyek);
+                    ->orWhereRaw('UPPER(TRIM(proyek)) != ?', ['BEACUKAI']);
             });
+        }
+
+        $this->applySingleProyekQueryFilter($query, $proyek);
 
         $query = $this->applySmartSearch($query, $search);
 
@@ -349,7 +363,7 @@ class PublicTradeInController extends Controller
                         'storage' => $attrs['storage'],
                         'brand' => $rep->brandName,
                         'category' => $rep->categoryName,
-                        'proyek' => $rep->proyek ?? 'NON-PROYEK',
+                        'proyek' => $attrs['proyek'],
                         'target_type' => $targetType,
                         'condition_label' => $targetType === 'second' ? 'Second / Bekas' : 'Baru / Segel',
                         'variant_count' => $group->count(),
@@ -378,7 +392,7 @@ class PublicTradeInController extends Controller
                     'storage' => $attrs['storage'],
                     'brand' => $device->brandName,
                     'category' => $device->categoryName,
-                    'proyek' => $device->proyek ?? 'NON-PROYEK',
+                    'proyek' => $attrs['proyek'],
                     'target_type' => $targetType,
                     'condition_label' => $targetType === 'second' ? 'Second / Bekas' : 'Baru / Segel',
                     'variant_count' => 1,
@@ -394,6 +408,7 @@ class PublicTradeInController extends Controller
             'status' => 'success',
             'target_type' => $targetType,
             'grouped' => $isGrouped,
+            'allowed_proyeks' => $allowedProyeks,
             'price_source_mode' => $targetType === 'second' ? $secondPriceSource : 'accurate_only',
             'total' => $devices->count(),
             'data' => $devices,
@@ -562,6 +577,67 @@ class PublicTradeInController extends Controller
         }
 
         return [2];
+    }
+
+    /**
+     * Resolusi daftar proyek (whitelist) yang diizinkan tampil berdasarkan key setting.
+     * Jika array kosong [], berarti semua proyek diizinkan.
+     */
+    private function resolveAllowedProyeks(string $settingKey): array
+    {
+        $configured = $this->settingService->get($settingKey, []);
+        if (is_string($configured)) {
+            $decoded = json_decode($configured, true);
+            $configured = is_array($decoded) ? $decoded : explode(',', $configured);
+        }
+
+        if (!is_array($configured)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(fn($p) => strtoupper(trim((string) $p)), $configured),
+            fn($p) => $p !== ''
+        )));
+    }
+
+    /**
+     * Terapkan filter whitelist proyek secara case-insensitive (mendukung 'NON-PROYEK' -> NULL / '' / 'Non-Proyek').
+     */
+    private function applyAllowedProyeksFilter($query, array $allowedProyeks): void
+    {
+        if (empty($allowedProyeks)) {
+            return;
+        }
+
+        $includeNonProyek = in_array('NON-PROYEK', $allowedProyeks, true);
+        $namedProyeks = array_values(array_filter($allowedProyeks, fn($p) => $p !== 'NON-PROYEK'));
+
+        $query->where(function ($q) use ($includeNonProyek, $namedProyeks) {
+            if ($includeNonProyek) {
+                $q->whereNull('proyek')
+                    ->orWhereRaw("TRIM(proyek) = ''")
+                    ->orWhereRaw("UPPER(TRIM(proyek)) = 'NON-PROYEK'");
+            }
+
+            if (!empty($namedProyeks)) {
+                $placeholders = implode(',', array_fill(0, count($namedProyeks), '?'));
+                $q->orWhereRaw("UPPER(TRIM(proyek)) IN ({$placeholders})", $namedProyeks);
+            }
+        });
+    }
+
+    /**
+     * Terapkan filter query parameter ?proyek= secara case-insensitive (mendukung ?proyek=NON-PROYEK).
+     */
+    private function applySingleProyekQueryFilter($query, ?string $proyek): void
+    {
+        $clean = strtoupper(trim((string) $proyek));
+        if ($clean === '') {
+            return;
+        }
+
+        $this->applyAllowedProyeksFilter($query, [$clean]);
     }
 
     /**

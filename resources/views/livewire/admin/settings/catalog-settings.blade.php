@@ -2,7 +2,7 @@
     {{-- Header --}}
     <div>
         <h1 class="text-2xl font-bold text-gray-800">Pengaturan Katalog & API Trade-In</h1>
-        <p class="text-gray-500 mt-1">Konfigurasikan visibilitas stok katalog serta aturan dinamis list produk & sumber harga pada API Tukar Tambah.</p>
+        <p class="text-gray-500 mt-1">Konfigurasikan visibilitas stok katalog serta aturan dinamis list produk, unit bisnis, proyek, & sumber harga pada API Tukar Tambah.</p>
     </div>
 
     <form wire:submit.prevent="save" class="space-y-6 max-w-4xl">
@@ -31,7 +31,7 @@
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
                 <div>
                     <h2 class="text-lg font-bold text-gray-800">Pengaturan Dinamis API Trade-In & Harga Unit Second</h2>
-                    <p class="text-xs text-gray-500 mt-0.5">Mengatur unit bisnis acuan harga beli, penyederhanaan varian warna, dan sumber harga jual unit Second.</p>
+                    <p class="text-xs text-gray-500 mt-0.5">Mengatur unit bisnis acuan harga beli, filter proyek, penyederhanaan varian warna, dan sumber harga jual unit Second.</p>
                 </div>
                 <a href="{{ \Illuminate\Support\Facades\Route::has('admin.buyback.index') ? route('admin.buyback.index') : url('/admin/buyback/devices') }}"
                     wire:navigate
@@ -82,6 +82,77 @@
                         <option value="buy_fallback">Utamakan Buy Price (Excel), Fallback ke Harga Accurate jika belum diatur [Default]</option>
                         <option value="buy_only">Hanya tampilkan perangkat yang sudah memiliki Buy Price &gt; 0 (Sembunyikan yang belum diatur)</option>
                     </select>
+                </div>
+            </div>
+
+            {{-- Filter Proyek yang Ditampilkan --}}
+            <div class="p-4 rounded-xl border border-violet-200/80 bg-violet-50/40 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-800">
+                            Filter Proyek yang Ditampilkan di API Trade-In
+                        </label>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            Centang proyek tertentu jika hanya ingin menampilkan proyek tersebut (contoh: hanya <code>RESMI</code> &amp; <code>INTER</code>). <strong>Biarkan tidak dicentang jika ingin menampilkan semua proyek.</strong>
+                        </p>
+                    </div>
+                </div>
+
+                {{-- 1. Proyek HP Lama --}}
+                <div class="bg-white p-3.5 rounded-xl border border-gray-200 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-gray-700 uppercase tracking-wide">1. Proyek HP Lama Customer (<code>/old-devices</code>)</span>
+                        <span class="text-[11px] font-semibold {{ count($tradeinOldAllowedProyeks) > 0 ? 'text-violet-700 bg-violet-100' : 'text-gray-500 bg-gray-100' }} px-2 py-0.5 rounded-full">
+                            {{ count($tradeinOldAllowedProyeks) > 0 ? count($tradeinOldAllowedProyeks) . ' Proyek Dipilih' : 'Semua Proyek' }}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        @foreach ($availableProyeks as $proyekItem)
+                            <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-violet-400 bg-gray-50/70 cursor-pointer text-xs font-bold text-gray-700 transition">
+                                <input type="checkbox" wire:model.live="tradeinOldAllowedProyeks" value="{{ $proyekItem }}"
+                                    class="rounded border-gray-300 text-violet-600 focus:ring-violet-600">
+                                <span>{{ $proyekItem }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- 2. Proyek HP Tujuan Second --}}
+                <div class="bg-white p-3.5 rounded-xl border border-gray-200 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-gray-700 uppercase tracking-wide">2. Proyek HP Tujuan Second (<code>target_type=second</code>)</span>
+                        <span class="text-[11px] font-semibold {{ count($tradeinTargetSecondAllowedProyeks) > 0 ? 'text-violet-700 bg-violet-100' : 'text-gray-500 bg-gray-100' }} px-2 py-0.5 rounded-full">
+                            {{ count($tradeinTargetSecondAllowedProyeks) > 0 ? count($tradeinTargetSecondAllowedProyeks) . ' Proyek Dipilih' : 'Semua Proyek' }}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        @foreach ($availableProyeks as $proyekItem)
+                            <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-violet-400 bg-gray-50/70 cursor-pointer text-xs font-bold text-gray-700 transition">
+                                <input type="checkbox" wire:model.live="tradeinTargetSecondAllowedProyeks" value="{{ $proyekItem }}"
+                                    class="rounded border-gray-300 text-violet-600 focus:ring-violet-600">
+                                <span>{{ $proyekItem }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- 3. Proyek HP Tujuan Baru --}}
+                <div class="bg-white p-3.5 rounded-xl border border-gray-200 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-gray-700 uppercase tracking-wide">3. Proyek HP Tujuan Baru (<code>target_type=new</code>)</span>
+                        <span class="text-[11px] font-semibold {{ count($tradeinTargetNewAllowedProyeks) > 0 ? 'text-violet-700 bg-violet-100' : 'text-gray-500 bg-gray-100' }} px-2 py-0.5 rounded-full">
+                            {{ count($tradeinTargetNewAllowedProyeks) > 0 ? count($tradeinTargetNewAllowedProyeks) . ' Proyek Dipilih' : 'Semua Proyek' }}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        @foreach ($availableProyeks as $proyekItem)
+                            <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-violet-400 bg-gray-50/70 cursor-pointer text-xs font-bold text-gray-700 transition">
+                                <input type="checkbox" wire:model.live="tradeinTargetNewAllowedProyeks" value="{{ $proyekItem }}"
+                                    class="rounded border-gray-300 text-violet-600 focus:ring-violet-600">
+                                <span>{{ $proyekItem }}</span>
+                            </label>
+                        @endforeach
+                    </div>
                 </div>
             </div>
 

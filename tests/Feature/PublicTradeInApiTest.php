@@ -366,5 +366,52 @@ class PublicTradeInApiTest extends TestCase
         $this->assertEquals([1, 2], $resBoth->json('business_unit_ids'));
         $this->assertEquals(3, $resBoth->json('total'));
     }
+
+    public function test_allowed_proyeks_filters_old_and_target_devices_dynamically()
+    {
+        $prod = Product::first();
+
+        ProductAccurate::create([
+            'product_id' => $prod->id,
+            'accurate_id' => 501,
+            'item_no' => 'IP13-INTER-128',
+            'name' => 'HP 2ND IPHONE 13 - 128GB - BLACK - INTER',
+            'brandName' => 'APPLE',
+            'categoryName' => 'HP SECOND',
+            'proyek' => 'INTER',
+            'base_price' => 7000000,
+            'buy_price' => 5200000,
+            'business_unit_id' => 2,
+        ]);
+
+        ProductAccurate::create([
+            'product_id' => $prod->id,
+            'accurate_id' => 502,
+            'item_no' => 'IP13-NONPROYEK-128',
+            'name' => 'HP 2ND IPHONE 13 - 128GB - WHITE',
+            'brandName' => 'APPLE',
+            'categoryName' => 'HP SECOND',
+            'proyek' => null,
+            'base_price' => 6800000,
+            'buy_price' => 5000000,
+            'business_unit_id' => 2,
+        ]);
+
+        $settingService = app(\App\Services\SettingService::class);
+
+        // Hanya izinkan proyek INTER pada HP Lama
+        $settingService->set('tradein_old_allowed_proyeks', ['INTER'], 'json');
+        $resOldInter = $this->getJson('/api/v1/public/trade-in/old-devices');
+        $resOldInter->assertStatus(200);
+        $this->assertEquals(1, $resOldInter->json('total'));
+        $this->assertEquals('INTER', $resOldInter->json('data.0.proyek'));
+
+        // Izinkan NON-PROYEK saja pada HP Tujuan Second
+        $settingService->set('tradein_target_second_allowed_proyeks', ['NON-PROYEK'], 'json');
+        $resTargetNon = $this->getJson('/api/v1/public/trade-in/target-devices?target_type=second');
+        $resTargetNon->assertStatus(200);
+        $this->assertEquals(1, $resTargetNon->json('total'));
+        $this->assertEquals('NON-PROYEK', $resTargetNon->json('data.0.proyek'));
+    }
 }
 

@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Settings;
 
 use App\Models\BusinessUnit;
+use App\Models\ProductAccurate;
 use App\Services\SettingService;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -14,6 +15,9 @@ class CatalogSettings extends Component
     // Pengaturan Dinamis API Trade-In & Harga Unit Second
     public array $tradeinOldBusinessUnitIds = [2];
     public string $tradeinOldPriceSource = 'buy_fallback';
+    public array $tradeinOldAllowedProyeks = [];
+    public array $tradeinTargetNewAllowedProyeks = [];
+    public array $tradeinTargetSecondAllowedProyeks = [];
     public bool $tradeinGroupOldDevices = true;
     public bool $tradeinGroupTargetDevices = true;
     public string $tradeinSecondPriceSource = 'custom_fallback';
@@ -33,12 +37,28 @@ class CatalogSettings extends Component
         }
 
         $this->tradeinOldPriceSource = (string) $settingService->get('tradein_old_price_source', 'buy_fallback');
+        $this->tradeinOldAllowedProyeks = $this->normalizeProyekList($settingService->get('tradein_old_allowed_proyeks', []));
+        $this->tradeinTargetNewAllowedProyeks = $this->normalizeProyekList($settingService->get('tradein_target_new_allowed_proyeks', []));
+        $this->tradeinTargetSecondAllowedProyeks = $this->normalizeProyekList($settingService->get('tradein_target_second_allowed_proyeks', []));
+
         $this->tradeinGroupOldDevices = (bool) $settingService->get('tradein_group_old_devices', true);
         $this->tradeinGroupTargetDevices = (bool) $settingService->get('tradein_group_target_devices', true);
         $this->tradeinSecondPriceSource = (string) $settingService->get('tradein_second_price_source', 'custom_fallback');
         $this->tradeinOldPriceStrategy = (string) $settingService->get('tradein_old_price_strategy', 'min');
         $this->tradeinTargetPriceStrategy = (string) $settingService->get('tradein_target_price_strategy', 'min');
         $this->tradeinExcludeAccessories = (bool) $settingService->get('tradein_exclude_accessories', true);
+    }
+
+    protected function normalizeProyekList(mixed $list): array
+    {
+        if (!is_array($list)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(fn($item) => strtoupper(trim((string) $item)), $list),
+            fn($item) => $item !== ''
+        )));
     }
 
     public function save(SettingService $settingService)
@@ -48,11 +68,21 @@ class CatalogSettings extends Component
             fn($id) => $id > 0
         )));
 
+        $this->tradeinOldAllowedProyeks = $this->normalizeProyekList($this->tradeinOldAllowedProyeks);
+        $this->tradeinTargetNewAllowedProyeks = $this->normalizeProyekList($this->tradeinTargetNewAllowedProyeks);
+        $this->tradeinTargetSecondAllowedProyeks = $this->normalizeProyekList($this->tradeinTargetSecondAllowedProyeks);
+
         $this->validate([
             'minimumStockThreshold' => 'required|integer|min:0',
             'tradeinOldBusinessUnitIds' => 'required|array|min:1',
             'tradeinOldBusinessUnitIds.*' => 'integer|exists:business_units,id',
             'tradeinOldPriceSource' => 'required|in:buy_fallback,buy_only',
+            'tradeinOldAllowedProyeks' => 'array',
+            'tradeinOldAllowedProyeks.*' => 'string|max:50',
+            'tradeinTargetNewAllowedProyeks' => 'array',
+            'tradeinTargetNewAllowedProyeks.*' => 'string|max:50',
+            'tradeinTargetSecondAllowedProyeks' => 'array',
+            'tradeinTargetSecondAllowedProyeks.*' => 'string|max:50',
             'tradeinGroupOldDevices' => 'boolean',
             'tradeinGroupTargetDevices' => 'boolean',
             'tradeinSecondPriceSource' => 'required|in:custom_fallback,custom_only,accurate_only',
@@ -67,6 +97,9 @@ class CatalogSettings extends Component
         $settingService->set('minimum_stock_threshold', $this->minimumStockThreshold, 'integer');
         $settingService->set('tradein_old_business_unit_ids', $this->tradeinOldBusinessUnitIds, 'json');
         $settingService->set('tradein_old_price_source', $this->tradeinOldPriceSource, 'string');
+        $settingService->set('tradein_old_allowed_proyeks', $this->tradeinOldAllowedProyeks, 'json');
+        $settingService->set('tradein_target_new_allowed_proyeks', $this->tradeinTargetNewAllowedProyeks, 'json');
+        $settingService->set('tradein_target_second_allowed_proyeks', $this->tradeinTargetSecondAllowedProyeks, 'json');
         $settingService->set('tradein_group_old_devices', $this->tradeinGroupOldDevices, 'boolean');
         $settingService->set('tradein_group_target_devices', $this->tradeinGroupTargetDevices, 'boolean');
         $settingService->set('tradein_second_price_source', $this->tradeinSecondPriceSource, 'string');
@@ -82,6 +115,22 @@ class CatalogSettings extends Component
     {
         $businessUnits = BusinessUnit::orderBy('id')->get(['id', 'name', 'code', 'is_active']);
 
-        return view('livewire.admin.settings.catalog-settings', compact('businessUnits'));
+        // Ambil seluruh variasi proyek unik dari product_accurates (dinormalisasi ke huruf besar)
+        $dbProyeks = ProductAccurate::query()
+            ->selectRaw("DISTINCT UPPER(TRIM(COALESCE(proyek, ''))) as norm_proyek")
+            ->pluck('norm_proyek')
+            ->map(fn($p) => ($p === '' || $p === 'NON-PROYEK') ? 'NON-PROYEK' : $p)
+            ->reject(fn($p) => $p === 'ACCESSORIES')
+            ->unique()
+            ->values()
+            ->all();
+
+        $availableProyeks = collect(array_merge(['RESMI', 'INTER', 'NON-PROYEK'], $dbProyeks))
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        return view('livewire.admin.settings.catalog-settings', compact('businessUnits', 'availableProyeks'));
     }
 }
