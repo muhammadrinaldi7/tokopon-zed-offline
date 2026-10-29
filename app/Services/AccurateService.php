@@ -1340,7 +1340,42 @@ class AccurateService
                 return $data['d'] ?? [];
             }
         }
-        Log::info('data proses serial number 2: ' . json_encode($data));
+        Log::info('data proses serial number 2: ' . json_encode($data ?? null));
+        return [];
+    }
+
+    /**
+     * Ambil histori mutasi transaksi untuk Serial Number tertentu dari Accurate
+     * Endpoint: /report/serial-number-mutation.do
+     */
+    public function getSerialNumberMutation($itemNo, $serialNumber, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/report/serial-number-mutation.do', [
+            'itemNo'       => (string) $itemNo,
+            'serialNumber' => (string) $serialNumber,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? [];
+            }
+        }
+
         return [];
     }
 
