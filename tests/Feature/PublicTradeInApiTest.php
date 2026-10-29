@@ -348,5 +348,23 @@ class PublicTradeInApiTest extends TestCase
         $this->assertEquals(6500000, $starlight->fresh()->buy_price);
         $this->assertEquals(8250000, $starlight->fresh()->custom_sell_price);
     }
+
+    public function test_old_devices_respects_dynamic_business_unit_and_buy_price_settings()
+    {
+        // Default: hanya BU 2 (oldPhone + secondPhone = 2 item; newPhone di BU 1 tidak ikut masuk)
+        $resDefault = $this->getJson('/api/v1/public/trade-in/old-devices');
+        $resDefault->assertStatus(200);
+        $this->assertEquals([2], $resDefault->json('business_unit_ids'));
+        $this->assertEquals(2, $resDefault->json('total'));
+
+        // Ubah setting dinamis agar BU 1 dan BU 2 keduanya diizinkan
+        $settingService = app(\App\Services\SettingService::class);
+        $settingService->set('tradein_old_business_unit_ids', [1, 2], 'json');
+
+        $resBoth = $this->getJson('/api/v1/public/trade-in/old-devices');
+        $resBoth->assertStatus(200);
+        $this->assertEquals([1, 2], $resBoth->json('business_unit_ids'));
+        $this->assertEquals(3, $resBoth->json('total'));
+    }
 }
 

@@ -42,11 +42,13 @@ class PublicTradeInController extends Controller
 
             $this->applySecondSellPriceFilter($query, $secondPriceSource);
         } elseif ($type === 'old') {
-            // HP Lama: Smartphone yang memiliki buy_price > 0 ATAU base_price > 0
+            $oldBuIds = $this->resolveOldBusinessUnitIds($request);
+            $oldPriceSource = (string) $this->settingService->get('tradein_old_price_source', 'buy_fallback');
+
+            $query->whereIn('business_unit_id', $oldBuIds);
+            $this->applyOldBuyPriceFilter($query, $oldPriceSource);
+
             $query->where(function ($q) {
-                $q->where('buy_price', '>', 0)
-                    ->orWhere('base_price', '>', 0);
-            })->where(function ($q) {
                 $q->where('categoryName', 'like', '%Handphone%')
                     ->orWhere('categoryName', 'like', '%HP SECOND%')
                     ->orWhere('name', 'like', '%HP 2ND%');
@@ -90,14 +92,13 @@ class PublicTradeInController extends Controller
             ? filter_var($request->query('grouped'), FILTER_VALIDATE_BOOLEAN)
             : (bool) $this->settingService->get('tradein_group_old_devices', true);
 
+        $oldBuIds = $this->resolveOldBusinessUnitIds($request);
+        $oldPriceSource = (string) $this->settingService->get('tradein_old_price_source', 'buy_fallback');
         $priceStrategy = (string) $this->settingService->get('tradein_old_price_strategy', 'min');
         $excludeAccessories = (bool) $this->settingService->get('tradein_exclude_accessories', true);
 
         $query = ProductAccurate::query()
-            ->where(function ($q) {
-                $q->where('buy_price', '>', 0)
-                    ->orWhere('base_price', '>', 0);
-            })
+            ->whereIn('business_unit_id', $oldBuIds)
             ->where(function ($q) {
                 $q->where('categoryName', 'like', '%Handphone%')
                     ->orWhere('categoryName', 'like', '%HP SECOND%')
@@ -110,6 +111,7 @@ class PublicTradeInController extends Controller
                 $q->where('proyek', $proyek);
             });
 
+        $this->applyOldBuyPriceFilter($query, $oldPriceSource);
         $this->applyExcludeAccessories($query, $excludeAccessories);
         $query = $this->applySmartSearch($query, $search);
 
@@ -129,8 +131,10 @@ class PublicTradeInController extends Controller
 
         if ($isGrouped) {
             $devices = $rawDevices
-                ->map(function (ProductAccurate $device) {
-                    $effectiveBuyPrice = (float) ($device->buy_price > 0 ? $device->buy_price : ($device->base_price ?? 0));
+                ->map(function (ProductAccurate $device) use ($oldPriceSource) {
+                    $effectiveBuyPrice = $oldPriceSource === 'buy_only'
+                        ? (float) ($device->buy_price ?? 0)
+                        : (float) ($device->buy_price > 0 ? $device->buy_price : ($device->base_price ?? 0));
                     $attrs = ProductAccurate::parseTradeInAttributes($device->name, $device->proyek, $device->business_unit_id);
                     return [
                         'model_instance' => $device,
@@ -170,6 +174,7 @@ class PublicTradeInController extends Controller
                     return [
                         'id' => $rep->id,
                         'item_no' => $rep->item_no,
+                        'business_unit_id' => $rep->business_unit_id,
                         'name' => $displayName,
                         'clean_name' => $cleanName,
                         'model' => $attrs['model'],
@@ -187,8 +192,10 @@ class PublicTradeInController extends Controller
                 })
                 ->values();
         } else {
-            $devices = $rawDevices->map(function (ProductAccurate $device) {
-                $effectiveBuyPrice = (float) ($device->buy_price > 0 ? $device->buy_price : ($device->base_price ?? 0));
+            $devices = $rawDevices->map(function (ProductAccurate $device) use ($oldPriceSource) {
+                $effectiveBuyPrice = $oldPriceSource === 'buy_only'
+                    ? (float) ($device->buy_price ?? 0)
+                    : (float) ($device->buy_price > 0 ? $device->buy_price : ($device->base_price ?? 0));
                 $attrs = ProductAccurate::parseTradeInAttributes($device->name, $device->proyek, $device->business_unit_id);
                 $cleanName = (string) preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $device->name);
                 $isSecond = ($device->business_unit_id == 2)
@@ -198,6 +205,7 @@ class PublicTradeInController extends Controller
                 return [
                     'id' => $device->id,
                     'item_no' => $device->item_no,
+                    'business_unit_id' => $device->business_unit_id,
                     'name' => $device->name,
                     'clean_name' => $cleanName,
                     'model' => $attrs['model'],
@@ -218,6 +226,8 @@ class PublicTradeInController extends Controller
         return response()->json([
             'status' => 'success',
             'grouped' => $isGrouped,
+            'business_unit_ids' => $oldBuIds,
+            'price_source_mode' => $oldPriceSource,
             'total' => $devices->count(),
             'data' => $devices,
         ]);
@@ -521,6 +531,52 @@ class PublicTradeInController extends Controller
                 'whatsapp_url' => $whatsappUrl,
             ],
         ]);
+    }
+
+    /**
+     * Resolusi daftar Business Unit ID yang dijadikan acuan daftar & harga beli HP Lama (/old-devices).
+     * Default: [2] (Unit Bisnis Second).
+     */
+    private function resolveOldBusinessUnitIds(Request $request): array
+    {
+        $override = $request->query('business_unit_id', $request->query('bu_id'));
+        if ($override !== null && $override !== '') {
+            $rawIds = is_array($override) ? $override : explode(',', (string) $override);
+            $parsed = array_values(array_unique(array_filter(array_map('intval', $rawIds), fn($id) => $id > 0)));
+            if (!empty($parsed)) {
+                return $parsed;
+            }
+        }
+
+        $configured = $this->settingService->get('tradein_old_business_unit_ids', [2]);
+        if (is_string($configured)) {
+            $decoded = json_decode($configured, true);
+            $configured = is_array($decoded) ? $decoded : explode(',', $configured);
+        }
+
+        if (is_array($configured)) {
+            $parsed = array_values(array_unique(array_filter(array_map('intval', $configured), fn($id) => $id > 0)));
+            if (!empty($parsed)) {
+                return $parsed;
+            }
+        }
+
+        return [2];
+    }
+
+    /**
+     * Terapkan filter harga beli HP Lama (/old-devices) berdasarkan setting dinamis.
+     */
+    private function applyOldBuyPriceFilter($query, string $oldPriceSource): void
+    {
+        if ($oldPriceSource === 'buy_only') {
+            $query->where('buy_price', '>', 0);
+        } else {
+            $query->where(function ($q) {
+                $q->where('buy_price', '>', 0)
+                    ->orWhere('base_price', '>', 0);
+            });
+        }
     }
 
     /**

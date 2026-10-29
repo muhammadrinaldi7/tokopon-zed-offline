@@ -31,7 +31,7 @@
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
                 <div>
                     <h2 class="text-lg font-bold text-gray-800">Pengaturan Dinamis API Trade-In & Harga Unit Second</h2>
-                    <p class="text-xs text-gray-500 mt-0.5">Mengatur penyederhanaan varian warna dan sumber harga jual unit bisnis Second (BU 2).</p>
+                    <p class="text-xs text-gray-500 mt-0.5">Mengatur unit bisnis acuan harga beli, penyederhanaan varian warna, dan sumber harga jual unit Second.</p>
                 </div>
                 <a href="{{ \Illuminate\Support\Facades\Route::has('admin.buyback.index') ? route('admin.buyback.index') : url('/admin/buyback/devices') }}"
                     wire:navigate
@@ -41,6 +41,48 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                     </svg>
                 </a>
+            </div>
+
+            {{-- Business Unit Acuan Harga Beli HP Lama (/old-devices) --}}
+            <div class="p-4 rounded-xl border border-emerald-200/80 bg-emerald-50/40 space-y-3">
+                <div>
+                    <label class="block text-sm font-bold text-gray-800">
+                        Business Unit Acuan Daftar & Harga Beli HP Lama (<code>/old-devices</code>)
+                    </label>
+                    <p class="text-xs text-gray-500 mt-0.5">
+                        Pilih unit bisnis mana saja yang dijadikan sumber master produk & acuan <code>Buy Price</code> pada endpoint HP Lama customer.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    @foreach ($businessUnits as $bu)
+                        <label class="flex items-center gap-3 p-3 rounded-lg bg-white border border-gray-200 hover:border-emerald-500/50 cursor-pointer transition shadow-xs">
+                            <input type="checkbox" wire:model="tradeinOldBusinessUnitIds" value="{{ $bu->id }}"
+                                class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-600">
+                            <div class="flex-1 min-w-0">
+                                <span class="block text-sm font-bold text-gray-800 truncate">
+                                    {{ $bu->name }}
+                                    <span class="text-xs font-mono text-gray-400">(#{{ $bu->id }}{{ $bu->code ? ' - ' . strtoupper($bu->code) : '' }})</span>
+                                </span>
+                                @if (!$bu->is_active)
+                                    <span class="text-[10px] font-bold text-rose-500 uppercase">Nonaktif</span>
+                                @endif
+                            </div>
+                        </label>
+                    @endforeach
+                </div>
+                @error('tradeinOldBusinessUnitIds')
+                    <span class="text-rose-500 text-xs font-semibold block">{{ $message }}</span>
+                @enderror
+
+                <div class="pt-2">
+                    <label class="block text-xs font-bold text-gray-700 mb-1.5">Filter Sumber Harga Beli HP Lama (<code>Buy Price</code>)</label>
+                    <select wire:model="tradeinOldPriceSource"
+                        class="w-full text-sm rounded-lg border-gray-300 px-3.5 py-2.5 shadow-sm focus:ring-4 focus:ring-emerald-600/10 focus:border-emerald-600 bg-white">
+                        <option value="buy_fallback">Utamakan Buy Price (Excel), Fallback ke Harga Accurate jika belum diatur [Default]</option>
+                        <option value="buy_only">Hanya tampilkan perangkat yang sudah memiliki Buy Price &gt; 0 (Sembunyikan yang belum diatur)</option>
+                    </select>
+                </div>
             </div>
 
             {{-- Toggle Grouping --}}
