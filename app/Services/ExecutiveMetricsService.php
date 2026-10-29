@@ -127,16 +127,85 @@ class ExecutiveMetricsService
     }
 
     /**
+     * Normalize string (comma-separated) or array filter values into clean array.
+     */
+    protected function parseMultiFilterValues($rawFilter): array
+    {
+        if (empty($rawFilter)) {
+            return [];
+        }
+
+        $values = [];
+        if (is_string($rawFilter)) {
+            $values = explode(',', $rawFilter);
+        } elseif (is_array($rawFilter)) {
+            foreach ($rawFilter as $v) {
+                if (is_string($v) && str_contains($v, ',')) {
+                    $values = array_merge($values, explode(',', $v));
+                } else {
+                    $values[] = (string) $v;
+                }
+            }
+        } else {
+            $values = [(string) $rawFilter];
+        }
+
+        $values = array_map('trim', $values);
+        return array_values(array_filter($values, fn($v) => $v !== '' && strtolower($v) !== 'all'));
+    }
+
+    /**
+     * Check whether an item's category matches single or multi-selected categories.
+     */
+    protected function matchesCategoryFilter(?string $itemCat, $categoryFilter): bool
+    {
+        $targets = $this->parseMultiFilterValues($categoryFilter);
+        if (empty($targets)) {
+            return true;
+        }
+        if (!$itemCat) {
+            return false;
+        }
+        foreach ($targets as $target) {
+            if (strcasecmp(trim($itemCat), $target) === 0 || stripos($itemCat, $target) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check whether an item's project matches single or multi-selected projects.
+     */
+    protected function matchesProjectFilter(?string $itemProj, $projectFilter): bool
+    {
+        $targets = $this->parseMultiFilterValues($projectFilter);
+        if (empty($targets)) {
+            return true;
+        }
+        $normalizedProj = strtoupper(trim($itemProj ?? ''));
+        if ($normalizedProj === '') {
+            $normalizedProj = 'NON-PROYEK';
+        }
+        foreach ($targets as $target) {
+            $upperTarget = strtoupper(trim($target));
+            if ($upperTarget === 'NON-PROYEK' || $upperTarget === 'TANPA PROYEK') {
+                if ($normalizedProj === 'NON-PROYEK') {
+                    return true;
+                }
+            } elseif ($normalizedProj === $upperTarget || stripos($normalizedProj, $upperTarget) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Apply multi-select or single category filter to a query.
      */
     public function applyCategoryFilter($query, $categoryFilter)
     {
-        if (empty($categoryFilter)) {
-            return $query;
-        }
-
-        $categories = is_array($categoryFilter) ? $categoryFilter : array_map('trim', explode(',', (string) $categoryFilter));
-        $categories = array_values(array_filter($categories));
+        $categories = $this->parseMultiFilterValues($categoryFilter);
         if (empty($categories)) {
             return $query;
         }
@@ -144,10 +213,63 @@ class ExecutiveMetricsService
         return $query->whereHas('items', function ($itemQuery) use ($categories) {
             $itemQuery->where(function ($iq) use ($categories) {
                 $iq->whereHasMorph('variant', [ProductAccurate::class], function ($paQ) use ($categories) {
-                    $paQ->whereIn('categoryName', $categories);
+                    $paQ->where(function ($sub) use ($categories) {
+                        foreach ($categories as $cat) {
+                            $sub->orWhere('categoryName', 'LIKE', '%' . $cat . '%');
+                        }
+                    });
                 })->orWhereHasMorph('variant', [ProductVariant::class], function ($pvQ) use ($categories) {
                     $pvQ->whereHas('product.category', function ($catQ) use ($categories) {
-                        $catQ->whereIn('name', $categories);
+                        $catQ->where(function ($sub) use ($categories) {
+                            foreach ($categories as $cat) {
+                                $sub->orWhere('name', 'LIKE', '%' . $cat . '%');
+                            }
+                        });
+                    });
+                });
+            });
+        });
+    }
+
+    /**
+     * Apply multi-select or single project filter to a query.
+     */
+    public function applyProjectFilter($query, $projectFilter)
+    {
+        $projects = $this->parseMultiFilterValues($projectFilter);
+        if (empty($projects)) {
+            return $query;
+        }
+
+        return $query->whereHas('items', function ($itemQuery) use ($projects) {
+            $itemQuery->where(function ($iq) use ($projects) {
+                $iq->whereHasMorph('variant', [ProductAccurate::class], function ($paQ) use ($projects) {
+                    $paQ->where(function ($sub) use ($projects) {
+                        foreach ($projects as $proj) {
+                            $upper = strtoupper(trim($proj));
+                            if ($upper === 'NON-PROYEK' || $upper === 'TANPA PROYEK') {
+                                $sub->orWhereNull('proyek')
+                                    ->orWhere('proyek', '=', '')
+                                    ->orWhereRaw("LOWER(proyek) = 'non-proyek'");
+                            } else {
+                                $sub->orWhere('proyek', 'LIKE', '%' . $proj . '%');
+                            }
+                        }
+                    });
+                })->orWhereHasMorph('variant', [ProductVariant::class], function ($pvQ) use ($projects) {
+                    $pvQ->whereHas('accurateData', function ($accQ) use ($projects) {
+                        $accQ->where(function ($sub) use ($projects) {
+                            foreach ($projects as $proj) {
+                                $upper = strtoupper(trim($proj));
+                                if ($upper === 'NON-PROYEK' || $upper === 'TANPA PROYEK') {
+                                    $sub->orWhereNull('proyek')
+                                        ->orWhere('proyek', '=', '')
+                                        ->orWhereRaw("LOWER(proyek) = 'non-proyek'");
+                                } else {
+                                    $sub->orWhere('proyek', 'LIKE', '%' . $proj . '%');
+                                }
+                            }
+                        });
                     });
                 });
             });
@@ -186,6 +308,7 @@ class ExecutiveMetricsService
 
         $query = $this->applyBranchFilter($query, $filters['branch'] ?? null);
         $query = $this->applyCategoryFilter($query, $filters['category'] ?? null);
+        $query = $this->applyProjectFilter($query, $filters['project'] ?? ($filters['projects'] ?? null));
 
         return $query;
     }
@@ -240,22 +363,25 @@ class ExecutiveMetricsService
             }
         }
 
-        // 2. Batch lookup ProductAccurate ID -> base_cost, buy_price & categoryName
+        // 2. Batch lookup ProductAccurate ID -> base_cost, buy_price, categoryName & proyek
         $accurateBaseCostMap = [];
         $accurateBuyPriceMap = [];
         $accurateCategoryMap = [];
+        $accurateProyekMap = [];
         if (!empty($accurateIds)) {
             $accurateIds = array_unique($accurateIds);
-            $accurateRows = ProductAccurate::whereIn('id', $accurateIds)->get(['id', 'base_cost', 'buy_price', 'categoryName']);
+            $accurateRows = ProductAccurate::whereIn('id', $accurateIds)->get(['id', 'base_cost', 'buy_price', 'categoryName', 'proyek']);
             $accurateBaseCostMap = $accurateRows->pluck('base_cost', 'id')->map(fn($v) => (float)$v)->toArray();
             $accurateBuyPriceMap = $accurateRows->pluck('buy_price', 'id')->map(fn($v) => (float)$v)->toArray();
             $accurateCategoryMap = $accurateRows->pluck('categoryName', 'id')->toArray();
+            $accurateProyekMap = $accurateRows->pluck('proyek', 'id')->toArray();
         }
 
-        // 3. Batch lookup ProductVariant ID -> base_cost, buy_price & category (via accurateData or product.category)
+        // 3. Batch lookup ProductVariant ID -> base_cost, buy_price, category & proyek (via accurateData or product.category)
         $variantBaseCostMap = [];
         $variantBuyPriceMap = [];
         $variantCategoryMap = [];
+        $variantProyekMap = [];
         if (!empty($variantIds)) {
             $variantIds = array_unique($variantIds);
             $variants = ProductVariant::with(['accurateData', 'product.category'])->whereIn('id', $variantIds)->get();
@@ -263,10 +389,14 @@ class ExecutiveMetricsService
                 $baseCost = $variant->accurateData?->base_cost ?? ($variant->base_cost ?? 0);
                 $buyPrice = $variant->accurateData?->buy_price ?? ($variant->buy_price ?? 0);
                 $category = $variant->accurateData?->categoryName ?? ($variant->product?->category?->name ?? null);
+                $proyek = $variant->proyek ?? ($variant->accurateData?->proyek ?? null);
                 $variantBaseCostMap[$variant->id] = (float)$baseCost;
                 $variantBuyPriceMap[$variant->id] = (float)$buyPrice;
                 if ($category) {
                     $variantCategoryMap[$variant->id] = $category;
+                }
+                if ($proyek) {
+                    $variantProyekMap[$variant->id] = $proyek;
                 }
             }
         }
@@ -311,7 +441,10 @@ class ExecutiveMetricsService
             'variantBaseCostMap' => $variantBaseCostMap,
             'variantBuyPriceMap' => $variantBuyPriceMap,
             'variantCategoryMap' => $variantCategoryMap,
+            'accurateProyekMap' => $accurateProyekMap,
+            'variantProyekMap' => $variantProyekMap,
             'filteredCategory' => $filters['category'] ?? null,
+            'filteredProject' => $filters['project'] ?? ($filters['projects'] ?? null),
             'sn_hpp' => $snHppMap,
             'accurate_cost' => $accurateBaseCostMap,
             'variant_cost' => $variantBaseCostMap,
@@ -349,6 +482,10 @@ class ExecutiveMetricsService
         $orderBuId = $order->business_unit_id;
 
         $filteredCategory = $lookups['filteredCategory'] ?? null;
+        $filteredProject = $lookups['filteredProject'] ?? null;
+        $accurateProyekMap = $lookups['accurateProyekMap'] ?? [];
+        $variantProyekMap = $lookups['variantProyekMap'] ?? [];
+        $snProyekMap = $lookups['snProyekMap'] ?? [];
         $filteredItemSubtotal = 0;
 
         foreach ($order->items as $item) {
@@ -359,7 +496,25 @@ class ExecutiveMetricsService
                 } elseif ($item->product_variant_id) {
                     $itemCat = $variantCategoryMap[$item->product_variant_id] ?? null;
                 }
-                if (!$itemCat || strcasecmp($itemCat, $filteredCategory) !== 0) {
+                if (!$this->matchesCategoryFilter($itemCat, $filteredCategory)) {
+                    continue;
+                }
+            }
+
+            if (!empty($filteredProject)) {
+                $itemProj = null;
+                if ($item->product_variant_type === ProductAccurate::class) {
+                    $itemProj = $accurateProyekMap[$item->product_variant_id] ?? null;
+                } elseif ($item->product_variant_id) {
+                    $itemProj = $variantProyekMap[$item->product_variant_id] ?? null;
+                }
+                if (empty($itemProj) && !empty($item->serial_number)) {
+                    $firstSn = trim(explode(',', $item->serial_number)[0] ?? '');
+                    if ($firstSn && isset($snProyekMap[$firstSn])) {
+                        $itemProj = $snProyekMap[$firstSn];
+                    }
+                }
+                if (!$this->matchesProjectFilter($itemProj, $filteredProject)) {
                     continue;
                 }
             }
@@ -440,7 +595,7 @@ class ExecutiveMetricsService
             }
         }
 
-        if (!empty($filteredCategory)) {
+        if (!empty($filteredCategory) || !empty($filteredProject)) {
             $orderTotal = (float)$order->total_amount ?: 1;
             $ratio = min(1, max(0, $filteredItemSubtotal / $orderTotal));
             $grossSales = $filteredItemSubtotal;
@@ -892,9 +1047,23 @@ class ExecutiveMetricsService
                 if ($variant instanceof ProductAccurate) {
                     $cat = $variant->categoryName;
                 } elseif ($variant instanceof ProductVariant) {
-                    $cat = $variant->product?->category?->name;
+                    $cat = $variant->accurateData?->categoryName ?? $variant->product?->category?->name;
                 }
-                return $cat && strcasecmp($cat, $catFilter) === 0;
+                return $this->matchesCategoryFilter($cat, $catFilter);
+            });
+        }
+
+        $projFilter = $filters['project'] ?? ($filters['projects'] ?? null);
+        if (!empty($projFilter)) {
+            $orderItems = $orderItems->filter(function ($item) use ($projFilter) {
+                $variant = $item->variant;
+                $proj = null;
+                if ($variant instanceof ProductAccurate) {
+                    $proj = $variant->proyek;
+                } elseif ($variant instanceof ProductVariant) {
+                    $proj = $variant->proyek ?? $variant->accurateData?->proyek;
+                }
+                return $this->matchesProjectFilter($proj, $projFilter);
             });
         }
 
