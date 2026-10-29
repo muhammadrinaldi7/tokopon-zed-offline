@@ -21,6 +21,9 @@ class SettingService
             $storeValue = Crypt::encryptString((string) $value);
         } elseif ($type === 'json' && is_array($value)) {
             $storeValue = json_encode($value);
+        } elseif ($type === 'boolean') {
+            $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            $storeValue = $value ? '1' : '0';
         }
 
         Setting::updateOrCreate(

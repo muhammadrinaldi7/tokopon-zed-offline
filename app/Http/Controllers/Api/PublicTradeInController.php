@@ -4,21 +4,30 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProductAccurate;
+use App\Services\SettingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PublicTradeInController extends Controller
 {
+    public function __construct(protected SettingService $settingService)
+    {
+    }
+
     /**
      * Get distinct list of available brands filtered by context (new, second, or old)
      */
     public function getBrands(Request $request): JsonResponse
     {
         $type = $request->query('type', 'all'); // 'new', 'second', 'old', or 'all'
+        $secondPriceSource = (string) $this->settingService->get('tradein_second_price_source', 'custom_fallback');
+        $excludeAccessories = (bool) $this->settingService->get('tradein_exclude_accessories', true);
 
         $query = ProductAccurate::query()
             ->whereNotNull('brandName')
             ->where('brandName', '!=', '');
+
+        $this->applyExcludeAccessories($query, $excludeAccessories);
 
         if ($type === 'new') {
             // HP Baru: BU 1 (Syihab) & Kategori Handphone
@@ -29,8 +38,9 @@ class PublicTradeInController extends Controller
             // HP Second: BU 2 (GSK Second) & Kategori HP SECOND & Khusus APPLE
             $query->where('business_unit_id', 2)
                 ->where('categoryName', 'like', '%HP SECOND%')
-                ->where('base_price', '>', 0)
                 ->whereRaw('UPPER(brandName) = ?', ['APPLE']);
+
+            $this->applySecondSellPriceFilter($query, $secondPriceSource);
         } elseif ($type === 'old') {
             // HP Lama: Smartphone yang memiliki buy_price > 0 ATAU base_price > 0
             $query->where(function ($q) {
@@ -67,14 +77,21 @@ class PublicTradeInController extends Controller
     }
 
     /**
-     * Get list of old devices available for trade-in / buyback (buy_price or base_price > 0 & category Handphone/HP SECOND)
+     * Get list of old devices available for trade-in / buyback
      */
     public function getOldDevices(Request $request): JsonResponse
     {
         $brand = $request->query('brand');
         $proyek = $request->query('proyek');
         $search = $request->query('search');
-        $limit = min((int)($request->query('limit', 5000)), 10000);
+        $limit = min((int) ($request->query('limit', 5000)), 10000);
+
+        $isGrouped = $request->has('grouped')
+            ? filter_var($request->query('grouped'), FILTER_VALIDATE_BOOLEAN)
+            : (bool) $this->settingService->get('tradein_group_old_devices', true);
+
+        $priceStrategy = (string) $this->settingService->get('tradein_old_price_strategy', 'min');
+        $excludeAccessories = (bool) $this->settingService->get('tradein_exclude_accessories', true);
 
         $query = ProductAccurate::query()
             ->where(function ($q) {
@@ -93,10 +110,12 @@ class PublicTradeInController extends Controller
                 $q->where('proyek', $proyek);
             });
 
+        $this->applyExcludeAccessories($query, $excludeAccessories);
         $query = $this->applySmartSearch($query, $search);
 
-        $devices = $query->orderBy('name')
-            ->take($limit)->get([
+        $rawDevices = $query->orderBy('name')
+            ->take($limit)
+            ->get([
                 'id',
                 'item_no',
                 'name',
@@ -106,28 +125,99 @@ class PublicTradeInController extends Controller
                 'buy_price',
                 'base_price',
                 'business_unit_id',
-            ])->map(function ($device) {
-                $effectiveBuyPrice = (float)($device->buy_price > 0 ? $device->buy_price : $device->base_price);
-                $cleanName = preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $device->name);
-                $isSecond = ($device->business_unit_id == 2) || (stripos($device->categoryName, 'SECOND') !== false) || (stripos($device->name, '2ND') !== false);
+            ]);
+
+        if ($isGrouped) {
+            $devices = $rawDevices
+                ->map(function (ProductAccurate $device) {
+                    $effectiveBuyPrice = (float) ($device->buy_price > 0 ? $device->buy_price : ($device->base_price ?? 0));
+                    $attrs = ProductAccurate::parseTradeInAttributes($device->name, $device->proyek, $device->business_unit_id);
+                    return [
+                        'model_instance' => $device,
+                        'effective_buy_price' => $effectiveBuyPrice,
+                        'attrs' => $attrs,
+                    ];
+                })
+                ->filter(fn($item) => $item['effective_buy_price'] > 0)
+                ->groupBy(fn($item) => $item['attrs']['group_key'])
+                ->map(function ($group) use ($priceStrategy) {
+                    $sorted = $priceStrategy === 'max'
+                        ? $group->sortByDesc('effective_buy_price')
+                        : $group->sortBy('effective_buy_price');
+
+                    $chosen = $sorted->first();
+                    /** @var ProductAccurate $rep */
+                    $rep = $chosen['model_instance'];
+                    $attrs = $chosen['attrs'];
+                    $effectiveBuyPrice = (float) $chosen['effective_buy_price'];
+
+                    $colors = $group->pluck('attrs.color')
+                        ->filter(fn($c) => $c !== null && $c !== '')
+                        ->unique(fn($c) => strtoupper($c))
+                        ->values()
+                        ->all();
+
+                    $shouldUseColorlessName = ($attrs['color'] !== null) || ($group->count() > 1);
+                    $displayName = $shouldUseColorlessName ? $attrs['grouped_name'] : $rep->name;
+                    $cleanName = $shouldUseColorlessName
+                        ? $attrs['short_name']
+                        : (string) preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $rep->name);
+
+                    $isSecond = ($rep->business_unit_id == 2)
+                        || (stripos((string) $rep->categoryName, 'SECOND') !== false)
+                        || (stripos((string) $rep->name, '2ND') !== false);
+
+                    return [
+                        'id' => $rep->id,
+                        'item_no' => $rep->item_no,
+                        'name' => $displayName,
+                        'clean_name' => $cleanName,
+                        'model' => $attrs['model'],
+                        'storage' => $attrs['storage'],
+                        'brand' => $rep->brandName,
+                        'category' => $rep->categoryName,
+                        'proyek' => $rep->proyek ?? 'NON-PROYEK',
+                        'is_second' => $isSecond,
+                        'condition_label' => $isSecond ? 'HP Second (2ND)' : 'Reguler',
+                        'variant_count' => $group->count(),
+                        'available_colors' => $colors,
+                        'buy_price' => $effectiveBuyPrice,
+                        'formatted_buy_price' => 'Rp ' . number_format($effectiveBuyPrice, 0, ',', '.'),
+                    ];
+                })
+                ->values();
+        } else {
+            $devices = $rawDevices->map(function (ProductAccurate $device) {
+                $effectiveBuyPrice = (float) ($device->buy_price > 0 ? $device->buy_price : ($device->base_price ?? 0));
+                $attrs = ProductAccurate::parseTradeInAttributes($device->name, $device->proyek, $device->business_unit_id);
+                $cleanName = (string) preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $device->name);
+                $isSecond = ($device->business_unit_id == 2)
+                    || (stripos((string) $device->categoryName, 'SECOND') !== false)
+                    || (stripos((string) $device->name, '2ND') !== false);
 
                 return [
                     'id' => $device->id,
                     'item_no' => $device->item_no,
                     'name' => $device->name,
                     'clean_name' => $cleanName,
+                    'model' => $attrs['model'],
+                    'storage' => $attrs['storage'],
                     'brand' => $device->brandName,
                     'category' => $device->categoryName,
                     'proyek' => $device->proyek ?? 'NON-PROYEK',
                     'is_second' => $isSecond,
                     'condition_label' => $isSecond ? 'HP Second (2ND)' : 'Reguler',
+                    'variant_count' => 1,
+                    'available_colors' => $attrs['color'] ? [$attrs['color']] : [],
                     'buy_price' => $effectiveBuyPrice,
                     'formatted_buy_price' => 'Rp ' . number_format($effectiveBuyPrice, 0, ',', '.'),
                 ];
-            });
+            })->filter(fn($item) => $item['buy_price'] > 0)->values();
+        }
 
         return response()->json([
             'status' => 'success',
+            'grouped' => $isGrouped,
             'total' => $devices->count(),
             'data' => $devices,
         ]);
@@ -136,7 +226,7 @@ class PublicTradeInController extends Controller
     /**
      * Get list of target devices for trade-in:
      * - target_type = 'new'    -> BU 1 (Syihab), Category 'Handphone', base_price > 0
-     * - target_type = 'second' -> BU 2 (GSK Second), Category 'HP SECOND', base_price > 0
+     * - target_type = 'second' -> BU 2 (GSK Second), Category 'HP SECOND', price per dynamic setting
      */
     public function getTargetDevices(Request $request): JsonResponse
     {
@@ -144,21 +234,33 @@ class PublicTradeInController extends Controller
         $brand = $request->query('brand');
         $proyek = $request->query('proyek');
         $search = $request->query('search');
-        $limit = min((int)($request->query('limit', 5000)), 10000);
+        $limit = min((int) ($request->query('limit', 5000)), 10000);
 
-        $query = ProductAccurate::query()
-            ->where('base_price', '>', 0);
+        $isGrouped = $request->has('grouped')
+            ? filter_var($request->query('grouped'), FILTER_VALIDATE_BOOLEAN)
+            : (bool) $this->settingService->get('tradein_group_target_devices', true);
+
+        $secondPriceSource = (string) $this->settingService->get('tradein_second_price_source', 'custom_fallback');
+        $priceStrategy = (string) $this->settingService->get('tradein_target_price_strategy', 'min');
+        $excludeAccessories = (bool) $this->settingService->get('tradein_exclude_accessories', true);
+
+        $query = ProductAccurate::query();
 
         if ($targetType === 'second') {
             // HP Second: BU 2 & Kategori HP SECOND & Khusus APPLE
             $query->where('business_unit_id', 2)
                 ->where('categoryName', 'like', '%HP SECOND%')
                 ->whereRaw('UPPER(brandName) = ?', ['APPLE']);
+
+            $this->applySecondSellPriceFilter($query, $secondPriceSource);
         } else {
             // HP Baru: BU 1 & Kategori Handphone
             $query->where('business_unit_id', 1)
-                ->where('categoryName', 'like', '%Handphone%');
+                ->where('categoryName', 'like', '%Handphone%')
+                ->where('base_price', '>', 0);
         }
+
+        $this->applyExcludeAccessories($query, $excludeAccessories);
 
         $query->when($brand, function ($q) use ($brand) {
             $q->where('brandName', $brand);
@@ -173,8 +275,9 @@ class PublicTradeInController extends Controller
 
         $query = $this->applySmartSearch($query, $search);
 
-        $devices = $query->orderBy('name')
-            ->take($limit)->get([
+        $rawDevices = $query->orderBy('name')
+            ->take($limit)
+            ->get([
                 'id',
                 'item_no',
                 'name',
@@ -182,28 +285,106 @@ class PublicTradeInController extends Controller
                 'categoryName',
                 'proyek',
                 'base_price',
+                'custom_sell_price',
                 'business_unit_id',
-            ])->map(function ($device) use ($targetType) {
-                $cleanName = preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $device->name);
+            ]);
+
+        if ($isGrouped) {
+            $devices = $rawDevices
+                ->map(function (ProductAccurate $device) use ($secondPriceSource) {
+                    $effectivePrice = $device->getEffectiveTradeInSellPrice($secondPriceSource);
+                    $attrs = ProductAccurate::parseTradeInAttributes($device->name, $device->proyek, $device->business_unit_id);
+                    $isUsingCustom = ($device->business_unit_id == 2)
+                        && $secondPriceSource !== 'accurate_only'
+                        && (($device->custom_sell_price ?? 0) > 0);
+
+                    return [
+                        'model_instance' => $device,
+                        'effective_price' => $effectivePrice,
+                        'price_source' => $isUsingCustom ? 'custom' : 'accurate',
+                        'attrs' => $attrs,
+                    ];
+                })
+                ->filter(fn($item) => $item['effective_price'] > 0)
+                ->groupBy(fn($item) => $item['attrs']['group_key'])
+                ->map(function ($group) use ($targetType, $priceStrategy) {
+                    $sorted = $priceStrategy === 'max'
+                        ? $group->sortByDesc('effective_price')
+                        : $group->sortBy('effective_price');
+
+                    $chosen = $sorted->first();
+                    /** @var ProductAccurate $rep */
+                    $rep = $chosen['model_instance'];
+                    $attrs = $chosen['attrs'];
+                    $effectivePrice = (float) $chosen['effective_price'];
+
+                    $colors = $group->pluck('attrs.color')
+                        ->filter(fn($c) => $c !== null && $c !== '')
+                        ->unique(fn($c) => strtoupper($c))
+                        ->values()
+                        ->all();
+
+                    $shouldUseColorlessName = ($attrs['color'] !== null) || ($group->count() > 1);
+                    $displayName = $shouldUseColorlessName ? $attrs['grouped_name'] : $rep->name;
+                    $cleanName = $shouldUseColorlessName
+                        ? $attrs['short_name']
+                        : (string) preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $rep->name);
+
+                    return [
+                        'id' => $rep->id,
+                        'item_no' => $rep->item_no,
+                        'name' => $displayName,
+                        'clean_name' => $cleanName,
+                        'model' => $attrs['model'],
+                        'storage' => $attrs['storage'],
+                        'brand' => $rep->brandName,
+                        'category' => $rep->categoryName,
+                        'proyek' => $rep->proyek ?? 'NON-PROYEK',
+                        'target_type' => $targetType,
+                        'condition_label' => $targetType === 'second' ? 'Second / Bekas' : 'Baru / Segel',
+                        'variant_count' => $group->count(),
+                        'available_colors' => $colors,
+                        'price_source' => $chosen['price_source'],
+                        'base_price' => $effectivePrice,
+                        'formatted_base_price' => 'Rp ' . number_format($effectivePrice, 0, ',', '.'),
+                    ];
+                })
+                ->values();
+        } else {
+            $devices = $rawDevices->map(function (ProductAccurate $device) use ($targetType, $secondPriceSource) {
+                $effectivePrice = $device->getEffectiveTradeInSellPrice($secondPriceSource);
+                $attrs = ProductAccurate::parseTradeInAttributes($device->name, $device->proyek, $device->business_unit_id);
+                $cleanName = (string) preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $device->name);
+                $isUsingCustom = ($device->business_unit_id == 2)
+                    && $secondPriceSource !== 'accurate_only'
+                    && (($device->custom_sell_price ?? 0) > 0);
 
                 return [
                     'id' => $device->id,
                     'item_no' => $device->item_no,
                     'name' => $device->name,
                     'clean_name' => $cleanName,
+                    'model' => $attrs['model'],
+                    'storage' => $attrs['storage'],
                     'brand' => $device->brandName,
                     'category' => $device->categoryName,
                     'proyek' => $device->proyek ?? 'NON-PROYEK',
                     'target_type' => $targetType,
                     'condition_label' => $targetType === 'second' ? 'Second / Bekas' : 'Baru / Segel',
-                    'base_price' => (float)$device->base_price,
-                    'formatted_base_price' => 'Rp ' . number_format((float)$device->base_price, 0, ',', '.'),
+                    'variant_count' => 1,
+                    'available_colors' => $attrs['color'] ? [$attrs['color']] : [],
+                    'price_source' => $isUsingCustom ? 'custom' : 'accurate',
+                    'base_price' => $effectivePrice,
+                    'formatted_base_price' => 'Rp ' . number_format($effectivePrice, 0, ',', '.'),
                 ];
-            });
+            })->filter(fn($item) => $item['base_price'] > 0)->values();
+        }
 
         return response()->json([
             'status' => 'success',
             'target_type' => $targetType,
+            'grouped' => $isGrouped,
+            'price_source_mode' => $targetType === 'second' ? $secondPriceSource : 'accurate_only',
             'total' => $devices->count(),
             'data' => $devices,
         ]);
@@ -221,22 +402,44 @@ class PublicTradeInController extends Controller
             'target_type' => 'nullable|string|in:new,second',
         ]);
 
+        /** @var ProductAccurate $oldDevice */
         $oldDevice = ProductAccurate::findOrFail($request->input('old_device_id'));
+        /** @var ProductAccurate $targetDevice */
         $targetDevice = ProductAccurate::findOrFail($request->input('target_device_id'));
 
-        $oldPrice = (float)($oldDevice->buy_price > 0 ? $oldDevice->buy_price : ($oldDevice->base_price ?? 0));
-        $targetPrice = (float)($targetDevice->base_price ?? 0);
+        $secondPriceSource = (string) $this->settingService->get('tradein_second_price_source', 'custom_fallback');
+        $groupOld = (bool) $this->settingService->get('tradein_group_old_devices', true);
+        $groupTarget = (bool) $this->settingService->get('tradein_group_target_devices', true);
+
+        $oldPrice = (float) ($oldDevice->buy_price > 0 ? $oldDevice->buy_price : ($oldDevice->base_price ?? 0));
+        $targetPrice = $targetDevice->getEffectiveTradeInSellPrice($secondPriceSource);
         $difference = max(0, $targetPrice - $oldPrice);
+
+        $oldAttrs = ProductAccurate::parseTradeInAttributes($oldDevice->name, $oldDevice->proyek, $oldDevice->business_unit_id);
+        $targetAttrs = ProductAccurate::parseTradeInAttributes($targetDevice->name, $targetDevice->proyek, $targetDevice->business_unit_id);
+
+        $oldDisplayName = ($groupOld && $oldAttrs['color'] !== null) ? $oldAttrs['grouped_name'] : $oldDevice->name;
+        $oldCleanName = ($groupOld && $oldAttrs['color'] !== null)
+            ? $oldAttrs['short_name']
+            : (string) preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $oldDevice->name);
+
+        $targetDisplayName = ($groupTarget && $targetAttrs['color'] !== null) ? $targetAttrs['grouped_name'] : $targetDevice->name;
+        $targetCleanName = ($groupTarget && $targetAttrs['color'] !== null)
+            ? $targetAttrs['short_name']
+            : (string) preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $targetDevice->name);
 
         $targetTypeLabel = $targetDevice->business_unit_id == 2 ? 'HP SECOND' : 'HP BARU';
         $waNumber = config('services.whatsapp.default_phone', '62081156006464');
 
+        $oldProyekLabel = $oldDevice->proyek ?: 'NON-PROYEK';
+        $targetProyekLabel = $targetDevice->proyek ?: 'NON-PROYEK';
+
         $waText = "Halo GSK Store 👋\n"
             . "Saya ingin konsultasi Tukar Tambah HP ({$targetTypeLabel}):\n\n"
-            . "📱 HP Lama: {$oldDevice->name} ({$oldDevice->proyek})\n"
+            . "📱 HP Lama: {$oldDisplayName} ({$oldProyekLabel})\n"
             . "   ↳ Estimasi Beli: Rp " . number_format($oldPrice, 0, ',', '.') . "\n\n"
             . "✨ HP Tujuan ({$targetTypeLabel}):\n"
-            . "   ↳ {$targetDevice->name} ({$targetDevice->proyek})\n"
+            . "   ↳ {$targetDisplayName} ({$targetProyekLabel})\n"
             . "   ↳ Harga: Rp " . number_format($targetPrice, 0, ',', '.') . "\n\n"
             . "💰 Estimasi Tambah Bayar: Rp " . number_format($difference, 0, ',', '.') . "\n\n"
             . "Apakah unit ready di cabang terdekat? Terima kasih!";
@@ -248,19 +451,19 @@ class PublicTradeInController extends Controller
             'data' => [
                 'old_device' => [
                     'id' => $oldDevice->id,
-                    'name' => $oldDevice->name,
-                    'clean_name' => preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $oldDevice->name),
+                    'name' => $oldDisplayName,
+                    'clean_name' => $oldCleanName,
                     'brand' => $oldDevice->brandName,
-                    'proyek' => $oldDevice->proyek ?? 'NON-PROYEK',
+                    'proyek' => $oldProyekLabel,
                     'buy_price' => $oldPrice,
                     'formatted_buy_price' => 'Rp ' . number_format($oldPrice, 0, ',', '.'),
                 ],
                 'target_device' => [
                     'id' => $targetDevice->id,
-                    'name' => $targetDevice->name,
-                    'clean_name' => preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $targetDevice->name),
+                    'name' => $targetDisplayName,
+                    'clean_name' => $targetCleanName,
                     'brand' => $targetDevice->brandName,
-                    'proyek' => $targetDevice->proyek ?? 'NON-PROYEK',
+                    'proyek' => $targetProyekLabel,
                     'target_type' => $targetDevice->business_unit_id == 2 ? 'second' : 'new',
                     'target_type_label' => $targetTypeLabel,
                     'base_price' => $targetPrice,
@@ -282,13 +485,23 @@ class PublicTradeInController extends Controller
      */
     public function getSingleDevicePrice($id): JsonResponse
     {
+        /** @var ProductAccurate $device */
         $device = ProductAccurate::findOrFail($id);
-        $buyPrice = (float)($device->buy_price > 0 ? $device->buy_price : ($device->base_price ?? 0));
+        $groupOld = (bool) $this->settingService->get('tradein_group_old_devices', true);
+        $attrs = ProductAccurate::parseTradeInAttributes($device->name, $device->proyek, $device->business_unit_id);
+
+        $displayName = ($groupOld && $attrs['color'] !== null) ? $attrs['grouped_name'] : $device->name;
+        $cleanName = ($groupOld && $attrs['color'] !== null)
+            ? $attrs['short_name']
+            : (string) preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $device->name);
+
+        $proyekLabel = $device->proyek ?: 'NON-PROYEK';
+        $buyPrice = (float) ($device->buy_price > 0 ? $device->buy_price : ($device->base_price ?? 0));
         $waNumber = config('services.whatsapp.default_phone', '62081156006464');
 
         $waText = "Halo GSK Store 👋\n"
             . "Saya ingin jual HP second saya:\n"
-            . "📱 Perangkat: {$device->name} ({$device->proyek})\n"
+            . "📱 Perangkat: {$displayName} ({$proyekLabel})\n"
             . "💰 Estimasi Harga: Rp " . number_format($buyPrice, 0, ',', '.') . "\n\n"
             . "Bagaimana proses pengecekan fisik di store? Terima kasih!";
 
@@ -298,16 +511,57 @@ class PublicTradeInController extends Controller
             'status' => 'success',
             'data' => [
                 'id' => $device->id,
-                'name' => $device->name,
-                'clean_name' => preg_replace('/^(HP\s+2ND\s+|HP\s+SECOND\s+|HP\s+)/i', '', $device->name),
+                'name' => $displayName,
+                'clean_name' => $cleanName,
                 'brand' => $device->brandName,
                 'category' => $device->categoryName,
-                'proyek' => $device->proyek ?? 'NON-PROYEK',
+                'proyek' => $proyekLabel,
                 'buy_price' => $buyPrice,
                 'formatted_buy_price' => 'Rp ' . number_format($buyPrice, 0, ',', '.'),
                 'whatsapp_url' => $whatsappUrl,
             ],
         ]);
+    }
+
+    /**
+     * Terapkan filter harga jual pada Unit Bisnis Second berdasarkan setting dinamis.
+     */
+    private function applySecondSellPriceFilter($query, string $secondPriceSource): void
+    {
+        if ($secondPriceSource === 'custom_only') {
+            $query->where('custom_sell_price', '>', 0);
+        } elseif ($secondPriceSource === 'accurate_only') {
+            $query->where('base_price', '>', 0);
+        } else {
+            // 'custom_fallback': utamakan custom_sell_price > 0, fallback ke base_price Accurate > 0
+            $query->where(function ($q) {
+                $q->where('custom_sell_price', '>', 0)
+                    ->orWhere('base_price', '>', 0);
+            });
+        }
+    }
+
+    /**
+     * Kecualikan item aksesoris yang salah kategori di dalam kategori Handphone / HP SECOND.
+     */
+    private function applyExcludeAccessories($query, bool $exclude): void
+    {
+        if (!$exclude) {
+            return;
+        }
+
+        $query->where(function ($q) {
+            $q->whereNull('proyek')
+                ->orWhereRaw('UPPER(proyek) != ?', ['ACCESSORIES']);
+        })
+            ->where(function ($q) {
+                $q->whereNull('is_addon')
+                    ->orWhere('is_addon', false);
+            })
+            ->where('name', 'not like', 'CASE -%')
+            ->where('name', 'not like', 'CASE %')
+            ->where('name', 'not like', 'TG -%')
+            ->where('name', 'not like', 'TEMPERED%');
     }
 
     /**

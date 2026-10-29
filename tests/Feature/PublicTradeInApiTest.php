@@ -160,5 +160,193 @@ class PublicTradeInApiTest extends TestCase
         $this->assertEquals(1, $res2->json('total'));
         $this->assertEquals('Apple iPhone 15 128GB (RESMI)', $res2->json('data.0.name'));
     }
+
+    public function test_groups_color_variants_dynamically_via_settings()
+    {
+        $prod11 = Product::first();
+
+        ProductAccurate::create([
+            'product_id' => $prod11->id,
+            'accurate_id' => 201,
+            'item_no' => 'IP11-128-BLK-INT',
+            'name' => 'HP 2ND IPHONE 11 - 128GB - BLACK - INTER',
+            'brandName' => 'APPLE',
+            'categoryName' => 'HP SECOND',
+            'proyek' => 'INTER',
+            'base_price' => 1, // Placeholder Rp 1 di Accurate
+            'buy_price' => 2600000,
+            'custom_sell_price' => 3550000,
+            'business_unit_id' => 2,
+        ]);
+
+        ProductAccurate::create([
+            'product_id' => $prod11->id,
+            'accurate_id' => 202,
+            'item_no' => 'IP11-128-WHT-INT',
+            'name' => 'HP 2ND IPHONE 11 - 128GB - WHITE - INTER',
+            'brandName' => 'APPLE',
+            'categoryName' => 'HP SECOND',
+            'proyek' => 'INTER',
+            'base_price' => 1,
+            'buy_price' => 2650000,
+            'custom_sell_price' => 3600000,
+            'business_unit_id' => 2,
+        ]);
+
+        // Aksesoris nyasar di kategori HP SECOND harus otomatis dikecualikan
+        ProductAccurate::create([
+            'product_id' => $prod11->id,
+            'accurate_id' => 203,
+            'item_no' => 'CASE-IP11',
+            'name' => 'CASE - IPHONE 11 (MID) LOW',
+            'brandName' => 'APPLE',
+            'categoryName' => 'HP SECOND',
+            'proyek' => 'ACCESSORIES',
+            'base_price' => 50000,
+            'buy_price' => 20000,
+            'custom_sell_price' => 50000,
+            'business_unit_id' => 2,
+        ]);
+
+        // Default: grouped = true & strategy = min
+        $resGrouped = $this->getJson('/api/v1/public/trade-in/target-devices?target_type=second&proyek=INTER');
+        $resGrouped->assertStatus(200);
+        $this->assertEquals(1, $resGrouped->json('total'));
+        $this->assertEquals('HP 2ND IPHONE 11 - 128GB', $resGrouped->json('data.0.name'));
+        $this->assertEquals('IPHONE 11 - 128GB', $resGrouped->json('data.0.clean_name'));
+        $this->assertEquals('INTER', $resGrouped->json('data.0.proyek'));
+        $this->assertEquals(2, $resGrouped->json('data.0.variant_count'));
+        $this->assertEquals(3550000, $resGrouped->json('data.0.base_price'));
+        $this->assertEquals('custom', $resGrouped->json('data.0.price_source'));
+
+        // Matikan grouping secara dinamis via SettingService
+        $settingService = app(\App\Services\SettingService::class);
+        $settingService->set('tradein_group_target_devices', false, 'boolean');
+
+        $resUngrouped = $this->getJson('/api/v1/public/trade-in/target-devices?target_type=second&proyek=INTER');
+        $resUngrouped->assertStatus(200);
+        $this->assertEquals(2, $resUngrouped->json('total'));
+    }
+
+    public function test_custom_sell_price_modes_and_calculate_integration()
+    {
+        $prod = Product::first();
+
+        // Produk BU 2 dengan base_price placeholder Rp 1 (belum diisi custom_sell_price)
+        $placeholderPhone = ProductAccurate::create([
+            'product_id' => $prod->id,
+            'accurate_id' => 301,
+            'item_no' => 'IP12-placeholder',
+            'name' => 'HP 2ND IPHONE 12 - 128GB - BLUE - INTER',
+            'brandName' => 'APPLE',
+            'categoryName' => 'HP SECOND',
+            'proyek' => 'INTER',
+            'base_price' => 1,
+            'buy_price' => 3200000,
+            'custom_sell_price' => null,
+            'business_unit_id' => 2,
+        ]);
+
+        // Pada default custom_fallback, sebelum custom_sell_price diisi akan fallback ke base_price Accurate
+        $resFallback = $this->getJson('/api/v1/public/trade-in/target-devices?target_type=second&proyek=INTER');
+        $this->assertEquals(1, $resFallback->json('total'));
+        $this->assertEquals(1, $resFallback->json('data.0.base_price'));
+        $this->assertEquals('accurate', $resFallback->json('data.0.price_source'));
+
+        // Update custom_sell_price (simulasi hasil import Excel) -> langsung menggantikan base_price Accurate
+        $placeholderPhone->update(['custom_sell_price' => 4750000]);
+
+        $resAfterImport = $this->getJson('/api/v1/public/trade-in/target-devices?target_type=second&proyek=INTER');
+        $this->assertEquals(1, $resAfterImport->json('total'));
+        $this->assertEquals(4750000, $resAfterImport->json('data.0.base_price'));
+        $this->assertEquals('custom', $resAfterImport->json('data.0.price_source'));
+
+        // Endpoint /calculate otomatis menggunakan custom_sell_price (4.750.000) & nama tanpa warna
+        $calcRes = $this->postJson('/api/v1/public/trade-in/calculate', [
+            'old_device_id' => $placeholderPhone->id, // buy_price = 3.200.000
+            'target_device_id' => $placeholderPhone->id, // custom_sell_price = 4.750.000
+        ]);
+
+        $calcRes->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'data' => [
+                    'target_device' => [
+                        'name' => 'HP 2ND IPHONE 12 - 128GB',
+                        'base_price' => 4750000,
+                    ],
+                    'calculation' => [
+                        'old_price' => 3200000,
+                        'target_price' => 4750000,
+                        'difference' => 1550000,
+                    ],
+                ],
+            ]);
+
+        // Mode custom_only menyembunyikan produk yang hanya punya base_price Accurate (tanpa custom_sell_price)
+        $settingService = app(\App\Services\SettingService::class);
+        $settingService->set('tradein_second_price_source', 'custom_only', 'string');
+
+        $resCustomOnly = $this->getJson('/api/v1/public/trade-in/target-devices?target_type=second');
+        $this->assertEquals(1, $resCustomOnly->json('total')); // Hanya IP12 yang punya custom_sell_price
+    }
+
+    public function test_csv_import_updates_custom_sell_price_and_propagates_to_color_group()
+    {
+        $user = \App\Models\User::factory()->create([
+            'business_unit_id' => 2,
+        ]);
+
+        $prod = Product::first();
+
+        $black = ProductAccurate::create([
+            'product_id' => $prod->id,
+            'accurate_id' => 401,
+            'database_source' => 'gsk',
+            'item_no' => 'IP14-128-BLK',
+            'name' => 'HP 2ND IPHONE 14 - 128GB - MIDNIGHT - RESMI',
+            'brandName' => 'APPLE',
+            'categoryName' => 'HP SECOND',
+            'proyek' => 'RESMI',
+            'base_price' => 1,
+            'buy_price' => 6000000,
+            'custom_sell_price' => null,
+            'business_unit_id' => 2,
+        ]);
+
+        $starlight = ProductAccurate::create([
+            'product_id' => $prod->id,
+            'accurate_id' => 402,
+            'database_source' => 'gsk',
+            'item_no' => 'IP14-128-WHT',
+            'name' => 'HP 2ND IPHONE 14 - 128GB - STARLIGHT - RESMI',
+            'brandName' => 'APPLE',
+            'categoryName' => 'HP SECOND',
+            'proyek' => 'RESMI',
+            'base_price' => 1,
+            'buy_price' => 6000000,
+            'custom_sell_price' => null,
+            'business_unit_id' => 2,
+        ]);
+
+        $csvContent = "ID;SKU;Nama Barang;Buy Price;Custom Sell Price\n"
+            . "{$black->id};IP14-128-BLK;HP 2ND IPHONE 14 - 128GB;6500000;8250000\n";
+
+        $uploadedFile = \Illuminate\Http\UploadedFile::fake()->createWithContent('harga_second.csv', $csvContent);
+
+        \Livewire\Livewire::actingAs($user)
+            ->test(\App\Livewire\Admin\Buyback\DeviceIndex::class)
+            ->set('csvFile', $uploadedFile)
+            ->set('syncColorGroupOnImport', true)
+            ->call('importCsv')
+            ->assertHasNoErrors();
+
+        $this->assertEquals(6500000, $black->fresh()->buy_price);
+        $this->assertEquals(8250000, $black->fresh()->custom_sell_price);
+
+        // Varian warna Starlight di grup yang sama ikut terupdate otomatis
+        $this->assertEquals(6500000, $starlight->fresh()->buy_price);
+        $this->assertEquals(8250000, $starlight->fresh()->custom_sell_price);
+    }
 }
 
