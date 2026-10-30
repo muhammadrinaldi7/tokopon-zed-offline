@@ -23,6 +23,8 @@ import {
     X,
     PanelLeftClose,
     PanelLeftOpen,
+    ChevronLeft,
+    ChevronRight,
     Search,
     ChevronsUpDown,
     ExternalLink,
@@ -570,15 +572,37 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                 Deep Obsidian Theme: bg-[#0B0F19] with Slate 800 borders
                ═══════════════════════════════════════════════════════════════ */}
             <aside
-                className={`fixed md:static inset-y-0 left-0 z-50 bg-[#0B0F19] text-slate-300 border-r border-slate-800/80 flex flex-col shrink-0 transition-all duration-300 ease-in-out shadow-2xl md:shadow-none select-none ${
+                className={`relative fixed md:static inset-y-0 left-0 z-50 bg-[#0B0F19] text-slate-300 border-r border-slate-800/80 flex flex-col shrink-0 transition-all duration-300 ease-in-out shadow-2xl md:shadow-none select-none ${
                     isCollapsed ? 'md:w-[68px]' : 'md:w-[260px]'
                 } ${mobileOpen ? 'w-[270px] translate-x-0' : '-translate-x-full md:translate-x-0'}`}
             >
+                {/* ── Floating Circular Edge Toggle Pill (Linear / Notion / HubSpot Style) ── */}
+                <button
+                    type="button"
+                    onClick={toggleSidebar}
+                    className="hidden md:flex absolute -right-3 top-5 w-6 h-6 rounded-full bg-[#0B0F19] text-slate-400 hover:text-white hover:bg-indigo-600 border border-slate-700 shadow-xl items-center justify-center z-50 transition-all hover:scale-110 group cursor-pointer"
+                    title={isCollapsed ? 'Lebarkan Sidebar (Ctrl+B)' : 'Ciutkan Sidebar (Ctrl+B)'}
+                >
+                    {isCollapsed ? (
+                        <ChevronRight className="w-3.5 h-3.5 text-indigo-400 group-hover:text-white transition-colors" />
+                    ) : (
+                        <ChevronLeft className="w-3.5 h-3.5 group-hover:text-white transition-colors" />
+                    )}
+                </button>
+
                 {/* ── Brand & Workspace Header ── */}
-                <div className="h-16 px-3.5 border-b border-slate-800/80 flex items-center justify-between shrink-0 bg-[#0B0F19]">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`h-16 border-b border-slate-800/80 flex items-center shrink-0 bg-[#0B0F19] transition-all ${
+                    isCollapsed && !mobileOpen ? 'justify-center px-2' : 'justify-between px-3.5'
+                }`}>
+                    <div
+                        onClick={isCollapsed && !mobileOpen ? toggleSidebar : undefined}
+                        className={`flex items-center gap-2.5 min-w-0 ${
+                            isCollapsed && !mobileOpen ? 'cursor-pointer group' : ''
+                        }`}
+                        title={isCollapsed && !mobileOpen ? 'Klik untuk Lebarkan Menu (Ctrl+B)' : undefined}
+                    >
                         {/* Custom Modern Vector Logo */}
-                        <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 p-0.5 shadow-lg shadow-indigo-600/30 shrink-0 flex items-center justify-center">
+                        <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 p-0.5 shadow-lg shadow-indigo-600/30 shrink-0 flex items-center justify-center group-hover:scale-105 transition-transform">
                             <div className="w-full h-full bg-[#0B0F19]/20 backdrop-blur-xs rounded-[10px] flex items-center justify-center">
                                 <svg
                                     viewBox="0 0 24 24"
@@ -625,19 +649,17 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                         <X className="w-4 h-4" />
                     </button>
 
-                    {/* Desktop toggle collapse button */}
-                    <button
-                        type="button"
-                        onClick={toggleSidebar}
-                        className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-all border border-transparent hover:border-slate-700/60"
-                        title={isCollapsed ? 'Lebarkan Sidebar (Ctrl+B)' : 'Ciutkan Sidebar (Ctrl+B)'}
-                    >
-                        {isCollapsed ? (
-                            <PanelLeftOpen className="w-4 h-4 text-indigo-400" />
-                        ) : (
+                    {/* Desktop toggle collapse button (visible when expanded) */}
+                    {isExpanded && (
+                        <button
+                            type="button"
+                            onClick={toggleSidebar}
+                            className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-all border border-transparent hover:border-slate-700/60"
+                            title="Ciutkan Sidebar (Ctrl+B)"
+                        >
                             <PanelLeftClose className="w-4 h-4" />
-                        )}
-                    </button>
+                        </button>
+                    )}
                 </div>
 
                 {/* ── Active Store / Business Unit Card (HubSpot / Zendesk style) ── */}
@@ -704,8 +726,11 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                     </div>
                 )}
 
-                {/* ── Navigation Items List ── */}
-                <nav className="flex-1 overflow-y-auto px-2.5 py-2 space-y-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                {/* ── Navigation Items List (Scrollbar Hidden for Ultra-Clean UI) ── */}
+                <nav
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    className="flex-1 overflow-y-auto px-2.5 py-2 space-y-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                >
                     {navigationGroups.map((group, gIdx) => (
                         <div key={gIdx} className="space-y-1">
                             {isExpanded ? (
@@ -840,7 +865,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#F8FAFC]">
                 {/* Modern Enterprise Header Toolbar */}
                 <header className="h-16 bg-white border-b border-slate-200/80 px-4 md:px-6 flex items-center justify-between gap-3 shrink-0 z-20 shadow-xs">
-                    {/* Left: Mobile trigger & Breadcrumb */}
+                    {/* Left: Mobile trigger, Desktop Toggle & Breadcrumb */}
                     <div className="flex items-center gap-3 min-w-0">
                         {/* Mobile Drawer Button */}
                         <button
@@ -850,6 +875,26 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                             title="Buka Menu"
                         >
                             <Menu className="w-5 h-5" />
+                        </button>
+
+                        {/* Desktop Sidebar Toggle Button (Always clearly visible in Top Header) */}
+                        <button
+                            type="button"
+                            onClick={toggleSidebar}
+                            className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-600 hover:text-indigo-600 shadow-2xs transition-all duration-150 group shrink-0 cursor-pointer"
+                            title={isCollapsed ? 'Lebarkan Sidebar (Ctrl+B)' : 'Ciutkan Sidebar (Ctrl+B)'}
+                        >
+                            {isCollapsed ? (
+                                <PanelLeftOpen className="w-4 h-4 text-indigo-600 group-hover:scale-110 transition-transform" />
+                            ) : (
+                                <PanelLeftClose className="w-4 h-4 text-slate-500 group-hover:text-indigo-600 transition-colors" />
+                            )}
+                            <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-900 hidden lg:inline">
+                                {isCollapsed ? 'Buka Sidebar' : 'Ciutkan Sidebar'}
+                            </span>
+                            <kbd className="hidden xl:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                                Ctrl+B
+                            </kbd>
                         </button>
 
                         <div className="min-w-0">
