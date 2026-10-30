@@ -11,9 +11,9 @@ class SalesInvoiceHandler implements WebhookHandlerInterface
         // $payload = $log->payload;
         // Logic sinkronisasi Faktur Penjualan
         // Contoh: Update status pesanan di Tokopun jika Faktur dibuat/dibatalkan dari Accurate
-        
+
         // Untuk sekarang, kita fallback sinkron stok
-        $stockHandler = new StockChangeHandler();
-        $stockHandler->handle($log);
+        // $stockHandler = new StockChangeHandler();
+        // $stockHandler->handle($log);
     }
 }
