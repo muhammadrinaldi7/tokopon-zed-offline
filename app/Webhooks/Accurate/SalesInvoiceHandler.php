@@ -3,6 +3,7 @@
 namespace App\Webhooks\Accurate;
 
 use App\Models\AccurateWebhookLog;
+use Illuminate\Support\Facades\Log;
 
 class SalesInvoiceHandler implements WebhookHandlerInterface
 {
@@ -15,5 +16,6 @@ class SalesInvoiceHandler implements WebhookHandlerInterface
         // Untuk sekarang, kita fallback sinkron stok
         // $stockHandler = new StockChangeHandler();
         // $stockHandler->handle($log);
+        Log::info('SalesInvoiceHandler: ' . $log);
     }
 }
