@@ -64,11 +64,24 @@ class ProcessAccurateWebhookJob implements ShouldQueue
                 $handler->handle($log);
             } else {
                 \Illuminate\Support\Facades\Log::info("No specific handler for Accurate Webhook event: {$log->event_type}");
+                \App\Services\SyncIssueRecorder::recordHandlerNotFound($log->event_type, $log);
             }
 
             $log->update(['status' => 'success']);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Accurate Webhook Job Failed: " . $e->getMessage());
+
+            \App\Services\SyncIssueRecorder::record(
+                reasonCode: 'JOB_EXCEPTION',
+                stage: 'job_execution',
+                log: $log,
+                severity: 'critical',
+                context: [
+                    'error' => $e->getMessage(),
+                    'trace' => substr($e->getTraceAsString(), 0, 1000)
+                ]
+            );
+
             $log->update([
                 'status' => 'failed',
                 'error_message' => $e->getMessage() . "\n" . $e->getTraceAsString(),

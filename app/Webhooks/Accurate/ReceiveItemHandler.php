@@ -35,6 +35,13 @@ class ReceiveItemHandler implements WebhookHandlerInterface
                         Log::info("ReceiveItemHandler: SN, HPP, Vendor sync success for receiveItemId: {$receiveItemId}");
                     } catch (\Exception $e) {
                         Log::error("ReceiveItemHandler: SN Sync failed for receiveItemId {$receiveItemId}: " . $e->getMessage());
+                        \App\Services\SyncIssueRecorder::record(
+                            reasonCode: 'SN_SYNC_FAILED',
+                            stage: 'sync_from_receive_item',
+                            log: $log,
+                            severity: 'error',
+                            context: ['error' => $e->getMessage(), 'receiveItemId' => $receiveItemId]
+                        );
                     }
 
                     // 2. Sinkronisasi Total Stok Gudang (WarehouseStock)
@@ -47,7 +54,7 @@ class ReceiveItemHandler implements WebhookHandlerInterface
                             $warehouseName = $detail['warehouse']['name'] ?? $apiData['warehouse']['name'] ?? null;
                             
                             if ($itemNo) {
-                                $this->syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource);
+                                $this->syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource, $log);
                             }
                         }
                     } else {
@@ -55,6 +62,7 @@ class ReceiveItemHandler implements WebhookHandlerInterface
                     }
                 } else {
                     Log::warning("ReceiveItemHandler: Payload tidak memiliki receiveItemId: " . json_encode($itemData));
+                    \App\Services\SyncIssueRecorder::recordPayloadUnrecognized([$itemData], 'ReceiveItemHandler', $log);
                 }
             }
         }

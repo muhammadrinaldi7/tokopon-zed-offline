@@ -26,7 +26,7 @@ class StockChangeHandler implements WebhookHandlerInterface
                 if (isset($itemData['itemNo']) || isset($itemData['no'])) {
                     $itemNo = $itemData['itemNo'] ?? $itemData['no'];
                     $warehouseName = $itemData['warehouseName'] ?? null;
-                    $hasSn = $this->syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource);
+                    $hasSn = $this->syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource, $log);
                     if ($hasSn) $skusToSyncSn[$itemNo] = true;
                 } 
                 // Skenario 2: Payload adalah Dokumen Transaksi (punya detailItem/detailTransfer dll)
@@ -40,12 +40,13 @@ class StockChangeHandler implements WebhookHandlerInterface
                             $warehouseName = $detail['warehouse']['name'] ?? $itemData['warehouse']['name'] ?? null;
                             
                             if ($itemNo) {
-                                $hasSn = $this->syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource);
+                                $hasSn = $this->syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource, $log);
                                 if ($hasSn) $skusToSyncSn[$itemNo] = true;
                             }
                         }
                     } else {
                         Log::warning("Accurate Webhook Payload Data tidak memiliki itemNo atau detailItem: " . json_encode($itemData));
+                        \App\Services\SyncIssueRecorder::recordPayloadUnrecognized([$itemData], 'StockChangeHandler', $log);
                     }
                 }
             }
@@ -62,6 +63,14 @@ class StockChangeHandler implements WebhookHandlerInterface
                     Log::info("Webhook SN Sync sukses (dari StockChangeHandler) untuk SKU: {$sku}");
                 } catch (\Exception $e) {
                     Log::error("Webhook SN Sync failed for SKU {$sku}: " . $e->getMessage());
+                    \App\Services\SyncIssueRecorder::record(
+                        reasonCode: 'SN_SYNC_FAILED',
+                        stage: 'serial_number_sync_from_stock_change',
+                        log: $log,
+                        itemNo: (string) $sku,
+                        severity: 'error',
+                        context: ['error' => $e->getMessage()]
+                    );
                 }
             }
         }

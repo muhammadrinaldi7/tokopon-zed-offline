@@ -97,6 +97,12 @@ class ItemSaveHandler implements WebhookHandlerInterface
             Log::info("Webhook Berhasil: Master ProductAccurate diupdate untuk SKU {$itemNo} | Nama: {$newName}");
         } catch (\Exception $e) {
             Log::error("Webhook Gagal: Gagal update ProductAccurate SKU {$itemNo}. Error: " . $e->getMessage());
+            \App\Services\SyncIssueRecorder::recordDbError(
+                errorMsg: $e->getMessage(),
+                stage: 'update_product_accurate_master',
+                itemNo: (string) $itemNo,
+                databaseSource: $dbSource
+            );
         }
 
         // 4. Sinkronisasi Serial Number JIKA BARANG MEMILIKI SN
@@ -109,6 +115,14 @@ class ItemSaveHandler implements WebhookHandlerInterface
                 Log::info("Webhook SN Sync sukses (dari ItemSaveHandler) untuk SKU: {$itemNo}");
             } catch (\Exception $e) {
                 Log::error("Webhook SN Sync failed (dari ItemSaveHandler) for SKU {$itemNo}: " . $e->getMessage());
+                \App\Services\SyncIssueRecorder::record(
+                    reasonCode: 'SN_SYNC_FAILED',
+                    stage: 'serial_number_sync_from_item_save',
+                    itemNo: (string) $itemNo,
+                    severity: 'error',
+                    context: ['error' => $e->getMessage()],
+                    databaseSource: $dbSource
+                );
             }
         }
 

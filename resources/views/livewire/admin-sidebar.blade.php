@@ -194,11 +194,11 @@
         </a>
 
         @can('view-catalog-menu')
-            <div x-data="{ openProducts: {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? 'true' : 'false' }} }">
+            <div x-data="{ openProducts: {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? 'true' : 'false' }} }">
                 <button @click="openProducts = !openProducts" type="button"
-                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeClass : $inactiveClass }}">
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeClass : $inactiveClass }}">
                     <div class="flex items-center gap-3">
-                        <svg class="w-5 h-5 {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeIconClass : $inactiveIconClass }}"
+                        <svg class="w-5 h-5 {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeIconClass : $inactiveIconClass }}"
                             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -248,6 +248,18 @@
                         <a href="{{ route('admin.accurate-sync-sn') }}" wire:navigate
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-sync-sn') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                             Sync Serial Number
+                        </a>
+                        <a href="{{ route('admin.accurate.sync-issues') }}" wire:navigate
+                            class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.sync-issues') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            <span>Sync Issues Tracker</span>
+                            @php
+                                $openIssuesCount = \App\Models\AccurateSyncIssue::where('status', 'open')->count();
+                            @endphp
+                            @if ($openIssuesCount > 0)
+                                <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-tight">
+                                    {{ $openIssuesCount > 99 ? '99+' : $openIssuesCount }}
+                                </span>
+                            @endif
                         </a>
                     @endcan
                     @can('manage-accurate-customers')
