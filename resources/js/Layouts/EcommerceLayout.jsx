@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import {
     MessageSquare,
@@ -18,14 +18,17 @@ import {
     AlertCircle,
     Info,
     Store,
-    Wifi,
-    UserCheck,
     Users,
-    Share2,
     Menu,
     X,
     PanelLeftClose,
-    PanelLeftOpen
+    PanelLeftOpen,
+    Search,
+    ChevronsUpDown,
+    ExternalLink,
+    Radio,
+    ShieldCheck,
+    Sparkles
 } from 'lucide-react';
 
 export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Suite' }) {
@@ -36,7 +39,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
     const [soundEnabled, setSoundEnabled] = useState(true);
     const [wsConnected, setWsConnected] = useState(true);
     const [toast, setToast] = useState(null);
-    const audioRef = useRef(null);
+    const [navSearch, setNavSearch] = useState('');
 
     // State Sidebar Collapsible (Persisten via LocalStorage)
     const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -64,18 +67,26 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                 e.preventDefault();
                 toggleSidebar();
             }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                const searchInput = document.getElementById('crm-nav-search');
+                if (searchInput) {
+                    if (isCollapsed) setIsCollapsed(false);
+                    searchInput.focus();
+                }
+            }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+    }, [isCollapsed]);
 
     // Tutup mobile drawer saat navigasi berubah
     useEffect(() => {
         setMobileOpen(false);
     }, [url]);
 
-    // Navigasi Terstruktur 4 Kelompok (10 Sub-Modul)
-    const navigationGroups = [
+    // Navigasi Terstruktur 4 Kelompok (10 Sub-Modul CRM)
+    const rawNavigationGroups = [
         {
             title: 'Layanan & Chat',
             items: [
@@ -83,41 +94,43 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                     label: 'Live Chat CS',
                     href: '/crm/chat',
                     icon: MessageSquare,
-                    badge: null,
-                    color: 'indigo'
+                    badge: 'LIVE',
+                    badgeType: 'live',
+                    description: 'Pesan & Inbox Pelanggan Realtime',
                 },
                 {
                     label: 'Analitik Closing',
                     href: '/crm/analytics',
                     icon: TrendingUp,
                     badge: null,
-                    color: 'emerald'
+                    description: 'Konversi CS & Laporan Penjualan',
                 },
             ]
         },
         {
-            title: 'Promosi & Penjualan',
+            title: 'Promosi & Marketing',
             items: [
                 {
                     label: 'Flash Sale',
                     href: '/crm/flash-sale',
                     icon: Zap,
                     badge: 'HOT',
-                    color: 'rose'
+                    badgeType: 'promo',
+                    description: 'Promo Kilat Berbatas Waktu',
                 },
                 {
                     label: 'Voucher Kupon',
                     href: '/crm/vouchers',
                     icon: Ticket,
                     badge: null,
-                    color: 'amber'
+                    description: 'Diskon & Kode Kupon Promo',
                 },
                 {
                     label: 'Banner Promo',
                     href: '/crm/banners',
                     icon: ImageIcon,
                     badge: null,
-                    color: 'blue'
+                    description: 'Slider & Banner Beranda Web',
                 },
             ]
         },
@@ -129,21 +142,21 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                     href: '/crm/products',
                     icon: PackageCheck,
                     badge: null,
-                    color: 'purple'
+                    description: 'Katalog Produk & Galeri Foto',
                 },
                 {
                     label: 'Member Loyalty',
                     href: '/crm/loyalty',
                     icon: Crown,
                     badge: null,
-                    color: 'yellow'
+                    description: 'Tier Poin & Keanggotaan Member',
                 },
                 {
                     label: 'Referral & Komisi',
                     href: '/crm/referral',
                     icon: Users,
                     badge: null,
-                    color: 'emerald'
+                    description: 'Program Afiliasi & Reward CS',
                 },
             ]
         },
@@ -155,18 +168,34 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                     href: '/crm/payments',
                     icon: CreditCard,
                     badge: null,
-                    color: 'cyan'
+                    description: 'Metode Pembayaran Transfer & VA',
                 },
                 {
-                    label: 'Pengaturan App',
+                    label: 'Pengaturan CRM',
                     href: '/crm/settings',
                     icon: Settings,
                     badge: null,
-                    color: 'slate'
+                    description: 'Konfigurasi Jam Operasional & Toko',
                 },
             ]
         }
     ];
+
+    // Filter navigasi berdasarkan input pencarian jika ada
+    const navigationGroups = useMemo(() => {
+        if (!navSearch.trim()) return rawNavigationGroups;
+        const q = navSearch.toLowerCase().trim();
+        return rawNavigationGroups
+            .map((grp) => ({
+                ...grp,
+                items: grp.items.filter(
+                    (item) =>
+                        item.label.toLowerCase().includes(q) ||
+                        (item.description && item.description.toLowerCase().includes(q))
+                ),
+            }))
+            .filter((grp) => grp.items.length > 0);
+    }, [navSearch]);
 
     // State Izin Desktop Notification Browser & Audio Context
     const [desktopNotifStatus, setDesktopNotifStatus] = useState('default');
@@ -263,7 +292,7 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                 icon: '/favicon.ico',
                 tag: conversationId ? `tokopon-conv-${conversationId}` : 'tokopon-cs',
                 renotify: true,
-                requireInteraction: true, // Menjaga notifikasi tetap tampil di pojok layar Windows
+                requireInteraction: true,
             });
 
             notif.onclick = () => {
@@ -407,10 +436,10 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
             lastPolledIdRef.current = msgId;
         }
 
-        // 1. Putar suara lonceng (terlindung debounce 600ms)
+        // 1. Putar suara lonceng
         playChime();
 
-        // 2. Munculkan popup Windows native (seperti WA Web)
+        // 2. Munculkan popup Windows native
         triggerDesktopNotification(senderName, messageText, convId);
 
         // 3. Kedipkan tab browser jika sedang di background
@@ -452,7 +481,6 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
             }
         };
 
-        // MessageSent disiarkan dengan alias 'message.sent'
         channel.listen('.message.sent', handleMessage);
 
         return () => {
@@ -522,35 +550,66 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
         (b) => b.id === auth?.user?.active_business_unit_id
     ) || businessUnits?.[0];
 
+    const isExpanded = !isCollapsed || mobileOpen;
+
     return (
-        <div className="flex h-screen bg-slate-100 overflow-hidden text-slate-800 font-sans antialiased">
+        <div className="flex h-screen bg-[#F8FAFC] overflow-hidden text-slate-800 font-sans antialiased selection:bg-indigo-500 selection:text-white">
+            {/* Audio chime tag cadangan */}
+            <audio id="global-chat-chime" preload="auto" src="/sounds/notification.mp3" className="hidden" />
+
             {/* Mobile Backdrop Overlay */}
             {mobileOpen && (
                 <div
                     onClick={() => setMobileOpen(false)}
-                    className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 md:hidden animate-in fade-in duration-200"
+                    className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 md:hidden animate-in fade-in duration-200"
                 />
             )}
 
-            {/* ─── 1. Left Sidebar (Collapsible & Responsive) ─── */}
+            {/* ═══════════════════════════════════════════════════════════════
+                1. LEFT SIDEBAR (HubSpot / Zendesk / Crisp Enterprise Pro)
+                Deep Obsidian Theme: bg-[#0B0F19] with Slate 800 borders
+               ═══════════════════════════════════════════════════════════════ */}
             <aside
-                className={`fixed md:static inset-y-0 left-0 z-50 bg-white border-r border-slate-200/90 flex flex-col shrink-0 transition-all duration-300 ease-in-out shadow-xl md:shadow-none ${
-                    isCollapsed ? 'md:w-[72px]' : 'md:w-64'
-                } ${mobileOpen ? 'w-64 translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+                className={`fixed md:static inset-y-0 left-0 z-50 bg-[#0B0F19] text-slate-300 border-r border-slate-800/80 flex flex-col shrink-0 transition-all duration-300 ease-in-out shadow-2xl md:shadow-none select-none ${
+                    isCollapsed ? 'md:w-[68px]' : 'md:w-[260px]'
+                } ${mobileOpen ? 'w-[270px] translate-x-0' : '-translate-x-full md:translate-x-0'}`}
             >
-                {/* Brand & Toggle Header */}
-                <div className="h-16 border-b border-slate-100 flex items-center justify-between px-3.5 shrink-0 bg-white">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-700 to-purple-600 text-white flex items-center justify-center font-black shadow-sm shadow-indigo-500/20 shrink-0">
-                            <span className="text-xl">⚡</span>
+                {/* ── Brand & Workspace Header ── */}
+                <div className="h-16 px-3.5 border-b border-slate-800/80 flex items-center justify-between shrink-0 bg-[#0B0F19]">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        {/* Custom Modern Vector Logo */}
+                        <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 p-0.5 shadow-lg shadow-indigo-600/30 shrink-0 flex items-center justify-center">
+                            <div className="w-full h-full bg-[#0B0F19]/20 backdrop-blur-xs rounded-[10px] flex items-center justify-center">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    className="w-5 h-5 text-white"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                                    <path d="M2 17l10 5 10-5" />
+                                    <path d="M2 12l10 5 10-5" />
+                                </svg>
+                            </div>
+                            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0B0F19]" />
                         </div>
-                        {(!isCollapsed || mobileOpen) && (
+
+                        {/* Brand Title (Visible when expanded) */}
+                        {isExpanded && (
                             <div className="min-w-0 transition-opacity duration-200">
-                                <span className="block font-black text-slate-900 text-sm tracking-tight truncate leading-tight">
-                                    Tokopon CRM
-                                </span>
-                                <span className="block text-[10.5px] font-bold text-indigo-600 truncate uppercase tracking-wider">
-                                    E-Commerce Hub
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-extrabold text-white text-[13.5px] tracking-tight leading-none">
+                                        TOKOPON
+                                    </span>
+                                    <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 leading-none">
+                                        CRM
+                                    </span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-medium tracking-tight truncate block mt-0.5">
+                                    Commerce Suite Pro
                                 </span>
                             </div>
                         )}
@@ -560,37 +619,101 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                     <button
                         type="button"
                         onClick={() => setMobileOpen(false)}
-                        className="md:hidden p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                        title="Tutup menu"
+                        className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                        title="Tutup Menu"
                     >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4" />
                     </button>
 
                     {/* Desktop toggle collapse button */}
                     <button
                         type="button"
                         onClick={toggleSidebar}
-                        className="hidden md:flex p-1.5 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-all"
-                        title={isCollapsed ? 'Lebarkan Menu (Ctrl+B)' : 'Ciutkan Menu (Ctrl+B)'}
+                        className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-all border border-transparent hover:border-slate-700/60"
+                        title={isCollapsed ? 'Lebarkan Sidebar (Ctrl+B)' : 'Ciutkan Sidebar (Ctrl+B)'}
                     >
                         {isCollapsed ? (
-                            <PanelLeftOpen className="w-4 h-4" />
+                            <PanelLeftOpen className="w-4 h-4 text-indigo-400" />
                         ) : (
                             <PanelLeftClose className="w-4 h-4" />
                         )}
                     </button>
                 </div>
 
-                {/* Grouped Navigation Links */}
-                <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5 scrollbar-thin scrollbar-thumb-slate-200">
+                {/* ── Active Store / Business Unit Card (HubSpot / Zendesk style) ── */}
+                <div className="pt-3 px-2.5 shrink-0">
+                    {isExpanded ? (
+                        <div className="p-2 rounded-xl bg-slate-900/90 border border-slate-800/90 hover:border-slate-700 transition-colors group flex items-center justify-between">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">
+                                    <Store className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="text-[11.5px] font-semibold text-slate-200 truncate leading-tight">
+                                        {activeBU?.name || 'Toko Tokopon Pusat'}
+                                    </div>
+                                    <div className="text-[9.5px] text-slate-400 flex items-center gap-1.5 leading-tight mt-0.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        <span className="truncate">Online Store Active</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <ChevronsUpDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 transition-colors shrink-0" />
+                        </div>
+                    ) : (
+                        <div
+                            className="relative group flex justify-center py-1 cursor-pointer"
+                            title={`Toko: ${activeBU?.name || 'Toko Utama'}`}
+                        >
+                            <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-indigo-400 group-hover:border-indigo-500/40 transition-colors">
+                                <Store className="w-4 h-4" />
+                            </div>
+                            <span className="absolute bottom-1 right-2 w-2 h-2 rounded-full bg-emerald-400 border border-[#0B0F19]" />
+
+                            {/* Tooltip on collapse */}
+                            <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-slate-900 text-white text-[11px] font-semibold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-all duration-150 whitespace-nowrap shadow-xl z-50 border border-slate-700">
+                                {activeBU?.name || 'Toko Utama'} (Online)
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Quick Search Filter (Super clean like Linear / Slack) ── */}
+                {isExpanded && (
+                    <div className="px-2.5 pt-2 pb-1 shrink-0">
+                        <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                                id="crm-nav-search"
+                                type="text"
+                                value={navSearch}
+                                onChange={(e) => setNavSearch(e.target.value)}
+                                placeholder="Cari modul... (Ctrl+K)"
+                                className="w-full bg-slate-900/60 border border-slate-800/90 rounded-lg pl-8 pr-7 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/40 transition-all"
+                            />
+                            {navSearch && (
+                                <button
+                                    type="button"
+                                    onClick={() => setNavSearch('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Navigation Items List ── */}
+                <nav className="flex-1 overflow-y-auto px-2.5 py-2 space-y-4 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                     {navigationGroups.map((group, gIdx) => (
                         <div key={gIdx} className="space-y-1">
-                            {(!isCollapsed || mobileOpen) ? (
-                                <div className="px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400 select-none">
-                                    {group.title}
+                            {isExpanded ? (
+                                <div className="px-2 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between select-none">
+                                    <span>{group.title}</span>
                                 </div>
                             ) : (
-                                <div className="h-px bg-slate-100 my-2 mx-2" />
+                                <div className="h-px bg-slate-800/80 my-2 mx-1" />
                             )}
 
                             {group.items.map((item) => {
@@ -603,39 +726,56 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                                             href={item.href}
                                             preserveScroll
                                             onClick={() => setMobileOpen(false)}
-                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all duration-150 font-bold text-xs ${
+                                            className={`relative flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all duration-150 text-[12.5px] font-medium leading-none ${
                                                 isActive
-                                                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
-                                                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-                                            } ${isCollapsed && !mobileOpen ? 'justify-center px-0' : ''}`}
+                                                    ? 'bg-gradient-to-r from-indigo-500/20 via-indigo-500/10 to-transparent text-white font-semibold border-l-2 border-indigo-400 shadow-xs'
+                                                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                                            } ${isCollapsed && !mobileOpen ? 'justify-center px-0 h-9' : 'h-9'}`}
                                         >
                                             <Icon
-                                                className={`w-5 h-5 shrink-0 transition-transform group-hover:scale-105 ${
+                                                className={`w-4 h-4 shrink-0 transition-colors ${
                                                     isActive
-                                                        ? 'text-white'
-                                                        : 'text-slate-500 group-hover:text-indigo-600'
+                                                        ? 'text-indigo-400'
+                                                        : 'text-slate-400 group-hover:text-slate-200'
                                                 }`}
                                             />
 
-                                            {(!isCollapsed || mobileOpen) && (
-                                                <span className="truncate flex-1 text-[13px] tracking-tight">
+                                            {isExpanded && (
+                                                <span className="truncate flex-1 tracking-tight">
                                                     {item.label}
                                                 </span>
                                             )}
 
-                                            {(!isCollapsed || mobileOpen) && item.badge && (
-                                                <span className="text-[9.5px] px-1.5 py-0.5 rounded-full font-black bg-rose-500 text-white shrink-0 shadow-2xs">
+                                            {/* Micro Badge */}
+                                            {isExpanded && item.badge && (
+                                                <span
+                                                    className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md leading-none shrink-0 ${
+                                                        item.badgeType === 'live'
+                                                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1'
+                                                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                                    }`}
+                                                >
+                                                    {item.badgeType === 'live' && (
+                                                        <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+                                                    )}
                                                     {item.badge}
                                                 </span>
                                             )}
                                         </Link>
 
-                                        {/* Floating Tooltip when Sidebar is Collapsed */}
+                                        {/* Floating Popover Tooltip when Sidebar is Collapsed */}
                                         {isCollapsed && !mobileOpen && (
-                                            <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-all duration-150 whitespace-nowrap shadow-xl z-50 flex items-center gap-2 border border-slate-700">
-                                                <span>{item.label}</span>
+                                            <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-2 bg-slate-900/95 backdrop-blur-md text-white text-xs font-semibold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-all duration-150 whitespace-nowrap shadow-2xl z-50 border border-slate-700/80 flex items-center gap-2">
+                                                <div>
+                                                    <div className="text-white font-bold">{item.label}</div>
+                                                    {item.description && (
+                                                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                                                            {item.description}
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 {item.badge && (
-                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full font-black bg-rose-500 text-white">
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-indigo-500 text-white">
                                                         {item.badge}
                                                     </span>
                                                 )}
@@ -646,52 +786,78 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                             })}
                         </div>
                     ))}
+
+                    {navigationGroups.length === 0 && (
+                        <div className="text-center py-6 px-3 text-slate-500 text-xs">
+                            Tidak ada modul "{navSearch}"
+                        </div>
+                    )}
                 </nav>
 
-                {/* Bottom Footer Section in Sidebar */}
-                <div className="p-3 border-t border-slate-100 space-y-2 shrink-0 bg-slate-50/60">
-                    {/* Kembali ke POS */}
+                {/* ── Bottom Section: Quick App Switcher & User Profile ── */}
+                <div className="p-2.5 border-t border-slate-800/80 bg-[#080C14] space-y-2 shrink-0">
+                    {/* Kembali ke POS Toko */}
                     <a
                         href="/zoffline"
-                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-white border border-slate-200/80 transition-all shadow-2xs group ${
-                            isCollapsed && !mobileOpen ? 'justify-center px-0' : ''
+                        className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 transition-all group ${
+                            isCollapsed && !mobileOpen ? 'justify-center px-0 h-9' : 'h-9'
                         }`}
-                        title="Kembali ke Dashboard Utama POS Toko"
+                        title="Beralih ke Terminal Kasir POS"
                     >
-                        <ArrowLeft className="w-4 h-4 text-slate-500 group-hover:-translate-x-1 transition-transform shrink-0" />
-                        {(!isCollapsed || mobileOpen) && (
-                            <span className="truncate">Kembali ke POS</span>
+                        <ArrowLeft className="w-3.5 h-3.5 text-slate-400 group-hover:-translate-x-0.5 transition-transform shrink-0" />
+                        {isExpanded && (
+                            <span className="truncate flex-1 text-[11.5px]">Kembali ke POS</span>
+                        )}
+                        {isExpanded && (
+                            <span className="text-[9.5px] px-1 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+                                POS
+                            </span>
                         )}
                     </a>
 
-                    {/* Toko Aktif */}
-                    {activeBU && (!isCollapsed || mobileOpen) && (
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold">
-                            <Store className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate text-[11.5px]">{activeBU.name}</span>
+                    {/* User Profile Tile */}
+                    <div className="pt-1 flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-700 to-purple-600 text-white font-bold text-xs flex items-center justify-center shadow-xs shrink-0 ring-1 ring-white/10">
+                            {auth?.user?.name ? auth.user.name.charAt(0).toUpperCase() : 'C'}
                         </div>
-                    )}
+                        {isExpanded && (
+                            <div className="min-w-0 flex-1">
+                                <div className="text-xs font-semibold text-slate-200 truncate leading-none">
+                                    {auth?.user?.name || 'Staf Admin CRM'}
+                                </div>
+                                <div className="text-[10px] text-slate-400 truncate leading-none mt-1">
+                                    {auth?.user?.role || 'Customer Service Specialist'}
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </aside>
 
-            {/* ─── 2. Main Right Area (Header + Main Content) ─── */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                {/* Modern Top Header Toolbar */}
-                <header className="h-16 bg-white border-b border-slate-200/80 px-4 md:px-6 flex items-center justify-between gap-3 shrink-0 shadow-2xs z-20">
+            {/* ═══════════════════════════════════════════════════════════════
+                2. MAIN CONTENT AREA (Header Toolbar + Children Workspace)
+               ═══════════════════════════════════════════════════════════════ */}
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#F8FAFC]">
+                {/* Modern Enterprise Header Toolbar */}
+                <header className="h-16 bg-white border-b border-slate-200/80 px-4 md:px-6 flex items-center justify-between gap-3 shrink-0 z-20 shadow-xs">
+                    {/* Left: Mobile trigger & Breadcrumb */}
                     <div className="flex items-center gap-3 min-w-0">
-                        {/* Mobile Drawer Trigger */}
+                        {/* Mobile Drawer Button */}
                         <button
                             type="button"
                             onClick={() => setMobileOpen(true)}
-                            className="md:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                            title="Buka menu navigasi"
+                            className="md:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors shrink-0"
+                            title="Buka Menu"
                         >
                             <Menu className="w-5 h-5" />
                         </button>
 
-                        <div>
-                            <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
-                                <span>Tokopon CRM</span>
+                        <div className="min-w-0">
+                            {/* Breadcrumbs */}
+                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 truncate">
+                                <span>Tokopon Suite</span>
+                                <span>/</span>
+                                <span className="text-slate-600 font-semibold">CRM Hub</span>
                                 <span>/</span>
                                 <span className="text-indigo-600 font-bold">{title}</span>
                             </div>
@@ -701,24 +867,24 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                         </div>
                     </div>
 
-                    {/* Controls & Quick Badges */}
+                    {/* Right: Operational Controls & Status Badges */}
                     <div className="flex items-center gap-2 flex-wrap">
-                        {/* Status WebSocket Realtime */}
-                        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-xs font-bold">
+                        {/* Status WebSocket Realtime Reverb */}
+                        <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-emerald-50/80 border border-emerald-200/60 text-emerald-700 text-xs font-semibold">
                             <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                             </span>
-                            <span className="text-[11px]">Reverb Realtime</span>
+                            <span className="text-[11px] tracking-tight">Reverb WebSocket: Live</span>
                         </div>
 
                         {/* Tombol Status Izin Notifikasi Desktop Windows */}
                         <button
                             type="button"
                             onClick={requestDesktopNotificationPermission}
-                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs shrink-0 ${
+                            className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs shrink-0 ${
                                 desktopNotifStatus === 'granted'
-                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                                    ? 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                                     : desktopNotifStatus === 'denied'
                                     ? 'bg-rose-50 border-rose-300 text-rose-700'
                                     : 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
@@ -734,31 +900,31 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                             <Bell className={`w-3.5 h-3.5 ${desktopNotifStatus === 'granted' ? 'text-emerald-600' : ''}`} />
                             <span className="text-[11.5px] hidden md:inline">
                                 {desktopNotifStatus === 'granted'
-                                    ? 'Notif Desktop: Aktif'
+                                    ? 'Notif Windows: Aktif'
                                     : desktopNotifStatus === 'denied'
                                     ? 'Notif Diblokir'
-                                    : 'Izinkan Notif'}
+                                    : 'Izinkan Notifikasi'}
                             </span>
                         </button>
 
-                        {/* Toggle Suara Chime */}
+                        {/* Toggle Suara Chime Notifikasi */}
                         <button
                             type="button"
                             onClick={() => {
                                 setSoundEnabled(!soundEnabled);
                                 if (!soundEnabled) playChime();
                             }}
-                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs shrink-0 ${
+                            className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs shrink-0 ${
                                 soundEnabled
                                     ? 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                                     : 'bg-rose-50 border-rose-200 text-rose-600'
                             }`}
-                            title="Aktifkan atau bisukan suara lonceng pesan masuk"
+                            title="Aktifkan atau bisukan nada dering pesan baru"
                         >
                             {soundEnabled ? (
                                 <>
                                     <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
-                                    <span className="text-[11.5px] hidden md:inline">Suara: Aktif</span>
+                                    <span className="text-[11.5px] hidden md:inline">Suara: On</span>
                                 </>
                             ) : (
                                 <>
@@ -767,33 +933,18 @@ export default function EcommerceLayout({ children, title = 'E-Commerce & CRM Su
                                 </>
                             )}
                         </button>
-
-                        {/* User Profile Info */}
-                        <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-black text-xs shadow-xs">
-                                {auth?.user?.name ? auth.user.name.charAt(0).toUpperCase() : 'C'}
-                            </div>
-                            <div className="hidden lg:block text-left">
-                                <span className="block text-xs font-bold text-slate-900 leading-none">
-                                    {auth?.user?.name || 'Staf CS'}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-medium leading-none mt-0.5 block">
-                                    Customer Service
-                                </span>
-                            </div>
-                        </div>
                     </div>
                 </header>
 
-                {/* Main Content Area */}
+                {/* Main Content Workspace */}
                 <main className={`flex-1 relative min-h-0 ${isChatPage ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
                     {children}
 
-                    {/* Global Toast Alert */}
+                    {/* Global Floating Toast Alert */}
                     {toast && (
                         <div className="fixed bottom-5 right-5 z-50 max-w-sm animate-in slide-in-from-bottom duration-200">
                             <div
-                                className={`p-3.5 rounded-2xl shadow-xl border flex items-start gap-3 bg-white ${
+                                className={`p-3.5 rounded-xl shadow-xl border flex items-start gap-3 bg-white ${
                                     toast.type === 'success'
                                         ? 'border-emerald-300'
                                         : toast.type === 'error'
