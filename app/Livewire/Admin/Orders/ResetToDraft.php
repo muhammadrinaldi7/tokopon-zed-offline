@@ -308,7 +308,7 @@ class ResetToDraft extends Component
     // ─── Manual Accurate Retry ───
     public function retryAccuratePush($orderId)
     {
-        $order = Order::with(['items', 'payments.paymentMethod', 'user', 'branch', 'handledBy.warehouse', 'handledBy.branch'])->find($orderId);
+        $order = Order::with(['items', 'payments.paymentMethod', 'user', 'branch', 'handledBy.warehouse', 'handledBy.branch', 'accurateDocs', 'customerDeposits'])->find($orderId);
 
         if (!$order || $order->order_status !== 'COMPLETED') {
             $this->dispatch('toast', title: 'Error', message: 'Hanya transaksi COMPLETED yang dapat disinkronkan ulang.', type: 'error');
@@ -409,6 +409,23 @@ class ResetToDraft extends Component
                     $detailItems[] = $itemData;
                 }
 
+                // Hubungkan nomor DO atau SO ke baris item SI jika berasal dari SO
+                $doDoc = $order->accurateDocs()
+                    ->where('doc_type', 'DELIVERY_ORDER')
+                    ->where('status', 'SUCCESS')
+                    ->first();
+                if ($doDoc && $doDoc->doc_number && !$financePayment) {
+                    foreach ($detailItems as &$itemRow) {
+                        $itemRow['deliveryOrderNumber'] = $doDoc->doc_number;
+                    }
+                    unset($itemRow);
+                } elseif ($order->accurate_so_number && !$financePayment) {
+                    foreach ($detailItems as &$itemRow) {
+                        $itemRow['salesOrderNumber'] = $order->accurate_so_number;
+                    }
+                    unset($itemRow);
+                }
+
                 $isTaxable = $bu ? (bool) $bu->is_taxable : false;
 
                 $siData = [
@@ -422,17 +439,65 @@ class ResetToDraft extends Component
                     'description' => $order->notes
                 ];
 
+                // Kumpulkan seluruh DP yang valid (DP bawaan SO maupun pemakaian CustomerDepositUsage)
                 $validDpInvoices = [];
-                $usages = \App\Models\CustomerDepositUsage::with('customerDeposit')->where('order_id', $order->id)->get();
-                foreach ($usages as $usage) {
-                    if ($usage->customerDeposit && $usage->customerDeposit->accurate_invoice_no) {
+                $usedDpInvoiceNumbers = [];
+
+                // 1. Ambil DP langsung dari Sales Order (OrderAccurateDoc DP_INVOICE & DP_RECEIPT)
+                $soDpDocs = $order->accurateDocs()
+                    ->where('doc_type', 'DP_INVOICE')
+                    ->where('status', 'SUCCESS')
+                    ->get();
+
+                foreach ($soDpDocs as $dpInv) {
+                    $hasReceipt = $order->accurateDocs()
+                        ->where('doc_type', 'DP_RECEIPT')
+                        ->where('status', 'SUCCESS')
+                        ->where('created_at', '>=', $dpInv->created_at)
+                        ->exists();
+
+                    if ($hasReceipt && !in_array($dpInv->doc_number, $usedDpInvoiceNumbers)) {
                         $validDpInvoices[] = [
-                            'invoiceNumber' => $usage->customerDeposit->accurate_invoice_no,
-                            'paymentAmount' => (float) $usage->amount_used,
+                            'invoiceNumber' => $dpInv->doc_number,
+                            'paymentAmount' => (float) $dpInv->amount,
                         ];
+                        $usedDpInvoiceNumbers[] = $dpInv->doc_number;
                     }
                 }
-                if (count($validDpInvoices) > 0) {
+
+                // 2. Fallback: Cek jika DP berasal dari CustomerDeposit dengan origin_order_id
+                if (empty($usedDpInvoiceNumbers)) {
+                    $originDeposits = $order->customerDeposits()
+                        ->whereNotNull('accurate_invoice_no')
+                        ->get();
+
+                    foreach ($originDeposits as $dep) {
+                        if (!in_array($dep->accurate_invoice_no, $usedDpInvoiceNumbers) && (float)$dep->amount > 0) {
+                            $validDpInvoices[] = [
+                                'invoiceNumber' => $dep->accurate_invoice_no,
+                                'paymentAmount' => (float) $dep->amount,
+                            ];
+                            $usedDpInvoiceNumbers[] = $dep->accurate_invoice_no;
+                        }
+                    }
+                }
+
+                // 3. Ambil DP dari pemakaian Deposit Mandiri POS (CustomerDepositUsage)
+                $usages = \App\Models\CustomerDepositUsage::with('customerDeposit')->where('order_id', $order->id)->get();
+                foreach ($usages as $usage) {
+                    if ($usage->customerDeposit && !empty($usage->customerDeposit->accurate_invoice_no)) {
+                        $invNo = $usage->customerDeposit->accurate_invoice_no;
+                        if (!in_array($invNo, $usedDpInvoiceNumbers)) {
+                            $validDpInvoices[] = [
+                                'invoiceNumber' => $invNo,
+                                'paymentAmount' => (float) $usage->amount_used,
+                            ];
+                            $usedDpInvoiceNumbers[] = $invNo;
+                        }
+                    }
+                }
+
+                if (count($validDpInvoices) > 0 && !$financePayment) {
                     $siData['detailDownPayment'] = $validDpInvoices;
                 }
 
@@ -453,6 +518,13 @@ class ResetToDraft extends Component
                         'amount' => $order->grand_total,
                         'status' => 'SUCCESS',
                     ]);
+
+                    // Pastikan deposit yang berasal dari SO ini berstatus USED
+                    \App\Models\CustomerDeposit::where('origin_order_id', $order->id)
+                        ->where('status', 'AVAILABLE')
+                        ->update(['status' => 'USED', 'balance' => 0]);
+                } else {
+                    throw new \Exception('Gagal membuat Faktur Penjualan (SI) di Accurate: ' . ($siResult['d'][0] ?? json_encode($siResult)));
                 }
             }
 
@@ -462,6 +534,12 @@ class ResetToDraft extends Component
                 foreach ($order->payments as $payment) {
                     $rowTotal = (float)$payment->amount;
                     if ($rowTotal <= 0) continue;
+
+                    // SKIP pembayaran yang merupakan Down Payment (DP) karena DP sudah dipotongkan langsung via detailDownPayment di Sales Invoice
+                    $extId = (string)($payment->xendit_external_id ?? '');
+                    if (str_starts_with($extId, 'DP-SO-') || str_starts_with($extId, 'DP-USE-')) {
+                        continue;
+                    }
 
                     $pm = $payment->paymentMethod;
                     if (!$pm || !empty($pm->accurate_customer_no)) continue;
@@ -504,11 +582,19 @@ class ResetToDraft extends Component
                             'amount' => $netReceiptAmount,
                             'status' => 'SUCCESS',
                         ]);
+                    } else {
+                        throw new \Exception('Gagal membuat Penerimaan Penjualan (SR) di Accurate: ' . ($srResult['d'][0] ?? json_encode($srResult)));
                     }
                 }
 
                 if (!empty($srNumbers)) {
                     $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
+                } elseif (!empty($validDpInvoices)) {
+                    $totalDpAmount = array_sum(array_column($validDpInvoices, 'paymentAmount'));
+                    if ($totalDpAmount >= (float)$order->grand_total) {
+                        $dpReceiptDoc = $order->accurateDocs()->where('doc_type', 'DP_RECEIPT')->where('status', 'SUCCESS')->first();
+                        $order->update(['accurate_receipt_no' => $dpReceiptDoc->doc_number ?? 'LUNAS-DP']);
+                    }
                 }
             }
 
