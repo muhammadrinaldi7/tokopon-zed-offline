@@ -108,9 +108,9 @@ class ProcessAccurateWebhookJob implements ShouldQueue
             // menembak API Accurate untuk menarik sisa stok absolut terbaru dan sinkron SN.
             'INVENTORY_ADJUSTMENT',
             'INVENTORY_TRANSFER',
+            'ITEM_TRANSFER',
             'ITEM_ADJUSTMENT',
             'STOCK_MUTATION' => \App\Webhooks\Accurate\StockChangeHandler::class,
-
             // EVENT PEMBELIAN
             'PURCHASE_INVOICE' => \App\Webhooks\Accurate\PurchaseInvoiceHandler::class,
 
