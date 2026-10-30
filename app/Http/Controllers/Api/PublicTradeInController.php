@@ -10,9 +10,7 @@ use Illuminate\Http\Request;
 
 class PublicTradeInController extends Controller
 {
-    public function __construct(protected SettingService $settingService)
-    {
-    }
+    public function __construct(protected SettingService $settingService) {}
 
     /**
      * Get distinct list of available brands filtered by context (new, second, or old)
@@ -461,12 +459,12 @@ class PublicTradeInController extends Controller
 
         $waText = "Halo GSK Store 👋\n"
             . "Saya ingin konsultasi Tukar Tambah HP ({$targetTypeLabel}):\n\n"
-            . "📱 HP Lama: {$oldDisplayName} ({$oldProyekLabel})\n"
-            . "   ↳ Estimasi Beli: Rp " . number_format($oldPrice, 0, ',', '.') . "\n\n"
-            . "✨ HP Tujuan ({$targetTypeLabel}):\n"
+            . "HP Lama: {$oldDisplayName} ({$oldProyekLabel})\n"
+            // . "   ↳ Estimasi Beli: Rp " . number_format($oldPrice, 0, ',', '.') . "\n\n"
+            . "HP Tujuan ({$targetTypeLabel}):\n"
             . "   ↳ {$targetDisplayName} ({$targetProyekLabel})\n"
-            . "   ↳ Harga: Rp " . number_format($targetPrice, 0, ',', '.') . "\n\n"
-            . "💰 Estimasi Tambah Bayar: Rp " . number_format($difference, 0, ',', '.') . "\n\n"
+            // . "   ↳ Harga: Rp " . number_format($targetPrice, 0, ',', '.') . "\n\n"
+            . "Estimasi Tambah Bayar: Rp " . number_format($difference, 0, ',', '.') . "\n\n"
             . "Apakah unit ready di cabang terdekat? Terima kasih!";
 
         $whatsappUrl = "https://wa.me/{$waNumber}?text=" . rawurlencode($waText);
@@ -526,8 +524,8 @@ class PublicTradeInController extends Controller
 
         $waText = "Halo GSK Store 👋\n"
             . "Saya ingin jual HP second saya:\n"
-            . "📱 Perangkat: {$displayName} ({$proyekLabel})\n"
-            . "💰 Estimasi Harga: Rp " . number_format($buyPrice, 0, ',', '.') . "\n\n"
+            . "Perangkat: {$displayName} ({$proyekLabel})\n"
+            . "Estimasi Harga: Rp " . number_format($buyPrice, 0, ',', '.') . "\n\n"
             . "Bagaimana proses pengecekan fisik di store? Terima kasih!";
 
         $whatsappUrl = "https://wa.me/{$waNumber}?text=" . rawurlencode($waText);
