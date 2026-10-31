@@ -952,6 +952,17 @@ class SellPhone extends Component
         return $rules;
     }
 
+    protected $validationAttributes = [
+        'photo_depan'       => 'foto tampak depan',
+        'photo_belakang'    => 'foto tampak belakang',
+        'photo_kiri'        => 'foto samping kiri',
+        'photo_kanan'       => 'foto samping kanan',
+        'photo_atas'        => 'foto tampak atas',
+        'photo_bawah'       => 'foto tampak bawah',
+        'photo_box'         => 'foto box',
+        'photo_kelengkapan' => 'foto kelengkapan',
+    ];
+
     protected $messages = [
         'selected_sales_id.required'    => 'Silakan pilih tenaga penjualan (sales).',
         'selected_sales_id.exists'      => 'Tenaga penjualan yang dipilih tidak valid.',
@@ -965,34 +976,42 @@ class SellPhone extends Component
         'photo_depan.required'          => 'Foto tampak depan wajib diunggah.',
         'photo_depan.image'             => 'File foto depan harus berupa gambar.',
         'photo_depan.max'               => 'Ukuran foto depan maksimal 5MB.',
+        'photo_depan.uploaded'          => 'Gagal mengunggah foto tampak depan. Silakan ambil ulang.',
 
         'photo_belakang.required'       => 'Foto tampak belakang wajib diunggah.',
         'photo_belakang.image'          => 'File foto belakang harus berupa gambar.',
         'photo_belakang.max'            => 'Ukuran foto belakang maksimal 5MB.',
+        'photo_belakang.uploaded'       => 'Gagal mengunggah foto tampak belakang. Silakan ambil ulang.',
 
         'photo_kiri.required'           => 'Foto samping kiri wajib diunggah.',
         'photo_kiri.image'              => 'File foto samping kiri harus berupa gambar.',
         'photo_kiri.max'                => 'Ukuran foto samping kiri maksimal 5MB.',
+        'photo_kiri.uploaded'           => 'Gagal mengunggah foto samping kiri. Silakan ambil ulang.',
 
         'photo_kanan.required'          => 'Foto samping kanan wajib diunggah.',
         'photo_kanan.image'             => 'File foto samping kanan harus berupa gambar.',
         'photo_kanan.max'               => 'Ukuran foto samping kanan maksimal 5MB.',
+        'photo_kanan.uploaded'          => 'Gagal mengunggah foto samping kanan. Silakan ambil ulang.',
 
         'photo_atas.required'           => 'Foto tampak atas wajib diunggah.',
         'photo_atas.image'              => 'File foto tampak atas harus berupa gambar.',
         'photo_atas.max'                => 'Ukuran foto tampak atas maksimal 5MB.',
+        'photo_atas.uploaded'           => 'Gagal mengunggah foto tampak atas. Silakan ambil ulang.',
 
         'photo_bawah.required'          => 'Foto tampak bawah wajib diunggah.',
         'photo_bawah.image'             => 'File foto tampak bawah harus berupa gambar.',
         'photo_bawah.max'               => 'Ukuran foto tampak bawah maksimal 5MB.',
+        'photo_bawah.uploaded'          => 'Gagal mengunggah foto tampak bawah. Silakan ambil ulang.',
 
         'photo_box.required'            => 'Foto box wajib diunggah.',
         'photo_box.image'               => 'File foto box harus berupa gambar.',
         'photo_box.max'                 => 'Ukuran foto box maksimal 5MB.',
+        'photo_box.uploaded'            => 'Gagal mengunggah foto box belakang. Silakan ambil ulang.',
 
         'photo_kelengkapan.required'    => 'Foto kelengkapan wajib diunggah.',
         'photo_kelengkapan.image'       => 'File foto kelengkapan harus berupa gambar.',
         'photo_kelengkapan.max'         => 'Ukuran foto kelengkapan maksimal 5MB.',
+        'photo_kelengkapan.uploaded'    => 'Gagal mengunggah foto kelengkapan. Silakan ambil ulang.',
         'old_phone_additional_note.max' => 'Catatan tambahan maksimal 1000 karakter.',
 
         // Tambahkan baris ini di dalam array $messages Anda yang sudah ada
