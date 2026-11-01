@@ -162,6 +162,9 @@
                                 `[Upload Error] Gagal mengunggah file kompresi pada: ${wirePropertyName}`,
                                 error
                             );
+                            window.dispatchEvent(new CustomEvent('reset-photo-slot', {
+                                detail: { property: wirePropertyName }
+                            }));
                             window.dispatchEvent(new CustomEvent('toast', {
                                 detail: {
                                     title: 'Upload Gagal',

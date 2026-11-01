@@ -623,14 +623,23 @@
                                     $hasError = $errors->has($propertyName);
                                 @endphp
 
-                                <div x-data="{ localPreview: null }"
+                                <div x-data="{
+                                        localPreview: null,
+                                        triggerCamera() {
+                                            this.localPreview = null;
+                                            if (this.$refs.fileInput) {
+                                                this.$refs.fileInput.value = '';
+                                                this.$refs.fileInput.click();
+                                            }
+                                        }
+                                    }"
                                     @reset-missing-photo-previews.window="if ($event.detail.slots && $event.detail.slots.includes('{{ $propertyName }}')) { localPreview = null; }"
+                                    @reset-photo-slot.window="if ($event.detail.property === '{{ $propertyName }}') { localPreview = null; }"
                                     class="relative aspect-square rounded-3xl overflow-hidden transition-all duration-300 group
-                                 {{ $photoFile ? 'border border-neutral-100 shadow-sm' : 'border-2 border-dashed bg-neutral-50/50 hover:bg-neutral-50/100 cursor-pointer' }}
-                                {{ $hasError ? 'border-rose-300 bg-rose-50/20' : 'border-neutral-200 hover:border-neutral-300' }}">
+                                 {{ $photoFile ? 'border-2 border-emerald-400/80 bg-white shadow-sm' : ($hasError ? 'border-2 border-rose-400 bg-rose-50/30' : 'border-2 border-dashed bg-neutral-50/50 hover:bg-neutral-50/100 border-neutral-200 hover:border-neutral-300 cursor-pointer') }}">
 
                                     {{-- PREVIEW MURNI DARI BROWSER (ALPINE JS) --}}
-                                    <template x-if="localPreview">
+                                    <template x-if="localPreview && !{{ $hasError ? 'true' : 'false' }}">
                                         <div class="absolute inset-0 z-20">
                                             <img :src="localPreview"
                                                 class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
@@ -644,8 +653,9 @@
 
                                             {{-- Tombol Hapus --}}
                                             <button type="button"
-                                                @click="localPreview = null; $wire.set('{{ $propertyName }}', null)"
-                                                class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-40 flex items-center justify-center">
+                                                @click.stop="localPreview = null; $wire.set('{{ $propertyName }}', null); $wire.resetErrorBag('{{ $propertyName }}')"
+                                                class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-40 flex items-center justify-center cursor-pointer"
+                                                title="Hapus foto ini">
                                                 <svg class="w-3.5 h-3.5 text-rose-500" fill="none"
                                                     stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -670,9 +680,9 @@
                                     </template>
 
                                     {{-- TOMBOL UPLOAD KAMERA --}}
-                                    <label x-show="!localPreview"
+                                    <label x-show="!localPreview || {{ $hasError ? 'true' : 'false' }}"
                                         class="absolute inset-0 flex flex-col items-center justify-center p-3 text-center select-none overflow-hidden cursor-pointer z-10">
-                                        <input type="file" accept="image/*" capture="environment" class="hidden"
+                                        <input type="file" x-ref="fileInput" accept="image/*" capture="environment" class="hidden"
                                             @change="if($event.target.files.length > 0) { localPreview = URL.createObjectURL($event.target.files[0]); } customCompressHandler($event, '{{ $propertyName }}')">
                                         <div
                                             class="absolute inset-0 flex items-center justify-center z-0 group-hover:scale-110 transition-transform duration-300">
@@ -689,11 +699,33 @@
                                         </div>
                                     </label>
 
-
-                                    @error('photo_' . $key)
+                                    {{-- OVERLAY JIKA TERJADI ERROR (DILENGKAPI TOMBOL ULANGI UPLOAD) --}}
+                                    @error($propertyName)
                                         <div
-                                            class="absolute inset-x-0 bottom-0 bg-rose-500 text-white p-2 text-center z-10 flex flex-col items-center justify-center h-12">
-                                            <span class="text-[9px] font-bold uppercase">{{ $message }}</span>
+                                            @click="triggerCamera(); $wire.resetErrorBag('{{ $propertyName }}')"
+                                            class="absolute inset-0 bg-rose-950/85 backdrop-blur-xs text-white p-3 z-40 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 hover:bg-rose-900/90"
+                                            title="Klik untuk ambil ulang foto">
+                                            <div class="w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center mb-1 shadow-sm shrink-0">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                            </div>
+                                            <span class="text-[9.5px] font-black uppercase text-rose-300 tracking-wider">Gagal Upload</span>
+                                            <span class="text-[9.5px] font-bold text-white leading-tight mt-0.5 line-clamp-2 px-1 max-w-full">
+                                                {{ $message }}
+                                            </span>
+
+                                            {{-- Tombol Ambil Ulang --}}
+                                            <button type="button"
+                                                @click.stop="triggerCamera(); $wire.resetErrorBag('{{ $propertyName }}')"
+                                                class="mt-2 px-2.5 py-1 bg-white text-rose-700 hover:bg-rose-50 rounded-xl text-[10px] font-black shadow-md flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0">
+                                                <svg class="w-3 h-3 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                                <span>Ambil Ulang</span>
+                                            </button>
                                         </div>
                                     @enderror
                                 </div>
