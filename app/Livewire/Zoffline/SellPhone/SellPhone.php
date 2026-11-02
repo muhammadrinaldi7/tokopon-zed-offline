@@ -1026,6 +1026,30 @@ class SellPhone extends Component
         'selectedCustomerId.required' => 'Silakan cari dan pilih pelanggan terlebih dahulu.',
     ];
 
+    public function removePhoto($propertyName)
+    {
+        $validPhotos = [
+            'photo_depan',
+            'photo_belakang',
+            'photo_kiri',
+            'photo_kanan',
+            'photo_atas',
+            'photo_bawah',
+            'photo_box',
+            'photo_kelengkapan',
+        ];
+
+        if (in_array($propertyName, $validPhotos)) {
+            $this->$propertyName = null;
+            $this->resetErrorBag($propertyName);
+        }
+    }
+
+    public function resetErrorBag($field = null)
+    {
+        parent::resetErrorBag($field);
+    }
+
     public function submit()
     {
         // Cek Autentikasi Utama

@@ -653,7 +653,7 @@
 
                                             {{-- Tombol Hapus --}}
                                             <button type="button"
-                                                @click.stop="localPreview = null; $wire.set('{{ $propertyName }}', null); $wire.resetErrorBag('{{ $propertyName }}')"
+                                                @click.stop="localPreview = null; if ($refs.fileInput) { $refs.fileInput.value = ''; } $wire.removePhoto('{{ $propertyName }}')"
                                                 class="absolute top-2 right-2 bg-white/80 hover:bg-white text-neutral-800 p-2 rounded-xl backdrop-blur-md shadow-sm transition hover:scale-105 active:scale-95 z-40 flex items-center justify-center cursor-pointer"
                                                 title="Hapus foto ini">
                                                 <svg class="w-3.5 h-3.5 text-rose-500" fill="none"
@@ -702,7 +702,7 @@
                                     {{-- OVERLAY JIKA TERJADI ERROR (DILENGKAPI TOMBOL ULANGI UPLOAD) --}}
                                     @error($propertyName)
                                         <div
-                                            @click="triggerCamera(); $wire.resetErrorBag('{{ $propertyName }}')"
+                                            @click="triggerCamera(); $wire.removePhoto('{{ $propertyName }}')"
                                             class="absolute inset-0 bg-rose-950/85 backdrop-blur-xs text-white p-3 z-40 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 hover:bg-rose-900/90"
                                             title="Klik untuk ambil ulang foto">
                                             <div class="w-7 h-7 rounded-full bg-rose-500 text-white flex items-center justify-center mb-1 shadow-sm shrink-0">
@@ -718,7 +718,7 @@
 
                                             {{-- Tombol Ambil Ulang --}}
                                             <button type="button"
-                                                @click.stop="triggerCamera(); $wire.resetErrorBag('{{ $propertyName }}')"
+                                                @click.stop="triggerCamera(); $wire.removePhoto('{{ $propertyName }}')"
                                                 class="mt-2 px-2.5 py-1 bg-white text-rose-700 hover:bg-rose-50 rounded-xl text-[10px] font-black shadow-md flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0">
                                                 <svg class="w-3 h-3 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
