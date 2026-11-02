@@ -2105,7 +2105,7 @@ trait WithCheckoutAndReceipt
                     if (!empty($projectNo)) {
                         $doItem['projectNo'] = $projectNo;
                     }
-                    if (!empty($cartItem['item_id']) && !$isFinance) {
+                    if (!empty($cartItem['is_so_item']) && !$isFinance) {
                         $doItem['salesOrderNumber'] = $order->accurate_so_number;
                     }
                     if (!empty($detailSNs)) {
@@ -2155,13 +2155,15 @@ trait WithCheckoutAndReceipt
                             }
                         } else {
                             foreach ($siDetailItems as $index => &$i) {
-                                $i['deliveryOrderNumber'] = $doDoc->doc_number;
+                                if (!empty($this->cart[$index]['is_so_item'])) {
+                                    $i['deliveryOrderNumber'] = $doDoc->doc_number;
+                                }
                             }
                         }
                     } elseif ($order->accurate_so_number && !$isFinance) {
                         foreach ($siDetailItems as $index => &$i) {
                             // Hanya set salesOrderNumber ke SI jika item tersebut berasal dari SO
-                            if (!empty($this->cart[$index]['item_id'])) {
+                            if (!empty($this->cart[$index]['is_so_item'])) {
                                 $i['salesOrderNumber'] = $order->accurate_so_number;
                             }
                         }

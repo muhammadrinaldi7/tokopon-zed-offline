@@ -151,13 +151,24 @@
         </div>
         <div class="lg:col-span-2 space-y-6">
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 overflow-hidden">
-                <h3 class="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    Daftar Barang
-                </h3>
+                <div class="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
+                        Daftar Barang
+                    </h3>
+                    @if ($order->order_status !== 'COMPLETED' && $order->order_status !== 'CANCELLED' && $order->order_status !== 'cancelled' && !$order->accurateDocs->where('doc_type', 'SALES_INVOICE')->where('status', 'SUCCESS')->first())
+                        <button type="button" wire:click="openAddItemModal"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1c69d4] hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Tambah Barang ke SO
+                        </button>
+                    @endif
+                </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse min-w-[500px]">
                         <thead>
@@ -923,7 +934,156 @@
         </div>
     @endif
 
-    {{-- Modal Refund DP --}}
+    {{-- Modal Tambah Barang ke SO --}}
+    @if ($showAddItemModal)
+        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                {{-- Header --}}
+                <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div class="flex items-center gap-2">
+                        <div class="w-9 h-9 bg-blue-50 text-[#1c69d4] rounded-xl flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-gray-800 text-lg">Tambah Barang ke SO</h3>
+                            <p class="text-xs text-gray-500">Pilih produk dan tentukan harga untuk ditambahkan ke pesanan</p>
+                        </div>
+                    </div>
+                    <button wire:click="closeAddItemModal" class="text-gray-400 hover:text-rose-500 font-bold text-2xl leading-none">&times;</button>
+                </div>
+
+                {{-- Body --}}
+                <div class="p-6 space-y-5 overflow-y-auto">
+                    {{-- Pencarian Produk --}}
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                            Cari Produk (Nama / No. SKU) *
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </span>
+                            <input type="text" wire:model.live.debounce.300ms="searchProduct"
+                                class="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-800 focus:ring-2 focus:ring-[#1c69d4] focus:border-transparent outline-none transition"
+                                placeholder="Ketik minimal 2 huruf...">
+                        </div>
+
+                        {{-- Hasil Pencarian Dropdown --}}
+                        @if (!empty($searchResults))
+                            <div class="mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100 z-10">
+                                @foreach ($searchResults as $res)
+                                    <button type="button" wire:click="selectProductToAdd({{ $res['id'] }})"
+                                        class="w-full text-left p-3 hover:bg-blue-50/70 transition flex items-center justify-between group">
+                                        <div>
+                                            <p class="text-sm font-bold text-gray-800 group-hover:text-[#1c69d4]">{{ $res['name'] }}</p>
+                                            <p class="text-xs text-gray-400 font-mono">{{ $res['item_no'] }}</p>
+                                        </div>
+                                        <div class="text-right shrink-0 ml-3">
+                                            <p class="text-xs font-bold text-gray-700">Rp {{ number_format($res['base_price'] ?? 0, 0, ',', '.') }}</p>
+                                            @if (!empty($res['has_sn']))
+                                                <span class="inline-block text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Wajib SN</span>
+                                            @endif
+                                        </div>
+                                    </button>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Info Produk Terpilih --}}
+                    @if ($selectedProduct)
+                        <div class="p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <span class="text-[10px] font-bold text-blue-700 uppercase tracking-wider block mb-1">Produk Terpilih</span>
+                                    <h4 class="font-bold text-gray-900 text-sm leading-snug">{{ $selectedProduct->name }}</h4>
+                                    <p class="text-xs text-gray-500 font-mono mt-0.5">SKU: {{ $selectedProduct->item_no }}</p>
+                                </div>
+                                <span class="text-xs font-bold text-[#1c69d4] bg-white px-2.5 py-1 rounded-lg border border-blue-200 shrink-0">
+                                    Master: Rp {{ number_format($selectedProduct->base_price ?? 0, 0, ',', '.') }}
+                                </span>
+                            </div>
+                        </div>
+
+                        {{-- Qty & Harga Satuan --}}
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                                    Jumlah (Qty) *
+                                </label>
+                                <input type="number" wire:model.live="addItemQty" min="1"
+                                    class="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-800 focus:ring-2 focus:ring-[#1c69d4] focus:border-transparent outline-none transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                                    Harga Satuan (Rp) *
+                                </label>
+                                <input type="number" wire:model.live="addItemPrice" min="0" step="1000"
+                                    class="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-800 focus:ring-2 focus:ring-[#1c69d4] focus:border-transparent outline-none transition">
+                            </div>
+                        </div>
+
+                        {{-- Diskon --}}
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                                Diskon Item Total (Rp)
+                            </label>
+                            <input type="number" wire:model.live="addItemDiscount" min="0" step="1000"
+                                class="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-800 focus:ring-2 focus:ring-[#1c69d4] focus:border-transparent outline-none transition"
+                                placeholder="0">
+                        </div>
+
+                        {{-- Kalkulasi Dampak --}}
+                        @php
+                            $cQty = max(1, (int)$addItemQty);
+                            $cPrice = (float) preg_replace('/[^0-9]/', '', (string)$addItemPrice);
+                            $cDisc = (float) preg_replace('/[^0-9]/', '', (string)$addItemDiscount);
+                            $itemSubtotal = max(0, ($cPrice * $cQty) - $cDisc);
+                            $newGrandTotal = (float)$order->grand_total + $itemSubtotal;
+                            $paidSoTotal = (float)$order->payments()->where('status', 'PAID')->sum('amount');
+                            $newRemaining = max(0, $newGrandTotal - $paidSoTotal);
+                        @endphp
+                        <div class="p-4 bg-neutral-50 rounded-xl border border-neutral-200 text-xs space-y-2">
+                            <div class="flex justify-between text-neutral-600">
+                                <span>Subtotal Item Tambahan:</span>
+                                <span class="font-bold text-neutral-800">Rp {{ number_format($itemSubtotal, 0, ',', '.') }}</span>
+                            </div>
+                            <div class="flex justify-between text-neutral-600">
+                                <span>Total SO Baru:</span>
+                                <span class="font-bold text-neutral-800">Rp {{ number_format($newGrandTotal, 0, ',', '.') }}</span>
+                            </div>
+                            <div class="flex justify-between text-neutral-600">
+                                <span>DP yang Sudah Dibayar:</span>
+                                <span class="font-bold text-emerald-600">Rp {{ number_format($paidSoTotal, 0, ',', '.') }}</span>
+                            </div>
+                            <div class="border-t border-neutral-200 pt-2 flex justify-between font-bold">
+                                <span class="text-neutral-700">Sisa Tagihan SO:</span>
+                                <span class="text-base text-rose-600">Rp {{ number_format($newRemaining, 0, ',', '.') }}</span>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Footer --}}
+                <div class="p-5 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                    <button type="button" wire:click="closeAddItemModal"
+                        class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition">
+                        Batal
+                    </button>
+                    <button type="button" wire:click="saveNewItemToSo" wire:loading.attr="disabled"
+                        @if (!$selectedProductId) disabled @endif
+                        class="px-6 py-2.5 bg-[#1c69d4] hover:bg-blue-700 text-white font-bold rounded-xl transition flex items-center gap-2 shadow-sm shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span wire:loading.remove wire:target="saveNewItemToSo">Simpan ke SO & Sinkron Accurate</span>
+                        <span wire:loading wire:target="saveNewItemToSo">Menyimpan...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
     @if ($showRefundDpModal)
         <div class="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
             <div class="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150">

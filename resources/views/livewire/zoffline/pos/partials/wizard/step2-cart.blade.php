@@ -146,6 +146,13 @@
                                     <div class="flex items-center gap-2 mb-1">
                                         <h4 class="font-bold text-gray-900 text-lg leading-tight pr-8 lg:pr-0">
                                             {{ $baseName }}</h4>
+                                        @if ($isSoFulfillment)
+                                            @if (!empty($item['is_so_item']))
+                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 uppercase tracking-wider shrink-0">Pesanan SO</span>
+                                            @else
+                                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider shrink-0">Item Tambahan</span>
+                                            @endif
+                                        @endif
                                         {{-- @if ($item['is_second'])
                                             <span
                                                 class="px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 uppercase tracking-widest shrink-0">Second</span>
@@ -178,15 +185,17 @@
                                                 {{ number_format($item['price'], 0, ',', '.') }}</p>
                                         </div>
 
-                                        <button wire:click="openEditPriceModal({{ $index }})"
-                                            class="w-8 h-8 flex items-center justify-center text-blue-500 bg-blue-50 hover:bg-blue-100 hover:text-blue-600 rounded-lg transition-colors tooltip shrink-0"
-                                            title="Edit Harga Transaksi">
-                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
-                                                stroke="currentColor" stroke-width="2.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                            </svg>
-                                        </button>
+                                        @if (empty($item['is_so_item']))
+                                            <button wire:click="openEditPriceModal({{ $index }})"
+                                                class="w-8 h-8 flex items-center justify-center text-blue-500 bg-blue-50 hover:bg-blue-100 hover:text-blue-600 rounded-lg transition-colors tooltip shrink-0"
+                                                title="Edit Harga Transaksi">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor" stroke-width="2.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                </svg>
+                                            </button>
+                                        @endif
 
                                     </div>
                                 </div>
@@ -200,7 +209,7 @@
                                     });
                                 @endphp
 
-                                @if ($validPresets->count() > 0 || true)
+                                @if (empty($item['is_so_item']) && ($validPresets->count() > 0 || true))
                                     {{-- Always show for Custom Input --}}
                                     <div class="pt-3 flex flex-wrap items-end gap-3">
                                         @if (isset($item['discount_amount']) && $item['discount_amount'] > 0)
@@ -250,6 +259,11 @@
                                                 Input Kustom
                                             </button>
                                         @endif
+                                    </div>
+                                @elseif (!empty($item['is_so_item']) && isset($item['discount_amount']) && $item['discount_amount'] > 0)
+                                    <div class="pt-3">
+                                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Diskon SO</p>
+                                        <p class="text-sm font-bold text-indigo-600">Rp {{ number_format($item['discount_amount'], 0, ',', '.') }}</p>
                                     </div>
                                 @endif
                             </div>
@@ -323,8 +337,11 @@
                                         </div>
 
                                         {{-- Qty Control --}}
-                                        {{-- @if (!$isSoFulfillment) --}}
-                                        @if (!$isSoFulfillment)
+                                        @php
+                                            $isLockedSoItem = $isSoFulfillment && !empty($item['is_so_item']);
+                                        @endphp
+
+                                        @if (!$isLockedSoItem)
                                             <div
                                                 class="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm mt-2">
                                                 <button wire:click="decrementCartItem({{ $index }})"
@@ -347,8 +364,8 @@
 
                                 </div>
 
-                                {{-- Tombol Hapus (Selalu Tampil) --}}
-                                @if (!$isSoFulfillment)
+                                {{-- Tombol Hapus --}}
+                                @if (!$isLockedSoItem)
                                     <div
                                         class="flex justify-end border-t lg:border-t-0 border-gray-100 pt-3 lg:pt-0 lg:mt-auto">
                                         <button wire:click="removeFromCart({{ $index }})"

@@ -451,6 +451,8 @@ class Pos extends Component
                 'database_source' => $variant->database_source ?? 'syihab',
                 'promo_discounts' => $promoDiscounts,
                 'item_id' => $item->id, // Important for updating SN later
+                'is_so_item' => true,
+                'original_so_item_id' => $item->id,
                 'project_number' => $projectNo,
             ];
         }
@@ -478,12 +480,8 @@ class Pos extends Component
             $this->dispatch('toast', title: 'Pilih Sales', message: 'Faktur SO berhasil dimuat. Pesanan SO ini belum memiliki data sales, silakan pilih pramuniaga terlebih dahulu.', type: 'warning');
             $this->goToStep(1);
         } else {
-            $this->dispatch('toast', title: 'Berhasil', message: 'Faktur SO berhasil dimuat.', type: 'success');
-            if ($hasDo) {
-                $this->goToStep(4);
-            } else {
-                $this->goToStep(2);
-            }
+            $this->dispatch('toast', title: 'Berhasil', message: 'Faktur SO berhasil dimuat. Anda dapat memeriksa barang atau menambahkan produk lain sebelum pembayaran.', type: 'success');
+            $this->goToStep(2);
         }
     }
 
