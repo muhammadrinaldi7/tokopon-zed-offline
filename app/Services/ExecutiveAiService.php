@@ -80,20 +80,26 @@ PRINSIP AKURASI & ANTI-HALUSINASI MUTLAK (ZERO-HALLUCINATION POLICY):
 
 STANDAR KOMUNIKASI & FORMATTING TABEL C-LEVEL:
 1. GAYA BAHASA: Lugas, tajam, profesional, berorientasi keputusan eksekutif. Hindari basa-basi bertele-tele. Sebutkan filter/periode data yang diacu secara eksplisit di awal agar Direksi yakin pada konteks angka.
-2. ATURAN TABEL MARKDOWN (AGAR RAPI DI DESKTOP & MOBILE):
-   - Maksimal 4–5 kolom kompak per tabel.
-   - Setiap baris tabel WAJIB berada pada baris baru (`\n`), diawali tepat satu pipa (`|`) dan diakhiri tepat satu pipa (`|`). DILARANG memakai pipa ganda (`||` atau `|||`) atau baris kosong di tengah tabel.
-   - Jangan gunakan tanda bintang (`**`) di dalam sel baris biasa; penebalan (`**`) hanya boleh pada baris TOTAL di paling bawah.
-   - Contoh kerangka format tabel:
-     | No | Cabang | Omset Bersih (Share) | Margin (Laba) | Trx |
-     |----|--------|----------------------|---------------|-----|
-     | 1 | Nama Cabang | Rp XXX.XXX.XXX (XX,X%) | X,X% (Rp XX,X Jt) | XX |
+2. ATURAN TABEL MARKDOWN WAJIB (AGAR RAPI DI DESKTOP & MOBILE):
+   - Seluruh data breakdown berikut WAJIB DISAJIKAN DALAM BENTUK TABEL MARKDOWN RESMI (GFM Table) yang rapi, bergaris, dan bertingkat jelas:
+     * Kinerja & Peringkat Cabang (No, Cabang, Omset Bersih, Margin/Laba, Transaksi)
+     * Alokasi Modal per Kategori Accurate (No, Kategori Produk, Unit Fisik, Total Modal HPP, Porsi Aset %)
+     * Persebaran Stok & Modal per Gudang / Cabang Accurate (No, Gudang, Unit Fisik, Total Modal HPP, Porsi %)
+     * Alokasi Modal per Brand / Merk (No, Merk, Unit Fisik, Total Modal HPP)
+     * Top Item Bernilai Modal Terbesar (No, Nama Produk / SKU, Kuantitas, HPP Satuan, Total Modal HPP)
+   - SETIAP TABEL WAJIB memiliki baris header dan garis pemisah (|:--:|:--|...|):
+     | No | Kategori Produk | Unit Fisik | Total Nilai Modal (HPP) | Porsi Aset |
+     |:--:|:----------------|:----------:|:-----------------------:|:----------:|
+     | 1  | HANDPHONE (Baru) | 2.103 unit | Rp 14.032.717.938 | 43,8% |
+     | 2  | HP SECOND | 1.121 unit | Rp 7.372.906.811 | 23,0% |
+     |    | **TOTAL KONSOLIDASI** | **XX unit** | **Rp XX.XXX.XXX.XXX** | **100,0%** |
+   - DILARANG KERAS menggabungkan baris tabel ke samping atau membuat baris dengan format list campur pipa seperti "| * HANDPHONE... | | * HP SECOND... |"! Setiap baris tabel WAJIB berada pada baris baru (\n) yang terpisah.
+   - Jika menyajikan list/poin biasa, DILARANG memakai tanda pipa (|) di dalam kalimat, gunakan tanda koma (,) atau tanda strip (-).
 3. STRUKTUR JAWABAN ANALITIS (SESUAIKAN DENGAN PERTANYAAN):
    - **📊 Sorotan Utama**: Ringkasan angka kunci dan konteks periode/filter aktif.
-   - Tabel rincian yang rapi dan mudah dipindai (jika relevan).
+   - Tabel rincian resmi yang rapi dan mudah dipindai (gunakan tabel markdown di atas).
    - **🏆 Performa Tertinggi** & **⚠️ Area Perlu Perhatian** (anomali margin tipis <5%, beban MDR tinggi, void kasir, atau stok mengendap).
    - **💡 Rekomendasi Tindakan Eksekutif**: Langkah taktis konkret yang siap ditindaklanjuti Direksi.
-
 KAMUS STRUKTUR BISNIS TOKOPON ZED:
 - UNIT BISNIS 1 — "Syihab" (`syihab`): Ritel HP/Gadget BARU resmi (Cabang: Banjarbaru, Martapura, Sultan Adam, Veteran, Premium).
 - UNIT BISNIS 2 — "GSK Second" (`second`): Spesialis HP Second / Bekas & Tukar Tambah (Cabang berawalan "GSK - "). Setiap pertanyaan stok/penjualan HP Second merujuk ke GSK Second.
@@ -789,17 +795,19 @@ PROMPT;
     public function normalizeMarkdownTables(string $text): string
     {
         if (empty($text)) {
-            return '';
+            return "";
         }
 
-        $lines = explode("\n", $text);
+        // Pre-process collapsed row separators
+        $preprocessed = preg_replace("/\\|\\s*\\|\\s*(?=[*#\\-[0-9A-Za-z])/u", "|\\n| ", $text);
+        $lines = explode("\\n", $preprocessed);
         $processedLines = [];
         $inCodeBlock = false;
 
         foreach ($lines as $line) {
             $trimmed = trim($line);
 
-            if (str_starts_with($trimmed, '```')) {
+            if (str_starts_with($trimmed, "```")) {
                 $inCodeBlock = !$inCodeBlock;
                 $processedLines[] = $line;
                 continue;
@@ -810,20 +818,32 @@ PROMPT;
                 continue;
             }
 
-            $line = preg_replace('/^\|{2,}\s*/', '| ', $line);
-            $line = preg_replace('/\|\s*\|\s*\|\s*/', "|\n| ", $line);
-            $line = preg_replace('/\|\s*\|\s*([0-9A-Za-z#\-\:\*\—\–\w])/u', "|\n| $1", $line);
-            $line = preg_replace('/\|{2,}\s*/', "|\n| ", $line);
+            // Clean up pseudo-table bullets like "| * Item: Rp ... |"
+            if (preg_match("/^\\|\\s*[\\*\\-]\\s*(.+?)\\s*\\|$/u", $trimmed, $m)) {
+                $cleanInner = preg_replace("/\\s*\\|\\s*/", " — ", trim($m[1]));
+                $processedLines[] = "- " . $cleanInner;
+                continue;
+            }
 
-            $subLines = explode("\n", $line);
+            $line = preg_replace("/^\\|{2,}\\s*/", "| ", $line);
+            $line = preg_replace("/\\|\\s*\\|\\s*\\|\\s*/", "|\\n| ", $line);
+            $line = preg_replace("/\\|\\s*\\|\\s*([0-9A-Za-z#\\-\\:\\*\\—\\–\\w])/u", "|\\n| $1", $line);
+            $line = preg_replace("/\\|{2,}\\s*/", "|\\n| ", $line);
+
+            $subLines = explode("\\n", $line);
             foreach ($subLines as $sub) {
                 $subTrimmed = trim($sub);
-                if (str_contains($subTrimmed, '|') && !str_starts_with($subTrimmed, '>') && !str_starts_with($subTrimmed, '#')) {
-                    if (!str_starts_with($subTrimmed, '|')) {
-                        $subTrimmed = '| ' . $subTrimmed;
+                $isBulletOrHeading = str_starts_with($subTrimmed, "- ")
+                    || str_starts_with($subTrimmed, "* ")
+                    || str_starts_with($subTrimmed, "> ")
+                    || str_starts_with($subTrimmed, "#");
+
+                if (str_contains($subTrimmed, "|") && !$isBulletOrHeading) {
+                    if (!str_starts_with($subTrimmed, "|")) {
+                        $subTrimmed = "| " . $subTrimmed;
                     }
-                    if (!str_ends_with($subTrimmed, '|')) {
-                        $subTrimmed = $subTrimmed . ' |';
+                    if (!str_ends_with($subTrimmed, "|")) {
+                        $subTrimmed = $subTrimmed . " |";
                     }
                 }
                 $processedLines[] = $subTrimmed;
@@ -832,13 +852,15 @@ PROMPT;
 
         $finalLines = [];
         $inTable = false;
+        $tableRowCount = 0;
+        $firstTableRow = "";
         $inCodeBlock = false;
 
         for ($i = 0; $i < count($processedLines); $i++) {
             $line = $processedLines[$i];
             $trimmed = trim($line);
 
-            if (str_starts_with($trimmed, '```')) {
+            if (str_starts_with($trimmed, "```")) {
                 $inCodeBlock = !$inCodeBlock;
                 $finalLines[] = $line;
                 continue;
@@ -849,25 +871,36 @@ PROMPT;
                 continue;
             }
 
-            $isTableRow = str_starts_with($trimmed, '|') && str_ends_with($trimmed, '|') && strlen($trimmed) > 2;
+            $isTableRow = str_starts_with($trimmed, "|") && str_ends_with($trimmed, "|") && strlen($trimmed) > 2;
+            $isSeparatorRow = $isTableRow && preg_match("/^\\|(?:\\s*:?-{2,}:?\\s*\\|)+$/", $trimmed);
 
             if ($isTableRow) {
                 if (!$inTable) {
-                    if (!empty($finalLines) && end($finalLines) !== '') {
-                        $finalLines[] = '';
+                    if (!empty($finalLines) && end($finalLines) !== "") {
+                        $finalLines[] = "";
                     }
                     $inTable = true;
+                    $tableRowCount = 0;
+                    $firstTableRow = $trimmed;
                 }
+                $tableRowCount++;
+
+                if ($tableRowCount === 2 && !$isSeparatorRow) {
+                    $colCount = max(1, count(explode("|", $firstTableRow)) - 2);
+                    $autoSep = "|" . implode("|", array_fill(0, $colCount, "---")) . "|";
+                    $finalLines[] = $autoSep;
+                }
+
                 $finalLines[] = $trimmed;
             } else {
-                if ($inTable && $trimmed === '') {
+                if ($inTable && $trimmed === "") {
                     $nextIsTable = false;
                     for ($j = $i + 1; $j < count($processedLines); $j++) {
                         $nextTrim = trim($processedLines[$j]);
-                        if ($nextTrim === '') {
+                        if ($nextTrim === "") {
                             continue;
                         }
-                        if (str_starts_with($nextTrim, '|') && str_ends_with($nextTrim, '|')) {
+                        if (str_starts_with($nextTrim, "|") && str_ends_with($nextTrim, "|")) {
                             $nextIsTable = true;
                         }
                         break;
@@ -883,6 +916,6 @@ PROMPT;
             }
         }
 
-        return implode("\n", $finalLines);
+        return implode("\\n", $finalLines);
     }
 }

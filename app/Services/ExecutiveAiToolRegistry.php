@@ -689,44 +689,52 @@ class ExecutiveAiToolRegistry
 
         if (!empty($val['branch_breakdown'])) {
             $out .= "\nPERSEBARAN STOK & MODAL PER GUDANG / CABANG ACCURATE:\n";
+            $out .= "| No | Gudang / Cabang | Unit Fisik | Total Nilai Modal (HPP) | Porsi |\n";
+            $out .= "|:--:|:----------------|:----------:|:-----------------------:|:-----:|\n";
             foreach ($val['branch_breakdown'] as $idx => $wh) {
                 $wName = $wh['warehouse_name'] ?? ($wh['branch_name'] ?? '-');
                 $wQty = number_format($wh['total_qty'] ?? 0, 0, ',', '.');
                 $wVal = number_format($wh['total_valuation'] ?? 0, 0, ',', '.');
                 $wShare = $wh['share_percentage'] ?? ($wh['percentage'] ?? 0);
-                $out .= '- #' . ($idx + 1) . " {$wName}: {$wQty} unit | Nilai Modal: Rp {$wVal} (Porsi {$wShare}%)\n";
+                $out .= "| " . ($idx + 1) . " | {$wName} | {$wQty} unit | Rp {$wVal} | {$wShare}% |\n";
             }
         }
 
         if (!empty($val['category_breakdown'])) {
-            $out .= "\nALOKASI MODAL PER KATEGORI:\n";
-            foreach (array_slice($val['category_breakdown'], 0, 10) as $cat) {
+            $out .= "\nALOKASI MODAL PER KATEGORI UTAMA ACCURATE:\n";
+            $out .= "| No | Kategori Produk | Unit Fisik | Total Nilai Modal (HPP) | Porsi Aset |\n";
+            $out .= "|:--:|:----------------|:----------:|:-----------------------:|:----------:|\n";
+            foreach (array_slice($val['category_breakdown'], 0, 10) as $idx => $cat) {
                 $cName = $cat['category_name'] ?? ($cat['category'] ?? '-');
                 $cQty = number_format($cat['total_qty'] ?? 0, 0, ',', '.');
                 $cVal = number_format($cat['total_valuation'] ?? 0, 0, ',', '.');
                 $cShare = $cat['share_percentage'] ?? ($cat['percentage'] ?? 0);
-                $out .= "- {$cName}: {$cQty} unit | Rp {$cVal} ({$cShare}%)\n";
+                $out .= "| " . ($idx + 1) . " | {$cName} | {$cQty} unit | Rp {$cVal} | {$cShare}% |\n";
             }
         }
 
         if (!empty($val['brand_breakdown'])) {
-            $out .= "\nALOKASI MODAL PER MERK / BRAND:\n";
-            foreach (array_slice($val['brand_breakdown'], 0, 10) as $br) {
+            $out .= "\nALOKASI MODAL PER MERK / BRAND ACCURATE:\n";
+            $out .= "| No | Merk / Brand | Unit Fisik | Total Nilai Modal (HPP) |\n";
+            $out .= "|:--:|:-------------|:----------:|:-----------------------:|\n";
+            foreach (array_slice($val['brand_breakdown'], 0, 10) as $idx => $br) {
                 $brName = $br['brand_name'] ?? ($br['brand'] ?? '-');
                 $brQty = number_format($br['total_qty'] ?? 0, 0, ',', '.');
                 $brVal = number_format($br['total_valuation'] ?? 0, 0, ',', '.');
-                $out .= "- {$brName}: {$brQty} unit | Rp {$brVal}\n";
+                $out .= "| " . ($idx + 1) . " | {$brName} | {$brQty} unit | Rp {$brVal} |\n";
             }
         }
 
         if (!empty($val['top_valuation_items'])) {
             $out .= "\nTOP 12 ITEM DENGAN NILAI MODAL TERBESAR:\n";
+            $out .= "| No | Nama Produk / SKU | Kuantitas | HPP Satuan | Total Modal HPP |\n";
+            $out .= "|:--:|:------------------|:---------:|:----------:|:---------------:|\n";
             foreach (array_slice($val['top_valuation_items'], 0, 12) as $idx => $it) {
                 $itName = $it['name'] ?? ($it['product_name'] ?? '-');
                 $itQty = number_format($it['qty'] ?? ($it['total_qty'] ?? ($it['stock'] ?? 0)), 0, ',', '.');
                 $itCost = number_format($it['unit_cost'] ?? ($it['base_cost'] ?? 0), 0, ',', '.');
                 $itVal = number_format($it['total_valuation'] ?? 0, 0, ',', '.');
-                $out .= '- #' . ($idx + 1) . " {$itName}: {$itQty} unit x HPP Rp {$itCost} = Total Rp {$itVal}\n";
+                $out .= "| " . ($idx + 1) . " | {$itName} | {$itQty} unit | Rp {$itCost} | Rp {$itVal} |\n";
             }
         }
 
