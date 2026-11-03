@@ -209,14 +209,14 @@
                                     });
                                 @endphp
 
-                                @if (empty($item['is_so_item']) && ($validPresets->count() > 0 || true))
+                                @if ($validPresets->count() > 0 || true)
                                     {{-- Always show for Custom Input --}}
                                     <div class="pt-3 flex flex-wrap items-end gap-3">
                                         @if (isset($item['discount_amount']) && $item['discount_amount'] > 0)
                                             <div>
                                                 <p
                                                     class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">
-                                                    Cashback</p>
+                                                    {{ !empty($item['is_so_item']) ? 'Cashback / Diskon SO' : 'Cashback' }}</p>
                                                 <p class="text-sm font-bold text-indigo-600">Rp
                                                     {{ number_format($item['discount_amount'], 0, ',', '.') }}</p>
                                             </div>
@@ -259,11 +259,6 @@
                                                 Input Kustom
                                             </button>
                                         @endif
-                                    </div>
-                                @elseif (!empty($item['is_so_item']) && isset($item['discount_amount']) && $item['discount_amount'] > 0)
-                                    <div class="pt-3">
-                                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Diskon SO</p>
-                                        <p class="text-sm font-bold text-indigo-600">Rp {{ number_format($item['discount_amount'], 0, ',', '.') }}</p>
                                     </div>
                                 @endif
                             </div>
