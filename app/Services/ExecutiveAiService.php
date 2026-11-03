@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\AiChatHistory;
 use App\Models\User;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -13,535 +12,132 @@ class ExecutiveAiService
 {
     protected ExecutiveMetricsService $metricsService;
     protected ExecutiveInventoryService $inventoryService;
+    protected ExecutiveAiToolRegistry $toolRegistry;
     protected string $apiBase;
     protected string $apiKey;
     protected string $model;
     protected int $timeout;
+    protected float $temperature;
+    protected int $maxTokens;
 
-    public function __construct(ExecutiveMetricsService $metricsService, ExecutiveInventoryService $inventoryService)
-    {
+    public function __construct(
+        ExecutiveMetricsService $metricsService,
+        ExecutiveInventoryService $inventoryService,
+        ExecutiveAiToolRegistry $toolRegistry
+    ) {
         $this->metricsService = $metricsService;
         $this->inventoryService = $inventoryService;
+        $this->toolRegistry = $toolRegistry;
 
-        // 9router or any OpenAI-compatible gateway configuration
-        $this->apiBase = rtrim(config('services.ninerouter.base_url', 'https://api.9router.com/v1'), '/');
-        $this->apiKey = config('services.ninerouter.api_key', '');
-        $this->model = config('services.ninerouter.model', 'groq/openai/gpt-oss-120b');
+        $this->apiBase = rtrim((string) config('services.ninerouter.base_url', 'https://api.9router.com/v1'), '/');
+        $this->apiKey = (string) config('services.ninerouter.api_key', '');
+        $this->model = (string) config('services.ninerouter.model', 'groq/openai/gpt-oss-120b');
         $this->timeout = (int) config('services.ninerouter.timeout', 90);
+        $this->temperature = (float) config('services.ninerouter.temperature', 0.1);
+        $this->maxTokens = (int) config('services.ninerouter.max_tokens', 4096);
     }
 
     /**
-     * Build rich executive system prompt injected with live business metrics context.
+     * Build clean, zero-hallucination executive system prompt grounded in server-verified baseline data.
      */
-    public function buildSystemPrompt(?array $contextData = null, ?User $user = null): string
-    {
+    public function buildSystemPrompt(
+        ?string $activeTab = 'overview',
+        array $activeFilters = [],
+        ?User $user = null,
+        string $extraFallbackContext = ''
+    ): string {
         $now = now()->translatedFormat('l, d F Y H:i:s');
         $userName = $user ? $user->name : 'Bapak/Ibu Direksi';
 
-        if (empty($contextData)) {
-            $contextData = Cache::remember('executive_live_summary_context', 120, function () {
-                try {
-                    return [
-                        'period' => ['range' => 'this_month'],
-                        'summary' => $this->metricsService->getKpiSummary(['period' => 'this_month']),
-                        'branches' => $this->metricsService->getBranchComparison(['period' => 'this_month']),
-                    ];
-                } catch (\Throwable $e) {
-                    Log::warning('ExecutiveAiService fallback metrics error: ' . $e->getMessage());
-                    return null;
-                }
-            });
-        }
+        $lockedBuId = $this->toolRegistry->getLockedBusinessUnitId($user);
+        $scopeNote = $lockedBuId
+            ? "Terikat pada Unit Bisnis ID #{$lockedBuId} sesuai hak akses jabatan."
+            : 'Akses Penuh Lintas Unit Bisnis (Direksi / Grup Konsolidasi).';
 
-        $metricsContext = '';
-        if ($contextData) {
-            $period = $contextData['period']['range'] ?? 'this_month';
-            $summary = $contextData['summary'] ?? ($contextData['kpi']['summary'] ?? null);
-            $branches = $contextData['branches'] ?? null;
-            $topProducts = $contextData['top_products'] ?? null;
-            $payments = $contextData['payments'] ?? null;
-
-            if ($summary) {
-                $netSales = number_format($summary['net_sales'] ?? 0, 0, ',', '.');
-                $grossProfit = number_format($summary['gross_profit'] ?? 0, 0, ',', '.');
-                $margin = number_format($summary['profit_margin'] ?? 0, 1, ',', '.');
-                $orders = number_format($summary['total_orders'] ?? 0, 0, ',', '.');
-                $piutang = number_format($summary['piutang_amount'] ?? 0, 0, ',', '.');
-                $completed = number_format($summary['completed_amount'] ?? 0, 0, ',', '.');
-
-                $metricsContext .= "\n[DATA REALTIME AKTIF DASHBOARD]\n";
-                $metricsContext .= "- Periode Laporan: {$period}\n";
-                $metricsContext .= "- Omset Bersih (Net Sales): Rp {$netSales}\n";
-                $metricsContext .= "- Laba Kotor (Gross Profit): Rp {$grossProfit} (Margin: {$margin}%)\n";
-                $metricsContext .= "- Total Transaksi: {$orders} pesanan\n";
-                $metricsContext .= "- Realisasi Kas Lunas: Rp {$completed}\n";
-                $metricsContext .= "- Total Piutang Berjalan: Rp {$piutang}\n";
-            }
-
-            if (!empty($branches) && is_array($branches)) {
-                $metricsContext .= "\n[PERFORMA LENGKAP SELURUH CABANG]\n";
-                foreach ($branches as $idx => $b) {
-                    $bName = $b['branch_name'] ?? '-';
-                    $bNet = number_format($b['net_sales'] ?? 0, 0, ',', '.');
-                    $bProfit = number_format($b['gross_profit'] ?? 0, 0, ',', '.');
-                    $bMargin = number_format($b['margin_percentage'] ?? 0, 1, ',', '.');
-                    $bShare = $b['contribution_percentage'] ?? 0;
-                    $bOrders = number_format($b['orders_count'] ?? 0, 0, ',', '.');
-                    $metricsContext .= "- #" . ($idx + 1) . " {$bName}: Omset Bersih Rp {$bNet} (Laba Kotor: Rp {$bProfit}, Margin: {$bMargin}%, Kontribusi: {$bShare}%, Transaksi: {$bOrders})\n";
-                }
-            }
-
-            if (!empty($topProducts) && is_array($topProducts)) {
-                $metricsContext .= "\n[TOP PRODUK TERLARIS]\n";
-                foreach (array_slice($topProducts, 0, 10) as $idx => $p) {
-                    $pName = $p['name'] ?? '-';
-                    $pQty = $p['qty_sold'] ?? 0;
-                    $pRev = number_format($p['revenue'] ?? 0, 0, ',', '.');
-                    $rank = $p['rank'] ?? ($idx + 1);
-                    $metricsContext .= "- #{$rank} {$pName} ({$pQty} unit, Rp {$pRev})\n";
-                }
-            }
-
-            if (!empty($payments) && is_array($payments)) {
-                $metricsContext .= "\n[BREAKDOWN METODE PEMBAYARAN]\n";
-                foreach ($payments as $pay) {
-                    $mName = $pay['payment_method_name'] ?? '-';
-                    $mTotal = number_format($pay['total_amount'] ?? 0, 0, ',', '.');
-                    $mShare = $pay['share_percentage'] ?? 0;
-                    $mMdr = number_format($pay['total_mdr'] ?? 0, 0, ',', '.');
-                    $metricsContext .= "- {$mName}: Total Rp {$mTotal} (Porsi: {$mShare}%, Biaya MDR: Rp {$mMdr})\n";
-                }
-            }
-
-            $projects = $contextData['projects'] ?? ($contextData['project_breakdown'] ?? null);
-            if (!empty($projects) && is_array($projects)) {
-                $metricsContext .= "\n[PENJUALAN PER KATEGORI PROYEK (RESMI, INTER, NON-PROYEK)]\n";
-                foreach ($projects as $proj) {
-                    $pName = $proj['project'] ?? '-';
-                    $pSales = number_format($proj['net_sales'] ?? 0, 0, ',', '.');
-                    $pProfit = number_format($proj['gross_profit'] ?? 0, 0, ',', '.');
-                    $pMargin = number_format($proj['margin_percentage'] ?? 0, 1, ',', '.');
-                    $pShare = $proj['contribution_percentage'] ?? 0;
-                    $pQty = number_format($proj['total_qty'] ?? 0, 0, ',', '.');
-                    $metricsContext .= "- Proyek {$pName}: Omset Rp {$pSales} (Share: {$pShare}%, Laba: Rp {$pProfit}, Margin: {$pMargin}%, Qty: {$pQty} unit)\n";
-                }
-            }
-
-            $staff = $contextData['staff'] ?? null;
-            if (!empty($staff['sales']) && is_array($staff['sales'])) {
-                $metricsContext .= "\n[TOP PERFORMER SALESPERSON]\n";
-                foreach (array_slice($staff['sales'], 0, 5) as $s) {
-                    $sName = $s['sales_name'] ?? '-';
-                    $sNet = number_format($s['net_sales'] ?? 0, 0, ',', '.');
-                    $sQty = $s['total_qty'] ?? 0;
-                    $sOrders = $s['orders_count'] ?? 0;
-                    $metricsContext .= "- #{$s['rank']} {$sName}: Omset Rp {$sNet} ({$sQty} unit, {$sOrders} order)\n";
-                }
-            }
-
-            $audit = $contextData['audit'] ?? null;
-            if (!empty($audit['cashier_cancellations']) && is_array($audit['cashier_cancellations'])) {
-                $metricsContext .= "\n[AUDIT PEMBATALAN / VOID KASIR]\n";
-                foreach (array_slice($audit['cashier_cancellations'], 0, 5) as $c) {
-                    $cName = $c['cashier_name'] ?? '-';
-                    $cCount = $c['cancellation_count'] ?? 0;
-                    $cAmt = number_format($c['total_amount'] ?? 0, 0, ',', '.');
-                    $reasons = implode(', ', $c['reasons'] ?? []);
-                    $metricsContext .= "- Kasir {$cName}: {$cCount} void (Total Rp {$cAmt}) | Alasan: {$reasons}\n";
-                }
-            }
-
-            $promosData = $contextData['promos'] ?? null;
-            if (!empty($promosData['brand_breakdown']) && is_array($promosData['brand_breakdown'])) {
-                $metricsContext .= "\n[KLAIM SUBSIDI PROMO PER BRAND & VENDOR (PENAGIHAN)]\n";
-                foreach (array_slice($promosData['brand_breakdown'], 0, 5) as $b) {
-                    $bName = $b['brand'] ?? '-';
-                    $bSub = number_format($b['total_subsidy'] ?? 0, 0, ',', '.');
-                    $bCnt = $b['claims_count'] ?? 0;
-                    $metricsContext .= "- Brand {$bName}: Total Subsidi Rp {$bSub} ({$bCnt} klaim)\n";
-                    if (!empty($b['vendors'])) {
-                        foreach (array_slice($b['vendors'], 0, 3) as $v) {
-                            $vName = $v['vendor_name'] ?? '-';
-                            $vSub = number_format($v['total_subsidy'] ?? 0, 0, ',', '.');
-                            $metricsContext .= "   * Ditagihkan ke {$vName}: Rp {$vSub}\n";
-                        }
-                    }
-                }
-            }
-
-            // Provide comparative baseline between Today and Yesterday if relevant
-            $activePeriod = $contextData['period']['range'] ?? 'today';
-            if ($activePeriod === 'today') {
-                $yesterdayData = $this->getMetricsForPeriod('yesterday', $user);
-                $ySummary = $yesterdayData['summary'] ?? null;
-                if ($ySummary && ($ySummary['total_orders'] > 0 || $ySummary['net_sales'] > 0)) {
-                    $yNet = number_format($ySummary['net_sales'] ?? 0, 0, ',', '.');
-                    $yOrders = number_format($ySummary['total_orders'] ?? 0, 0, ',', '.');
-                    $yMargin = number_format($ySummary['profit_margin'] ?? 0, 1, ',', '.');
-                    $metricsContext .= "\n[KOMPARASI PERFORMA KEMARIN (YESTERDAY)]\n";
-                    $metricsContext .= "- Total Omset Kemarin: Rp {$yNet} (Transaksi: {$yOrders}, Margin: {$yMargin}%)\n";
-                }
-            } elseif ($activePeriod === 'yesterday') {
-                $todayData = $this->getMetricsForPeriod('today', $user);
-                $tSummary = $todayData['summary'] ?? null;
-                if ($tSummary && ($tSummary['total_orders'] > 0 || $tSummary['net_sales'] > 0)) {
-                    $tNet = number_format($tSummary['net_sales'] ?? 0, 0, ',', '.');
-                    $tOrders = number_format($tSummary['total_orders'] ?? 0, 0, ',', '.');
-                    $tMargin = number_format($tSummary['profit_margin'] ?? 0, 1, ',', '.');
-                    $metricsContext .= "\n[KOMPARASI PERFORMA HARI INI BERJALAN (TODAY)]\n";
-                }
-            }
-
-            if (!empty($contextData['inventory_context'])) {
-                $metricsContext .= "\n\n" . $contextData['inventory_context'] . "\n";
-            }
-
-            if (!empty($contextData['piutang_context'])) {
-                $metricsContext .= "\n\n" . $contextData['piutang_context'] . "\n";
-            }
+        $baselineSnapshot = $this->toolRegistry->buildActiveScreenBaseline($activeTab, $activeFilters, $user);
+        if (!empty($extraFallbackContext)) {
+            $baselineSnapshot .= "\n\n" . $extraFallbackContext;
         }
 
         return <<<PROMPT
-Kamu adalah "Zed Executive Intelligence AI" — Asisten Intelijen Bisnis & Penasihat Strategis khusus untuk jajaran Direksi dan C-Level PT Syihab Store & GSK Group (Tokopon Zed).
-Pengguna saat ini: {$userName}.
-Waktu saat ini: {$now}.
+Kamu adalah "Zed Executive Intelligence AI" — Asisten Intelijen Bisnis & Penasihat Strategis resmi untuk jajaran Direksi dan C-Level PT Syihab Store & GSK Group (Tokopon Zed).
+Pengguna saat ini: {$userName} ({$scopeNote})
+Waktu server saat ini: {$now}
 
-Gaya Komunikasi & Standar Jawaban:
-1. SIKAP & NADA: Sangat profesional, lugas, berbasis data, ringkas, dan berorientasi pada keputusan strategis eksekutif (C-Level). Hindari basa-basi panjang.
-2. PANDUAN FORMATTING TABEL (SANGAT KRUSIAL AGAR RAPI DI SEMUA LAYAR & MOBILE):
-   - JIKA MENAMPILKAN DATA CABANG ATAU PRODUK:
-     * TABEL HARUS KOMPAK MAKSIMAL 4-5 KOLOM (JANGAN buat 6 kolom lebar karena akan terpotong, wrapping berantakan, dan sulit dibaca di chat/mobile).
-     * SETIAP BARIS TABEL WAJIB MENGGUNAKAN BARIS BARU (LINE BREAK \n). DILARANG KERAS menggabungkan 2 atau lebih baris tabel dalam satu line teks!
-     * DILARANG MENGGUNAKAN DOUBLE/TRIPLE PIPE (|| atau |||). Setiap baris tabel WAJIB diawali tepat satu pipa (|) dan diakhiri tepat satu pipa (|).
-     * JANGAN ADA BARIS KOSONG di antara baris-baris data dalam satu tabel. Baris header langsung diikuti baris pemisah (|---|---|), lalu baris data.
-     * Padatkan informasi dalam kolom ringkas:
-       | No | Cabang | Omset Bersih (Share) | Margin (Laba) | Trx |
-       |----|--------|----------------------|---------------|-----|
-       | 1  | Banjarbaru | Rp 288.918.693 (25,4%) | 5,8% (Rp 16,7 Jt) | 106 |
-     * DILARANG menggunakan tanda bintang ganda (**) di dalam sel data tabel! Tulis teks angka dan nama cabang polos bersih tanpa asterisks agar layout tabel tidak rusak. Bolding (**) hanya diperbolehkan untuk baris TOTAL di terbawah.
-     * Tulis persentase rapat tanpa spasi sebelum persen (contoh: 25,4% BUKAN 25,4 %).
-     * Baris TOTAL wajib disertakan di bagian bawah tabel.
-3. STRUKTUR LAPORAN EKSEKUTIF YANG MUDAH DI-SCAN:
-   - Awali dengan **📊 Highlight Singkat** (Total Omset, Total Laba Kotor, Rata-rata Margin, Total Transaksi).
-   - Tampilkan Tabel Ringkas Kompak.
-   - 🎯 **Top Performer & High Margin** (cabang kontributor omset & margin tertinggi).
-   - ⚠️ **Cabang Perlu Perhatian** (cabang dengan margin di bawah target <5% atau anomali transaksi).
-   - 💡 **Rekomendasi Tindakan C-Level** (langkah konkret yang dapat langsung dieksekusi).
-4. KAMUS STRUKTUR UNIT BISNIS & ATURAN PRODUK (WAJIB DIPAHAMI):
-   - UNIT BISNIS 1: "Syihab" (HP Baru / Retail Utama Resmi)
-     * Toko Cabang: Banjarbaru, Martapura, Sultan Adam, Veteran, Premium.
-     * Produk: Khusus HP/Gadget BARU resmi (Apple Resmi, Android Baru, Aksesoris).
-   - UNIT BISNIS 2: "GSK Second" (Spesialis HP Second / Bekas & Tukar Tambah)
-     * Toko Cabang: Menggunakan prefix "GSK - " (GSK - Banjarbaru, GSK - Martapura, GSK - Sultan Adam, GSK - Veteran, GSK - Kayutangi, GSK - Sampit).
-     * ATURAN MUTLAK: SETIAP PERTANYAAN TENTANG HP SECOND / BEKAS HARUS MERUJUK KE UNIT BISNIS GSK SECOND.
-   - UNIT BISNIS 3: "GSK Distri" (Grosir / Distribusi B2B).
-5. ATURAN CARA MENJAWAB INFORMASI STOK, HARGA & LOKASI HP:
-   - JIKA ADA BLOK [DATA REALTIME STOK & LOKASI UNIT HP DI GUDANG/CABANG] ATAU [DATA PELACAKAN FISIK NOMOR SERI / IMEI], utamakan menjawab berdasarkan data tersebut.
-   - Sajikan secara detail dan ramah:
-     * Nama model produk lengkap & SKU-nya.
-     * Unit Bisnis yang menaungi (Syihab Baru vs GSK Second).
-     * Harga Jual resmi & Modal HPP (karena Anda berbicara dengan Direksi).
-     * Total unit fisik yang siap jual (Available) dan rincian lokasinya per cabang toko.
-     * Jika stok fisik kosong atau tidak tersedia di cabang tertentu, sampaikan secara transparan.
-6. ATURAN PENJELASAN PIUTANG & SISA TAGIHAN (SESUAI DASHBOARD DIREKSI):
-   - Piutang di Tokopon Zed terdiri dari DUA KATEGORI UTAMA:
-     1. "Piutang Toko": Transaksi kasir langsung (order_status = 'PIUTANG'). Barang fisik sudah diserahkan ke pelanggan namun belum dilunasi. Sisa tagihan = 100% grand total pesanan.
-     2. "Piutang Leasing / Multi-Finance": Transaksi kredit konsumen via KREDIVO, AKULAKU, Samsung Finance Plus, Home Credit, dll. Status order 'COMPLETED' karena barang sudah diambil. Jika status pembayaran 'PENDING', artinya dana talangan leasing BELUM CAIR ke rekening toko (Outstanding). Jika sudah 'PAID', artinya dana leasing sudah cair (Sisa = Rp 0).
-   - Selalu bedakan secara tegas antara Piutang Toko vs Piutang Leasing Pending.
-7. KONTEKS DATA REALTIME:
-{$metricsContext}
-8. Jawab pertanyaan Direksi dengan menganalisis angka-angka di atas secara tajam, berikan 'Key Takeaways' dan 'Rekomendasi Tindakan' praktis jika relevan.
+PRINSIP AKURASI & ANTI-HALUSINASI MUTLAK (ZERO-HALLUCINATION POLICY):
+1. DILARANG KERAS mengarang, menebak, mengestimasi, atau membulatkan sembarangan angka Rupiah, kuantitas stok, persentase margin, nama kasir, nama salesperson, maupun nomor nota/IMEI yang tidak tertulis eksplisit pada hasil Tool atau Snapshot Server.
+2. WAJIB MEMANGGIL TOOL DATA yang tersedia apabila pertanyaan Direksi membutuhkan data di luar Snapshot Layar Aktif — seperti:
+   - Audit Void Kasir / Pembatalan Nota / Buyback Overpay (`get_cashier_void_and_buyback_audit`)
+   - Peringkat Salesperson / Staf / Kasir (`get_staff_and_salesperson_kpi`)
+   - Evaluasi Biaya MDR / Mesin EDC / Metode Pembayaran (`get_payment_and_mdr_breakdown`)
+   - Valuasi Persediaan, Nilai Modal Stok & Gudang Accurate Online (`get_accurate_inventory_valuation`)
+   - Posisi Kas & Bank, Piutang Usaha (AR), dan Hutang Usaha (AP) Accurate Online (`get_accurate_financial_position`)
+   - Piutang Toko vs Piutang Leasing Pending POS (`get_pos_piutang_and_leasing_pending`)
+   - Performa Brand, Klaim Subsidi Promo Vendor, atau Penjualan Proyek (`get_brand_promo_and_project_analytics`)
+   - Cek Stok/Harga model HP spesifik, Dead Stock, atau Lacak Nomor Seri/IMEI (`search_physical_stock_imei_and_deadstock`)
+   - Komparasi lintas periode / bulan / tanggal spesifik (`get_sales_and_branch_performance` — boleh dipanggil lebih dari satu kali untuk membandingkan 2 periode berbeda).
+3. ISOLASI FILTER & RIWAYAT PERCAKAPAN: Jika angka pada pesan riwayat chat sebelumnya berasal dari periode waktu atau filter cabang/kategori/proyek yang berbeda dengan permintaan saat ini, ABAIKAN angka lama tersebut dan gunakan murni data terbaru dari Tool / Snapshot Server. Jika suatu metrik bernilai Rp 0 atau kosong, laporkan secara jujur Rp 0 / belum ada transaksi.
+
+STANDAR KOMUNIKASI & FORMATTING TABEL C-LEVEL:
+1. GAYA BAHASA: Lugas, tajam, profesional, berorientasi keputusan eksekutif. Hindari basa-basi bertele-tele. Sebutkan filter/periode data yang diacu secara eksplisit di awal agar Direksi yakin pada konteks angka.
+2. ATURAN TABEL MARKDOWN (AGAR RAPI DI DESKTOP & MOBILE):
+   - Maksimal 4–5 kolom kompak per tabel.
+   - Setiap baris tabel WAJIB berada pada baris baru (`\n`), diawali tepat satu pipa (`|`) dan diakhiri tepat satu pipa (`|`). DILARANG memakai pipa ganda (`||` atau `|||`) atau baris kosong di tengah tabel.
+   - Jangan gunakan tanda bintang (`**`) di dalam sel baris biasa; penebalan (`**`) hanya boleh pada baris TOTAL di paling bawah.
+   - Contoh kerangka format tabel:
+     | No | Cabang | Omset Bersih (Share) | Margin (Laba) | Trx |
+     |----|--------|----------------------|---------------|-----|
+     | 1 | Nama Cabang | Rp XXX.XXX.XXX (XX,X%) | X,X% (Rp XX,X Jt) | XX |
+3. STRUKTUR JAWABAN ANALITIS (SESUAIKAN DENGAN PERTANYAAN):
+   - **📊 Sorotan Utama**: Ringkasan angka kunci dan konteks periode/filter aktif.
+   - Tabel rincian yang rapi dan mudah dipindai (jika relevan).
+   - **🏆 Performa Tertinggi** & **⚠️ Area Perlu Perhatian** (anomali margin tipis <5%, beban MDR tinggi, void kasir, atau stok mengendap).
+   - **💡 Rekomendasi Tindakan Eksekutif**: Langkah taktis konkret yang siap ditindaklanjuti Direksi.
+
+KAMUS STRUKTUR BISNIS TOKOPON ZED:
+- UNIT BISNIS 1 — "Syihab" (`syihab`): Ritel HP/Gadget BARU resmi (Cabang: Banjarbaru, Martapura, Sultan Adam, Veteran, Premium).
+- UNIT BISNIS 2 — "GSK Second" (`second`): Spesialis HP Second / Bekas & Tukar Tambah (Cabang berawalan "GSK - "). Setiap pertanyaan stok/penjualan HP Second merujuk ke GSK Second.
+- UNIT BISNIS 3 — "GSK Distri" (`distri`): Distribusi / Grosir B2B.
+- DEFINISI PIUTANG POS:
+  1. "Piutang Toko": Barang diserahkan ke pelanggan langsung dengan status belum lunas (`order_status = PIUTANG`).
+  2. "Piutang Leasing / Multi-Finance": Kredit via Kredivo, Akulaku, Home Credit (HCI), Samsung Finance, dll. Jika pembayaran `PENDING`, dana talangan leasing belum cair ke rekening perusahaan.
+
+DATA SNAPSHOT TERVERIFIKASI SERVER SAAT INI:
+{$baselineSnapshot}
 PROMPT;
     }
 
     /**
-     * Detect time-period intent from user query.
+     * Extract normalized active filters & active tab from request inputs (backward-compatible).
      */
-    public function detectRequestedPeriod(string $message): ?string
+    protected function normalizeContextInputs(?string $activeTab, ?array $activeFilters, ?array $legacyContextData): array
     {
-        $msg = strtolower($message);
+        $resolvedTab = $activeTab ?: ($legacyContextData['active_tab'] ?? 'overview');
+        $resolvedFilters = !empty($activeFilters)
+            ? $activeFilters
+            : ($legacyContextData['active_filters'] ?? []);
 
-        if (preg_match('/\b(kemarin|yesterday|hari\s*kemarin)\b/i', $msg)) {
-            return 'yesterday';
+        if (empty($resolvedFilters['date_range']) && !empty($legacyContextData['period']['range'])) {
+            $resolvedFilters['date_range'] = $legacyContextData['period']['range'];
+        }
+        if (empty($resolvedFilters['start_date']) && !empty($legacyContextData['period']['start_date'])) {
+            $resolvedFilters['start_date'] = $legacyContextData['period']['start_date'];
+        }
+        if (empty($resolvedFilters['end_date']) && !empty($legacyContextData['period']['end_date'])) {
+            $resolvedFilters['end_date'] = $legacyContextData['period']['end_date'];
         }
 
-        if (preg_match('/\b(hari\s*ini|today)\b/i', $msg)) {
-            return 'today';
-        }
-
-        if (preg_match('/\b(bulan\s*lalu|last\s*month|bulan\s*kemarin)\b/i', $msg)) {
-            return 'last_month';
-        }
-
-        if (preg_match('/\b(minggu\s*lalu|last\s*week|pekan\s*lalu)\b/i', $msg)) {
-            return 'last_week';
-        }
-
-        if (preg_match('/\b(minggu\s*ini|this\s*week|pekan\s*ini)\b/i', $msg)) {
-            return 'this_week';
-        }
-
-        if (preg_match('/\b(bulan\s*ini|this\s*month)\b/i', $msg)) {
-            return 'this_month';
-        }
-
-        if (preg_match('/\b(7\s*hari|last\s*7\s*days)\b/i', $msg)) {
-            return 'last_7_days';
-        }
-
-        if (preg_match('/\b(tahun\s*ini|this\s*year)\b/i', $msg)) {
-            return 'this_year';
-        }
-
-        return null;
+        return [$resolvedTab, is_array($resolvedFilters) ? $resolvedFilters : []];
     }
 
     /**
-     * Detect real-time operational inventory / stock / IMEI / dead-stock intent from user query.
+     * Build message array with anti-pollution history window.
      */
-    public function detectInventoryIntent(string $message): ?array
-    {
-        $msg = strtolower($message);
-
-        // 1. Detect IMEI / Serial Number tracking
-        if (preg_match('/\b(?:imei|sn|serial(?:\s*number)?)\s*[:#]?\s*([a-zA-Z0-9\-\/]{4,30})\b/i', $message, $m)) {
-            return [
-                'type' => 'imei_track',
-                'imei' => trim($m[1]),
-            ];
-        }
-
-        // 2. Detect Dead Stock / Aging stock intent
-        if (preg_match('/\b(dead\s*stock|stok\s*(?:mati|mengendap|lama|tertahan)|lama\s*belum\s*laku)\b/i', $msg)) {
-            $buId = 2; // Default to GSK Second
-            if (preg_match('/\b(baru|syihab)\b/i', $msg)) {
-                $buId = 1;
-            }
-            return [
-                'type' => 'dead_stock',
-                'business_unit_id' => $buId,
-            ];
-        }
-
-        // 3. Detect stock, price, or product location inquiry
-        $inventoryKeywords = [
-            'stok', 'stock', 'harga', 'price', 'lokasi', 'ada di mana', 'tersedia', 'ketersediaan',
-            'iphone', 'ipad', 'macbook', 'apple watch', 'samsung', 'oppo', 'vivo', 'xiaomi', 'redmi',
-            'infinix', 'poco', 'iqoo', 'realme', 'second', 'bekas', '2nd', 'unit'
-        ];
-
-        $matched = false;
-        foreach ($inventoryKeywords as $kw) {
-            if (str_contains($msg, $kw)) {
-                $matched = true;
-                break;
-            }
-        }
-
-        if (!$matched) {
-            return null;
-        }
-
-        // Detect Business Unit
-        $buId = null;
-        if (preg_match('/\b(second|bekas|2nd|gsk)\b/i', $msg)) {
-            $buId = 2; // GSK Second
-        } elseif (preg_match('/\b(baru|new|resmi|syihab)\b/i', $msg)) {
-            $buId = 1; // Syihab Baru
-        }
-
-        // Detect branch filter if mentioned
-        $branches = ['banjarbaru', 'martapura', 'sultan adam', 'veteran', 'premium', 'kayutangi', 'sampit', 'head office'];
-        $branchFilter = null;
-        foreach ($branches as $b) {
-            if (str_contains($msg, $b)) {
-                $branchFilter = $b;
-                break;
-            }
-        }
-
-        // Extract product search term
-        $clean = preg_replace('/[?!.,;:]+/', ' ', $message);
-        $clean = preg_replace('/\b(cek|tolong|coba|tanya|apakah|ada|stok|stock|harga|berapa|unit|lokasi|di|cabang|toko|mana|ya|dong|min|zed|ai|mohon|info|informasi|tentang)\b/i', ' ', $clean);
-        $clean = preg_replace('/\b(saja|sih|kah|nya|kan|nih|deh|aja)\b/i', ' ', $clean);
-        $clean = preg_replace('/\b(second|bekas|2nd|baru|new|resmi|banjarbaru|martapura|veteran|sultan adam|premium|kayutangi|sampit|head office)\b/i', ' ', $clean);
-        $clean = trim(preg_replace('/\s+/', ' ', $clean));
-
-        if (empty($clean) || strlen($clean) < 2) {
-            if (preg_match('/(iphone\s*\d*(?:\s*(?:pro\s*max|pro|plus|mini))?|samsung\s*[a-z0-9\+\s]+|iqoo\s*[a-z0-9\s]+|macbook|ipad)/i', $message, $mModel)) {
-                $clean = trim($mModel[1]);
-            }
-        }
-
-        if (empty($clean)) {
-            return null;
-        }
-
-        return [
-            'type' => 'stock_search',
-            'keyword' => $clean,
-            'business_unit_id' => $buId,
-            'branch' => $branchFilter,
-        ];
-    }
-
-    /**
-     * Format dead stock data into AI context text.
-     */
-    public function formatDeadStockForAiContext(array $deadStock): string
-    {
-        if (empty($deadStock)) {
-            return "[DATA STOK MENGENDAP (DEAD STOCK): Tidak ada unit yang mengendap >30 hari, rotasi stok fisik sehat!]";
-        }
-
-        $text = "[PERINGATAN OPERASIONAL: STOK MENGENDAP / DEAD STOCK (>30 HARI DI TOKO)]\n";
-        foreach ($deadStock as $idx => $ds) {
-            $num = $idx + 1;
-            $price = number_format($ds['price'], 0, ',', '.');
-            $cost = number_format($ds['hpp'], 0, ',', '.');
-            $text .= "- #{$num} {$ds['product_name']} | Cabang: {$ds['branch']} | Qty: {$ds['qty']} unit | Mengendap: {$ds['days_in_stock']} hari (Harga Jual: Rp {$price}, Modal HPP: Rp {$cost})\n";
-        }
-        return trim($text);
-    }
-
-    /**
-     * Format piutang report strictly adhering to Dashboard.php into AI context text.
-     */
-    public function formatPiutangForAiContext(array $report): string
-    {
-        $summary = $report['summary'] ?? [];
-        $totalPiutang = number_format($summary['total_piutang'] ?? 0, 0, ',', '.');
-        $totalSisa = number_format($summary['total_sisa'] ?? 0, 0, ',', '.');
-        $piutangToko = number_format($summary['total_piutang_toko'] ?? 0, 0, ',', '.');
-        $financePending = number_format($summary['total_finance_pending'] ?? 0, 0, ',', '.');
-        $outstandingCount = $summary['outstanding_orders_count'] ?? 0;
-
-        $text = "[DATA REALTIME TRANSAKSI PIUTANG & LEASING PENDING (STANDAR DASHBOARD DIREKSI)]\n";
-        $text .= "- Total Portofolio Piutang Tercatat: Rp {$totalPiutang}\n";
-        $text .= "- Sisa Tagihan Berjalan (Outstanding Belum Masuk Kas): Rp {$totalSisa} ({$outstandingCount} transaksi)\n";
-        $text .= "  * Piutang Toko (Langsung Customer Belum Lunas): Rp {$piutangToko}\n";
-        $text .= "  * Piutang Leasing / Finance (Status PENDING Belum Cair ke Rekening): Rp {$financePending}\n";
-
-        $text .= "\nRINCIAN PER METODE (JENIS PIUTANG):\n";
-        foreach ($report['piutang_transactions'] ?? [] as $pt) {
-            $mName = $pt['payment_method'];
-            $tot = number_format($pt['total'], 0, ',', '.');
-            $sis = number_format($pt['sisa'], 0, ',', '.');
-            $trx = $pt['count_total'];
-            $pnd = $pt['count_pending'];
-            $type = $pt['type'] === 'toko' ? 'Piutang Toko Langsung' : 'Multi-Finance Leasing';
-            $text .= "- {$mName} [{$type}]: Total Rp {$tot} ({$trx} trx) | Sisa Outstanding: Rp {$sis} ({$pnd} pending)\n";
-        }
-
-        $outstandingDetails = array_filter($report['details'] ?? [], fn($d) => $d['is_outstanding']);
-        if (!empty($outstandingDetails)) {
-            $text .= "\nDAFTAR NOTA OUTSTANDING TERBESAR / MENUNGGAK:\n";
-            foreach (array_slice($outstandingDetails, 0, 10) as $idx => $d) {
-                $num = $idx + 1;
-                $net = number_format($d['net_amount'], 0, ',', '.');
-                $text .= "  #{$num} Nota {$d['order_number']} ({$d['order_date']}, {$d['aging_days']} hr) | {$d['payment_method']} | Cabang: {$d['branch']} | Pelanggan: {$d['customer_name']} | Sisa: Rp {$net}\n";
-            }
-        }
-
-        return trim($text);
-    }
-
-    public function getMetricsForPeriod(string $period, ?User $user = null): array
-    {
-        $cacheKey = 'executive_metrics_auto_' . $period . '_' . ($user ? $user->id : 'all');
-
-        return Cache::remember($cacheKey, 60, function () use ($period, $user) {
-            $filters = ['date_range' => $period];
-            if ($user && !$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
-                $filters['business_unit_id'] = $user->business_unit_id;
-            }
-
-            try {
-                $kpi = $this->metricsService->getKpiSummary($filters);
-                $branches = $this->metricsService->getBranchComparison($filters);
-                $topProducts = $this->metricsService->getTopProducts($filters, 10);
-                $payments = $this->metricsService->getPaymentMethodBreakdown($filters);
-                $projectReport = $this->metricsService->getProjectSalesReport($filters);
-                $staff = $this->metricsService->getStaffKpi($filters);
-                $audit = $this->metricsService->getCashierAudit($filters);
-                $promos = $this->metricsService->getPromoClaims($filters);
-
-                return [
-                    'period' => ['range' => $period],
-                    'summary' => $kpi['summary'] ?? null,
-                    'branches' => $branches,
-                    'top_products' => $topProducts,
-                    'payments' => $payments,
-                    'projects' => $projectReport['project_breakdown'] ?? [],
-                    'staff' => $staff,
-                    'audit' => $audit,
-                    'promos' => $promos,
-                ];
-            } catch (\Throwable $e) {
-                Log::warning("Failed to fetch metrics for period {$period}: " . $e->getMessage());
-                return ['period' => ['range' => $period]];
-            }
-        });
-    }
-
-    /**
-     * Send chat prompt to 9router / OpenAI-compatible endpoint and record history.
-     */
-    public function chat(string $message, string $sessionId, int $adminId, ?array $contextData = null, ?User $user = null): array
-    {
-        // 1. Detect if user is asking for a specific period (e.g. 'yesterday' or 'last_month')
-        $detectedPeriod = $this->detectRequestedPeriod($message);
-        $activeContextPeriod = $contextData['period']['range'] ?? null;
-
-        if ($detectedPeriod && $detectedPeriod !== $activeContextPeriod) {
-            $contextData = $this->getMetricsForPeriod($detectedPeriod, $user);
-        } elseif (empty($contextData)) {
-            $contextData = $this->getMetricsForPeriod($detectedPeriod ?: 'today', $user);
-        }
-
-        // 1b. Real-time Inventory & Operational Intent Pre-fetch
-        $inventoryIntent = $this->detectInventoryIntent($message);
-        if ($inventoryIntent) {
-            if ($inventoryIntent['type'] === 'stock_search') {
-                $searchResults = $this->inventoryService->searchInventory(
-                    $inventoryIntent['keyword'],
-                    $inventoryIntent['business_unit_id'],
-                    $inventoryIntent['branch'] ?? null
-                );
-                $contextData['inventory_context'] = $this->inventoryService->formatInventoryForAiContext($searchResults);
-            } elseif ($inventoryIntent['type'] === 'imei_track') {
-                $imeiResult = $this->inventoryService->trackSerialNumber($inventoryIntent['imei']);
-                $contextData['inventory_context'] = $this->inventoryService->formatImeiForAiContext($imeiResult);
-            } elseif ($inventoryIntent['type'] === 'dead_stock') {
-                $deadStock = $this->inventoryService->getDeadStockAlerts($inventoryIntent['business_unit_id'] ?? 2, 30);
-                $contextData['inventory_context'] = $this->formatDeadStockForAiContext($deadStock);
-            }
-        }
-
-        // 1c. Piutang Intent Pre-fetch (Standar Dashboard.php)
-        if (preg_match('/\b(piutang|leasing|tagihan|outstanding|kredivo|akulaku|samsung\s*finance|hci|home\s*credit|menunggak|belum\s*lunas|belum\s*cair)\b/i', $message)) {
-            $periodToUse = $detectedPeriod ?: ($contextData['period']['range'] ?? 'this_month');
-            $piutangFilters = [
-                'date_range' => $periodToUse,
-                'start_date' => $contextData['period']['start_date'] ?? null,
-                'end_date' => $contextData['period']['end_date'] ?? null,
-            ];
-            if ($user && !$user->hasAnyRole(['superadmin', 'director', 'admin'])) {
-                $piutangFilters['business_unit_id'] = $user->business_unit_id;
-            }
-            $piutangReport = $this->metricsService->getPiutangReport($piutangFilters);
-            $contextData['piutang_context'] = $this->formatPiutangForAiContext($piutangReport);
-        }
-
-        // 2. Record user message
-        AiChatHistory::create([
-            'admin_id' => $adminId,
-            'session_id' => $sessionId,
-            'role' => 'user',
-            'message' => $message,
-        ]);
-
-        // 2. Load recent conversation history for this session (up to 8 messages for context)
+    protected function buildConversationMessages(
+        int $adminId,
+        string $sessionId,
+        string $systemPrompt
+    ): array {
         $pastMessages = AiChatHistory::where('admin_id', $adminId)
             ->where('session_id', $sessionId)
             ->orderBy('id', 'desc')
@@ -549,80 +145,532 @@ PROMPT;
             ->get()
             ->reverse();
 
-        $messages = [];
-
-        // System prompt with live context
-        $messages[] = [
-            'role' => 'system',
-            'content' => $this->buildSystemPrompt($contextData, $user),
+        $messages = [
+            [
+                'role' => 'system',
+                'content' => $systemPrompt,
+            ],
         ];
 
-        // Append historical conversation
         foreach ($pastMessages as $hist) {
             $messages[] = [
                 'role' => $hist->role === 'assistant' ? 'assistant' : 'user',
-                'content' => $hist->message,
+                'content' => (string) $hist->message,
             ];
         }
 
-        // 3. Call 9router OpenAI-compatible chat completions
-        $endpoint = $this->apiBase . '/chat/completions';
+        return $messages;
+    }
 
-        try {
-            $request = Http::timeout($this->timeout);
+    /**
+     * Standard JSON chat completion with multi-turn LLM Tool Calling.
+     */
+    public function chat(
+        string $message,
+        string $sessionId,
+        int $adminId,
+        ?array $legacyContextData = null,
+        ?User $user = null,
+        ?string $activeTab = null,
+        ?array $activeFilters = null
+    ): array {
+        [$resolvedTab, $resolvedFilters] = $this->normalizeContextInputs($activeTab, $activeFilters, $legacyContextData);
 
-            if (!empty($this->apiKey)) {
-                $request = $request->withToken($this->apiKey);
+        AiChatHistory::create([
+            'admin_id' => $adminId,
+            'session_id' => $sessionId,
+            'role' => 'user',
+            'message' => $message,
+        ]);
+
+        $systemPrompt = $this->buildSystemPrompt($resolvedTab, $resolvedFilters, $user);
+        $messages = $this->buildConversationMessages($adminId, $sessionId, $systemPrompt);
+        $tools = $this->toolRegistry->getToolDefinitions();
+
+        $reply = $this->executeToolLoopSync($messages, $tools, $message, $resolvedTab, $resolvedFilters, $user);
+        $reply = $this->normalizeMarkdownTables($reply);
+
+        $assistantRecord = AiChatHistory::create([
+            'admin_id' => $adminId,
+            'session_id' => $sessionId,
+            'role' => 'assistant',
+            'message' => $reply,
+        ]);
+
+        return [
+            'reply' => $reply,
+            'session_id' => $sessionId,
+            'created_at' => $assistantRecord->created_at->format('Y-m-d H:i:s'),
+            'model' => $this->model,
+        ];
+    }
+
+    /**
+     * Real-time Server-Sent Events (SSE) streaming chat with live tool execution status updates.
+     */
+    public function streamChat(
+        string $message,
+        string $sessionId,
+        int $adminId,
+        callable $emitEvent,
+        ?User $user = null,
+        ?string $activeTab = null,
+        ?array $activeFilters = null,
+        ?array $legacyContextData = null
+    ): void {
+        [$resolvedTab, $resolvedFilters] = $this->normalizeContextInputs($activeTab, $activeFilters, $legacyContextData);
+
+        $emitEvent([
+            'type' => 'status',
+            'text' => 'Memverifikasi filter & konteks data aktif...',
+        ]);
+
+        AiChatHistory::create([
+            'admin_id' => $adminId,
+            'session_id' => $sessionId,
+            'role' => 'user',
+            'message' => $message,
+        ]);
+
+        $systemPrompt = $this->buildSystemPrompt($resolvedTab, $resolvedFilters, $user);
+        $messages = $this->buildConversationMessages($adminId, $sessionId, $systemPrompt);
+        $tools = $this->toolRegistry->getToolDefinitions();
+
+        $fullReply = '';
+        $maxRounds = 3;
+        $useTools = true;
+
+        for ($round = 0; $round < $maxRounds; $round++) {
+            $emitEvent([
+                'type' => 'status',
+                'text' => $round === 0 ? 'Menganalisis pertanyaan Direksi...' : 'Menyusun sintesis eksekutif...',
+            ]);
+
+            $stepResult = $this->performSingleStreamingRound($messages, $useTools ? $tools : [], function (string $deltaText) use (&$fullReply, $emitEvent) {
+                $fullReply .= $deltaText;
+                $emitEvent([
+                    'type' => 'delta',
+                    'text' => $deltaText,
+                ]);
+            });
+
+            if ($stepResult['tools_unsupported'] && $useTools) {
+                // Gateway model rejected `tools`: hydrate server-side fallback and retry without tools
+                $useTools = false;
+                $emitEvent([
+                    'type' => 'status',
+                    'text' => 'Mengambil data lintas modul dari server...',
+                ]);
+                $fallbackData = $this->toolRegistry->hydrateFallbackToolsForQuery($message, $resolvedFilters, $user);
+                $messages[0]['content'] = $this->buildSystemPrompt($resolvedTab, $resolvedFilters, $user, $fallbackData);
+                continue;
             }
 
+            $toolCalls = $stepResult['tool_calls'] ?? [];
+            if (empty($toolCalls)) {
+                if ($fullReply === '' && !empty($stepResult['content'])) {
+                    $fullReply = $stepResult['content'];
+                    $emitEvent([
+                        'type' => 'delta',
+                        'text' => $fullReply,
+                    ]);
+                }
+                break;
+            }
+
+            // Append assistant tool_calls request message
+            $messages[] = [
+                'role' => 'assistant',
+                'content' => $stepResult['content'] ?? '',
+                'tool_calls' => array_values($toolCalls),
+            ];
+
+            // Execute each requested tool with live status feedback
+            foreach ($toolCalls as $tc) {
+                $fnName = $tc['function']['name'] ?? '';
+                $rawArgs = $tc['function']['arguments'] ?? '{}';
+                $decodedArgs = json_decode($rawArgs, true);
+                if (!is_array($decodedArgs)) {
+                    $decodedArgs = [];
+                }
+
+                $emitEvent([
+                    'type' => 'status',
+                    'text' => $this->toolRegistry->getToolStatusLabel($fnName),
+                ]);
+
+                $toolOutput = $this->toolRegistry->executeTool($fnName, $decodedArgs, $resolvedFilters, $user);
+                $messages[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $tc['id'] ?? ('call_' . uniqid()),
+                    'name' => $fnName,
+                    'content' => $toolOutput,
+                ];
+            }
+        }
+
+        if (trim($fullReply) === '') {
+            $fullReply = 'Maaf, asisten tidak menghasilkan respons teks saat ini. Silakan ulangi pertanyaan Anda.';
+            $emitEvent([
+                'type' => 'delta',
+                'text' => $fullReply,
+            ]);
+        }
+
+        $normalizedReply = $this->normalizeMarkdownTables($fullReply);
+
+        $assistantRecord = AiChatHistory::create([
+            'admin_id' => $adminId,
+            'session_id' => $sessionId,
+            'role' => 'assistant',
+            'message' => $normalizedReply,
+        ]);
+
+        $emitEvent([
+            'type' => 'done',
+            'reply' => $normalizedReply,
+            'session_id' => $sessionId,
+            'created_at' => $assistantRecord->created_at->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
+     * Execute synchronous multi-turn tool loop for non-streaming requests.
+     */
+    protected function executeToolLoopSync(
+        array $messages,
+        array $tools,
+        string $originalMessage,
+        ?string $activeTab,
+        array $activeFilters,
+        ?User $user
+    ): string {
+        $endpoint = $this->apiBase . '/chat/completions';
+        $maxRounds = 3;
+        $useTools = true;
+
+        for ($round = 0; $round < $maxRounds; $round++) {
             $payload = [
                 'model' => $this->model,
                 'messages' => $messages,
                 'stream' => false,
-                'temperature' => (float) config('services.ninerouter.temperature', 0.4),
-                'max_tokens' => (int) config('services.ninerouter.max_tokens', 2000),
+                'temperature' => $this->temperature,
+                'max_tokens' => $this->maxTokens,
             ];
+
+            if ($useTools && !empty($tools)) {
+                $payload['tools'] = $tools;
+                $payload['tool_choice'] = 'auto';
+            }
+
+            $request = Http::timeout($this->timeout);
+            if (!empty($this->apiKey)) {
+                $request = $request->withToken($this->apiKey);
+            }
 
             $response = $request->post($endpoint, $payload);
 
             if ($response->failed()) {
-                $errMsg = 'Koneksi ke 9router AI gagal (HTTP ' . $response->status() . '): ' . $response->body();
-                Log::error($errMsg);
-                throw new \Exception($errMsg);
+                // Graceful fallback if upstream provider rejects `tools` parameter
+                if ($useTools && in_array($response->status(), [400, 422], true)) {
+                    Log::warning('ExecutiveAiService: Upstream rejected tools parameter, switching to server-side hydrator fallback.', [
+                        'status' => $response->status(),
+                        'body' => substr($response->body(), 0, 400),
+                    ]);
+                    $useTools = false;
+                    $fallbackData = $this->toolRegistry->hydrateFallbackToolsForQuery($originalMessage, $activeFilters, $user);
+                    $messages[0]['content'] = $this->buildSystemPrompt($activeTab, $activeFilters, $user, $fallbackData);
+                    continue;
+                }
+
+                Log::error('ExecutiveAiService upstream HTTP failure', [
+                    'status' => $response->status(),
+                    'body' => substr($response->body(), 0, 800),
+                ]);
+                throw new \RuntimeException('Upstream AI gateway error (HTTP ' . $response->status() . ')');
             }
 
-            $reply = $this->extractReplyFromResponse($response);
-            $reply = $this->normalizeMarkdownTables($reply);
+            $toolCalls = $this->extractToolCallsFromResponse($response);
+            if (empty($toolCalls)) {
+                return $this->extractReplyFromResponse($response);
+            }
 
-            // 4. Save assistant response
-            $assistantRecord = AiChatHistory::create([
-                'admin_id' => $adminId,
-                'session_id' => $sessionId,
+            $assistantContent = '';
+            $json = $response->json();
+            if (is_array($json) && isset($json['choices'][0]['message']['content']) && is_string($json['choices'][0]['message']['content'])) {
+                $assistantContent = $json['choices'][0]['message']['content'];
+            }
+
+            $messages[] = [
                 'role' => 'assistant',
-                'message' => $reply,
-            ]);
-
-            return [
-                'reply' => $reply,
-                'session_id' => $sessionId,
-                'created_at' => $assistantRecord->created_at->format('Y-m-d H:i:s'),
-                'model' => $this->model,
+                'content' => $assistantContent,
+                'tool_calls' => array_values($toolCalls),
             ];
-        } catch (\Exception $e) {
-            Log::error('ExecutiveAiService Error: ' . $e->getMessage());
-            throw $e;
+
+            foreach ($toolCalls as $tc) {
+                $fnName = $tc['function']['name'] ?? '';
+                $rawArgs = $tc['function']['arguments'] ?? '{}';
+                $decodedArgs = json_decode($rawArgs, true);
+                if (!is_array($decodedArgs)) {
+                    $decodedArgs = [];
+                }
+
+                $toolResult = $this->toolRegistry->executeTool($fnName, $decodedArgs, $activeFilters, $user);
+                $messages[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $tc['id'] ?? ('call_' . uniqid()),
+                    'name' => $fnName,
+                    'content' => $toolResult,
+                ];
+            }
         }
+
+        // Final synthesis call without tools if max tool rounds were reached
+        $finalReq = Http::timeout($this->timeout);
+        if (!empty($this->apiKey)) {
+            $finalReq = $finalReq->withToken($this->apiKey);
+        }
+        $finalRes = $finalReq->post($endpoint, [
+            'model' => $this->model,
+            'messages' => $messages,
+            'stream' => false,
+            'temperature' => $this->temperature,
+            'max_tokens' => $this->maxTokens,
+        ]);
+
+        if ($finalRes->failed()) {
+            Log::error('ExecutiveAiService final synthesis failure', [
+                'status' => $finalRes->status(),
+                'body' => substr($finalRes->body(), 0, 500),
+            ]);
+            throw new \RuntimeException('Upstream AI synthesis error');
+        }
+
+        return $this->extractReplyFromResponse($finalRes);
     }
 
     /**
-     * Generate an on-demand 1-click strategic executive summary for current dashboard metrics.
+     * Execute one streaming round against the OpenAI-compatible endpoint, supporting both streamed SSE chunks and plain JSON responses.
      */
-    public function generateExecutiveSummary(array $contextData, int $adminId, ?User $user = null): array
+    protected function performSingleStreamingRound(array $messages, array $tools, callable $onDelta): array
     {
-        $sessionId = 'summary-' . date('Ymd');
-        $prompt = "Berikan Analisis Eksekutif & Ringkasan Strategis C-Level atas seluruh data performa bisnis Tokopon Zed pada periode ini. Sajikan dalam 3 bagian terstruktur:\n1. 📊 Key Performance Highlights (Kinerja Omset & Transaksi)\n2. ⚖️ Analisis Margin, Beban MDR, & Risiko Piutang\n3. 🎯 Rekomendasi Langkah Strategis untuk Direksi.";
+        $endpoint = $this->apiBase . '/chat/completions';
+        $payload = [
+            'model' => $this->model,
+            'messages' => $messages,
+            'stream' => true,
+            'temperature' => $this->temperature,
+            'max_tokens' => $this->maxTokens,
+        ];
 
-        return $this->chat($prompt, $sessionId, $adminId, $contextData, $user);
+        if (!empty($tools)) {
+            $payload['tools'] = $tools;
+            $payload['tool_choice'] = 'auto';
+        }
+
+        $request = Http::timeout($this->timeout)->withOptions(['stream' => true]);
+        if (!empty($this->apiKey)) {
+            $request = $request->withToken($this->apiKey);
+        }
+
+        $response = $request->post($endpoint, $payload);
+
+        if ($response->failed()) {
+            $errBody = (string) $response->getBody();
+            if (!empty($tools) && in_array($response->status(), [400, 422], true)) {
+                Log::warning('ExecutiveAiService stream: tools rejected by upstream, falling back.', [
+                    'status' => $response->status(),
+                    'body' => substr($errBody, 0, 400),
+                ]);
+                return ['tools_unsupported' => true, 'tool_calls' => [], 'content' => ''];
+            }
+
+            Log::error('ExecutiveAiService stream HTTP error', [
+                'status' => $response->status(),
+                'body' => substr($errBody, 0, 800),
+            ]);
+            throw new \RuntimeException('Upstream AI stream error (HTTP ' . $response->status() . ')');
+        }
+
+        $psrBody = $response->toPsrResponse()->getBody();
+        $buffer = '';
+        $rawAll = '';
+        $collectedContent = '';
+        $toolCallsAccum = [];
+        $sawSseDataLine = false;
+
+        while (!$psrBody->eof()) {
+            if (connection_aborted()) {
+                break;
+            }
+
+            $chunk = $psrBody->read(1024);
+            if ($chunk === '') {
+                usleep(15000);
+                continue;
+            }
+
+            $rawAll .= $chunk;
+            $buffer .= $chunk;
+
+            while (($newlinePos = strpos($buffer, "\n")) !== false) {
+                $line = trim(substr($buffer, 0, $newlinePos));
+                $buffer = substr($buffer, $newlinePos + 1);
+
+                if ($line === '' || !str_starts_with($line, 'data:')) {
+                    continue;
+                }
+
+                $sawSseDataLine = true;
+                $dataStr = trim(substr($line, 5));
+                if ($dataStr === '' || $dataStr === '[DONE]') {
+                    continue;
+                }
+
+                $decoded = json_decode($dataStr, true);
+                if (!is_array($decoded) || !isset($decoded['choices'][0])) {
+                    continue;
+                }
+
+                $choice = $decoded['choices'][0];
+                $delta = $choice['delta'] ?? ($choice['message'] ?? []);
+
+                if (!empty($delta['tool_calls']) && is_array($delta['tool_calls'])) {
+                    foreach ($delta['tool_calls'] as $idx => $tcDelta) {
+                        $slot = $tcDelta['index'] ?? $idx;
+                        if (!isset($toolCallsAccum[$slot])) {
+                            $toolCallsAccum[$slot] = [
+                                'id' => $tcDelta['id'] ?? ('call_' . uniqid()),
+                                'type' => 'function',
+                                'function' => [
+                                    'name' => '',
+                                    'arguments' => '',
+                                ],
+                            ];
+                        }
+                        if (!empty($tcDelta['id'])) {
+                            $toolCallsAccum[$slot]['id'] = $tcDelta['id'];
+                        }
+                        if (!empty($tcDelta['function']['name'])) {
+                            $toolCallsAccum[$slot]['function']['name'] .= $tcDelta['function']['name'];
+                        }
+                        if (isset($tcDelta['function']['arguments']) && is_string($tcDelta['function']['arguments'])) {
+                            $toolCallsAccum[$slot]['function']['arguments'] .= $tcDelta['function']['arguments'];
+                        }
+                    }
+                }
+
+                if (isset($delta['content']) && is_string($delta['content']) && $delta['content'] !== '') {
+                    $collectedContent .= $delta['content'];
+                    if (empty($toolCallsAccum)) {
+                        $onDelta($delta['content']);
+                    }
+                }
+            }
+        }
+
+        // Handle case where proxy buffered response into standard non-SSE JSON object
+        if (!$sawSseDataLine && trim($rawAll) !== '') {
+            $cleaned = preg_replace('/\s*data:\s*\[DONE\]\s*$/s', '', trim($rawAll));
+            $json = json_decode($cleaned, true);
+            if (is_array($json) && isset($json['choices'][0]['message'])) {
+                $msg = $json['choices'][0]['message'];
+                if (!empty($msg['tool_calls']) && is_array($msg['tool_calls'])) {
+                    return [
+                        'tools_unsupported' => false,
+                        'tool_calls' => $msg['tool_calls'],
+                        'content' => is_string($msg['content'] ?? null) ? $msg['content'] : '',
+                    ];
+                }
+                $txt = $msg['content'] ?? ($msg['reasoning_content'] ?? '');
+                if (is_string($txt) && trim($txt) !== '') {
+                    return [
+                        'tools_unsupported' => false,
+                        'tool_calls' => [],
+                        'content' => trim($txt),
+                    ];
+                }
+            }
+        }
+
+        return [
+            'tools_unsupported' => false,
+            'tool_calls' => array_values($toolCallsAccum),
+            'content' => $collectedContent,
+        ];
+    }
+
+    /**
+     * Extract tool_calls from a standard JSON chat completion response if present.
+     */
+    protected function extractToolCallsFromResponse(\Illuminate\Http\Client\Response $response): array
+    {
+        $body = trim($response->body());
+        $cleanedBody = preg_replace('/\s*data:\s*\[DONE\]\s*$/s', '', $body);
+        $json = json_decode($cleanedBody, true) ?? $response->json();
+
+        if (is_array($json) && !empty($json['choices'][0]['message']['tool_calls']) && is_array($json['choices'][0]['message']['tool_calls'])) {
+            return $json['choices'][0]['message']['tool_calls'];
+        }
+
+        return [];
+    }
+
+    /**
+     * Generate an on-demand 1-click strategic executive summary strictly from server-verified metrics.
+     */
+    public function generateExecutiveSummary(
+        ?array $legacyContextData,
+        int $adminId,
+        ?User $user = null,
+        ?array $activeFilters = null
+    ): array {
+        [, $resolvedFilters] = $this->normalizeContextInputs('overview', $activeFilters, $legacyContextData);
+
+        $salesBlock = $this->toolRegistry->executeTool('get_sales_and_branch_performance', [], $resolvedFilters, $user);
+        $mdrBlock = $this->toolRegistry->executeTool('get_payment_and_mdr_breakdown', [], $resolvedFilters, $user);
+        $piutangBlock = $this->toolRegistry->executeTool('get_pos_piutang_and_leasing_pending', [], $resolvedFilters, $user);
+
+        $combinedVerifiedData = implode("\n\n", [$salesBlock, $mdrBlock, $piutangBlock]);
+        $systemPrompt = $this->buildSystemPrompt('overview', $resolvedFilters, $user, $combinedVerifiedData);
+
+        $prompt = "Berikan Analisis Eksekutif & Ringkasan Strategis C-Level atas seluruh data terverifikasi server pada periode & filter aktif ini. Sajikan ringkas, tajam, dan akurat dalam 3 bagian terstruktur:\n1. 📊 Sorotan Kinerja Utama (Omset Bersih, Laba Kotor, Transaksi & Cabang Kontributor)\n2. ⚠️ Evaluasi Margin, Beban MDR EDC & Risiko Piutang/Leasing Pending\n3. 💡 Rekomendasi Langkah Strategis untuk Direksi.";
+
+        $messages = [
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user', 'content' => $prompt],
+        ];
+
+        $endpoint = $this->apiBase . '/chat/completions';
+        $request = Http::timeout($this->timeout);
+        if (!empty($this->apiKey)) {
+            $request = $request->withToken($this->apiKey);
+        }
+
+        $response = $request->post($endpoint, [
+            'model' => $this->model,
+            'messages' => $messages,
+            'stream' => false,
+            'temperature' => $this->temperature,
+            'max_tokens' => $this->maxTokens,
+        ]);
+
+        if ($response->failed()) {
+            Log::error('ExecutiveAiService summarize HTTP failure', [
+                'status' => $response->status(),
+                'body' => substr($response->body(), 0, 500),
+            ]);
+            throw new \RuntimeException('Upstream AI summary error');
+        }
+
+        $reply = $this->normalizeMarkdownTables($this->extractReplyFromResponse($response));
+
+        return [
+            'reply' => $reply,
+            'session_id' => 'executive-summary-' . date('Ymd'),
+            'created_at' => now()->format('Y-m-d H:i:s'),
+            'model' => $this->model,
+        ];
     }
 
     /**
@@ -630,16 +678,16 @@ PROMPT;
      */
     public function getHistory(int $adminId, ?string $sessionId = null, int $limit = 50): Collection
     {
+        $targetSession = $sessionId ?: 'exec-drawer-session';
+
         return AiChatHistory::where('admin_id', $adminId)
-            ->when($sessionId, function ($q) use ($sessionId) {
-                $q->where('session_id', $sessionId);
-            })
+            ->where('session_id', $targetSession)
             ->orderBy('id', 'asc')
             ->take($limit)
             ->get(['id', 'role', 'message', 'created_at'])
             ->map(function ($item) {
                 if ($item->role === 'assistant') {
-                    $item->message = $this->normalizeMarkdownTables($item->message);
+                    $item->message = $this->normalizeMarkdownTables((string) $item->message);
                 }
                 return $item;
             });
@@ -658,33 +706,21 @@ PROMPT;
     }
 
     /**
-     * Robustly extract textual reply from 9router / OpenAI-compatible response,
-     * handling standard JSON, reasoning/thinking models, content arrays, and SSE streams.
+     * Robustly extract textual reply from OpenAI-compatible response.
      */
     protected function extractReplyFromResponse(\Illuminate\Http\Client\Response $response): string
     {
         $body = trim($response->body());
-        
-        // Strip trailing 'data: [DONE]' or streaming sentinel appended by some router gateways
         $cleanedBody = preg_replace('/\s*data:\s*\[DONE\]\s*$/s', '', $body);
         $json = json_decode($cleanedBody, true) ?? $response->json();
 
-        // 1. Standard OpenAI / Groq JSON format
         if (is_array($json) && isset($json['choices'][0])) {
             $choice = $json['choices'][0];
 
-            // Direct message content
             if (isset($choice['message']['content']) && is_string($choice['message']['content']) && trim($choice['message']['content']) !== '') {
                 return trim($choice['message']['content']);
             }
 
-            // Reasoning models (Groq / DeepSeek / OpenAI reasoning)
-            $reasoning = $choice['message']['reasoning_content'] ?? ($choice['message']['reasoning'] ?? null);
-            if (!empty($reasoning) && is_string($reasoning) && trim($reasoning) !== '') {
-                return trim($reasoning);
-            }
-
-            // Message content as array of blocks (e.g. Claude format)
             if (isset($choice['message']['content']) && is_array($choice['message']['content'])) {
                 $textParts = [];
                 foreach ($choice['message']['content'] as $block) {
@@ -699,16 +735,19 @@ PROMPT;
                 }
             }
 
-            // Legacy completions format (choices[0].text)
+            $reasoning = $choice['message']['reasoning_content'] ?? ($choice['message']['reasoning'] ?? null);
+            if (!empty($reasoning) && is_string($reasoning) && trim($reasoning) !== '') {
+                return trim($reasoning);
+            }
+
             if (!empty($choice['text']) && is_string($choice['text'])) {
                 return trim($choice['text']);
             }
         }
 
-        // 2. Fallback: Parse Server-Sent Events (SSE) stream if response came as streaming chunks
         if (str_contains($body, 'data:')) {
             $collectedText = '';
-            $lines = preg_split("/\r\n|\n|\r/", $body);
+            $lines = preg_split("/\r\n|\n|\r/", $body) ?: [];
 
             foreach ($lines as $line) {
                 $line = trim($line);
@@ -724,8 +763,8 @@ PROMPT;
                 $chunk = json_decode($dataPayload, true);
                 if (is_array($chunk) && isset($chunk['choices'][0]['delta'])) {
                     $delta = $chunk['choices'][0]['delta'];
-                    $content = $delta['content'] ?? ($delta['reasoning_content'] ?? null);
-                    if ($content) {
+                    $content = $delta['content'] ?? null;
+                    if (is_string($content) && $content !== '') {
                         $collectedText .= $content;
                     }
                 }
@@ -741,14 +780,11 @@ PROMPT;
             'body_sample' => substr($body, 0, 500),
         ]);
 
-        return 'Maaf, AI tidak menghasilkan respons teks.';
+        return 'Maaf, asisten tidak menghasilkan respons teks saat ini.';
     }
 
     /**
-     * Robustly normalize and repair markdown tables from LLM:
-     * - Fixes consecutive pipes (||, |||) and collapsed rows into proper line breaks
-     * - Ensures valid leading and trailing pipes
-     * - Enforces GFM table continuity without accidental blank lines
+     * Robustly normalize and repair markdown tables from LLM.
      */
     public function normalizeMarkdownTables(string $text): string
     {
@@ -774,12 +810,9 @@ PROMPT;
                 continue;
             }
 
-            // Clean up multi-pipe artifacts at the start of a line
             $line = preg_replace('/^\|{2,}\s*/', '| ', $line);
-
-            // Convert collapsed row separators into line breaks
             $line = preg_replace('/\|\s*\|\s*\|\s*/', "|\n| ", $line);
-            $line = preg_replace('/\|\s*\|\s*([0-9A-Za-z#\-\:\*\—\–\w])/', "|\n| $1", $line);
+            $line = preg_replace('/\|\s*\|\s*([0-9A-Za-z#\-\:\*\—\–\w])/u', "|\n| $1", $line);
             $line = preg_replace('/\|{2,}\s*/', "|\n| ", $line);
 
             $subLines = explode("\n", $line);
@@ -831,7 +864,9 @@ PROMPT;
                     $nextIsTable = false;
                     for ($j = $i + 1; $j < count($processedLines); $j++) {
                         $nextTrim = trim($processedLines[$j]);
-                        if ($nextTrim === '') continue;
+                        if ($nextTrim === '') {
+                            continue;
+                        }
                         if (str_starts_with($nextTrim, '|') && str_ends_with($nextTrim, '|')) {
                             $nextIsTable = true;
                         }
@@ -851,4 +886,3 @@ PROMPT;
         return implode("\n", $finalLines);
     }
 }
-

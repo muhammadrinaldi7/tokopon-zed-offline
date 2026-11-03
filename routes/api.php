@@ -134,10 +134,12 @@ Route::prefix('v1/executive')->group(function () {
                 ->name('api.executive.financial.sync');
         });
 
-        // AI Executive Assistant Endpoints (Direct 9router Integration)
-        Route::prefix('ai')->group(function () {
+        // AI Executive Assistant Endpoints (Server-Verified Tool-Calling & Rate-Limited)
+        Route::prefix('ai')->middleware('throttle:15,1')->group(function () {
             Route::post('/chat', [\App\Http\Controllers\Api\Executive\ExecutiveAiController::class, 'chat'])
                 ->name('api.executive.ai.chat');
+            Route::post('/chat/stream', [\App\Http\Controllers\Api\Executive\ExecutiveAiController::class, 'stream'])
+                ->name('api.executive.ai.stream');
             Route::get('/history', [\App\Http\Controllers\Api\Executive\ExecutiveAiController::class, 'history'])
                 ->name('api.executive.ai.history');
             Route::post('/summarize', [\App\Http\Controllers\Api\Executive\ExecutiveAiController::class, 'summarize'])

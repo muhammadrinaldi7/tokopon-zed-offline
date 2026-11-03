@@ -54,8 +54,8 @@ return [
         'api_key' => env('NINEROUTER_API_KEY', env('OPENAI_API_KEY', '')),
         'model' => env('NINEROUTER_MODEL', 'groq/openai/gpt-oss-120b'),
         'timeout' => (int) env('NINEROUTER_TIMEOUT', 90),
-        'temperature' => (float) env('NINEROUTER_TEMPERATURE', 0.4),
-        'max_tokens' => (int) env('NINEROUTER_MAX_TOKENS', 2000),
+        'temperature' => (float) env('NINEROUTER_TEMPERATURE', 0.1),
+        'max_tokens' => (int) env('NINEROUTER_MAX_TOKENS', 4096),
     ],
 
     'n8n' => [
