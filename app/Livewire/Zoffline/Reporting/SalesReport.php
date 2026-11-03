@@ -347,7 +347,13 @@ class SalesReport extends Component
                         // Non-SN: ambil base_cost dari variant / ProductAccurate
                         $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
                         $itemModal = $baseCost * (float)$item->qty;
+                        $vendor = $variant?->vendor_name ?? $variant?->accurateData?->vendor_name ?? '-';
                     }
+
+                    // Ambil HPP dari field unit_hpp di order_items, fallback ke $itemModal jika transaksi lama belum memiliki unit_hpp
+                    $itemHpp = (isset($item->unit_hpp) && (float)$item->unit_hpp != 0)
+                        ? (float)$item->unit_hpp
+                        : ($item->qty != 0 ? round($itemModal / abs($item->qty), 2) : $itemModal);
 
                     $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
                     $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];
@@ -384,7 +390,7 @@ class SalesReport extends Component
                         $itemLoyaltyDiscount,
                         $item->subtotal,
                         $penjualanBersih,
-                        $itemModal,
+                        $itemHpp,
                     ];
 
                     $itemTotalPembayaranKotor = 0;
@@ -680,7 +686,7 @@ class SalesReport extends Component
             $activeBuId = Auth::user()?->getActiveBusinessUnitId();
 
             $msg = "Berhasil menyinkronkan {$syncedCount} transaksi retur (Total Nilai: Rp {$totalAmountFormatted}) untuk periode {$this->syncStartDate} s/d {$this->syncEndDate}. Filter tabel otomatis disesuaikan!";
-            
+
             if ($bu && $activeBuId != $bu->id) {
                 $msg .= " (Perhatian: Unit Usaha aktif Anda saat ini berbeda dengan '{$bu->name}'. Silakan beralih ke Unit Usaha '{$bu->name}' untuk melihat data ini pada tabel).";
                 Log::warning("[SalesReport] Unit Usaha aktif user (ID: {$activeBuId}) tidak sama dengan Unit Usaha yang disinkronkan (ID: {$bu->id} - {$bu->name})");
@@ -773,7 +779,7 @@ class SalesReport extends Component
                     $itemModal = $baseCost * (float)$item->qty;
                 }
 
-                $vendorDisplay = !empty($vendorNames) ? implode(', ', array_unique($vendorNames)) : 'Tanpa Vendor / Unknown';
+                $vendorDisplay = !empty($vendorNames) ? implode(', ', array_unique($vendorNames)) : ($variant?->vendor_name ?? $variant?->accurateData?->vendor_name ?? 'Tanpa Vendor / Unknown');
 
                 if ($this->vendorFilter && !str_contains(strtolower($vendorDisplay), strtolower($this->vendorFilter))) {
                     continue;
@@ -782,6 +788,11 @@ class SalesReport extends Component
                 if ($this->search && $this->activeTab === 'vendor' && !str_contains(strtolower($vendorDisplay), strtolower($this->search))) {
                     continue;
                 }
+
+                // Ambil HPP dari field unit_hpp di order_items, fallback ke $itemModal jika transaksi lama belum memiliki unit_hpp
+                $itemHpp = (isset($item->unit_hpp) && (float)$item->unit_hpp != 0)
+                    ? (float)$item->unit_hpp
+                    : ($item->qty != 0 ? round($itemModal / abs($item->qty), 2) : $itemModal);
 
                 $rows[] = [
                     $vendorDisplay,
@@ -802,7 +813,7 @@ class SalesReport extends Component
                     $itemPromosTotal,
                     $actualItemSubtotal,
                     $penjualanBersih,
-                    $itemModal,
+                    $itemHpp,
                 ];
             }
         }
