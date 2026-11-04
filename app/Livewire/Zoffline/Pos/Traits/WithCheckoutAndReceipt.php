@@ -1742,6 +1742,7 @@ trait WithCheckoutAndReceipt
                 'subtotal' => $item['price'] * $item['qty'],
                 'unit_hpp' => $hppData['unit_hpp'],
                 'total_hpp' => $hppData['total_hpp'],
+                'vendor_name' => $hppData['vendor_name'] ?? null,
                 'discount_amount' => (int)($item['discount_amount'] ?? 0) * (int)($item['qty'] ?? 1),
                 'promo_discount_amount' => (int)($item['promo_discount'] ?? 0),
                 'serial_number' => !empty($cleanSns) ? implode(', ', $cleanSns) : '',

@@ -116,7 +116,7 @@ class CekStock extends Component
         // =========================================================================
         $snQuery = \Illuminate\Support\Facades\DB::table('product_serial_numbers')
             ->where('serial_number', 'like', $term)
-            ->where('status', '!=', 'Unavailable');
+            ->whereNotIn('status', ['Unavailable', 'Sold']);
 
         if (!empty($filterBu)) {
             $snQuery->where('business_unit_id', $filterBu);
@@ -208,7 +208,7 @@ class CekStock extends Component
             $groupedSns = \App\Models\ProductSerialNumber::with('vendor')
                 ->where('item_no', $accurate->item_no)
                 ->where('business_unit_id', $accurate->business_unit_id)
-                ->where('status', '!=', 'Unavailable')
+                ->whereNotIn('status', ['Unavailable', 'Sold'])
                 ->get()
                 ->groupBy('warehouse_id'); // Menghasilkan array dengan key berupa warehouse_id
 
@@ -216,7 +216,7 @@ class CekStock extends Component
             // AMBIL STOCK HANYA DARI PRODUCT ACCURATE
             // =========================================================================
             $allStocks = collect();
-            
+
             // 1. Ambil stok langsung dari ProductAccurate
             foreach ($accurate->warehouseStocks as $ws) {
                 $allStocks->push($ws);

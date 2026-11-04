@@ -54,7 +54,7 @@ class VendorInboundQc extends Component
         $secondSkus = SecondProductVariant::pluck('sku')->toArray();
 
         $query = ProductSerialNumber::whereIn('item_no', $secondSkus)
-            ->where('status', '!=', 'Sold')
+            ->where('status', 'Available')
             ->whereHas('warehouse.businessUnit', function ($q) {
                 $q->where('code', 'second')->orWhere('name', 'like', '%GSK%');
             });

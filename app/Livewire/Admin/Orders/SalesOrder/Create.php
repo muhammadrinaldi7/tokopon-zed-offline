@@ -478,8 +478,8 @@ class Create extends Component
             return;
         }
 
-        if ($localSnRecord->status === 'Unavailable') {
-            $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "SN sudah Terjual atau Draft.", type: 'warning');
+        if ($localSnRecord->status !== 'Available') {
+            $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "SN '{$sn}' tidak tersedia karena berstatus '{$localSnRecord->status}'.", type: 'warning');
             $this->items[$itemIndex]['scanned_sn'] = '';
             return;
         }

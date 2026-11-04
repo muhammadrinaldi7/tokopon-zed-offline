@@ -44,9 +44,11 @@ class OrderHppResolverService
         if (!empty($cleanSns)) {
             $totalHpp = 0.0;
             $countSns = count($cleanSns);
+            $vendorNames = [];
 
             foreach ($cleanSns as $sn) {
                 $snHpp = 0.0;
+                $snVendor = null;
 
                 // Priority 1: Check if this SN was a Buyback in SellPhone
                 $sellPhone = SellPhone::where('imei', $sn)
@@ -66,28 +68,53 @@ class OrderHppResolverService
 
                 if ($sellPhone && (float)$sellPhone->appraised_value > 0) {
                     $snHpp = (float)$sellPhone->appraised_value;
+                    $customerName = $sellPhone->bank_account_name ?: ($sellPhone->user?->name ?? 'Customer');
+                    $snVendor = 'Customer: ' . $customerName;
                 } else {
                     // Priority 2: Check in product_serial_numbers for the same BU
                     $psn = null;
                     if ($businessUnitId) {
-                        $psn = ProductSerialNumber::where('serial_number', $sn)
+                        $psn = ProductSerialNumber::with('vendor')
+                            ->where('serial_number', $sn)
                             ->where('business_unit_id', $businessUnitId)
                             ->first();
                     }
 
                     // Priority 3: Cross-BU Fallback
                     if (!$psn || (float)($psn->hpp ?? 0) <= 0) {
-                        $psn = ProductSerialNumber::where('serial_number', $sn)->first();
+                        $psn = ProductSerialNumber::with('vendor')->where('serial_number', $sn)->first();
                     }
 
                     if ($psn && (float)($psn->hpp ?? 0) > 0) {
                         $snHpp = (float)$psn->hpp;
+                    }
+                    if ($psn?->vendor?->vendor_name) {
+                        $snVendor = $psn->vendor->vendor_name;
+                    }
+
+                    // Priority 3b: Check in DeviceInspection -> PurchaseOrderItem -> PurchaseOrder -> Vendor
+                    if (!$snVendor) {
+                        $inspection = \App\Models\DeviceInspection::where('imei', $sn)
+                            ->where('inspectable_type', \App\Models\PurchaseOrderItem::class)
+                            ->latest()
+                            ->first();
+                        if ($inspection?->inspectable?->purchaseOrder?->vendor) {
+                            $snVendor = $inspection->inspectable->purchaseOrder->vendor->vendor_name;
+                        }
                     }
                 }
 
                 // Priority 4: Fallback to ProductAccurate base_cost -> buy_price
                 if ($snHpp <= 0) {
                     $snHpp = self::extractVariantBaseCost($variant);
+                }
+
+                if (!$snVendor) {
+                    $snVendor = $variant?->vendor_name ?? $variant?->accurateData?->vendor_name ?? null;
+                }
+
+                if ($snVendor) {
+                    $vendorNames[] = $snVendor;
                 }
 
                 $totalHpp += $snHpp;
@@ -99,15 +126,20 @@ class OrderHppResolverService
                 $totalHpp = -$totalHpp;
             }
 
+            $vendorNames = array_unique(array_filter($vendorNames));
+            $resolvedVendor = !empty($vendorNames) ? implode(', ', $vendorNames) : ($variant?->vendor_name ?? $variant?->accurateData?->vendor_name ?? null);
+
             return [
                 'unit_hpp' => round($unitHpp, 2),
                 'total_hpp' => round($totalHpp, 2),
+                'vendor_name' => $resolvedVendor,
             ];
         }
 
         // 2. Non-SN item (Accessories, etc.)
         $unitHpp = self::extractVariantBaseCost($variant);
         $totalHpp = $unitHpp * $qty;
+        $resolvedVendor = $variant?->vendor_name ?? $variant?->accurateData?->vendor_name ?? null;
 
         if ($isReturn && $totalHpp > 0) {
             $totalHpp = -$totalHpp;
@@ -116,6 +148,7 @@ class OrderHppResolverService
         return [
             'unit_hpp' => round($unitHpp, 2),
             'total_hpp' => round($totalHpp, 2),
+            'vendor_name' => $resolvedVendor,
         ];
     }
 

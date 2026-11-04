@@ -160,8 +160,8 @@ trait WithCart
                     return;
                 }
 
-                if ($localSnRecordGlobal->status === 'Unavailable') {
-                    $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$sn}' sudah dalam status Draft atau Terjual.", type: 'warning');
+                if ($localSnRecordGlobal->status !== 'Available') {
+                    $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$sn}' tidak tersedia karena berstatus '{$localSnRecordGlobal->status}'.", type: 'warning');
                     $this->scanned_sn = '';
                     $this->closeAddonModal();
                     return;
@@ -256,9 +256,9 @@ trait WithCart
                     return;
                 }
 
-                // Cek apakah SN statusnya Unavailable (sudah di draft / terjual)
-                if ($localSnRecordGlobal->status === 'Unavailable') {
-                    $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$sn}' sudah dalam status Draft atau Terjual.", type: 'warning');
+                // Cek apakah SN statusnya bukan Available (sudah di draft / terjual / reserved)
+                if ($localSnRecordGlobal->status !== 'Available') {
+                    $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$sn}' tidak tersedia karena berstatus '{$localSnRecordGlobal->status}'.", type: 'warning');
                     $this->scanned_sn = '';
                     return;
                 }
@@ -781,9 +781,9 @@ trait WithCart
                         return;
                     }
 
-                    // Cek Status
-                    if ($localSnRecordGlobal->status === 'Unavailable') {
-                        $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$value}' sudah dalam status Draft atau Terjual.", type: 'warning');
+                    // Cek Status (Harus Available)
+                    if ($localSnRecordGlobal->status !== 'Available') {
+                        $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$value}' tidak tersedia karena berstatus '{$localSnRecordGlobal->status}'.", type: 'warning');
                         $this->new_sns[$index] = '';
                         return;
                     }
