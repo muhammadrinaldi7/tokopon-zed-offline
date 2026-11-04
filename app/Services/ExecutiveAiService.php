@@ -795,12 +795,20 @@ PROMPT;
     public function normalizeMarkdownTables(string $text): string
     {
         if (empty($text)) {
-            return "";
+            return '';
+        }
+
+        // 1. Normalize carriage returns to standard newline
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+
+        // 2. Unescape literal '\n' sequences from LLM if present
+        if (str_contains($text, '\n')) {
+            $text = str_replace('\n', "\n", $text);
         }
 
         // Pre-process collapsed row separators
-        $preprocessed = preg_replace("/\\|\\s*\\|\\s*(?=[*#\\-[0-9A-Za-z])/u", "|\\n| ", $text);
-        $lines = explode("\\n", $preprocessed);
+        $preprocessed = preg_replace("/\\|\\s*\\|\\s*(?=[*#\\-[0-9A-Za-z])/u", "|\n| ", $text);
+        $lines = explode("\n", $preprocessed);
         $processedLines = [];
         $inCodeBlock = false;
 
@@ -826,11 +834,11 @@ PROMPT;
             }
 
             $line = preg_replace("/^\\|{2,}\\s*/", "| ", $line);
-            $line = preg_replace("/\\|\\s*\\|\\s*\\|\\s*/", "|\\n| ", $line);
-            $line = preg_replace("/\\|\\s*\\|\\s*([0-9A-Za-z#\\-\\:\\*\\—\\–\\w])/u", "|\\n| $1", $line);
-            $line = preg_replace("/\\|{2,}\\s*/", "|\\n| ", $line);
+            $line = preg_replace("/\\|\\s*\\|\\s*\\|\\s*/", "|\n| ", $line);
+            $line = preg_replace("/\\|\\s*\\|\\s*([0-9A-Za-z#\\-\\:\\*\\—\\–\\w])/u", "|\n| $1", $line);
+            $line = preg_replace("/\\|{2,}\\s*/", "|\n| ", $line);
 
-            $subLines = explode("\\n", $line);
+            $subLines = explode("\n", $line);
             foreach ($subLines as $sub) {
                 $subTrimmed = trim($sub);
                 $isBulletOrHeading = str_starts_with($subTrimmed, "- ")
@@ -916,6 +924,6 @@ PROMPT;
             }
         }
 
-        return implode("\\n", $finalLines);
+        return implode("\n", $finalLines);
     }
 }
