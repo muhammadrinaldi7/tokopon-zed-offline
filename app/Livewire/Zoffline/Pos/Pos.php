@@ -887,6 +887,7 @@ class Pos extends Component
 
         // 1. Exact Match Scan Barcode di tabel ProductSerialNumber (Untuk HP / Barang ber-IMEI)
         $snItems = \App\Models\ProductSerialNumber::where('serial_number', $this->search)
+            ->where('status', 'Available')
             ->whereHas('productAccurate', function ($q) use ($buId) {
                 $q->where(function ($q2) use ($buId) {
                     $q2->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
