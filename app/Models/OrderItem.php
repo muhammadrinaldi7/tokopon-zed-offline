@@ -78,14 +78,21 @@ class OrderItem extends Model
 
     public function getVendorNameAttribute()
     {
-        if (!$this->variant) return 'Vendor tidak ditemukan';
-        
-        // Coba ambil dari ProductAccurate
-        if (isset($this->variant->vendor_name)) {
+        // 1. Ambil dari kolom snapshot database jika sudah terisi dan valid
+        if (!empty($this->attributes['vendor_name']) && $this->attributes['vendor_name'] !== 'Vendor tidak ditemukan') {
+            return $this->attributes['vendor_name'];
+        }
+
+        // 2. Coba ambil dari Master Variant / Accurate jika ada
+        if ($this->variant && !empty($this->variant->vendor_name)) {
             return $this->variant->vendor_name;
         }
 
-        return 'Vendor tidak ditemukan';
+        if ($this->variant && !empty($this->variant->accurateData?->vendor_name)) {
+            return $this->variant->accurateData->vendor_name;
+        }
+
+        return null;
     }
 
     public function getTotalDiscountAttribute()

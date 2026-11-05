@@ -151,29 +151,41 @@ class SalesReport extends Component
             ->when($this->vendorFilter, function ($query) {
                 if ($this->vendorFilter === 'unknown') {
                     $query->whereHas('items', function ($qi) {
-                        $qi->whereNull('serial_number')->orWhere('serial_number', '');
+                        $qi->where(function ($sub) {
+                            $sub->whereNull('vendor_name')
+                                ->orWhere('vendor_name', '')
+                                ->orWhere('vendor_name', 'Vendor tidak ditemukan')
+                                ->orWhere('vendor_name', 'Tanpa Vendor / Unknown');
+                        })->where(function ($sub2) {
+                            $sub2->whereNull('serial_number')->orWhere('serial_number', '');
+                        });
                     });
                 } else {
-                    $snList = \App\Models\ProductSerialNumber::whereHas('vendor', function ($qv) {
-                        $qv->where('vendor_name', $this->vendorFilter);
+                    $targetVendor = $this->vendorFilter;
+                    $snList = \App\Models\ProductSerialNumber::whereHas('vendor', function ($qv) use ($targetVendor) {
+                        $qv->where('vendor_name', $targetVendor);
                     })->pluck('serial_number')->toArray();
 
-                    if (!empty($snList)) {
-                        $query->whereHas('items', function ($qi) use ($snList) {
-                            $qi->where(function ($qSub) use ($snList) {
-                                $qSub->whereHas('serialNumbers', function ($qsn) use ($snList) {
-                                    $qsn->whereIn('serial_number', $snList);
-                                });
-                                foreach (array_chunk($snList, 50) as $chunk) {
-                                    $qSub->orWhere(function ($qc) use ($chunk) {
-                                        foreach ($chunk as $sn) {
-                                            $qc->orWhere('order_items.serial_number', 'like', '%' . $sn . '%');
-                                        }
+                    $query->whereHas('items', function ($qi) use ($targetVendor, $snList) {
+                        $qi->where(function ($qSub) use ($targetVendor, $snList) {
+                            $qSub->where('vendor_name', 'like', '%' . $targetVendor . '%');
+
+                            if (!empty($snList)) {
+                                $qSub->orWhere(function ($qSnMatch) use ($snList) {
+                                    $qSnMatch->whereHas('serialNumbers', function ($qsn) use ($snList) {
+                                        $qsn->whereIn('serial_number', $snList);
                                     });
-                                }
-                            });
+                                    foreach (array_chunk($snList, 50) as $chunk) {
+                                        $qSnMatch->orWhere(function ($qc) use ($chunk) {
+                                            foreach ($chunk as $sn) {
+                                                $qc->orWhere('order_items.serial_number', 'like', '%' . $sn . '%');
+                                            }
+                                        });
+                                    }
+                                });
+                            }
                         });
-                    }
+                    });
                 }
             })
             ->when(!empty($this->proyekFilter), function ($query) {
@@ -349,7 +361,7 @@ class SalesReport extends Component
                     $vendor = '-';
                     $itemModal = 0;
 
-                    if (!empty($item->vendor_name)) {
+                    if (!empty($item->vendor_name) && $item->vendor_name !== 'Vendor tidak ditemukan') {
                         $vendor = $item->vendor_name;
                         if (!empty($snList)) {
                             foreach ($snList as $sn) {
@@ -772,6 +784,11 @@ class SalesReport extends Component
             ->when($this->branchFilter, function ($query) {
                 $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
             })
+            ->when(!empty($this->proyekFilter), function ($query) {
+                $query->whereHas('items.variant', function ($iq) {
+                    $iq->whereIn('proyek', $this->proyekFilter);
+                });
+            })
             ->latest('orders.order_date')
             ->get();
 
@@ -829,7 +846,7 @@ class SalesReport extends Component
                 $vendorNames = [];
                 $itemModal = 0;
 
-                if (!empty($item->vendor_name)) {
+                if (!empty($item->vendor_name) && $item->vendor_name !== 'Vendor tidak ditemukan') {
                     $vendorDisplay = $item->vendor_name;
                     if ($item->serial_number) {
                         $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
@@ -963,15 +980,20 @@ class SalesReport extends Component
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end = Carbon::parse($this->endDate)->endOfDay();
 
-        // Ambil order COMPLETED bulan ini untuk semua cabang (atau cabang terfilter)
+        // Ambil order COMPLETED & piutang pada rentang tanggal terpilih untuk semua cabang (atau cabang terfilter)
         $orders = Order::with(['items.variant', 'items.promos'])
             ->whereBetween('orders.order_date', [$start, $end])
-            ->whereIn('orders.order_status', ['COMPLETED'])
+            ->whereIn('orders.order_status', ['COMPLETED', 'piutang'])
             ->when($this->businessUnitFilter && $this->businessUnitFilter !== 'all', function ($query) {
                 $query->where('orders.business_unit_id', $this->businessUnitFilter);
             })
             ->when($this->branchFilter, function ($query) {
                 $query->where('orders.shipping_address_snapshot->store', $this->branchFilter);
+            })
+            ->when(!empty($this->proyekFilter), function ($query) {
+                $query->whereHas('items.variant', function ($iq) {
+                    $iq->whereIn('proyek', $this->proyekFilter);
+                });
             })
             ->get();
 
@@ -1021,8 +1043,13 @@ class SalesReport extends Component
 
             foreach ($order->items as $item) {
                 $itemVendors = [];
-                if (!empty($item->vendor_name)) {
-                    $itemVendors[$item->vendor_name] = $item->qty;
+                if (!empty($item->vendor_name) && $item->vendor_name !== 'Vendor tidak ditemukan') {
+                    $vendors = array_filter(array_map('trim', explode(',', $item->vendor_name)));
+                    $vCount = max(1, count($vendors));
+                    $perVendorQty = $item->qty / $vCount;
+                    foreach ($vendors as $v) {
+                        $itemVendors[$v] = ($itemVendors[$v] ?? 0) + $perVendorQty;
+                    }
                 } elseif ($item->serial_number) {
                     $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
                     foreach ($sns as $sn) {
