@@ -173,7 +173,7 @@ trait WithCheckoutAndReceipt
 
             if (!$order) {
                 // Buat Order Number baru jika belum ada
-                $businessUnit = \Illuminate\Support\Facades\Auth::user()->businessUnit;
+                $businessUnit = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
                 $draftPrefix = $businessUnit->draft_prefix ?? 'POS-DRF-';
 
                 $orderNumber = $draftPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
@@ -491,7 +491,7 @@ trait WithCheckoutAndReceipt
                 $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
 
                 // 2. Generate order number berdasarkan order_date
-                $businessUnit = \Illuminate\Support\Facades\Auth::user()->businessUnit;
+                $businessUnit = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
                 $completedPrefix = $businessUnit->order_prefix ?? 'POS-';
 
                 $orderNumber = $completedPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
@@ -927,7 +927,7 @@ trait WithCheckoutAndReceipt
             }
 
             if (!$order) {
-                $businessUnit = \Illuminate\Support\Facades\Auth::user()->businessUnit;
+                $businessUnit = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
                 $completedPrefix = $businessUnit->order_prefix ?? 'POS-';
 
                 $orderNumber = $completedPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
@@ -1972,10 +1972,9 @@ trait WithCheckoutAndReceipt
             $warehouseName = $handler->warehouse->name ?? 'Gudang Utama';
             $branchName = $handler->branch->name ?? 'Banjarbaru';
 
-            $accurateBranchName = $branchName;
-            if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
-                $accurateBranchName = 'GSK ' . $accurateBranchName;
-            }
+            $accurateBranchName = $order->businessUnit
+                ? $order->businessUnit->resolveAccurateBranchName($branchName)
+                : $branchName;
 
             // Ambil sales aktif dari form POS jika kasir mengganti/memilih sales, atau fallback ke order sebelumnya
             $activeSalesId = !empty($this->selectedSales) ? $this->selectedSales[0]['id'] : ($order->sales_id ?? null);

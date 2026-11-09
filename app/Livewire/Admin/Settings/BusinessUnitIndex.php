@@ -31,6 +31,7 @@ class BusinessUnitIndex extends Component
     public $prefix;
     public $store_title;
     public $receipt_show_discount = false;
+    public $requires_inbound_qc = false;
     public $accurate_host;
     public $accurate_token;
     public $accurate_secret_key;
@@ -78,6 +79,7 @@ class BusinessUnitIndex extends Component
         $this->prefix = '';
         $this->store_title = '';
         $this->receipt_show_discount = false;
+        $this->requires_inbound_qc = false;
         $this->accurate_host = '';
         $this->accurate_token = '';
         $this->accurate_secret_key = '';
@@ -123,6 +125,7 @@ class BusinessUnitIndex extends Component
         $this->prefix = $unit->prefix;
         $this->store_title = $unit->store_title;
         $this->receipt_show_discount = (bool)$unit->receipt_show_discount;
+        $this->requires_inbound_qc = (bool)$unit->requires_inbound_qc;
         $this->accurate_host = $unit->accurate_host;
         $this->accurate_token = $unit->accurate_token;
         $this->accurate_secret_key = $unit->accurate_secret_key;
@@ -169,6 +172,7 @@ class BusinessUnitIndex extends Component
             'prefix' => 'nullable|string|max:20',
             'store_title' => 'nullable|string|max:100',
             'receipt_show_discount' => 'boolean',
+            'requires_inbound_qc' => 'boolean',
             'telegram_approval_webhook' => 'nullable|url',
             'telegram_log_webhook' => 'nullable|url',
             'is_visible_mobile' => 'boolean',
@@ -191,6 +195,7 @@ class BusinessUnitIndex extends Component
                 'prefix' => $this->prefix ? strtoupper($this->prefix) : null,
                 'store_title' => $this->store_title ? strtoupper($this->store_title) : null,
                 'receipt_show_discount' => $this->receipt_show_discount,
+                'requires_inbound_qc' => (bool)$this->requires_inbound_qc,
                 'accurate_host' => $this->accurate_host,
                 'accurate_token' => $this->accurate_token,
                 'accurate_secret_key' => $this->accurate_secret_key,

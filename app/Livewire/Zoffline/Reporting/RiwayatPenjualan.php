@@ -934,11 +934,9 @@ class RiwayatPenjualan extends Component
                         ];
                     }
 
-                    // Tentukan nama cabang untuk Accurate
-                    $branchName = $existingSi['branch']['name'] ?? ($existingSi['branchName'] ?? ($order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru')));
-                    if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
-                        $branchName = 'GSK ' . $branchName;
-                    }
+                    // Tentukan nama cabang untuk Accurate secara dinamis
+                    $rawBranchName = $existingSi['branch']['name'] ?? ($existingSi['branchName'] ?? ($order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru')));
+                    $branchName = $order->businessUnit ? $order->businessUnit->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
 
                     $siPayload = [
                         'id' => $siDoc->accurate_id,
@@ -981,10 +979,8 @@ class RiwayatPenjualan extends Component
                         ];
                     }
 
-                    $branchName = $existingSo['branch']['name'] ?? ($existingSo['branchName'] ?? ($order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru')));
-                    if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
-                        $branchName = 'GSK ' . $branchName;
-                    }
+                    $rawBranchName = $existingSo['branch']['name'] ?? ($existingSo['branchName'] ?? ($order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru')));
+                    $branchName = $order->businessUnit ? $order->businessUnit->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
 
                     $soPayload = [
                         'id' => $soDoc->accurate_id,

@@ -50,18 +50,18 @@ class OrderHppResolverService
                 $snHpp = 0.0;
                 $snVendor = null;
 
+                $bu = $businessUnitId ? \App\Models\BusinessUnit::find($businessUnitId) : null;
+                $allowCrossBuBuyback = $bu ? (bool) $bu->requires_inbound_qc : ($businessUnitId == 2);
+
                 // Priority 1: Check if this SN was a Buyback in SellPhone
                 $sellPhone = SellPhone::where('imei', $sn)
                     ->where('status', 'COMPLETED')
                     ->where('appraised_value', '>', 0)
-                    ->when($businessUnitId, function ($q) use ($businessUnitId) {
-                        $q->where(function ($sub) use ($businessUnitId) {
-                            $sub->where('business_unit_id', $businessUnitId);
-                            // Fallback to any BU if order is GSK Second (BU ID: 2)
-                            if ($businessUnitId == 2) {
-                                $sub->orWhereNotNull('id');
-                            }
-                        });
+                    ->when($businessUnitId && !$allowCrossBuBuyback, function ($q) use ($businessUnitId) {
+                        $q->where('business_unit_id', $businessUnitId);
+                    })
+                    ->when($businessUnitId && $allowCrossBuBuyback, function ($q) use ($businessUnitId) {
+                        $q->orderByRaw('CASE WHEN business_unit_id = ? THEN 0 ELSE 1 END', [(int) $businessUnitId]);
                     })
                     ->latest()
                     ->first();

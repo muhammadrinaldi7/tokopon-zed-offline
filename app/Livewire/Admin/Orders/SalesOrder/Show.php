@@ -375,10 +375,9 @@ class Show extends Component
                 }
                 $branchName = $handler->branch->name;
 
-                $accurateBranchName = $branchName;
-                if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
-                    $accurateBranchName = 'GSK ' . $accurateBranchName;
-                }
+                $accurateBranchName = $businessUnit
+                    ? $businessUnit->resolveAccurateBranchName($branchName)
+                    : $branchName;
 
                 $pmId = $paymentData['payment_method_id'];
                 $pm = \App\Models\PaymentMethod::find($pmId);
@@ -845,10 +844,9 @@ class Show extends Component
             $detailItem[] = $dItem;
         }
 
-        $branchName = $this->order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru');
-        if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
-            $branchName = 'GSK ' . $branchName;
-        }
+        $rawBranchName = $this->order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru');
+        $bu = $this->order->businessUnit ?: BusinessUnit::where('code', $dbSource)->first();
+        $branchName = $bu ? $bu->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
 
         $payload = [
             'id' => $soDoc->accurate_id,

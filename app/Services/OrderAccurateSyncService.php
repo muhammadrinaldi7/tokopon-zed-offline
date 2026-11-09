@@ -127,7 +127,8 @@ class OrderAccurateSyncService
                 $invoiceCustomerNo = 'PELANGGAN-UMUM';
             }
 
-            $accurateBranchName = $order->branch->name ?? 'Banjarbaru';
+            $rawBranchName = $order->branch->name ?? 'Banjarbaru';
+            $accurateBranchName = $bu ? $bu->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
             $accurateWarehouseName = $order->handledBy?->warehouse?->name ?? ($order->warehouse?->name ?? 'Head Office');
 
             // 2. PROSES SALES INVOICE (FAKTUR PENJUALAN)
@@ -184,9 +185,12 @@ class OrderAccurateSyncService
                         'projectNo' => $projectNo,
                     ];
 
-                    // Departemen produk second (GSK)
+                    // Departemen produk berdasarkan kondisi & tag Business Unit secara dinamis
                     if (in_array($condition, ['Inter', 'Resmi'])) {
-                        $city = trim(str_replace(['GSK -', 'GSK '], '', $accurateWarehouseName));
+                        $tag = $bu ? $bu->getBuTag() : '';
+                        $city = $tag !== ''
+                            ? trim((string) preg_replace('/^' . preg_quote($tag, '/') . '\s*[-_]?\s*/i', '', $accurateWarehouseName))
+                            : trim($accurateWarehouseName);
                         $departmentPrefix = ($condition === 'Inter') ? 'Distri' : 'Retail';
                         $itemData['departmentName'] = $departmentPrefix . ' ' . $city;
                     }

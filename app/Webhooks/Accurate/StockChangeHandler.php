@@ -97,19 +97,15 @@ class StockChangeHandler implements WebhookHandlerInterface
         $transactionType = strtoupper((string)($itemData['transactionType'] ?? ''));
         $transactionNumber = $itemData['transactionNumber'] ?? null;
 
-        // Cari gudang lokal
+        $bu = \App\Models\BusinessUnit::where('code', $dbSource)->first();
+
+        // Cari gudang lokal secara dinamis berdasarkan Business Unit
         $warehouse = null;
         if ($warehouseName) {
-            $warehouse = Warehouse::where('name', $warehouseName)->first();
-            if (!$warehouse && $dbSource === 'second') {
-                $altName = str_starts_with($warehouseName, 'GSK - ')
-                    ? str_replace('GSK - ', '', $warehouseName)
-                    : 'GSK - ' . $warehouseName;
-                $warehouse = Warehouse::where('name', $altName)->first();
-            }
+            $warehouse = $bu
+                ? $bu->findLocalWarehouse($warehouseName)
+                : Warehouse::where('name', $warehouseName)->first();
         }
-
-        $bu = \App\Models\BusinessUnit::where('code', $dbSource)->first();
 
         foreach ($snList as $snItem) {
             $snString = $snItem['number'] ?? ($snItem['serialNumber']['number'] ?? null);

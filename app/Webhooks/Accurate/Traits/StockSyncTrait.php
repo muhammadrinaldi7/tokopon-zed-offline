@@ -14,16 +14,11 @@ trait StockSyncTrait
      */
     private function syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource, $log = null): bool
     {
-        // 1. Validasi DB Lokal: Pastikan Gudang ada di Laravel Anda
-        // Cek langsung dengan nama gudang asli terlebih dahulu
-        $warehouse = Warehouse::where('name', $warehouseName)->first();
-        if (!$warehouse && $dbSource === 'second') {
-            // Fallback toleransi jika di Accurate ada/tidak ada prefix 'GSK '
-            $altWarehouseName = str_starts_with($warehouseName, 'GSK - ') 
-                ? str_replace('GSK - ', '', $warehouseName)
-                : 'GSK - ' . $warehouseName;
-            $warehouse = Warehouse::where('name', $altWarehouseName)->first();
-        }
+        // 1. Validasi DB Lokal: Pastikan Gudang ada di Laravel secara dinamis per Business Unit
+        $bu = \App\Models\BusinessUnit::where('code', $dbSource)->first();
+        $warehouse = $bu
+            ? $bu->findLocalWarehouse($warehouseName)
+            : Warehouse::where('name', $warehouseName)->first();
 
         if (!$warehouse) {
             \App\Services\SyncIssueRecorder::recordWarehouseNotFound(

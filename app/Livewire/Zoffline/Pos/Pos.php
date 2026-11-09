@@ -781,10 +781,11 @@ class Pos extends Component
 
     public function mount()
     {
-        $unit = \Illuminate\Support\Facades\Auth::user()->businessUnit?->code ?? 'all';
+        $activeBu = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
+        $unit = $activeBu?->code ?? 'all';
         $this->databaseSource = $unit !== 'all' ? $unit : 'syihab';
 
-        if ($unit === 'second') {
+        if ($activeBu && $activeBu->requires_inbound_qc) {
             $this->productType = 'second';
         } elseif ($unit === 'all') {
             $this->productType = 'all';

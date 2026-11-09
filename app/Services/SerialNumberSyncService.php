@@ -336,7 +336,7 @@ class SerialNumberSyncService
                 $sn = (string)$sn;
 
                 $existingSn = ProductSerialNumber::where('serial_number', $sn)->first();
-                $qcStatus = $databaseSource === 'second' ? 'Pending Inbound' : null;
+                $qcStatus = ($bu && $bu->requires_inbound_qc) ? 'Pending Inbound' : null;
 
                 if ($existingSn) {
                     $updatePayload = [
@@ -786,16 +786,16 @@ class SerialNumberSyncService
 
                 if ($siblingWithVendor) {
                     $newVendorId = $siblingWithVendor->vendor_id;
-                } elseif ($dbSource === 'second') {
-                    // Default fallback untuk GSK Second: "CUSTOMER GSK"
-                    $defaultGskVendor = \App\Models\Vendor::where('database_source', 'second')
+                } else {
+                    // Default fallback dinamis untuk vendor CUSTOMER pada database_source terkait
+                    $defaultCustomerVendor = \App\Models\Vendor::where('database_source', $dbSource)
                         ->where(function ($q) {
                             $q->where('vendor_name', 'like', '%CUSTOMER%')
                               ->orWhere('vendor_no', 'like', '%CUSTOMER%');
                         })
                         ->first();
-                    if ($defaultGskVendor) {
-                        $newVendorId = $defaultGskVendor->id;
+                    if ($defaultCustomerVendor) {
+                        $newVendorId = $defaultCustomerVendor->id;
                     }
                 }
             } else {
