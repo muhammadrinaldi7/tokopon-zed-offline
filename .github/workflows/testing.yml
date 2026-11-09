@@ -37,7 +37,7 @@ jobs:
     #     run: vendor/bin/phpunit
 
   deploy:
-    needs: deploy_vps
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
