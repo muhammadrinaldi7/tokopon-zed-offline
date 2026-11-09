@@ -795,9 +795,50 @@ trait WithCheckoutAndReceipt
                         $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
                     }
                 }
+
+                $order->update([
+                    'accurate_sync_status' => 'SYNCED',
+                    'accurate_synced_at' => now(),
+                    'accurate_sync_last_error' => null,
+                ]);
+
+                \App\Models\OrderAccurateSyncLog::create([
+                    'order_id' => $order->id,
+                    'business_unit_id' => $order->business_unit_id,
+                    'branch_id' => $order->branch_id,
+                    'trigger_type' => 'REALTIME_POS',
+                    'status' => 'SUCCESS',
+                    'attempt_number' => 1,
+                    'accurate_invoice_no' => $order->accurate_invoice_no,
+                    'accurate_receipt_no' => $order->accurate_receipt_no,
+                    'executed_by' => \Illuminate\Support\Facades\Auth::id(),
+                ]);
             } catch (\Exception $e) {
-                Log::channel('pos_accurate')->error('POS Accurate Integration Error: ' . $e->getMessage());
-                $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate gagal.', type: 'warning');
+                $errorMessage = $e->getMessage();
+                Log::channel('pos_accurate')->error('POS Accurate Integration Error: ' . $errorMessage);
+                $errorCategory = \App\Models\OrderAccurateSyncLog::categorizeError($errorMessage);
+
+                $order->update([
+                    'accurate_sync_status' => 'PENDING',
+                    'accurate_sync_attempts' => (int)$order->accurate_sync_attempts + 1,
+                    'accurate_sync_last_error' => $errorMessage,
+                ]);
+
+                \App\Models\OrderAccurateSyncLog::create([
+                    'order_id' => $order->id,
+                    'business_unit_id' => $order->business_unit_id,
+                    'branch_id' => $order->branch_id,
+                    'trigger_type' => 'REALTIME_POS',
+                    'status' => 'FAILED',
+                    'attempt_number' => (int)$order->accurate_sync_attempts,
+                    'accurate_invoice_no' => $order->accurate_invoice_no,
+                    'accurate_receipt_no' => $order->accurate_receipt_no,
+                    'error_category' => $errorCategory,
+                    'error_message' => $errorMessage,
+                    'executed_by' => \Illuminate\Support\Facades\Auth::id(),
+                ]);
+
+                $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate tertunda dan masuk antrean otomatis.', type: 'warning');
                 // Sengaja tidak me-rethrow exception agar transaksi POS lokal tetap dianggap berhasil
             }
 

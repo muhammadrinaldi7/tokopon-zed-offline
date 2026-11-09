@@ -114,6 +114,16 @@ class Order extends Model
         return $this->hasMany(OrderAccurateDoc::class);
     }
 
+    public function accurateSyncLogs()
+    {
+        return $this->hasMany(OrderAccurateSyncLog::class)->latest();
+    }
+
+    public function latestAccurateSyncLog()
+    {
+        return $this->hasOne(OrderAccurateSyncLog::class)->latestOfMany();
+    }
+
     public function resetLogs()
     {
         return $this->hasMany(OrderResetLog::class);
