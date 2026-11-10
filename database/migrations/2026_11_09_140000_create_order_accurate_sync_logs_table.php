@@ -14,7 +14,7 @@ return new class extends Migration
         // 1. Tambahkan kolom pendukung pelacakan sinkronisasi Accurate pada tabel orders
         Schema::table('orders', function (Blueprint $table) {
             if (!Schema::hasColumn('orders', 'accurate_sync_status')) {
-                $table->string('accurate_sync_status', 20)->default('PENDING')->after('accurate_receipt_no')->index();
+                $table->string('accurate_sync_status', 20)->nullable()->default(null)->after('accurate_receipt_no')->index();
             }
             if (!Schema::hasColumn('orders', 'accurate_sync_attempts')) {
                 $table->unsignedInteger('accurate_sync_attempts')->default(0)->after('accurate_sync_status');
@@ -28,35 +28,37 @@ return new class extends Migration
         });
 
         // 2. Buat tabel audit log riwayat sinkronisasi & retry penjualan
-        Schema::create('order_accurate_sync_logs', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('order_id')->constrained('orders')->cascadeOnDelete();
-            $table->foreignId('business_unit_id')->nullable()->constrained('business_units')->nullOnDelete();
-            $table->foreignId('branch_id')->nullable()->constrained('branches')->nullOnDelete();
-            
-            // Pemicu eksekusi: REALTIME_POS, AUTO_RETRY_SCHEDULE, MANUAL_ADMIN
-            $table->string('trigger_type', 30)->default('MANUAL_ADMIN')->index();
-            
-            // Status hasil: SUCCESS, FAILED, PENDING
-            $table->string('status', 20)->default('PENDING')->index();
-            
-            $table->unsignedInteger('attempt_number')->default(1);
-            $table->string('accurate_invoice_no', 100)->nullable();
-            $table->string('accurate_receipt_no', 100)->nullable();
-            
-            // Kategori error: NETWORK_TIMEOUT, INSUFFICIENT_STOCK, ITEM_NOT_FOUND, ACCOUNT_NOT_FOUND, AUTH_ERROR, VALIDATION_ERROR, UNKNOWN
-            $table->string('error_category', 50)->nullable()->index();
-            $table->text('error_message')->nullable();
-            $table->json('payload_snapshot')->nullable();
-            
-            // Staf yang mengeksekusi (jika MANUAL_ADMIN, null jika scheduler/cron)
-            $table->foreignId('executed_by')->nullable()->constrained('users')->nullOnDelete();
-            
-            $table->timestamps();
+        if (!Schema::hasTable('order_accurate_sync_logs')) {
+            Schema::create('order_accurate_sync_logs', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('order_id')->constrained('orders')->cascadeOnDelete();
+                $table->foreignId('business_unit_id')->nullable()->constrained('business_units')->nullOnDelete();
+                $table->foreignId('branch_id')->nullable()->constrained('branches')->nullOnDelete();
+                
+                // Pemicu eksekusi: REALTIME_POS, AUTO_RETRY_SCHEDULE, MANUAL_ADMIN
+                $table->string('trigger_type', 30)->default('MANUAL_ADMIN')->index();
+                
+                // Status hasil: SUCCESS, FAILED, PENDING
+                $table->string('status', 20)->default('PENDING')->index();
+                
+                $table->unsignedInteger('attempt_number')->default(1);
+                $table->string('accurate_invoice_no', 100)->nullable();
+                $table->string('accurate_receipt_no', 100)->nullable();
+                
+                // Kategori error: NETWORK_TIMEOUT, INSUFFICIENT_STOCK, ITEM_NOT_FOUND, ACCOUNT_NOT_FOUND, AUTH_ERROR, VALIDATION_ERROR, UNKNOWN
+                $table->string('error_category', 50)->nullable()->index();
+                $table->text('error_message')->nullable();
+                $table->json('payload_snapshot')->nullable();
+                
+                // Staf yang mengeksekusi (jika MANUAL_ADMIN, null jika scheduler/cron)
+                $table->foreignId('executed_by')->nullable()->constrained('users')->nullOnDelete();
+                
+                $table->timestamps();
 
-            $table->index(['order_id', 'status']);
-            $table->index(['status', 'created_at']);
-        });
+                $table->index(['order_id', 'status']);
+                $table->index(['status', 'created_at']);
+            });
+        }
 
         // 3. Inisialisasi status untuk pesanan yang sudah memiliki nomor faktur Accurate sebelumnya
         try {
