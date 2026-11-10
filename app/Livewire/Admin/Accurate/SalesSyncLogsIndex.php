@@ -160,6 +160,8 @@ class SalesSyncLogsIndex extends Component
 
     public function retryAllPending()
     {
+        $this->healLegacySyncedOrders();
+
         $orders = Order::where('order_status', 'COMPLETED')
             ->where(function ($q) {
                 $q->where('accurate_sync_status', 'PENDING')
@@ -209,8 +211,30 @@ class SalesSyncLogsIndex extends Component
         $this->selectedOrder = null;
     }
 
+    protected function healLegacySyncedOrders(): void
+    {
+        Order::where('order_status', 'COMPLETED')
+            ->where(function ($q) {
+                $q->whereNull('accurate_sync_status')
+                  ->orWhere(function ($sub) {
+                      $sub->where('accurate_sync_status', 'PENDING')
+                          ->whereDoesntHave('accurateSyncLogs');
+                  });
+            })
+            ->whereNotNull('accurate_invoice_no')
+            ->where('accurate_invoice_no', '!=', '')
+            ->whereNotNull('accurate_receipt_no')
+            ->where('accurate_receipt_no', '!=', '')
+            ->update([
+                'accurate_sync_status' => 'SYNCED',
+                'accurate_synced_at' => now(),
+            ]);
+    }
+
     public function render()
     {
+        $this->healLegacySyncedOrders();
+
         // 1. KPI Metrik
         $totalPending = Order::where('order_status', 'COMPLETED')
             ->where(function ($q) {
