@@ -95,6 +95,33 @@ class ItemSaveHandler implements WebhookHandlerInterface
                 ]
             );
             Log::info("Webhook Berhasil: Master ProductAccurate diupdate untuk SKU {$itemNo} | Nama: {$newName}");
+
+            // 3b. Sinkronisasi rincian stok per gudang (detailWarehouseData) ke WarehouseStock lokal
+            if (!empty($accurateItem['detailWarehouseData']) && is_array($accurateItem['detailWarehouseData'])) {
+                $bu = $buId ? \App\Models\BusinessUnit::find($buId) : \App\Models\BusinessUnit::where('code', $dbSource)->first();
+                foreach ($accurateItem['detailWarehouseData'] as $whData) {
+                    $whName = $whData['name'] ?? ($whData['warehouseName'] ?? ($whData['warehouse']['name'] ?? null));
+                    if (!$whName) {
+                        continue;
+                    }
+                    $localWh = $bu
+                        ? $bu->findLocalWarehouse($whName)
+                        : \App\Models\Warehouse::where('name', $whName)->first();
+                    if ($localWh) {
+                        $whQty = (int) ($whData['availableStock'] ?? ($whData['balance'] ?? ($whData['quantity'] ?? 0)));
+                        \App\Models\WarehouseStock::updateOrCreate(
+                            [
+                                'warehouse_id' => $localWh->id,
+                                'variant_id'   => $productAccurate->id,
+                                'variant_type' => get_class($productAccurate),
+                            ],
+                            [
+                                'stock' => $whQty,
+                            ]
+                        );
+                    }
+                }
+            }
         } catch (\Exception $e) {
             Log::error("Webhook Gagal: Gagal update ProductAccurate SKU {$itemNo}. Error: " . $e->getMessage());
             \App\Services\SyncIssueRecorder::recordDbError(

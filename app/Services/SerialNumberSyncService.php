@@ -80,11 +80,18 @@ class SerialNumberSyncService
         $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
         if (!$bu) return 0;
         
-        $warehouseMap = \App\Models\Warehouse::where('business_unit_id', $bu->id)->pluck('id', 'warehouse_id')->toArray();
-        $warehouseIds = array_values($warehouseMap);
+        $warehouseIds = \App\Models\Warehouse::where('business_unit_id', $bu->id)->pluck('id')->toArray();
+        $warehouseMap = \App\Models\Warehouse::where('business_unit_id', $bu->id)
+            ->whereNotNull('warehouse_id')
+            ->pluck('id', 'warehouse_id')
+            ->toArray();
+        $warehouseNameCache = [];
         
         $pa = \App\Models\ProductAccurate::where('item_no', $sku)
-            ->where('business_unit_id', $bu->id)
+            ->where(function ($q) use ($bu, $databaseSource) {
+                $q->where('business_unit_id', $bu->id)
+                  ->orWhere('database_source', $databaseSource);
+            })
             ->first();
         $productAccurateId = $pa ? $pa->id : null;
 
@@ -94,25 +101,68 @@ class SerialNumberSyncService
             ->pluck('serial_number')
             ->toArray();
 
-        $existingReceiptDates = ProductSerialNumber::where('item_no', $sku)
-            ->whereNotNull('receipt_date')
-            ->pluck('receipt_date', 'serial_number')
-            ->map(fn ($date) => \Carbon\Carbon::parse($date)->format('Y-m-d'))
-            ->toArray();
+        $existingRecords = ProductSerialNumber::where('item_no', $sku)
+            ->get(['serial_number', 'warehouse_id', 'receipt_date', 'qc_status'])
+            ->keyBy(fn ($row) => (string) $row->serial_number);
+
+        $defaultQcStatus = $bu->requires_inbound_qc ? 'Pending Inbound' : null;
+
+        // Proteksi SN yang sudah terjual/di-lock di Order lokal aktif namun belum terpotong di Accurate
+        // (misal sedang antri PENDING/PROCESSING atau di-lock pada SO yang masih PROCESSING)
+        $incomingSns = [];
+        foreach ($accurateData as $item) {
+            $snCandidate = $item['serialNumber']['number'] ?? null;
+            if ($snCandidate) {
+                $incomingSns[] = (string) $snCandidate;
+            }
+        }
+        $locallyLockedSns = [];
+        if (!empty($incomingSns)) {
+            $lockedList = \App\Models\OrderItemSerialNumber::whereIn('serial_number', $incomingSns)
+                ->whereHas('orderItem.order', function ($q) {
+                    $q->where('order_status', '!=', 'CANCELLED')
+                      ->where(function ($sub) {
+                          $sub->whereIn('accurate_sync_status', ['PENDING', 'PROCESSING'])
+                              ->orWhere(function ($soQ) {
+                                  $soQ->where('order_channel', 'SO')
+                                      ->where('order_status', 'PROCESSING');
+                              });
+                      });
+                })
+                ->pluck('serial_number')
+                ->toArray();
+            $locallyLockedSns = array_fill_keys(array_map('strval', $lockedList), true);
+        }
 
         $processedSerialNumbers = [];
         $upsertData = [];
 
         foreach ($accurateData as $item) {
             $accurateWarehouseId = $item['warehouse']['id'] ?? null;
+            $accurateWarehouseName = $item['warehouse']['name'] ?? null;
             $serialNumberStr = $item['serialNumber']['number'] ?? null;
             $accurateSnId = $item['serialNumber']['id'] ?? null;
             $createDateStr = $item['serialNumber']['createDate'] ?? null;
 
-            if (!$serialNumberStr || !$accurateWarehouseId) continue;
+            if (!$serialNumberStr || (!$accurateWarehouseId && !$accurateWarehouseName)) continue;
             $serialNumberStr = (string) $serialNumberStr;
 
-            $localWarehouseId = $warehouseMap[$accurateWarehouseId] ?? null;
+            $existingRec = $existingRecords[$serialNumberStr] ?? null;
+
+            $localWarehouseId = ($accurateWarehouseId && isset($warehouseMap[$accurateWarehouseId]))
+                ? $warehouseMap[$accurateWarehouseId]
+                : null;
+
+            if (!$localWarehouseId && $accurateWarehouseName) {
+                if (!array_key_exists($accurateWarehouseName, $warehouseNameCache)) {
+                    $warehouseNameCache[$accurateWarehouseName] = $bu->findLocalWarehouse($accurateWarehouseName)?->id;
+                }
+                $localWarehouseId = $warehouseNameCache[$accurateWarehouseName];
+            }
+
+            if (!$localWarehouseId && $existingRec) {
+                $localWarehouseId = $existingRec->warehouse_id;
+            }
 
             $parsedCreateDate = null;
             if ($createDateStr) {
@@ -128,6 +178,13 @@ class SerialNumberSyncService
                 }
             }
 
+            $existingReceiptDateStr = ($existingRec && $existingRec->receipt_date)
+                ? \Carbon\Carbon::parse($existingRec->receipt_date)->format('Y-m-d')
+                : null;
+
+            $finalStatus = isset($locallyLockedSns[$serialNumberStr]) ? 'Unavailable' : 'Available';
+            $finalQcStatus = $existingRec ? $existingRec->qc_status : $defaultQcStatus;
+
             $upsertData[] = [
                 'accurate_sn_id'      => $accurateSnId,
                 'item_no'             => $sku,
@@ -135,8 +192,9 @@ class SerialNumberSyncService
                 'business_unit_id'    => $bu ? $bu->id : null,
                 'product_accurate_id' => $productAccurateId,
                 'serial_number'       => $serialNumberStr,
-                'status'              => 'Available',
-                'receipt_date'        => $existingReceiptDates[$serialNumberStr] ?? $parsedCreateDate,
+                'status'              => $finalStatus,
+                'qc_status'           => $finalQcStatus,
+                'receipt_date'        => $existingReceiptDateStr ?? $parsedCreateDate,
                 'created_at'          => now(),
                 'updated_at'          => now(),
             ];
@@ -150,7 +208,7 @@ class SerialNumberSyncService
                 ProductSerialNumber::upsert(
                     $upsertData,
                     ['serial_number'], // <- Acuan Pencarian (Unique)
-                    ['accurate_sn_id', 'item_no', 'warehouse_id', 'business_unit_id', 'product_accurate_id', 'status', 'receipt_date', 'updated_at'] // <- Yang di-update
+                    ['accurate_sn_id', 'item_no', 'warehouse_id', 'business_unit_id', 'product_accurate_id', 'status', 'qc_status', 'receipt_date', 'updated_at'] // <- Yang di-update
                 );
                 Log::info("Webhook/Sync Berhasil: Upsert " . count($upsertData) . " Serial Number untuk SKU {$sku}");
             } catch (\Exception $e) {
@@ -533,9 +591,14 @@ class SerialNumberSyncService
         // TIER 1: Cari dari transaksi lokal SellPhone / Buyback
         // (Prioritas Tertinggi: Khususnya jika perangkat dibeli dari customer melalui trade-in / buyback di BU lokal)
         // -------------------------------------------------------------
+        $requiresInboundQc = $bu && ($bu->requires_inbound_qc || $bu->code === 'second');
         $sellPhone = \App\Models\SellPhone::where('imei', $sn->serial_number)
-            ->when($sn->business_unit_id, function ($q) use ($sn) {
+            ->where('status', 'COMPLETED')
+            ->when($sn->business_unit_id && !$requiresInboundQc, function ($q) use ($sn) {
                 $q->where('business_unit_id', $sn->business_unit_id);
+            })
+            ->when($sn->business_unit_id && $requiresInboundQc, function ($q) use ($sn) {
+                $q->orderByRaw('CASE WHEN business_unit_id = ? THEN 0 ELSE 1 END', [(int) $sn->business_unit_id]);
             })
             ->latest()
             ->first();

@@ -197,10 +197,13 @@ class ResetToDraft extends Component
                 $usage->delete();
             }
 
-            // Kembalikan deposit SO (yang berasal dari DP SO ini) ke AVAILABLE
+            // Kembalikan deposit SO (yang berasal dari DP SO ini) ke AVAILABLE beserta nilai saldonya
             \App\Models\CustomerDeposit::where('origin_order_id', $order->id)
                 ->where('status', 'USED')
-                ->update(['status' => 'AVAILABLE']);
+                ->update([
+                    'status'  => 'AVAILABLE',
+                    'balance' => \Illuminate\Support\Facades\DB::raw('amount'),
+                ]);
 
             // Void garansi aktif dan pulihkan status Serial Number ke Available
             $order->loadMissing('items');

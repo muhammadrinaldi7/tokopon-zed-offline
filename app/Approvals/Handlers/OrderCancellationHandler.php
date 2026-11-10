@@ -25,6 +25,9 @@ class OrderCancellationHandler implements ApprovalHandlerInterface
             throw new Exception("Order not found for approval #{$request->id}.");
         }
 
+        $previousStatus = strtoupper((string) $order->order_status);
+        $isSoOrder = strtoupper((string) $order->order_channel) === 'SO';
+
         // Execute Accurate Deletion using rollback method
         $accurateService = app(AccurateService::class);
         $accurateService->rollbackOrderDocuments($order);
@@ -73,6 +76,16 @@ class OrderCancellationHandler implements ApprovalHandlerInterface
         $warehouseId = $order->handledBy?->warehouse_id ?? Auth::user()?->warehouse_id;
         if ($warehouseId) {
             foreach ($order->items as $item) {
+                // Untuk SO yang belum COMPLETED (masih PROCESSING), stok lokal hanya terpotong
+                // saat pembuatan SO apabila item tersebut memiliki lock SN/IMEI.
+                $shouldRestoreStock = !$isSoOrder
+                    || $previousStatus === 'COMPLETED'
+                    || !empty(trim((string) $item->serial_number));
+
+                if (!$shouldRestoreStock) {
+                    continue;
+                }
+
                 $warehouseStock = WarehouseStock::where([
                     'warehouse_id' => $warehouseId,
                     'variant_id'   => $item->product_variant_id,
@@ -103,10 +116,13 @@ class OrderCancellationHandler implements ApprovalHandlerInterface
             $usage->delete();
         }
 
-        // Kembalikan deposit SO (yang berasal dari DP SO ini) ke AVAILABLE
+        // Kembalikan deposit SO (yang berasal dari DP SO ini) ke AVAILABLE beserta nilai saldonya
         CustomerDeposit::where('origin_order_id', $order->id)
             ->where('status', 'USED')
-            ->update(['status' => 'AVAILABLE']);
+            ->update([
+                'status'  => 'AVAILABLE',
+                'balance' => \Illuminate\Support\Facades\DB::raw('amount'),
+            ]);
 
         // 5. Kembalikan / batalkan poin loyalty terkait
         try {

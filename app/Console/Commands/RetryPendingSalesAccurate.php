@@ -40,9 +40,14 @@ class RetryPendingSalesAccurate extends Command
         } else {
             $orders = Order::where('order_status', 'COMPLETED')
                 ->where(function ($q) {
-                    $q->whereNull('accurate_invoice_no')
-                      ->orWhere('accurate_invoice_no', '')
-                      ->orWhere('accurate_sync_status', 'PENDING');
+                    $q->where('accurate_sync_status', 'PENDING')
+                      ->orWhere(function ($sub) {
+                          $sub->whereNull('accurate_sync_status')
+                              ->where(function ($inv) {
+                                  $inv->whereNull('accurate_invoice_no')
+                                      ->orWhere('accurate_invoice_no', '');
+                              });
+                      });
                 })
                 ->where('created_at', '>=', now()->subDays(7))
                 ->where('accurate_sync_attempts', '<', 5)

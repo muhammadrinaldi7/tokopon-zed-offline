@@ -2093,10 +2093,11 @@ class AccurateService
         $actionUser = $claim->claimedBy ?? Auth::user();
 
         // Ambil Nama Cabang berdasarkan parameter, atau fallback ke actionUser
-        $branchName = $branchName ?? $actionUser?->branch?->name ?? 'Cabang Utama';
+        $rawBranchName = $branchName ?? $actionUser?->branch?->name ?? 'Cabang Utama';
 
-        // Ambil konfigurasi pajak dari Business Unit
+        // Ambil konfigurasi pajak & resolusi nama cabang dari Business Unit
         $businessUnit = $claim->warranty->policy->businessUnit ?? null;
+        $branchName = $businessUnit ? $businessUnit->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
         $isTaxable = $businessUnit?->is_taxable ?? false;
 
         $warehouseMainName = $actionUser?->warehouse?->name ?? 'Gudang Utama';
@@ -2783,7 +2784,9 @@ class AccurateService
 
         // Gunakan user pembuat klaim (CS/Kasir) sebagai acuan cabang
         $actionUser = $claim->claimedBy ?? Auth::user();
-        $branchName = $actionUser?->branch?->name ?? 'Cabang Utama';
+        $rawBranchName = $actionUser?->branch?->name ?? 'Cabang Utama';
+        $businessUnit = $claim->warranty->policy?->businessUnit ?? null;
+        $branchName = $businessUnit ? $businessUnit->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
 
         // Payload Penerimaan Penjualan (Uang Keluar)
         $receiptPayload = [

@@ -85,27 +85,58 @@ class BusinessUnit extends Model implements HasMedia
             return 'Banjarbaru';
         }
 
-        // 1. Cek apakah ada cabang spesifik milik business_unit_id ini di tabel branches
+        // 1. Prioritas Utama: Exact match di tabel branches milik business_unit_id ini
+        $exactBranch = $this->branches()
+            ->where('name', $branchName)
+            ->first();
+
+        if ($exactBranch) {
+            return $exactBranch->name;
+        }
+
+        // Bersihkan kemungkinan awalan tag jika nama cabang berasal dari pencocokan parsial
+        $tag = $this->getBuTag();
+        $cleanName = $tag !== ''
+            ? trim(preg_replace('/^' . preg_quote($tag, '/') . '\s*[-\s]\s*/i', '', $branchName))
+            : $branchName;
+
+        // 2. Cari di tabel branches milik business_unit_id ini dengan kandidat nama ber-prefix atau parsial
         $buBranch = $this->branches()
-            ->where(function ($q) use ($branchName) {
-                $q->where('name', $branchName)
-                    ->orWhere('name', 'like', "%{$branchName}%");
+            ->where(function ($q) use ($branchName, $cleanName, $tag) {
+                $q->where('name', $cleanName);
+                if ($tag !== '') {
+                    $q->orWhere('name', "{$tag} - {$cleanName}")
+                      ->orWhere('name', "{$tag} {$cleanName}");
+                }
+                $q->orWhere('name', 'like', "%{$cleanName}%");
             })
+            ->orderByRaw('CASE WHEN name = ? THEN 0 WHEN name = ? THEN 1 WHEN name = ? THEN 2 ELSE 3 END', [
+                $branchName,
+                $tag !== '' ? "{$tag} - {$cleanName}" : $cleanName,
+                $tag !== '' ? "{$tag} {$cleanName}" : $cleanName,
+            ])
             ->first();
 
         if ($buBranch) {
             return $buBranch->name;
         }
 
-        // 2. Deteksi otomatis apakah gudang unit bisnis ini memakai awalan Prefix Global (contoh: 'GSK - Banjarbaru')
-        $tag = $this->getBuTag();
-        if ($tag !== '') {
-            $usesPrefixedNaming = $this->warehouses()
-                ->where('name', 'like', "{$tag}%")
+        // 3. Fallback ke pola penamaan gudang unit bisnis ini (deteksi apakah memakai "TAG - Kota" atau "TAG Kota")
+        if ($tag !== '' && !str_starts_with(strtoupper($branchName), $tag)) {
+            $usesHyphenPrefix = $this->warehouses()
+                ->where('name', 'like', "{$tag} - %")
                 ->exists();
 
-            if ($usesPrefixedNaming && !str_starts_with(strtoupper($branchName), $tag)) {
-                return $tag . ' ' . $branchName;
+            if ($usesHyphenPrefix) {
+                return "{$tag} - {$cleanName}";
+            }
+
+            $usesSpacePrefix = $this->warehouses()
+                ->where('name', 'like', "{$tag} %")
+                ->exists();
+
+            if ($usesSpacePrefix) {
+                return "{$tag} {$cleanName}";
             }
         }
 

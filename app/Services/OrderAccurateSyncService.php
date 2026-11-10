@@ -208,14 +208,50 @@ class OrderAccurateSyncService
                     ->where('status', 'SUCCESS')
                     ->first();
 
-                if ($doDoc && $doDoc->doc_number && !$financePayment) {
+                if ($doDoc && $financePayment) {
+                    if ($doDoc->accurate_id) {
+                        try {
+                            $this->accurateService->deleteDeliveryOrder($doDoc->accurate_id, $dbSource);
+                            $doDoc->update(['status' => 'CANCELLED']);
+                            $doDoc = null;
+                        } catch (Exception $e) {
+                            Log::channel('pos_accurate')->warning("OrderAccurateSyncService: Gagal menghapus legacy DO saat pelunasan finance: " . $e->getMessage());
+                        }
+                    }
+                } elseif ($doDoc && $doDoc->doc_number && !$financePayment) {
                     foreach ($detailItems as &$itemRow) {
                         $itemRow['deliveryOrderNumber'] = $doDoc->doc_number;
                     }
                     unset($itemRow);
                 } elseif ($order->accurate_so_number && !$financePayment) {
+                    // Ambil daftar itemNo yang terdaftar di SO Accurate (agar item tambahan saat pelunasan POS tidak ditolak Accurate)
+                    $soItemNos = null;
+                    $soDoc = $order->accurateDocs()
+                        ->where('doc_type', 'SALES_ORDER')
+                        ->where('status', 'SUCCESS')
+                        ->first();
+                    if ($soDoc && $soDoc->accurate_id) {
+                        try {
+                            $soDetail = $this->accurateService->getSalesOrderDetail($soDoc->accurate_id, $dbSource);
+                            if (!empty($soDetail['detailItem']) && is_array($soDetail['detailItem'])) {
+                                $soItemNos = [];
+                                foreach ($soDetail['detailItem'] as $soRow) {
+                                    $rowNo = $soRow['item']['no'] ?? ($soRow['itemNo'] ?? null);
+                                    if ($rowNo) {
+                                        $soItemNos[] = (string) $rowNo;
+                                    }
+                                }
+                            }
+                        } catch (Exception $e) {
+                            // Fallback: jika gagal fetch detail SO, pasang ke semua item
+                            $soItemNos = null;
+                        }
+                    }
+
                     foreach ($detailItems as &$itemRow) {
-                        $itemRow['salesOrderNumber'] = $order->accurate_so_number;
+                        if ($soItemNos === null || in_array((string) $itemRow['itemNo'], $soItemNos, true)) {
+                            $itemRow['salesOrderNumber'] = $order->accurate_so_number;
+                        }
                     }
                     unset($itemRow);
                 }
@@ -329,6 +365,14 @@ class OrderAccurateSyncService
                     \App\Models\CustomerDeposit::where('origin_order_id', $order->id)
                         ->where('status', 'AVAILABLE')
                         ->update(['status' => 'USED', 'balance' => 0]);
+
+                    if ($financePayment && $order->accurate_so_number) {
+                        try {
+                            $this->accurateService->closeSalesOrder($order->accurate_so_number, $dbSource);
+                        } catch (Exception $e) {
+                            Log::channel('pos_accurate')->warning("OrderAccurateSyncService: Gagal menutup SO {$order->accurate_so_number} saat pelunasan finance: " . $e->getMessage());
+                        }
+                    }
                 } else {
                     $apiError = $siResult['d'][0] ?? ($siResult['message'] ?? json_encode($siResult));
                     throw new Exception("Gagal membuat Faktur Penjualan (SI) di Accurate: {$apiError}");
@@ -337,7 +381,13 @@ class OrderAccurateSyncService
 
             // 3. PROSES SALES RECEIPT (PENERIMAAN PENJUALAN)
             if (empty($order->accurate_receipt_no) && !empty($order->accurate_invoice_no)) {
-                $srNumbers = [];
+                $existingSrDocs = $order->accurateDocs()
+                    ->where('doc_type', 'SALES_RECEIPT')
+                    ->where('status', 'SUCCESS')
+                    ->get();
+
+                $srNumbers = $existingSrDocs->pluck('doc_number')->filter()->values()->all();
+                $usedSrDocIds = [];
 
                 foreach ($order->payments as $payment) {
                     $rowTotal = (float)$payment->amount;
@@ -363,11 +413,31 @@ class OrderAccurateSyncService
                     }
                     $rowMdr = $pct > 0 ? round($rowTotal * $pct / 100, 0) : 0;
                     $netReceiptAmount = $rowTotal - $rowMdr;
+                    $bankNo = $pm->accurate_bank_no ?? 'KAS-CASH';
+
+                    // Cek idempotensi: lewati jika payment ini sudah pernah berhasil dibuatkan SR sebelumnya
+                    $alreadySyncedDoc = $existingSrDocs->first(function ($doc) use ($payment, $netReceiptAmount, $bankNo, $usedSrDocIds) {
+                        if (in_array($doc->id, $usedSrDocIds, true)) {
+                            return false;
+                        }
+                        $docPayload = is_array($doc->payload) ? $doc->payload : [];
+                        if (isset($docPayload['_payment_id']) && (int) $docPayload['_payment_id'] === (int) $payment->id) {
+                            return true;
+                        }
+                        $amountMatches = abs((float) $doc->amount - (float) $netReceiptAmount) < 1;
+                        $bankMatches = !isset($docPayload['bankNo']) || $docPayload['bankNo'] === $bankNo;
+                        return $amountMatches && $bankMatches;
+                    });
+
+                    if ($alreadySyncedDoc) {
+                        $usedSrDocIds[] = $alreadySyncedDoc->id;
+                        continue;
+                    }
 
                     $srData = [
                         'customerNo' => $invoiceCustomerNo,
                         'branchName' => $accurateBranchName,
-                        'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
+                        'bankNo' => $bankNo,
                         'receiptAmount' => (float) $netReceiptAmount,
                         'chequeAmount' => (float) $netReceiptAmount,
                         'transDate' => $order->order_date ? Carbon::parse($order->order_date)->format('d/m/Y') : now()->format('d/m/Y'),
@@ -389,15 +459,16 @@ class OrderAccurateSyncService
                         $srNo = $srResult['r']['number'];
                         $srNumbers[] = $srNo;
 
-                        OrderAccurateDoc::create([
+                        $newDoc = OrderAccurateDoc::create([
                             'order_id' => $order->id,
                             'doc_type' => 'SALES_RECEIPT',
                             'doc_number' => $srNo,
                             'accurate_id' => $srResult['r']['id'] ?? null,
                             'amount' => (float) $netReceiptAmount,
                             'status' => 'SUCCESS',
-                            'payload' => $srData,
+                            'payload' => array_merge($srData, ['_payment_id' => $payment->id]),
                         ]);
+                        $usedSrDocIds[] = $newDoc->id;
                     } else {
                         $apiError = $srResult['d'][0] ?? ($srResult['message'] ?? json_encode($srResult));
                         throw new Exception("Gagal membuat Penerimaan Penjualan (SR) di Accurate: {$apiError}");
@@ -405,7 +476,7 @@ class OrderAccurateSyncService
                 }
 
                 if (!empty($srNumbers)) {
-                    $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
+                    $order->update(['accurate_receipt_no' => implode(', ', array_unique($srNumbers))]);
                 } elseif (!empty($validDpInvoices)) {
                     $totalDpAmount = array_sum(array_column($validDpInvoices, 'paymentAmount'));
                     if ($totalDpAmount >= (float)$order->grand_total) {

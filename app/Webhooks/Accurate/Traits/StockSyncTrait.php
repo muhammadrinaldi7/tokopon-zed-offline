@@ -34,7 +34,14 @@ trait StockSyncTrait
         // Wajib menggunakan ProductAccurate karena tabel warehouse_stocks 
         // berelasi polymorphic (morphTo) ke variant_id dan variant_type milik ProductAccurate.
         $productAccurate = \App\Models\ProductAccurate::where('item_no', (string) $itemNo)
-            ->where('database_source', $dbSource)
+            ->where(function ($q) use ($bu, $dbSource) {
+                if ($bu) {
+                    $q->where('business_unit_id', $bu->id)
+                      ->orWhere('database_source', $dbSource);
+                } else {
+                    $q->where('database_source', $dbSource);
+                }
+            })
             ->first();
 
         if (!$productAccurate) {
