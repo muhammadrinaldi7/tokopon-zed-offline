@@ -213,6 +213,8 @@ class SalesSyncLogsIndex extends Component
 
     protected function healLegacySyncedOrders(): void
     {
+        // 1. Tandai SYNCED untuk transaksi COMPLETED dari kode lama yang sudah punya nomor faktur Accurate
+        // dan belum memiliki riwayat gagal di order_accurate_sync_logs
         Order::where('order_status', 'COMPLETED')
             ->where(function ($q) {
                 $q->whereNull('accurate_sync_status')
@@ -223,12 +225,54 @@ class SalesSyncLogsIndex extends Component
             })
             ->whereNotNull('accurate_invoice_no')
             ->where('accurate_invoice_no', '!=', '')
-            ->whereNotNull('accurate_receipt_no')
-            ->where('accurate_receipt_no', '!=', '')
             ->update([
                 'accurate_sync_status' => 'SYNCED',
-                'accurate_synced_at' => now(),
             ]);
+
+        // 2. Pastikan seluruh order PENDING (7 hari terakhir) & FAILED yang belum punya baris di order_accurate_sync_logs
+        // dibuatkan log awalnya agar selalu tampil di tabel daftar di bawah (sinkron dengan angka badge KPI)
+        $ordersWithoutLog = Order::where('order_status', 'COMPLETED')
+            ->whereDoesntHave('accurateSyncLogs')
+            ->where(function ($q) {
+                $q->where('accurate_sync_status', 'FAILED')
+                  ->orWhere(function ($sub) {
+                      $sub->where(function ($p) {
+                          $p->where('accurate_sync_status', 'PENDING')
+                            ->orWhere(function ($nullStatus) {
+                                $nullStatus->whereNull('accurate_sync_status')
+                                    ->where(function ($inv) {
+                                        $inv->whereNull('accurate_invoice_no')
+                                            ->orWhere('accurate_invoice_no', '');
+                                    });
+                            });
+                      })->where('created_at', '>=', now()->subDays(7));
+                  });
+            })
+            ->limit(100)
+            ->get();
+
+        foreach ($ordersWithoutLog as $order) {
+            $status = $order->accurate_sync_status === 'FAILED' ? 'FAILED' : 'PENDING';
+            if ($order->accurate_sync_status === null) {
+                $order->update(['accurate_sync_status' => 'PENDING']);
+            }
+
+            OrderAccurateSyncLog::create([
+                'order_id'            => $order->id,
+                'business_unit_id'    => $order->business_unit_id,
+                'branch_id'           => $order->branch_id,
+                'trigger_type'        => 'REALTIME_POS',
+                'status'              => $status,
+                'attempt_number'      => max(1, (int) $order->accurate_sync_attempts),
+                'accurate_invoice_no' => $order->accurate_invoice_no ?: null,
+                'accurate_receipt_no' => $order->accurate_receipt_no ?: null,
+                'error_category'      => $status === 'FAILED' ? 'UNKNOWN' : 'NETWORK_TIMEOUT',
+                'error_message'       => $order->accurate_sync_last_error
+                    ?: 'Transaksi belum memiliki nomor Faktur Accurate (menunggu sinkronisasi ulang).',
+                'created_at'          => $order->created_at ?? now(),
+                'updated_at'          => $order->updated_at ?? now(),
+            ]);
+        }
     }
 
     public function render()
@@ -266,7 +310,14 @@ class SalesSyncLogsIndex extends Component
 
         $totalSyncedToday = Order::where('order_status', 'COMPLETED')
             ->where('accurate_sync_status', 'SYNCED')
-            ->whereDate('accurate_synced_at', Carbon::today())
+            ->where(function ($q) {
+                $q->whereDate('order_date', Carbon::today())
+                  ->orWhereDate('created_at', Carbon::today())
+                  ->orWhereHas('accurateSyncLogs', function ($logQ) {
+                      $logQ->where('status', 'SUCCESS')
+                           ->whereDate('created_at', Carbon::today());
+                  });
+            })
             ->count();
 
         // 2. Query Log

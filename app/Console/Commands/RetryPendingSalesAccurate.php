@@ -35,7 +35,7 @@ class RetryPendingSalesAccurate extends Command
 
         $settingService->set('accurate_sales_retry_last_run_at', now()->toDateTimeString());
 
-        // Self-healing: tandai SYNCED untuk transaksi dari kode lama yang sudah memiliki nomor faktur & kwitansi Accurate
+        // Self-healing: tandai SYNCED untuk transaksi dari kode lama yang sudah memiliki nomor faktur Accurate
         // namun belum memiliki accurate_sync_status (atau berstatus PENDING tanpa riwayat gagal di log)
         Order::where('order_status', 'COMPLETED')
             ->where(function ($q) {
@@ -47,11 +47,8 @@ class RetryPendingSalesAccurate extends Command
             })
             ->whereNotNull('accurate_invoice_no')
             ->where('accurate_invoice_no', '!=', '')
-            ->whereNotNull('accurate_receipt_no')
-            ->where('accurate_receipt_no', '!=', '')
             ->update([
                 'accurate_sync_status' => 'SYNCED',
-                'accurate_synced_at' => now(),
             ]);
 
         if ($specificOrderId) {
