@@ -74,3 +74,40 @@ Artisan::command('mail:test-mailtrap {email=test@example.com}', function (string
     ->everyTenMinutes()
     ->withoutOverlapping();
 
+// Otomatisasi retry transaksi penjualan POS yang tertunda (pending/gagal sync) ke Accurate
+// Frekuensi dinamis dapat diatur melalui menu Admin > Log & Antrean Sinkronisasi Accurate
+\Illuminate\Support\Facades\Schedule::command('accurate:retry-pending-sales')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->when(function () {
+        $settingService = app(\App\Services\SettingService::class);
+        $frequency = $settingService->get('accurate_sales_retry_frequency', 'every_ten_minutes');
+
+        if ($frequency === 'disabled') {
+            return false;
+        }
+
+        $lastRunAt = $settingService->get('accurate_sales_retry_last_run_at');
+        if (!$lastRunAt) {
+            return true;
+        }
+
+        try {
+            $lastDate = \Carbon\Carbon::parse($lastRunAt);
+            $diffInSeconds = $lastDate->diffInSeconds(now());
+            $diffInMinutes = $lastDate->diffInMinutes(now());
+
+            return match ($frequency) {
+                'every_minute' => $diffInSeconds >= 50,
+                'every_five_minutes' => $diffInMinutes >= 5,
+                'every_ten_minutes' => $diffInMinutes >= 10,
+                'every_fifteen_minutes' => $diffInMinutes >= 15,
+                'every_thirty_minutes' => $diffInMinutes >= 30,
+                'hourly' => $diffInMinutes >= 60,
+                default => false,
+            };
+        } catch (\Throwable $e) {
+            return true;
+        }
+    });
+

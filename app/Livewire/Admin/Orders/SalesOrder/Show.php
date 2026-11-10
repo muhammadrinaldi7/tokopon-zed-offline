@@ -375,9 +375,13 @@ class Show extends Component
                 }
                 $branchName = $handler->branch->name;
 
-                $accurateBranchName = $branchName;
-                if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
-                    $accurateBranchName = 'GSK ' . $accurateBranchName;
+                $accurateBranchName = $businessUnit
+                    ? $businessUnit->resolveAccurateBranchName($branchName)
+                    : $branchName;
+
+                if ($customerUser) {
+                    $accurateService->syncCustomer($customerUser, $dbSource);
+                    $customerUser->refresh();
                 }
 
                 $pmId = $paymentData['payment_method_id'];
@@ -425,17 +429,19 @@ class Show extends Component
                 $dpInvResult = $accurateService->postDownPaymentInvoice($dpInvData, $dbSource);
 
                 if (!isset($dpInvResult['r']['number'])) {
-                    throw new \Exception('Gagal mendapatkan nomor Faktur Uang Muka dari Accurate.');
+                    $apiErr = $dpInvResult['d'][0] ?? ($dpInvResult['message'] ?? 'Gagal mendapatkan nomor Faktur Uang Muka dari Accurate.');
+                    throw new \Exception($apiErr);
                 }
 
                 $dpInvoiceNo = $dpInvResult['r']['number'];
+                $dpInvoiceId = $dpInvResult['r']['id'] ?? null;
                 $deposit->update(['accurate_invoice_no' => $dpInvoiceNo]);
 
                 \App\Models\OrderAccurateDoc::create([
                     'order_id' => $this->order->id,
                     'doc_type' => 'DP_INVOICE',
                     'doc_number' => $dpInvoiceNo,
-                    'accurate_id' => $dpInvResult['r']['id'] ?? null,
+                    'accurate_id' => $dpInvoiceId,
                     'amount' => (float)$paymentData['amount'],
                     'status' => 'SUCCESS',
                 ]);
@@ -461,9 +467,14 @@ class Show extends Component
                 }
 
                 \Illuminate\Support\Facades\Log::info('Accurate DP Receipt Payload: ' . json_encode($srData));
-                $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+                try {
+                    $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
 
-                if (isset($srResult['r']['number'])) {
+                    if (!isset($srResult['r']['number'])) {
+                        $apiErr = $srResult['d'][0] ?? ($srResult['message'] ?? 'Gagal mencatat Penerimaan DP di Accurate.');
+                        throw new \Exception($apiErr);
+                    }
+
                     $deposit->update(['accurate_receipt_no' => $srResult['r']['number']]);
                     \App\Models\OrderAccurateDoc::create([
                         'order_id' => $this->order->id,
@@ -473,6 +484,13 @@ class Show extends Component
                         'amount' => (float)$paymentData['amount'],
                         'status' => 'SUCCESS',
                     ]);
+                } catch (\Exception $srEx) {
+                    try {
+                        $accurateService->deleteSalesInvoice($dpInvoiceId ?: $dpInvoiceNo, $dbSource);
+                    } catch (\Exception $cleanupEx) {
+                        \Illuminate\Support\Facades\Log::warning("Gagal cleanup Faktur DP {$dpInvoiceNo} saat SR gagal: " . $cleanupEx->getMessage());
+                    }
+                    throw $srEx;
                 }
             } // End of if ($actualAmount > 0)
         } catch (\Exception $e) {
@@ -845,10 +863,9 @@ class Show extends Component
             $detailItem[] = $dItem;
         }
 
-        $branchName = $this->order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru');
-        if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
-            $branchName = 'GSK ' . $branchName;
-        }
+        $rawBranchName = $this->order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru');
+        $bu = $this->order->businessUnit ?: BusinessUnit::where('code', $dbSource)->first();
+        $branchName = $bu ? $bu->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
 
         $payload = [
             'id' => $soDoc->accurate_id,

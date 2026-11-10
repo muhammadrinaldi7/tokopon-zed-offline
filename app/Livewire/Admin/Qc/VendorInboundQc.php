@@ -56,7 +56,7 @@ class VendorInboundQc extends Component
         $query = ProductSerialNumber::whereIn('item_no', $secondSkus)
             ->where('status', 'Available')
             ->whereHas('warehouse.businessUnit', function ($q) {
-                $q->where('code', 'second')->orWhere('name', 'like', '%GSK%');
+                $q->where('requires_inbound_qc', true)->orWhere('code', 'second');
             });
 
         if ($this->filterQcStatus === 'pending') {

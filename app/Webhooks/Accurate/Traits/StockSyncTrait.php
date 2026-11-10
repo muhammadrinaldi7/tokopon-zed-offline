@@ -14,16 +14,11 @@ trait StockSyncTrait
      */
     private function syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource, $log = null): bool
     {
-        // 1. Validasi DB Lokal: Pastikan Gudang ada di Laravel Anda
-        // Cek langsung dengan nama gudang asli terlebih dahulu
-        $warehouse = Warehouse::where('name', $warehouseName)->first();
-        if (!$warehouse && $dbSource === 'second') {
-            // Fallback toleransi jika di Accurate ada/tidak ada prefix 'GSK '
-            $altWarehouseName = str_starts_with($warehouseName, 'GSK - ') 
-                ? str_replace('GSK - ', '', $warehouseName)
-                : 'GSK - ' . $warehouseName;
-            $warehouse = Warehouse::where('name', $altWarehouseName)->first();
-        }
+        // 1. Validasi DB Lokal: Pastikan Gudang ada di Laravel secara dinamis per Business Unit
+        $bu = \App\Models\BusinessUnit::where('code', $dbSource)->first();
+        $warehouse = $bu
+            ? $bu->findLocalWarehouse($warehouseName)
+            : Warehouse::where('name', $warehouseName)->first();
 
         if (!$warehouse) {
             \App\Services\SyncIssueRecorder::recordWarehouseNotFound(
@@ -39,7 +34,14 @@ trait StockSyncTrait
         // Wajib menggunakan ProductAccurate karena tabel warehouse_stocks 
         // berelasi polymorphic (morphTo) ke variant_id dan variant_type milik ProductAccurate.
         $productAccurate = \App\Models\ProductAccurate::where('item_no', (string) $itemNo)
-            ->where('database_source', $dbSource)
+            ->where(function ($q) use ($bu, $dbSource) {
+                if ($bu) {
+                    $q->where('business_unit_id', $bu->id)
+                      ->orWhere('database_source', $dbSource);
+                } else {
+                    $q->where('database_source', $dbSource);
+                }
+            })
             ->first();
 
         if (!$productAccurate) {

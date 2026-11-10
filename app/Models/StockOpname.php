@@ -157,13 +157,14 @@ class StockOpname extends Model
     public static function generateOpnameNumber(int $businessUnitId, int $branchId): string
     {
         $bu = BusinessUnit::find($businessUnitId);
-        $buCode = $bu ? strtoupper(substr($bu->code ?? $bu->name, 0, 3)) : 'BU';
+        $buCode = $bu ? $bu->getBuTag() : 'BU';
 
         $branch = Branch::find($branchId);
         $branchCode = 'CAB';
         if ($branch) {
-            // Bersihkan nama cabang dan ambil singkatan
-            $cleanName = str_ireplace(['gsk', 'syihab', '-', ' '], '', $branch->name);
+            // Bersihkan nama cabang secara dinamis dari tag/nama BU dan ambil singkatan
+            $stripTokens = array_filter([$bu?->prefix, $bu?->code, $bu?->name, 'gsk', 'syihab', '-', ' ']);
+            $cleanName = str_ireplace($stripTokens, '', $branch->name);
             $branchCode = strtoupper(substr($cleanName, 0, 3));
             if (empty($branchCode)) {
                 $branchCode = 'BR' . $branch->id;

@@ -31,11 +31,7 @@ class AccurateReturnSyncService
      */
     public function getBuTag(BusinessUnit $bu): string
     {
-        return match (strtolower($bu->code)) {
-            'second', 'gsk' => 'GSK',
-            'syihab', 'syb' => 'SYB',
-            default         => strtoupper($bu->code),
-        };
+        return $bu->getBuTag();
     }
 
     /**

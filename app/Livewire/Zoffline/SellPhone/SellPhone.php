@@ -1361,22 +1361,24 @@ class SellPhone extends Component
             // PROSES INSERT DATA DEVICE & TRANSMISI KE ACCURATE
             // -------------------------------------------------------------
 
-            $productAccurateQuery = \App\Models\ProductAccurate::where('business_unit_id', 2)
-                ->where('name', $this->selected_model_name);
+            $activeBuId = Auth::user()?->getActiveBusinessUnitId() ?? 2;
+            $basePaQuery = \App\Models\ProductAccurate::where('name', $this->selected_model_name);
 
             if ($this->selected_brand_id) {
-                $productAccurateQuery->where('brandName', $this->selected_brand_id);
+                $basePaQuery->where('brandName', $this->selected_brand_id);
             }
 
             if ($this->selected_categoryName) {
-                $productAccurateQuery->where('categoryName', $this->selected_categoryName);
+                $basePaQuery->where('categoryName', $this->selected_categoryName);
             }
 
             if ($this->selected_proyek) {
-                $productAccurateQuery->where('proyek', $this->selected_proyek);
+                $basePaQuery->where('proyek', $this->selected_proyek);
             }
 
-            $productAccurate = $productAccurateQuery->first();
+            // Cari di Business Unit aktif terlebih dahulu, fallback ke BU Second (ID 2) jika katalog buyback terpusat di Second
+            $productAccurate = (clone $basePaQuery)->where('business_unit_id', $activeBuId)->first()
+                ?? (clone $basePaQuery)->where('business_unit_id', 2)->first();
 
             if (!$productAccurate) {
                 DB::rollBack();

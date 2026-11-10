@@ -88,7 +88,7 @@ class Show extends Component
         $this->editBankAccountNumber = $this->sellPhone->bank_account_number ?: ($userBank?->account_number ?? '');
         $this->editBankAccountName = $this->sellPhone->bank_account_name ?: ($userBank?->account_name ?? '');
 
-        $dbSource = $this->sellPhone->businessUnit ? strtolower($this->sellPhone->businessUnit->code) : 'gsk';
+        $dbSource = $this->sellPhone->businessUnit ? strtolower($this->sellPhone->businessUnit->code) : 'second';
 
         // Load Accurate GL Accounts for Bank selection
         $this->accurateGlAccounts = \App\Models\AccurateGlAccount::where('account_type', 'CASH_BANK')
@@ -96,6 +96,13 @@ class Show extends Component
             ->orderBy('name')
             ->get()
             ->toArray();
+
+        if (empty($this->accurateGlAccounts)) {
+            $this->accurateGlAccounts = \App\Models\AccurateGlAccount::where('account_type', 'CASH_BANK')
+                ->orderBy('name')
+                ->get()
+                ->toArray();
+        }
     }
 
     #[On('qc-inspection-saved')]
@@ -214,7 +221,11 @@ class Show extends Component
 
             $phoneData = $this->phoneData;
             $flUser = $this->sellPhone->handledBy;
-            $accurateBranchName = $flUser && $flUser->branch ? $flUser->branch->name : 'Banjarbaru';
+            $businessUnit = $this->sellPhone->businessUnit ?: \App\Models\BusinessUnit::where('code', 'second')->first();
+            $dbSource = $businessUnit ? strtolower($businessUnit->code) : 'second';
+
+            $rawBranchName = $flUser && $flUser->branch ? $flUser->branch->name : ($this->sellPhone->branch?->name ?? 'Banjarbaru');
+            $accurateBranchName = $businessUnit ? $businessUnit->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
             $accurateWarehouseName = $flUser && $flUser->warehouse ? $flUser->warehouse->name : 'Head Office';
 
             $itemNo = $phoneData->productAccurate->item_no ?? null;
@@ -258,9 +269,6 @@ class Show extends Component
 
             $detailItem = [$itemDetail];
 
-            // Tentukan database source dari Business Unit kasir/admin
-            $dbSource = $flUser && $flUser->businessUnit ? strtolower($flUser->businessUnit->code) : 'gsk';
-
             // 2. Masukkan ke dalam parameter utama Purchase Invoice Accurate
             $vendorNoAwal = $phoneData->user->getAccurateVendorNo($dbSource) ?? 'V-CASH';
             $this->dataParamPurchaseInvoice = [
@@ -301,8 +309,9 @@ class Show extends Component
                         // Simpan state secara iteratif
                         $this->sellPhone->update(['invoice_number' => $accurateResponse['r']['number']]);
                     } else {
-                        // Fallback jika tidak ada number
-                        $this->sellPhone->update(['invoice_number' => $billNumber]);
+                        $errMsg = $accurateResponse['d'][0]
+                            ?? ($accurateResponse['message'] ?? json_encode($accurateResponse));
+                        throw new \Exception('Gagal membuat Faktur Pembelian (PI) di Accurate: ' . (is_array($errMsg) ? implode(', ', $errMsg) : $errMsg));
                     }
                 }
 
@@ -329,7 +338,14 @@ class Show extends Component
                         ],
 
                     ];
-                    $accurateService->postPurchasePayment($paymentData, $dbSource);
+                    $ppResponse = $accurateService->postPurchasePayment($paymentData, $dbSource);
+                    Log::info('data purchase payment yang masuk ke accurate : ', ['data' => $paymentData, 'response' => $ppResponse]);
+
+                    if ((isset($ppResponse['s']) && $ppResponse['s'] === false) || (!isset($ppResponse['r']) && !isset($ppResponse['d']))) {
+                        $ppErr = $ppResponse['d'][0]
+                            ?? ($ppResponse['message'] ?? json_encode($ppResponse));
+                        throw new \Exception('Faktur Pembelian (' . $this->sellPhone->invoice_number . ') berhasil dibuat, namun gagal mencatat Pembayaran Pembelian di Accurate: ' . (is_array($ppErr) ? implode(', ', $ppErr) : $ppErr));
+                    }
                 }
 
                 // JIKA BERHASIL: Update status dan redirect
@@ -667,7 +683,8 @@ class Show extends Component
             $previousPaId = $this->sellPhone->product_accurate_id;
             $previousInvoiceNo = $this->sellPhone->invoice_number;
             $previousAppraisedValue = $this->sellPhone->appraised_value;
-            $dbSource = $this->sellPhone->businessUnit ? strtolower($this->sellPhone->businessUnit->code) : 'gsk';
+            $businessUnit = $this->sellPhone->businessUnit ?: \App\Models\BusinessUnit::where('code', 'second')->first();
+            $dbSource = $businessUnit ? strtolower($businessUnit->code) : 'second';
             $accurateService = app(AccurateService::class);
 
             $accurateDocsSnapshot = [];
@@ -686,7 +703,8 @@ class Show extends Component
 
                 // Susun ulang Purchase Invoice untuk SKU baru
                 $flUser = $this->sellPhone->handledBy;
-                $accurateBranchName = $flUser && $flUser->branch ? $flUser->branch->name : 'Banjarbaru';
+                $rawBranchName = $flUser && $flUser->branch ? $flUser->branch->name : ($this->sellPhone->branch?->name ?? 'Banjarbaru');
+                $accurateBranchName = $businessUnit ? $businessUnit->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
                 $accurateWarehouseName = $flUser && $flUser->warehouse ? $flUser->warehouse->name : 'Head Office';
 
                 $namaProyek = trim(strtoupper($newPa->proyek ?? ''));
@@ -732,6 +750,10 @@ class Show extends Component
                 $accurateResponse = $accurateService->postPurchaseInvoice($piPayload, $dbSource);
                 if (isset($accurateResponse['r']['number'])) {
                     $newInvoiceNumber = $accurateResponse['r']['number'];
+                } else {
+                    $errMsg = $accurateResponse['d'][0]
+                        ?? ($accurateResponse['message'] ?? json_encode($accurateResponse));
+                    throw new \Exception('Gagal membuat ulang Faktur Pembelian (PI) saat koreksi SKU di Accurate: ' . (is_array($errMsg) ? implode(', ', $errMsg) : $errMsg));
                 }
 
                 // Buat ulang Pembayaran Pembelian
@@ -750,7 +772,12 @@ class Show extends Component
                             ]
                         ],
                     ];
-                    $accurateService->postPurchasePayment($paymentData, $dbSource);
+                    $ppResponse = $accurateService->postPurchasePayment($paymentData, $dbSource);
+                    if ((isset($ppResponse['s']) && $ppResponse['s'] === false) || (!isset($ppResponse['r']) && !isset($ppResponse['d']))) {
+                        $ppErr = $ppResponse['d'][0]
+                            ?? ($ppResponse['message'] ?? json_encode($ppResponse));
+                        throw new \Exception('Gagal membuat ulang Pembayaran Pembelian saat koreksi SKU di Accurate: ' . (is_array($ppErr) ? implode(', ', $ppErr) : $ppErr));
+                    }
                 }
             }
 

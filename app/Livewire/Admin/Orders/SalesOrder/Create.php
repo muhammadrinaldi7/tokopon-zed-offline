@@ -972,10 +972,9 @@ class Create extends Component
                 $businessUnit = BusinessUnit::find($this->business_unit_id);
                 $dbSource = $businessUnit ? $businessUnit->code : 'syihab';
 
-                $accurateBranchName = $branchName;
-                if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
-                    $accurateBranchName = 'GSK ' . $accurateBranchName;
-                }
+                $accurateBranchName = $businessUnit
+                    ? $businessUnit->resolveAccurateBranchName($branchName)
+                    : $branchName;
 
                 $accurateService->syncCustomer($customerUser, $dbSource);
                 $customerUser->refresh();

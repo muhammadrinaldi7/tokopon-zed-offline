@@ -173,7 +173,7 @@ trait WithCheckoutAndReceipt
 
             if (!$order) {
                 // Buat Order Number baru jika belum ada
-                $businessUnit = \Illuminate\Support\Facades\Auth::user()->businessUnit;
+                $businessUnit = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
                 $draftPrefix = $businessUnit->draft_prefix ?? 'POS-DRF-';
 
                 $orderNumber = $draftPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
@@ -378,6 +378,9 @@ trait WithCheckoutAndReceipt
 
                     $handler = Auth::user();
                     $branchName = $handler->branch->name ?? 'Banjarbaru';
+                    $accurateBranchName = $order->businessUnit
+                        ? $order->businessUnit->resolveAccurateBranchName($branchName)
+                        : $branchName;
 
                     if (!$order->accurate_receipt_no && $order->accurate_invoice_no) {
                         $srNumbers = [];
@@ -401,7 +404,7 @@ trait WithCheckoutAndReceipt
                                 $detailDiscounts[] = [
                                     'accountNo' => $rate->accurate_account_no,
                                     'amount' => (float) $rowMdr,
-                                    'departmentName' => $branchName,
+                                    'departmentName' => $accurateBranchName,
                                     'discountNotes' => 'MDR ' . ($rate->name ?? ' ')
                                 ];
                             }
@@ -417,7 +420,7 @@ trait WithCheckoutAndReceipt
 
                             $srData = [
                                 'customerNo' => $order->user->getAccurateCustomerNo($dbSource),
-                                'branchName' => $branchName,
+                                'branchName' => $accurateBranchName,
                                 'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
                                 'receiptAmount' => (float) $netReceiptAmount,
                                 'chequeAmount' => (float) $netReceiptAmount,
@@ -438,7 +441,11 @@ trait WithCheckoutAndReceipt
                                     'accurate_id' => $srResult['r']['id'] ?? null,
                                     'amount' => (float) $netReceiptAmount,
                                     'status' => 'SUCCESS',
+                                    'payload' => $srData,
                                 ]);
+                            } else {
+                                $apiError = $srResult['d'][0] ?? ($srResult['message'] ?? json_encode($srResult));
+                                throw new \Exception("Gagal membuat Penerimaan Pelunasan Piutang (SR) di Accurate: {$apiError}");
                             }
                         }
 
@@ -446,8 +453,50 @@ trait WithCheckoutAndReceipt
                             $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
                         }
                     }
+
+                    $order->update([
+                        'accurate_sync_status' => 'SYNCED',
+                        'accurate_synced_at' => now(),
+                        'accurate_sync_last_error' => null,
+                    ]);
+
+                    \App\Models\OrderAccurateSyncLog::create([
+                        'order_id' => $order->id,
+                        'business_unit_id' => $order->business_unit_id,
+                        'branch_id' => $order->branch_id,
+                        'trigger_type' => 'REALTIME_POS',
+                        'status' => 'SUCCESS',
+                        'attempt_number' => 1,
+                        'accurate_invoice_no' => $order->accurate_invoice_no,
+                        'accurate_receipt_no' => $order->accurate_receipt_no,
+                        'executed_by' => \Illuminate\Support\Facades\Auth::id(),
+                    ]);
                 } catch (\Exception $e) {
-                    Log::channel('pos_accurate')->error('POS Accurate Integration Error (Pelunasan Piutang): ' . $e->getMessage());
+                    $errorMessage = $e->getMessage();
+                    Log::channel('pos_accurate')->error('POS Accurate Integration Error (Pelunasan Piutang): ' . $errorMessage);
+                    $errorCategory = \App\Models\OrderAccurateSyncLog::categorizeError($errorMessage);
+
+                    $order->update([
+                        'accurate_sync_status' => 'PENDING',
+                        'accurate_sync_attempts' => (int)$order->accurate_sync_attempts + 1,
+                        'accurate_sync_last_error' => $errorMessage,
+                    ]);
+
+                    \App\Models\OrderAccurateSyncLog::create([
+                        'order_id' => $order->id,
+                        'business_unit_id' => $order->business_unit_id,
+                        'branch_id' => $order->branch_id,
+                        'trigger_type' => 'REALTIME_POS',
+                        'status' => 'FAILED',
+                        'attempt_number' => (int)$order->accurate_sync_attempts,
+                        'accurate_invoice_no' => $order->accurate_invoice_no,
+                        'accurate_receipt_no' => $order->accurate_receipt_no,
+                        'error_category' => $errorCategory,
+                        'error_message' => $errorMessage,
+                        'executed_by' => \Illuminate\Support\Facades\Auth::id(),
+                    ]);
+
+                    $this->dispatch('toast', title: 'Peringatan', message: 'Pelunasan piutang berhasil, tapi sinkronisasi ke Accurate tertunda dan masuk antrean otomatis.', type: 'warning');
                 }
 
                 $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'salesBy']);
@@ -491,7 +540,7 @@ trait WithCheckoutAndReceipt
                 $dateToUse = !empty($this->order_date) ? \Carbon\Carbon::parse($this->order_date) : now();
 
                 // 2. Generate order number berdasarkan order_date
-                $businessUnit = \Illuminate\Support\Facades\Auth::user()->businessUnit;
+                $businessUnit = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
                 $completedPrefix = $businessUnit->order_prefix ?? 'POS-';
 
                 $orderNumber = $completedPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
@@ -618,10 +667,13 @@ trait WithCheckoutAndReceipt
                 $branchName = $handler->branch->name ?? 'Banjarbaru';
                 $warehouseName = $handler->warehouse->name ?? 'Head Office';
 
-                $dbSource = Auth::user()->getActiveBusinessUnit()?->code ?? 'syihab';
+                $activeBu = Auth::user()->getActiveBusinessUnit();
+                $dbSource = $activeBu?->code ?? 'syihab';
 
-                // Gunakan nama Cabang & Gudang asli untuk dikirim ke Accurate
-                $accurateBranchName = $branchName;
+                // Gunakan nama Cabang & Gudang sesuai Business Unit untuk dikirim ke Accurate
+                $accurateBranchName = $activeBu
+                    ? $activeBu->resolveAccurateBranchName($branchName)
+                    : $branchName;
                 $accurateWarehouseName = $warehouseName;
 
                 // Sync Customer to Accurate
@@ -677,8 +729,11 @@ trait WithCheckoutAndReceipt
 
                         $condition = $item['condition'] ?? '';
                         if (in_array($condition, ['Inter', 'Resmi'])) {
-                            // Ekstrak nama kota dari cabang (Misal "GSK - Banjarbaru" atau "GSK Martapura" -> "Banjarbaru")
-                            $city = trim(str_replace(['GSK -', 'GSK '], '', $accurateWarehouseName));
+                            // Ekstrak nama kota dari cabang secara dinamis berdasarkan Prefix Global BU
+                            $buTag = $activeBu ? $activeBu->getBuTag() : '';
+                            $city = $buTag !== ''
+                                ? trim(preg_replace('/^' . preg_quote($buTag, '/') . '\s*[-\s]\s*/i', '', $accurateWarehouseName))
+                                : trim($accurateWarehouseName);
 
                             // Inter = Distri, Resmi = Retail
                             $departmentPrefix = ($condition === 'Inter') ? 'Distri' : 'Retail';
@@ -731,7 +786,11 @@ trait WithCheckoutAndReceipt
                             'accurate_id' => $siResult['r']['id'] ?? null,
                             'amount' => $grandTotal,
                             'status' => 'SUCCESS',
+                            'payload' => $siData,
                         ]);
+                    } else {
+                        $apiError = $siResult['d'][0] ?? ($siResult['message'] ?? json_encode($siResult));
+                        throw new \Exception("Gagal membuat Faktur Penjualan (SI) di Accurate: {$apiError}");
                     }
                 }
 
@@ -787,7 +846,11 @@ trait WithCheckoutAndReceipt
                                 'accurate_id' => $srResult['r']['id'] ?? null,
                                 'amount' => (float) $netReceiptAmount,
                                 'status' => 'SUCCESS',
+                                'payload' => $srData,
                             ]);
+                        } else {
+                            $apiError = $srResult['d'][0] ?? ($srResult['message'] ?? json_encode($srResult));
+                            throw new \Exception("Gagal membuat Penerimaan Penjualan (SR) di Accurate: {$apiError}");
                         }
                     }
 
@@ -795,9 +858,50 @@ trait WithCheckoutAndReceipt
                         $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
                     }
                 }
+
+                $order->update([
+                    'accurate_sync_status' => 'SYNCED',
+                    'accurate_synced_at' => now(),
+                    'accurate_sync_last_error' => null,
+                ]);
+
+                \App\Models\OrderAccurateSyncLog::create([
+                    'order_id' => $order->id,
+                    'business_unit_id' => $order->business_unit_id,
+                    'branch_id' => $order->branch_id,
+                    'trigger_type' => 'REALTIME_POS',
+                    'status' => 'SUCCESS',
+                    'attempt_number' => 1,
+                    'accurate_invoice_no' => $order->accurate_invoice_no,
+                    'accurate_receipt_no' => $order->accurate_receipt_no,
+                    'executed_by' => \Illuminate\Support\Facades\Auth::id(),
+                ]);
             } catch (\Exception $e) {
-                Log::channel('pos_accurate')->error('POS Accurate Integration Error: ' . $e->getMessage());
-                $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate gagal.', type: 'warning');
+                $errorMessage = $e->getMessage();
+                Log::channel('pos_accurate')->error('POS Accurate Integration Error: ' . $errorMessage);
+                $errorCategory = \App\Models\OrderAccurateSyncLog::categorizeError($errorMessage);
+
+                $order->update([
+                    'accurate_sync_status' => 'PENDING',
+                    'accurate_sync_attempts' => (int)$order->accurate_sync_attempts + 1,
+                    'accurate_sync_last_error' => $errorMessage,
+                ]);
+
+                \App\Models\OrderAccurateSyncLog::create([
+                    'order_id' => $order->id,
+                    'business_unit_id' => $order->business_unit_id,
+                    'branch_id' => $order->branch_id,
+                    'trigger_type' => 'REALTIME_POS',
+                    'status' => 'FAILED',
+                    'attempt_number' => (int)$order->accurate_sync_attempts,
+                    'accurate_invoice_no' => $order->accurate_invoice_no,
+                    'accurate_receipt_no' => $order->accurate_receipt_no,
+                    'error_category' => $errorCategory,
+                    'error_message' => $errorMessage,
+                    'executed_by' => \Illuminate\Support\Facades\Auth::id(),
+                ]);
+
+                $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate tertunda dan masuk antrean otomatis.', type: 'warning');
                 // Sengaja tidak me-rethrow exception agar transaksi POS lokal tetap dianggap berhasil
             }
 
@@ -886,7 +990,7 @@ trait WithCheckoutAndReceipt
             }
 
             if (!$order) {
-                $businessUnit = \Illuminate\Support\Facades\Auth::user()->businessUnit;
+                $businessUnit = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
                 $completedPrefix = $businessUnit->order_prefix ?? 'POS-';
 
                 $orderNumber = $completedPrefix . $dateToUse->format('Ymd') . '-' . mt_rand(1000, 9999) . '-' . str_pad(
@@ -937,9 +1041,12 @@ trait WithCheckoutAndReceipt
                 $branchName = $handler->branch->name ?? 'Banjarbaru';
                 $warehouseName = $handler->warehouse->name ?? 'Head Office';
 
-                $dbSource = Auth::user()->getActiveBusinessUnit()?->code ?? 'syihab';
+                $activeBu = Auth::user()->getActiveBusinessUnit();
+                $dbSource = $activeBu?->code ?? 'syihab';
 
-                $accurateBranchName = $branchName;
+                $accurateBranchName = $activeBu
+                    ? $activeBu->resolveAccurateBranchName($branchName)
+                    : $branchName;
                 $accurateWarehouseName = $warehouseName;
 
                 $accurateService->syncCustomer($customerUser, $dbSource);
@@ -978,7 +1085,10 @@ trait WithCheckoutAndReceipt
 
                         $condition = $item['condition'] ?? '';
                         if (in_array($condition, ['Inter', 'Resmi'])) {
-                            $city = trim(str_replace(['GSK -', 'GSK '], '', $accurateWarehouseName));
+                            $buTag = $activeBu ? $activeBu->getBuTag() : '';
+                            $city = $buTag !== ''
+                                ? trim(preg_replace('/^' . preg_quote($buTag, '/') . '\s*[-\s]\s*/i', '', $accurateWarehouseName))
+                                : trim($accurateWarehouseName);
                             $departmentPrefix = ($condition === 'Inter') ? 'Distri' : 'Retail';
                             $itemData['departmentName'] = $departmentPrefix . ' ' . $city;
                         }
@@ -1016,11 +1126,57 @@ trait WithCheckoutAndReceipt
                             'accurate_id' => $siResult['r']['id'] ?? null,
                             'amount' => $grandTotal,
                             'status' => 'SUCCESS',
+                            'payload' => $siData,
                         ]);
+                    } else {
+                        $apiError = $siResult['d'][0] ?? ($siResult['message'] ?? json_encode($siResult));
+                        throw new \Exception("Gagal membuat Faktur Penjualan (SI) Piutang di Accurate: {$apiError}");
                     }
                 }
+
+                $order->update([
+                    'accurate_sync_status' => 'SYNCED',
+                    'accurate_synced_at' => now(),
+                    'accurate_sync_last_error' => null,
+                ]);
+
+                \App\Models\OrderAccurateSyncLog::create([
+                    'order_id' => $order->id,
+                    'business_unit_id' => $order->business_unit_id,
+                    'branch_id' => $order->branch_id,
+                    'trigger_type' => 'REALTIME_POS',
+                    'status' => 'SUCCESS',
+                    'attempt_number' => 1,
+                    'accurate_invoice_no' => $order->accurate_invoice_no,
+                    'accurate_receipt_no' => $order->accurate_receipt_no,
+                    'executed_by' => \Illuminate\Support\Facades\Auth::id(),
+                ]);
             } catch (\Exception $e) {
-                Log::channel('pos_accurate')->error('POS Accurate Integration Error (Piutang): ' . $e->getMessage());
+                $errorMessage = $e->getMessage();
+                Log::channel('pos_accurate')->error('POS Accurate Integration Error (Piutang): ' . $errorMessage);
+                $errorCategory = \App\Models\OrderAccurateSyncLog::categorizeError($errorMessage);
+
+                $order->update([
+                    'accurate_sync_status' => 'PENDING',
+                    'accurate_sync_attempts' => (int)$order->accurate_sync_attempts + 1,
+                    'accurate_sync_last_error' => $errorMessage,
+                ]);
+
+                \App\Models\OrderAccurateSyncLog::create([
+                    'order_id' => $order->id,
+                    'business_unit_id' => $order->business_unit_id,
+                    'branch_id' => $order->branch_id,
+                    'trigger_type' => 'REALTIME_POS',
+                    'status' => 'FAILED',
+                    'attempt_number' => (int)$order->accurate_sync_attempts,
+                    'accurate_invoice_no' => $order->accurate_invoice_no,
+                    'accurate_receipt_no' => $order->accurate_receipt_no,
+                    'error_category' => $errorCategory,
+                    'error_message' => $errorMessage,
+                    'executed_by' => \Illuminate\Support\Facades\Auth::id(),
+                ]);
+
+                $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi piutang berhasil, tapi sinkronisasi ke Accurate tertunda dan masuk antrean otomatis.', type: 'warning');
             }
 
             $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'salesBy']);
@@ -1931,10 +2087,9 @@ trait WithCheckoutAndReceipt
             $warehouseName = $handler->warehouse->name ?? 'Gudang Utama';
             $branchName = $handler->branch->name ?? 'Banjarbaru';
 
-            $accurateBranchName = $branchName;
-            if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
-                $accurateBranchName = 'GSK ' . $accurateBranchName;
-            }
+            $accurateBranchName = $order->businessUnit
+                ? $order->businessUnit->resolveAccurateBranchName($branchName)
+                : $branchName;
 
             // Ambil sales aktif dari form POS jika kasir mengganti/memilih sales, atau fallback ke order sebelumnya
             $activeSalesId = !empty($this->selectedSales) ? $this->selectedSales[0]['id'] : ($order->sales_id ?? null);
@@ -2117,6 +2272,7 @@ trait WithCheckoutAndReceipt
                     // For SI
                     $siItem = [
                         'itemNo' => $sku,
+                        'warehouseName' => $warehouseName,
                         'unitPrice' => (float)$cartItem['price'],
                         'quantity' => (float)$cartItem['qty'],
                         'detailName' => $cartItem['name'],
@@ -2170,13 +2326,16 @@ trait WithCheckoutAndReceipt
                         }
                     }
 
+                    $isTaxable = $order->businessUnit ? (bool) $order->businessUnit->is_taxable : false;
+
                     $siData = [
                         'customerNo' => $invoiceCustomerNo,
                         'branchName' => $accurateBranchName,
                         'transDate' => now()->format('d/m/Y'),
                         'detailItem' => $siDetailItems,
-                        'inclusiveTax' => true,
-                        'taxable' => true,
+                        'inclusiveTax' => $isTaxable,
+                        'taxable' => $isTaxable,
+                        'useTax1' => $isTaxable,
                         'description' => 'Pelunasan SO via POS' . (!empty($this->notes) ? ' - ' . $this->notes : '')
                     ];
 
@@ -2256,7 +2415,7 @@ trait WithCheckoutAndReceipt
 
                         $srData = [
                             'customerNo' => $invoiceCustomerNo,
-                            'branchName' => $branchName,
+                            'branchName' => $accurateBranchName,
                             'bankNo' => $pm->accurate_bank_no ?? 'KAS-CASH',
                             'receiptAmount' => (float) $netReceiptAmount,
                             'chequeAmount' => (float) $netReceiptAmount,
@@ -2275,6 +2434,7 @@ trait WithCheckoutAndReceipt
                                 'accurate_id' => $srResult['r']['id'] ?? null,
                                 'amount' => (float) $netReceiptAmount,
                                 'status' => 'SUCCESS',
+                                'payload' => $srData,
                             ]);
                         } else {
                             throw new \Exception('Gagal membuat Penerimaan Penjualan (SR) di Accurate: ' . ($srResult['d'][0] ?? json_encode($srResult)));
@@ -2284,9 +2444,50 @@ trait WithCheckoutAndReceipt
                         $order->update(['accurate_receipt_no' => implode(', ', $srNumbers)]);
                     }
                 }
+
+                $order->update([
+                    'accurate_sync_status' => 'SYNCED',
+                    'accurate_synced_at' => now(),
+                    'accurate_sync_last_error' => null,
+                ]);
+
+                \App\Models\OrderAccurateSyncLog::create([
+                    'order_id' => $order->id,
+                    'business_unit_id' => $order->business_unit_id,
+                    'branch_id' => $order->branch_id,
+                    'trigger_type' => 'REALTIME_POS',
+                    'status' => 'SUCCESS',
+                    'attempt_number' => 1,
+                    'accurate_invoice_no' => $order->accurate_invoice_no,
+                    'accurate_receipt_no' => $order->accurate_receipt_no,
+                    'executed_by' => \Illuminate\Support\Facades\Auth::id(),
+                ]);
             } catch (\Exception $e) {
-                Log::channel('pos_accurate')->error('POS Accurate Integration Error (SO Fulfillment): ' . $e->getMessage() . "\nTrace: " . $e->getTraceAsString());
-                $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate gagal.', type: 'warning');
+                $errorMessage = $e->getMessage();
+                Log::channel('pos_accurate')->error('POS Accurate Integration Error (SO Fulfillment): ' . $errorMessage . "\nTrace: " . $e->getTraceAsString());
+                $errorCategory = \App\Models\OrderAccurateSyncLog::categorizeError($errorMessage);
+
+                $order->update([
+                    'accurate_sync_status' => 'PENDING',
+                    'accurate_sync_attempts' => (int)$order->accurate_sync_attempts + 1,
+                    'accurate_sync_last_error' => $errorMessage,
+                ]);
+
+                \App\Models\OrderAccurateSyncLog::create([
+                    'order_id' => $order->id,
+                    'business_unit_id' => $order->business_unit_id,
+                    'branch_id' => $order->branch_id,
+                    'trigger_type' => 'REALTIME_POS',
+                    'status' => 'FAILED',
+                    'attempt_number' => (int)$order->accurate_sync_attempts,
+                    'accurate_invoice_no' => $order->accurate_invoice_no,
+                    'accurate_receipt_no' => $order->accurate_receipt_no,
+                    'error_category' => $errorCategory,
+                    'error_message' => $errorMessage,
+                    'executed_by' => \Illuminate\Support\Facades\Auth::id(),
+                ]);
+
+                $this->dispatch('toast', title: 'Peringatan', message: 'Transaksi berhasil, tapi sinkronisasi ke Accurate tertunda dan masuk antrean otomatis.', type: 'warning');
             }
 
             $this->completedOrder = $order->load(['items', 'user', 'payments.paymentMethod', 'payments.paymentMethodRate', 'handledBy', 'salesBy']);

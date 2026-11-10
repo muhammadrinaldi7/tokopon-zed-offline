@@ -56,7 +56,11 @@ class ItemQuantityHandler implements WebhookHandlerInterface
      */
     private function updateLocalStock($itemNo, $warehouseName, $newQuantity, $databaseSource, $log = null): bool
     {
-        $warehouse = Warehouse::where('name', $warehouseName)->first();
+        $bu = \App\Models\BusinessUnit::where('code', $databaseSource)->first();
+        $warehouse = $bu
+            ? $bu->findLocalWarehouse($warehouseName)
+            : Warehouse::where('name', $warehouseName)->first();
+
         if (!$warehouse) {
             \App\Services\SyncIssueRecorder::recordWarehouseNotFound(
                 warehouseName: $warehouseName,
@@ -69,7 +73,14 @@ class ItemQuantityHandler implements WebhookHandlerInterface
         }
 
         $productAccurate = \App\Models\ProductAccurate::where('item_no', (string) $itemNo)
-            ->where('database_source', $databaseSource)
+            ->where(function ($q) use ($bu, $databaseSource) {
+                if ($bu) {
+                    $q->where('business_unit_id', $bu->id)
+                      ->orWhere('database_source', $databaseSource);
+                } else {
+                    $q->where('database_source', $databaseSource);
+                }
+            })
             ->first();
 
         if (!$productAccurate) {
