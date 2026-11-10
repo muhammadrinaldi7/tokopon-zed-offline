@@ -448,7 +448,19 @@
                             {{-- Tanggal & Nota --}}
                             <td class="px-4 py-3 align-top">
                                 <p class="font-semibold text-gray-800">{{ $order->order_date ? $order->order_date->format('d M Y') : $order->created_at->format('d M Y') }}</p>
-                                <p class="text-[11px] text-gray-500 font-mono mt-0.5">{{ $order->order_number }}</p>
+                                @if (str_starts_with($order->order_number ?? '', 'POS'))
+                                    <button type="button" 
+                                        wire:click="viewReceipt({{ $order->id }})"
+                                        class="group inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#1c69d4] hover:text-blue-800 hover:underline mt-0.5 text-left transition focus:outline-none"
+                                        title="Klik untuk melihat Nota Transaksi POS (Read-Only)">
+                                        <svg class="w-3.5 h-3.5 text-blue-500 group-hover:scale-110 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        <span>{{ $order->order_number }}</span>
+                                    </button>
+                                @else
+                                    <p class="text-[11px] text-gray-500 font-mono mt-0.5">{{ $order->order_number }}</p>
+                                @endif
                                 <div class="flex flex-wrap gap-1 mt-1">
                                     @if ($isReturn)
                                         <span class="inline-block px-1.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded text-[10px] font-bold">
@@ -586,4 +598,7 @@
             {{ $items->links() }}
         </div>
     </div>
+
+    {{-- Modal Struk POS Read-Only --}}
+    @include('livewire.zoffline.reporting.modal-receipt-readonly')
 </div>

@@ -8,10 +8,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\UnableToRetrieveMetadata;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Computed;
 use Livewire\WithFileUploads;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 #[Layout('layouts.z', ['title' => 'Sell-Phone'])]
 class SellPhone extends Component
@@ -949,6 +952,17 @@ class SellPhone extends Component
         return $rules;
     }
 
+    protected $validationAttributes = [
+        'photo_depan'       => 'foto tampak depan',
+        'photo_belakang'    => 'foto tampak belakang',
+        'photo_kiri'        => 'foto samping kiri',
+        'photo_kanan'       => 'foto samping kanan',
+        'photo_atas'        => 'foto tampak atas',
+        'photo_bawah'       => 'foto tampak bawah',
+        'photo_box'         => 'foto box',
+        'photo_kelengkapan' => 'foto kelengkapan',
+    ];
+
     protected $messages = [
         'selected_sales_id.required'    => 'Silakan pilih tenaga penjualan (sales).',
         'selected_sales_id.exists'      => 'Tenaga penjualan yang dipilih tidak valid.',
@@ -962,34 +976,42 @@ class SellPhone extends Component
         'photo_depan.required'          => 'Foto tampak depan wajib diunggah.',
         'photo_depan.image'             => 'File foto depan harus berupa gambar.',
         'photo_depan.max'               => 'Ukuran foto depan maksimal 5MB.',
+        'photo_depan.uploaded'          => 'Gagal mengunggah foto tampak depan. Silakan ambil ulang.',
 
         'photo_belakang.required'       => 'Foto tampak belakang wajib diunggah.',
         'photo_belakang.image'          => 'File foto belakang harus berupa gambar.',
         'photo_belakang.max'            => 'Ukuran foto belakang maksimal 5MB.',
+        'photo_belakang.uploaded'       => 'Gagal mengunggah foto tampak belakang. Silakan ambil ulang.',
 
         'photo_kiri.required'           => 'Foto samping kiri wajib diunggah.',
         'photo_kiri.image'              => 'File foto samping kiri harus berupa gambar.',
         'photo_kiri.max'                => 'Ukuran foto samping kiri maksimal 5MB.',
+        'photo_kiri.uploaded'           => 'Gagal mengunggah foto samping kiri. Silakan ambil ulang.',
 
         'photo_kanan.required'          => 'Foto samping kanan wajib diunggah.',
         'photo_kanan.image'             => 'File foto samping kanan harus berupa gambar.',
         'photo_kanan.max'               => 'Ukuran foto samping kanan maksimal 5MB.',
+        'photo_kanan.uploaded'          => 'Gagal mengunggah foto samping kanan. Silakan ambil ulang.',
 
         'photo_atas.required'           => 'Foto tampak atas wajib diunggah.',
         'photo_atas.image'              => 'File foto tampak atas harus berupa gambar.',
         'photo_atas.max'                => 'Ukuran foto tampak atas maksimal 5MB.',
+        'photo_atas.uploaded'           => 'Gagal mengunggah foto tampak atas. Silakan ambil ulang.',
 
         'photo_bawah.required'          => 'Foto tampak bawah wajib diunggah.',
         'photo_bawah.image'             => 'File foto tampak bawah harus berupa gambar.',
         'photo_bawah.max'               => 'Ukuran foto tampak bawah maksimal 5MB.',
+        'photo_bawah.uploaded'          => 'Gagal mengunggah foto tampak bawah. Silakan ambil ulang.',
 
         'photo_box.required'            => 'Foto box wajib diunggah.',
         'photo_box.image'               => 'File foto box harus berupa gambar.',
         'photo_box.max'                 => 'Ukuran foto box maksimal 5MB.',
+        'photo_box.uploaded'            => 'Gagal mengunggah foto box belakang. Silakan ambil ulang.',
 
         'photo_kelengkapan.required'    => 'Foto kelengkapan wajib diunggah.',
         'photo_kelengkapan.image'       => 'File foto kelengkapan harus berupa gambar.',
         'photo_kelengkapan.max'         => 'Ukuran foto kelengkapan maksimal 5MB.',
+        'photo_kelengkapan.uploaded'    => 'Gagal mengunggah foto kelengkapan. Silakan ambil ulang.',
         'old_phone_additional_note.max' => 'Catatan tambahan maksimal 1000 karakter.',
 
         // Tambahkan baris ini di dalam array $messages Anda yang sudah ada
@@ -1003,6 +1025,30 @@ class SellPhone extends Component
         'bank_name.required' => 'Nama Bank wajib diisi.',
         'selectedCustomerId.required' => 'Silakan cari dan pilih pelanggan terlebih dahulu.',
     ];
+
+    public function removePhoto($propertyName)
+    {
+        $validPhotos = [
+            'photo_depan',
+            'photo_belakang',
+            'photo_kiri',
+            'photo_kanan',
+            'photo_atas',
+            'photo_bawah',
+            'photo_box',
+            'photo_kelengkapan',
+        ];
+
+        if (in_array($propertyName, $validPhotos)) {
+            $this->$propertyName = null;
+            $this->resetErrorBag($propertyName);
+        }
+    }
+
+    public function resetErrorBag($field = null)
+    {
+        parent::resetErrorBag($field);
+    }
 
     public function submit()
     {
@@ -1069,7 +1115,63 @@ class SellPhone extends Component
             }
         }
 
-        // Jalankan Validasi dengan tangkapan error detail
+        // -------------------------------------------------------------
+        // PRE-FLIGHT INTEGRITY CHECK UNTUK FILE UPLOAD FOTO
+        // -------------------------------------------------------------
+        $photoSlots = [
+            'photo_depan'       => 'Tampak Depan',
+            'photo_belakang'    => 'Tampak Belakang',
+            'photo_kiri'        => 'Samping Kiri',
+            'photo_kanan'       => 'Samping Kanan',
+            'photo_atas'        => 'Tampak Atas',
+            'photo_bawah'       => 'Tampak Bawah',
+            'photo_box'         => 'Box Belakang',
+            'photo_kelengkapan' => 'Kelengkapan / Box',
+        ];
+
+        $missingPhotos = [];
+        $resetSlots = [];
+
+        foreach ($photoSlots as $prop => $label) {
+            if ($this->$prop) {
+                if ($this->$prop instanceof TemporaryUploadedFile) {
+                    try {
+                        if (!$this->$prop->exists()) {
+                            $missingPhotos[] = $label;
+                            $resetSlots[] = $prop;
+                            $this->$prop = null;
+                        }
+                    } catch (\Throwable $th) {
+                        $missingPhotos[] = $label;
+                        $resetSlots[] = $prop;
+                        $this->$prop = null;
+                    }
+                }
+            }
+        }
+
+        if (!empty($missingPhotos)) {
+            $missingText = implode(', ', $missingPhotos);
+            Log::channel('sell_phone')->warning("File foto kedaluwarsa atau hilang dari disk saat submit:", [
+                'missing' => $missingPhotos,
+                'user_id' => $currentUser->id,
+                'imei' => $this->imei,
+            ]);
+
+            $this->dispatch('toast',
+                title: 'Foto Kedaluwarsa',
+                message: "Foto [{$missingText}] sudah kedaluwarsa atau tidak ditemukan di server. Silakan ambil ulang foto tersebut.",
+                type: 'error'
+            );
+
+            // Arahkan kembali ke Step 2 (Foto)
+            $this->dispatch('go-to-step', step: 2);
+            $this->dispatch('set-qc-step', qcStep: 0);
+            $this->dispatch('reset-missing-photo-previews', slots: $resetSlots);
+            return;
+        }
+
+        // Jalankan Validasi dengan tangkapan error detail & proteksi exception Flysystem
         try {
             $this->validate();
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -1083,9 +1185,46 @@ class SellPhone extends Component
                 'model' => $this->selected_model_name,
             ]);
 
+            // Jika error disebabkan oleh foto yang belum diisi/valid, arahkan kasir langsung ke step 2 foto
+            $photoKeys = array_keys($photoSlots);
+            $hasPhotoError = false;
+            foreach ($photoKeys as $pKey) {
+                if (isset($errorMap[$pKey])) {
+                    $hasPhotoError = true;
+                    break;
+                }
+            }
+
+            if ($hasPhotoError) {
+                $this->dispatch('go-to-step', step: 2);
+                $this->dispatch('set-qc-step', qcStep: 0);
+            }
+
             $firstError = $errors[0] ?? 'Silakan lengkapi formulir dengan benar.';
             $this->dispatch('toast', title: 'Validasi Gagal', message: $firstError, type: 'error');
             throw $e;
+        } catch (FilesystemException | UnableToRetrieveMetadata | \RuntimeException $e) {
+            Log::channel('sell_phone')->error("Flysystem/Metadata error saat validasi file foto:", [
+                'error'   => $e->getMessage(),
+                'user_id' => $currentUser->id,
+                'imei'    => $this->imei,
+            ]);
+
+            // Bersihkan semua properti foto agar tidak berulang
+            foreach ($photoSlots as $prop => $label) {
+                $this->$prop = null;
+            }
+
+            $this->dispatch('toast',
+                title: 'File Foto Kedaluwarsa',
+                message: 'Satu atau lebih file foto telah kedaluwarsa atau hilang dari server. Silakan ambil ulang foto pada Step 2.',
+                type: 'error'
+            );
+
+            $this->dispatch('go-to-step', step: 2);
+            $this->dispatch('set-qc-step', qcStep: 0);
+            $this->dispatch('reset-missing-photo-previews', slots: array_keys($photoSlots));
+            return;
         }
 
         // Cek apakah ada perubahan data pada pelanggan lama sebelum eksekusi transaksi
@@ -1222,22 +1361,24 @@ class SellPhone extends Component
             // PROSES INSERT DATA DEVICE & TRANSMISI KE ACCURATE
             // -------------------------------------------------------------
 
-            $productAccurateQuery = \App\Models\ProductAccurate::where('business_unit_id', 2)
-                ->where('name', $this->selected_model_name);
+            $activeBuId = Auth::user()?->getActiveBusinessUnitId() ?? 2;
+            $basePaQuery = \App\Models\ProductAccurate::where('name', $this->selected_model_name);
 
             if ($this->selected_brand_id) {
-                $productAccurateQuery->where('brandName', $this->selected_brand_id);
+                $basePaQuery->where('brandName', $this->selected_brand_id);
             }
 
             if ($this->selected_categoryName) {
-                $productAccurateQuery->where('categoryName', $this->selected_categoryName);
+                $basePaQuery->where('categoryName', $this->selected_categoryName);
             }
 
             if ($this->selected_proyek) {
-                $productAccurateQuery->where('proyek', $this->selected_proyek);
+                $basePaQuery->where('proyek', $this->selected_proyek);
             }
 
-            $productAccurate = $productAccurateQuery->first();
+            // Cari di Business Unit aktif terlebih dahulu, fallback ke BU Second (ID 2) jika katalog buyback terpusat di Second
+            $productAccurate = (clone $basePaQuery)->where('business_unit_id', $activeBuId)->first()
+                ?? (clone $basePaQuery)->where('business_unit_id', 2)->first();
 
             if (!$productAccurate) {
                 DB::rollBack();

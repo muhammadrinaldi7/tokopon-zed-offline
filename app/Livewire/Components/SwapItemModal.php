@@ -131,6 +131,26 @@ class SwapItemModal extends Component
             $newVariant = $newVariantType::find($newVariantId);
             $newName = $newVariant ? ($newVariant->name ?? $newVariant->item_no ?? 'Unknown') : 'Unknown';
 
+            // Lepaskan IMEI lama ke status 'Available' dan kembalikan stok gudang lama
+            $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id ?? $this->order->branch?->warehouse_id;
+            if (!empty($oldItem->serial_number)) {
+                $oldSns = array_filter(array_map('trim', explode(',', $oldItem->serial_number)));
+                if (!empty($oldSns)) {
+                    \App\Models\ProductSerialNumber::whereIn('serial_number', $oldSns)
+                        ->update(['status' => 'Available']);
+                }
+                if ($warehouseId) {
+                    $oldStock = \App\Models\WarehouseStock::where([
+                        'warehouse_id' => $warehouseId,
+                        'variant_id'   => $oldItem->product_variant_id,
+                        'variant_type' => $oldItem->product_variant_type,
+                    ])->first();
+                    if ($oldStock) {
+                        $oldStock->increment('stock', (int)$oldItem->qty);
+                    }
+                }
+            }
+
             // Update the Order Item
             $oldItem->product_variant_id = $newVariantId;
             $oldItem->product_variant_type = $newVariantType;

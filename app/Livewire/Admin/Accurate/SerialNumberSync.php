@@ -307,7 +307,9 @@ class SerialNumberSync extends Component
             $service = app(SerialNumberSyncService::class);
             $res = $service->syncSingleSerialNumber($snId);
 
-            $msg = "SN [{$res['sn']}] berhasil disinkronkan. HPP: Rp " . number_format($res['new_hpp']) . " | Vendor: {$res['vendor_name']}";
+            $docInfo = !empty($res['source_doc']) ? " ({$res['source_doc']})" : "";
+            $receiptDateStr = $res['receipt_date'] ?? '-';
+            $msg = "SN [{$res['sn']}] berhasil disinkronkan{$docInfo}. HPP: Rp " . number_format($res['new_hpp']) . " | Vendor: {$res['vendor_name']} | Tgl Terima: {$receiptDateStr}";
             $this->addLog($msg);
             $this->dispatch('toast', title: 'Sinkronisasi Berhasil', message: $msg, type: 'success');
         } catch (\Exception $e) {

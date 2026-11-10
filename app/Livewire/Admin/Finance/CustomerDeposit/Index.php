@@ -197,15 +197,15 @@ class Index extends Component
             ]);
             $accurateService = app(AccurateService::class);
             $customerUser = User::find($this->customer_id);
-            $dbSource = $user->businessUnit->code; // Defaulting to syihab or pick from branch logic
+            $activeBu = $deposit->businessUnit ?: $user->getActiveBusinessUnit();
+            $dbSource = $activeBu?->code ?? 'syihab';
 
             $handler = $user;
-            $branchName = $handler->branch->name ?? 'Pusat';
+            $branchName = $handler->branch->name ?? 'Banjarbaru';
 
-            $accurateBranchName = $branchName;
-            // if ($deposit->businessUnit && $deposit->businessUnit->code === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
-            //     $accurateBranchName = 'GSK ' . $accurateBranchName;
-            // }
+            $accurateBranchName = $activeBu
+                ? $activeBu->resolveAccurateBranchName($branchName)
+                : $branchName;
 
             $pm = PaymentMethod::find($paymentData['payment_method_id']);
             $rate = null;
@@ -237,6 +237,9 @@ class Index extends Component
                     'accurate_receipt_no' => $this->manual_receipt_no,
                 ]);
             } else {
+                $accurateService->syncCustomer($customerUser, $dbSource);
+                $customerUser->refresh();
+
                 // STEP 1: DP Invoice without SO (Via API)
                 $dpInvData = [
                     'customerNo' => $customerUser->getAccurateCustomerNo($dbSource),
@@ -255,7 +258,8 @@ class Index extends Component
                 $dpInvResult = $accurateService->postDownPaymentInvoice($dpInvData, $dbSource);
 
                 if (!isset($dpInvResult['r']['number'])) {
-                    throw new \Exception('Gagal mendapatkan nomor Faktur Uang Muka dari Accurate.');
+                    $apiErr = $dpInvResult['d'][0] ?? ($dpInvResult['message'] ?? 'Gagal mendapatkan nomor Faktur Uang Muka dari Accurate.');
+                    throw new \Exception($apiErr);
                 }
 
                 $dpInvoiceNo = $dpInvResult['r']['number'];
@@ -282,10 +286,22 @@ class Index extends Component
                     $srData['detailInvoice'][0]['detailDiscount'] = $detailDiscounts;
                 }
 
-                $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+                try {
+                    $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
 
-                if (isset($srResult['r']['number'])) {
+                    if (!isset($srResult['r']['number'])) {
+                        $apiErr = $srResult['d'][0] ?? ($srResult['message'] ?? 'Gagal membuat Penerimaan Deposit di Accurate.');
+                        throw new \Exception($apiErr);
+                    }
+
                     $deposit->update(['accurate_receipt_no' => $srResult['r']['number']]);
+                } catch (\Exception $srEx) {
+                    try {
+                        $accurateService->deleteSalesInvoice($dpInvoiceNo, $dbSource);
+                    } catch (\Exception $cleanupEx) {
+                        Log::warning("Gagal cleanup Faktur DP {$dpInvoiceNo} saat SR gagal: " . $cleanupEx->getMessage());
+                    }
+                    throw $srEx;
                 }
             }
 

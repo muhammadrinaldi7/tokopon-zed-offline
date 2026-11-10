@@ -35,6 +35,13 @@ class PurchaseInvoiceHandler implements WebhookHandlerInterface
                         Log::info("PurchaseInvoiceHandler: SN, HPP, Vendor sync success for purchaseInvoiceId: {$purchaseInvoiceId}");
                     } catch (\Exception $e) {
                         Log::error("PurchaseInvoiceHandler: SN Sync failed for purchaseInvoiceId {$purchaseInvoiceId}: " . $e->getMessage());
+                        \App\Services\SyncIssueRecorder::record(
+                            reasonCode: 'SN_SYNC_FAILED',
+                            stage: 'sync_from_purchase_invoice',
+                            log: $log,
+                            severity: 'error',
+                            context: ['error' => $e->getMessage(), 'purchaseInvoiceId' => $purchaseInvoiceId]
+                        );
                     }
 
                     // 2. Sinkronisasi Total Stok Gudang (WarehouseStock)
@@ -46,7 +53,7 @@ class PurchaseInvoiceHandler implements WebhookHandlerInterface
                             $warehouseName = $detail['warehouse']['name'] ?? $apiData['warehouse']['name'] ?? null;
 
                             if ($itemNo) {
-                                $this->syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource);
+                                $this->syncItemStockFromAccurate($itemNo, $warehouseName, $dbSource, $log);
                             }
                         }
                     } else {
@@ -54,6 +61,7 @@ class PurchaseInvoiceHandler implements WebhookHandlerInterface
                     }
                 } else {
                     Log::warning("PurchaseInvoiceHandler: Payload tidak memiliki id dokumen: " . json_encode($itemData));
+                    \App\Services\SyncIssueRecorder::recordPayloadUnrecognized([$itemData], 'PurchaseInvoiceHandler', $log);
                 }
             }
         }

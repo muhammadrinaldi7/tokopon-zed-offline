@@ -54,6 +54,16 @@ class Show extends Component
     public $editItemMasterPrice = null;
     public $editItemNewPrice = 0;
 
+    // Add Item to SO Modal
+    public $showAddItemModal = false;
+    public $searchProduct = '';
+    public $searchResults = [];
+    public $selectedProductId = null;
+    public $selectedProduct = null;
+    public $addItemQty = 1;
+    public $addItemPrice = 0;
+    public $addItemDiscount = 0;
+
     // Invoice Form
     
     
@@ -365,9 +375,13 @@ class Show extends Component
                 }
                 $branchName = $handler->branch->name;
 
-                $accurateBranchName = $branchName;
-                if ($dbSource === 'second' && !str_contains(strtolower($accurateBranchName), 'gsk')) {
-                    $accurateBranchName = 'GSK ' . $accurateBranchName;
+                $accurateBranchName = $businessUnit
+                    ? $businessUnit->resolveAccurateBranchName($branchName)
+                    : $branchName;
+
+                if ($customerUser) {
+                    $accurateService->syncCustomer($customerUser, $dbSource);
+                    $customerUser->refresh();
                 }
 
                 $pmId = $paymentData['payment_method_id'];
@@ -415,17 +429,19 @@ class Show extends Component
                 $dpInvResult = $accurateService->postDownPaymentInvoice($dpInvData, $dbSource);
 
                 if (!isset($dpInvResult['r']['number'])) {
-                    throw new \Exception('Gagal mendapatkan nomor Faktur Uang Muka dari Accurate.');
+                    $apiErr = $dpInvResult['d'][0] ?? ($dpInvResult['message'] ?? 'Gagal mendapatkan nomor Faktur Uang Muka dari Accurate.');
+                    throw new \Exception($apiErr);
                 }
 
                 $dpInvoiceNo = $dpInvResult['r']['number'];
+                $dpInvoiceId = $dpInvResult['r']['id'] ?? null;
                 $deposit->update(['accurate_invoice_no' => $dpInvoiceNo]);
 
                 \App\Models\OrderAccurateDoc::create([
                     'order_id' => $this->order->id,
                     'doc_type' => 'DP_INVOICE',
                     'doc_number' => $dpInvoiceNo,
-                    'accurate_id' => $dpInvResult['r']['id'] ?? null,
+                    'accurate_id' => $dpInvoiceId,
                     'amount' => (float)$paymentData['amount'],
                     'status' => 'SUCCESS',
                 ]);
@@ -451,9 +467,14 @@ class Show extends Component
                 }
 
                 \Illuminate\Support\Facades\Log::info('Accurate DP Receipt Payload: ' . json_encode($srData));
-                $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
+                try {
+                    $srResult = $accurateService->postSalesReceipt($srData, $dbSource);
 
-                if (isset($srResult['r']['number'])) {
+                    if (!isset($srResult['r']['number'])) {
+                        $apiErr = $srResult['d'][0] ?? ($srResult['message'] ?? 'Gagal mencatat Penerimaan DP di Accurate.');
+                        throw new \Exception($apiErr);
+                    }
+
                     $deposit->update(['accurate_receipt_no' => $srResult['r']['number']]);
                     \App\Models\OrderAccurateDoc::create([
                         'order_id' => $this->order->id,
@@ -463,6 +484,13 @@ class Show extends Component
                         'amount' => (float)$paymentData['amount'],
                         'status' => 'SUCCESS',
                     ]);
+                } catch (\Exception $srEx) {
+                    try {
+                        $accurateService->deleteSalesInvoice($dpInvoiceId ?: $dpInvoiceNo, $dbSource);
+                    } catch (\Exception $cleanupEx) {
+                        \Illuminate\Support\Facades\Log::warning("Gagal cleanup Faktur DP {$dpInvoiceNo} saat SR gagal: " . $cleanupEx->getMessage());
+                    }
+                    throw $srEx;
                 }
             } // End of if ($actualAmount > 0)
         } catch (\Exception $e) {
@@ -610,6 +638,173 @@ class Show extends Component
         }
     }
 
+    public function openAddItemModal()
+    {
+        if ($this->order->order_status === 'COMPLETED' || in_array(strtolower($this->order->order_status), ['cancelled', 'cancel'])) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Pesanan yang sudah selesai atau dibatalkan tidak dapat ditambahkan barang.', type: 'error');
+            return;
+        }
+
+        $hasSi = $this->order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->where('status', 'SUCCESS')->exists();
+        if ($hasSi) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Faktur Penjualan (SI) sudah terbit untuk SO ini di Accurate. Barang tidak dapat ditambahkan.', type: 'error');
+            return;
+        }
+
+        $this->searchProduct = '';
+        $this->searchResults = [];
+        $this->selectedProductId = null;
+        $this->selectedProduct = null;
+        $this->addItemQty = 1;
+        $this->addItemPrice = 0;
+        $this->addItemDiscount = 0;
+        $this->showAddItemModal = true;
+    }
+
+    public function closeAddItemModal()
+    {
+        $this->showAddItemModal = false;
+        $this->searchProduct = '';
+        $this->searchResults = [];
+        $this->selectedProductId = null;
+        $this->selectedProduct = null;
+        $this->addItemQty = 1;
+        $this->addItemPrice = 0;
+        $this->addItemDiscount = 0;
+    }
+
+    public function updatedSearchProduct($val)
+    {
+        $term = trim($val);
+        if (strlen($term) < 2) {
+            $this->searchResults = [];
+            return;
+        }
+
+        $buId = $this->order->business_unit_id;
+        $this->searchResults = \App\Models\ProductAccurate::query()
+            ->where(function ($q) use ($term) {
+                $q->where('name', 'like', "%{$term}%")
+                  ->orWhere('item_no', 'like', "%{$term}%");
+            })
+            ->where(function ($q) use ($buId) {
+                if ($buId) {
+                    $q->where('business_unit_id', $buId)->orWhereNull('business_unit_id');
+                }
+            })
+            ->limit(10)
+            ->get(['id', 'item_no', 'name', 'base_price', 'has_sn', 'itemType', 'proyek'])
+            ->toArray();
+    }
+
+    public function selectProductToAdd($productId)
+    {
+        $product = \App\Models\ProductAccurate::find($productId);
+        if ($product) {
+            $this->selectedProductId = $product->id;
+            $this->selectedProduct = $product;
+            $this->addItemPrice = (float) ($product->base_price ?? 0);
+            $this->addItemQty = 1;
+            $this->addItemDiscount = 0;
+            $this->searchResults = [];
+            $this->searchProduct = $product->name;
+        }
+    }
+
+    public function saveNewItemToSo()
+    {
+        if ($this->order->order_status === 'COMPLETED' || in_array(strtolower($this->order->order_status), ['cancelled', 'cancel'])) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Pesanan yang sudah selesai atau dibatalkan tidak dapat ditambahkan barang.', type: 'error');
+            return;
+        }
+
+        $hasSi = $this->order->accurateDocs()->where('doc_type', 'SALES_INVOICE')->where('status', 'SUCCESS')->exists();
+        if ($hasSi) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Faktur Penjualan (SI) sudah terbit untuk SO ini di Accurate. Barang tidak dapat ditambahkan.', type: 'error');
+            return;
+        }
+
+        if (!$this->selectedProductId) {
+            $this->dispatch('toast', title: 'Validasi Gagal', message: 'Silakan pilih produk yang akan ditambahkan.', type: 'warning');
+            return;
+        }
+
+        $cleanPrice = (float) preg_replace('/[^0-9]/', '', (string)$this->addItemPrice);
+        $cleanQty = max(1, (int)$this->addItemQty);
+        $cleanDiscount = (float) preg_replace('/[^0-9]/', '', (string)$this->addItemDiscount);
+
+        if ($cleanPrice < 0) {
+            $this->dispatch('toast', title: 'Validasi Gagal', message: 'Harga satuan tidak valid.', type: 'warning');
+            return;
+        }
+
+        DB::beginTransaction();
+        try {
+            $product = \App\Models\ProductAccurate::findOrFail($this->selectedProductId);
+
+            $hppData = \App\Services\OrderHppResolverService::resolve(
+                $product,
+                [],
+                $this->order->business_unit_id,
+                $cleanQty,
+                false
+            );
+
+            $subtotal = max(0, ($cleanPrice * $cleanQty) - $cleanDiscount);
+
+            $orderItem = \App\Models\OrderItem::create([
+                'order_id' => $this->order->id,
+                'product_variant_id' => $product->id,
+                'product_variant_type' => \App\Models\ProductAccurate::class,
+                'product_name' => $product->name,
+                'qty' => $cleanQty,
+                'price_at_checkout' => $cleanPrice,
+                'unit_hpp' => $hppData['unit_hpp'] ?? 0,
+                'total_hpp' => $hppData['total_hpp'] ?? 0,
+                'discount_amount' => $cleanDiscount,
+                'promo_discount_amount' => 0,
+                'subtotal' => $subtotal,
+                'serial_number' => null,
+                'sales_ids' => !empty($this->order->sales_id) ? json_encode([$this->order->sales_id]) : null,
+            ]);
+
+            // Recalculate Order totals
+            $orderTotalAmount = $this->order->items()->sum(DB::raw('price_at_checkout * qty'));
+            $orderDiscountAmount = $this->order->items()->sum(DB::raw('discount_amount + promo_discount_amount'));
+            $this->order->total_amount = $orderTotalAmount;
+            $this->order->discount_amount = $orderDiscountAmount;
+            $this->order->grand_total = max(0, $orderTotalAmount - $orderDiscountAmount);
+
+            // Update status jika ada perubahan balance
+            $paidAmount = (float)$this->order->payments()->where('status', 'PAID')->sum('amount');
+            if ($this->order->grand_total > $paidAmount && $this->order->order_status === 'paid') {
+                $this->order->order_status = 'down_payment';
+            }
+
+            // Catat history perubahan di notes
+            $user = Auth::user()->name ?? 'System';
+            $noteLog = "\n[" . now()->format('Y-m-d H:i') . "] $user menambahkan produk \"{$product->name}\" (Qty: {$cleanQty}, Harga: Rp " . number_format($cleanPrice, 0, ',', '.') . ") ke SO.";
+            $this->order->notes = ($this->order->notes ?? '') . $noteLog;
+            $this->order->save();
+
+            // Sinkronkan ke Accurate
+            $this->syncPriceUpdateToAccurate();
+
+            DB::commit();
+
+            $this->closeAddItemModal();
+            $this->order->refresh();
+            $this->dp_amount = $this->getRemainingBalance();
+
+            $this->dispatch('toast', title: 'Berhasil', message: "Produk '{$product->name}' berhasil ditambahkan ke Sales Order.", type: 'success');
+            $this->dispatch('refreshOrderDetails');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Gagal menambahkan item ke SO: " . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal menambahkan produk ke SO: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
     private function syncPriceUpdateToAccurate(): void
     {
         $soDoc = $this->order->accurateDocs()->where('doc_type', 'SALES_ORDER')->where('status', 'SUCCESS')->first();
@@ -623,6 +818,7 @@ class Show extends Component
         $existingSo = $accurateService->getSalesOrderDetail($soDoc->accurate_id, $dbSource);
         $existingDetailItems = $existingSo['detailItem'] ?? [];
 
+        $usedExItemIds = [];
         $detailItem = [];
         foreach ($this->order->items as $item) {
             $variant = $item->variant;
@@ -650,11 +846,16 @@ class Show extends Component
                 $dItem['projectNo'] = $projectNo;
             }
 
-            // Cari ID baris lama yang cocok berdasarkan itemNo
+            // Cari ID baris lama yang cocok berdasarkan itemNo dan belum terpakai
             foreach ($existingDetailItems as $exItem) {
+                $exId = $exItem['id'] ?? null;
+                if ($exId && in_array($exId, $usedExItemIds)) {
+                    continue;
+                }
                 $exItemNo = $exItem['itemNo'] ?? ($exItem['item']['no'] ?? '');
                 if ($exItemNo === $dItem['itemNo']) {
-                    $dItem['id'] = $exItem['id'];
+                    $dItem['id'] = $exId;
+                    $usedExItemIds[] = $exId;
                     break;
                 }
             }
@@ -662,10 +863,9 @@ class Show extends Component
             $detailItem[] = $dItem;
         }
 
-        $branchName = $this->order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru');
-        if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
-            $branchName = 'GSK ' . $branchName;
-        }
+        $rawBranchName = $this->order->branch->name ?? (Auth::user()->branch->name ?? 'Banjarbaru');
+        $bu = $this->order->businessUnit ?: BusinessUnit::where('code', $dbSource)->first();
+        $branchName = $bu ? $bu->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
 
         $payload = [
             'id' => $soDoc->accurate_id,

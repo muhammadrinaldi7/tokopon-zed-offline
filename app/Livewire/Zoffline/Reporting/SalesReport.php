@@ -157,29 +157,41 @@ class SalesReport extends Component
             ->when($this->vendorFilter, function ($query) {
                 if ($this->vendorFilter === 'unknown') {
                     $query->whereHas('items', function ($qi) {
-                        $qi->whereNull('serial_number')->orWhere('serial_number', '');
+                        $qi->where(function ($sub) {
+                            $sub->whereNull('vendor_name')
+                                ->orWhere('vendor_name', '')
+                                ->orWhere('vendor_name', 'Vendor tidak ditemukan')
+                                ->orWhere('vendor_name', 'Tanpa Vendor / Unknown');
+                        })->where(function ($sub2) {
+                            $sub2->whereNull('serial_number')->orWhere('serial_number', '');
+                        });
                     });
                 } else {
-                    $snList = \App\Models\ProductSerialNumber::whereHas('vendor', function ($qv) {
-                        $qv->where('vendor_name', $this->vendorFilter);
+                    $targetVendor = $this->vendorFilter;
+                    $snList = \App\Models\ProductSerialNumber::whereHas('vendor', function ($qv) use ($targetVendor) {
+                        $qv->where('vendor_name', $targetVendor);
                     })->pluck('serial_number')->toArray();
 
-                    if (!empty($snList)) {
-                        $query->whereHas('items', function ($qi) use ($snList) {
-                            $qi->where(function ($qSub) use ($snList) {
-                                $qSub->whereHas('serialNumbers', function ($qsn) use ($snList) {
-                                    $qsn->whereIn('serial_number', $snList);
-                                });
-                                foreach (array_chunk($snList, 50) as $chunk) {
-                                    $qSub->orWhere(function ($qc) use ($chunk) {
-                                        foreach ($chunk as $sn) {
-                                            $qc->orWhere('order_items.serial_number', 'like', '%' . $sn . '%');
-                                        }
+                    $query->whereHas('items', function ($qi) use ($targetVendor, $snList) {
+                        $qi->where(function ($qSub) use ($targetVendor, $snList) {
+                            $qSub->where('vendor_name', 'like', '%' . $targetVendor . '%');
+
+                            if (!empty($snList)) {
+                                $qSub->orWhere(function ($qSnMatch) use ($snList) {
+                                    $qSnMatch->whereHas('serialNumbers', function ($qsn) use ($snList) {
+                                        $qsn->whereIn('serial_number', $snList);
                                     });
-                                }
-                            });
+                                    foreach (array_chunk($snList, 50) as $chunk) {
+                                        $qSnMatch->orWhere(function ($qc) use ($chunk) {
+                                            foreach ($chunk as $sn) {
+                                                $qc->orWhere('order_items.serial_number', 'like', '%' . $sn . '%');
+                                            }
+                                        });
+                                    }
+                                });
+                            }
                         });
-                    }
+                    });
                 }
             })
             ->when(!empty($this->proyekFilter), function ($query) {
@@ -709,11 +721,27 @@ class SalesReport extends Component
         $allSns = array_unique($allSns);
 
         $snVendors = [];
+        $sellPhones = [];
+        $inspections = [];
         if (!empty($allSns)) {
             $snVendors = \App\Models\ProductSerialNumber::with('vendor')
                 ->whereIn('serial_number', $allSns)
                 ->get()
                 ->keyBy('serial_number');
+
+            $sellPhones = \App\Models\SellPhone::with('user')
+                ->whereIn('imei', $allSns)
+                ->where('status', 'COMPLETED')
+                ->latest()
+                ->get()
+                ->keyBy('imei');
+
+            $inspections = \App\Models\DeviceInspection::with('inspectable.purchaseOrder.vendor')
+                ->whereIn('imei', $allSns)
+                ->where('inspectable_type', \App\Models\PurchaseOrderItem::class)
+                ->latest()
+                ->get()
+                ->keyBy('imei');
         }
 
         $rows = [];
@@ -828,25 +856,68 @@ class SalesReport extends Component
                     $itemModal = 0;
 
                     $itemVendors = [];
-                    if (!empty($snList)) {
+                    if (!empty($item->vendor_name) && $item->vendor_name !== 'Vendor tidak ditemukan') {
+                        $vendor = $item->vendor_name;
+                        $itemVendors = array_map('trim', explode(',', $item->vendor_name));
+                        if (!empty($snList)) {
+                            foreach ($snList as $sn) {
+                                $snHpp = (float)($snVendors->get($sn)?->hpp ?? 0);
+                                $itemModal += ($item->qty < 0) ? -$snHpp : $snHpp;
+                            }
+                        } else {
+                            $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                            $itemModal = $baseCost * (float)$item->qty;
+                        }
+                    } elseif (!empty($snList)) {
                         $vendorNames = [];
                         foreach ($snList as $sn) {
-                            $snModel = $snVendors->get($sn);
-                            $vn = $snModel?->vendor?->vendor_name ?? 'Tanpa Vendor / Unknown';
-                            $vendorNames[] = $vn;
-                            $itemVendors[] = $vn;
-                            $snHpp = (float)($snModel?->hpp ?? 0);
+                            $snHpp = 0;
+                            // A. Prioritas 1: DeviceInspection Inbound PO (Vendor pembelian asli saat unit fisik di-inbound)
+                            if (isset($inspections[$sn]) && $inspections[$sn]->inspectable?->purchaseOrder?->vendor) {
+                                $vn = $inspections[$sn]->inspectable->purchaseOrder->vendor->vendor_name;
+                                $vendorNames[] = $vn;
+                                $itemVendors[] = $vn;
+                            }
+                            // B. Prioritas 2: SellPhone (Trade-in / Buyback dari customer)
+                            elseif (isset($sellPhones[$sn])) {
+                                $sp = $sellPhones[$sn];
+                                $customerName = $sp->bank_account_name ?: ($sp->user?->name ?? 'Customer');
+                                $vn = 'Customer: ' . $customerName;
+                                $vendorNames[] = $vn;
+                                $itemVendors[] = $vn;
+                                if ((float)$sp->appraised_value > 0) {
+                                    $snHpp = (float)$sp->appraised_value;
+                                }
+                            }
+                            // C. Prioritas 3: ProductSerialNumber
+                            elseif ($snVendors->has($sn) && $snVendors->get($sn)->vendor) {
+                                $vn = $snVendors->get($sn)->vendor->vendor_name;
+                                $vendorNames[] = $vn;
+                                $itemVendors[] = $vn;
+                            } else {
+                                $itemVendors[] = 'Tanpa Vendor / Unknown';
+                            }
+
+                            if ($snHpp <= 0) {
+                                $snHpp = (float)($snVendors->get($sn)?->hpp ?? 0);
+                            }
                             $itemModal += ($item->qty < 0) ? -$snHpp : $snHpp;
                         }
-                        $vendorNames = array_unique($vendorNames);
-                        $vendor = implode(', ', $vendorNames);
+                        $vendorNames = array_unique(array_filter($vendorNames));
+                        $vendor = !empty($vendorNames) ? implode(', ', $vendorNames) : ($variant?->vendor_name ?? $variant?->accurateData?->vendor_name ?? '-');
                     } else {
                         // Non-SN: ambil base_cost dari variant / ProductAccurate
                         $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
                         $itemModal = $baseCost * (float)$item->qty;
-                        $itemVendors = ['Tanpa Vendor / Unknown'];
+                        $vendor = $variant?->vendor_name ?? $variant?->accurateData?->vendor_name ?? '-';
+                        $itemVendors = ($vendor && $vendor !== '-') ? [$vendor] : ['Tanpa Vendor / Unknown'];
                     }
                     $itemVendors = array_unique($itemVendors);
+
+                    // Ambil HPP dari field unit_hpp di order_items, fallback ke $itemModal jika transaksi lama belum memiliki unit_hpp
+                    $itemHpp = (isset($item->unit_hpp) && (float)$item->unit_hpp != 0)
+                        ? (float)$item->unit_hpp
+                        : ($item->qty != 0 ? round($itemModal / abs($item->qty), 2) : $itemModal);
 
                     $promoNamesStr = $itemPromoData[$item->id]['promo_names'];
                     $itemPromosTotal = $itemPromoData[$item->id]['promo_total'];
@@ -887,7 +958,7 @@ class SalesReport extends Component
                         $itemLoyaltyDiscount,
                         $item->subtotal,
                         $penjualanBersih,
-                        $itemModal,
+                        $itemHpp,
                     ];
 
                     $itemTotalPembayaranKotor = 0;
@@ -1183,7 +1254,7 @@ class SalesReport extends Component
             $activeBuId = Auth::user()?->getActiveBusinessUnitId();
 
             $msg = "Berhasil menyinkronkan {$syncedCount} transaksi retur (Total Nilai: Rp {$totalAmountFormatted}) untuk periode {$this->syncStartDate} s/d {$this->syncEndDate}. Filter tabel otomatis disesuaikan!";
-            
+
             if ($bu && $activeBuId != $bu->id) {
                 $msg .= " (Perhatian: Unit Usaha aktif Anda saat ini berbeda dengan '{$bu->name}'. Silakan beralih ke Unit Usaha '{$bu->name}' untuk melihat data ini pada tabel).";
                 Log::warning("[SalesReport] Unit Usaha aktif user (ID: {$activeBuId}) tidak sama dengan Unit Usaha yang disinkronkan (ID: {$bu->id} - {$bu->name})");
@@ -1227,11 +1298,27 @@ class SalesReport extends Component
         $allSns = array_unique($allSns);
 
         $snVendors = [];
+        $sellPhones = [];
+        $inspections = [];
         if (!empty($allSns)) {
             $snVendors = \App\Models\ProductSerialNumber::with('vendor')
                 ->whereIn('serial_number', $allSns)
                 ->get()
                 ->keyBy('serial_number');
+
+            $sellPhones = \App\Models\SellPhone::with('user')
+                ->whereIn('imei', $allSns)
+                ->where('status', 'COMPLETED')
+                ->latest()
+                ->get()
+                ->keyBy('imei');
+
+            $inspections = \App\Models\DeviceInspection::with('inspectable.purchaseOrder.vendor')
+                ->whereIn('imei', $allSns)
+                ->where('inspectable_type', \App\Models\PurchaseOrderItem::class)
+                ->latest()
+                ->get()
+                ->keyBy('imei');
         }
 
         $rows = [];
@@ -1253,21 +1340,56 @@ class SalesReport extends Component
 
                 $vendorNames = [];
                 $itemModal = 0;
-                if ($item->serial_number) {
+
+                if (!empty($item->vendor_name) && $item->vendor_name !== 'Vendor tidak ditemukan') {
+                    $vendorDisplay = $item->vendor_name;
+                    if ($item->serial_number) {
+                        $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
+                        foreach ($sns as $sn) {
+                            $snHpp = (float)($snVendors->get($sn)?->hpp ?? 0);
+                            $itemModal += ($item->qty < 0) ? -$snHpp : $snHpp;
+                        }
+                    } else {
+                        $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
+                        $itemModal = $baseCost * (float)$item->qty;
+                    }
+                } elseif ($item->serial_number) {
                     $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
                     foreach ($sns as $sn) {
-                        $vendorModel = $snVendors->get($sn)?->vendor;
-                        $vendorNames[] = $vendorModel?->vendor_name ?? 'Tanpa Vendor / Unknown';
-                        $snHpp = (float)($snVendors->get($sn)?->hpp ?? 0);
+                        $snHpp = 0;
+                        if (isset($inspections[$sn]) && $inspections[$sn]->inspectable?->purchaseOrder?->vendor) {
+                            $vendorNames[] = $inspections[$sn]->inspectable->purchaseOrder->vendor->vendor_name;
+                        } elseif (isset($sellPhones[$sn])) {
+                            $sp = $sellPhones[$sn];
+                            $customerName = $sp->bank_account_name ?: ($sp->user?->name ?? 'Customer');
+                            $vendorNames[] = 'Customer: ' . $customerName;
+                            if ((float)$sp->appraised_value > 0) {
+                                $snHpp = (float)$sp->appraised_value;
+                            }
+                        } elseif ($snVendors->has($sn) && $snVendors->get($sn)->vendor) {
+                            $vendorNames[] = $snVendors->get($sn)->vendor->vendor_name;
+                        }
+
+                        if ($snHpp <= 0) {
+                            $snHpp = (float)($snVendors->get($sn)?->hpp ?? 0);
+                        }
                         $itemModal += ($item->qty < 0) ? -$snHpp : $snHpp;
                     }
+                    $vendorNames = array_unique(array_filter($vendorNames));
+                    $vendorDisplay = !empty($vendorNames) ? implode(', ', $vendorNames) : ($variant?->vendor_name ?? $variant?->accurateData?->vendor_name ?? 'Tanpa Vendor / Unknown');
                 } else {
                     $baseCost = (float)($variant?->base_cost ?? $variant?->accurateData?->base_cost ?? 0);
                     $itemModal = $baseCost * (float)$item->qty;
+                    $vendorDisplay = $variant?->vendor_name ?? $variant?->accurateData?->vendor_name ?? 'Tanpa Vendor / Unknown';
                 }
 
-                $vendorDisplay = !empty($vendorNames) ? implode(', ', array_unique($vendorNames)) : 'Tanpa Vendor / Unknown';
-                $itemVendors = !empty($vendorNames) ? array_unique($vendorNames) : ['Tanpa Vendor / Unknown'];
+                $itemVendors = !empty($vendorNames)
+                    ? array_unique($vendorNames)
+                    : (($vendorDisplay && $vendorDisplay !== 'Tanpa Vendor / Unknown') ? array_map('trim', explode(',', $vendorDisplay)) : ['Tanpa Vendor / Unknown']);
+
+                if ($this->vendorFilter && !str_contains(strtolower($vendorDisplay), strtolower($this->vendorFilter))) {
+                    continue;
+                }
 
                 if (!$this->itemMatchesReportingFilters($item, $variant, $merk, $category, $proyek, $itemVendors)) {
                     continue;
@@ -1276,6 +1398,11 @@ class SalesReport extends Component
                 if ($this->search && $this->activeTab === 'vendor' && !str_contains(strtolower($vendorDisplay), strtolower($this->search))) {
                     continue;
                 }
+
+                // Ambil HPP dari field unit_hpp di order_items, fallback ke $itemModal jika transaksi lama belum memiliki unit_hpp
+                $itemHpp = (isset($item->unit_hpp) && (float)$item->unit_hpp != 0)
+                    ? (float)$item->unit_hpp
+                    : ($item->qty != 0 ? round($itemModal / abs($item->qty), 2) : $itemModal);
 
                 $rows[] = [
                     $vendorDisplay,
@@ -1296,7 +1423,7 @@ class SalesReport extends Component
                     $itemPromosTotal,
                     $actualItemSubtotal,
                     $penjualanBersih,
-                    $itemModal,
+                    $itemHpp,
                 ];
             }
         }
@@ -1355,7 +1482,7 @@ class SalesReport extends Component
     {
         $orders = $this->buildOrdersQuery()
             ->with(['items.variant', 'items.promos', 'warehouse'])
-            ->whereIn('orders.order_status', ['COMPLETED'])
+            ->whereIn('orders.order_status', ['COMPLETED', 'piutang'])
             ->get();
 
         // Kumpulkan semua serial number dari seluruh order items untuk query vendor sekaligus (bulk)
@@ -1374,11 +1501,27 @@ class SalesReport extends Component
 
         // Query data vendor untuk Serial Number terkait
         $snVendors = [];
+        $sellPhones = [];
+        $inspections = [];
         if (!empty($allSns)) {
             $snVendors = \App\Models\ProductSerialNumber::with('vendor')
                 ->whereIn('serial_number', $allSns)
                 ->get()
                 ->keyBy('serial_number');
+
+            $sellPhones = \App\Models\SellPhone::with('user')
+                ->whereIn('imei', $allSns)
+                ->where('status', 'COMPLETED')
+                ->latest()
+                ->get()
+                ->keyBy('imei');
+
+            $inspections = \App\Models\DeviceInspection::with('inspectable.purchaseOrder.vendor')
+                ->whereIn('imei', $allSns)
+                ->where('inspectable_type', \App\Models\PurchaseOrderItem::class)
+                ->latest()
+                ->get()
+                ->keyBy('imei');
         }
 
         $vendorData = [];
@@ -1393,18 +1536,33 @@ class SalesReport extends Component
                 $proyek = $variant?->proyek ?? '-';
 
                 $itemVendors = [];
-                if ($item->serial_number) {
+                if (!empty($item->vendor_name) && $item->vendor_name !== 'Vendor tidak ditemukan') {
+                    $vendors = array_filter(array_map('trim', explode(',', $item->vendor_name)));
+                    $vCount = max(1, count($vendors));
+                    $perVendorQty = $item->qty / $vCount;
+                    foreach ($vendors as $v) {
+                        $itemVendors[$v] = ($itemVendors[$v] ?? 0) + $perVendorQty;
+                    }
+                } elseif ($item->serial_number) {
                     $sns = array_filter(array_map('trim', explode(',', $item->serial_number)));
                     foreach ($sns as $sn) {
-                        $vendorModel = $snVendors->get($sn)?->vendor;
-                        $vendorName = $vendorModel?->vendor_name ?? 'Tanpa Vendor / Unknown';
+                        $vendorName = null;
+                        if (isset($inspections[$sn]) && $inspections[$sn]->inspectable?->purchaseOrder?->vendor) {
+                            $vendorName = $inspections[$sn]->inspectable->purchaseOrder->vendor->vendor_name;
+                        } elseif (isset($sellPhones[$sn])) {
+                            $sp = $sellPhones[$sn];
+                            $cName = $sp->bank_account_name ?: ($sp->user?->name ?? 'Customer');
+                            $vendorName = 'Customer: ' . $cName;
+                        } elseif ($snVendors->has($sn) && $snVendors->get($sn)->vendor) {
+                            $vendorName = $snVendors->get($sn)->vendor->vendor_name;
+                        }
+
+                        $vendorName = $vendorName ?? 'Tanpa Vendor / Unknown';
                         $itemVendors[$vendorName] = ($itemVendors[$vendorName] ?? 0) + 1;
                     }
-                }
-
-                // Fallback jika tidak menggunakan SN atau data vendor kosong
-                if (empty($itemVendors)) {
-                    $itemVendors = ['Tanpa Vendor / Unknown' => $item->qty];
+                } else {
+                    $fallbackVendor = $item->variant?->vendor_name ?? $item->variant?->accurateData?->vendor_name ?? 'Tanpa Vendor / Unknown';
+                    $itemVendors[$fallbackVendor] = $item->qty;
                 }
 
                 $vendorNames = array_keys($itemVendors);

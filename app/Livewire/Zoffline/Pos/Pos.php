@@ -201,10 +201,14 @@ class Pos extends Component
 
         if ($step == 4 && $this->selectedCustomerId) {
             $orderId = $this->loadedSoOrderId ?? 0;
+            $activeBuId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
             $this->availableCustomerDeposits = \App\Models\CustomerDeposit::where('user_id', $this->selectedCustomerId)
                 ->where('status', 'AVAILABLE')
                 ->where('balance', '>', 0)
-                ->where('business_unit_id', \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId())
+                ->where(function ($q) use ($activeBuId) {
+                    $q->where('business_unit_id', $activeBuId)
+                        ->orWhereNull('business_unit_id');
+                })
                 ->where(function ($q) use ($orderId) {
                     $q->whereNull('origin_order_id')
                         ->orWhere('origin_order_id', '!=', $orderId);
@@ -447,6 +451,8 @@ class Pos extends Component
                 'database_source' => $variant->database_source ?? 'syihab',
                 'promo_discounts' => $promoDiscounts,
                 'item_id' => $item->id, // Important for updating SN later
+                'is_so_item' => true,
+                'original_so_item_id' => $item->id,
                 'project_number' => $projectNo,
             ];
         }
@@ -474,12 +480,8 @@ class Pos extends Component
             $this->dispatch('toast', title: 'Pilih Sales', message: 'Faktur SO berhasil dimuat. Pesanan SO ini belum memiliki data sales, silakan pilih pramuniaga terlebih dahulu.', type: 'warning');
             $this->goToStep(1);
         } else {
-            $this->dispatch('toast', title: 'Berhasil', message: 'Faktur SO berhasil dimuat.', type: 'success');
-            if ($hasDo) {
-                $this->goToStep(4);
-            } else {
-                $this->goToStep(2);
-            }
+            $this->dispatch('toast', title: 'Berhasil', message: 'Faktur SO berhasil dimuat. Anda dapat memeriksa barang atau menambahkan produk lain sebelum pembayaran.', type: 'success');
+            $this->goToStep(2);
         }
     }
 
@@ -779,10 +781,11 @@ class Pos extends Component
 
     public function mount()
     {
-        $unit = \Illuminate\Support\Facades\Auth::user()->businessUnit?->code ?? 'all';
+        $activeBu = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
+        $unit = $activeBu?->code ?? 'all';
         $this->databaseSource = $unit !== 'all' ? $unit : 'syihab';
 
-        if ($unit === 'second') {
+        if ($activeBu && $activeBu->requires_inbound_qc) {
             $this->productType = 'second';
         } elseif ($unit === 'all') {
             $this->productType = 'all';
@@ -885,6 +888,7 @@ class Pos extends Component
 
         // 1. Exact Match Scan Barcode di tabel ProductSerialNumber (Untuk HP / Barang ber-IMEI)
         $snItems = \App\Models\ProductSerialNumber::where('serial_number', $this->search)
+            ->where('status', 'Available')
             ->whereHas('productAccurate', function ($q) use ($buId) {
                 $q->where(function ($q2) use ($buId) {
                     $q2->where('business_unit_id', $buId)->orWhereNull('business_unit_id');

@@ -597,12 +597,16 @@ class Scan extends Component
             $maxBaseLen = 30 - strlen($suffix);
             $receiveNumber = substr($baseSj, 0, $maxBaseLen) . $suffix;
 
+            $poBu = \App\Models\BusinessUnit::where('code', $this->po->database_source)->first();
+            $rawBranchName = Auth::user()->branch->name ?? null;
+            $accurateBranchName = ($poBu && $rawBranchName) ? $poBu->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
+
             $payload = [
                 'receiveNumber' => $receiveNumber,
                 'vendorNo' => $this->po->vendor->vendor_no ?? '',
                 'warehouseName' => $targetWarehouseName,
                 'detailItem' => $detailItems,
-                'branchName' => Auth::user()->branch->name ?? null
+                'branchName' => $accurateBranchName
             ];
 
             $timestamp = now()->toIso8601String();

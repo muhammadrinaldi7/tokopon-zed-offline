@@ -3,7 +3,7 @@ name: Deploy Laravel to Stagging Server
 on:
   push:
     branches:
-      - stagging_prod
+      - stagging
 
 jobs:
   test:
@@ -86,7 +86,17 @@ jobs:
 
       # 8. Kompres proyek menjadi file ZIP (Mengecualikan folder yang tidak diperlukan di server)
       - name: 🤐 Compress files
-        run: zip -q -r deploy.zip . -x "node_modules/*" "vendor/*" ".git/*" "tests/*"
+        run: |
+          zip -q -r deploy.zip . -x \
+            "node_modules/*" \
+            "vendor/*" \
+            "storage/*" \
+            ".git/*" \
+            "tests/*" \
+            ".agents/*" \
+            "artifacts/*" \
+            "scratch/*" \
+            "desain-figma/*"
 
       # 9. Pastikan folder tujuan di VPS sudah siap sebelum file ditransfer
       - name: 🛠️ Menyiapkan folder core di VPS
@@ -126,8 +136,17 @@ jobs:
             unzip -q -o deploy.zip
             rm deploy.zip
             
+            # Pastikan struktur folder storage dan permissions tersedia
+            mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache storage/logs bootstrap/cache
+            
             # Pasang vendor production langsung di server jika ada pembaruan package
             composer install --no-dev --optimize-autoloader
+            
+            # Jalankan migrasi database otomatis (aman & idempotent)
+            php artisan migrate --force
+            
+            # Hubungkan folder storage jika belum terhubung
+            php artisan storage:link
             
             # Jalankan optimasi caching Laravel
             php artisan optimize:clear
@@ -135,7 +154,6 @@ jobs:
             php artisan event:cache
             php artisan route:cache
             php artisan view:cache
-
  # --- JOB BARU: DEPLOY KE VPS ---
   # --- JOB BARU: DEPLOY KE VPS VIA FTP ---
  

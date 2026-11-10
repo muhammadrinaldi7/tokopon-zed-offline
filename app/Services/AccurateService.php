@@ -157,10 +157,8 @@ class AccurateService
         // Ambil alamat primary
         $address = $user->addresses()->where('is_primary', true)->first();
 
-        // Generate prefix dynamically for any new business unit, preserving legacy ones
-        $prefix = strtoupper(trim($databaseSource)) . '_';
-        if (trim(strtolower($databaseSource)) === 'second') $prefix = 'GSK_';
-        if (trim(strtolower($databaseSource)) === 'syihab') $prefix = 'SYB_';
+        // Ambil prefix vendor secara dinamis dari konfigurasi Business Unit
+        $prefix = $bu->getVendorPrefix();
 
         // Data yang akan dikirim ke Accurate
         $vendorData = [
@@ -1340,7 +1338,42 @@ class AccurateService
                 return $data['d'] ?? [];
             }
         }
-        Log::info('data proses serial number 2: ' . json_encode($data));
+        Log::info('data proses serial number 2: ' . json_encode($data ?? null));
+        return [];
+    }
+
+    /**
+     * Ambil histori mutasi transaksi untuk Serial Number tertentu dari Accurate
+     * Endpoint: /report/serial-number-mutation.do
+     */
+    public function getSerialNumberMutation($itemNo, $serialNumber, $databaseSource = 'syihab')
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->get($host . '/report/serial-number-mutation.do', [
+            'itemNo'       => (string) $itemNo,
+            'serialNumber' => (string) $serialNumber,
+        ]);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['s']) && $data['s'] === true) {
+                return $data['d'] ?? [];
+            }
+        }
+
         return [];
     }
 
@@ -2060,10 +2093,11 @@ class AccurateService
         $actionUser = $claim->claimedBy ?? Auth::user();
 
         // Ambil Nama Cabang berdasarkan parameter, atau fallback ke actionUser
-        $branchName = $branchName ?? $actionUser?->branch?->name ?? 'Cabang Utama';
+        $rawBranchName = $branchName ?? $actionUser?->branch?->name ?? 'Cabang Utama';
 
-        // Ambil konfigurasi pajak dari Business Unit
+        // Ambil konfigurasi pajak & resolusi nama cabang dari Business Unit
         $businessUnit = $claim->warranty->policy->businessUnit ?? null;
+        $branchName = $businessUnit ? $businessUnit->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
         $isTaxable = $businessUnit?->is_taxable ?? false;
 
         $warehouseMainName = $actionUser?->warehouse?->name ?? 'Gudang Utama';
@@ -2541,10 +2575,9 @@ class AccurateService
      */
     public function refundDownPayment(\App\Models\Order $order, $dpInvoiceNo, $dbSource, $customBankNo = null, $customAmount = null)
     {
-        $branchName = \Illuminate\Support\Facades\Auth::user()->branch->name ?? 'Cabang Utama';
-        if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
-            $branchName = 'GSK ' . $branchName;
-        }
+        $rawBranchName = \Illuminate\Support\Facades\Auth::user()->branch->name ?? ($order->branch->name ?? 'Cabang Utama');
+        $bu = $order->businessUnit ?: \App\Models\BusinessUnit::where('code', $dbSource)->first();
+        $branchName = $bu ? $bu->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
         $customerNo = $order->user ? $order->user->getAccurateCustomerNo($dbSource) : 'UMUM';
 
         // 1. Jika dipanggil dari Form Refund Manual dengan akun Bank & Nominal spesifik
@@ -2649,10 +2682,8 @@ class AccurateService
         $dbSource = strtolower($businessUnit ? $businessUnit->code : 'syihab');
 
         $user = \Illuminate\Support\Facades\Auth::user();
-        $branchName = $user->branch->name ?? 'Cabang Utama';
-        if ($dbSource === 'second' && !str_contains(strtolower($branchName), 'gsk')) {
-            $branchName = 'GSK ' . $branchName;
-        }
+        $rawBranchName = $user->branch->name ?? 'Cabang Utama';
+        $branchName = $businessUnit ? $businessUnit->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
 
         $customerUser = $deposit->user;
         $customerNo = $customerUser ? $customerUser->getAccurateCustomerNo($dbSource) : 'UMUM';
@@ -2753,7 +2784,9 @@ class AccurateService
 
         // Gunakan user pembuat klaim (CS/Kasir) sebagai acuan cabang
         $actionUser = $claim->claimedBy ?? Auth::user();
-        $branchName = $actionUser?->branch?->name ?? 'Cabang Utama';
+        $rawBranchName = $actionUser?->branch?->name ?? 'Cabang Utama';
+        $businessUnit = $claim->warranty->policy?->businessUnit ?? null;
+        $branchName = $businessUnit ? $businessUnit->resolveAccurateBranchName($rawBranchName) : $rawBranchName;
 
         // Payload Penerimaan Penjualan (Uang Keluar)
         $receiptPayload = [

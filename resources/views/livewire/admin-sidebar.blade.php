@@ -194,11 +194,11 @@
         </a>
 
         @can('view-catalog-menu')
-            <div x-data="{ openProducts: {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? 'true' : 'false' }} }">
+            <div x-data="{ openProducts: {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate.sales-sync-logs', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? 'true' : 'false' }} }">
                 <button @click="openProducts = !openProducts" type="button"
-                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeClass : $inactiveClass }}">
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate.sales-sync-logs', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeClass : $inactiveClass }}">
                     <div class="flex items-center gap-3">
-                        <svg class="w-5 h-5 {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeIconClass : $inactiveIconClass }}"
+                        <svg class="w-5 h-5 {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeIconClass : $inactiveIconClass }}"
                             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -248,6 +248,37 @@
                         <a href="{{ route('admin.accurate-sync-sn') }}" wire:navigate
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-sync-sn') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                             Sync Serial Number
+                        </a>
+                        <a href="{{ route('admin.accurate.sync-issues') }}" wire:navigate
+                            class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.sync-issues') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            <span>Sync Issues Tracker</span>
+                            @php
+                                $openIssuesCount = \App\Models\AccurateSyncIssue::where('status', 'open')->count();
+                            @endphp
+                            @if ($openIssuesCount > 0)
+                                <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-tight">
+                                    {{ $openIssuesCount > 99 ? '99+' : $openIssuesCount }}
+                                </span>
+                            @endif
+                        </a>
+                        <a href="{{ route('admin.accurate.sales-sync-logs') }}" wire:navigate
+                            class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.sales-sync-logs') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            <span>Log & Antrean Penjualan</span>
+                            @php
+                                $pendingSalesCount = \App\Models\Order::where('order_status', 'COMPLETED')
+                                    ->where(function ($q) {
+                                        $q->whereNull('accurate_invoice_no')
+                                          ->orWhere('accurate_invoice_no', '')
+                                          ->orWhere('accurate_sync_status', 'PENDING');
+                                    })
+                                    ->where('created_at', '>=', now()->subDays(7))
+                                    ->count();
+                            @endphp
+                            @if ($pendingSalesCount > 0)
+                                <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-tight">
+                                    {{ $pendingSalesCount > 99 ? '99+' : $pendingSalesCount }}
+                                </span>
+                            @endif
                         </a>
                     @endcan
                     @can('manage-accurate-customers')
@@ -315,6 +346,34 @@
                     class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
                     x-show="sidebarCollapsed" style="display:none;" x-cloak>Pesanan & Tagihan
                     (SO)</span>
+            </a>
+
+            <a href="{{ route('admin.accurate.sales-sync-logs') }}" wire:navigate
+                class="flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.sales-sync-logs') ? $activeClass : $inactiveClass }}">
+                <div class="flex items-center gap-3">
+                    <svg class="w-5 h-5 {{ request()->routeIs('admin.accurate.sales-sync-logs') ? $activeIconClass : $inactiveIconClass }}"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Antrean Sync Accurate</span><span
+                        class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                        x-show="sidebarCollapsed" style="display:none;" x-cloak>Antrean Sync Accurate</span>
+                </div>
+                @php
+                    $pendingSalesCount = \App\Models\Order::where('order_status', 'COMPLETED')
+                        ->where(function ($q) {
+                            $q->whereNull('accurate_invoice_no')
+                              ->orWhere('accurate_invoice_no', '')
+                              ->orWhere('accurate_sync_status', 'PENDING');
+                        })
+                        ->where('created_at', '>=', now()->subDays(7))
+                        ->count();
+                @endphp
+                @if ($pendingSalesCount > 0)
+                    <span x-show="!sidebarCollapsed" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-tight">
+                        {{ $pendingSalesCount > 99 ? '99+' : $pendingSalesCount }}
+                    </span>
+                @endif
             </a>
 
             <a href="{{ route('admin.orders.reset-to-draft') }}" wire:navigate

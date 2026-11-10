@@ -31,11 +31,7 @@ class AccurateReturnSyncService
      */
     public function getBuTag(BusinessUnit $bu): string
     {
-        return match (strtolower($bu->code)) {
-            'second', 'gsk' => 'GSK',
-            'syihab', 'syb' => 'SYB',
-            default         => strtoupper($bu->code),
-        };
+        return $bu->getBuTag();
     }
 
     /**
@@ -478,6 +474,7 @@ class AccurateReturnSyncService
                         'price_at_checkout' => $unitPrice,
                         'unit_hpp' => $hppData['unit_hpp'],
                         'total_hpp' => $hppData['total_hpp'],
+                        'vendor_name' => $hppData['vendor_name'] ?? null,
                         'discount_amount' => 0,
                         'promo_discount_amount' => 0,
                         'subtotal' => -$itemSubtotal,

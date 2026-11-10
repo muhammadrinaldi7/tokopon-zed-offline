@@ -115,7 +115,8 @@ trait WithCart
 
         $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
         $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
-        $buName = Auth::user()->getActiveBusinessUnit()->code;
+        $activeBu = Auth::user()->getActiveBusinessUnit();
+        $buName = $activeBu ? $activeBu->code : 'syihab';
 
         $accurateService = app(\App\Services\AccurateService::class);
         $skuFromAccurate = $accurateService->findSkuBySerialNumber($sn, $buName);
@@ -160,8 +161,8 @@ trait WithCart
                     return;
                 }
 
-                if ($localSnRecordGlobal->status === 'Unavailable') {
-                    $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$sn}' sudah dalam status Draft atau Terjual.", type: 'warning');
+                if ($localSnRecordGlobal->status !== 'Available') {
+                    $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$sn}' tidak tersedia karena berstatus '{$localSnRecordGlobal->status}'.", type: 'warning');
                     $this->scanned_sn = '';
                     $this->closeAddonModal();
                     return;
@@ -216,7 +217,7 @@ trait WithCart
         $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
 
         $activeBu = Auth::user()->getActiveBusinessUnit();
-        $buName = $activeBu ? $activeBu->code : 'second'; // Default ke syihab jika null
+        $buName = $activeBu ? $activeBu->code : 'syihab';
         // 1. Cek dulu ke Accurate Service
         $accurateService = app(\App\Services\AccurateService::class);
         $skuFromAccurate = $accurateService->findSkuBySerialNumber($sn, $buName);
@@ -256,9 +257,9 @@ trait WithCart
                     return;
                 }
 
-                // Cek apakah SN statusnya Unavailable (sudah di draft / terjual)
-                if ($localSnRecordGlobal->status === 'Unavailable') {
-                    $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$sn}' sudah dalam status Draft atau Terjual.", type: 'warning');
+                // Cek apakah SN statusnya bukan Available (sudah di draft / terjual / reserved)
+                if ($localSnRecordGlobal->status !== 'Available') {
+                    $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$sn}' tidak tersedia karena berstatus '{$localSnRecordGlobal->status}'.", type: 'warning');
                     $this->scanned_sn = '';
                     return;
                 }
@@ -338,8 +339,40 @@ trait WithCart
             }
         }
 
+        // Cek jika SN sudah ada di baris manapun dalam keranjang
+        if ($sn !== null) {
+            foreach ($this->cart as $cItem) {
+                if (in_array($sn, $cItem['serial_numbers'] ?? [])) {
+                    $this->dispatch('toast', title: 'Peringatan', message: "Serial Number '{$sn}' sudah ada di keranjang.", type: 'warning');
+                    return;
+                }
+            }
+        }
+
+        // 1. Jika ini proses pemenuhan SO dan SN ini cocok untuk item SO yang belum lengkap SN-nya
+        if ($sn !== null) {
+            $soIndex = collect($this->cart)->search(
+                fn($item) => !empty($item['is_so_item'])
+                    && $item['variant_id'] == $variantId
+                    && $item['variant_type'] == $variantType
+                    && count($item['serial_numbers'] ?? []) < (int)$item['qty']
+            );
+
+            if ($soIndex !== false) {
+                $this->cart[$soIndex]['serial_numbers'][] = $sn;
+                $this->dispatch('toast', title: 'Sukses', message: "SN '{$sn}' berhasil dipasangkan ke item Pesanan SO.", type: 'success');
+
+                if (!empty($this->selectedPromos)) {
+                    $this->applyPromosToCart();
+                }
+                $this->syncSinglePaymentAmount();
+                return;
+            }
+        }
+
+        // 2. Cari item non-SO yang sudah ada di keranjang untuk produk ini
         $existingIndex = collect($this->cart)->search(
-            fn($item) => $item['variant_id'] == $variantId && $item['variant_type'] == $variantType
+            fn($item) => empty($item['is_so_item']) && $item['variant_id'] == $variantId && $item['variant_type'] == $variantType
         );
 
         if ($existingIndex !== false) {
@@ -347,10 +380,6 @@ trait WithCart
 
             if ($currentQty < $maxStock || $sn !== null) { // if SN is not null, maxStock isn't strictly checked here, we rely on user scanning individual SNs
                 if ($sn !== null) {
-                    if (in_array($sn, $this->cart[$existingIndex]['serial_numbers'])) {
-                        $this->dispatch('toast', title: 'Peringatan', message: 'SN sudah ada di keranjang.', type: 'warning');
-                        return;
-                    }
                     $this->cart[$existingIndex]['serial_numbers'][] = $sn;
                 }
 
@@ -373,10 +402,10 @@ trait WithCart
                 'serial_numbers' => $sn ? [$sn] : [],
                 'sku' => $productAccurate->item_no,
                 'has_sn' => (bool) $productAccurate->has_sn,
-                // 'is_second' => false,
                 'database_source' => $productAccurate->database_source,
                 'brand_id' => $brandId,
-                // 'condition' => '',
+                'is_so_item' => false,
+                'original_so_item_id' => null,
                 'project_number' => BusinessUnitProject::getProjectNoByBusinessUnit(
                     $productAccurate->business_unit_id ?? (Auth::check() ? Auth::user()->getActiveBusinessUnitId() : 1),
                     $productAccurate->proyek,
@@ -559,7 +588,7 @@ trait WithCart
 
     public function removeFromCart($index)
     {
-        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) {
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['is_so_item'])) {
             $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak dapat menghapus barang pada pesanan SO yang sedang ditarik.', type: 'error');
             return;
         }
@@ -604,7 +633,7 @@ trait WithCart
 
     public function validateCartItemQty($index, $newQty)
     {
-        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) {
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['is_so_item'])) {
             return;
         }
 
@@ -658,7 +687,7 @@ trait WithCart
 
     public function incrementCartItem($index)
     {
-        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) return;
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['is_so_item'])) return;
 
         if (isset($this->cart[$index])) {
             $this->validateCartItemQty($index, $this->cart[$index]['qty'] + 1);
@@ -668,7 +697,7 @@ trait WithCart
 
     public function decrementCartItem($index)
     {
-        if ($this->loadedSoOrderId && !empty($this->cart[$index]['item_id'])) return;
+        if ($this->loadedSoOrderId && !empty($this->cart[$index]['is_so_item'])) return;
 
         if (isset($this->cart[$index]) && $this->cart[$index]['qty'] > 1) {
             $this->validateCartItemQty($index, $this->cart[$index]['qty'] - 1);
@@ -707,7 +736,7 @@ trait WithCart
             $warehouseId = \Illuminate\Support\Facades\Auth::user()->warehouse_id;
             $buId = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnitId();
             $activeBu = \Illuminate\Support\Facades\Auth::user()->getActiveBusinessUnit();
-            $buName = $activeBu ? $activeBu->code : 'second';
+            $buName = $activeBu ? $activeBu->code : 'syihab';
 
             // 1. Cek dulu ke Accurate Service
             $accurateService = app(\App\Services\AccurateService::class);
@@ -753,9 +782,9 @@ trait WithCart
                         return;
                     }
 
-                    // Cek Status
-                    if ($localSnRecordGlobal->status === 'Unavailable') {
-                        $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$value}' sudah dalam status Draft atau Terjual.", type: 'warning');
+                    // Cek Status (Harus Available)
+                    if ($localSnRecordGlobal->status !== 'Available') {
+                        $this->dispatch('toast', title: 'SN Tidak Tersedia', message: "Serial Number '{$value}' tidak tersedia karena berstatus '{$localSnRecordGlobal->status}'.", type: 'warning');
                         $this->new_sns[$index] = '';
                         return;
                     }
@@ -1028,6 +1057,10 @@ trait WithCart
     public function openEditPriceModal($index)
     {
         if (isset($this->cart[$index])) {
+            if ($this->loadedSoOrderId && !empty($this->cart[$index]['is_so_item'])) {
+                $this->dispatch('toast', title: 'Akses Ditolak', message: 'Harga produk dari pesanan SO tidak dapat diubah di POS.', type: 'warning');
+                return;
+            }
             $this->editPriceCartIndex = $index;
             $this->editPriceValue = $this->cart[$index]['price'] ?? 0;
             $this->showEditPriceModal = true;

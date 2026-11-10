@@ -94,7 +94,7 @@ class PromoReport extends Component
 
     public function getOrdersQueryProperty()
     {
-        return Order::with(['items.variant', 'items.promos', 'promos'])
+        return Order::with(['items.variant', 'items.promos', 'promos', 'salesBy'])
             ->where(function ($q) {
                 $q->whereBetween('order_date', [$this->startDate, $this->endDate])
                     ->orWhere(function ($sub) {
@@ -106,11 +106,27 @@ class PromoReport extends Component
                     });
             })
             ->whereHas('promos') // Hanya ambil order yang pakai promo
+            ->whereNotIn('order_status', [
+                'CANCELLED', 'cancelled',
+                'DELETED', 'deleted',
+                'down_payment', 'DOWN_PAYMENT',
+                'paid', 'PAID',
+                'pending', 'PENDING',
+                'DRAFT', 'draft',
+            ])
+            ->whereIn('order_status', ['COMPLETED', 'completed', 'PIUTANG', 'piutang'])
+            ->whereDoesntHave('approvalRequests', function ($q) {
+                $q->whereIn('request_type', ['ORDER_CANCELLATION', 'cancellation'])
+                    ->where('status', 'PENDING');
+            })
             ->when($this->search, function ($query) {
                 $search = trim($this->search);
                 $query->where(function ($q) use ($search) {
                     $q->where('order_number', 'like', '%' . $search . '%')
                         ->orWhere('accurate_invoice_no', 'like', '%' . $search . '%')
+                        ->orWhereHas('salesBy', function ($salesQuery) use ($search) {
+                            $salesQuery->where('name', 'like', '%' . $search . '%');
+                        })
                         ->orWhereHas('items', function ($itemQuery) use ($search) {
                             $itemQuery->where('serial_number', 'like', '%' . $search . '%')
                                 ->orWhereHas('serialNumbers', function ($snQuery) use ($search) {
@@ -145,6 +161,7 @@ class PromoReport extends Component
 
         foreach ($orders as $order) {
             $branch = $order->shipping_address_snapshot['store'] ?? 'Unknown';
+            $salesName = $order->salesBy?->name ?? '-';
             $orderDate = $order->order_date
                 ? $order->order_date->format('Y-m-d')
                 : $order->created_at->format('Y-m-d');
@@ -176,6 +193,7 @@ class PromoReport extends Component
                             'order_no' => $orderNo,
                             'inv_no' => $invNo,
                             'cabang' => $branch,
+                            'sales' => $salesName,
                             'merk' => $merk,
                             'vendor' => $vendorName,
                             'nama_produk' => $name,
@@ -224,6 +242,7 @@ class PromoReport extends Component
                 'NO. ORDER',
                 'NO. INVOICE',
                 'CABANG',
+                'SALES',
                 'MERK PRODUK',
                 'NAMA VENDOR',
                 'NAMA PRODUK',

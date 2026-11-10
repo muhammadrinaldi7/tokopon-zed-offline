@@ -30,6 +30,10 @@ class ManagementSalesReport extends Component
     public $proyekFilter = [];
     public $csvSeparator = ';';
 
+    // Read-only Receipt Modal
+    public $showReceiptModal = false;
+    public $completedOrder = null;
+
     public function mount()
     {
         $this->businessUnitFilter = (string)(Auth::user()?->getActiveBusinessUnitId() ?? '');
@@ -837,5 +841,160 @@ class ManagementSalesReport extends Component
             'availableProjects' => $availableProjects,
             'summary' => $summary,
         ])->layout('layouts.z');
+    }
+
+    public function viewReceipt(int $orderId): void
+    {
+        $buId = $this->businessUnitFilter ?: (Auth::user()?->getActiveBusinessUnitId() ?? '');
+
+        $this->completedOrder = Order::with([
+            'items.variant',
+            'user.profile',
+            'payments.paymentMethod',
+            'payments.paymentMethodRate',
+            'handledBy',
+            'salesBy',
+            'businessUnit'
+        ])
+        ->when($buId && $buId !== 'all', function ($q) use ($buId) {
+            $q->where('business_unit_id', $buId);
+        })
+        ->find($orderId);
+
+        if ($this->completedOrder) {
+            $this->showReceiptModal = true;
+        } else {
+            $this->dispatch('toast', title: 'Data Tidak Ditemukan', message: 'Transaksi tidak ditemukan atau berada di luar otorisasi unit bisnis Anda.', type: 'error');
+        }
+    }
+
+    public function closeReceipt(): void
+    {
+        $this->showReceiptModal = false;
+        $this->completedOrder = null;
+    }
+
+    public function getEscposBase64(): void
+    {
+        if (!$this->completedOrder) {
+            $this->dispatch('toast', title: 'Error', message: 'Tidak ada transaksi aktif untuk dicetak.', type: 'error');
+            return;
+        }
+
+        try {
+            $connector = new \Mike42\Escpos\PrintConnectors\DummyPrintConnector();
+            $printer = new \Mike42\Escpos\Printer($connector);
+            $printer->initialize();
+
+            $this->generateEscposContent($printer);
+            $printer->feed(1);
+            $printer->cut();
+
+            $data = $connector->getData();
+            $base64 = base64_encode($data);
+            $printer->close();
+
+            $orderNumber = $this->completedOrder->order_number ?? 'terbaru';
+            $this->dispatch('print-receipt', base64Data: $base64, orderNumber: $orderNumber);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('ESCPOS Base64 Generation Error: ' . $e->getMessage());
+            $this->dispatch('toast', title: 'Gagal', message: 'Gagal memproses cetakan thermal: ' . $e->getMessage(), type: 'error');
+        }
+    }
+
+    private function generateEscposContent($printer): void
+    {
+        $maxColumns = 40;
+        $separator = str_repeat("-", $maxColumns) . "\n";
+
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
+        $printer->selectPrintMode(
+            \Mike42\Escpos\Printer::MODE_FONT_B |
+                \Mike42\Escpos\Printer::MODE_DOUBLE_WIDTH |
+                \Mike42\Escpos\Printer::MODE_DOUBLE_HEIGHT
+        );
+        $storeTitle = optional($this->completedOrder->businessUnit)->store_title ?? 'Z-POS STORE';
+        $printer->text($storeTitle . "\n");
+        $printer->selectPrintMode(\Mike42\Escpos\Printer::MODE_FONT_B);
+
+        $storeName = $this->completedOrder->shipping_address_snapshot['store'] ?? 'Toko';
+        $printer->text($storeName . "\n");
+        $printer->text($this->completedOrder->created_at->format('d/m/Y H:i') . "\n");
+        $printer->text($separator);
+
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_LEFT);
+        $printer->text($this->formatLine("No. Transaksi", $this->completedOrder->order_number, $maxColumns) . "\n");
+        $printer->text($this->formatLine("Kasir", $this->completedOrder->handledBy->name ?? '-', $maxColumns) . "\n");
+        $printer->text($this->formatLine("Sales", $this->completedOrder->salesBy->name ?? '-', $maxColumns) . "\n");
+        $printer->text($this->formatLine("Customer", $this->completedOrder->user->name ?? '-', $maxColumns) . "\n");
+        $printer->text($this->formatLine("Customer No", $this->completedOrder->user->profile->phone_number ?? '-', $maxColumns) . "\n");
+        $printer->text($separator);
+
+        foreach ($this->completedOrder->items as $item) {
+            $v = $item->variant;
+
+            if ($v instanceof \App\Models\ProductAccurate) {
+                $itemName = $v->name ?? '-';
+                $ram = '';
+                $storage = '';
+                $color = '';
+            } else {
+                $itemName = $v ? $v->product->name ?? ($v->secondProduct->name ?? '-') : '-';
+                $ram = $v ? $v->ram ?? '' : '';
+                $storage = $v ? $v->storage ?? '' : '';
+                $color = $v ? $v->color ?? '' : '';
+            }
+
+            $itemName = preg_replace('/^(?:DS\s*-\s*HP\s*|DS\s*-\s*|HP\s*-\s*|HP\s*)/i', '', trim($itemName));
+
+            if ($v && !($v instanceof \App\Models\ProductAccurate)) {
+                $variantDetails = "";
+                if ($ram != null && $ram !== '') $variantDetails .= $ram . "/";
+                $variantDetails .= $storage;
+                if ($color != null && $color !== '') $variantDetails .= " " . $color;
+                if (trim($variantDetails) !== '') $itemName .= " " . trim($variantDetails);
+            }
+
+            $printer->text($itemName . "\n");
+
+            $qtyAndPrice = $item->qty . "x Rp " . number_format($item->price_at_checkout, 0, ',', '.');
+            $subtotal = "Rp " . number_format($item->subtotal, 0, ',', '.');
+
+            $printer->text($this->formatLine(" " . $qtyAndPrice, $subtotal, $maxColumns) . "\n");
+
+            if ($item->serial_number) {
+                $printer->text(" SN: " . $item->serial_number . "\n");
+            }
+        }
+        $printer->text($separator);
+
+        $showDiscount = optional($this->completedOrder->businessUnit)->receipt_show_discount;
+        if ($showDiscount) {
+            $printer->text($this->formatLine("Subtotal", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), $maxColumns) . "\n");
+            if ($this->completedOrder->discount_amount > 0) {
+                $printer->text($this->formatLine("Diskon", "-Rp " . number_format($this->completedOrder->discount_amount, 0, ',', '.'), $maxColumns) . "\n");
+            }
+            $printer->text($this->formatLine("TOTAL", "Rp " . number_format($this->completedOrder->grand_total, 0, ',', '.'), $maxColumns) . "\n");
+        } else {
+            $printer->text($this->formatLine("Total", "Rp " . number_format($this->completedOrder->total_amount, 0, ',', '.'), $maxColumns) . "\n");
+        }
+        $printer->text($separator);
+        if ($this->completedOrder->accurate_invoice_no) {
+            $printer->text($this->formatLine("No. SI", $this->completedOrder->accurate_invoice_no, $maxColumns) . "\n");
+        }
+        $printer->text($separator);
+        $printer->setJustification(\Mike42\Escpos\Printer::JUSTIFY_CENTER);
+        $printer->text("\nTerima kasih telah berbelanja!\n");
+        $printer->text("Call Center : 0811-5600-6464\n");
+        $printer->text("\n\n\n\n\n");
+    }
+
+    private function formatLine($left, $right, $width = 40): string
+    {
+        $leftWidth = strlen($left);
+        $rightWidth = strlen($right);
+        $spaces = $width - $leftWidth - $rightWidth;
+        if ($spaces < 1) $spaces = 1;
+        return $left . str_repeat(' ', $spaces) . $right;
     }
 }
