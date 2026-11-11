@@ -161,7 +161,7 @@ class SalesOrderReport extends Component
                         ->orWhere('orders.accurate_invoice_no', 'like', '%' . $this->search . '%')
                         ->orWhereHas('user', function ($qc) {
                             $qc->where('name', 'like', '%' . $this->search . '%')
-                                ->orWhere('phone', 'like', '%' . $this->search . '%')
+                                ->orWhere('email', 'like', '%' . $this->search . '%')
                                 ->orWhereHas('profile', function ($qp) {
                                     $qp->where('phone_number', 'like', '%' . $this->search . '%');
                                 });
@@ -174,7 +174,14 @@ class SalesOrderReport extends Component
                         })
                         ->orWhereHas('items', function ($qi) {
                             $qi->where('product_name', 'like', '%' . $this->search . '%')
-                                ->orWhere('serial_number', 'like', '%' . $this->search . '%');
+                                ->orWhere('serial_number', 'like', '%' . $this->search . '%')
+                                ->orWhereHasMorph('variant', [ProductAccurate::class], function ($qv) {
+                                    $qv->where('name', 'like', '%' . $this->search . '%')
+                                       ->orWhere('item_no', 'like', '%' . $this->search . '%');
+                                })
+                                ->orWhereHasMorph('variant', [\App\Models\ProductVariant::class, \App\Models\SecondProductVariant::class], function ($qv) {
+                                    $qv->where('name', 'like', '%' . $this->search . '%');
+                                });
                         });
                 });
             })
