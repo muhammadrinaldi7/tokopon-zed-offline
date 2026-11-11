@@ -69,3 +69,4 @@ class SalesOrderReportExport implements FromArray, WithHeadings, ShouldAutoSize,
         ];
     }
 }
+

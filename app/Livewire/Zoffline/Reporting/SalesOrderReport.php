@@ -102,6 +102,15 @@ class SalesOrderReport extends Component
         $this->resetPage();
     }
 
+    public function resetFilters(): void
+    {
+        $this->reset(['search', 'branchFilter', 'proyekFilter']);
+        $this->businessUnitFilter = (string)(Auth::user()?->getActiveBusinessUnitId() ?? '');
+        $this->dateRange = 'this_month';
+        $this->setDateRange();
+        $this->resetPage();
+    }
+
     private function setDateRange(): void
     {
         $now = now();
