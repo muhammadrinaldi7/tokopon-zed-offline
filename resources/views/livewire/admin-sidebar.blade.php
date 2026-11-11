@@ -194,9 +194,9 @@
         </a>
 
         @can('view-catalog-menu')
-            <div x-data="{ openProducts: {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate.sales-sync-logs', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? 'true' : 'false' }} }">
+            <div x-data="{ openProducts: {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate.sales-sync-logs', 'admin.accurate.document-control', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? 'true' : 'false' }} }">
                 <button @click="openProducts = !openProducts" type="button"
-                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate.sales-sync-logs', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeClass : $inactiveClass }}">
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate.sales-sync-logs', 'admin.accurate.document-control', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeClass : $inactiveClass }}">
                     <div class="flex items-center gap-3">
                         <svg class="w-5 h-5 {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeIconClass : $inactiveIconClass }}"
                             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -279,6 +279,10 @@
                                     {{ $pendingSalesCount > 99 ? '99+' : $pendingSalesCount }}
                                 </span>
                             @endif
+                        </a>
+                        <a href="{{ route('admin.accurate.document-control') }}" wire:navigate
+                            class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.document-control') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                            <span>Kendali Dokumen</span>
                         </a>
                     @endcan
                     @can('manage-accurate-customers')

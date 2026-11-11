@@ -801,14 +801,14 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
+        $params = is_numeric($id) ? ['id' => $id] : ['number' => $id];
+
         $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization'   => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature' => $signature,
             'Content-Type'    => 'application/json',
-        ])->get($host . '/sales-invoice/detail.do', [
-            'id' => $id,
-        ]);
+        ])->get($host . '/sales-invoice/detail.do', $params);
 
         if ($response->successful()) {
             $data = $response->json();
@@ -1204,14 +1204,14 @@ class AccurateService
         $timestamp = now()->toIso8601String();
         $signature = hash_hmac('sha256', $timestamp, $secretKey);
 
+        $params = is_numeric($id) ? ['id' => $id] : ['number' => $id];
+
         $response = Http::timeout(30)->retry(2, 500)->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'X-Api-Timestamp' => $timestamp,
             'X-Api-Signature'  => $signature,
             'Content-Type'  => 'application/json',
-        ])->get($host . '/sales-receipt/detail.do', [
-            'id' => $id
-        ]);
+        ])->get($host . '/sales-receipt/detail.do', $params);
 
         if ($response->successful()) {
             $data = $response->json();
