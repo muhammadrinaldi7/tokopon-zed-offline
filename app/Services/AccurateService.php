@@ -1882,6 +1882,49 @@ class AccurateService
         return null;
     }
 
+    /**
+     * Simpan / Perbarui Dokumen Penerimaan Barang (Receive Item) di Accurate
+     */
+    public function saveReceiveItem(array $payload, string $databaseSource = 'syihab'): array
+    {
+        list($host, $token, $secretKey) = $this->getCredentials($databaseSource);
+
+        if (!$host || !$token) {
+            throw new \Exception("Kredensial API Accurate untuk sumber '{$databaseSource}' belum diatur.");
+        }
+
+        $timestamp = now()->toIso8601String();
+        $signature = hash_hmac('sha256', $timestamp, $secretKey);
+
+        $response = Http::timeout(30)->retry(2, 500)->withHeaders([
+            'Authorization'   => 'Bearer ' . $token,
+            'X-Api-Timestamp' => $timestamp,
+            'X-Api-Signature' => $signature,
+            'Content-Type'    => 'application/json',
+        ])->post($host . '/receive-item/save.do', $payload);
+
+        $data = $response->json();
+        if ($response->successful() && isset($data['s']) && $data['s'] === true) {
+            return [
+                'success' => true,
+                'data' => $data['r'] ?? $data,
+            ];
+        }
+
+        $errMsg = 'Error dari Accurate API.';
+        if (isset($data['d']) && is_array($data['d'])) {
+            $errMsg = implode(', ', $data['d']);
+        } elseif (isset($data['message'])) {
+            $errMsg = $data['message'];
+        }
+
+        return [
+            'success' => false,
+            'error' => $errMsg,
+            'raw' => $data,
+        ];
+    }
+
     public function getPurchaseInvoiceDetail($idOrNumber, $databaseSource = 'syihab')
     {
         $config = $this->getHeaders($databaseSource);

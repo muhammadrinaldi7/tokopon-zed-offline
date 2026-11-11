@@ -34,6 +34,15 @@ class Scan extends Component
     public $editingImei = '';
     public $editErrorMessage = '';
 
+    // Pushed IMEI Correction Modal State
+    public bool $showPushedCorrectionModal = false;
+    public ?int $correctingInspectionId = null;
+    public string $correctingOldImei = '';
+    public string $correctingNewImei = '';
+    public string $correctingReason = '';
+    public bool $syncAccurateOnCorrection = true;
+    public string $correctionErrorMessage = '';
+
     // Warehouse Selection & Confirmation Modal
     public $selectedWarehouseId = null;
     public $showConfirmModal = false;
@@ -463,6 +472,89 @@ class Scan extends Component
         $this->cancelEditImei();
         $this->po->refresh();
         $this->dispatch('toast', title: 'Berhasil', message: "IMEI {$oldImei} berhasil dikoreksi menjadi {$newImei}.", type: 'success');
+    }
+
+    /**
+     * Buka modal koreksi IMEI yang sudah tersinkron ke Accurate (memerlukan izin)
+     */
+    public function openPushedImeiCorrectionModal(int $inspectionId)
+    {
+        if (!Auth::user()->can('correct-inbound-imei')) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki hak akses untuk mengkoreksi IMEI yang sudah disinkronkan ke Accurate.', type: 'error');
+            return;
+        }
+
+        $inspection = DeviceInspection::find($inspectionId);
+        if (!$inspection) {
+            $this->dispatch('toast', title: 'Error', message: 'Data inspeksi unit tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        $this->correctingInspectionId = $inspectionId;
+        $this->correctingOldImei = $inspection->imei;
+        $this->correctingNewImei = '';
+        $this->correctingReason = '';
+        $this->syncAccurateOnCorrection = true;
+        $this->correctionErrorMessage = '';
+        $this->showPushedCorrectionModal = true;
+    }
+
+    public function closePushedImeiCorrectionModal()
+    {
+        $this->showPushedCorrectionModal = false;
+        $this->correctingInspectionId = null;
+        $this->correctingOldImei = '';
+        $this->correctingNewImei = '';
+        $this->correctingReason = '';
+        $this->correctionErrorMessage = '';
+    }
+
+    /**
+     * Simpan koreksi IMEI pasca-push dan selaraskan ke Accurate Online
+     */
+    public function savePushedImeiCorrection()
+    {
+        if (!Auth::user()->can('correct-inbound-imei')) {
+            $this->dispatch('toast', title: 'Akses Ditolak', message: 'Anda tidak memiliki izin untuk tindakan ini.', type: 'error');
+            return;
+        }
+
+        $this->correctionErrorMessage = '';
+
+        if (empty(trim($this->correctingNewImei))) {
+            $this->correctionErrorMessage = 'Nomor IMEI baru tidak boleh kosong.';
+            return;
+        }
+
+        if (empty(trim($this->correctingReason)) || strlen(trim($this->correctingReason)) < 5) {
+            $this->correctionErrorMessage = 'Alasan koreksi wajib diisi (minimal 5 karakter).';
+            return;
+        }
+
+        $inspection = DeviceInspection::find($this->correctingInspectionId);
+        if (!$inspection) {
+            $this->closePushedImeiCorrectionModal();
+            $this->dispatch('toast', title: 'Error', message: 'Data inspeksi tidak ditemukan.', type: 'error');
+            return;
+        }
+
+        try {
+            $service = app(\App\Services\InboundImeiCorrectionService::class);
+            $res = $service->correctPushedImei(
+                $inspection,
+                $this->correctingNewImei,
+                $this->correctingReason,
+                Auth::id(),
+                $this->syncAccurateOnCorrection
+            );
+
+            $this->closePushedImeiCorrectionModal();
+            $this->po->refresh();
+            $this->dispatch('toast', title: 'Koreksi Berhasil', message: $res['message'], type: 'success');
+        } catch (\Throwable $e) {
+            $this->correctionErrorMessage = $e->getMessage();
+            $this->dispatch('toast', title: 'Gagal Koreksi', message: $e->getMessage(), type: 'error');
+        }
     }
 
     public function deleteQc($inspectionId)

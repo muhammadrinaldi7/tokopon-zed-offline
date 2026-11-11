@@ -412,7 +412,7 @@
                                                 <button type="button"
                                                     wire:click="startEditImei({{ $ins->id }})"
                                                     class="px-2 py-1.5 bg-neutral-50 text-neutral-400 hover:bg-blue-500 hover:text-white transition-colors border-l border-neutral-100 group-hover:border-transparent"
-                                                    title="Koreksi IMEI">
+                                                    title="Koreksi IMEI (Lokal)">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
                                                         viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -431,6 +431,21 @@
                                                         </path>
                                                     </svg>
                                                 </button>
+                                            @else
+                                                <span class="px-1.5 py-0.5 mr-1 text-[9px] font-bold bg-blue-100 text-blue-700 rounded flex items-center gap-0.5" title="Tersinkron ke Accurate Online">
+                                                    Accurate✓
+                                                </span>
+                                                @can('correct-inbound-imei')
+                                                    <button type="button"
+                                                        wire:click="openPushedImeiCorrectionModal({{ $ins->id }})"
+                                                        class="px-2 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white transition-colors border-l border-amber-200 group-hover:border-transparent"
+                                                        title="Koreksi IMEI (Tersinkron Accurate)">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                    </button>
+                                                @endcan
                                             @endif
                                         </div>
                                     @endif
@@ -1349,6 +1364,134 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                         </svg>
                         <span>Simpan Penerimaan</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal Koreksi IMEI Pasca-Sync Accurate (Dilindungi Permission) --}}
+    @if ($showPushedCorrectionModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+                <!-- Modal Header -->
+                <div class="px-6 py-4 bg-gradient-to-r from-amber-600 to-amber-700 text-white flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold leading-tight">Koreksi IMEI (Tersinkron Accurate)</h3>
+                            <p class="text-xs text-amber-100 font-medium">Ubah IMEI di database lokal & otomatis update dokumen Accurate</p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="closePushedImeiCorrectionModal"
+                        class="text-white/80 hover:text-white rounded-lg p-1.5 hover:bg-white/10 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 space-y-4">
+                    @if ($correctionErrorMessage)
+                        <div class="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2.5">
+                            <svg class="w-4 h-4 text-rose-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <div class="font-medium leading-relaxed">
+                                {{ $correctionErrorMessage }}
+                            </div>
+                        </div>
+                    @endif
+
+                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+                        <svg class="w-4 h-4 text-amber-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>
+                            Unit ini telah disinkronkan ke Accurate Online. Pastikan nomor IMEI baru sesuai fisik unit dan belum terjual di POS.
+                        </span>
+                    </div>
+
+                    <!-- Old IMEI -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">IMEI Lama (Saat Ini)</label>
+                        <div class="px-3.5 py-2.5 bg-slate-100 rounded-xl border border-slate-200 font-mono text-sm font-bold text-slate-700 flex items-center justify-between">
+                            <span>{{ $correctingOldImei }}</span>
+                            <span class="text-[10px] px-2 py-0.5 bg-slate-200 text-slate-600 rounded font-sans font-semibold">Tercatat di Accurate</span>
+                        </div>
+                    </div>
+
+                    <!-- New IMEI -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                IMEI Baru <span class="text-rose-500">*</span>
+                            </label>
+                            <span class="text-[11px] font-mono text-slate-400">
+                                {{ strlen(trim($correctingNewImei)) }} / 15 Digit
+                            </span>
+                        </div>
+                        <input type="text" wire:model.live.debounce.300ms="correctingNewImei"
+                            class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono text-sm font-bold text-slate-800 placeholder-slate-400 uppercase focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
+                            placeholder="Masukkan 15 Digit IMEI Baru..." autofocus />
+                        @error('correctingNewImei')
+                            <p class="text-xs text-rose-500 font-medium mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Reason -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                            Alasan Koreksi <span class="text-rose-500">*</span>
+                        </label>
+                        <textarea wire:model="correctingReason" rows="2"
+                            class="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all resize-none"
+                            placeholder="Contoh: Salah ketik 1 digit terakhir barcode saat scanning..."></textarea>
+                        @error('correctingReason')
+                            <p class="text-xs text-rose-500 font-medium mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Accurate Sync Checkbox -->
+                    <div class="pt-1">
+                        <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 cursor-pointer transition-colors">
+                            <input type="checkbox" wire:model="syncAccurateOnCorrection"
+                                class="mt-0.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                            <div class="text-xs">
+                                <span class="font-bold text-slate-700">Perbarui langsung di Dokumen Penerimaan Accurate Online</span>
+                                <p class="text-slate-500 text-[11px] mt-0.5 leading-relaxed">
+                                    Sistem akan mencari nomor seri lama pada Penerimaan Barang terkait di Accurate dan mengubahnya ke nomor seri baru secara otomatis.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+                    <button type="button" wire:click="closePushedImeiCorrectionModal"
+                        class="px-5 py-2.5 bg-white border border-slate-300 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-100 transition-colors">
+                        Batal
+                    </button>
+                    <button type="button" wire:click="savePushedImeiCorrection" wire:loading.attr="disabled"
+                        class="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
+                        <svg wire:loading wire:target="savePushedImeiCorrection" class="animate-spin -ml-1 mr-1 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <svg wire:loading.remove wire:target="savePushedImeiCorrection" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span wire:loading.remove wire:target="savePushedImeiCorrection">Simpan & Sinkronkan</span>
+                        <span wire:loading wire:target="savePushedImeiCorrection">Memproses Koreksi...</span>
                     </button>
                 </div>
             </div>
