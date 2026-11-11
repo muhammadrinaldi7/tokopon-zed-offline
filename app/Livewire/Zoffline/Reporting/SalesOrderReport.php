@@ -179,8 +179,17 @@ class SalesOrderReport extends Component
                                     $qv->where('name', 'like', '%' . $this->search . '%')
                                        ->orWhere('item_no', 'like', '%' . $this->search . '%');
                                 })
-                                ->orWhereHasMorph('variant', [\App\Models\ProductVariant::class, \App\Models\SecondProductVariant::class], function ($qv) {
-                                    $qv->where('name', 'like', '%' . $this->search . '%');
+                                ->orWhereHasMorph('variant', [\App\Models\ProductVariant::class], function ($qv) {
+                                    $qv->where('sku', 'like', '%' . $this->search . '%')
+                                       ->orWhereHas('product', function ($qp) {
+                                           $qp->where('name', 'like', '%' . $this->search . '%');
+                                       });
+                                })
+                                ->orWhereHasMorph('variant', [\App\Models\SecondProductVariant::class], function ($qv) {
+                                    $qv->where('sku', 'like', '%' . $this->search . '%')
+                                       ->orWhereHas('secondProduct', function ($qsp) {
+                                           $qsp->where('name', 'like', '%' . $this->search . '%');
+                                       });
                                 });
                         });
                 });
