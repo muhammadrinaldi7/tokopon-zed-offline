@@ -194,11 +194,11 @@
         </a>
 
         @can('view-catalog-menu')
-            <div x-data="{ openProducts: {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate.sales-sync-logs', 'admin.accurate.document-control', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? 'true' : 'false' }} }">
+            <div x-data="{ openProducts: {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.warehouse-stocks', 'admin.check-serial-number') ? 'true' : 'false' }} }">
                 <button @click="openProducts = !openProducts" type="button"
-                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate.sales-sync-logs', 'admin.accurate.document-control', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeClass : $inactiveClass }}">
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeClass : $inactiveClass }}">
                     <div class="flex items-center gap-3">
-                        <svg class="w-5 h-5 {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.accurate-products', 'admin.accurate-sync-sn', 'admin.accurate.sync-issues', 'admin.accurate-customers', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeIconClass : $inactiveIconClass }}"
+                        <svg class="w-5 h-5 {{ request()->routeIs('admin.products', 'admin.second-products', 'admin.products.variants', 'admin.second-products.variants', 'admin.categories', 'admin.brands', 'admin.warehouse-stocks', 'admin.check-serial-number') ? $activeIconClass : $inactiveIconClass }}"
                             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -238,57 +238,6 @@
                         <a href="{{ route('admin.brands') }}" wire:navigate
                             class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.brands') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
                             Master Merek
-                        </a>
-                    @endcan
-                    @can('manage-accurate-products')
-                        <a href="{{ route('admin.accurate-products') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-products') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Produk Accurate
-                        </a>
-                        <a href="{{ route('admin.accurate-sync-sn') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-sync-sn') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Sync Serial Number
-                        </a>
-                        <a href="{{ route('admin.accurate.sync-issues') }}" wire:navigate
-                            class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.sync-issues') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            <span>Sync Issues Tracker</span>
-                            @php
-                                $openIssuesCount = \App\Models\AccurateSyncIssue::where('status', 'open')->count();
-                            @endphp
-                            @if ($openIssuesCount > 0)
-                                <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-tight">
-                                    {{ $openIssuesCount > 99 ? '99+' : $openIssuesCount }}
-                                </span>
-                            @endif
-                        </a>
-                        <a href="{{ route('admin.accurate.sales-sync-logs') }}" wire:navigate
-                            class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.sales-sync-logs') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            <span>Log & Antrean Penjualan</span>
-                            @php
-                                $pendingSalesCount = \App\Models\Order::where('order_status', 'COMPLETED')
-                                    ->where(function ($q) {
-                                        $q->whereNull('accurate_invoice_no')
-                                          ->orWhere('accurate_invoice_no', '')
-                                          ->orWhere('accurate_sync_status', 'PENDING');
-                                    })
-                                    ->where('created_at', '>=', now()->subDays(7))
-                                    ->count();
-                            @endphp
-                            @if ($pendingSalesCount > 0)
-                                <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-tight">
-                                    {{ $pendingSalesCount > 99 ? '99+' : $pendingSalesCount }}
-                                </span>
-                            @endif
-                        </a>
-                        <a href="{{ route('admin.accurate.document-control') }}" wire:navigate
-                            class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.document-control') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            <span>Kendali Dokumen</span>
-                        </a>
-                    @endcan
-                    @can('manage-accurate-customers')
-                        <a href="{{ route('admin.accurate-customers') }}" wire:navigate
-                            class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-customers') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
-                            Pelanggan Accurate
                         </a>
                     @endcan
                     @can('view-warehouse-stocks')
@@ -352,33 +301,100 @@
                     (SO)</span>
             </a>
 
-            <a href="{{ route('admin.accurate.sales-sync-logs') }}" wire:navigate
-                class="flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.sales-sync-logs') ? $activeClass : $inactiveClass }}">
-                <div class="flex items-center gap-3">
-                    <svg class="w-5 h-5 {{ request()->routeIs('admin.accurate.sales-sync-logs') ? $activeIconClass : $inactiveIconClass }}"
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity">Antrean Sync Accurate</span><span
-                        class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
-                        x-show="sidebarCollapsed" style="display:none;" x-cloak>Antrean Sync Accurate</span>
+            <!-- Menu Khusus: Integrasi & Dokumen Accurate -->
+            <div x-data="{ openAccurate: {{ request()->routeIs('admin.accurate.*', 'admin.accurate-products', 'admin.accurate-customers', 'admin.accurate-sync-sn') ? 'true' : 'false' }} }">
+                <button @click="openAccurate = !openAccurate" type="button"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.*', 'admin.accurate-products', 'admin.accurate-customers', 'admin.accurate-sync-sn') ? $activeClass : $inactiveClass }}">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 {{ request()->routeIs('admin.accurate.*', 'admin.accurate-products', 'admin.accurate-customers', 'admin.accurate-sync-sn') ? $activeIconClass : $inactiveIconClass }}"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                        <span x-show="!sidebarCollapsed" class="whitespace-nowrap transition-opacity font-semibold">Integrasi Accurate</span>
+                        <span class="absolute left-full ml-4 px-3 py-1.5 bg-neutral-800 text-white text-xs font-bold rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200 whitespace-nowrap shadow-md z-50"
+                            x-show="sidebarCollapsed" style="display:none;" x-cloak>Integrasi Accurate</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        @php
+                            $pendingSalesCount = \App\Models\Order::where('order_status', 'COMPLETED')
+                                ->where(function ($q) {
+                                    $q->whereNull('accurate_invoice_no')
+                                      ->orWhere('accurate_invoice_no', '')
+                                      ->orWhere('accurate_sync_status', 'PENDING');
+                                })
+                                ->where('created_at', '>=', now()->subDays(7))
+                                ->count();
+                        @endphp
+                        @if ($pendingSalesCount > 0)
+                            <span x-show="!sidebarCollapsed" class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-tight">
+                                {{ $pendingSalesCount > 99 ? '99+' : $pendingSalesCount }}
+                            </span>
+                        @endif
+                        <svg class="w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': openAccurate }"
+                            x-show="!sidebarCollapsed" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                </button>
+
+                <div x-show="openAccurate && !sidebarCollapsed" x-collapse class="pl-4 pr-2 py-2 space-y-1">
+                    <!-- 1. Faktur Penjualan -->
+                    <a href="{{ route('admin.accurate.sales-invoices') }}" wire:navigate
+                        class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.sales-invoices') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        <span>Faktur Penjualan</span>
+                        <span class="text-[9px] px-1.5 py-0.2 rounded bg-blue-50 text-blue-600 font-semibold uppercase">SI</span>
+                    </a>
+
+                    <!-- 2. Faktur Pembelian (SellPhone / Buyback) -->
+                    <a href="{{ route('admin.accurate.purchase-invoices') }}" wire:navigate
+                        class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.purchase-invoices') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        <span>Faktur Pembelian</span>
+                        <span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 font-semibold uppercase">PI</span>
+                    </a>
+
+                    <!-- 3. Pusat Kendali Dokumen -->
+                    <a href="{{ route('admin.accurate.document-control') }}" wire:navigate
+                        class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.document-control') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        <span>Kendali Dokumen</span>
+                        <span class="text-[9px] px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 font-semibold">2-Arah</span>
+                    </a>
+
+                    <!-- 4. Log & Antrean Penjualan -->
+                    <a href="{{ route('admin.accurate.sales-sync-logs') }}" wire:navigate
+                        class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.sales-sync-logs') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        <span>Log & Antrean</span>
+                        @if ($pendingSalesCount > 0)
+                            <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-tight">
+                                {{ $pendingSalesCount > 99 ? '99+' : $pendingSalesCount }}
+                            </span>
+                        @endif
+                    </a>
+
+                    <!-- 5. Sync Issues Tracker -->
+                    <a href="{{ route('admin.accurate.sync-issues') }}" wire:navigate
+                        class="flex items-center justify-between px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate.sync-issues') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        <span>Sync Issues</span>
+                    </a>
+
+                    <!-- 6. Sync Serial Number -->
+                    <a href="{{ route('admin.accurate-sync-sn') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-sync-sn') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Audit SN & HPP
+                    </a>
+
+                    <!-- 7. Produk Accurate -->
+                    <a href="{{ route('admin.accurate-products') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-products') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Katalog Produk Accurate
+                    </a>
+
+                    <!-- 8. Pelanggan Accurate -->
+                    <a href="{{ route('admin.accurate-customers') }}" wire:navigate
+                        class="block px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer {{ request()->routeIs('admin.accurate-customers') ? 'bg-[#1c69d4]/10 text-[#1c69d4] font-bold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800 font-medium' }}">
+                        Pelanggan Accurate
+                    </a>
                 </div>
-                @php
-                    $pendingSalesCount = \App\Models\Order::where('order_status', 'COMPLETED')
-                        ->where(function ($q) {
-                            $q->whereNull('accurate_invoice_no')
-                              ->orWhere('accurate_invoice_no', '')
-                              ->orWhere('accurate_sync_status', 'PENDING');
-                        })
-                        ->where('created_at', '>=', now()->subDays(7))
-                        ->count();
-                @endphp
-                @if ($pendingSalesCount > 0)
-                    <span x-show="!sidebarCollapsed" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-tight">
-                        {{ $pendingSalesCount > 99 ? '99+' : $pendingSalesCount }}
-                    </span>
-                @endif
-            </a>
+            </div>
 
             <a href="{{ route('admin.orders.reset-to-draft') }}" wire:navigate
                 class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors cursor-pointer {{ request()->routeIs('admin.orders.reset-to-draft') ? $activeClass : $inactiveClass }}">

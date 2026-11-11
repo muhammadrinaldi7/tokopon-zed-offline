@@ -171,6 +171,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/accurate-sync-sn', \App\Livewire\Admin\Accurate\SerialNumberSync::class)->name('accurate-sync-sn')->middleware('can:manage-accurate-products');
     Route::get('/accurate/sync-issues', \App\Livewire\Admin\Accurate\SyncIssuesIndex::class)->name('accurate.sync-issues')->middleware('can:manage-accurate-products');
     Route::get('/accurate/sales-sync-logs', \App\Livewire\Admin\Accurate\SalesSyncLogsIndex::class)->name('accurate.sales-sync-logs')->middleware('can:manage-orders');
+    Route::get('/accurate/sales-invoices', \App\Livewire\Admin\Accurate\SalesInvoicesIndex::class)->name('accurate.sales-invoices')->middleware('can:manage-orders');
+    Route::get('/accurate/purchase-invoices', \App\Livewire\Admin\Accurate\PurchaseInvoicesIndex::class)->name('accurate.purchase-invoices')->middleware('can:manage-orders');
     Route::get('/accurate/document-control', \App\Livewire\Admin\Accurate\DocumentControlIndex::class)->name('accurate.document-control')->middleware('can:manage-orders');
     Route::get('/warehouse-stocks', \App\Livewire\Admin\Warehouse\StockManagement::class)->name('warehouse-stocks')->middleware('can:view-warehouse-stocks');
 
