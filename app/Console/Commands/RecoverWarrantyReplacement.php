@@ -7,6 +7,7 @@ use App\Models\Employe;
 use App\Models\Order;
 use App\Models\OrderAccurateDoc;
 use App\Models\OrderItem;
+use App\Models\ProductAccurate;
 use App\Models\ProductSerialNumber;
 use App\Models\ProductVariant;
 use App\Models\SecondProductVariant;
@@ -283,26 +284,65 @@ class RecoverWarrantyReplacement extends Command
 
                 // Resolusi variant jika beda
                 $newVariant = null;
-                if ($replacement_type === 'different' && $replacement_item_no) {
-                    $newVariant = ProductVariant::whereHas('accurateData', function ($q) use ($replacement_item_no) {
-                        $q->where('item_no', $replacement_item_no);
-                    })->first() ?? SecondProductVariant::whereHas('accurateData', function ($q) use ($replacement_item_no) {
-                        $q->where('item_no', $replacement_item_no);
-                    })->first();
+                if ($replacement_type === 'different') {
+                    // 1. Prioritas Utama: Cari di ProductAccurate berdasarkan item_no
+                    if ($replacement_item_no) {
+                        $newVariant = ProductAccurate::where('item_no', $replacement_item_no)
+                            ->when($business_unit_id, function ($q) use ($business_unit_id) {
+                                $q->where('business_unit_id', $business_unit_id);
+                            })->first() ?? ProductAccurate::where('item_no', $replacement_item_no)->first();
+                    }
+
+                    // 2. Prioritas Kedua: Resolusi dari nomor seri pengganti (ProductSerialNumber)
+                    if (!$newVariant && $newSn) {
+                        $psn = ProductSerialNumber::where('serial_number', $newSn)->first();
+                        if ($psn) {
+                            if ($psn->product_accurate_id) {
+                                $newVariant = ProductAccurate::find($psn->product_accurate_id);
+                            } elseif ($psn->item_no) {
+                                $newVariant = ProductAccurate::where('item_no', $psn->item_no)
+                                    ->when($business_unit_id, function ($q) use ($business_unit_id) {
+                                        $q->where('business_unit_id', $business_unit_id);
+                                    })->first() ?? ProductAccurate::where('item_no', $psn->item_no)->first();
+                            }
+                        }
+                    }
+
+                    // 3. Fallback: Cari di katalog lama ProductVariant atau SecondProductVariant
+                    if (!$newVariant && $replacement_item_no) {
+                        $newVariant = ProductVariant::whereHas('accurateData', function ($q) use ($replacement_item_no) {
+                            $q->where('item_no', $replacement_item_no);
+                        })->first() ?? SecondProductVariant::whereHas('accurateData', function ($q) use ($replacement_item_no) {
+                            $q->where('item_no', $replacement_item_no);
+                        })->first();
+                    }
+                } elseif ($replacement_type === 'same' && $newSn) {
+                    $psn = ProductSerialNumber::where('serial_number', $newSn)->first();
+                    if ($psn) {
+                        if ($psn->product_accurate_id) {
+                            $newVariant = ProductAccurate::find($psn->product_accurate_id);
+                        } elseif ($psn->item_no) {
+                            $newVariant = ProductAccurate::where('item_no', $psn->item_no)
+                                ->when($business_unit_id, function ($q) use ($business_unit_id) {
+                                    $q->where('business_unit_id', $business_unit_id);
+                                })->first() ?? ProductAccurate::where('item_no', $psn->item_no)->first();
+                        }
+                    }
                 }
+
+                $targetVariant = $newVariant ?? $warranty->orderItem?->variant;
+                $variantType = $targetVariant ? get_class($targetVariant) : ($warranty->orderItem?->product_variant_type ?? ProductAccurate::class);
+                $variantId = $targetVariant?->id ?? $warranty->orderItem?->product_variant_id;
+                $productName = ($replacement_type === 'different' && $replacement_product_name)
+                    ? $replacement_product_name
+                    : ($targetVariant?->name ?? $warranty->orderItem?->product_name ?? 'Unit Pengganti Garansi');
 
                 $orderItem = OrderItem::create([
                     'order_id' => $wrOrder->id,
                     'product_id' => $warranty->orderItem?->product_id ?? 1,
-                    'product_variant_type' => $replacement_type === 'different' && $replacement_item_no ?
-                        ($newVariant ? get_class($newVariant) : $warranty->orderItem?->product_variant_type) :
-                        $warranty->orderItem?->product_variant_type,
-                    'product_variant_id' => $replacement_type === 'different' && $replacement_item_no ?
-                        ($newVariant?->id ?? $warranty->orderItem?->product_variant_id) :
-                        $warranty->orderItem?->product_variant_id,
-                    'product_name' => $replacement_type === 'different' && $replacement_product_name ?
-                        $replacement_product_name :
-                        ($warranty->orderItem?->product_name ?? 'Unit Pengganti Garansi'),
+                    'product_variant_type' => $variantType,
+                    'product_variant_id' => $variantId,
+                    'product_name' => $productName,
                     'serial_number' => $newSn,
                     'qty' => 1,
                     'price_at_checkout' => $newPrice,

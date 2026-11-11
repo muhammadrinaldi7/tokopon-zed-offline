@@ -489,7 +489,18 @@ class ClaimManagement extends Component
             return null;
         }
 
-        // 1. Cek dari relasi variant orderItem (accurateData atau item_no)
+        // 1. Cek langsung dari ProductSerialNumber berdasarkan serial_number klaim (unit fisik yang diretur)
+        if (!empty($claim->serial_number)) {
+            $snRecord = \App\Models\ProductSerialNumber::where('serial_number', $claim->serial_number)->first();
+            if ($snRecord) {
+                $itemNo = $snRecord->item_no ?: ($snRecord->productAccurate?->item_no ?? null);
+                if ($itemNo) {
+                    return $itemNo;
+                }
+            }
+        }
+
+        // 2. Cek dari relasi variant orderItem (accurateData atau item_no)
         $variant = $claim->warranty?->orderItem?->variant;
         if ($variant) {
             if (!empty($variant->item_no)) {
@@ -500,14 +511,6 @@ class ClaimManagement extends Component
             }
             if (method_exists($variant, 'accurateData') && $variant->accurateData()->first()) {
                 return $variant->accurateData()->first()->item_no;
-            }
-        }
-
-        // 2. Cek langsung dari ProductSerialNumber berdasarkan serial_number klaim
-        if (!empty($claim->serial_number)) {
-            $snItemNo = \App\Models\ProductSerialNumber::where('serial_number', $claim->serial_number)->value('item_no');
-            if ($snItemNo) {
-                return $snItemNo;
             }
         }
 

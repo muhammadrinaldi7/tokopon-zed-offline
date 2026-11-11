@@ -8,6 +8,8 @@ use App\Models\Employe;
 use App\Models\Order;
 use App\Models\OrderAccurateDoc;
 use App\Models\OrderItem;
+use App\Models\ProductAccurate;
+use App\Models\ProductSerialNumber;
 use App\Models\ProductVariant;
 use App\Models\SecondProductVariant;
 use App\Models\WarrantyClaim;
@@ -77,15 +79,51 @@ class WarrantyReplacementHandler implements ApprovalHandlerInterface
         );
 
         $newVariant = null;
-        if ($replacement_type === 'different' && $newItemNo) {
-            $newVariant = ProductVariant::whereHas('accurateData', function ($q) use ($newItemNo) {
-                $q->where('item_no', $newItemNo);
-            })->first();
+        if ($replacement_type === 'different') {
+            // 1. Prioritas Utama: Cari di ProductAccurate berdasarkan item_no
+            if ($newItemNo) {
+                $newVariant = ProductAccurate::where('item_no', $newItemNo)
+                    ->when($business_unit_id, function ($q) use ($business_unit_id) {
+                        $q->where('business_unit_id', $business_unit_id);
+                    })
+                    ->first() ?? ProductAccurate::where('item_no', $newItemNo)->first();
+            }
 
-            if (!$newVariant) {
-                $newVariant = SecondProductVariant::whereHas('accurateData', function ($q) use ($newItemNo) {
+            // 2. Prioritas Kedua: Resolusi dari nomor seri pengganti (ProductSerialNumber)
+            if (!$newVariant && $replacement_imei) {
+                $psn = ProductSerialNumber::where('serial_number', $replacement_imei)->first();
+                if ($psn) {
+                    if ($psn->product_accurate_id) {
+                        $newVariant = ProductAccurate::find($psn->product_accurate_id);
+                    } elseif ($psn->item_no) {
+                        $newVariant = ProductAccurate::where('item_no', $psn->item_no)
+                            ->when($business_unit_id, function ($q) use ($business_unit_id) {
+                                $q->where('business_unit_id', $business_unit_id);
+                            })->first() ?? ProductAccurate::where('item_no', $psn->item_no)->first();
+                    }
+                }
+            }
+
+            // 3. Fallback: Cari di katalog lama ProductVariant atau SecondProductVariant
+            if (!$newVariant && $newItemNo) {
+                $newVariant = ProductVariant::whereHas('accurateData', function ($q) use ($newItemNo) {
+                    $q->where('item_no', $newItemNo);
+                })->first() ?? SecondProductVariant::whereHas('accurateData', function ($q) use ($newItemNo) {
                     $q->where('item_no', $newItemNo);
                 })->first();
+            }
+        } elseif ($replacement_type === 'same' && $replacement_imei) {
+            // Untuk tipe same, jika IMEI pengganti terdaftar dengan ProductAccurate spesifik, gunakan untuk validitas varian
+            $psn = ProductSerialNumber::where('serial_number', $replacement_imei)->first();
+            if ($psn) {
+                if ($psn->product_accurate_id) {
+                    $newVariant = ProductAccurate::find($psn->product_accurate_id);
+                } elseif ($psn->item_no) {
+                    $newVariant = ProductAccurate::where('item_no', $psn->item_no)
+                        ->when($business_unit_id, function ($q) use ($business_unit_id) {
+                            $q->where('business_unit_id', $business_unit_id);
+                        })->first() ?? ProductAccurate::where('item_no', $psn->item_no)->first();
+                }
             }
         }
 
@@ -301,7 +339,14 @@ class WarrantyReplacementHandler implements ApprovalHandlerInterface
                     ]);
                 }
 
-                $repVariant = $newVariant ?? $claim->warranty->orderItem?->variant;
+                $targetVariant = $newVariant ?? $claim->warranty->orderItem?->variant;
+                $variantType = $targetVariant ? get_class($targetVariant) : ($claim->warranty->orderItem?->product_variant_type ?? ProductAccurate::class);
+                $variantId = $targetVariant?->id ?? $claim->warranty->orderItem?->product_variant_id;
+                $productName = ($replacement_type === 'different' && $replacement_product_name)
+                    ? $replacement_product_name
+                    : ($targetVariant?->name ?? $claim->warranty->orderItem?->product_name ?? 'Unit Pengganti Garansi');
+
+                $repVariant = $targetVariant ?? $claim->warranty->orderItem?->variant;
                 $repHpp = \App\Services\OrderHppResolverService::resolve(
                     $repVariant,
                     $replacement_imei ? [$replacement_imei] : [],
@@ -313,15 +358,9 @@ class WarrantyReplacementHandler implements ApprovalHandlerInterface
                 $orderItem = OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $claim->warranty->orderItem?->product_id ?? 1,
-                    'product_variant_type' => $replacement_type === 'different' && $newItemNo ?
-                        ($newVariant ? get_class($newVariant) : $claim->warranty->orderItem?->product_variant_type) :
-                        $claim->warranty->orderItem?->product_variant_type,
-                    'product_variant_id' => $replacement_type === 'different' && $newItemNo ?
-                        ($newVariant?->id ?? $claim->warranty->orderItem?->product_variant_id) :
-                        $claim->warranty->orderItem?->product_variant_id,
-                    'product_name' => $replacement_type === 'different' && $replacement_product_name ?
-                        $replacement_product_name :
-                        ($claim->warranty->orderItem?->product_name ?? 'Unit Pengganti Garansi'),
+                    'product_variant_type' => $variantType,
+                    'product_variant_id' => $variantId,
+                    'product_name' => $productName,
                     'serial_number' => $replacement_imei,
                     'qty' => 1,
                     'price_at_checkout' => $newPrice,

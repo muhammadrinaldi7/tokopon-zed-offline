@@ -2050,11 +2050,21 @@ class AccurateService
             throw new \Exception("Faktur Penjualan (Sales Invoice) Accurate untuk pesanan/unit ini tidak ditemukan di sistem. Pastikan pesanan asli sudah dibuatkan invoice-nya di Accurate.");
         }
 
-        // Ambil Item No (SKU) dari relasi Variant
-        $variant = $claim->warranty->orderItem->variant ?? null;
-        $originalItemNo = 'UNKNOWN-SKU';
+        // Ambil Item No (SKU) dari unit yang diretur
+        // 1. Prioritas Utama: Ambil dari ProductSerialNumber berdasarkan IMEI fisik klaim
+        // Ini memastikan retur ke Accurate sesuai unit fisik yang sedang dikembalikan,
+        // bahkan jika order_item mengalami kesalahan referensi variant pada retur bertingkat sebelumnya.
+        $originalItemNo = null;
+        if (!empty($claim->serial_number)) {
+            $snRecord = \App\Models\ProductSerialNumber::where('serial_number', $claim->serial_number)->first();
+            if ($snRecord) {
+                $originalItemNo = $snRecord->item_no ?: ($snRecord->productAccurate?->item_no ?? null);
+            }
+        }
 
-        if ($variant) {
+        // 2. Prioritas Kedua: Ambil dari relasi Variant orderItem
+        $variant = $claim->warranty->orderItem->variant ?? null;
+        if (!$originalItemNo && $variant) {
             // Jika variant langsung dari ProductAccurate
             if (isset($variant->item_no)) {
                 $originalItemNo = $variant->item_no;
@@ -2069,6 +2079,13 @@ class AccurateService
             }
         }
 
+        // 3. Fallback: jika product_name di orderItem cocok dengan ProductAccurate
+        if (!$originalItemNo && !empty($claim->warranty->orderItem?->product_name)) {
+            $originalItemNo = \App\Models\ProductAccurate::where('name', $claim->warranty->orderItem->product_name)->value('item_no');
+        }
+
+        $originalItemNo = $originalItemNo ?: 'UNKNOWN-SKU';
+
         // Ambil Project No
         $businessUnitId = $claim->warranty->policy?->business_unit_id ?? (Auth::user()->getActiveBusinessUnitId() ?? 1);
         $projectName = '';
@@ -2079,6 +2096,12 @@ class AccurateService
                 $projectName = trim(strtoupper($variant->accurateData->proyek));
             } elseif (method_exists($variant, 'accurateData') && $variant->accurateData()->first()) {
                 $projectName = trim(strtoupper($variant->accurateData()->first()->proyek ?? ''));
+            }
+        }
+        if (empty($projectName) && $originalItemNo && $originalItemNo !== 'UNKNOWN-SKU') {
+            $paProyek = \App\Models\ProductAccurate::where('item_no', $originalItemNo)->value('proyek');
+            if ($paProyek) {
+                $projectName = trim(strtoupper($paProyek));
             }
         }
         $projectNo = \App\Models\BusinessUnitProject::getProjectNoByBusinessUnit($businessUnitId, $projectName, $projectName ?: null);
